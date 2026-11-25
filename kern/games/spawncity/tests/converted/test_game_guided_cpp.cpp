@@ -35,11 +35,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
-namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
-namespace WorldLife { namespace TowTruck { enum class State : u8 { to_job, hook, tow, depot }; } }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -47,6 +42,11 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
+namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
+namespace WorldLife { namespace TowTruck { enum class State : u8 { to_job, hook, tow, depot }; } }
 namespace game { namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } } }
 namespace People { enum class Kind : u8 { citizen, officer, soldier, zombie, enemy }; }
 namespace People { enum class State : u8 { walk, wait, flee, down, gone, officer, fight }; }

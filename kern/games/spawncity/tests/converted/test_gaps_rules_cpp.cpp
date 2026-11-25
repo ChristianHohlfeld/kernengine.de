@@ -363,11 +363,11 @@ namespace gaps { void VisualPose::update(Vec3 position, Quat rotation, Vec3 anch
   e = raw - offset_;
   err = converted::wide::length(e);
   if (err > p.max_pos) offset_ += e * ((err - p.max_pos) / err);
-  q_ = slerp(q_, target, damping(p.rotation_rate, step));
-  f32 ang = quat_angle(q_, target);
-  if (ang > p.soft_rot) q_ = slerp(q_, target, clampf((ang - p.soft_rot) * damping(p.rot_recovery, step) / ang, 0, 1));
-  ang = quat_angle(q_, target);
-  if (ang > p.max_rot) q_ = slerp(q_, target, 1 - p.max_rot / ang);
+  q_ = gaps::slerp(q_, target, damping(p.rotation_rate, step));
+  f32 ang = gaps::quat_angle(q_, target);
+  if (ang > p.soft_rot) q_ = gaps::slerp(q_, target, clampf((ang - p.soft_rot) * damping(p.rot_recovery, step) / ang, 0, 1));
+  ang = gaps::quat_angle(q_, target);
+  if (ang > p.max_rot) q_ = gaps::slerp(q_, target, 1 - p.max_rot / ang);
   out_p = anchor + offset_;
   out_q = q_;
 } }

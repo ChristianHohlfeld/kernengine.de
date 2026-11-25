@@ -54,7 +54,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace controls { struct RateStick {
   f32 full_px_s, tau;
   Vec2 rate;

@@ -168,7 +168,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 namespace mp { constexpr f64 kInterpolationDelayMs = 90; }
 namespace mp { constexpr f64 kMaxExtrapolationMs = 100; }

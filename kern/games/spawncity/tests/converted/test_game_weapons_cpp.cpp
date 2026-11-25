@@ -9,7 +9,8 @@
 #include <vector>
 #include <algorithm>
 #include "../../src/game.h"
-#include "../../src/person_hit.h"
+#include "../../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "../converted.h"
 
 namespace converted_game_weapons_cpp {

@@ -169,13 +169,13 @@ struct MeshData {
   
 
 
-  
-
-
-
-
-
-  
+  void push(Vec3 p, Vec3 n, Vec3 c, Vec2 uv) {
+    positions.insert(positions.end(), {p.x, p.y, p.z});
+    normals.insert(normals.end(), {n.x, n.y, n.z});
+    colors.insert(colors.end(), {c.x, c.y, c.z});
+    uvs.insert(uvs.end(), {uv.x, uv.y});
+  }
+  void push_extra(const f32* values) { extra.insert(extra.end(), values, converted_pointed_end(values, extra_size)); }
   
 
 
@@ -241,6 +241,7 @@ struct FootprintStream : converted::EngineObject {
   void ring(const Vec2* points, const u32& count) const;
   ~FootprintStream();
   FootprintStream();
+  std::vector<double> values() const;
   FootprintStream(const FootprintStream&) = default;
   FootprintStream(FootprintStream&&) = default;
   FootprintStream& operator=(const FootprintStream&) = default;
@@ -268,6 +269,7 @@ struct RoadBuilder : converted::EngineObject {
   RoadBuilder();
   bool begin(const double* stream, const u32& length, const RoadOptions& options, const HeightSampler& heights) const;
   bool step(const double& budget_ms) const;
+  std::vector<GeoChunk>& chunks();
   RoadBuilder(const RoadBuilder&) = default;
   RoadBuilder(RoadBuilder&&) = default;
   RoadBuilder& operator=(const RoadBuilder&) = default;
@@ -498,13 +500,13 @@ struct Terrain {
   
 
   /// The ground's shape is decided (elevation loaded, or flat because there is none).
-  
+  bool settled() const { return settled_; }
   
   /// Collision under p is built.
   bool ready_at(Vec3 p) const;
   /// The ground of the whole rect (x0, y0, x1, y1) is known for good: it lies in an elevation
   /// window's interior, where no later window gives another height (or there is no elevation).
-  
+  bool covers(const Vec4& rect) const;
   /// What must be known (the city sets it every frame): the square of the map tiles round the
   /// player first, then one per far mate (host). The windows are planned to hold them.
   std::vector<Vec4> needs;
@@ -526,10 +528,10 @@ struct Terrain {
   void add_waterway(const std::vector<Vec2>& points, f32 width, f32 speed);
   void add_bridge(Vec2 a, Vec2 b, f32 width);
   bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
-  
-  
+  f32 water_level(f32 x, f32 y) const { return elevation(x, y) + kWaterLevel; }
+  Vec2 flow_at(f32 x, f32 y) const;
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
-  
+  i32 surface_at(f32 x, f32 y) const;
 
   // ---- map areas (world_ground.mjs paintAreas) ----
   /// Parks, woods, pitches, sand tint the ground's vertex colours (node * .45 + colour * .55,
@@ -568,10 +570,10 @@ struct Terrain {
   /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
   
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
-  
+  void take_changes(std::vector<Vec4>& out) { out.insert(out.end(), changes_.begin(), changes_.end()); changes_.clear(); }
 
   /// Builds elevation, collision tiles around focus and anchor, render tiles, water meshes.
-  
+  void update(Vec3 focus, Vec3 anchor, f64 budget_ms);
   /// Where the focus will be in a while (its velocity x 12 s): the elevation window is loaded
   /// around there, so a fast jet never flies past the edge of the known ground.
   Vec3 lead;
@@ -612,24 +614,24 @@ struct Terrain {
   converted::wide::Map<u64, Image> images_;
   std::vector<TileKey> image_requests_;
   Vec2 image_at_{1e9, 1e9};
-  
-  
-  
+  void plan_images(Vec3 focus);
+  bool ground_albedo(f32 x, f32 y, Vec3& lin) const;
+  Vec4 image_bounds(const TileKey& k) const;
 
-  
-  
+  void plan_windows(Vec3 focus);
+  bool plan_dem(Vec2 centre, f32 half, bool side);
   Vec4 interior(const Grid& g) const;
-  
+  bool run_job(f64 deadline);
   
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
   bool water_cell(i32 cx, i32 cy) const;
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);
-  
-  
-  
-  
+  void build_render_tile(i32 level, i32 i, i32 j);
+  void build_collision_tile(i32 i, i32 j);
+  void build_water_chunk(i32 i, i32 j, bool detail);
+  void want_tiles(Vec3 focus, Vec3 anchor);
 
   Renderer* r_ = nullptr;
   World* world_ = nullptr;
@@ -695,7 +697,7 @@ struct CityStream {
   
 
   /// Requests, builds and unloads around `focus` for about `budget_ms`.
-  
+  void update(Vec3 focus, f64 budget_ms);
 
   // ---- host side ----
   /// Tiles to fetch now, as JSON [[z,x,y],...] (each tile once).
@@ -805,7 +807,7 @@ struct CityStream {
   void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
   Vec4 ring_bounds(Vec3 focus, i32 r) const;
-  
+  bool work(Tile& t, f64 deadline);
   void finish_features(Tile& t);
   void upload(Tile& t, GeoChunk& chunk, const Material& material, bool walls);
   void remove(Tile& t);
@@ -849,7 +851,7 @@ struct CityStream {
   converted::wide::Map<u32, Damage> damage_;
   std::vector<u32> damage_log_;
   bool damage_quiet_ = false;  // merge_damage(.., false): not logged
-  
+  void begin_cells(Tile& t);
   bool finish_cells(Tile& t, f64 deadline);
 
   Renderer* r_ = nullptr;
@@ -913,28 +915,817 @@ struct CityStream::Tile {
 };
 namespace cityjobs { constexpr u32 kTile = 1, kBuildings = 2; }
 namespace cityjobs { std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, Span<const u8> mvt); }
+namespace cityjobs { bool read_features(const std::vector<u8>& output, MapFeatures& out); }
+namespace cityjobs { std::vector<u8> buildings_input(const FootprintStream& footprints, const BuildingOptions& options); }
 namespace cityjobs { u32 chunk_count(const std::vector<u8>& output); }
 namespace cityjobs { bool read_chunk(const std::vector<u8>& output, std::size_t& at, GeoChunk& out); }
 namespace jobs { unsigned int submit(const unsigned int& kind, const std::vector<unsigned char>& input); }
 namespace jobs { bool take(const unsigned int& id, std::vector<unsigned char>& out); }
 namespace jobs { void cancel(const unsigned int& id); }
 namespace jobs { void pump(const double& budget_ms); }
-namespace cityjobs { u32 chunk_count(const std::vector<u8>& output) {
-  // (the count the job put first: its four bytes as they lie in memory - little-endian, as on every
-  // target of the engine)
-  if (output.size() < 4) return 0;
-  return u32{converted::at(output, 0)} | u32{converted::at(output, 1)} << 8 | u32{converted::at(output, 2)} << 16 | u32{converted::at(output, 3)} << 24;
+void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat) {
+  lon = p.lon0 + x / (GeoProjector::kEarthRadius * p.cos_lat) / GeoProjector::kRad;
+  lat = p.lat0 + y / GeoProjector::kEarthRadius / GeoProjector::kRad;
+}
+namespace tiles_cpp_local { constexpr f64 kPiD = 3.14159265358979323846; }
+void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
+  const f64 n = ldexp_bp(1.0, t.z);
+  lon = (t.x + fx) / n * 360 - 180;
+  lat = kern::math::atan(sinh_bp(tiles_cpp_local::kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / tiles_cpp_local::kPiD;
+}
+namespace terrain_cpp_local { constexpr f64 kPiD = 3.14159265358979323846; }
+namespace terrain_cpp_local { constexpr f32 kTile = 160; }
+namespace terrain_cpp_local { constexpr f32 kBlock = 640; }
+namespace terrain_cpp_local { constexpr i32 kCells = 32; }
+namespace terrain_cpp_local { constexpr f32 kWaterBlock = 64; }
+namespace terrain_cpp_local { constexpr f32 kWaterChunk = 320; }
+namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
+namespace terrain_cpp_local { u64 key3(i32 level, i32 i, i32 j) {
+  return (converted::shl_bits(static_cast<u64>(level), 56)) | (converted::shl_bits((static_cast<u64>(static_cast<u32>(i)) & 0xFFFFFFF), 28)) | (static_cast<u64>(static_cast<u32>(j)) & 0xFFFFFFF);
 } }
+namespace terrain_cpp_local { i32 sx28(u64 v) { return static_cast<i32>(static_cast<u32>(converted::shl_bits(v, 4))) >> 4; } }
+namespace terrain_cpp_local { void unkey3(u64 k, i32& level, i32& i, i32& j) {
+  level = static_cast<i32>(converted::shr_bits(k, 56));
+  i = sx28((converted::shr_bits(k, 28)) & 0xFFFFFFF);
+  j = sx28(k & 0xFFFFFFF);
+} }
+namespace terrain_cpp_local { f32 rect_distance(f32 x, f32 y, f32 x0, f32 y0, f32 x1, f32 y1) {
+  const f32 dx = std::fmax(0.0, std::fmax(x0 - x, x - x1)), dy = std::fmax(0.0, std::fmax(y0 - y, y - y1));
+  return kern::math::sqrt(dx * dx + dy * dy);
+} }
+namespace terrain_cpp_local { f64 merc_y(f64 lat, i32 z) {
+  const f64 r = lat * kPiD / 180;
+  return (1 - asinh_bp(kern::math::tan(r)) / kPiD) / 2 * ldexp_bp(1.0, z);
+} }
+namespace terrain_cpp_local { f64 merc_x(f64 lon, i32 z) { return (lon + 180) / 360 * ldexp_bp(1.0, z); } }
+namespace terrain_cpp_local { const Vec3 kGround{0.437, 0.485, 0.349}; }
+namespace terrain_cpp_local { const Vec3 kBed{0.30, 0.29, 0.22}; }
+namespace terrain_cpp_local { const Vec3 kSoil = converted::wide::hex_color(0x6b5a44); }
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
+  const f32 bowl = radius * 0.5;
+  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
+  if (r >= radius) return 0;
+  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
+  return rim * kern::math::exp(-(k * k)) * (1 - x);
+}
+namespace terrain_cpp_local { struct DemOrigin { f64 lon0 = 0, lat0 = 0; }; }
+namespace terrain_cpp_local { struct DemWindow { f32 x0 = 0, y0 = 0, step = 10; u32 n = 0; f32 open = 160, blur = 30; u32 count = 0; }; }
+namespace terrain_cpp_local { struct DemTileHead { u32 x = 0, y = 0, w = 0, h = 0; }; }
+void Terrain::disable_dem() {
+  dem_ = false;
+  if (job_ && converted::present(job_)->id) jobs::cancel(converted::present(job_)->id);
+  job_.reset();
+  requests_.clear();
+  settled_ = true;
+}
+namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
+namespace terrain_cpp_local { bool rect_in(const Vec4& in, const Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; } }
+Vec4 Terrain::interior(const Grid& g) const {
+  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
+}
+bool Terrain::covers(const Vec4& rect) const {
+  if (!settled_) return false;
+  if (!dem_) return true;  // flat ground: known everywhere
+  if (!grid_ready_) return false;
+  if (terrain_cpp_local::rect_in(rect, interior(grid_))) return true;
+  for (const Grid& g : side_) if (terrain_cpp_local::rect_in(rect, interior(g))) return true;
+  return false;
+}
+void Terrain::plan_windows(Vec3 focus) {
+  if (!dem_ || job_) return;
+  // what must be known: the city's tiles round the player (needs[0]) and round each far mate
+  // (host); without a city (tests) a square round the focus
+  Vec4 own{focus.x - 1500, focus.y - 1500, focus.x + 1500, focus.y + 1500};
+  if (!needs.empty()) own = converted::at(needs, 0);
+  // one window for everybody when they fit in it, else the player's own and one per far mate
+  Vec4 all = own;
+  for (std::size_t i = 1; i < needs.size(); converted::pre_inc(i)) all = {std::fmin(all.x, converted::at(needs, i).x), std::fmin(all.y, converted::at(needs, i).y), std::fmax(all.z, converted::at(needs, i).z), std::fmax(all.w, converted::at(needs, i).w)};
+  const bool together = needs.size() > 1 && all.z - all.x < kDemMaxSize - 2 * kDemMargin - 800 && all.w - all.y < kDemMaxSize - 2 * kDemMargin - 800;
+  const Vec4 want = together ? all : own;
+  // the player's window: a new one when what is needed comes within the slack of its interior's
+  // edge (a tile's width ahead is loaded with it, so the next row of tiles is known before the
+  // player reaches it)
+  const f32 tile = std::fmax(400.0, (own.z - own.x) / 3), slack = std::fmin(400.0, tile * 0.25);
+  bool planned = false;
+  if (!grid_ready_ || !terrain_cpp_local::rect_in({want.x - slack, want.y - slack, want.z + slack, want.w + slack}, interior(grid_))) {
+    // (a window that already holds what is needed is only replaced by one that holds more of it)
+    Vec2 c{(want.x + want.z) / 2, (want.y + want.w) / 2};
+    // a fast craft: the window leads it, as far as what is needed now stays inside
+    const f32 lead_max = tile;
+    c.x += clampf(lead.x, -lead_max, lead_max);
+    c.y += clampf(lead.y, -lead_max, lead_max);
+    const f32 half_need = std::fmax(want.z - want.x, want.w - want.y) / 2 + lead_max + kDemMargin + tile;
+    const f32 half = clampf(std::ceil(std::fmax(kDemSize / 2, half_need) / 50) * 50, kDemSize / 2, kDemMaxSize / 2);
+    planned = plan_dem(c, half, false);
+    if (planned || job_) return;
+  }
+  if (together || !grid_ready_) { side_.clear(); return; }
+  // far mates: their own windows (the ground there is the real one for the host's traffic too)
+  converted::erase(side_, std::remove_if(side_.begin(), side_.end(), [&](const Grid& g) {
+    for (std::size_t i = 1; i < needs.size(); converted::pre_inc(i)) if (terrain_cpp_local::rect_in(converted::at(needs, i), interior(g))) return false;
+    return true;
+  }), side_.end());
+  for (std::size_t i = 1; i < needs.size(); converted::pre_inc(i)) {
+    const Vec4& n = converted::at(needs, i);
+    if (covers(n) || side_.size() >= 3) continue;
+    const f32 half = clampf(std::ceil((std::fmax(n.z - n.x, n.w - n.y) / 2 + kDemMargin + 400) / 50) * 50, 1500.0, kDemMaxSize / 2);
+    if (plan_dem({(n.x + n.z) / 2, (n.y + n.w) / 2}, half, true) || job_) return;
+  }
+}
+bool Terrain::plan_dem(Vec2 centre, f32 half, bool side) {
+  if (!dem_ || job_) return false;
+  const f64 now = now_ms();
+  if (now < retry_at_) return false;
+  const f32 cx = std::round(centre.x / 50) * 50, cy = std::round(centre.y / 50) * 50;
+  f64 lon_a, lat_a, lon_b, lat_b;
+  unproject(proj_, cx - half, cy + half, lon_a, lat_a);
+  unproject(proj_, cx + half, cy - half, lon_b, lat_b);
+  const i32 ix0 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_x(lon_a, kDemZoom)))), iy0 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_y(lat_a, kDemZoom))));
+  const i32 ix1 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_x(lon_b, kDemZoom)))), iy1 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_y(lat_b, kDemZoom))));
+  if (converted::times((converted::plus(converted::minus(ix1, ix0), 1)), (converted::plus(converted::minus(iy1, iy0), 1))) > 100) return false;
+  bool all = true, failed = false;
+  for (i32 y = iy0; y <= iy1; converted::pre_inc(y))
+    for (i32 x = ix0; x <= ix1; converted::pre_inc(x)) {
+      const TileKey k{kDemZoom, x, y};
+      DemTile& t = dem_tiles_[k.hash()];
+      if (!t.requested) { t.requested = true; t.key = k; requests_.push_back(k); }
+      if (t.failed) failed = true;
+      if (t.h.empty()) all = false;
+    }
+  if (failed) {
+    // Never invent heights: without its first elevation the world stays flat for good (the
+    // buildings already stand on it); a failed reload keeps the last surface and is asked again
+    // (what lies outside the known ground waits for it: covers).
+    ++dem_failures_;
+    if (!grid_ready_) { disable_dem(); return false; }
+    for (auto& [k, t] : dem_tiles_) if (t.failed) { t.failed = false; t.requested = false; }
+    retry_at_ = now + std::min(15000.0, 1500.0 * dem_failures_);
+    return false;
+  }
+  if (!all) return false;
+  dem_failures_ = 0;
+  // Drop tiles far from this window (memory: a z13 tile is 256 KB of floats).
+  if (!side) for (auto it = dem_tiles_.begin(); it != dem_tiles_.end();) {
+    const i32 x = it->second.key.x, y = it->second.key.y;
+    if (x < converted::minus(ix0, 1) || x > converted::plus(ix1, 1) || y < converted::minus(iy0, 1) || y > converted::plus(iy1, 1)) it = dem_tiles_.erase(it);
+    else ++it;
+  }
+  job_ = std::make_unique<Job>();
+  converted::present(job_)->side = side;
+  converted::present(job_)->x0 = ix0; converted::present(job_)->y0 = iy0; converted::present(job_)->x1 = ix1; converted::present(job_)->y1 = iy1;
+  Grid& g = converted::present(job_)->g;
+  g.step = kDemStep;
+  g.n = static_cast<u32>(std::lround(half * 2 / kDemStep)) + 1;
+  g.x0 = cx - half;
+  g.y0 = cy - half;
+  g.cx = cx;
+  g.cy = cy;
+  g.h.resize(converted::count(converted::times(static_cast<std::size_t>(g.n), g.n)));
+  return true;
+}
+bool Terrain::run_job(f64 deadline) { using terrain_cpp_local::DemOrigin; using terrain_cpp_local::DemTileHead; using terrain_cpp_local::DemWindow;
+  (void)deadline;
+  Job& j = *converted::present(job_);
+  Grid& g = j.g;
+  if (!j.id) {
+    // Sampling the window (641k points) and the bare-earth filter run off the frame (a Web
+    // Worker / thread), like MapLibre's raster-dem workers do it for the original.
+    // (kDemJob's input - see dem_grid_job: the numbers of each struct as their bytes, the heights of
+    // each tile as theirs, one after the other)
+    auto mine = [&](const DemTile& t) { return !t.h.empty() && t.key.x >= j.x0 && t.key.x <= j.x1 && t.key.y >= j.y0 && t.key.y <= j.y1; };
+    u32 count = 0;
+    for (const auto& [k, t] : dem_tiles_) count += mine(t) ? 1 : 0;
+    const DemOrigin origin{proj_.lon0, proj_.lat0};
+    const DemWindow win{g.x0, g.y0, g.step, g.n, kOpen, kBlur, count};
+    std::vector<u8> in(converted::count(converted::plus(sizeof origin, std::size_t{28})));
+    std::memcpy(in.data(), &origin, sizeof origin);
+    converted::layout::to_bytes(in.data() + sizeof origin, win, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.x0); converted::layout::single_to(o_ + 4, v_.y0); converted::layout::single_to(o_ + 8, v_.step); converted::layout::raw_to(o_ + 12, v_.n); converted::layout::single_to(o_ + 16, v_.open); converted::layout::single_to(o_ + 20, v_.blur); converted::layout::raw_to(o_ + 24, v_.count); });
+    for (const auto& [k, t] : dem_tiles_) {
+      if (!mine(t)) continue;
+      const DemTileHead head{static_cast<u32>(t.key.x), static_cast<u32>(t.key.y), t.w, t.hgt};
+      const std::size_t at = in.size();
+      in.resize(converted::count(converted::plus(converted::plus(at, sizeof head), converted::times(t.h.size(), 4))));
+      std::memcpy(in.data() + at, &head, sizeof head);
+      converted::layout::copy_bytes<false, true>(in.data() + at + sizeof head, t.h.data(), converted::times(t.h.size(), 4));
+    }
+    j.id = jobs::submit(kDemJob, std::move(in));
+    return false;
+  }
+  std::vector<u8> out;
+  if (!jobs::take(j.id, out)) return false;
+  j.id = 0;
+  if (out.size() != converted::times(converted::times(static_cast<std::size_t>(g.n), g.n), 4)) { job_.reset(); retry_at_ = now_ms() + 1500; return true; }
+  converted::layout::copy_bytes<true, false>(g.h.data(), out.data(), out.size());
+  if (j.side) {
+    // a far mate's window: kept beside the player's; the ground there is built again from it
+    const f32 span = g.step * static_cast<f32>(g.n - 1);
+    const f32 x0 = g.x0, y0 = g.y0;
+    side_.push_back(std::move(g));
+    job_.reset();
+    dirty(x0, y0, x0 + span, y0 + span);
+    return true;
+  }
+  // Commit. The reference (z = 0) is the bare earth at the world origin, fixed for this origin.
+  if (!ref_ready_) {
+    ref_height_ = grid_at(g, 0, 0);
+    ref_ready_ = true;
+  }
+  const bool reload = grid_ready_;
+  const Vec4 known = reload ? interior(grid_) : Vec4{0, 0, 0, 0};
+  grid_ = std::move(g);
+  grid_ready_ = true;
+  settled_ = true;
+  job_.reset();
+  f32 lo = 1e9, hi = -1e9;
+  for (f32 v : grid_.h) { lo = std::fmin(lo, v - ref_height_); hi = std::fmax(hi, v - ref_height_); }
+  stats_.min_height = lo;
+  stats_.max_height = hi;
+  ++stats_.windows;
+  if (reload) {
+    // Inside the old window's interior the ground is the same as before (see plan_windows):
+    // only what lay outside it is built again.
+    const f32 big = 1e9;
+    dirty(-big, -big, known.x, big);
+    dirty(known.z, -big, big, big);
+    dirty(known.x, -big, known.z, known.y);
+    dirty(known.x, known.w, known.z, big);
+  }
+  return true;
+}
+f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
+  if (g.n < 2) return 0;
+  const f32 lim = static_cast<f32>(g.n) - 1.001;
+  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
+  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
+  const f32 tx = fx - i, ty = fy - j;
+  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
+  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
+}
+f32 Terrain::elevation(f32 x, f32 y) const {
+  if (!grid_ready_) return 0.0;
+  // the window that knows the place (its interior); else any that holds it; else the player's,
+  // held at its edge (far ground nobody stands on: the horizon)
+  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
+  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
+  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
+  return grid_at(grid_, x, y) - ref_height_;
+}
+namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
+namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
+i32 Terrain::corridor_set(f32 x, f32 y) const {
+  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
+  for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
+    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
+    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
+  }
+  return -1;
+}
+f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
+  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
+  // junctions blend smoothly, no steps
+  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
+  if (at < 0) return h;
+  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
+  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
+  if (it == set.grid.end()) return h;
+  f32 best = 0, sw = 0, sh = 0;
+  for (const CorridorSeg& s : it->second) {
+    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
+    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
+    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
+    if (w <= 0) continue;
+    const f32 ws = w * w * (3 - 2 * w);
+    sw += ws;
+    sh += ws * (s.ha + (s.hb - s.ha) * t);
+    best = std::fmax(best, w);
+  }
+  if (sw <= 0) return h;
+  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
+}
+f32 Terrain::node_height(f32 x, f32 y) const {
+  const f32 e = elevation(x, y);
+  f32 h = road_level(x, y, e);
+  for (const Crater& c : craters_) {
+    const f32 dx = x - c.c.x, dy = y - c.c.y;
+    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
+    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
+    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
+  }
+  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
+  return h;
+}
+bool Terrain::water_cell(i32 cx, i32 cy) const {
+  // the 256 bits of the cell's 64 m block
+  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
+  if (it == water_.end()) return false;
+  const u32 idx = static_cast<u32>(converted::plus(converted::times((cy & 15), 16), (cx & 15)));
+  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
+}
+bool Terrain::on_bridge(f32 x, f32 y) const {
+  for (const Bridge& b : bridges_) {
+    const f32 dx = x - b.c.x, dy = y - b.c.y;
+    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
+    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
+    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
+  }
+  return false;
+}
+bool Terrain::water_at(f32 x, f32 y) const {
+  if (water_.empty()) return false;
+  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
+  return bridges_.empty() || !on_bridge(x, y);
+}
+Vec2 Terrain::flow_at(f32 x, f32 y) const {
+  const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), cy = static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell)));
+  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
+  if (it == water_.end() || it->second.flow.empty() || !water_at(x, y)) return {};
+  const u32 idx = static_cast<u32>(converted::plus(converted::times((cy & 15), 16), (cx & 15)));
+  return converted::at(it->second.flow, idx) * converted::at(it->second.speed, idx);
+}
+i32 Terrain::surface_at(f32 x, f32 y) const {
+  if (water_at(x, y)) return 1;
+  for (const Crater& c : craters_)
+    if (hypot_bp(x - c.c.x, y - c.c.y) < c.r * 0.8) return 2;
+  return 0;
+}
+Vec4 Terrain::image_bounds(const TileKey& k) const {
+  f64 lon0, lat0, lon1, lat1;
+  tile_lonlat(k, 0, 0, lon0, lat0);
+  tile_lonlat(k, 1, 1, lon1, lat1);
+  f64 ax, ay, bx, by;
+  proj_.project(lon0, lat0, ax, ay);
+  proj_.project(lon1, lat1, bx, by);
+  return {static_cast<f32>(std::fmin(ax, bx)), static_cast<f32>(std::fmin(ay, by)), static_cast<f32>(std::fmax(ax, bx)), static_cast<f32>(std::fmax(ay, by))};
+}
+void Terrain::plan_images(Vec3 focus) {
+  // SIZE_M 1600 around the focus (10 m grid of it), REBUILD_MOVE_M 350
+  if (hypot_bp(focus.x - image_at_.x, focus.y - image_at_.y) < 350) return;
+  image_at_ = {std::round(focus.x / 10) * 10, std::round(focus.y / 10) * 10};
+  constexpr f32 half = 800;
+  f64 lon_a, lat_a, lon_b, lat_b;
+  unproject(proj_, image_at_.x - half, image_at_.y + half, lon_a, lat_a);
+  unproject(proj_, image_at_.x + half, image_at_.y - half, lon_b, lat_b);
+  const i32 ix0 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_x(lon_a, kImageZoom)))), iy0 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_y(lat_a, kImageZoom))));
+  const i32 ix1 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_x(lon_b, kImageZoom)))), iy1 = static_cast<i32>(converted::fits<int>(std::floor(terrain_cpp_local::merc_y(lat_b, kImageZoom))));
+  if (converted::times((converted::plus(converted::minus(ix1, ix0), 1)), (converted::plus(converted::minus(iy1, iy0), 1))) > 25) return;
+  for (i32 y = iy0; y <= iy1; converted::pre_inc(y))
+    for (i32 x = ix0; x <= ix1; converted::pre_inc(x)) {
+      const TileKey k{kImageZoom, x, y};
+      Image& im = images_[k.hash()];
+      if (!im.requested) { im.requested = true; im.key = k; image_requests_.push_back(k); }
+    }
+  // the cache keeps what is near (tileCache: 64 tiles)
+  for (auto it = images_.begin(); it != images_.end();) {
+    const TileKey& k = it->second.key;
+    if (k.x < converted::minus(ix0, 2) || k.x > converted::plus(ix1, 2) || k.y < converted::minus(iy0, 2) || k.y > converted::plus(iy1, 2)) { if (!it->second.albedo.empty()) repaint(image_bounds(k)); it = images_.erase(it); }
+    else ++it;
+  }
+}
+bool Terrain::ground_albedo(f32 x, f32 y, Vec3& lin) const {
+  if (images_.empty()) return false;
+  f64 lon, lat;
+  unproject(proj_, x, y, lon, lat);
+  const f64 fx = terrain_cpp_local::merc_x(lon, kImageZoom), fy = terrain_cpp_local::merc_y(lat, kImageZoom);
+  const i32 tx = static_cast<i32>(converted::fits<int>(std::floor(fx))), ty = static_cast<i32>(converted::fits<int>(std::floor(fy)));
+  auto it = images_.find(TileKey{kImageZoom, tx, ty}.hash());
+  if (it == images_.end() || it->second.albedo.empty()) return false;
+  const i32 px = std::clamp(static_cast<i32>(converted::fits<int>((fx - tx) * kImagePixels)), 0, converted::minus(kImagePixels, 1)), py = std::clamp(static_cast<i32>(converted::fits<int>((fy - ty) * kImagePixels)), 0, converted::minus(kImagePixels, 1));
+  const std::vector<f32>& texels = it->second.albedo;
+  const std::size_t at = converted::times((converted::plus(converted::times(static_cast<std::size_t>(py), kImagePixels), px)), 3);
+  lin = {converted::at(texels, at), converted::at(texels, converted::plus(at, 1)), converted::at(texels, converted::plus(at, 2))};
+  return true;
+}
+namespace terrain_cpp_local { f32 linear_to_srgb(f32 v) { return v <= 0.0031308 ? v * 12.92 : 1.055 * kern::math::pow(v, 1 / 2.4) - 0.055; } }
+namespace terrain_cpp_local { Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_to_srgb(c.z)}; } }
+void Terrain::repaint(const Vec4& b) {
+  // only the render tiles: the shape (collision, roads on it) does not change
+  for (auto& [k, t] : render_) {
+    (void)t;
+    i32 level, i, j;
+    terrain_cpp_local::unkey3(k, level, i, j);
+    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
+    if (i * size <= b.z && (converted::plus(i, 1)) * size >= b.x && j * size <= b.w && (converted::plus(j, 1)) * size >= b.y) dirty_render_.insert(k);
+  }
+}
+void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify) {
+  const f32 m = kStep * 2;
+  x0 -= m; y0 -= m; x1 += m; y1 += m;
+  for (auto& [k, t] : render_) {
+    i32 level, i, j;
+    terrain_cpp_local::unkey3(k, level, i, j);
+    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
+    if (i * size <= x1 && (converted::plus(i, 1)) * size >= x0 && j * size <= y1 && (converted::plus(j, 1)) * size >= y0) dirty_render_.insert(k);
+  }
+  for (auto& [k, c] : collision_) {
+    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
+    if (i * terrain_cpp_local::kTile - kStep <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kTile + kStep >= x0 && j * terrain_cpp_local::kTile - kStep <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kTile + kStep >= y0) dirty_collision_.insert(k);
+  }
+  for (auto& [k, m2] : water_meshes_) {
+    (void)m2;
+    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
+    if (i * terrain_cpp_local::kWaterChunk <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kWaterChunk >= x0 && j * terrain_cpp_local::kWaterChunk <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kWaterChunk >= y0) dirty_water_.insert(k);
+  }
+  if (notify) changes_.push_back({x0, y0, x1, y1});
+  replan_ = true;
+}
+namespace terrain_cpp_local { struct WantedTile { f32 d; u64 k; }; }
+void Terrain::want_tiles(Vec3 focus, Vec3 anchor) { using terrain_cpp_local::WantedTile;
+  std::vector<WantedTile> render, coll, water;
+  // Render: 640 m blocks out to 3.2 km; blocks near the focus split into 160 m tiles (5 m nodes
+  // near, 20 m further out).
+  const i32 bi = static_cast<i32>(converted::fits<int>(std::floor(focus.x / terrain_cpp_local::kBlock))), bj = static_cast<i32>(converted::fits<int>(std::floor(focus.y / terrain_cpp_local::kBlock)));
+  for (i32 j = converted::minus(bj, 5); j <= converted::plus(bj, 5); converted::pre_inc(j))
+    for (i32 i = converted::minus(bi, 5); i <= converted::plus(bi, 5); converted::pre_inc(i)) {
+      const f32 d = terrain_cpp_local::rect_distance(focus.x, focus.y, i * terrain_cpp_local::kBlock, j * terrain_cpp_local::kBlock, (converted::plus(i, 1)) * terrain_cpp_local::kBlock, (converted::plus(j, 1)) * terrain_cpp_local::kBlock);
+      if (d > 3200) continue;
+      if (d < 200) {
+        for (i32 b = 0; b < 4; converted::pre_inc(b))
+          for (i32 a = 0; a < 4; converted::pre_inc(a)) {
+            const i32 ti = converted::plus(converted::times(i, 4), a), tj = converted::plus(converted::times(j, 4), b);
+            const f32 td = terrain_cpp_local::rect_distance(focus.x, focus.y, ti * terrain_cpp_local::kTile, tj * terrain_cpp_local::kTile, (converted::plus(ti, 1)) * terrain_cpp_local::kTile, (converted::plus(tj, 1)) * terrain_cpp_local::kTile);
+            render.push_back({td, terrain_cpp_local::key3(td < 260 ? 0 : 1, ti, tj)});
+          }
+      } else {
+        render.push_back({d, terrain_cpp_local::key3(2, i, j)});
+      }
+    }
+  // Collision: 160 m tiles within 420 m of the focus (traffic lives there) and 200 m of the
+  // anchor (the pilot on foot while his drone is away).
+  std::vector<std::pair<Vec3, f32>> around{{focus, 420.0}, {anchor, 200.0}};
+  for (const Vec3& m : extra) around.push_back({m, 300.0});  // the mates (MP host): his traffic there
+  for (const auto& [p, reach] : around) {
+    const i32 ci = static_cast<i32>(converted::fits<int>(std::floor(p.x / terrain_cpp_local::kTile))), cj = static_cast<i32>(converted::fits<int>(std::floor(p.y / terrain_cpp_local::kTile)));
+    const i32 rr = static_cast<i32>(converted::fits<int>(std::ceil(reach / terrain_cpp_local::kTile)));
+    for (i32 j = converted::minus(cj, rr); j <= converted::plus(cj, rr); converted::pre_inc(j))
+      for (i32 i = converted::minus(ci, rr); i <= converted::plus(ci, rr); converted::pre_inc(i)) {
+        const f32 d = terrain_cpp_local::rect_distance(p.x, p.y, i * terrain_cpp_local::kTile, j * terrain_cpp_local::kTile, (converted::plus(i, 1)) * terrain_cpp_local::kTile, (converted::plus(j, 1)) * terrain_cpp_local::kTile);
+        if (d <= reach) coll.push_back({d, terrain_cpp_local::key2(i, j)});
+      }
+  }
+  // Water: 320 m chunks holding water within 2.4 km.
+  converted::wide::Set<u64> chunks;
+  for (const auto& [k, b] : water_) {
+    (void)b;
+    const i32 bx = static_cast<i32>(converted::shr_bits(k, 32)), by = static_cast<i32>(k & 0xffffffffu);
+    const i32 ci = static_cast<i32>(converted::fits<int>(std::floor(bx * terrain_cpp_local::kWaterBlock / terrain_cpp_local::kWaterChunk))), cj = static_cast<i32>(converted::fits<int>(std::floor(by * terrain_cpp_local::kWaterBlock / terrain_cpp_local::kWaterChunk)));
+    chunks.insert(terrain_cpp_local::key2(ci, cj));
+  }
+  for (u64 k : chunks) {
+    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
+    const f32 d = terrain_cpp_local::rect_distance(focus.x, focus.y, i * terrain_cpp_local::kWaterChunk, j * terrain_cpp_local::kWaterChunk, (converted::plus(i, 1)) * terrain_cpp_local::kWaterChunk, (converted::plus(j, 1)) * terrain_cpp_local::kWaterChunk);
+    if (d < 2400) water.push_back({d, k});
+  }
+  auto finish = [](std::vector<WantedTile>& v, std::vector<u64>& out) {
+    std::stable_sort(v.begin(), v.end(), [](const WantedTile& a, const WantedTile& b) { return a.d < b.d; });
+    out.clear();
+    for (const WantedTile& w : v)
+      if (std::find(out.begin(), out.end(), w.k) == out.end()) out.push_back(w.k);
+  };
+  finish(render, want_render_);
+  finish(coll, want_collision_);
+  finish(water, want_water_);
+  planned_focus_ = focus;
+  planned_anchor_ = anchor;
+  planned_extra_ = extra;
+  replan_ = false;
+}
+void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
+  const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
+  const i32 cells = level == 0 ? terrain_cpp_local::kCells : level == 1 ? 8 : 16;
+  const f32 step = size / static_cast<f32>(cells), x0 = ti * size, y0 = tj * size;
+  const i32 n = converted::plus(cells, 1);
+  MeshData m;
+  std::vector<f32> h(converted::count(converted::times(static_cast<std::size_t>(converted::plus(n, 2)), (converted::plus(n, 2)))));
+  // Coarse tiles sample the surface they stand for at their own nodes; a border ring for normals.
+  for (i32 j = -1; j <= n; converted::pre_inc(j))
+    for (i32 i = -1; i <= n; converted::pre_inc(i)) converted::at(h, converted::plus(converted::times(static_cast<std::size_t>(converted::plus(j, 1)), (converted::plus(n, 2))), (converted::plus(i, 1)))) = node_height(x0 + i * step, y0 + j * step);
+  auto H = [&](i32 i, i32 j) { return converted::at(h, converted::plus(converted::times(static_cast<std::size_t>(converted::plus(j, 1)), (converted::plus(n, 2))), (converted::plus(i, 1)))); };
+  // world_ground.mjs paintAreas: every node inside a map area (outer ring, not in a hole) takes
+  // node * .45 + area * .55 (linear), area after area.
+  // world_ground.mjs: the aerial albedo per node (the fallback grass/soil where none loaded), then
+  // the map areas tint it
+  std::vector<Vec3> tint(converted::count(converted::times(static_cast<std::size_t>(n), n)));
+  for (i32 j = 0; j < n; converted::pre_inc(j))
+    for (i32 i = 0; i < n; converted::pre_inc(i)) {
+      Vec3& c = converted::at(tint, converted::plus(converted::times(static_cast<std::size_t>(j), n), i));
+      if (!ground_albedo(x0 + i * step, y0 + j * step, c)) c = {0.16, 0.2, 0.1};
+    }
+  {
+    std::vector<f32> xs;
+    const f32 x1 = x0 + size, y1 = y0 + size;
+    for (const Tint& a : tints_) {
+      if (a.box.x > x1 || a.box.z < x0 || a.box.y > y1 || a.box.w < y0) continue;
+      for (i32 j = 0; j < n; converted::pre_inc(j)) {
+        const f32 y = y0 + j * step;
+        if (y < a.box.y || y > a.box.w) continue;
+        xs.clear();
+        for (const auto& ring : a.rings)
+          for (std::size_t q = 0, r = converted::minus(ring.size(), 1); q < ring.size(); r = converted::post_inc(q)) {
+            const Vec2 p = converted::at(ring, q), o = converted::at(ring, r);
+            if ((p.y > y) != (o.y > y)) xs.push_back(p.x + (y - p.y) * (o.x - p.x) / (o.y - p.y));
+          }
+        std::stable_sort(xs.begin(), xs.end());
+        for (std::size_t q = 0; converted::plus(q, 1) < xs.size(); converted::plus_to(q, 2)) {
+          const i32 i0 = std::max(0, static_cast<i32>(converted::fits<int>(std::ceil((converted::at(xs, q) - x0) / step))));
+          const i32 i1 = std::min(converted::minus(n, 1), static_cast<i32>(converted::fits<int>(std::floor((converted::at(xs, converted::plus(q, 1)) - x0) / step))));
+          for (i32 i = i0; i <= i1; converted::pre_inc(i)) {
+            Vec3& c = converted::at(tint, converted::plus(converted::times(static_cast<std::size_t>(j), n), i));
+            c = c * 0.45 + a.lin * 0.55;
+          }
+        }
+      }
+    }
+  }
+  for (i32 j = 0; j < n; converted::pre_inc(j))
+    for (i32 i = 0; i < n; converted::pre_inc(i)) {
+      const f32 x = x0 + i * step, y = y0 + j * step, z = H(i, j);
+      const f32 dx = H(converted::plus(i, 1), j) - H(converted::minus(i, 1), j), dy = H(i, converted::plus(j, 1)) - H(i, converted::minus(j, 1));
+      const Vec3 nn = converted::wide::normalize(Vec3{-dx, -dy, 2 * step});
+      Vec3 c = terrain_cpp_local::to_srgb(converted::at(tint, converted::plus(converted::times(static_cast<std::size_t>(j), n), i)));
+      if (z < elevation(x, y) - 0.6) c = water_at(x, y) ? terrain_cpp_local::kBed : terrain_cpp_local::kSoil;
+      else if (surface_at(x, y) == 2) c = terrain_cpp_local::kSoil;
+      m.push({x, y, z}, nn, c, {x * 0.1, y * 0.1});
+    }
+  for (i32 j = 0; j < cells; converted::pre_inc(j))
+    for (i32 i = 0; i < cells; converted::pre_inc(i)) {
+      const u32 a = static_cast<u32>(converted::plus(converted::times(j, n), i)), b = a + 1, c = a + static_cast<u32>(n), d = c + 1;
+      m.indices.insert(m.indices.end(), {a, b, d, a, d, c});  // SW-NE diagonal, counter-clockwise from above
+    }
+  // Skirts: a curtain down from every edge hides the cracks between tiles of different detail.
+  const f32 drop = level == 0 ? 2.0 : level == 1 ? 4.0 : 10.0;
+  auto skirt = [&](i32 i0, i32 j0, i32 di, i32 dj, bool flip) {
+    for (i32 k = 0; k < cells; converted::pre_inc(k)) {
+      const i32 ia = converted::plus(i0, converted::times(di, k)), ja = converted::plus(j0, converted::times(dj, k)), ib = converted::plus(ia, di), jb = converted::plus(ja, dj);
+      const u32 top_a = static_cast<u32>(converted::plus(converted::times(ja, n), ia)), top_b = static_cast<u32>(converted::plus(converted::times(jb, n), ib));
+      const u32 base = m.vertex_count();
+      for (u32 v : {top_a, top_b}) {
+        const Vec3 p{converted::at(m.positions, v * 3), converted::at(m.positions, v * 3 + 1), converted::at(m.positions, v * 3 + 2) - drop};
+        m.push(p, {0, 0, 1}, terrain_cpp_local::kGround, {p.x * 0.1, p.y * 0.1});
+      }
+      if (flip) m.indices.insert(m.indices.end(), {top_a, base, top_b, top_b, base, base + 1});
+      else m.indices.insert(m.indices.end(), {top_a, top_b, base, top_b, base + 1, base});
+    }
+  };
+  skirt(0, 0, 1, 0, false);
+  skirt(0, converted::minus(n, 1), 1, 0, true);
+  skirt(0, 0, 0, 1, true);
+  skirt(converted::minus(n, 1), 0, 0, 1, false);
+  MeshLook look;
+  look.material.roughness = 1;
+  look.material.cast_shadow = false;
+  look.material.double_sided = true;
+  const u32 id = r_->allocate_id();
+  if (!upsert(*r_, id, m, look)) { r_->release_id(id); return; }
+  RenderTile& t = render_[terrain_cpp_local::key3(level, ti, tj)];
+  if (t.mesh) r_->remove(t.mesh);
+  t.mesh = id;
+}
+void Terrain::build_collision_tile(i32 ti, i32 tj) {
+  // terrain_tiles.mjs: 32 cells of 5 m plus one cell into each neighbour with the outer ring sunk,
+  // so the seam is an interior edge of both tiles (no ghost contacts on fast wheels).
+  const i32 N = converted::plus(terrain_cpp_local::kCells, 3);
+  const f32 x0 = ti * terrain_cpp_local::kTile - kStep, y0 = tj * terrain_cpp_local::kTile - kStep;
+  std::vector<Vec3> pts(converted::count(converted::times(static_cast<std::size_t>(N), N)));
+  for (i32 r = 0; r < N; converted::pre_inc(r))
+    for (i32 c = 0; c < N; converted::pre_inc(c)) {
+      const f32 x = x0 + c * kStep, y = y0 + r * kStep;
+      f32 z = node_height(x, y);
+      if (r == 0 || c == 0 || r == converted::minus(N, 1) || c == converted::minus(N, 1)) z -= kSkirtDrop;
+      converted::at(pts, converted::plus(converted::times(static_cast<std::size_t>(r), N), c)) = {x, y, z};
+    }
+  std::vector<u32> idx;
+  idx.reserve(converted::count(converted::times(converted::times(static_cast<std::size_t>(converted::minus(N, 1)), (converted::minus(N, 1))), 6)));
+  for (i32 r = 0; converted::plus(r, 1) < N; converted::pre_inc(r))
+    for (i32 c = 0; converted::plus(c, 1) < N; converted::pre_inc(c)) {
+      const u32 a = static_cast<u32>(converted::plus(converted::times(r, N), c)), b = a + 1, cc = a + static_cast<u32>(N), d = cc + 1;
+      idx.insert(idx.end(), {a, b, d, a, d, cc});
+    }
+  physics::BodySettings bs;
+  bs.type = physics::BodyType::fixed;
+  const physics::Body body = world_->create_body(bs);
+  physics::ShapeSettings ss;
+  ss.kind = physics::ShapeKind::mesh;
+  ss.points = Span<const Vec3>(pts.data(), pts.size());
+  ss.indices = Span<const u32>(idx.data(), idx.size());
+  ss.material.friction = 0.8;  // the level's ground friction so far
+  ss.material.category_bits = kCatWorld;
+  world_->create_shape(body, ss);
+  // New field first, then the old one goes (terrain_tiles.mjs writeTile order).
+  CollisionTile& t = collision_[terrain_cpp_local::key2(ti, tj)];
+  if (t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
+  t.body = body;
+}
+void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
+  // world_water.mjs: within RADIUS_M 1000 one quad per 4 m water cell, the corners carrying the
+  // shore distance (two-pass chamfer, cells) and the flow - what the water shader reads (aWater:
+  // shore + 1, flow x, flow y; water_look.h). Farther out the cells merge into rows (deep water,
+  // still: the same look without the per-cell mesh).
+  MeshData m;
+  m.extra_size = 3;
+  const Vec3 color = converted::wide::hex_color(0x176b98);  // world_water.mjs material colour
+  const i32 per = static_cast<i32>(converted::fits<int>(terrain_cpp_local::kWaterChunk / kWaterCell));  // 80 cells
+  const i32 cx0 = converted::times(ci, per), cy0 = converted::times(cj, per);
+  auto wet = [&](i32 cx, i32 cy) {
+    if (!water_cell(cx, cy)) return false;
+    return bridges_.empty() || !on_bridge((cx + 0.5) * kWaterCell, (cy + 0.5) * kWaterCell);
+  };
+  if (!detail) {
+    const f32 deep[3] = {13, 0, 0};
+    auto quad = [&](f32 xa, f32 ya, f32 xb, f32 yb) {
+      const u32 base = m.vertex_count();
+      for (const Vec2 p : {Vec2{xa, ya}, Vec2{xb, ya}, Vec2{xb, yb}, Vec2{xa, yb}}) {
+        m.push({p.x, p.y, water_level(p.x, p.y) + kWaterRenderZ}, {0, 0, 1}, color, {p.x * 0.05, p.y * 0.05});
+        m.push_extra(deep);
+      }
+      m.indices.insert(m.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    };
+    for (i32 y = cy0; y < converted::plus(cy0, per); converted::pre_inc(y)) {
+      i32 x = cx0;
+      while (x < converted::plus(cx0, per)) {
+        if (!wet(x, y)) { converted::pre_inc(x); continue; }
+        i32 e = x;
+        while (e < converted::plus(cx0, per) && wet(e, y)) converted::pre_inc(e);
+        quad(x * kWaterCell, y * kWaterCell, e * kWaterCell, (converted::plus(y, 1)) * kWaterCell);
+        x = e;
+      }
+    }
+  } else {
+    // the cells of the chunk and a 3-cell margin (the shore distance across the chunk's edge)
+    constexpr i32 B = 3;
+    const i32 W = converted::plus(per, converted::times(2, B));
+    std::vector<u8> water(converted::count(converted::times(static_cast<std::size_t>(W), W)));
+    std::vector<f32> dist(converted::count(water.size()));
+    bool any = false;
+    for (i32 j = 0; j < W; converted::pre_inc(j))
+      for (i32 i = 0; i < W; converted::pre_inc(i)) {
+        const bool w = wet(converted::plus(converted::minus(cx0, B), i), converted::plus(converted::minus(cy0, B), j));
+        converted::at(water, converted::plus(converted::times(static_cast<std::size_t>(j), W), i)) = w;
+        converted::at(dist, converted::plus(converted::times(static_cast<std::size_t>(j), W), i)) = w ? 1e6 : 0;
+        any = any || (w && i >= B && j >= B && i < converted::minus(W, B) && j < converted::minus(W, B));
+      }
+    if (any) {
+      auto at = [&](i32 i, i32 j) -> f32& { return converted::at(dist, converted::plus(converted::times(static_cast<std::size_t>(j), W), i)); };
+      for (i32 j = 0; j < W; converted::pre_inc(j))
+        for (i32 i = 0; i < W; converted::pre_inc(i)) {
+          if (!converted::at(water, converted::plus(converted::times(static_cast<std::size_t>(j), W), i))) continue;
+          f32 d = at(i, j);
+          if (i > 0) d = std::fmin(d, at(converted::minus(i, 1), j) + 1);
+          if (j > 0) d = std::fmin(d, at(i, converted::minus(j, 1)) + 1);
+          if (i > 0 && j > 0) d = std::fmin(d, at(converted::minus(i, 1), converted::minus(j, 1)) + 1.414);
+          if (i < converted::minus(W, 1) && j > 0) d = std::fmin(d, at(converted::plus(i, 1), converted::minus(j, 1)) + 1.414);
+          at(i, j) = d;
+        }
+      for (i32 j = converted::minus(W, 1); j >= 0; converted::pre_dec(j))
+        for (i32 i = converted::minus(W, 1); i >= 0; converted::pre_dec(i)) {
+          if (!converted::at(water, converted::plus(converted::times(static_cast<std::size_t>(j), W), i))) continue;
+          f32 d = at(i, j);
+          if (i < converted::minus(W, 1)) d = std::fmin(d, at(converted::plus(i, 1), j) + 1);
+          if (j < converted::minus(W, 1)) d = std::fmin(d, at(i, converted::plus(j, 1)) + 1);
+          if (i < converted::minus(W, 1) && j < converted::minus(W, 1)) d = std::fmin(d, at(converted::plus(i, 1), converted::plus(j, 1)) + 1.414);
+          if (i > 0 && j < converted::minus(W, 1)) d = std::fmin(d, at(converted::minus(i, 1), converted::plus(j, 1)) + 1.414);
+          at(i, j) = d;
+        }
+      // corners shared by their cells (vtx in world_water.mjs)
+      std::vector<i32> corner(converted::count(converted::times(static_cast<std::size_t>(converted::plus(per, 1)), (converted::plus(per, 1)))), -1);
+      auto vtx = [&](i32 a, i32 b) -> u32 {
+        i32& v = converted::at(corner, converted::plus(converted::times(static_cast<std::size_t>(b), (converted::plus(per, 1))), a));
+        if (v >= 0) return static_cast<u32>(v);
+        f32 d = 0;
+        Vec2 fl{};
+        i32 n = 0;
+        for (const auto [di, dj] : {std::pair<i32, i32>{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}) {
+          const i32 i = converted::plus(converted::plus(a, di), B), j = converted::plus(converted::plus(b, dj), B);
+          if (!converted::at(water, converted::plus(converted::times(static_cast<std::size_t>(j), W), i))) continue;
+          d += at(i, j);
+          const f32 px = (converted::plus(converted::plus(cx0, a), di) + 0.5) * kWaterCell, py = (converted::plus(converted::plus(cy0, b), dj) + 0.5) * kWaterCell;
+          fl = fl + flow_at(px, py);
+          converted::pre_inc(n);
+        }
+        const f32 x = (converted::plus(cx0, a)) * kWaterCell, y = (converted::plus(cy0, b)) * kWaterCell;
+        const f32 shore = n == 4 ? std::fmin(d / 4 * kWaterCell, 40.0) : 0;
+        const f32 rec[3] = {shore + 1, n ? fl.x / static_cast<f32>(n) : 0, n ? fl.y / static_cast<f32>(n) : 0};
+        v = static_cast<i32>(m.vertex_count());
+        m.push({x, y, water_level(x, y) + kWaterRenderZ}, {0, 0, 1}, color, {x * 0.05, y * 0.05});
+        m.push_extra(rec);
+        return static_cast<u32>(v);
+      };
+      for (i32 b = 0; b < per; converted::pre_inc(b))
+        for (i32 a = 0; a < per; converted::pre_inc(a)) {
+          if (!converted::at(water, converted::plus(converted::times(static_cast<std::size_t>(converted::plus(b, B)), W), (converted::plus(a, B))))) continue;
+          const u32 p = vtx(a, b), q = vtx(converted::plus(a, 1), b), r = vtx(converted::plus(a, 1), converted::plus(b, 1)), s = vtx(a, converted::plus(b, 1));
+          m.indices.insert(m.indices.end(), {p, q, r, p, r, s});
+        }
+    }
+  }
+  const u64 key = terrain_cpp_local::key2(ci, cj);
+  u32& slot = water_meshes_[key];
+  water_detail_[key] = detail;
+  if (m.vertex_count() == 0) { if (slot) r_->remove(slot); slot = 0; return; }
+  MeshLook look;
+  look.material.roughness = 0.08;  // world_water.mjs: roughness .08, metalness 0, transparent .94
+  look.material.metalness = 0;
+  look.material.cast_shadow = false;
+  look.material.alpha = AlphaMode::blend;
+  look.extra_slot = 1;  // the second extension's stream (main.cpp: facades, water)
+  const u32 id = r_->allocate_id();
+  if (!upsert(*r_, id, m, look)) { r_->release_id(id); return; }
+  if (slot) r_->remove(slot);
+  slot = id;
+}
+void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
+  if (!r_ || !world_) return;
+  const f64 deadline = now_ms() + budget_ms;
+  plan_windows(focus);
+  plan_images(focus);
+  if (job_) run_job(deadline);
+  if (!settled_) return;
+  bool extra_moved = extra.size() != planned_extra_.size();
+  for (std::size_t i = 0; !extra_moved && i < extra.size(); converted::pre_inc(i)) extra_moved = hypot_bp(converted::at(extra, i).x - converted::at(planned_extra_, i).x, converted::at(extra, i).y - converted::at(planned_extra_, i).y) > 40;
+  if (replan_ || extra_moved || hypot_bp(focus.x - planned_focus_.x, focus.y - planned_focus_.y) > 40 ||
+      hypot_bp(anchor.x - planned_anchor_.x, anchor.y - planned_anchor_.y) > 40)
+    want_tiles(focus, anchor);
+  bool missing = false;
+  // 0. the ground right under the focus and the anchor (and their neighbours) at once, whatever
+  // the budget: a jet at 250 m/s or a reload of the elevation never leaves a hole under anybody
+  std::vector<Vec3> under{focus, anchor};
+  under.insert(under.end(), extra.begin(), extra.end());
+  for (const Vec3& at : under) {
+    const i32 ci = static_cast<i32>(converted::fits<int>(std::floor(at.x / terrain_cpp_local::kTile))), cj = static_cast<i32>(converted::fits<int>(std::floor(at.y / terrain_cpp_local::kTile)));
+    for (i32 j = converted::minus(cj, 1); j <= converted::plus(cj, 1); converted::pre_inc(j))
+      for (i32 i = converted::minus(ci, 1); i <= converted::plus(ci, 1); converted::pre_inc(i)) {
+        const u64 k = terrain_cpp_local::key2(i, j);
+        if (collision_.count(k) && !dirty_collision_.count(k)) continue;
+        build_collision_tile(i, j);
+        dirty_collision_.erase(k);
+        ++stats_.rebuilds;
+      }
+  }
+  // 1. collision (what stands on it must not fall), 2. render, 3. water
+  for (u64 k : want_collision_) {
+    if (collision_.count(k) && !dirty_collision_.count(k)) continue;
+    if (now_ms() > deadline) { missing = true; break; }
+    build_collision_tile(static_cast<i32>(converted::shr_bits(k, 32)), static_cast<i32>(k & 0xffffffffu));
+    dirty_collision_.erase(k);
+    ++stats_.rebuilds;
+  }
+  for (u64 k : want_render_) {
+    if (render_.count(k) && !dirty_render_.count(k)) continue;
+    if (now_ms() > deadline) { missing = true; break; }
+    i32 level, i, j;
+    terrain_cpp_local::unkey3(k, level, i, j);
+    build_render_tile(level, i, j);
+    dirty_render_.erase(k);
+    ++stats_.rebuilds;
+  }
+  for (u64 k : want_water_) {
+    const i32 wi = static_cast<i32>(converted::shr_bits(k, 32)), wj = static_cast<i32>(k & 0xffffffffu);
+    const bool detail = terrain_cpp_local::rect_distance(focus.x, focus.y, wi * terrain_cpp_local::kWaterChunk, wj * terrain_cpp_local::kWaterChunk, (converted::plus(wi, 1)) * terrain_cpp_local::kWaterChunk, (converted::plus(wj, 1)) * terrain_cpp_local::kWaterChunk) < 1000;
+    if (water_meshes_.count(k) && !dirty_water_.count(k) && water_detail_[k] == detail) continue;
+    if (now_ms() > deadline) { missing = true; break; }
+    build_water_chunk(wi, wj, detail);
+    dirty_water_.erase(k);
+  }
+  if (!missing) {
+    // Everything wanted is there: drop what is no longer wanted (never before - no holes).
+    converted::wide::Set<u64> keep(want_render_.begin(), want_render_.end());
+    for (auto it = render_.begin(); it != render_.end();) {
+      if (!keep.count(it->first)) { if (it->second.mesh) r_->remove(it->second.mesh); dirty_render_.erase(it->first); it = render_.erase(it); }
+      else ++it;
+    }
+    keep = converted::wide::Set<u64>(want_collision_.begin(), want_collision_.end());
+    for (auto it = collision_.begin(); it != collision_.end();) {
+      if (!keep.count(it->first)) {
+        if (it->second.body.valid() && world_->body_valid(it->second.body)) world_->destroy_body(it->second.body);
+        dirty_collision_.erase(it->first);
+        it = collision_.erase(it);
+      } else ++it;
+    }
+    keep = converted::wide::Set<u64>(want_water_.begin(), want_water_.end());
+    for (auto it = water_meshes_.begin(); it != water_meshes_.end();) {
+      if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); water_detail_.erase(it->first); it = water_meshes_.erase(it); }
+      else ++it;
+    }
+  }
+  stats_.render_tiles = static_cast<u32>(render_.size());
+  stats_.collision_tiles = static_cast<u32>(collision_.size());
+  stats_.dem = grid_ready_;
+  stats_.settled = settled_;
+  stats_.dem_tiles = 0;
+  for (const auto& [k, t] : dem_tiles_) stats_.dem_tiles += t.h.empty() ? 0 : 1;
+}
 namespace wire { struct U32 { u32 v = 0; }; }
+namespace wire { struct F32 { f32 v = 0; }; }
 namespace cityjobs { namespace city_jobs_cpp_local { struct Reader {
   std::size_t p = 0;
   bool ok = true;
-  
-
-
-
-
-
+  u8 get_u8(Span<const u8> b) {
+    if (b.size < converted::plus(p, 1)) { ok = false; return 0; }
+    const u8 v = converted::at(b, p);
+    converted::plus_to(p, 1);
+    return v;
+  }
   u32 get_u32(Span<const u8> b) {
     if (b.size < converted::plus(p, 4)) { ok = false; return 0; }
     wire::U32 x;
@@ -944,13 +1735,13 @@ namespace cityjobs { namespace city_jobs_cpp_local { struct Reader {
   }
   /// (An i32 is the i32 of the u32 of its four bytes.)
   i32 get_i32(Span<const u8> b) { return static_cast<i32>(get_u32(b)); }
-  
-
-
-
-
-
-
+  f32 get_f32(Span<const u8> b) {
+    if (b.size < converted::plus(p, 4)) { ok = false; return 0; }
+    wire::F32 x;
+    converted::layout::of_bytes(x, b.data + p, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.v, p_ + 0); });
+    converted::plus_to(p, 4);
+    return x.v;
+  }
   
 
 
@@ -979,21 +1770,51 @@ namespace cityjobs { namespace city_jobs_cpp_local { struct Reader {
 
 
 
-  
-
-
-
-
-
+  void points(Span<const u8> b, std::vector<Vec2>& v) {
+    const u32 n = get_u32(b);
+    if (!ok || converted::minus(b.size, p) < converted::times(static_cast<std::size_t>(n), 8)) { ok = false; return; }
+    v.resize(converted::count(n));
+    for (u32 i = 0; i < n; ++i) { converted::at(v, i).x = get_f32(b); converted::at(v, i).y = get_f32(b); }
+  }
   /// False: a broken count (the reader may still be ok).
-  
-
-
-
-
-
-
+  bool spots(Span<const u8> b, std::vector<MapFeatures::Spot>& v) {
+    const u32 n = get_u32(b);
+    if (!ok || n > 200000) return false;
+    v.resize(converted::count(n));
+    for (auto& sp : v) { sp.p.x = get_f32(b); sp.p.y = get_f32(b); sp.a = get_f32(b); }
+    return true;
+  }
 }; } }
+namespace cityjobs { bool read_features(const std::vector<u8>& output, MapFeatures& f) { using cityjobs::city_jobs_cpp_local::Reader;
+  const Span<const u8> in(output);
+  Reader r;
+  if (r.get_u8(in) != 1) return false;
+  f.procedural = r.get_u8(in) != 0;
+  f.buildings.resize(converted::count(r.get_u32(in)));
+  for (auto& b : f.buildings) {
+    b.base = r.get_f32(in); b.top = r.get_f32(in); b.seed = r.get_u32(in);
+    b.rings.resize(converted::count(r.get_u32(in)));
+    for (auto& ring : b.rings) r.points(in, ring);
+    if (!r.ok) return false;
+  }
+  f.roads.resize(converted::count(r.get_u32(in)));
+  for (auto& rd : f.roads) { rd.cls = static_cast<RoadClass>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, r.get_u8(in))); rd.bridge = r.get_u8(in) != 0; r.points(in, rd.points); if (!r.ok) return false; }
+  f.areas.resize(converted::count(r.get_u32(in)));
+  for (auto& a : f.areas) {
+    a.kind = static_cast<AreaKind>(converted::among({0, 1, 2, 3, 4, 5}, r.get_u8(in)));
+    a.rings.resize(converted::count(r.get_u32(in)));
+    for (auto& ring : a.rings) r.points(in, ring);
+    if (!r.ok) return false;
+  }
+  if (!r.spots(in, f.trees) || !r.spots(in, f.lamps)) return false;
+  return r.ok;
+} }
+namespace cityjobs { u32 chunk_count(const std::vector<u8>& output) {
+  // (the count the job put first: its four bytes as they lie in memory - little-endian, as on every
+  // target of the engine)
+  if (output.size() < 4) return 0;
+  return u32{converted::at(output, 0)} | u32{converted::at(output, 1)} << 8 | u32{converted::at(output, 2)} << 16 | u32{converted::at(output, 3)} << 24;
+} }
 namespace cityjobs { namespace city_jobs_cpp_local { void read_one_chunk(Span<const u8> in, Reader& r, GeoChunk& c) {
   c.x = r.get_i32(in); c.y = r.get_i32(in); c.items = r.get_u32(in); c.triangles = r.get_u32(in);
   c.mesh.extra_size = r.get_u32(in);
@@ -1008,8 +1829,36 @@ namespace cityjobs { bool read_chunk(const std::vector<u8>& output, std::size_t&
   at = r.p;
   return true;
 } }
-namespace terrain_cpp_local { constexpr f32 kTile = 160; }
-namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
+namespace wire { struct F64 { f64 v = 0; }; }
+namespace wire { inline void put_u8(std::vector<u8>& b, u8 v) { b.push_back(v); } }
+namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_f64(std::vector<u8>& b, f64 v) {
+  const std::array<u8, 8> x = std::bit_cast<std::array<u8, 8>>(F64{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace cityjobs { namespace city_jobs_cpp_local { void put_array_f64(std::vector<u8>& b, const std::vector<f64>& v) {
+  wire::put_u32(b, static_cast<u32>(v.size()));
+  const std::size_t n = b.size();
+  b.resize(converted::count(converted::plus(n, converted::times(v.size(), sizeof(f64)))));
+  if (!v.empty()) std::memcpy(b.data() + n, v.data(), converted::times(v.size(), sizeof(f64)));
+} } }
+namespace cityjobs { std::vector<u8> buildings_input(const FootprintStream& footprints, const BuildingOptions& o) {
+  std::vector<u8> b;
+  wire::put_f64(b, o.chunk_size); wire::put_u32(b, o.max_buildings); wire::put_u8(b, o.cornice ? 1 : 0); wire::put_u8(b, o.wall_records ? 1 : 0);
+  auto rgb = [&](const Rgb& c) { wire::put_f64(b, c.r); wire::put_f64(b, c.g); wire::put_f64(b, c.b); };
+  wire::put_u32(b, static_cast<u32>(o.style.walls.size()));
+  for (const auto& c : o.style.walls) rgb(c);
+  wire::put_u32(b, static_cast<u32>(o.style.roofs.size()));
+  for (const auto& c : o.style.roofs) rgb(c);
+  rgb(o.style.trim);
+  wire::put_f64(b, o.style.trim_mix);
+  std::vector<f64> stream(footprints.values());
+  cityjobs::city_jobs_cpp_local::put_array_f64(b, stream);
+  return b;
+} }
 bool Terrain::ready_at(Vec3 p) const {
   if (!settled_) return false;
   if (!world_) return true;
@@ -1021,14 +1870,6 @@ bool Terrain::ready_at(Vec3 p) const {
       if (!collision_.count(k) || dirty_collision_.count(k)) return false;
     }
   return true;
-}
-i32 Terrain::corridor_set(f32 x, f32 y) const {
-  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
-  for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
-    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
-    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
-  }
-  return -1;
 }
 bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) >= 0; }
 void Terrain::clear() {
@@ -1073,13 +1914,6 @@ void Terrain::clear() {
   planned_focus_ = planned_anchor_ = {1e9, 1e9, 0};
   stats_ = {};
   settled_ = !dem_;
-}
-void Terrain::disable_dem() {
-  dem_ = false;
-  if (job_ && converted::present(job_)->id) jobs::cancel(converted::present(job_)->id);
-  job_.reset();
-  requests_.clear();
-  settled_ = true;
 }
 void training_level(MapFeatures& out) {
   out.procedural = true;
@@ -1343,40 +2177,6 @@ void furnish(MapFeatures& out, const Vec4& sq, const std::vector<std::vector<Vec
     }
   }
 }
-namespace terrain_cpp_local { constexpr f32 kBlock = 640; }
-namespace terrain_cpp_local { constexpr f32 kWaterChunk = 320; }
-namespace terrain_cpp_local { i32 sx28(u64 v) { return static_cast<i32>(static_cast<u32>(converted::shl_bits(v, 4))) >> 4; } }
-namespace terrain_cpp_local { void unkey3(u64 k, i32& level, i32& i, i32& j) {
-  level = static_cast<i32>(converted::shr_bits(k, 56));
-  i = sx28((converted::shr_bits(k, 28)) & 0xFFFFFFF);
-  j = sx28(k & 0xFFFFFFF);
-} }
-namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
-Vec4 Terrain::interior(const Grid& g) const {
-  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
-}
-f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
-  if (g.n < 2) return 0;
-  const f32 lim = static_cast<f32>(g.n) - 1.001;
-  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
-  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
-  const f32 tx = fx - i, ty = fy - j;
-  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
-  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
-}
-f32 Terrain::elevation(f32 x, f32 y) const {
-  if (!grid_ready_) return 0.0;
-  // the window that knows the place (its interior); else any that holds it; else the player's,
-  // held at its edge (far ground nobody stands on: the horizon)
-  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
-  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
-  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
-  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
-  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
-  return grid_at(grid_, x, y) - ref_height_;
-}
-namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
-namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
 f32 Terrain::road_field(f32 x, f32 y) const {
   // terrain_craters.mjs roadField: the ground smoothed over ~36 m (tent kernel) - a street's
   // profile along its length; one field for all streets, so crossing streets agree at a junction
@@ -1446,49 +2246,6 @@ void Terrain::remove_corridors(u64 owner) {
     return;
   }
 }
-void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify) {
-  const f32 m = kStep * 2;
-  x0 -= m; y0 -= m; x1 += m; y1 += m;
-  for (auto& [k, t] : render_) {
-    i32 level, i, j;
-    terrain_cpp_local::unkey3(k, level, i, j);
-    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
-    if (i * size <= x1 && (converted::plus(i, 1)) * size >= x0 && j * size <= y1 && (converted::plus(j, 1)) * size >= y0) dirty_render_.insert(k);
-  }
-  for (auto& [k, c] : collision_) {
-    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
-    if (i * terrain_cpp_local::kTile - kStep <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kTile + kStep >= x0 && j * terrain_cpp_local::kTile - kStep <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kTile + kStep >= y0) dirty_collision_.insert(k);
-  }
-  for (auto& [k, m2] : water_meshes_) {
-    (void)m2;
-    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
-    if (i * terrain_cpp_local::kWaterChunk <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kWaterChunk >= x0 && j * terrain_cpp_local::kWaterChunk <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kWaterChunk >= y0) dirty_water_.insert(k);
-  }
-  if (notify) changes_.push_back({x0, y0, x1, y1});
-  replan_ = true;
-}
-f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
-  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
-  // junctions blend smoothly, no steps
-  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
-  if (at < 0) return h;
-  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
-  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
-  if (it == set.grid.end()) return h;
-  f32 best = 0, sw = 0, sh = 0;
-  for (const CorridorSeg& s : it->second) {
-    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
-    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
-    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
-    if (w <= 0) continue;
-    const f32 ws = w * w * (3 - 2 * w);
-    sw += ws;
-    sh += ws * (s.ha + (s.hb - s.ha) * t);
-    best = std::fmax(best, w);
-  }
-  if (sw <= 0) return h;
-  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
-}
 f32 Terrain::footprint_base(const std::vector<Vec2>& ring) const {
   if (!grid_ready_ && craters_.empty()) return 0;
   f32 m = 1e9;
@@ -1528,25 +2285,6 @@ std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Ve
   close();
   return out;
 }
-f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
-  const f32 bowl = radius * 0.5;
-  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
-  if (r >= radius) return 0;
-  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
-  return rim * kern::math::exp(-(k * k)) * (1 - x);
-}
-f32 Terrain::node_height(f32 x, f32 y) const {
-  const f32 e = elevation(x, y);
-  f32 h = road_level(x, y, e);
-  for (const Crater& c : craters_) {
-    const f32 dx = x - c.c.x, dy = y - c.c.y;
-    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
-    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
-    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
-  }
-  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
-  return h;
-}
 f32 Terrain::height(f32 x, f32 y) const {
   // terrain_surface.mjs triangleHeightAt: the SW-NE diagonal of every 5 m cell.
   const f32 x0 = std::floor(x / kStep) * kStep, y0 = std::floor(y / kStep) * kStep;
@@ -1560,27 +2298,6 @@ HeightSampler Terrain::sampler(f32 offset) const {
   s.user = const_cast<Terrain*>(this);
   s.fn = [](void* u, f64 x, f64 y) -> f64 { return static_cast<const Terrain*>(u)->height(static_cast<f32>(x), static_cast<f32>(y)); };
   return s;
-}
-bool Terrain::water_cell(i32 cx, i32 cy) const {
-  // the 256 bits of the cell's 64 m block
-  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
-  if (it == water_.end()) return false;
-  const u32 idx = static_cast<u32>(converted::plus(converted::times((cy & 15), 16), (cx & 15)));
-  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
-}
-bool Terrain::on_bridge(f32 x, f32 y) const {
-  for (const Bridge& b : bridges_) {
-    const f32 dx = x - b.c.x, dy = y - b.c.y;
-    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
-    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
-    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
-  }
-  return false;
-}
-bool Terrain::water_at(f32 x, f32 y) const {
-  if (water_.empty()) return false;
-  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
-  return bridges_.empty() || !on_bridge(x, y);
 }
 void Terrain::set_water_cell(i32 cx, i32 cy) {
   WaterBlock& b = water_[terrain_cpp_local::key2(cx >> 4, cy >> 4)];
@@ -1623,16 +2340,6 @@ void Terrain::add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, V
   repaint(t.box);
   tints_.push_back(std::move(t));
 }
-void Terrain::repaint(const Vec4& b) {
-  // only the render tiles: the shape (collision, roads on it) does not change
-  for (auto& [k, t] : render_) {
-    (void)t;
-    i32 level, i, j;
-    terrain_cpp_local::unkey3(k, level, i, j);
-    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
-    if (i * size <= b.z && (converted::plus(i, 1)) * size >= b.x && j * size <= b.w && (converted::plus(j, 1)) * size >= b.y) dirty_render_.insert(k);
-  }
-}
 void Terrain::add_waterway(const std::vector<Vec2>& pts, f32 width, f32 speed) {
   f32 x_lo = 1e9, y_lo = 1e9, x_hi = -1e9, y_hi = -1e9;
   for (std::size_t k = 0; converted::plus(k, 1) < pts.size(); converted::pre_inc(k)) {
@@ -1672,15 +2379,6 @@ void Terrain::add_bridge(Vec2 a, Vec2 b, f32 width) {
   const f32 r = l / 2 + width;
   dirty((a.x + b.x) / 2 - r, (a.y + b.y) / 2 - r, (a.x + b.x) / 2 + r, (a.y + b.y) / 2 + r);
 }
-namespace wire { struct F64 { f64 v = 0; }; }
-namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
-  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_f64(std::vector<u8>& b, f64 v) {
-  const std::array<u8, 8> x = std::bit_cast<std::array<u8, 8>>(F64{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
 namespace cityjobs { namespace city_jobs_cpp_local { void put_i32(std::vector<u8>& b, i32 v) { wire::put_u32(b, static_cast<u32>(v)); } } }
 namespace cityjobs { std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, Span<const u8> mvt) {
   std::vector<u8> b;
@@ -1690,11 +2388,6 @@ namespace cityjobs { std::vector<u8> tile_input(const TileKey& key, f64 lon0, f6
   b.insert(b.end(), mvt.begin(), mvt.end());
   return b;
 } }
-void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat) {
-  lon = p.lon0 + x / (GeoProjector::kEarthRadius * p.cos_lat) / GeoProjector::kRad;
-  lat = p.lat0 + y / GeoProjector::kEarthRadius / GeoProjector::kRad;
-}
-namespace tiles_cpp_local { constexpr f64 kPiD = 3.14159265358979323846; }
 TileKey tile_at(f64 lon, f64 lat, i32 z) {
   const f64 n = ldexp_bp(1.0, z);
   const f64 lr = lat * tiles_cpp_local::kPiD / 180;
@@ -1703,11 +2396,6 @@ TileKey tile_at(f64 lon, f64 lat, i32 z) {
   t.x = static_cast<i32>(converted::fits<int>(std::floor((lon + 180) / 360 * n)));
   t.y = static_cast<i32>(converted::fits<int>(std::floor((1 - asinh_bp(kern::math::tan(lr)) / tiles_cpp_local::kPiD) / 2 * n)));
   return t;
-}
-void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
-  const f64 n = ldexp_bp(1.0, t.z);
-  lon = (t.x + fx) / n * 360 - 180;
-  lat = kern::math::atan(sinh_bp(tiles_cpp_local::kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / tiles_cpp_local::kPiD;
 }
 void Terrain::start(Renderer* renderer, World* world, const GeoProjector& proj, bool dem) {
   clear();
@@ -2388,6 +3076,28 @@ void CityStream::clear_damage() {
   }
   near_.dirty = true;
 }
+void CityStream::begin_cells(Tile& t) {
+  // the cells to build (wanted and not there yet, or damaged), the nearest first - a few per job,
+  // so the first ones stand soon and no upload step is long
+  std::vector<std::pair<f32, u64>> order;
+  for (u64 c : t.dirty_cells) {
+    const i32 cx = static_cast<i32>(static_cast<u32>(converted::shr_bits(c, 32))), cy = static_cast<i32>(static_cast<u32>(c));
+    order.push_back({hypot_bp((static_cast<f32>(cx) + 0.5) * kChunk - focus_.x, (static_cast<f32>(cy) + 0.5) * kChunk - focus_.y), c});
+  }
+  std::stable_sort(order.begin(), order.end(), [](const std::pair<f32, u64>& a, const std::pair<f32, u64>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
+  if (order.size() > 6) order.resize(converted::count(6));
+  FootprintStream fs;
+  std::vector<Vec2> thin;
+  t.job_cells.clear();
+  for (const auto& [d, c] : order) {
+    t.job_cells.push_back(c);
+    t.dirty_cells.erase(c);
+    const auto it = t.cell_items.find(c);
+    if (it == t.cell_items.end()) continue;
+    for (u32 i : it->second) put_footprint(fs, converted::at(t.features.buildings, i), converted::at(t.cent, i), thin);
+  }
+  t.cell_job = jobs::submit(cityjobs::kBuildings, cityjobs::buildings_input(fs, building_options()));
+}
 bool CityStream::finish_cells(Tile& t, f64 deadline) {
   if (!t.cell_uploading) {
     if (!jobs::take(t.cell_job, t.built_bytes)) return false;
@@ -2431,6 +3141,201 @@ bool CityStream::finish_cells(Tile& t, f64 deadline) {
   ++rebuilds_;
   if (ms_.t_built < 0 && t.key == origin_tile_) ms_.t_built = now_ms() - start_ms_;
   return true;
+}
+bool CityStream::work(Tile& t, f64 deadline) {
+  using S = Tile::State;
+  switch (t.state) {
+    case S::ready:
+      // the drawn cells: built off the frame, uploaded a chunk a step, swapped when complete
+      if (t.cell_job || t.cell_uploading) {
+        const f64 t1 = now_ms();
+        const bool done = finish_cells(t, deadline);
+        step_time("cells.swap", t1);
+        if (!done) return now_ms() <= deadline;
+      }
+      if (!t.dirty_cells.empty() && !t.cell_job && !t.cell_uploading) {
+        const f64 t1 = now_ms();
+        begin_cells(t);
+        step_time("cells.begin", t1);
+      }
+      // the streets round the player (world_city_roads.mjs RADIUS_M 720): laid again after
+      // REBUILD_MOVE_M 260 m of travel
+      if (const Vec2 mid{focus_.x + view_lead.x * 0.5, focus_.y + view_lead.y * 0.5};
+          !t.relay && hypot_bp(mid.x - t.roads_at.x, mid.y - t.roads_at.y) >= 260 && rect_distance_to(t.bounds, mid.x, mid.y) < converted::plus(720, 260) + hypot_bp(view_lead.x, view_lead.y) * 0.5) {
+        t.relay = true;
+        t.old_lay = std::move(t.lay_meshes);
+        t.lay_meshes.clear();
+        begin_roads(t);
+        return now_ms() <= deadline;
+      }
+      return now_ms() <= deadline;
+    case S::requested:
+    case S::failed: return true;
+    case S::decoding: {
+      std::vector<u8> out;
+      if (!jobs::take(t.tile_job, out)) return true;  // still decoding off the frame: next tile
+      t.tile_job = 0;
+      if (!cityjobs::read_features(out, t.features)) { t.state = S::failed; return true; }
+      ++real_tiles_;
+      if (t.key == origin_tile_ && ms_.t_decoded < 0) ms_.t_decoded = now_ms() - start_ms_;
+      feed_terrain(t);
+      t.state = S::terrain_wait;
+      return now_ms() > deadline ? false : work(t, deadline);
+    }
+    case S::terrain_wait:
+      // Buildings and streets stand on the terrain: wait until the ground of the whole tile is
+      // known for good (terrain.h covers) - a house is never based on a height that changes later.
+      // (the tile's data reaches a little over its square - its buffer - and the streets' profile
+      // is smoothed over the ground beside them: 80 m more must be known)
+      if (!terrain_.settled() || !terrain_.covers({t.bounds.x - 80, t.bounds.y - 80, t.bounds.z + 80, t.bounds.w + 80})) return true;
+      if (ms_.t_terrain < 0) ms_.t_terrain = now_ms() - start_ms_;
+      finish_features(t);
+      return now_ms() > deadline ? false : work(t, deadline);
+    case S::building:
+      // (the drawn buildings are cells now - see S::ready; a tile goes from its features to its streets)
+      begin_roads(t);
+      return now_ms() > deadline ? false : work(t, deadline);
+    case S::roads: {
+      {
+        const f64 t1 = now_ms();
+        const bool built = t.road_builder.step(std::max(0.5, deadline - now_ms()));
+        step_time("roads.build", t1);
+        if (!built) return false;
+      }
+      Material m;
+      m.roughness = 0.95;
+      m.cast_shadow = false;
+      m.double_sided = true;
+      auto& chunks = t.road_builder.chunks();
+      while (t.upload_next < chunks.size()) {
+        const std::size_t before = t.meshes.size();
+        const f64 t1 = now_ms();
+        GeoChunk chunk = std::move(converted::at(chunks, t.upload_next));   // (out of the engine's list: upload welds it)
+        upload(t, chunk, m, false);
+        step_time("roads.upload", t1);
+        // road meshes are the re-layable ones
+        t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
+        t.meshes.resize(converted::count(before));
+        converted::at(chunks, converted::post_inc(t.upload_next)).mesh = MeshData{};
+        if (now_ms() > deadline) return false;
+      }
+      chunks.clear();
+      chunks.shrink_to_fit();
+      t.upload_next = 0;
+      t.state = S::areas;
+      return now_ms() > deadline ? false : work(t, deadline);
+    }
+    case S::areas:
+      // the map areas are painted into the ground (Terrain::add_tint), as in world_ground.mjs
+      if (t.relay) {
+        // New layer in place: the old one goes now (no frame without roads).
+        for (u32 id : t.old_lay) r_->remove(id);
+        t.old_lay.clear();
+        t.relay = false;
+        t.state = S::ready;
+        if (t.relay_again) {
+          t.relay_again = false;
+          t.relay = true;
+          t.old_lay = std::move(t.lay_meshes);
+          t.lay_meshes.clear();
+          begin_roads(t);
+        }
+        return true;
+      }
+      t.state = S::ready;  // collision: the working set around the player (update_collision)
+      // a new set only when this tile brings buildings into the 340 m around the player
+      for (Vec2 c : t.cent)
+        if (hypot_bp(c.x - focus_.x, c.y - focus_.y) <= 340) { near_.dirty = true; break; }
+      return true;
+    case S::collision:
+      t.state = S::ready;
+      return true;
+  }
+  return true;
+}
+void CityStream::update(Vec3 focus, f64 budget_ms) {
+  if (!r_ || !world_) return;
+  const f64 start = now_ms(), deadline = start + budget_ms;
+  // without workers / threads the jobs run here, inside the frame's budget
+  f64 t0 = now_ms();
+  jobs::pump(budget_ms * 0.5);
+  step_time("jobs", t0);
+  focus_ = focus;
+  t0 = now_ms();
+  select_cells(focus, false);
+  step_time("select_cells", t0);
+  t0 = now_ms();
+  request_around(focus, ring);
+  for (const Vec3& f : extra_foci) request_around(f, mate_ring);  // MP host: the town around the mates too
+  for (auto& [k, tp] : tiles_)
+    if (converted::present(tp)->state == Tile::State::failed && start >= converted::present(tp)->retry_ms) { converted::present(tp)->state = Tile::State::requested; requests_.push_back(converted::present(tp)->key); }
+  unload_far(focus);
+  step_time("request/unload", t0);
+  t0 = now_ms();
+  terrain_.extra = extra_foci;
+  // the ground the city needs: the squares of the tiles round the player and round each mate
+  terrain_.needs.clear();
+  if (!offline_) {
+    auto grown = [](Vec4 r) { return Vec4{r.x - 80, r.y - 80, r.z + 80, r.w + 80}; };
+    terrain_.needs.push_back(grown(ring_bounds(focus, ring)));
+    for (const Vec3& f : extra_foci) terrain_.needs.push_back(grown(ring_bounds(f, mate_ring)));
+  }
+  terrain_.update(focus, anchor, std::fmax(1.0, budget_ms * 0.45));
+  step_time("terrain", t0);
+  t0 = now_ms();
+  terrain_.take_changes(terrain_changes_);
+  for (const Vec4& r : terrain_changes_) { relay(r); ground_changes_.push_back(r); }
+  terrain_changes_.clear();
+  step_time("relay", t0);
+  // The collision around the player first (the player must never stand where no wall is): half
+  // the budget while a set is built, at least 1.5 ms.
+  t0 = now_ms();
+  update_collision(focus, now_ms() + std::fmax(1.5, budget_ms * 0.5));
+  step_time("collision", t0);
+  // Nearest unfinished tile first: each tile by its key, with its distance (squared) - stably, so tiles as far
+  // keep the order of the map.
+  std::vector<std::pair<f32, u64>> order;
+  for (auto& [k, t] : tiles_) order.push_back({(converted::present(t)->center.x - focus.x) * (converted::present(t)->center.x - focus.x) + (converted::present(t)->center.y - focus.y) * (converted::present(t)->center.y - focus.y), k});
+  std::stable_sort(order.begin(), order.end(), [](const std::pair<f32, u64>& a, const std::pair<f32, u64>& b) { return a.first < b.first; });
+  static const char* kStateName[] = {"requested", "decoding", "terrain_wait", "building", "roads", "areas", "collision", "ready", "failed"};
+  for (const auto& [d, k] : order) {
+    if (now_ms() > deadline) break;
+    t0 = now_ms();
+    auto it = tiles_.find(k);
+    Tile& t = *converted::present(it->second);
+    const char* name = converted::at(kStateName, static_cast<u32>(t.state));
+    const bool more = work(t, deadline);
+    step_time(name, t0);
+    if (!more) break;
+  }
+  // what is left of the budget goes on with the collision set
+  t0 = now_ms();
+  if (now_ms() < deadline) update_collision(focus, deadline);
+  step_time("collision", t0);
+  stats_ = {};
+  for (auto& [k, t] : tiles_) {
+    if (converted::present(t)->state == Tile::State::ready) ++stats_.tiles_ready;
+    else if (converted::present(t)->state == Tile::State::failed) ++stats_.tiles_failed;
+    else ++stats_.tiles_loading;
+    stats_.buildings += static_cast<u32>(converted::present(t)->features.buildings.size());
+
+    stats_.triangles += converted::present(t)->triangles;
+    stats_.meshes += static_cast<u32>(converted::plus(converted::present(t)->meshes.size(), converted::present(t)->lay_meshes.size()));
+  }
+  stats_.colliders = near_.colliders;
+  ms_.work_ms += now_ms() - start;
+  stats_.t_request = ms_.t_request; stats_.t_data = ms_.t_data; stats_.t_decoded = ms_.t_decoded; stats_.t_terrain = ms_.t_terrain;
+  stats_.t_built = ms_.t_built; stats_.t_collision = ms_.t_collision; stats_.work_ms = ms_.work_ms;
+  stats_.rebuilds = rebuilds_;
+  stats_.uploads = upload_count_;
+  stats_.upload_vertices = static_cast<u32>(converted::quot_bits(upload_vertices_, 1000));
+  stats_.relays = relays_;
+  stats_.last_slice_ms = now_ms() - start;
+  if (now_ms() - worst_at_ > 2000) { worst_ = 0; worst_at_ = now_ms(); worst_step_ = ""; worst_step_ms_ = 0; }
+  worst_ = std::fmax(worst_, stats_.last_slice_ms);
+  stats_.worst_ms = worst_;
+  stats_.worst_step = worst_step_;
+  stats_.worst_step_ms = worst_step_ms_;
 }
 void CityStream::step_time(const char* name, f64 t0) {
   const f64 took = now_ms() - t0;
@@ -3408,6 +4313,7 @@ inline void FootprintStream::begin(const unsigned int& seed_hash, const double& 
 inline void FootprintStream::ring(const Vec2* points, const u32& count) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.ring", {converted::value_of(*this), converted::value_of(std::vector<Vec2>(points, points + converted::room(points, 1 * static_cast<std::size_t>(count)))), converted::value_of(count)}); }
 inline FootprintStream::~FootprintStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.footprint_stream.release", {converted::value_of(*this)}); }
 inline FootprintStream::FootprintStream() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.make", {}); converted::take_made(*this, kern_out[0]); }
+inline std::vector<double> FootprintStream::values() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.values", {converted::value_of(*this)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; }
 inline FootprintStream& FootprintStream::operator=(FootprintStream&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.footprint_stream.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
@@ -3416,6 +4322,7 @@ inline RoadBuilder::~RoadBuilder() { if (kern_owned && kern_handle && !converted
 inline RoadBuilder::RoadBuilder() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.make", {}); converted::take_made(*this, kern_out[0]); }
 inline bool RoadBuilder::begin(const double* stream, const u32& length, const RoadOptions& options, const HeightSampler& heights) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.begin", {converted::value_of(*this), converted::value_of(std::vector<double>(stream, stream + converted::room(stream, 1 * static_cast<std::size_t>(length)))), converted::value_of(length), converted::value_of(options), converted::value_of(heights)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool RoadBuilder::step(const double& budget_ms) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.step", {converted::value_of(*this), converted::value_of(budget_ms)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline std::vector<GeoChunk>& RoadBuilder::chunks() { return converted::engine_place<std::vector<GeoChunk>, std::vector<GeoChunk>>("engine.road_builder.chunks", {converted::value_of(*this)}); }
 inline RoadBuilder& RoadBuilder::operator=(RoadBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline RoadStream::~RoadStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_stream.release", {converted::value_of(*this)}); }
 inline RoadStream::RoadStream() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_stream.make", {}); converted::take_made(*this, kern_out[0]); }
@@ -3484,10 +4391,18 @@ struct Out_CityStream_merge_damage { CityStream Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_CityStream_merge_damage& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_merge_damage& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_CityStream_merge_damage& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_CityStream_begin_cells { CityStream Self; CityStream::Tile t; };
+[[maybe_unused]] static bool same(const Out_CityStream_begin_cells& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_begin_cells& s) { return defined(s.Self) && defined(s.t); }
+[[maybe_unused]] static std::string text(const Out_CityStream_begin_cells& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + "}"; }
 struct Out_CityStream_finish_cells { CityStream Self; bool Result; CityStream::Tile t; };
 [[maybe_unused]] static bool same(const Out_CityStream_finish_cells& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.t, (*got.rows)[2]), ".t"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_finish_cells& s) { return defined(s.Self) && defined(s.Result) && defined(s.t); }
 [[maybe_unused]] static std::string text(const Out_CityStream_finish_cells& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.t) + "}"; }
+struct Out_CityStream_work { CityStream Self; bool Result; CityStream::Tile t; };
+[[maybe_unused]] static bool same(const Out_CityStream_work& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.t, (*got.rows)[2]), ".t"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_work& s) { return defined(s.Self) && defined(s.Result) && defined(s.t); }
+[[maybe_unused]] static std::string text(const Out_CityStream_work& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.t) + "}"; }
 struct Out_CityStream_street_point { bool Result; Rng rng; Vec3 point; double heading; };
 [[maybe_unused]] static bool same(const Out_CityStream_street_point& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.rng, (*got.rows)[1]), ".rng") && converted::at_place(same(want.point, (*got.rows)[2]), ".point") && converted::at_place(same(want.heading, (*got.rows)[3]), ".heading"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_street_point& s) { return defined(s.Result) && defined(s.rng) && defined(s.point) && defined(s.heading); }
@@ -3516,6 +4431,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3536,6 +4452,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3556,6 +4473,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3577,6 +4495,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3598,6 +4517,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3621,6 +4541,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3643,6 +4564,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3664,6 +4586,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3684,6 +4607,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3708,6 +4632,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3730,6 +4655,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3751,6 +4677,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3777,6 +4704,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3800,6 +4728,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3823,6 +4752,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3845,6 +4775,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3866,6 +4797,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3890,6 +4822,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3912,6 +4845,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3935,6 +4869,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3958,6 +4893,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3980,6 +4916,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4002,6 +4939,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4023,6 +4961,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4045,6 +4984,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4067,6 +5007,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4089,6 +5030,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4111,6 +5053,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4136,6 +5079,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4158,6 +5102,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4181,6 +5126,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4203,6 +5149,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4226,6 +5173,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4251,6 +5199,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4273,6 +5222,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4296,6 +5246,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4319,6 +5270,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4340,10 +5292,34 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::begin_cells
+    converted::Tally tally("CityStream_begin_cells");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1) { converted::counted([&] { return a0.begin_cells(a1); }); return Out_CityStream_begin_cells{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      CityStream::Tile a1 = draw_CityStream__Tile(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // CityStream::step_time
@@ -4363,6 +5339,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4386,10 +5363,59 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
+    }
+  }
+  {  // CityStream::work
+    converted::Tally tally("CityStream_work");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.work(a1, std::move(a2)); }); return Out_CityStream_work{std::move(a0), std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      CityStream::Tile a1 = draw_CityStream__Tile(draw);
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
+    }
+  }
+  {  // CityStream::update
+    converted::Tally tally("CityStream_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CityStream::walls_near
@@ -4410,6 +5436,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4432,6 +5459,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4458,6 +5486,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4482,6 +5511,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4504,6 +5534,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4529,6 +5560,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4551,6 +5583,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4574,6 +5607,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4595,6 +5629,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

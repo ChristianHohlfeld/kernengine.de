@@ -54,7 +54,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace controls { bool bind(kern::logic::Runtime& logic); }
 namespace controls { f32 smoothstep01(f32 t); }
 namespace controls { f32 walk_pad_axis(f32 v); }

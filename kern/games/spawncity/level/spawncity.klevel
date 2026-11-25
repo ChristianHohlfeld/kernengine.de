@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 319,
+ "nextId": 322,
  "actors": [
   {
    "id": 1,
@@ -3649,7 +3649,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -18709,7 +18709,7 @@
         "op": "<="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -21201,7 +21201,7 @@
         "op": "<="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -51982,7 +51982,7 @@
        "x": 720,
        "y": 1880,
        "values": {
-        "a": 0.000001
+        "a": 1e-06
        }
       },
       {
@@ -52287,7 +52287,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-8
+        "b": 1e-08
        }
       },
       {
@@ -61656,7 +61656,7 @@
         "op": ">="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -62602,101 +62602,6 @@
    }
   },
   {
-   "id": 95,
-   "name": "facades",
-   "folder": "Source",
-   "transform": {
-    "position": [
-     0,
-     0,
-     0
-    ],
-    "rotation": [
-     0,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "logic": {
-     "kind": "kern-logic",
-     "version": 1,
-     "nextId": 11,
-     "variables": [],
-     "library": true,
-     "structs": [
-      {
-       "name": "Facades",
-       "fields": [
-        {
-         "name": "night",
-         "type": "float",
-         "value": 0
-        },
-        {
-         "name": "u_night_",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        }
-       ]
-      }
-     ],
-     "nodes": [
-      {
-       "id": 1,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
-       "params": {
-        "function": "Facades_name"
-       }
-      },
-      {
-       "id": 2,
-       "type": "func.return",
-       "x": 280,
-       "y": 0,
-       "params": {
-        "function": "Facades_name"
-       },
-       "values": {
-        "Result": "spawncity-facades"
-       }
-      }
-     ],
-     "links": [
-      [
-       1,
-       "then",
-       2,
-       "exec"
-      ]
-     ],
-     "machines": [],
-     "functions": [
-      {
-       "name": "Facades_name",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      }
-     ]
-    }
-   }
-  },
-  {
    "id": 112,
    "name": "shapes",
    "folder": "Source",
@@ -63001,101 +62906,6 @@
      "nodes": [],
      "links": [],
      "machines": []
-    }
-   }
-  },
-  {
-   "id": 118,
-   "name": "water_look",
-   "folder": "Source",
-   "transform": {
-    "position": [
-     0,
-     0,
-     0
-    ],
-    "rotation": [
-     0,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "logic": {
-     "kind": "kern-logic",
-     "version": 1,
-     "nextId": 11,
-     "variables": [],
-     "library": true,
-     "structs": [
-      {
-       "name": "WaterLook",
-       "fields": [
-        {
-         "name": "time",
-         "type": "float",
-         "value": 0
-        },
-        {
-         "name": "u_time_",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        }
-       ]
-      }
-     ],
-     "nodes": [
-      {
-       "id": 1,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
-       "params": {
-        "function": "WaterLook_name"
-       }
-      },
-      {
-       "id": 2,
-       "type": "func.return",
-       "x": 280,
-       "y": 0,
-       "params": {
-        "function": "WaterLook_name"
-       },
-       "values": {
-        "Result": "spawncity-water"
-       }
-      }
-     ],
-     "links": [
-      [
-       1,
-       "then",
-       2,
-       "exec"
-      ]
-     ],
-     "machines": [],
-     "functions": [
-      {
-       "name": "WaterLook_name",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      }
-     ]
     }
    }
   },
@@ -83144,7 +82954,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-7
+        "b": 1e-07
        }
       },
       {
@@ -83743,7 +83553,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -97303,7 +97113,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -131863,7 +131673,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -141784,420 +141594,6 @@
    }
   },
   {
-   "id": 216,
-   "name": "facades_cpp",
-   "folder": "Source",
-   "transform": {
-    "position": [
-     0,
-     0,
-     0
-    ],
-    "rotation": [
-     0,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "logic": {
-     "kind": "kern-logic",
-     "version": 1,
-     "nextId": 17,
-     "variables": [
-      {
-       "name": "kWall",
-       "type": "struct_list",
-       "of": "ExtensionAttribute",
-       "count": 1,
-       "value": [
-        {
-         "key": "wall",
-         "size": 4,
-         "glsl": "aWall"
-        }
-       ],
-       "help": "The same vertex stream Kern's BuildingBuilder fills (key \"wall\", 4 floats).",
-       "const": true
-      }
-     ],
-     "library": true,
-     "uses": [
-      "engine_gfx_shader",
-      "facades"
-     ],
-     "structs": [
-      {
-       "name": "ExtensionAttribute",
-       "fields": [
-        {
-         "name": "key",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "size",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        },
-        {
-         "name": "glsl",
-         "type": "text",
-         "value": ""
-        }
-       ],
-       "from": "engine_gfx_shader"
-      },
-      {
-       "name": "Facades",
-       "fields": [
-        {
-         "name": "night",
-         "type": "float",
-         "value": 0
-        },
-        {
-         "name": "u_night_",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        }
-       ],
-       "from": "facades"
-      }
-     ],
-     "nodes": [
-      {
-       "id": 1,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
-       "params": {
-        "function": "Facades_vertex_declarations"
-       }
-      },
-      {
-       "id": 2,
-       "type": "func.return",
-       "x": 280,
-       "y": 0,
-       "params": {
-        "function": "Facades_vertex_declarations"
-       },
-       "values": {
-        "Result": "flat out vec4 vWall;\n"
-       }
-      },
-      {
-       "id": 3,
-       "type": "func.entry",
-       "x": 0,
-       "y": 200,
-       "params": {
-        "function": "Facades_vertex"
-       }
-      },
-      {
-       "id": 4,
-       "type": "func.return",
-       "x": 280,
-       "y": 200,
-       "params": {
-        "function": "Facades_vertex"
-       },
-       "values": {
-        "Result": "  vWall = aWall;\n"
-       }
-      },
-      {
-       "id": 5,
-       "type": "func.entry",
-       "x": 0,
-       "y": 400,
-       "params": {
-        "function": "Facades_fragment_declarations"
-       }
-      },
-      {
-       "id": 6,
-       "type": "func.return",
-       "x": 280,
-       "y": 400,
-       "params": {
-        "function": "Facades_fragment_declarations"
-       },
-       "values": {
-        "Result": "\n// flat: constant per wall (world_city_buildings.mjs snaps the seed for the same reason)\nflat in vec4 vWall;\nuniform float uNight;\nfloat fh(float n) { return fract(sin(n * 127.1) * 43758.5453); }\n"
-       }
-      },
-      {
-       "id": 7,
-       "type": "func.entry",
-       "x": 0,
-       "y": 600,
-       "params": {
-        "function": "Facades_fragment_surface"
-       }
-      },
-      {
-       "id": 8,
-       "type": "func.return",
-       "x": 280,
-       "y": 600,
-       "params": {
-        "function": "Facades_fragment_surface"
-       },
-       "values": {
-        "Result": "\n  {\n    float sdq = floor(vWall.z * 997.0 + 0.5) / 997.0;\n    vec3 wn = normalize(cross(dFdx(vWorld), dFdy(vWorld)));\n    float u = vUV.x, len = vWall.x, z = vUV.y, H = vWall.y;\n    // only Kern's building walls carry a record (len > 0); other meshes read the default (0,0,0,1)\n    if (len > 0.0 && abs(wn.z) < 0.5) {\n      vec3 glassC = vec3(0.2, 0.26, 0.32);\n      float aa = clamp(1.6 - fwidth(u) * 1.2, 0.0, 1.0);\n      float pil = 1.0 - step(0.38, u) * step(u, len - 0.38);\n      float tower = step(26.0, H);\n      float pitch = mix(2.7, 3.7, fh(sdq * 7.0)), floorH = vWall.w;\n      float nWin = max(1.0, floor((len - 0.8) / pitch)), margin = (len - nWin * pitch) * 0.5;\n      float lu = (u - margin) / pitch, fu = fract(lu), inRow = step(0.0, lu) * step(lu, nWin);\n      float gl = 0.0, trimM = 0.0;\n      if (z < 4.0 && len > 3.0) {\n        float sp = 4.4, ns = max(1.0, floor(len / sp)), sm = (len - ns * sp) * 0.5, su = fract((u - sm) / sp), inS = step(0.0, u - sm) * step(u - sm, ns * sp);\n        float win = inS * step(.08, su) * step(su, .92) * step(.35, z) * step(z, 3.0);\n        float frame = inS * step(.05, su) * step(su, .95) * step(.25, z) * step(z, 3.1) - win;\n        base = mix(base * 0.9, vec3(0.12, 0.12, 0.13), frame * aa); trimM = frame; gl = win * aa;\n        float k = fh(sdq * 11.0);\n        vec3 awn = k < .25 ? vec3(0.45, 0.09, 0.07) : k < .5 ? vec3(0.08, 0.24, 0.15) : k < .75 ? vec3(0.08, 0.15, 0.32) : vec3(0.5, 0.36, 0.08);\n        float aw = step(3.15, z) * step(z, 3.75) * aa; base = mix(base, awn * mix(1.0, 1.15, step(0.5, fract(u * 1.4))), aw);\n        base = mix(base, base * 0.78, step(3.75, z) * step(z, 4.0));\n      } else if (tower > 0.5) {\n        float fz = fract((z - 4.0) / floorH), mull = step(.95, fract(u / 1.6)), spandrel = step(.8, fz);\n        gl = (1.0 - spandrel) * (1.0 - mull) * aa * (1.0 - pil); base = mix(base, base * 0.85, spandrel * aa); trimM = mull;\n      } else {\n        float fz = fract((z - 4.0) / floorH);\n        float ww = mix(.38, .6, fh(sdq * 5.0)), wh = mix(.42, .6, fh(sdq * 9.0)), inTop = step(z, H - 1.2);\n        float win = inRow * inTop * step(.5 - ww * .5, fu) * step(fu, .5 + ww * .5) * step(.3, fz) * step(fz, .3 + wh);\n        float frame = inRow * inTop * step(.5 - ww * .5 - .05, fu) * step(fu, .5 + ww * .5 + .05) * step(.25, fz) * step(fz, .35 + wh) - win;\n        float sill = inRow * inTop * step(.5 - ww * .5 - .09, fu) * step(fu, .5 + ww * .5 + .09) * step(.2, fz) * step(fz, .25);\n        vec3 frameC = fh(sdq * 17.0) < .5 ? vec3(0.85, 0.84, 0.8) : vec3(0.14, 0.14, 0.15);\n        base = mix(base, frameC, frame * aa); base = mix(base, base * 1.12 + 0.04, sill * aa); trimM = frame + sill; gl = win * aa;\n        base *= 1.0 - 0.08 * step(.965, fz) * aa;\n      }\n      base = mix(base, base * 0.86, pil * aa);\n      base = mix(base, glassC, gl);\n      surfaceGlass = max(surfaceGlass, gl);\n      base *= mix(0.72, 1.0, smoothstep(0.0, 2.5, z));  // grime / contact darkening near the ground\n      // night: some windows lit (warm), per window and storey\n      float lit = step(0.42, fh(floor(lu) * 7.31 + floor((z - 4.0) / floorH) * 17.0 + sdq * 997.0));\n      emissive += gl * lit * uNight * vec3(1.0, 0.74, 0.42) * 1.6;\n    } else if (len < -1.5) {\n      // cornice (roughness 0.7 in the original)\n    } else if (len < -0.5 && abs(wn.z) >= 0.5) {  // roofs\n      float t = fract(sin(dot(floor(vWorld.xy * 0.7), vec2(12.99, 78.23))) * 43758.5);\n      base *= 0.88 + 0.12 * t;\n    }\n  }\n"
-       }
-      },
-      {
-       "id": 9,
-       "type": "func.entry",
-       "x": 0,
-       "y": 880,
-       "params": {
-        "function": "Facades_attributes"
-       }
-      },
-      {
-       "id": 10,
-       "type": "func.return",
-       "x": 288,
-       "y": 936,
-       "params": {
-        "function": "Facades_attributes"
-       }
-      },
-      {
-       "id": 11,
-       "type": "var.get",
-       "x": 240,
-       "y": 1088,
-       "params": {
-        "variable": "kWall"
-       }
-      },
-      {
-       "id": 12,
-       "type": "func.entry",
-       "x": 0,
-       "y": 1368,
-       "params": {
-        "function": "Facades_bind"
-       }
-      },
-      {
-       "id": 13,
-       "type": "var.set",
-       "x": 288,
-       "y": 1424,
-       "params": {
-        "variable": "location",
-        "scope": "Facades_bind"
-       }
-      },
-      {
-       "id": 14,
-       "type": "engine.program.location",
-       "x": 240,
-       "y": 1576,
-       "values": {
-        "name": "uNight"
-       }
-      },
-      {
-       "id": 15,
-       "type": "var.set",
-       "x": 576,
-       "y": 1480,
-       "params": {
-        "variable": "self",
-        "scope": "Facades_bind",
-        "path": ".u_night_"
-       }
-      },
-      {
-       "id": 16,
-       "type": "var.get",
-       "x": 528,
-       "y": 1632,
-       "params": {
-        "variable": "location",
-        "scope": "Facades_bind"
-       }
-      }
-     ],
-     "links": [
-      [
-       1,
-       "then",
-       2,
-       "exec"
-      ],
-      [
-       3,
-       "then",
-       4,
-       "exec"
-      ],
-      [
-       5,
-       "then",
-       6,
-       "exec"
-      ],
-      [
-       7,
-       "then",
-       8,
-       "exec"
-      ],
-      [
-       9,
-       "then",
-       10,
-       "exec"
-      ],
-      [
-       11,
-       "value",
-       10,
-       "Result"
-      ],
-      [
-       12,
-       "p",
-       14,
-       "program"
-      ],
-      [
-       12,
-       "then",
-       13,
-       "exec"
-      ],
-      [
-       13,
-       "then",
-       15,
-       "exec"
-      ],
-      [
-       14,
-       "result",
-       13,
-       "value"
-      ],
-      [
-       16,
-       "value",
-       15,
-       "value"
-      ]
-     ],
-     "machines": [],
-     "functions": [
-      {
-       "name": "Facades_attributes",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "struct_list",
-         "of": "ExtensionAttribute",
-         "value": []
-        }
-       ]
-      },
-      {
-       "name": "Facades_vertex_declarations",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "Facades_vertex",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "Facades_fragment_declarations",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "Facades_fragment_surface",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "Facades_bind",
-       "inputs": [
-        {
-         "name": "self",
-         "type": "struct",
-         "of": "Facades",
-         "ref": true,
-         "value": {
-          "night": 0,
-          "u_night_": 0
-         }
-        },
-        {
-         "name": "p",
-         "type": "int",
-         "value": 0
-        }
-       ],
-       "outputs": [],
-       "locals": [
-        {
-         "name": "location",
-         "type": "int",
-         "value": 0
-        }
-       ]
-      }
-     ]
-    }
-   }
-  },
-  {
    "id": 217,
    "name": "game_toss_cpp",
    "folder": "Source",
@@ -143061,419 +142457,6 @@
      "nodes": [],
      "links": [],
      "machines": []
-    }
-   }
-  },
-  {
-   "id": 220,
-   "name": "water_look_cpp",
-   "folder": "Source",
-   "transform": {
-    "position": [
-     0,
-     0,
-     0
-    ],
-    "rotation": [
-     0,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "logic": {
-     "kind": "kern-logic",
-     "version": 1,
-     "nextId": 17,
-     "variables": [
-      {
-       "name": "kWater",
-       "type": "struct_list",
-       "of": "ExtensionAttribute",
-       "count": 1,
-       "value": [
-        {
-         "key": "water",
-         "size": 3,
-         "glsl": "aWater"
-        }
-       ],
-       "const": true
-      }
-     ],
-     "library": true,
-     "uses": [
-      "engine_gfx_shader",
-      "water_look"
-     ],
-     "structs": [
-      {
-       "name": "ExtensionAttribute",
-       "fields": [
-        {
-         "name": "key",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "size",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        },
-        {
-         "name": "glsl",
-         "type": "text",
-         "value": ""
-        }
-       ],
-       "from": "engine_gfx_shader"
-      },
-      {
-       "name": "WaterLook",
-       "fields": [
-        {
-         "name": "time",
-         "type": "float",
-         "value": 0
-        },
-        {
-         "name": "u_time_",
-         "type": "int",
-         "of": "u32",
-         "value": 0
-        }
-       ],
-       "from": "water_look"
-      }
-     ],
-     "nodes": [
-      {
-       "id": 1,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
-       "params": {
-        "function": "WaterLook_vertex_declarations"
-       }
-      },
-      {
-       "id": 2,
-       "type": "func.return",
-       "x": 280,
-       "y": 0,
-       "params": {
-        "function": "WaterLook_vertex_declarations"
-       },
-       "values": {
-        "Result": "out vec3 vWater;\n"
-       }
-      },
-      {
-       "id": 3,
-       "type": "func.entry",
-       "x": 0,
-       "y": 200,
-       "params": {
-        "function": "WaterLook_vertex"
-       }
-      },
-      {
-       "id": 4,
-       "type": "func.return",
-       "x": 280,
-       "y": 200,
-       "params": {
-        "function": "WaterLook_vertex"
-       },
-       "values": {
-        "Result": "  vWater = aWater;\n"
-       }
-      },
-      {
-       "id": 5,
-       "type": "func.entry",
-       "x": 0,
-       "y": 400,
-       "params": {
-        "function": "WaterLook_fragment_declarations"
-       }
-      },
-      {
-       "id": 6,
-       "type": "func.return",
-       "x": 280,
-       "y": 400,
-       "params": {
-        "function": "WaterLook_fragment_declarations"
-       },
-       "values": {
-        "Result": "\nin vec3 vWater;\nuniform float uWaterTime;\nvec2 waveGrad(vec2 p, vec2 dir, float k, float sp, float a) { float ph = dot(p, dir) * k - uWaterTime * sp; return dir * cos(ph) * k * a; }\nfloat wh(vec2 p) { return fract(sin(dot(floor(p), vec2(41.3, 289.1))) * 43758.5); }\nfloat wn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1, 0)), f.x), mix(wh(i + vec2(0, 1)), wh(i + vec2(1, 1)), f.x), f.y); }\n"
-       }
-      },
-      {
-       "id": 7,
-       "type": "func.entry",
-       "x": 0,
-       "y": 600,
-       "params": {
-        "function": "WaterLook_fragment_surface"
-       }
-      },
-      {
-       "id": 8,
-       "type": "func.return",
-       "x": 280,
-       "y": 600,
-       "params": {
-        "function": "WaterLook_fragment_surface"
-       },
-       "values": {
-        "Result": "\n  if (vWater.x > 0.5) {\n    float shore = vWater.x - 1.0;\n    vec2 flow = vWater.yz;\n    float fl = length(flow);\n    vec2 fd = fl > 0.01 ? flow / fl : normalize(vec2(0.8, 0.6));\n    vec2 side = vec2(-fd.y, fd.x);\n    vec2 adv = vWorld.xy - flow * uWaterTime * 2.2;\n    float wDepth = clamp(shore / 9.0, 0.0, 1.0);\n    base = mix(vec3(0.08, 0.43, 0.62), vec3(0.025, 0.20, 0.36), wDepth);\n    float foam = smoothstep(0.55, 0.95, wn(adv * 0.6 + uWaterTime * 0.15)) * (1.0 - smoothstep(0.0, 2.4, shore))\n               + smoothstep(0.75, 1.0, wn(adv * 1.3)) * smoothstep(0.6, 1.6, fl) * 0.6;\n    base = mix(base, vec3(0.9, 0.94, 0.95), clamp(foam, 0.0, 0.85));\n    alpha = mix(0.55, 0.94, smoothstep(0.0, 3.0, shore));\n    vec2 g = waveGrad(adv, fd, 0.9, 2.1, 0.05) + waveGrad(adv, normalize(fd + side * 0.6), 1.7, 3.0, 0.03)\n           + waveGrad(adv, normalize(side - fd * 0.3), 2.9, 4.2, 0.018) + waveGrad(vWorld.xy, normalize(vec2(0.6, -0.8)), 5.3, 6.0, 0.008);\n    n = normalize(vec3(-g.x, -g.y, 1.0));\n  }\n"
-       }
-      },
-      {
-       "id": 9,
-       "type": "func.entry",
-       "x": 0,
-       "y": 880,
-       "params": {
-        "function": "WaterLook_attributes"
-       }
-      },
-      {
-       "id": 10,
-       "type": "func.return",
-       "x": 288,
-       "y": 936,
-       "params": {
-        "function": "WaterLook_attributes"
-       }
-      },
-      {
-       "id": 11,
-       "type": "var.get",
-       "x": 240,
-       "y": 1088,
-       "params": {
-        "variable": "kWater"
-       }
-      },
-      {
-       "id": 12,
-       "type": "func.entry",
-       "x": 0,
-       "y": 1368,
-       "params": {
-        "function": "WaterLook_bind"
-       }
-      },
-      {
-       "id": 13,
-       "type": "var.set",
-       "x": 288,
-       "y": 1424,
-       "params": {
-        "variable": "location",
-        "scope": "WaterLook_bind"
-       }
-      },
-      {
-       "id": 14,
-       "type": "engine.program.location",
-       "x": 240,
-       "y": 1576,
-       "values": {
-        "name": "uWaterTime"
-       }
-      },
-      {
-       "id": 15,
-       "type": "var.set",
-       "x": 576,
-       "y": 1480,
-       "params": {
-        "variable": "self",
-        "scope": "WaterLook_bind",
-        "path": ".u_time_"
-       }
-      },
-      {
-       "id": 16,
-       "type": "var.get",
-       "x": 528,
-       "y": 1632,
-       "params": {
-        "variable": "location",
-        "scope": "WaterLook_bind"
-       }
-      }
-     ],
-     "links": [
-      [
-       1,
-       "then",
-       2,
-       "exec"
-      ],
-      [
-       3,
-       "then",
-       4,
-       "exec"
-      ],
-      [
-       5,
-       "then",
-       6,
-       "exec"
-      ],
-      [
-       7,
-       "then",
-       8,
-       "exec"
-      ],
-      [
-       9,
-       "then",
-       10,
-       "exec"
-      ],
-      [
-       11,
-       "value",
-       10,
-       "Result"
-      ],
-      [
-       12,
-       "p",
-       14,
-       "program"
-      ],
-      [
-       12,
-       "then",
-       13,
-       "exec"
-      ],
-      [
-       13,
-       "then",
-       15,
-       "exec"
-      ],
-      [
-       14,
-       "result",
-       13,
-       "value"
-      ],
-      [
-       16,
-       "value",
-       15,
-       "value"
-      ]
-     ],
-     "machines": [],
-     "functions": [
-      {
-       "name": "WaterLook_attributes",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "struct_list",
-         "of": "ExtensionAttribute",
-         "value": []
-        }
-       ]
-      },
-      {
-       "name": "WaterLook_vertex_declarations",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "WaterLook_vertex",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "WaterLook_fragment_declarations",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "WaterLook_fragment_surface",
-       "pure": true,
-       "inputs": [],
-       "outputs": [
-        {
-         "name": "Result",
-         "type": "text",
-         "value": ""
-        }
-       ]
-      },
-      {
-       "name": "WaterLook_bind",
-       "inputs": [
-        {
-         "name": "self",
-         "type": "struct",
-         "of": "WaterLook",
-         "ref": true,
-         "value": {
-          "time": 0,
-          "u_time_": 0
-         }
-        },
-        {
-         "name": "p",
-         "type": "int",
-         "value": 0
-        }
-       ],
-       "outputs": [],
-       "locals": [
-        {
-         "name": "location",
-         "type": "int",
-         "value": 0
-        }
-       ]
-      }
-     ]
     }
    }
   },
@@ -304784,7 +303767,7 @@
         "scope": "finish"
        },
        "values": {
-        "value": 0.000001
+        "value": 1e-06
        }
       },
       {
@@ -330211,7 +329194,7 @@
       {
        "name": "kBearingDrag",
        "type": "float",
-       "value": 1.5e-7,
+       "value": 1.5e-07,
        "help": "propulsion_authority.mjs MOTOR_BEARING_DRAG_NM_PER_RAD_S",
        "const": true
       },
@@ -330643,7 +329626,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -330666,7 +329649,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -330765,7 +329748,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -330783,7 +329766,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -331213,7 +330196,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -331231,7 +330214,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -331543,7 +330526,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -331561,7 +330544,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -331964,7 +330947,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -332254,7 +331237,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -332338,7 +331321,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -332356,7 +331339,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353617,7 +352600,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353635,7 +352618,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353833,7 +352816,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353851,7 +352834,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354050,7 +353033,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354068,7 +353051,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354925,7 +353908,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355004,7 +353987,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355022,7 +354005,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355273,7 +354256,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -355316,7 +354299,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355395,7 +354378,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355413,7 +354396,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355660,7 +354643,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355739,7 +354722,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355757,7 +354740,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356013,7 +354996,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -356290,7 +355273,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -356369,7 +355352,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356387,7 +355370,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356757,7 +355740,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -356836,7 +355819,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356854,7 +355837,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -357249,7 +356232,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -357328,7 +356311,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -357346,7 +356329,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -485419,7 +484402,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -719977,7 +718960,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -775841,7 +774824,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -847155,7 +846138,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -878364,7 +877347,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1021937,7 +1020920,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -1061220,7 +1060203,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1061436,7 +1060419,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -1253202,7 +1252185,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -1313834,7 +1312817,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-7
+        "b": 1e-07
        }
       },
       {
@@ -1409759,7 +1408742,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1409782,7 +1408765,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1409941,7 +1408924,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1409959,7 +1408942,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1418676,7 +1417659,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1418694,7 +1417677,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1421091,7 +1420074,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1421109,7 +1420092,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1433152,7 +1432135,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433170,7 +1432153,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433225,7 +1432208,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433243,7 +1432226,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433410,7 +1432393,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433428,7 +1432411,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433551,7 +1432534,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433569,7 +1432552,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433687,7 +1432670,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433705,7 +1432688,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433854,7 +1432837,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433872,7 +1432855,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434059,7 +1433042,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434077,7 +1433060,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434206,7 +1433189,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434224,7 +1433207,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434397,7 +1433380,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434415,7 +1433398,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434699,7 +1433682,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434717,7 +1433700,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434905,7 +1433888,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434923,7 +1433906,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435053,7 +1434036,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435071,7 +1434054,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435201,7 +1434184,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435219,7 +1434202,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1455533,7 +1454516,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1455556,7 +1454539,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1455717,7 +1454700,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1455735,7 +1454718,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1456256,7 +1455239,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1456274,7 +1455257,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1457274,7 +1456257,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1459780,7 +1458763,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1462435,7 +1461418,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1472152,7 +1471135,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472170,7 +1471153,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472300,7 +1471283,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472318,7 +1471301,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472441,7 +1471424,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472459,7 +1471442,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472584,7 +1471567,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472602,7 +1471585,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472776,7 +1471759,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472794,7 +1471777,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1474573,7 +1473556,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474591,7 +1473574,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474764,7 +1473747,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474782,7 +1473765,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474950,7 +1473933,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474968,7 +1473951,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475140,7 +1474123,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475158,7 +1474141,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475349,7 +1474332,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475367,7 +1474350,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475736,7 +1474719,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475754,7 +1474737,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1523587,7 +1522570,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1523610,7 +1522593,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1523771,7 +1522754,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1523789,7 +1522772,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1524274,7 +1523257,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1524292,7 +1523275,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1524603,7 +1523586,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1524621,7 +1523604,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527106,7 +1526089,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527124,7 +1526107,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527297,7 +1526280,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527315,7 +1526298,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527489,7 +1526472,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527507,7 +1526490,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527745,7 +1526728,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527763,7 +1526746,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527961,7 +1526944,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527979,7 +1526962,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528172,7 +1527155,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528190,7 +1527173,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528387,7 +1527370,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528405,7 +1527388,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1529732,7 +1528715,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1529755,7 +1528738,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1529854,7 +1528837,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1529872,7 +1528855,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1530302,7 +1529285,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1530320,7 +1529303,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1530504,7 +1529487,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1530522,7 +1529505,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1530733,7 +1529716,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -1531020,7 +1530003,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -1531104,7 +1530087,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1531122,7 +1530105,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1531664,7 +1530647,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1531743,7 +1530726,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1531761,7 +1530744,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532031,7 +1531014,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1532110,7 +1531093,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532128,7 +1531111,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532394,7 +1531377,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1532473,7 +1531456,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532491,7 +1531474,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1548056,7 +1547039,7 @@
          "prop_d": 0.127,
          "kv": 2300,
          "R": 0.08,
-         "J": 0.000011,
+         "J": 1.1e-05,
          "Ct": 0.105,
          "Cq": 0.012,
          "motor_limit_a": 45,
@@ -1548135,7 +1547118,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1548153,7 +1547136,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1558583,7 +1557566,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1558606,7 +1557589,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1558705,7 +1557688,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1558723,7 +1557706,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1559153,7 +1558136,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1559171,7 +1558154,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1559355,7 +1558338,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1559373,7 +1558356,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1559562,7 +1558545,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -1559852,7 +1558835,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -1559936,7 +1558919,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1559954,7 +1558937,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1618439,7 +1617422,7 @@
         "prop_d": 0.127,
         "kv": 2300,
         "R": 0.08,
-        "J": 0.000011,
+        "J": 1.1e-05,
         "Ct": 0.105,
         "Cq": 0.012,
         "motor_limit_a": 45,
@@ -1831463,7 +1830446,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1832442,7 +1831425,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1841477,7 +1840460,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -2183991,7 +2182974,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184070,7 +2183053,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184088,7 +2183071,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184356,7 +2183339,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -2184399,7 +2183382,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184478,7 +2183461,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184496,7 +2183479,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184748,7 +2183731,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184827,7 +2183810,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184845,7 +2183828,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2185098,7 +2184081,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2185177,7 +2184160,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2185195,7 +2184178,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2215853,7 +2214836,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -2255983,6 +2254966,108 @@
      "nodes": [],
      "links": [],
      "machines": []
+    }
+   }
+  },
+  {
+   "id": 319,
+   "name": "Facades",
+   "folder": "Source",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 1,
+     "variables": [],
+     "nodes": [],
+     "links": [],
+     "machines": [],
+     "functions": []
+    }
+   }
+  },
+  {
+   "id": 320,
+   "name": "WaterLook",
+   "folder": "Source",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 1,
+     "variables": [],
+     "nodes": [],
+     "links": [],
+     "machines": [],
+     "functions": []
+    }
+   }
+  },
+  {
+   "id": 321,
+   "name": "SpawnCityApp",
+   "folder": "Source",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 1,
+     "variables": [],
+     "nodes": [],
+     "links": [],
+     "machines": [],
+     "functions": []
     }
    }
   }

@@ -16,7 +16,7 @@
 #include "../../src/destruction.h"
 #include "../../src/guided.h"
 #include "../../src/combat_detail.h"
-#include "../../src/combat_audio.h"
+#include "level_blueprints.h"
 #include "../../src/drone.h"
 #include "../../src/game_ui.h"
 #include "../../src/game_combat.h"
@@ -75,7 +75,13 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
 namespace net { enum class ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
@@ -85,13 +91,7 @@ namespace net { enum class ClientState : i8 {
   challenged = 2,       // sending responses
   connected = 3,
 }; }
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
 namespace game { namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } } }
 struct PadState {
   bool connected = false;

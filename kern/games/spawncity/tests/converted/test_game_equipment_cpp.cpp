@@ -127,7 +127,13 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct BlueprintWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -136,7 +142,22 @@ struct Instance : converted::EngineObject {
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
 namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
 namespace audio { using ClipId = u32; }
@@ -167,7 +188,38 @@ struct Mixer : converted::EngineObject {
   void set_volume(const u64& voice, const double& volume, const double& ramp = 0.03) const;
   void set_position(const u64& voice, const Vec3& position, const Vec3& velocity = {}) const;
 };
-namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
+namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace audio { struct SynthPatch {
+  Wave wave = Wave::square;
+  f32 volume = 0.5;
+  // envelope (seconds): attack, sustain (with optional punch), release
+  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
+  // pitch
+  f32 frequency = 440;          // Hz at the start
+  f32 slide = 0;                // octaves per second
+  f32 slide_accel = 0;          // octaves per second^2
+  f32 min_frequency = 20;       // the slide stops here
+  f32 vibrato_depth = 0;        // semitones
+  f32 vibrato_rate = 6;         // Hz
+  f32 arp_ratio = 1;            // frequency multiplier after arp_time
+  f32 arp_time = 0;             // seconds, 0 = off
+  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
+  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
+  // filters
+  f32 lowpass = 0;              // Hz, 0 = off
+  f32 lowpass_sweep = 0;        // octaves per second
+  f32 resonance = 0;            // 0..0.95
+  f32 highpass = 0;             // Hz, 0 = off
+  // modulation
+  f32 tremolo_depth = 0, tremolo_rate = 0;
+  f32 repeat = 0;               // seconds: restart the pitch envelope
+  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
+  u32 seed = 1;                 // noise
+}; }
+namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
+namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
+namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
+namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -181,6 +233,12 @@ struct NightWindows : public ShaderExtension {
 namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
 namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
 struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct BitWriter : converted::EngineObject {
@@ -222,60 +280,207 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
+struct EngineObjects : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Engine : converted::EngineObject {
+struct Sink : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct App : converted::EngineObject {
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+struct PureNodes : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
-namespace audio { struct SynthPatch {
-  Wave wave = Wave::square;
-  f32 volume = 0.5;
-  // envelope (seconds): attack, sustain (with optional punch), release
-  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
-  // pitch
-  f32 frequency = 440;          // Hz at the start
-  f32 slide = 0;                // octaves per second
-  f32 slide_accel = 0;          // octaves per second^2
-  f32 min_frequency = 20;       // the slide stops here
-  f32 vibrato_depth = 0;        // semitones
-  f32 vibrato_rate = 6;         // Hz
-  f32 arp_ratio = 1;            // frequency multiplier after arp_time
-  f32 arp_time = 0;             // seconds, 0 = off
-  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
-  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
-  // filters
-  f32 lowpass = 0;              // Hz, 0 = off
-  f32 lowpass_sweep = 0;        // octaves per second
-  f32 resonance = 0;            // 0..0.95
-  f32 highpass = 0;             // Hz, 0 = off
-  // modulation
-  f32 tremolo_depth = 0, tremolo_rate = 0;
-  f32 repeat = 0;               // seconds: restart the pitch envelope
-  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
-  u32 seed = 1;                 // noise
-}; }
-namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
-namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
-namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
-namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
-struct SoundBank : converted::EngineObject {
+struct Chars : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GameAudio : converted::EngineObject {
+struct String : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct P_engine_mixer_bus : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_game_world_hud_mut : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_game_world_events : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_game_world_sound_cues : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_game_world_shots : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_building_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_road_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_visible : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_layers : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_pick_bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_linear_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_material : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_texture : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_positions : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_uvs : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_indices : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_joints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_weights : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_bones : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_transforms : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_tints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_instance_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_instance_count : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_mirror : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_local_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_world_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_gpu : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_sort_distance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mesh_live_index : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_shader_extension_material_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_shader_extension_attribute_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_desc_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_desc_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_desc_mipmaps : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_desc_repeat : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_desc_nearest : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mixer_speed_of_sound : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_mixer_doppler_factor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_game_world_logic_native : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_property_change_actor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_property_change_path : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_motion_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_motion_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_motion_asset_keys : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_night_windows_night : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_sound_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_sound_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_sound_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_asset_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_texture_asset_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_simulator_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct P_engine_character_mover_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Machine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Layout : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BlueprintCore : public PureNodes {
+  using PureNodes::PureNodes;
+};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
+namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
+namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

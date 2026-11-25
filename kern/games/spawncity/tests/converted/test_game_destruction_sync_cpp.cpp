@@ -46,11 +46,6 @@ namespace logic { enum class PinType : u8 {
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
   callback, count
 }; }
-namespace DestroySync { using Craters = std::vector<Terrain::CraterRec>; }
-namespace DestroySync { using DamageList = std::vector<CityStream::DamageRec>; }
-namespace DestroySync { using Points = std::vector<std::pair<u32, f32>>; }
-namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
-namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -58,6 +53,17 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace BlueprintCore { using U16 = ::kern::logic::Sized<u16>; }
+namespace BlueprintCore { using U32 = ::kern::logic::Sized<u32>; }
+namespace BlueprintCore { using I8 = ::kern::logic::Sized<i8>; }
+namespace BlueprintCore { using I16 = ::kern::logic::Sized<i16>; }
+namespace BlueprintCore { using I32 = ::kern::logic::Sized<i32>; }
+namespace DestroySync { using Craters = std::vector<Terrain::CraterRec>; }
+namespace DestroySync { using DamageList = std::vector<CityStream::DamageRec>; }
+namespace DestroySync { using Points = std::vector<std::pair<u32, f32>>; }
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
 namespace wire { struct F32 { f32 v = 0; }; }

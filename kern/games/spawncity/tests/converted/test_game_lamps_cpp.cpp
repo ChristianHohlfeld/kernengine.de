@@ -153,8 +153,6 @@ namespace logic { enum class PinType : u8 {
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
   callback, count
 }; }
-namespace GpsLive { enum class View : u8 { eye, follow, map }; }
-namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -162,6 +160,9 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace GpsLive { enum class View : u8 { eye, follow, map }; }
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 Mat4 yaw_at(Vec3 p, f32 yaw) { return Mat4::trs(p, Quat::axis_angle({0, 0, 1}, yaw), {1, 1, 1}); }
 Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 std::vector<f32> glass_pcm(u32 rate) {

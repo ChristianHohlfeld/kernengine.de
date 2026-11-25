@@ -56,6 +56,7 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
 f32 lane_distance(const Lane& l, Vec2 p) {
   f32 best = 1e9;
   for (std::size_t i = 0; converted::plus(i, 1) < l.points.size(); converted::pre_inc(i)) {

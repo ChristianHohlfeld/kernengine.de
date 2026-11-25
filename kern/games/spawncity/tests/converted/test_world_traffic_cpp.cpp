@@ -48,6 +48,9 @@ struct Lane {
   u64 tile = 0;
   bool alive = true;
 };
+struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
@@ -55,6 +58,16 @@ namespace logic { enum class PinType : u8 {
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
   callback, count
 }; }
+struct Variable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct StructField : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FunctionPin : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 struct TrafficRules {
  public:

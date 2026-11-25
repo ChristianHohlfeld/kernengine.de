@@ -45,6 +45,7 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
 i16 dms(f32 v) { return static_cast<i16>(std::lround(clampf(v * 10, -32000, 32000))); }
 #undef private
 #undef protected

@@ -37,7 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 namespace combat { enum class FunEvent : u8 { tick, world_kill_person, world_kill_car, world_kill_bus, world_kill_player, police_kill, emp, escape, damage, drone_destroyed, player_death, cycle_contract }; }
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -45,6 +44,8 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
 struct PoliceDrone {
   bool active = false, sees = false, emp = false, retreating = false;
   Vec3 pos, vel, target, retreat_goal;
