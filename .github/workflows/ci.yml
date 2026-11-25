@@ -43,7 +43,7 @@ jobs:
   # go with 1/12 of pass 1.
   native-spawncity-build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
       - uses: actions/checkout@v4
       - name: Build the SpawnCity tests (ASan/UBSan)
@@ -61,7 +61,7 @@ jobs:
   native-spawncity:
     needs: native-spawncity-build
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
