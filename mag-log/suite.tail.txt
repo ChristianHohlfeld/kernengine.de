@@ -1,0 +1,80 @@
+  253 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_vehicle_art_lowered.cpp:724:32: error: unknown type name 'MeshData'; did you mean 'kern::MeshData'?
+  724 |       ::sc::lowered::Arg<const MeshData &> o2;
+      |                                ^~~~~~~~
+      |                                kern::MeshData
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/include/kern/geo/mesh_data.h:12:8: note: 'kern::MeshData' declared here
+   12 | struct MeshData {
+      |        ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_vehicle_art_lowered.cpp:725:32: error: unknown type name 'MeshData'; did you mean 'kern::MeshData'?
+  725 |       ::sc::lowered::Arg<const MeshData &> n2;
+      |                                ^~~~~~~~
+      |                                kern::MeshData
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/include/kern/geo/mesh_data.h:12:8: note: 'kern::MeshData' declared here
+   12 | struct MeshData {
+      |        ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_vehicle_art_lowered.cpp:770:32: error: unknown type name 'Mat4'; did you mean 'kern::Mat4'?
+  770 |       ::sc::lowered::Arg<const Mat4 &> o0;
+      |                                ^~~~
+      |                                kern::Mat4
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/include/kern/math/math.h:98:8: note: 'kern::Mat4' declared here
+   98 | struct Mat4 {
+      |        ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_vehicle_art_lowered.cpp:771:32: error: unknown type name 'Mat4'; did you mean 'kern::Mat4'?
+  771 |       ::sc::lowered::Arg<const Mat4 &> n0;
+      |                                ^~~~
+      |                                kern::Mat4
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/include/kern/math/math.h:98:8: note: 'kern::Mat4' declared here
+   98 | struct Mat4 {
+      |        ^
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_touch_play_lowered.cpp:7:
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/../source_diff.h:468:19: error: static assertion failed due to requirement 'sizeof(sc_old_touch_play::sc::TouchBtn *) == 0': a value the test cannot compare
+  468 |     static_assert(sizeof(X) == 0, "a value the test cannot compare");
+      |                   ^~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/../source_diff.h:413:53: note: in instantiation of function template specialization 'sc::lowered::same<sc_old_touch_play::sc::TouchBtn *, int>' requested here
+  413 |     return a.has_value() == b.has_value() && (!a || same(*a, *b));
+      |                                                     ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/../source_diff.h:817:10: note: in instantiation of function template specialization 'sc::lowered::same<std::optional<sc_old_touch_play::sc::TouchBtn *>, std::optional<int>>' requested here
+  817 |     if (!same(a, b)) text += (text.empty() ? "" : ", ") + std::string(what);
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_touch_play_lowered.cpp:1367:15: note: in instantiation of function template specialization 'sc::lowered::Differs::check<std::optional<sc_old_touch_play::sc::TouchBtn *>, std::optional<int>>' requested here
+ 1367 |       differs.check("what it returns", o_r, n_r);
+      |               ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/../source_diff.h:468:29: note: expression evaluates to '8 == 0'
+  468 |     static_assert(sizeof(X) == 0, "a value the test cannot compare");
+      |                   ~~~~~~~~~~^~~~
+1 error generated.
+7 warnings generated.
+4 errors generated.
+3 warnings generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:181:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  181 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:229:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  229 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:619:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  619 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:668:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  668 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/test_mp.cpp:356:30: error: non-const lvalue reference to type 'U32' (aka 'Sized<unsigned int>') cannot bind to a value of unrelated type 'blueprints::qr_code_cpp::Int' (aka 'kern::logic::Whole')
+  356 |   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+      |                              ^~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/tests/test_util.h:23:11: note: expanded from macro 'SC_CHECK'
+   23 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-1755-voll-175235-1998/kern/games/spawncity/src/level_blueprints.h:589:56: note: passing argument to parameter 'level_bits' here
+  589 |   read_formatResult read_format(const qr_Code& c, U32& level_bits, U32& mask) {
+      |                                                        ^
+1 error generated.
+1 warning generated.
+4 warnings generated.
+
+real	16m12,781s
+user	441m12,396s
+sys	4m50,575s
