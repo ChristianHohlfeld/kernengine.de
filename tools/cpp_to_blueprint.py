@@ -11326,6 +11326,23 @@ class Emit:
                     n = self.ex(a[1], "Int")
                     if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
                         return self.ex(lst, t), t
+                # a view to read of the entries a pointer points at, as many as it says - `{bytes, length}` of a pointer into
+                # a list (an export's: the host's bytes): those entries, copied into a list of their own (a view that is read
+                # gives what they are; Copy Bytes, as memcpy)
+                p = bare(a[0])
+                while p.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(p):
+                    p = bare(kids(p)[0])
+                held = self.pointers.get((p.get("referencedDecl") or {}).get("id")) if p.get("kind") == "DeclRefExpr" else None
+                args_ = template_args(re.sub(r"^const\s+|\s*&$", "", qtype(b).strip()))
+                code = pointer_code(self.u, a[0])
+                widths = {"u8": 1, "i8": 1}   # (bytes: their count is the count of the entries - of wider numbers it would be a formula)
+                if held is not None and args_ and re.match(r"const\b", args_[0].strip()) and code in widths and BYTE_FIELD.get(code) == it and held[2] == it:
+                    lname, aname, _ = held
+                    n = self.ex(a[1], "Int")
+                    made = self.temp("part", t)
+                    self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {n}, {u.zero(it)});",
+                                f"list_copy_bytes<{text_literal(code)}, {text_literal(code)}>({made}, 0, {lname}, {aname}, {n});"])
+                    return made, t
                 raise Wait("a view (Span) of a part of a list")
             if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
                 # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:
