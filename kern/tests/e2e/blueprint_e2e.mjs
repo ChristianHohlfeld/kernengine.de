@@ -600,29 +600,53 @@ check(errorsOf(await logic()).length === 0, "both compile" + (errorsOf(await log
 await cmd({cmd: "logicClose"});
 
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
-// The level as the built game carries it (kern/games/spawncity/build.sh): without the folder "Source" - the Blueprints
-// written from the game's C++, which stand beside it until their file switches. KERN_E2E_WHOLE_LEVEL=1 opens the whole
-// project instead, every Blueprint of "Source" with it (the Blueprint Game has every function of ~40 files): that is
-// step 6 of kern/games/spawncity/BLUEPRINTS.md, "the project loads in the editor", and still open - with the whole
-// level this test did not end within the CI's 30 minutes (run 45613904805, 25.11.2026).
-const whole = process.env.KERN_E2E_WHOLE_LEVEL === "1";
-const file = JSON.parse(await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text());
-if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
-const text = JSON.stringify(file);
-const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
-check(opened?.ok !== false, "SpawnCity's level file opens in the editor" + (opened?.error ? ": " + opened.error : ""));
-let st = await state();
-check(st.level?.name === "SpawnCity", `it is the level SpawnCity (${st.level?.name})`);
-// (the level file says which actors carry a Blueprint; the editor's state lists every actor as [id, name])
-const carriers = JSON.parse(text).actors.filter(a => a.components?.logic).map(a => a.name);
-const withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
-check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its rule actors are there (${withBlueprint.map(a => a.name).join(", ")})`);
-for (const a of withBlueprint) {
-  await cmd({cmd: "logicOpen", owner: a.id});
-  l = await logic();
-  const bad = errorsOf(l);
-  check(bad.length === 0 && l.nodes.every(n => n.title), `${a.name}: its Blueprint compiles in the editor (${l.functions.length} functions, ${l.nodes.length} nodes)` + (bad.length ? ": " + bad.slice(0, 3).join(" | ") : ""));
-  await cmd({cmd: "logicClose"});
+// The whole project first: every Blueprint of the level file, the folder "Source" with it - the Blueprints written
+// from the game's C++ (the Blueprint Game has every function of ~40 files, tens of thousands of nodes). The editor
+// opens each one (step 6 of kern/games/spawncity/BLUEPRINTS.md, "the project loads in the editor"): a Blueprint
+// too large for one canvas shows a function's body at a time - its largest is opened too. Then the level as the
+// built game carries it (kern/games/spawncity/build.sh: without "Source"), and Play runs that.
+const levelText = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
+let withBlueprint = [];
+for (const whole of [true, false]) {
+  const file = JSON.parse(levelText);
+  if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
+  const text = JSON.stringify(file);
+  const what = whole ? "the whole project" : "the level the game carries";
+  const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
+  check(opened?.ok !== false, `SpawnCity's level file opens in the editor (${what})` + (opened?.error ? ": " + opened.error : ""));
+  const st = await state();
+  check(st.level?.name === "SpawnCity", `it is the level SpawnCity (${st.level?.name})`);
+  // (the level file says which actors carry a Blueprint; the editor's state lists every actor as [id, name])
+  const carriers = file.actors.filter(a => a.components?.logic).map(a => a.name);
+  withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
+  check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its ${carriers.length} Blueprints are there (${what})`);
+  let slowest = ["", 0], nodes = 0, bad = 0;
+  for (const a of withBlueprint) {
+    const start = Date.now();
+    await cmd({cmd: "logicOpen", owner: a.id});
+    let l = await logic();
+    const issues = errorsOf(l);
+    let ok = issues.length === 0 && l.nodes.every(n => n.title);
+    if (l.sheets?.length) {
+      // (sheets: what is shown is one function's body - the largest one is drawn too, and it is that function's)
+      const largest = l.sheets.reduce((x, y) => (y.nodes > x.nodes ? y : x));
+      await cmd({cmd: "logicSheet", function: largest.name});
+      l = await logic();
+      ok = ok && l.sheet === largest.name && l.nodes.length === largest.nodes && l.nodes.every(n => n.title) && l.nodes.some(n => n.id === largest.entry);
+      ok = ok && await until(async () => await page.locator("#logicEditor .lg-node").count() === largest.nodes, 60000);
+    }
+    const ms = Date.now() - start;
+    if (ms > slowest[1]) slowest = [a.name, ms];
+    nodes += l.counts?.nodes || 0;
+    if (!ok) bad++;
+    // (one line for each of the rule Blueprints the game runs, and for every one that fails; the others are summed below)
+    if (!ok || !whole) check(ok, `${a.name}: its Blueprint compiles in the editor (${l.functions.length} functions, ${l.counts?.nodes} nodes)` + (issues.length ? ": " + issues.slice(0, 3).join(" | ") : ""));
+    await cmd({cmd: "logicClose"});
+  }
+  if (whole) {
+    check(bad === 0, `every one of the ${withBlueprint.length} Blueprints opens and compiles in the editor (${nodes} nodes; the slowest, ${slowest[0]}, in ${slowest[1]} ms)`);
+    check(slowest[1] < 20000, `none takes longer than 20 s to open (${slowest[0]}: ${slowest[1]} ms)`);
+  }
 }
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).logic?.compiled >= withBlueprint.length, 60000), `Play runs them as machine code (${(await status()).logic?.compiled} compiled)`);
