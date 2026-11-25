@@ -445,7 +445,8 @@ int main(int argc, char** argv) {
               "bool bind(kern::logic::Runtime& logic);\n\n}  // namespace blueprints\n";
     out += "\n// ---------------------------------------------------------------------------\n"
            "// How the program binds the classes of the header (blueprints::bind; each binds in the source of its glue).\n"
-           "namespace blueprints {\n";
+           "namespace blueprints {\n"
+           "bool bind(kern::logic::Runtime& logic);  // (as " + header_path_name + " declares it)\n";
     for (const std::string& b : binds) out += "bool bind_" + b + "(kern::logic::Runtime& logic);\n";
     out += "}  // namespace blueprints\n"
            "bool blueprints::bind(kern::logic::Runtime& logic) {\n  (void)logic;\n  bool all = true;\n";
