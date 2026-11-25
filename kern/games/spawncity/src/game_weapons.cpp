@@ -6,7 +6,8 @@
 #include <cmath>
 
 #include "game.h"
-#include "person_hit.h"
+#include "blueprint_call.h"     // (rules::decimal: a number of the game into a Blueprint)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: person_hit
 
 namespace sc {
 
@@ -133,14 +134,14 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
   // self-hit; his body is the soldier's capsule, the hit is by the person's pose)
   if (by_player && mode_ == Mode::drone && !player_dead_ && world_->actor_alive(soldier_)) {
     const Vec3 c = matrix_of(soldier_).translation();
-    f32 t = 2;
-    const BodyPart part = person_hit::hit(c - Vec3{0, 0, 0.73f}, world_->camera_yaw() * kDeg, 0, from, to - from, t);
-    if (part != BodyPart::none) {
-      out.to = from + (to - from) * t;
+    f64 t = 2;  // (the Blueprint person_hit, called as its class: its numbers - rules::decimal in)
+    const blueprints::person_hit::BodyPart part = kern::logic::blueprint<blueprints::person_hit>().hit(t, c - Vec3{0, 0, 0.73f}, rules::decimal(world_->camera_yaw() * kDeg), 0.0, from, to - from).Result;
+    if (part != blueprints::person_hit::BodyPart::none) {
+      out.to = from + (to - from) * static_cast<f32>(t);
       out.surface = 3;
       out.impact = true;
       shot_flesh_ = true;
-      world_->damage(soldier_, damage * (part == BodyPart::head ? 2.0f : part == BodyPart::legs ? 0.7f : 1.0f), 0, false, from);
+      world_->damage(soldier_, damage * (part == blueprints::person_hit::BodyPart::head ? 2.0f : part == blueprints::person_hit::BodyPart::legs ? 0.7f : 1.0f), 0, false, from);
       return true;
     }
   }
