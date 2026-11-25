@@ -1514,7 +1514,9 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 **Die Blueprints der Welt.** Was eine Logik laufen lässt, sieht ein Blueprint mit dem Knoten der Engine
 `engine.game.blueprints_running` (`kern::game::blueprints_running(const logic::Runtime&)`, das Handle aus
 `engine.game_world.logic_runtime`): je Blueprint Name, Stufe, Zahl der Funktionen und Knoten seines Graphen, ob er
-angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Die Sprache selbst (`kern::logic::`) hat keine
+angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Ohne Kopie, einzeln: `engine.game.blueprint_count`
+und je Index `blueprint_name` (die Referenz, wo die Logik den Namen hält), `blueprint_tier`, `blueprint_functions`,
+`blueprint_nodes`, `blueprint_disabled` – ein Index ohne Blueprint nennt keinen („“, 0, false). Die Sprache selbst (`kern::logic::`) hat keine
 Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `engine_blueprints_running`.
 
 ### Formeln

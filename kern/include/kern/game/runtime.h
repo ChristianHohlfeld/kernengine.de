@@ -719,5 +719,14 @@ struct BlueprintRunning {
 /// The Blueprints a logic runs, in the order it runs them (logic::Runtime::instances): what a Blueprint or a tool
 /// shows of them - the node engine.blueprints_running.
 std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic);
+/// The same without a copy, one by one (each a node of the engine - engine.game.blueprint_*): how many Blueprints the
+/// logic runs, and of the one at `at` (in the order it runs them) its name where the logic holds it, how it runs, the
+/// functions and nodes of its graph, whether it stopped. An index the logic has no Blueprint at names none: "", 0, false.
+std::size_t blueprint_count(const logic::Runtime& logic);
+const std::string& blueprint_name(const logic::Runtime& logic, std::size_t at);
+const char* blueprint_tier(const logic::Runtime& logic, std::size_t at);
+std::size_t blueprint_functions(const logic::Runtime& logic, std::size_t at);
+std::size_t blueprint_nodes(const logic::Runtime& logic, std::size_t at);
+bool blueprint_disabled(const logic::Runtime& logic, std::size_t at);
 
 }  // namespace kern::game
