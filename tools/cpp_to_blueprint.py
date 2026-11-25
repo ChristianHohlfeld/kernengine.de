@@ -3802,6 +3802,8 @@ class Emit:
                 copies.append((p, name, t))
         if "ref" in f.kinds:
             f.pure = False   # (it changes a place of its caller: a step, not a value)
+        if f.pure and self.writes_outside(d, body):
+            f.pure = False   # (it changes what is not its own - through a reference, a pointer, a call's place: a step)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
         if d.get("kind") == "CXXDestructorDecl":
@@ -4707,6 +4709,34 @@ class Emit:
             self.named_places.add(v["id"])
 
     named_places = frozenset()
+
+    def writes_outside(self, d, body):
+        """Does the function change anything but its own values - its locals and its inputs by value? What it
+        changes through a reference it declares (`PadState& p = game().pad; p.pressed = …`), through a pointer, at
+        the place a call gives, a variable of the file or a field of an object: then it is a step, never a value
+        (a function read as a value only computes)."""
+        if body is None:
+            return False
+        own = {p["id"] for p in kids(d) if p.get("kind") == "ParmVarDecl" and "&" not in qtype(p) and "*" not in qtype(p)}
+        own |= {v["id"] for v in walk(body) if v.get("kind") == "VarDecl" and v.get("storageClass") != "static"
+                and not qtype(v).rstrip().endswith("&") and "*" not in qtype(v)}
+        # (a reference to a part of its own value is its own too - `i32& v = corner[at];`, `for (auto& x : list)` of a
+        # list of its own)
+        grew = True
+        while grew:
+            grew = False
+            for v in walk(body):
+                if v.get("kind") == "VarDecl" and v["id"] not in own and qtype(v).rstrip().endswith("&") and v.get("init") and kids(v) and self.root(kids(v)[-1]) in own:
+                    own.add(v["id"])
+                    grew = True
+                elif v.get("kind") == "CXXForRangeStmt":
+                    declared = [x for c in kids(v) if c.get("kind") == "DeclStmt" for x in kids(c) if x.get("kind") == "VarDecl"]
+                    if any(x["id"] in own for x in declared if (x.get("name") or "").startswith("__range")):
+                        for x in declared:
+                            if not (x.get("name") or "").startswith("__") and x["id"] not in own:
+                                own.add(x["id"])
+                                grew = True
+        return any(i is None or i not in own for i in self.assigned(body, steps=True))
 
     def steps_in(self, n):
         """Does working out this expression change something (a call that changes its object or what it is

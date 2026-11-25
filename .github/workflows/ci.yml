@@ -79,6 +79,16 @@ jobs:
           KERN_JOBS: 4
         run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
 
+  # The converter's small cases (tools/converter_cases): forms of the game's C++ and what their Blueprint text must say.
+  converter-cases:
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Converter cases
+        run: CLANGXX=clang++ tools/converter_cases/run.sh
+
   native:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
