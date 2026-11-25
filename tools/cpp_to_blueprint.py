@@ -15658,11 +15658,13 @@ def wire_words(p, before, aliases):
         return ["text"]
     if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
         return ["bytes", "at"]
-    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return ["floats", "at"]
+    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] in (["bytes", "at"], ["floats", "at"])):
         return ["len"]
     if t in C_WORDS:
         return [C_WORDS[t]]
-    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
+    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
 
 
 def wire_out(d, aliases):
