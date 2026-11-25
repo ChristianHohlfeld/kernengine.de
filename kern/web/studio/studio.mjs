@@ -1050,7 +1050,9 @@ class StudioPage {
     if (!p) return;
     const key = JSON.stringify(p);
     $("#projectName").textContent = p.name + (p.dirty ? " *" : "");
-    if (key === this.panelKeys.project || $("#projectBody").contains(document.activeElement)) return;
+    // (not while a field of it is being typed in - a button or a box that has the focus does not hold it back)
+    const typing = document.activeElement?.matches?.('#projectBody textarea, #projectBody input:not([type="radio"]):not([type="checkbox"])');
+    if (key === this.panelKeys.project || typing) return;
     this.panelKeys.project = key;
     const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
     const levels = p.levels.map(l => `<div class="prow" data-name="${esc(l)}"><label><input type="radio" name="projectStart" value="${esc(l)}"${l === p.startLevel ? " checked" : ""}> ${esc(l)}</label>

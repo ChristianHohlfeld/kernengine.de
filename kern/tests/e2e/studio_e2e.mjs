@@ -587,7 +587,7 @@ const vpCenter = async (page, i = 0) => {
     // (on a desktop the outliner stands beside the viewport: no tabs)
     await page.click("#projectBox > summary");
     await cmd(page, {cmd: "projectSet", levels: ["levels/a.klevel", "levels/b.klevel"]});
-    check(await until(() => page.locator('#projectBody input[name="projectStart"]').count() === 2), "project: the outliner lists its levels");
+    check(await until(async () => await page.locator('#projectBody input[name="projectStart"]').count() === 2), "project: the outliner lists its levels");
     await page.check('#projectBody input[name="projectStart"][value="levels/b.klevel"]');
     check(await until(async () => (await state(page)).project.startLevel === "levels/b.klevel"), "project: a click on a level makes it the start level");
     await page.fill("#projectBpName", "Spiel");
