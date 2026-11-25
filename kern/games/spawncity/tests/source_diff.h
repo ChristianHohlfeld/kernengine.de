@@ -88,6 +88,41 @@ template <class T> T* made() {
   all.push_back(std::make_unique<T>());
   return all.back().get();
 }
+/// An object of the engine that only the engine makes - its constructor takes the engine's other objects - and that a
+/// class of the program holds from outside (the game's kern::game::GameWorld: made in Game::start). The test makes it as
+/// the game's tests make it (tests/test_gaps.cpp): the engine's renderer, one for the program, set up as they set it up,
+/// and a world of its own for every call, started with a level of nothing (kern::game::Level as it is made) - in each
+/// program alike, so both sides run in the same world. A class the engine makes so says so here: Made<O>::make().
+template <class O> struct Made;
+template <class O> concept EngineMade = requires { { Made<O>::make() } -> std::same_as<std::unique_ptr<O>>; };
+template <> struct Made<kern::game::GameWorld> {
+  static kern::Renderer& renderer() {
+    static kern::Renderer r;
+    static const bool ready = [] {
+      kern::RendererOptions o;
+      return r.init(o);
+    }();
+    SC_CHECK(ready, "the engine's renderer does not start (as the tests start it)");
+    return r;
+  }
+  static std::unique_ptr<kern::game::GameWorld> make() {
+    auto w = std::make_unique<kern::game::GameWorld>(renderer());
+    const bool started = w->start(kern::game::Level{}, kern::game::SimMode::simulate);
+    SC_CHECK(started, "the engine's world does not start with a level of nothing: %s", kern::last_error());
+    return w;
+  }
+};
+/// An object the engine makes, for a pointer of this call to point at (as made<T>: it lives until the next call begins).
+template <EngineMade T> T* made() {
+  static std::vector<std::unique_ptr<T>> all;
+  static unsigned long long of = 0;
+  if (of != g_call) {
+    all.clear();
+    of = g_call;
+  }
+  all.push_back(Made<T>::make());
+  return all.back().get();
+}
 /// A map (std::map, std::unordered_map, kern::Map) and a set (std::set, std::unordered_set, kern::Set): by what they
 /// are, not by their name - keys, and for a map the values. One of them keeps no order (unordered_*): two are then
 /// the same when they hold the same, in any order.
@@ -202,6 +237,11 @@ template <class T> void draw(Draw& d, T& x) {
         draw(d, *made_here);
         x = made_here;
       }
+    } else if constexpr (EngineMade<O>) {
+      static const bool said = (std::printf("  note: %s: an object of the engine held by a pointer: the engine makes it as the tests do, each side its own (never none)\n", __PRETTY_FUNCTION__), true);
+      (void)said;
+      if constexpr (is_owned<U>::value) x = Made<O>::make();
+      else x = made<O>();
     } else {
       static const bool said = (std::printf("  note: %s: an object held by a pointer that the test cannot make: none (null) on both sides\n", __PRETTY_FUNCTION__), true);
       (void)said;
@@ -912,10 +952,29 @@ template <class T> Bytes bytes_of(const T& x) {
 
 /// The object a method is called on: made by its constructor (value-initialized, as `T x{}`), drawn or not; a
 /// destructor ends it in the call (end()), else it ends with the call.
+/// (an object of the engine that the object holds from outside and that its constructor left none - the game's world,
+/// which Game::start makes: the engine makes it as the tests do, Made - a method runs in the world the program runs in)
+template <class T> void give_engine_made(T& x) {
+  if constexpr (HasFields<T>) {
+    std::apply([](auto&... f) {
+      ([&](auto& v) {
+        using U = std::remove_cvref_t<decltype(v)>;
+        if constexpr (is_held<U>) {
+          if constexpr (EngineMade<Pointee<U>>) {
+            if (v == nullptr) {
+              if constexpr (is_owned<U>::value) v = Made<Pointee<U>>::make();
+              else v = made<Pointee<U>>();
+            }
+          }
+        }
+      }(f), ...);
+    }, fields(x));
+  }
+}
 template <class T> struct Self {
   void* room = ::operator new(sizeof(T), std::align_val_t(alignof(T)));
   T* p = ::new (room) T{};
-  Self() = default;
+  Self() { give_engine_made(*p); }
   Self(const Self&) = delete;
   Self& operator=(const Self&) = delete;
   ~Self() {
