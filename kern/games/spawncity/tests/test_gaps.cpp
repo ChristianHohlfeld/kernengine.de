@@ -221,7 +221,7 @@ SC_TEST(gaps_smoke) {
   SC_CHECK(g.SmokeField_accelerate(f, "car-1", 0, 12.3f).Result && g.SmokeField_effects(f).Result == 1, "accelerate");
   g.SmokeField_update(f, 12.49f, 0.01f);
   SC_CHECK(g.SmokeField_effects(f).Result == 0, "expired");
-  SC_CHECK(g.organic_rate(Gp::gaps_Organic::bird).Result == 1.16f && g.organic_rate(Gp::gaps_Organic::animal).Result == 0.94f, "rates");
+  SC_CHECK(g.organic_rate(Gp::gaps_Organic::bird).Result == 1.16 && g.organic_rate(Gp::gaps_Organic::animal).Result == 0.94, "rates");
 }
 
 SC_TEST(gaps_visual_pose) {
