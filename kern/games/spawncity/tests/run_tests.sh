@@ -28,6 +28,10 @@ if [ -z "${CC:-}" ]; then
   if ! command -v "$CC" >/dev/null; then echo "FAIL: no C compiler beside $CXX ($CC)"; exit 1; fi
 fi
 cc="$CC" cxx="$CXX"
+# (where the time of a run goes - KERN_TIMES=0: not said: lines "time: ...", the seconds since the start of each step's end,
+# and every object that took 30 s or more to build)
+say_time() { [ "${KERN_TIMES:-1}" = 0 ] || echo "time: $1 (${SECONDS} s since the start)"; }
+export KERN_TIMES="${KERN_TIMES:-1}"
 echo "compilers: $("$cxx" --version | head -1) / $cc"
 # (objects of each compiler apart: its name and version are part of every cache key and folder)
 tool="$({ "$cxx" --version | head -1; "$cc" --version | head -1; } | sha256sum | cut -c1-8)"
@@ -49,6 +53,7 @@ for p in "${pids[@]}"; do wait "$p"; done
 python3 "$game/tools/embed_level.py" "$game/level/spawncity.klevel" "$game/src/level_data.cpp"
 # ... and its Blueprints as C++ classes, as the game links them: the tests run the rules as the game does.
 "$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp"
+say_time "the level and its Blueprints as C++ written"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub, Kern Logic for the rules that are Blueprints, the game layer for the Blueprints
 # that ask the world - a ray, an actor), every component the game is built with (kern/build.sh --app
@@ -73,10 +78,14 @@ export -f object_of
 printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   src="$1"; shift
   o="$(object_of "$src")"
-  [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"' _ {} "${flags[@]}"
+  s=$SECONDS
+  [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"
+  [ "$KERN_TIMES" = 0 ] || [ $((SECONDS - s)) -lt 30 ] || echo "time: built $(basename "$src") in $((SECONDS - s)) s"' _ {} "${flags[@]}"
+say_time "the objects built"
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
+say_time "the tests linked"
 # SC_TEST_BUILD_ONLY=1 (the CI: one job builds, the jobs of the tests take its objects - SC_TEST_OUT - and only link): stop here.
 [ "${SC_TEST_BUILD_ONLY:-}" = 1 ] && { echo "built $out/spawncity_tests"; exit 0; }
 # SC_TEST_SHARD=k/n (the CI: n jobs): this job runs the k-th of every n tests, in both passes; the steps after the
@@ -92,10 +101,11 @@ case "$pass" in "" | 1 | 2) ;; *) echo "FAIL SC_TEST_PASS=$pass (1 or 2)"; exit 
 # (up to KERN_JOBS tests at once, else as many as there are cores - test_main.cpp; each in its own process, its lines as one piece in the order of the tests)
 rc=0
 [ "$pass" = 2 ] || "$out/spawncity_tests" "$@" || rc=1
+[ "$pass" = 2 ] || say_time "the first pass (the engine's stand-in)"
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
-if [ $# -eq 0 ] && [ "$pass" != 1 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
+if [ $# -eq 0 ] && [ "$pass" != 1 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; say_time "the second pass (the engine itself)"; fi
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
@@ -104,6 +114,7 @@ if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
   printf '%s\n' "${rest[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} "$cxx" -std=c++20 -fsyntax-only -fno-exceptions -fno-rtti -Wall -Wextra -Wno-unused-parameter \
     -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" {}
   echo "ok   the game's own sources compile (${#rest[@]} files)"
+  say_time "the game's own sources checked"
 fi
 # The rules' Blueprint as its C++ text, compiled as it is by the host compiler (nothing looked up
 # at run time), gives what the interpreter gives: every call, value for value.
@@ -116,5 +127,6 @@ if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
   for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*) engine_objects+=("$f") ;; esac; done
   "$cxx" "${flags[@]}" -Werror -I"$nat" "$nat/blueprint_native_main.cpp" "${engine_objects[@]}" "${objects[@]}" -lm -o "$out/wanted_native_test"
   "$out/wanted_native_test" "$nat/blueprint_native_expected.txt"
+  say_time "the rules' Blueprint as C++"
 fi
 exit "$rc"
