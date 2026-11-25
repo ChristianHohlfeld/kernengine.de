@@ -14312,6 +14312,8 @@ class TestWriter:
                     G.kept.add(d["id"])
                     if tree.owner.get(d["id"]):
                         want_record(tree.owner[d["id"]])
+                    # (and what its body names, where its class's text holds it - wire::Reader::get_i8 and its I8)
+                    todo.append(("function", tree.body.get(d["id"], d)))
                 elif kind == "declaration":
                     G.declared[d["id"]] = d
                 elif kind == "record" and d.get("_q"):
