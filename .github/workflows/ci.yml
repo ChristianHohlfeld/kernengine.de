@@ -18,6 +18,9 @@ on:
       probe:
         description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job"
         default: ""
+      beleg:
+        description: "Only the proof of one lowering in the form 'two builds': the driver tests/lowered/builds/<file> (e.g. 'game_town') - no other job (tests/lowered/BELEGE.md)"
+        default: ""
 
 permissions:
   contents: write
@@ -25,7 +28,7 @@ permissions:
 # A newer push to a pull request makes its older run moot; on main every push runs to the end, so
 # every green main state is published (a run takes ~17 min and main gets pushes more often).
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ inputs.probe && github.run_id || '' }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ (inputs.probe || inputs.beleg) && github.run_id || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -34,7 +37,7 @@ jobs:
   probe:
     if: ${{ inputs.probe != '' && inputs.probe != null }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 340   # (the whole program on 4 cores takes hours: a probe of all sources is allowed to)
     steps:
       - uses: actions/checkout@v4
       - name: Convert
@@ -47,7 +50,7 @@ jobs:
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
-          rc=$?; tail -n 200 "$W/convert.log"; echo "convert rc=$rc"; exit $rc
+          rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"; exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -58,8 +61,25 @@ jobs:
             /home/runner/probe/texts
           retention-days: 2
 
+  # A proof of one lowering (workflow_dispatch with "beleg"): its driver in the form "two builds" - the old tree's program
+  # and today's, the engine as it stands -, nothing else (tests/run_tests.sh, SC_BELEG; the result goes to BELEGE.md).
+  beleg:
+    if: ${{ inputs.beleg != '' && inputs.beleg != null }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the old tree: git archive of the driver's base)
+      - name: Two builds
+        env:
+          SC_BELEG: ${{ inputs.beleg }}
+          SC_TEST_OUT: /home/runner/sc-tests
+          KERN_JOBS: 4
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
+
   native:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -76,11 +96,13 @@ jobs:
   # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
   # go with 1/12 of pass 1.
   native-spawncity-build:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the differential tests build an older state of a source beside today's: tests/run_tests.sh reads it with git archive)
       - name: Build the SpawnCity tests (ASan/UBSan)
         env:
           SC_TEST_OUT: /home/runner/sc-tests
@@ -94,7 +116,7 @@ jobs:
           compression-level: 1
 
   native-spawncity:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: native-spawncity-build
     runs-on: ubuntu-24.04
     timeout-minutes: 75
@@ -120,7 +142,7 @@ jobs:
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
   determinism:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -131,7 +153,7 @@ jobs:
         run: build-mac/kern_lehrer --fingerprint 400 | diff - kern/tests/determinism_fingerprint.txt
 
   build:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -171,6 +193,9 @@ jobs:
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
             kern/build.sh --lehrer generated/kern_lehrer.wasm
             kern/games/spawncity/build.sh
+            # The way "only Blueprints": SpawnCity's level alone, exported as Kern Studio exports any level, and
+            # what it still lacks (generated/spawncity_gaps.txt - BLUEPRINTS.md, "5 - Umschalten").
+            kern/games/spawncity/build.sh --only-blueprints
             # The native export: a level as a game with its Blueprints compiled in as C++ classes
             # (the browser test plays it: kern/tests/e2e/export_e2e.mjs).
             tools/export_game.sh kern/tests/e2e/native_export.klevel generated/native_export.html
@@ -247,6 +272,13 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
+          name: spawncity-only-blueprints
+          path: |
+            generated/spawncity_blueprints.html
+            generated/spawncity_gaps.txt
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
           name: native-export
           path: generated/native_export.html
           retention-days: 7
@@ -286,7 +318,7 @@ jobs:
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" spawncity-de-dropin
 
   e2e:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -341,7 +373,7 @@ jobs:
   # One input reader for every host (kern.mjs BrowserInput, readGamepad): its contract, the example
   # games and SpawnCity with a real mouse and keyboard - beside the Studio's test, not after it.
   input:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
