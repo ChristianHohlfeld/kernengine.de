@@ -1152,6 +1152,20 @@ std::string Graph::body_of(u32 node, const Library& lib) const {
   }
   return body;
 }
+std::unordered_map<u32, std::string> Graph::bodies(const Library& lib) const {
+  std::unordered_map<u32, std::string> of;
+  std::unordered_map<u32, bool> two;   // (in the bodies of two functions: body_of says "")
+  for (const Node& entry : nodes) {
+    if (entry.type != "func.entry") continue;
+    const std::string name = entry.param("function");
+    for (u32 id : body_nodes(*this, entry.id, lib)) {
+      auto [it, fresh] = of.try_emplace(id, name);
+      if (!fresh && it->second != name) two[id] = true;
+    }
+  }
+  for (const auto& [id, yes] : two) of.erase(id);
+  return of;
+}
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
   return nullptr;

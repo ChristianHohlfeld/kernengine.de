@@ -1,6 +1,8 @@
 // Kern Studio: editing logic graphs (the level's and the actors'). Every edit is
 // a level edit (one undo step); the page draws what logic_json() describes.
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -523,6 +525,16 @@ json::Value Studio::logic_json() const {
   }
   for (const logic::Issue& i : issues) by_node[i.node].push_back(&i);
   json::Value nodes = json::Value::array();
+  // (asked for every pin and every call below - once here, so a Blueprint of tens of thousands of nodes opens:
+  // which pins have a wire, and the function each node stands in)
+  auto pin_key = [](u32 node, const std::string& pin, bool output) { return std::to_string(node) + (output ? ">" : "<") + pin; };
+  std::unordered_set<std::string> wired;
+  wired.reserve(g->links.size() * 2);
+  for (const logic::Link& l : g->links) {
+    wired.insert(pin_key(l.from, l.out, true));
+    wired.insert(pin_key(l.to, l.in, false));
+  }
+  const std::unordered_map<u32, std::string> body_names = g->bodies(lib);
   for (const logic::Node& n : g->nodes) {
     const logic::NodeDef* d = lib.find(n.type);
     json::Value x = json::Value::object();
@@ -564,10 +576,7 @@ json::Value Studio::logic_json() const {
           for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
           pj.set("generic", types);
         }
-        bool linked = false;
-        for (const logic::Link& l : g->links)
-          if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
-        pj.set("linked", linked);
+        pj.set("linked", wired.count(pin_key(n.id, p.id, output)) != 0);
         if (!output && p.type != logic::PinType::exec) {
           const json::Value* v = n.value(p.id);
           pj.set("value", logic::Value::from_json(v ? *v : p.def, p.type, *g, p.of).to_json(*g, p.of));
@@ -635,7 +644,8 @@ json::Value Studio::logic_json() const {
       // A call of a function with reference inputs: for each, the place the call gives it - a
       // variable (of the Blueprint, or of the function the call stands in) and the path from it.
       if (const logic::Function* called = n.type == "func.call" || n.type == "func.pure" ? g->function(n.param("function")) : nullptr) {
-        const logic::Function* body = g->function(g->body_of(n.id, lib));
+        const auto in_body = body_names.find(n.id);
+        const logic::Function* body = in_body == body_names.end() ? nullptr : g->function(in_body->second);
         for (const logic::FunctionPin& in : called->inputs) {
           if (!in.ref) continue;
           json::Value variable = json::Value::object(), path = json::Value::object(), choices = json::Value::array();
