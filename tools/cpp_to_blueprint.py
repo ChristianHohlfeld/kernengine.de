@@ -354,6 +354,46 @@ def c_string(v):
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
+class Trees:
+    """The compiler's trees of one run, each dumped once: a run reads the same sources from its start to its end, and
+    a Blueprint converted again in a later round (or the plan before it) asks the compiler for the same tree with the
+    same command - it is given what the compiler said then, the same bytes. They stand in a folder of the run's own
+    (main: made at its start, removed at its end, shared by the processes of its pool); nothing is kept between runs.
+    KERN_TREES=0: every tree dumped where it is asked for, as before."""
+    folder = None
+
+    @classmethod
+    def started(cls, folder):
+        cls.folder = folder
+
+    @classmethod
+    def path(cls, cmd):
+        import hashlib
+        return os.path.join(cls.folder, hashlib.sha256("\0".join(cmd).encode("utf-8")).hexdigest() + ".tree")
+
+    @classmethod
+    def get(cls, cmd):
+        if cls.folder is None:
+            return None
+        import pickle, zlib
+        try:
+            with open(cls.path(cmd), "rb") as f:
+                return pickle.loads(zlib.decompress(f.read()))
+        except FileNotFoundError:
+            return None
+
+    @classmethod
+    def put(cls, cmd, got):
+        if cls.folder is None:
+            return
+        import pickle, zlib
+        path = cls.path(cmd)
+        part = f"{path}.{os.getpid()}"
+        with open(part, "wb") as f:
+            f.write(zlib.compress(pickle.dumps(got, protocol=pickle.HIGHEST_PROTOCOL), 1))
+        os.replace(part, path)   # (whole or not at all: another process reads it only when it is written)
+
+
 def run_clang(path, namespace, flags):
     """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
     between runs: a tree of another state of the sources is another tree)."""
@@ -364,14 +404,20 @@ def run_clang(path, namespace, flags):
     cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
-    start = time.monotonic()
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    TIMES["tree_s"] += time.monotonic() - start
-    TIMES["trees"] += 1
-    if r.returncode != 0 and not r.stdout:
-        sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
+    got = Trees.get(cmd)
+    if got is None:
+        start = time.monotonic()
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        TIMES["tree_s"] += time.monotonic() - start
+        TIMES["trees"] += 1
+        got = (r.returncode, r.stdout, r.stderr[:2000])
+        Trees.put(cmd, got)
+    else:
+        TIMES["trees_again"] += 1
+    returncode, s, stderr = got
+    if returncode != 0 and not s:
+        sys.stderr.write(f"{path}: clang failed\n{stderr}\n")
         return []
-    s = r.stdout
     out, dec, i = [], json.JSONDecoder(), 0
     while True:
         j = s.find("{", i)
@@ -15113,7 +15159,13 @@ def main(argv):
     if r.returncode != 0 or not r.stdout.strip():
         raise SystemExit("the engine's node names are not to be had (tools/blueprint_cpp.sh --node-names): " + (r.stderr or r.stdout).strip()[:500])
     NODES.update(r.stdout.split())
-    pool = concurrent.futures.ProcessPoolExecutor(workers)
+    # (the compiler's trees of this run, each dumped once - Trees; the folder goes with the run)
+    if os.environ.get("KERN_TREES", "1") != "0":
+        import atexit
+        trees, me = tempfile.mkdtemp(prefix="kern-trees-"), os.getpid()
+        atexit.register(lambda: os.getpid() == me and shutil.rmtree(trees, ignore_errors=True))
+        Trees.started(trees)
+    pool = concurrent.futures.ProcessPoolExecutor(workers, initializer=Trees.started, initargs=(Trees.folder,))
     world = World(files, flags, more)
     world.nodes = set(NODES)
     if level:   # (the Blueprints of the level's actors: what the program calls on them looks as they have it)
@@ -15445,7 +15497,7 @@ def main(argv):
             print(f"time: round {rounds}: {time.monotonic() - round_start:.1f} s, {sum(took[u] for u in now):.1f} s of work ({workers} at once)", flush=True)
             for u in sorted(now, key=lambda u: (-took[u], u))[:12]:
                 t = spent[u]
-                print(f"time:   {u}: {took[u]:.1f} s - tree {t.get('tree_s', 0):.1f} s ({t.get('trees', 0)}), layouts {t.get('layout_s', 0):.1f} s, "
+                print(f"time:   {u}: {took[u]:.1f} s - tree {t.get('tree_s', 0):.1f} s ({t.get('trees', 0)}; {t.get('trees_again', 0)} as dumped before in the run), layouts {t.get('layout_s', 0):.1f} s, "
                       f"test checked {t.get('checks', 0)} times in {t.get('tries', 0)} tries: {t.get('check_s', 0):.1f} s", flush=True)
         for u in now:
             r = got[u]
