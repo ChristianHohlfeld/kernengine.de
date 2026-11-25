@@ -2597,7 +2597,8 @@ bool CityStream::work(Tile& t, f64 deadline) {
       while (t.upload_next < chunks.size()) { ::sc::lowered::tick();
         const std::size_t before = t.meshes.size();
         const f64 t1 = kern::now_ms();
-        upload(t, ::sc::converted::at(chunks, t.upload_next), m, false);
+        kern::GeoChunk chunk = std::move(::sc::converted::at(chunks, t.upload_next));   // (out of the engine's list: upload welds it)
+        upload(t, chunk, m, false);
         step_time("roads.upload", t1);
         // road meshes are the re-layable ones
         t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
@@ -2952,6 +2953,32 @@ template <> struct Values<::sc_new_city_stream::sc::CityStream::Tile::State> { s
 
 namespace sc {
 SC_TEST(lowered_city_stream_cpp) {
+  {  // CityStream::work(Tile &, f64)  ->  CityStream::work(Tile &, f64)
+    ::sc::lowered::Tally tally("CityStream::work(Tile &, f64)");
+    ::sc::converted::Draw draw;
+    for (int call = 0; tally.more(call); ++call) {
+      ::sc_old_city_stream::sc::CityStream o_self{};
+      if (draw.flag()) ::sc::lowered::draw(draw, o_self);
+      ::sc_new_city_stream::sc::CityStream n_self{};
+      ::sc::lowered::carry(o_self, n_self);
+      ::sc::lowered::Arg<::sc_old_city_stream::sc::CityStream::Tile &> o0;
+      ::sc::lowered::Arg<::sc_new_city_stream::sc::CityStream::Tile &> n0;
+      ::sc::lowered::draw_pair(draw, o0, n0);
+      ::sc::lowered::Arg<f64> o1;
+      ::sc::lowered::Arg<f64> n1;
+      ::sc::lowered::draw_pair(draw, o1, n1);
+      std::optional<std::remove_cvref_t<decltype(o_self.work(o0.get(), o1.get()))>> o_r;
+      std::optional<std::remove_cvref_t<decltype(n_self.work(n0.get(), n1.get()))>> n_r;
+      long old_asks = 0, new_asks = 0;
+      const bool old_defined = ::sc::lowered::run([&] { o_r.emplace(o_self.work(o0.get(), o1.get())); }, old_asks);
+      const bool new_defined = ::sc::lowered::run([&] { n_r.emplace(n_self.work(n0.get(), n1.get())); }, new_asks);
+      ::sc::lowered::Differs differs;
+      differs.check("what it returns", o_r, n_r);
+      differs.check("its object", o_self, n_self);
+      differs.check("its parameter t", o0, n0);
+      tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
+    }
+  }
   {  // CityStream::update(Vec3, f64)  ->  CityStream::update(Vec3, f64)
     ::sc::lowered::Tally tally("CityStream::update(Vec3, f64)");
     ::sc::converted::Draw draw;

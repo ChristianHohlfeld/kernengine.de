@@ -862,7 +862,8 @@ bool CityStream::work(Tile& t, f64 deadline) {
       while (t.upload_next < chunks.size()) {
         const std::size_t before = t.meshes.size();
         const f64 t1 = kern::now_ms();
-        upload(t, chunks[t.upload_next], m, false);
+        kern::GeoChunk chunk = std::move(chunks[t.upload_next]);   // (out of the engine's list: upload welds it)
+        upload(t, chunk, m, false);
         step_time("roads.upload", t1);
         // road meshes are the re-layable ones
         t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
