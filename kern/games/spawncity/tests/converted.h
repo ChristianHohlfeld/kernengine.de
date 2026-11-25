@@ -1657,7 +1657,7 @@ struct Blueprint {
     if (!lost(interpreted) && !lost(compiled)) return false;
     interpreted = std::make_unique<RuleBlueprint>(name, nullptr, false, others);
     compiled = std::make_unique<RuleBlueprint>(name, nullptr, true, others);
-    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;   // (as the game sets it)
     interp = interpreted->inst;
     native = compiled->inst;
     interpreted_actors = {};
