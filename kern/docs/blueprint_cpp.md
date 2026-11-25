@@ -1502,6 +1502,11 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Schnittstelle (`EngineInterface::waits`).
 - **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
   Schnittstelle (eine mit `?` darf fehlen).
+- **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
+  `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
+  Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
+  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
+  Funktionen mit den Namen der Schnittstelle; was sie nicht kann, sagt check() wie bei einem geschriebenen Blueprint.
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.

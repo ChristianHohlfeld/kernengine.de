@@ -1258,6 +1258,7 @@ class World:
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
+        self.state_implements = {}  # such a class that derives from an interface of the engine -> the interface's name (Graph::implements)
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
@@ -2771,7 +2772,8 @@ class Unit:
         way those they use - the types among them, wherever they are declared in the end (main puts every
         Blueprint together from what all files say)."""
         variables, functions, members, types = self.parts()
-        return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members, state=self.state is not None)
+        return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members, state=self.state is not None,
+                              implements=self.world.state_implements.get(self.state))
 
 
 def actors_called(f, met=None):
@@ -2786,11 +2788,13 @@ def actors_called(f, met=None):
     return out
 
 
-def blueprint_text(name, uses, types, variables, functions, members, state=False):
+def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states)."""
+    variables of a state (World.states) - and, with `implements`, the interface of the engine it is the object of
+    (World.state_implements)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
-    out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses) + " {"]
+    out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
+           + (f', kern::Implements<"{implements}">' if state and implements else "") + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -14937,7 +14941,7 @@ def survey_one(job):
                         and (i in tree.scope_of or d.get("storageClass") == "static") and (d.get("constexpr") or re.search(r"\bconst\b", qtype(d)))
                         and os.path.abspath(d.get("_file") or "?") == me and not is_header(me)})
     records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
-                   "virtual": any(c.get("virtual") for c in kids(tree.records[q])),
+                   "virtual": any(c.get("virtual") for c in kids(tree.records[q])), "implements": engine_interface_of(tree, tree.records[q]),
                    # (its members by name, in their order: what a part of its Blueprint that does not see the class names them)
                    "members": [("field", c.get("name") or "field") if c.get("kind") == "FieldDecl" else ("method", c.get("name"))
                                for c in kids(tree.records[q]) if c.get("kind") == "FieldDecl" or (c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit"))]}
@@ -15031,11 +15035,30 @@ def objects_made(tree):
     return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
 
 
+def engine_interface_of(tree, rec):
+    """The interface of the engine a class of the program derives from (kern/docs/blueprint_cpp.md, "Schnittstellen der
+    Engine"): its one base, public, a class of the engine whose functions are all virtual and that holds nothing
+    (`class SpawnCityApp final : public kern::App`) - by the name the Blueprints give it (App); else None."""
+    bases = rec.get("bases") or []
+    if len(bases) != 1 or bases[0].get("access", "public") != "public" or bases[0].get("isVirtual"):
+        return None
+    q = re.sub(r"^(?:const\s+|class\s+|struct\s+)+", "", bases[0].get("type", {}).get("qualType", "")).strip().lstrip(":")
+    base = tree.records.get(q)
+    if not q.startswith(ENGINE + "::") or base is None or base.get("bases"):
+        return None
+    methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
+    if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
+        return None
+    return type_name_of(q)
+
+
 def state_classes(world, surveys):
     """The classes of the program that are the state of a Blueprint: of each the program has exactly one
     object, with static storage (`Game& game() { static Game g; return g; }`), and it makes none in any other
-    way - and the class has no base class and no virtual function (an object of the engine's kind). Its
-    fields are the variables of a Blueprint, its methods that Blueprint's functions: {class: Blueprint}."""
+    way - and the class has no base class and no virtual function (an object of the engine's kind), or its one
+    base is an interface of the engine (engine_interface_of: the Blueprint implements it, its overrides are the
+    Blueprint's functions of the interface's names - world.state_implements). Its fields are the variables of a
+    Blueprint, its methods that Blueprint's functions: {class: Blueprint}."""
     statics, made, records = collections.defaultdict(set), set(), {}
     for r in surveys:
         for q, places in r["statics"].items():
@@ -15045,9 +15068,13 @@ def state_classes(world, surveys):
     out = {}
     for q, places in statics.items():
         info = records.get(q)
-        if len(places) != 1 or q in made or info is None or not world.program(info["file"]) or info["bases"] or info["virtual"]:
+        if len(places) != 1 or q in made or info is None or not world.program(info["file"]):
+            continue
+        if (info["bases"] or info["virtual"]) and not info.get("implements"):
             continue
         out[q] = type_name_of(q)
+        if info.get("implements"):
+            world.state_implements[q] = info["implements"]
         world.state_members[q] = info.get("members", [])
     return out
 
@@ -15453,6 +15480,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers, w.state_members = world.actors, world.states, world.parts, world.part_numbers, world.state_members
+        w.state_implements = world.state_implements
         w.pointer_lists, w.globals, w.state_functions = world.pointer_lists, world.globals, world.state_functions
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
@@ -15758,7 +15786,8 @@ def main(argv):
         # (a Blueprint that comes along with another one it uses is not named again - unless its functions are called)
         direct = [x for x in uses[u] if x in called or not any(y != x and through(y, x) for y in uses[u])]
         variables, texts_, members = blue[u]["parts"] if u in written else ([], [], [])
-        blueprints[u] = blueprint_text(u, direct, [declared[n][1] for n in mine], variables, texts_, members, state=bool(blue[u].get("state")) if u in blue else False)
+        blueprints[u] = blueprint_text(u, direct, [declared[n][1] for n in mine], variables, texts_, members, state=bool(blue[u].get("state")) if u in blue else False,
+                                       implements=next((i for q, i in world.state_implements.items() if world.states.get(q) == u), None))
     order, left = [], dict(uses)
     while left:   # (a library before the Blueprints that use it)
         free = sorted(u for u in left if all(x not in left for x in left[u]))
