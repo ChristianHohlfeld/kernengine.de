@@ -34,7 +34,7 @@ jobs:
   probe:
     if: ${{ inputs.probe != '' && inputs.probe != null }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 340   # (the whole program on 4 cores takes hours: a probe of all sources is allowed to)
     steps:
       - uses: actions/checkout@v4
       - name: Convert
@@ -47,7 +47,7 @@ jobs:
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
-          rc=$?; tail -n 200 "$W/convert.log"; echo "convert rc=$rc"; exit $rc
+          rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"; exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
