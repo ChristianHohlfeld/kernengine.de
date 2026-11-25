@@ -80,7 +80,11 @@ kern::game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 po
   return a;
 }
 
-void register_node() {
+}  // namespace
+
+// (a method of the one Game: what it keeps from one call to the next - done - is a variable of its Blueprint, and the node type
+// is its Blueprint's Event Tick - the converter, node_registrations)
+void Game::register_node() {
   static bool done = false;
   if (done) return;
   done = true;
@@ -98,6 +102,8 @@ void register_node() {
   };
   kern::logic::library().add(std::move(d));
 }
+
+namespace {
 
 std::string json_escape(const std::string& s) {
   std::string o;
