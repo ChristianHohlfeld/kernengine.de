@@ -1504,6 +1504,7 @@ class Unit:
         self.state = next((q for q, b in self.world.states.items() if b == name), None)
         self.state_fields, self.state_types, self.state_lines, self.state_mutable = {}, {}, {}, set()
         self.state_statics = {}     # a variable kept by a method of the state, or one of the file only its methods use -> (variable, type)
+        self.state_met = {}         # such a static local variable whose initializer is computed -> its Bool: given it yet (state_static)
         self.state_users = None     # (see kept_by_state)
         self.enums = {}             # qualified C++ name -> Blueprint name
         self.structs = {}           # qualified C++ name -> Blueprint name
@@ -1912,7 +1913,10 @@ class Unit:
             return "Int"
         if t == "std::_Bit_reference":
             return "Bool"   # (std::vector<bool>'s entry where it stands: in a List<Bool> a place like any other - see member_call, for_each)
-        if "*" in re.sub(r"<.*>", "<>", t) and not re.match(r"(?:const\s+)?char\s*\*\s*(?:const\s*)?(?:\[\d+\]\s*)+$", t):
+        # (an array of pointers to objects of the engine - ShaderExtension* ext[2] - is a list of their handles: below)
+        handles = re.fullmatch(r"(.+?\*\s*(?:const\s*)?)((?:\[\d+\]\s*)+)", t)
+        if "*" in re.sub(r"<.*>", "<>", t) and not re.match(r"(?:const\s+)?char\s*\*\s*(?:const\s*)?(?:\[\d+\]\s*)+$", t) \
+                and not (handles and self.object_of(handles.group(1).strip())):
             # (a pointer itself - one inside a type's arguments is that type's: an iterator holds one; an array of
             # texts written out, const char* [4], is a list of texts: below)
             raise Wait("a pointer")
@@ -2716,13 +2720,18 @@ class Unit:
         self.state_types[field] = t
         return name, t
 
-    def state_static(self, d, owner):
+    def state_static(self, d, owner, met=False):
         """A variable a method of the state keeps from one call to the next (`static int last_tick = 0;`), or one
         of the file only the state's methods use: there is one object of the state, so this is part of its
         state - a variable of its Blueprint, called by where it stands (the method's name or the file's, and
-        its own) and starting at its initializer. (its name, its type)"""
+        its own) and starting at its initializer. (its name, its type)
+        `met`: a static local variable of the method whose initializer is computed (`static T* p[2] = {&a(), &b()};`)
+        - C++ computes it when the declaration is first met: the variable starts at zero, and a second one, a Bool
+        (`<name>_met`, false), says whether that happened; the method sets both there (Unit.state_static_met).
+        (its name, its type, the Bool's name or None)"""
         if d["id"] in self.state_statics:
-            return self.state_statics[d["id"]]
+            got = self.state_statics[d["id"]]
+            return (*got, self.state_met.get(d["id"])) if met else got
         shared = d.get("storageClass") != "static" and "_GLOBAL__N_" not in (d.get("mangledName") or "") and d["id"] in self.tree.scope_of
         if shared:   # (a variable the whole program shares: called by its namespaces, the same in every part of the Blueprint)
             q = self.tree.scope_of[d["id"]] + (d.get("name") or "")
@@ -2736,16 +2745,26 @@ class Unit:
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         if shared and init is None and self.world.globals.get(q) is False:
             raise Wait(f"the variable {q} starts with what its definition in another file says")
+        flag = None
         try:
             default = Const(self).literal(init, t) if init is not None else self.zero(t)
         except Wait as w:
-            raise Wait(f"the variable {d.get('name')} kept by {owner} starts with what is computed when it is first met ({w})")
+            if not met or shared or d.get("storageClass") != "static":
+                raise Wait(f"the variable {d.get('name')} kept by {owner} starts with what is computed when it is first met ({w})")
+            default = self.zero(t)
+            flag = sane_name(want + "_met")
+            if flag in self.names:
+                raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {flag}")
         if shared and init is not None and starts_at_zero(init):
             default = self.zero(t)   # (written as every part writes it, also those that only see it declared)
         self.names.add(name)
         self.state_lines[(1, name)] = [f"  /// ({'of the program: ' + q if shared else 'kept by ' + owner})", f"  {self.dtype(qtype(d), t)} {name} = {default};"]
         self.state_statics[d["id"]] = (name, t)
-        return name, t
+        if flag is not None:
+            self.names.add(flag)
+            self.state_lines[(1, flag)] = [f"  /// (has {name} been given what it starts with - when its declaration was first met)", f"  Bool {flag} = false;"]
+            self.state_met[d["id"]] = flag
+        return (name, t, flag) if met else (name, t)
 
     def kept_by_state(self, d):
         """Is this a variable of the program that the state keeps: one the program has once - of a namespace,
@@ -4042,6 +4061,25 @@ class Emit:
             return t is not None and function_key(self.tree, t) in self.u.world.getters and \
                 re.sub(r"\b(const|volatile)\b|&", "", qtype(t).split("(")[0]).strip().split("::")[-1] == (self.u.state or "").split("::")[-1]
         return n.get("kind") == "CXXThisExpr"
+
+    def implementing_state(self, n):
+        """The Blueprint (its actor's name) whose one object `n` is, where that is a state that derives from an
+        interface of the engine (World.state_implements: Facades, a ShaderExtension) and `n` its getter called -
+        `sc::facades()` (World.getters); else None."""
+        n = bare(n)
+        while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
+            n = bare(kids(n)[0])
+        if n.get("kind") != "CallExpr" or len(kids(n)) != 1:
+            return None
+        rid = (callee(n).get("referencedDecl") or {}).get("id")
+        t = (self.tree.body.get(rid) or self.tree.decl.get(rid)) if rid else None
+        if t is None or function_key(self.tree, t) not in self.u.world.getters:
+            return None
+        q = re.sub(r"\b(const|volatile)\b|&", "", qtype(t).split("(")[0]).strip()
+        q = next((s for s in self.u.world.states if s == q or s.endswith("::" + q) or q.endswith("::" + s)), None)
+        if q is None or q not in self.u.world.state_implements:
+            return None
+        return self.u.world.states[q]
 
     def at_state(self, n):
         """Is this the one object of the state, reached through a field that holds it (`g->` of a struct a method
@@ -5399,10 +5437,18 @@ class Emit:
                         self.u.constant(v)
                         continue
                     if self.f.state:   # (kept by a method of the one object there is: a variable of its Blueprint)
-                        name, t = self.u.state_static(v, self.f.name)
+                        name, t, flag = self.u.state_static(v, self.f.name, met=True)
                         self.names[v["id"]], self.types[v["id"]] = name, t
                         if t.startswith("List<") and self.u.fixed(qtype(v)):
                             self.lengths[name] = self.u.fixed(qtype(v))
+                        if flag is not None:
+                            # (its initializer, computed when the declaration is first met - and only then)
+                            init = kids(v)[-1]
+                            said = self.written_array(init, t) if name in self.lengths else None
+                            if said and len(said[0]) > 16:
+                                raise Wait("a static local array of more entries than a Make List takes, computed when first met")
+                            text = self.made_list(said[0], t) if said else self.put(init, t)
+                            out += [f"if (logic_not({flag})) {{", *["  " + ln for ln in self.take_pre() + [f"{name} = {text};", f"{flag} = true;"]], "}"]
                         continue
                     raise Wait("a static local variable (kept from one call to the next: a library keeps nothing)")
                 lam = self.lambda_of(kids(v)[-1]) if kids(v) and v.get("init") else None
@@ -10135,6 +10181,11 @@ class Emit:
                 return self.self_name, self.f.self_type
             if op in ("*", "&") and (self.u.object_of(qtype(b), by_value=True) or self.u.object_of(qtype(kids(b)[0]), by_value=True)):
                 return self.ex(kids(b)[0], "Int"), "Int"   # (an object of the engine and a pointer to it: one handle)
+            implementing = self.implementing_state(kids(b)[0]) if op == "&" and kids(b) else None
+            if implementing is not None:
+                # (&sc::facades(): the one object of a state that is an object of an interface of the engine - what
+                # the engine is handed as that object is its handle: Engine Object of Blueprint on its Blueprint)
+                return f"func_engine_object(actor_find({text_literal(implementing)}))", "Int"
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":
