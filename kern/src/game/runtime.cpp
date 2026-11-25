@@ -2751,6 +2751,33 @@ void GameWorld::debug_lines(bool colliders, bool contacts, bool joints, std::vec
   }
 }
 
+namespace {
+const logic::Instance* running_at(const logic::Runtime& logic, std::size_t at) { return at < logic.instances().size() ? logic.instances()[at].get() : nullptr; }
+}  // namespace
+
+std::size_t blueprint_count(const logic::Runtime& logic) { return logic.instances().size(); }
+const std::string& blueprint_name(const logic::Runtime& logic, std::size_t at) {
+  static const std::string none;
+  const logic::Instance* const i = running_at(logic, at);
+  return i ? i->name() : none;
+}
+const char* blueprint_tier(const logic::Runtime& logic, std::size_t at) {
+  const logic::Instance* const i = running_at(logic, at);
+  return i ? i->tier() : "";
+}
+std::size_t blueprint_functions(const logic::Runtime& logic, std::size_t at) {
+  const logic::Instance* const i = running_at(logic, at);
+  return i ? i->graph().functions.size() : 0;
+}
+std::size_t blueprint_nodes(const logic::Runtime& logic, std::size_t at) {
+  const logic::Instance* const i = running_at(logic, at);
+  return i ? i->graph().nodes.size() : 0;
+}
+bool blueprint_disabled(const logic::Runtime& logic, std::size_t at) {
+  const logic::Instance* const i = running_at(logic, at);
+  return i && i->disabled();
+}
+
 std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic) {
   std::vector<BlueprintRunning> out;
   out.reserve(logic.instances().size());

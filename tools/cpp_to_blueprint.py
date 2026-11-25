@@ -1308,7 +1308,7 @@ class World:
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
-        self.state_implements = {}  # such a class that derives from an interface of the engine -> the interface's name (Graph::implements)
+        self.state_implements = {}  # such a class that derives from an interface of the engine -> [the interface's name (Graph::implements), its pure functions]
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.getters = set()   # (keys of) the functions that give the one object of a state and nothing else - `Game& game() { static Game g; return g; }`: that Blueprint itself (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
@@ -3072,11 +3072,14 @@ def actors_called(f, met=None):
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states) - and, with `implements`, the interface of the engine it is the object of
-    (World.state_implements)."""
+    variables of a state (World.states) - and, with `implements` ([name, pure functions]: World.state_implements),
+    the interface of the engine it is the object of: once it has every pure function of it (until then the
+    engine has no object of it - what waits keeps the interface's functions from it, as from any caller)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
+    defines = lambda t, f: re.search(r"(?m)^\s*(?:KERN_\w+\s+)*[\w:<>,]+\s+" + re.escape(f) + r"\(", t)   # (a function's text: its head names it)
+    whole = bool(state and implements) and all(any(defines(t, p) for t in functions) for p in implements[1])
     out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
-           + (f', kern::Implements<"{implements}">' if state and implements else "") + " {"]
+           + (f', kern::Implements<"{implements[0]}">' if whole else "") + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -3707,6 +3710,7 @@ class Emit:
             f.mutates = f.ctor = True
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
+        registered = self.node_registrations(d)   # (a node type of the program: an event of its Blueprint - taken out of the body)
         self.lifetimes(d)
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
         self.dissolve(d)   # (a call of a function that names a place: the place)
@@ -3839,6 +3843,15 @@ class Emit:
         lines += self.block(kids(body))
         if not self.ends(kids(body)) and f.ctor:
             lines.append(self.ret_line(None))
+        events = []
+        for handler, ins, run in registered:
+            held = len(self.locals)
+            steps = self.block(run)
+            if len(self.locals) > held:
+                raise Wait("the run of a node type of the program needs local variables (an event has none)")
+            node = u.next_node
+            u.next_node += 1
+            events += ["", f"  KERN_EVENT(on{node}, {handler})", f"  void on{node}({ins}) {{", *["    " + x for x in steps], "  }"]
         head = []
         doc = u.comment_of(d)
         if f.result is not None:
@@ -3885,8 +3898,114 @@ class Emit:
                 node = u.next_node
                 u.next_node += 1
                 out += ["", f"  KERN_EVENT(on{node}, event_end)", f"  void on{node}() {{", *["    " + x for x in ended], "  }"]
+        out += events
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
+
+    # The events of the language a node type of the program can be (NodeDef::event): its handler, and its inputs.
+    NODE_EVENTS = {"logic.tick": ("event_tick", "Float delta")}
+
+    def node_registrations(self, d):
+        """A node type the program adds to the language (`kern::logic::NodeDef d; d.type = ...; d.kind = NodeKind::event;
+        d.event = "logic.tick"; d.accepts = [](...) { return true; }; d.run = [](Context&) { ...; return kStop; };
+        kern::logic::library().add(std::move(d));`): in a Blueprint it is no value but an event of the Blueprint the
+        function is a function of, which runs what `run` runs (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine":
+        Entscheidung E-c2, register_node). Such statements are taken out of the body; [(handler, its inputs, the
+        statements of `run`)] - one for each. A NodeDef of any other form waits."""
+        body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+        if body is None:
+            return []
+        logic = ENGINE + "::logic::"
+        def bare(x):
+            while x.get("kind") in ("ExprWithCleanups", "ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ParenExpr", "CXXFunctionalCastExpr") and kids(x):
+                x = kids(x)[-1] if x.get("kind") == "CXXFunctionalCastExpr" else kids(x)[0]
+            if x.get("kind") == "CXXConstructExpr" and len(kids(x)) == 1:
+                return bare(kids(x)[0])
+            return x
+        defs = {}
+        for st in kids(body):
+            if st.get("kind") == "DeclStmt" and len(kids(st)) == 1 and kids(st)[0].get("kind") == "VarDecl" and \
+                    re.sub(r"^const\s+", "", qtype(kids(st)[0])).strip() == logic + "NodeDef":
+                defs[kids(st)[0]["id"]] = {"decl": st, "fields": {}, "stmts": [st]}
+        if not defs:
+            return []
+        def of_def(x):
+            x = bare(x)
+            return defs.get((x.get("referencedDecl") or {}).get("id")) if x.get("kind") == "DeclRefExpr" else None
+        added = []
+        for st in kids(body):
+            if any(st is r["decl"] for r in defs.values()):
+                continue
+            e = bare(st)
+            target = value = None
+            if e.get("kind") == "BinaryOperator" and e.get("opcode") == "=" and len(kids(e)) == 2:
+                target, value = kids(e)
+            elif e.get("kind") == "CXXOperatorCallExpr" and callee_name(e) == "operator=" and len(kids(e)) == 3:
+                target, value = kids(e)[1], kids(e)[2]
+            if target is not None:
+                t = bare(target)
+                r = of_def(kids(t)[0]) if t.get("kind") == "MemberExpr" and kids(t) else None
+                if r is not None:
+                    r["fields"][t.get("name")] = bare(value)
+                    r["stmts"].append(st)
+                    continue
+            if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") == "add" and len(kids(e)) == 2:
+                base = bare(kids(callee(e))[0]) if kids(callee(e)) else {}
+                arg = bare(kids(e)[1])
+                if arg.get("kind") == "CallExpr" and callee_name(arg) == "move" and len(kids(arg)) == 2:
+                    arg = kids(arg)[1]
+                r = of_def(arg)
+                if r is not None and base.get("kind") == "CallExpr" and callee_name(base) == "library" and \
+                        (self.tree.decl.get((callee(base).get("referencedDecl") or {}).get("id")) or {}).get("_q", logic + "library").startswith(logic):
+                    r["stmts"].append(st)
+                    added.append(r)
+                    continue
+            for x in walk(st):
+                if of_def(x) is not None:
+                    raise Wait("a node type of the program (NodeDef) used otherwise than set field by field and added to the language")
+        out = []
+        for r in defs.values():
+            if r not in added:
+                raise Wait("a node type of the program (NodeDef) that is not added to the language")
+            f = r["fields"]
+            extra = sorted(set(f) - {"type", "label", "category", "help", "kind", "event", "accepts", "run"})
+            if extra:
+                raise Wait(f"a node type of the program with {', '.join(extra)} (only an event that runs steps is an event of its Blueprint)")
+            kind = f.get("kind")
+            if kind is None or (kind.get("referencedDecl") or {}).get("name") != "event":
+                raise Wait("a node type of the program that is no event")
+            event = f.get("event")
+            if event is None or event.get("kind") != "StringLiteral" or json.loads(event.get("value", '""')) not in self.NODE_EVENTS:
+                raise Wait("a node type of the program for an event that is no event of a Blueprint: " + (event or {}).get("value", "?"))
+            handler, ins = self.NODE_EVENTS[json.loads(event["value"])]
+            def lambda_body(x, what):
+                if x is None or x.get("kind") != "LambdaExpr":
+                    raise Wait(f"a node type of the program whose {what} is no lambda")
+                parts = kids(x)
+                if len(parts) != 2 or parts[0].get("kind") != "CXXRecordDecl" or parts[1].get("kind") != "CompoundStmt":
+                    raise Wait(f"a node type of the program whose {what} captures something")
+                return parts[1]
+            accepts = f.get("accepts")
+            if accepts is not None:
+                a = kids(lambda_body(accepts, "accepts"))
+                lit = bare(kids(a[0])[0]) if len(a) == 1 and a[0].get("kind") == "ReturnStmt" and kids(a[0]) else {}
+                if lit.get("kind") != "CXXBoolLiteralExpr" or lit.get("value") is not True:
+                    raise Wait("a node type of the program that accepts only some events (an event of a Blueprint runs on every one)")
+            run = kids(lambda_body(f.get("run"), "run"))
+            last = run[-1] if run else {}
+            stop = bare(kids(last)[0]) if last.get("kind") == "ReturnStmt" and kids(last) else {}
+            if (stop.get("referencedDecl") or {}).get("name") != "kStop":
+                raise Wait("a node type of the program whose run goes on to another node (it does not end with kStop)")
+            steps = run[:-1]
+            if any(x.get("kind") == "ReturnStmt" for st in steps for x in walk(st)):
+                raise Wait("a node type of the program whose run ends in the middle")
+            params = [x for x in walk(f["run"]) if x.get("kind") == "ParmVarDecl"]
+            if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") in {p_["id"] for p_ in params} for st in steps for x in walk(st)):
+                raise Wait("a node type of the program whose run reads what its node is handed (the Context)")
+            out.append((handler, ins, steps))
+        taken = {id(st) for r in defs.values() for st in r["stmts"]}
+        body["inner"] = [st for st in kids(body) if id(st) not in taken]
+        return out
 
     def ret_line(self, value):
         """The return of the function: what the C++ returns as it is at this place (a constructor: the object)."""
@@ -15517,7 +15636,7 @@ def engine_interface_of(tree, rec):
     methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
     if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
         return None
-    return type_name_of(q)
+    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
 
 
 def state_classes(world, surveys):
@@ -15977,8 +16096,11 @@ def main(argv):
     # A function that is no method but shares a variable of the program - or calls one that does -, when the
     # program has one object (a state): a function of that state's Blueprint, in the part of its file. (A method
     # of another class that does stays where it is, and waits: it would need its object and the state's.)
-    if len(set(world.states.values())) == 1:
-        state = next(iter(world.states.values()))
+    # (the state the program's variables are of: its one state that is no object of an interface of the engine -
+    # an App, a ShaderExtension is the engine's object, called by the engine; its functions are its own)
+    holders = {b for q, b in world.states.items() if q not in world.state_implements}
+    if len(holders) == 1:
+        state = next(iter(holders))
         callers = collections.defaultdict(set)
         for k, f in functions.items():
             for c in f["calls"]:
