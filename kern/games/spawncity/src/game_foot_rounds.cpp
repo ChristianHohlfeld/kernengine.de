@@ -94,7 +94,7 @@ void Game::grenade_bounce(Projectile& p, Vec3 point, Vec3 n, f32 now) {
   // audioGrenadeBounce: gain .16 + v * .018 (.16 .. .44), rate .92 + n * .035 + .02 min(v, 10) (.88 .. 1.32)
   osfx("gameplay_final_runtime_v2.audioGrenadeBounce", point, impact, static_cast<f32>(p.bounces));
   if (p.id == Id::grenade_launcher) bounce_fx_[bounce_fx_next_++ % 8] = {point + n * 0.008f, n, now, clampf(impact / 12, 0.55f, 1.35f)};
-  world_->play_sound(combat_sfx(combat_audio::Kind::bounce), point, clampf(0.16f + impact * 0.018f, 0.16f, 0.44f) / 0.44f * 0.5f,
+  world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::bounce), point, clampf(0.16f + impact * 0.018f, 0.16f, 0.44f) / 0.44f * 0.5f,
                      clampf(0.92f + p.bounces * 0.035f + 0.02f * std::fmin(impact, 10.0f), 0.88f, 1.32f), true);
   if (p.bounces >= kMaxBounces && kern::length(p.vel) < 2.8f) p.vel = p.vel * 0.38f;
 }
@@ -387,7 +387,7 @@ bool Game::melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_
     const kern::physics::RayHit h = world_->physics().cast_ray(eye, dir * reach, ~0ull, body(soldier_));
     if (h.hit && h.body.valid()) world_->physics().apply_linear_impulse(h.body, dir * momentum_ns, h.point);
   }
-  world_->play_sound(hit >= 0 ? combat_sfx(combat_audio::Kind::hit) : "builtin:click", eye + dir, 0.7f, knife ? 1.3f : 0.8f, true);
+  world_->play_sound(hit >= 0 ? combat_sfx(blueprints::combat_audio::combat_audio_Kind::hit) : "builtin:click", eye + dir, 0.7f, knife ? 1.3f : 0.8f, true);
   return hit >= 0;
 }
 

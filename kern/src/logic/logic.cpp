@@ -1,7 +1,11 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_api.h"
 
+#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -967,7 +971,26 @@ Variable* Graph::variable(std::string_view name) {
   return nullptr;
 }
 bool Graph::variable_of(const Node& n, Variable& out) const { return root_of(n, out) != Root::none; }
+const EngineFunction* bound_function(const Graph& g, const Node& n, const Node** binder) {
+  const std::string b = n.param("bound");
+  if (b.empty() || b.find_first_not_of("0123456789") != std::string::npos || b.size() > 9) return nullptr;
+  const Node* e = g.find(static_cast<u32>(std::stoul(b)));
+  const EngineFunction* f = e ? engine_function(e->type) : nullptr;
+  if (!f || !f->place || f->outputs.empty()) return nullptr;
+  if (binder) *binder = e;
+  return f;
+}
 Graph::Root Graph::root_of(const Node& n, Variable& out, std::string_view prefix) const {
+  if (prefix.empty() && !n.param("bound").empty()) {
+    // (a place of the engine: what the node of the engine named there bound when it ran - of the type
+    // of its output "result")
+    const EngineFunction* f = bound_function(*this, n);
+    if (!f) return Root::none;
+    const EnginePin& p = f->outputs[0];
+    const TypeRef t{p.type, p.of ? p.of : ""};
+    out = Variable{"n" + n.param("bound") + "." + p.id, p.type, zero_of(t, *this).to_json(*this, t), {}, t.of};
+    return Root::bound;
+  }
   const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
   const Function* f = scope.empty() ? nullptr : function(scope);
   // (in a function: its local variables and its inputs come before the Blueprint's variables -
@@ -1115,31 +1138,49 @@ bool Graph::place_of(const Node& n, Variable& out, std::string* why, std::string
 namespace {
 /// The nodes of a function's body: the steps its Function Entry leads to along exec wires, and
 /// the values they read.
-std::vector<u32> body_nodes(const Graph& g, u32 entry, const Library& lib) {
+/// A graph's nodes by id and, for each node, the wires at it in the order the graph has them: what a walk over a
+/// body asks at every step. Built once for a walk - or for the walks over all bodies (Graph::bodies).
+struct Wiring {
+  std::unordered_map<u32, const Node*> node;
+  std::unordered_map<u32, std::vector<const Link*>> at;
+  explicit Wiring(const Graph& g) {
+    node.reserve(g.nodes.size());
+    for (const Node& n : g.nodes) node.try_emplace(n.id, &n);   // (the first of an id, as Graph::find)
+    for (const Link& l : g.links) {
+      at[l.from].push_back(&l);
+      if (l.to != l.from) at[l.to].push_back(&l);
+    }
+  }
+};
+std::vector<u32> body_nodes(const Graph& g, const Wiring& w, u32 entry, const Library& lib) {
   std::vector<u32> todo{entry}, seen{entry};
+  std::unordered_set<u32> have{entry};
   auto take = [&](u32 id) {
-    if (std::find(seen.begin(), seen.end(), id) != seen.end()) return;
+    if (!have.insert(id).second) return;
     seen.push_back(id);
     todo.push_back(id);
   };
   while (!todo.empty()) {
     const u32 at = todo.back();
     todo.pop_back();
-    const Node* n = g.find(at);
-    if (!n) continue;
+    const auto found = w.node.find(at);
+    if (found == w.node.end()) continue;
+    const auto wires = w.at.find(at);
+    if (wires == w.at.end()) continue;
     std::vector<PinDef> in, out;
-    lib.pins(*n, g, in, out);
-    for (const Link& l : g.links) {
-      if (l.from == at)
+    lib.pins(*found->second, g, in, out);
+    for (const Link* l : wires->second) {
+      if (l->from == at)
         for (const PinDef& p : out)
-          if (p.id == l.out && p.type == PinType::exec) take(l.to);
-      if (l.to == at)
+          if (p.id == l->out && p.type == PinType::exec) take(l->to);
+      if (l->to == at)
         for (const PinDef& p : in)
-          if (p.id == l.in && p.type != PinType::exec) take(l.from);
+          if (p.id == l->in && p.type != PinType::exec) take(l->from);
     }
   }
   return seen;
 }
+std::vector<u32> body_nodes(const Graph& g, u32 entry, const Library& lib) { return body_nodes(g, Wiring(g), entry, lib); }
 }  // namespace
 std::string Graph::body_of(u32 node, const Library& lib) const {
   std::string body;
@@ -1151,6 +1192,21 @@ std::string Graph::body_of(u32 node, const Library& lib) const {
     body = entry.param("function");
   }
   return body;
+}
+std::unordered_map<u32, std::string> Graph::bodies(const Library& lib) const {
+  std::unordered_map<u32, std::string> of;
+  std::unordered_map<u32, bool> two;   // (in the bodies of two functions: body_of says "")
+  const Wiring w(*this);
+  for (const Node& entry : nodes) {
+    if (entry.type != "func.entry") continue;
+    const std::string name = entry.param("function");
+    for (u32 id : body_nodes(*this, w, entry.id, lib)) {
+      auto [it, fresh] = of.try_emplace(id, name);
+      if (!fresh && it->second != name) two[id] = true;
+    }
+  }
+  for (const auto& [id, yes] : two) of.erase(id);
+  return of;
 }
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
@@ -1553,6 +1609,7 @@ json::Value graph_to_json(const Graph& g) {
     for (const std::string& name : g.uses) uses.push(name);
     root.set("uses", std::move(uses));
   }
+  if (!g.implements.empty()) root.set("implements", g.implements);  // (only then: other graphs keep their content hash)
   if (!g.enums.empty()) {  // (only then: graphs without types of their own keep their content hash)
     json::Value enums = json::Value::array();
     for (const EnumType& e : g.enums) {
@@ -1678,6 +1735,10 @@ json::Value graph_to_json(const Graph& g) {
       if (f.external) o.set("external", true);
       if (!f.remote.empty()) o.set("remote", f.remote);
       if (!f.from.empty()) o.set("from", f.from);
+      if (!f.exported.empty()) {
+        o.set("export", f.exported);
+        o.set("wire", f.wire);
+      }
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
       o.set("outputs", pins(f.outputs));
@@ -1704,6 +1765,58 @@ json::Value graph_to_json(const Graph& g) {
   return root;
 }
 
+bool export_ok(const Function& f, std::string* why) {
+  auto no = [&](std::string w) {
+    if (why) *why = std::move(w);
+    return false;
+  };
+  if (f.exported.empty()) return f.wire.empty() || no("a wire without an export name");
+  if (f.external || !f.from.empty()) return no("a function of another Blueprint is not exported here");
+  if (f.exported.size() > 64 || !(std::isalpha(static_cast<unsigned char>(f.exported[0])) || f.exported[0] == '_') ||
+      !std::all_of(f.exported.begin(), f.exported.end(), [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }))
+    return no("the export name \"" + f.exported + "\" is no C name");
+  std::vector<std::string> words;
+  bool arrow = false;
+  std::string out;
+  for (std::size_t i = 0; i < f.wire.size();) {
+    while (i < f.wire.size() && f.wire[i] == ' ') ++i;
+    std::size_t e = i;
+    while (e < f.wire.size() && f.wire[e] != ' ') ++e;
+    if (e == i) break;
+    const std::string w = f.wire.substr(i, e - i);
+    i = e;
+    if (w == "->") {
+      if (arrow) return no("the wire \"" + f.wire + "\" has two arrows");
+      arrow = true;
+    } else if (arrow) {
+      if (!out.empty()) return no("the wire \"" + f.wire + "\" gives one output at most");
+      out = w;
+    } else {
+      words.push_back(w);
+    }
+  }
+  if (words.size() != f.inputs.size()) return no("the wire \"" + f.wire + "\" names " + std::to_string(words.size()) + " inputs, the function has " + std::to_string(f.inputs.size()));
+  if (out.empty() != f.outputs.empty() || f.outputs.size() > 1) return no("an exported function gives one output or none, and its wire says so after ->");
+  auto fits = [](const std::string& w, const FunctionPin& p, bool input) {
+    const bool number = (p.type == PinType::integer || p.type == PinType::number || p.type == PinType::boolean) && !p.ref;
+    if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return number;
+    if (w == "len" || w == "at") return input && p.type == PinType::integer && !p.ref;
+    if (w == "text") return p.type == PinType::text && (!p.ref || p.constant);
+    if (w == "bytes") return input && p.type == PinType::integer_list && (!p.ref || p.constant);
+    return false;
+  };
+  for (std::size_t k = 0; k < words.size(); ++k) {
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; len, at: an Int)");
+    const std::size_t before = k >= 2 && words[k - 1] == "at" ? k - 2 : k - 1;
+    if (words[k] == "len" && (k == 0 || (words[before] != "text" && words[before] != "bytes"))) return no("len is the length of the text or the bytes before it (after the bytes' at)");
+    if (words[k] == "at" && (k == 0 || words[k - 1] != "bytes")) return no("at is the place in the bytes before it");
+    const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
+    if (words[k] == "bytes" && (after >= words.size() || words[after] != "len")) return no("bytes are followed by their length: bytes len (or bytes at len)");
+  }
+  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64 or text)");
+  return true;
+}
+
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
   auto bad = [&](const std::string& why) {
     if (error) *error = "logic graph: " + why;
@@ -1726,6 +1839,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (g.uses_library(name)) return bad("the library \"" + name + "\" is used twice");
     g.uses.push_back(name);
   }
+  g.implements = j["implements"].as_string();
+  if (g.implements.size() > 64) return bad("the interface a Blueprint implements has a name of 1-64 characters");
   for (const json::Value& v : j["enums"].items()) {
     EnumType e;
     e.name = v["name"].as_string();
@@ -1888,6 +2003,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     f.external = v["external"].as_bool();
     f.remote = v["remote"].as_string();
     if (!f.remote.empty() && !f.external) return bad("function \"" + f.name + "\" has the name of another Blueprint's function, but is none of another Blueprint");
+    f.exported = v["export"].as_string();
+    f.wire = v["wire"].as_string();
     f.help = v["help"].as_string();
     auto pins = [&](const json::Value& list, std::vector<FunctionPin>& out, const char* what) {
       for (const json::Value& x : list.items()) {
@@ -1905,6 +2022,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       return true;
     };
     if (!pins(v["inputs"], f.inputs, "an input") || !pins(v["outputs"], f.outputs, "an output") || !pins(v["locals"], f.locals, "a local variable")) return false;
+    if (std::string why; !export_ok(f, &why)) return bad("function \"" + f.name + "\": " + why);
     g.functions.push_back(std::move(f));
   }
   for (const json::Value& v : j["comments"].items()) {
@@ -2233,6 +2351,49 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   for (std::size_t k = 0; k < g.uses.size(); ++k)
     for (std::size_t o = 0; o < k; ++o)
       if (g.uses[o] == g.uses[k]) err(0, "the library \"" + g.uses[k] + "\" is used twice");
+  // The object of an interface of the engine (Graph::implements): the engine calls its functions of the names of the
+  // interface's - each with the inputs and outputs of the interface's function (its node's after the object), every
+  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+  if (!g.implements.empty()) {
+    const EngineInterface* const i = engine_interface(g.implements);
+    if (!i) {
+      err(0, "it implements " + g.implements + ", which is no interface of the engine");
+    } else {
+      if (g.library) err(0, "a library is no object: it implements no interface of the engine (" + g.implements + ")");
+      if (*i->waits) err(0, "no Blueprint implements " + g.implements + " in this build: " + i->waits);
+      auto shown = [](PinType t, std::string_view of) { return pin_type_name(t) + (of.empty() ? "" : "<" + std::string(of) + ">"); };
+      for (const EngineVirtual& v : i->functions) {
+        const Function* const f = g.function(v.name);
+        const EngineFunction* const e = engine_function(v.node);
+        if (!f) {
+          if (v.pure) err(0, "it implements " + g.implements + ": it has no function " + v.name + " (the interface's has no body - " + v.node + ")");
+          continue;
+        }
+        if (!e) continue;
+        const std::string what = "function \"" + f->name + "\" of the interface " + g.implements;
+        if (*v.waits) {
+          err(0, what + ": the engine cannot call it on a Blueprint yet - it " + v.waits + " (the interface's own runs there)");
+          continue;
+        }
+        if (!f->from.empty() || f->external) err(0, what + ": it is the Blueprint's own (the engine calls it on this one)");
+        if (f->inputs.size() + 1 != e->inputs.size()) err(0, what + ": it takes " + std::to_string(e->inputs.size() - 1) + " input(s), not " + std::to_string(f->inputs.size()));
+        else
+          for (std::size_t k = 0; k < f->inputs.size(); ++k) {
+            const EnginePin& p = e->inputs[k + 1];
+            const FunctionPin& in = f->inputs[k];
+            if (in.ref) err(0, what + ": its input " + in.name + " is a value the engine hands over, no reference");
+            if (in.type != p.type || in.of != p.of) err(0, what + ": its input " + std::to_string(k + 1) + " is " + shown(p.type, p.of) + ", not " + shown(in.type, in.of));
+          }
+        if (f->outputs.size() != e->outputs.size()) err(0, what + ": it gives " + std::to_string(e->outputs.size()) + " output(s), not " + std::to_string(f->outputs.size()));
+        else
+          for (std::size_t k = 0; k < f->outputs.size(); ++k) {
+            const EnginePin& p = e->outputs[k];
+            const FunctionPin& o = f->outputs[k];
+            if (o.type != p.type || o.of != p.of) err(0, what + ": its output " + std::to_string(k + 1) + " is " + shown(p.type, p.of) + ", not " + shown(o.type, o.of));
+          }
+      }
+    }
+  }
   // Reference inputs (FunctionPin::ref): a call names a place for each, and the function works
   // on it where it stands.
   for (const Function& f : g.functions)
@@ -2432,6 +2593,91 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   }
   // A Blueprint is its C++ as well: what that cannot say (names C++ cannot write, a Return off its
   // function's path, a random value read twice ...) is an error of the graph.
+  // Places of the engine (setting "bound", kern/docs/blueprint_cpp.md "Plätze der Engine"): the place is the output
+  // of the node that bound it, and it is bound as long as C++ would hold the reference - within the run of the
+  // chain the node ran in. So: no wire reads that output (a wire would be a copy, the class reads the place); every
+  // way from where a chain starts to a node that names the place goes through the node that binds it; and no
+  // latent node (a Delay, a wait) lies between them.
+  {
+    std::unordered_map<u32, std::vector<u32>> next;  // exec wires
+    std::unordered_map<u32, int> into;               // exec wires into a node
+    std::unordered_map<u32, std::vector<u32>> readers;  // data wires: who reads a node's outputs
+    for (const Link& l : g.links) {
+      const auto it = pins.find(l.from);
+      bool exec = false;
+      if (it != pins.end())
+        for (const PinDef& pd : it->second.second) exec = exec || (pd.id == l.out && pd.type == PinType::exec);
+      if (exec) next[l.from].push_back(l.to), ++into[l.to];
+      else readers[l.from].push_back(l.to);
+    }
+    auto is_exec = [&](u32 id) {
+      const Node* n = g.find(id);
+      const NodeDef* d = n ? lib.find(n->type) : nullptr;
+      return d && d->kind != NodeKind::pure;
+    };
+    for (const Node& n : g.nodes) {
+      for (const auto& [key, value] : n.params)
+        if (key.size() > 6 && key.ends_with(".bound") && !value.empty()) err(n.id, lib.title(n) + ": a place of the engine is not given to a function as a reference");
+      if (const EngineFunction* f = engine_function(n.type); f && f->place)
+        for (const Link& l : g.links)
+          if (l.from == n.id && l.out == f->outputs[0].id) err(l.to, lib.title(n) + ": its output \"" + l.out + "\" is a place of the engine - read it with a node that names the place (bound " + std::to_string(n.id) + "), not through a wire");
+      if (n.param("bound").empty()) continue;
+      const Node* binder = nullptr;
+      const NodeDef* d = lib.find(n.type);
+      bool has_path = false;
+      if (d) for (const ParamDef& pd : d->params) has_path = has_path || pd.kind == ParamDef::Kind::path;
+      if (!bound_function(g, n, &binder) || !has_path || !n.param("variable").empty()) {
+        err(n.id, lib.title(n) + ": \"bound\" names no node that binds a place of the engine (" + n.param("bound") + "), or this node names no place");
+        continue;
+      }
+      // where the place is used: the node itself (a step), or the steps that read it (a value)
+      std::vector<u32> users, todo{n.id};
+      std::set<u32> seen;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (!seen.insert(x).second) continue;
+        if (is_exec(x)) { users.push_back(x); continue; }
+        for (u32 r : readers[x]) todo.push_back(r);
+      }
+      // reached from where a chain starts without the binder?
+      std::set<u32> reach;
+      for (const Node& m : g.nodes)
+        if (m.id != binder->id && is_exec(m.id) && !into.count(m.id)) todo.push_back(m.id);
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !reach.insert(x).second) continue;
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      // reached from the binder only past a latent node?
+      std::set<u32> late;
+      for (u32 y : next[binder->id]) todo.push_back(y);
+      std::set<u32> walked;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !walked.insert(x).second) continue;
+        const Node* xn = g.find(x);
+        const NodeDef* xd = xn ? lib.find(xn->type) : nullptr;
+        if (xd && xd->latent)
+          for (u32 y : next[x]) late.insert(y);
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      for (u32 y : std::vector<u32>(late.begin(), late.end())) todo.push_back(y);
+      std::set<u32> after_wait;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !after_wait.insert(x).second) continue;
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      for (u32 u : users) {
+        if (reach.count(u)) err(u, lib.title(n) + ": the place n" + n.param("bound") + " bound may not be bound here - every way to this node goes through the node that binds it (" + lib.title(*binder) + "), in the same chain");
+        else if (after_wait.count(u)) err(u, lib.title(n) + ": the place n" + n.param("bound") + " bound is not bound after a wait (a latent node between the node that binds it and this one)");
+      }
+    }
+  }
   bool errors = false;
   for (const Issue& i : out) errors = errors || i.error;
   if (!errors) {
@@ -3230,6 +3476,26 @@ void change_at(Value& v, const TypeRef& t, const std::vector<Instance::Spot::Ste
 }  // namespace
 bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i64>& indices, Spot& out) const {
   out = Spot();
+  if (prefix.empty() && !n.param("bound").empty()) {
+    // A place of the engine: what the node of the engine bound when it ran. Naming it asks the engine
+    // nothing - what is there is read when it is read (Instance::read), and beside its list the place
+    // goes on in an entry of its own then (value_at, change_at), as in a Blueprint's class.
+    const Node* binder = nullptr;
+    if (!bound_function(graph_, n, &binder)) return false;
+    auto at = index_.find(binder->id);
+    if (at == index_.end()) return false;
+    out.bound = at->second;
+    std::vector<std::string> steps;
+    if (!path_steps(n.param("path"), steps)) return false;
+    std::size_t entry = 0;
+    for (std::string& step : steps) {
+      Spot::Step st;
+      if (step.empty()) st.index = entry < indices.size() ? indices[entry] : -1, ++entry;
+      else st.field = std::move(step);
+      out.steps.push_back(std::move(st));
+    }
+    return true;
+  }
   const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
   auto fn = scope.empty() ? fn_index_.end() : fn_index_.find(scope);
   const Function* f = fn == fn_index_.end() ? nullptr : &graph_.functions[static_cast<std::size_t>(fn->second)];
@@ -3326,6 +3592,20 @@ bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i6
   }
   return true;
 }
+bool Instance::bound_now(const Spot& s, std::string& function, std::vector<Value>& in, TypeRef& t, Value& now) const {
+  const CNode& e = nodes_[static_cast<std::size_t>(s.bound)];
+  const EngineFunction* f = engine_function(e.def->type);
+  const std::size_t o = f && !f->value ? 1 : 0;  // (the output "result": a step's first after "then")
+  function = e.def->type;
+  t = o < e.out.size() ? TypeRef{e.out[o].type, e.out[o].of} : TypeRef{};
+  // (what the node was given when it ran - before it ran the place is bound to no object: the handle 0, and
+  // the engine says so as it says it of a handle of no object; check() sees to it that it ran)
+  in = o < e.outputs.size() && e.outputs[o].type == PinType::structure && e.outputs[o].rows ? *e.outputs[o].rows : std::vector<Value>{Value::integer(0)};
+  std::vector<Value> out{zero_of(t, graph_)};
+  const bool ok = rt_.host().engine(function + "@get", in, out);
+  now = ok && !out.empty() ? std::move(out[0]) : zero_of(t, graph_);
+  return ok;
+}
 std::vector<std::size_t> Instance::lengths_on(const Spot& s) const {
   std::vector<std::size_t> out;
   if (s.beside || s.entry >= 0) return out;   // (an entry of its own beside a list, an input by value: no list holds it)
@@ -3352,6 +3632,14 @@ std::vector<std::size_t> Instance::lengths_on(const Spot& s) const {
 }
 
 Value Instance::read(const Spot& s) const {
+  if (s.bound >= 0) {
+    std::string function;
+    std::vector<Value> in;
+    TypeRef t;
+    Value now;
+    bound_now(s, function, in, t, now);
+    return value_at(now, t, s.steps, 0, graph_);
+  }
   if (s.beside) return value_at(s.beside->value, s.beside->type, s.steps, 0, graph_);
   if (s.entry >= 0) {
     const CNode& e = nodes_[static_cast<std::size_t>(s.entry)];
@@ -3363,6 +3651,21 @@ Value Instance::read(const Spot& s) const {
   return s.steps.empty() ? held(s.key) : value_at(held(s.key), t->second, s.steps, 0, graph_);
 }
 bool Instance::write(const Spot& s, const std::function<void(Value&)>& change) {
+  if (s.bound >= 0) {
+    // (what the engine holds is read, changed at the place, and set back - where it holds nothing, the
+    // change goes into an entry of its own that nobody keeps, as in a Blueprint's class)
+    std::string function;
+    std::vector<Value> in;
+    TypeRef t;
+    Value now;
+    const bool there = bound_now(s, function, in, t, now);
+    change_at(now, t, s.steps, 0, graph_, change);
+    if (!there) return true;
+    in.push_back(std::move(now));
+    std::vector<Value> none;
+    rt_.host().engine(function + "@set", in, none);
+    return true;
+  }
   if (s.beside) {
     change_at(s.beside->value, s.beside->type, s.steps, 0, graph_, change);
     return true;
@@ -4011,6 +4314,10 @@ void Context::out(std::size_t index, Value v) {
   if (s >= 0) inst_.slots_[static_cast<std::size_t>(s)] = c.outputs[index].as_number();
 }
 
+void Context::bind(std::size_t index, std::vector<Value> in) {
+  Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
+  if (index < c.outputs.size()) c.outputs[index] = Value::structure(std::move(in));
+}
 void Context::out(std::string_view pin, Value v) {
   const Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
   for (std::size_t i = 0; i < c.out.size(); ++i) if (c.out[i].id == pin) { out(i, std::move(v)); return; }

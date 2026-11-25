@@ -320,7 +320,7 @@ export class LogicEditor {
   }
 
   get view() {
-    const k = `${this.data?.owner ?? 0}:${this.data?.view ?? "graph"}`;
+    const k = `${this.data?.owner ?? 0}:${this.data?.view ?? "graph"}:${this.data?.sheet ?? ""}`;
     if (!this.views.has(k)) this.views.set(k, {x: 120, y: 120, zoom: 1, fitted: false});
     return this.views.get(k);
   }
@@ -621,7 +621,7 @@ export class LogicEditor {
     if (data.view !== "graph" && !this.machine) data.view = "graph";
     this.renderTabs(data);
     this.renderMy(data);
-    const key = JSON.stringify([data.owner, data.view, data.nodes, data.links, data.machines, data.comments, data.issues]);
+    const key = JSON.stringify([data.owner, data.view, data.sheet, data.nodes, data.links, data.machines, data.comments, data.issues]);
     if (key !== this.key) {
       this.key = key;
       // Drop selections that no longer exist.
@@ -630,6 +630,12 @@ export class LogicEditor {
       if (this.selLink && !(data.links || []).some(l => l.join() === this.selLink.join())) this.selLink = null;
       if (data.view === "graph") this.renderGraph(data);
       else this.renderMachine(data, this.machine);
+      // (a sheet was opened for a node - openSheet, focusNode: now that it is drawn, show the node)
+      if (this.focusAfter) {
+        const id = this.focusAfter;
+        if (this.el.nodes.querySelector(`.lg-node[data-id="${id}"]`)) this.focusNode(id);
+        this.focusAfter = 0;
+      }
     }
     // The C++ view shows this Blueprint: it follows (undo, a renamed variable, another Blueprint)
     // unless its text is being changed.
@@ -650,11 +656,13 @@ export class LogicEditor {
 
   renderTabs(data) {
     const machines = data.machines || [];
-    const tabs = [{id: "graph", label: "Event Graph", icon: "graph"}, ...machines.map(m => ({id: "m:" + m.id, label: m.name, icon: "machine"}))];
-    const k = JSON.stringify([tabs, data.view]);
+    // (a Blueprint with sheets: beside the events' sheet, the function whose body is shown)
+    const sheet = data.sheets && data.sheet ? [{id: "f:" + data.sheet, label: data.sheet, icon: "pure"}] : [];
+    const tabs = [{id: "graph", label: "Event Graph", icon: "graph"}, ...sheet, ...machines.map(m => ({id: "m:" + m.id, label: m.name, icon: "machine"}))];
+    const k = JSON.stringify([tabs, data.view, data.sheet]);
     if (k === this.tabKey) return;
     this.tabKey = k;
-    this.el.tabs.innerHTML = tabs.map(t => `<button class="lg-tab${t.id === data.view ? " active" : ""}" data-view="${t.id}">${lgIco(t.icon)}<span>${lgEsc(t.label)}</span></button>`).join("") +
+    this.el.tabs.innerHTML = tabs.map(t => `<button class="lg-tab${t.id === (data.view === "graph" && data.sheets && data.sheet ? "f:" + data.sheet : data.view) ? " active" : ""}" data-view="${t.id}">${lgIco(t.icon)}<span>${lgEsc(t.label)}</span></button>`).join("") +
       `<button class="lg-tab add" title="Add a state machine">${lgIco("plus")}</button>`;
     for (const b of this.el.tabs.querySelectorAll("[data-view]")) {
       b.onclick = () => this.openView(b.dataset.view);
@@ -668,6 +676,9 @@ export class LogicEditor {
   }
 
   openView(view) {
+    if (view.startsWith("f:")) return;   // (the sheet that is shown)
+    if (view === "graph" && this.data?.sheets && this.data.view === "graph") return this.openSheet("");
+    if (view === "graph" && this.data?.sheets) this.cmd({cmd: "logicSheet", function: ""});
     this.selection.clear();
     this.selLink = null;
     this.selTransition = null;
@@ -759,7 +770,11 @@ export class LogicEditor {
           <i class="lg-fni">L</i><span class="lg-vn">${lgEsc(n)}</span><span class="lg-acts"><button data-unuse title="Do not use this library any more">×</button></span>
         </div>`).join("") +
       (canUse.length ? `<div class="lg-declare"><select data-use title="This Blueprint uses a library of this level: it has its types and calls its functions directly">
-        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "");
+        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "") +
+      // the interface of the engine it is the object of: the engine calls its functions of the interface's names
+      `<div class="lg-declare"><select data-implements title="The engine calls this Blueprint as an object of one of its interfaces: its functions of the names of the interface's (a name with ? it may leave out - the interface's own runs there)">
+        <option value=""${data.implements ? "" : " selected"}>Implements no interface of the engine</option>${(data.interfaces || []).map(i =>
+          `<option value="${lgEsc(i.name)}"${i.name === data.implements ? " selected" : ""} title="${lgEsc(i.functions.join(", "))}">Implements ${lgEsc(i.name)}</option>`).join("")}</select></div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("libs", "Libraries", "", libs) + section("vars", "Variables", "Add a variable", vars) +
       section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums + adopt("enum")) + section("structs", "Structures", "Add a struct", structs + adopt("struct")) +
       section("events", "Events", "Add a custom event", events);
@@ -806,6 +821,11 @@ export class LogicEditor {
       if (r && r.ok === false) libFlag.checked = !libFlag.checked;
     };
     for (const row of this.el.mylist.querySelectorAll(".lg-lib")) row.querySelector("[data-unuse]").onclick = () => this.cmd({cmd: "logicLibrary", op: "unuse", name: row.dataset.lib});
+    const implSel = this.el.mylist.querySelector("[data-implements]");
+    if (implSel) implSel.onchange = () => {
+      const r = this.cmd({cmd: "logicImplements", name: implSel.value});
+      if (r && r.ok === false) implSel.value = data.implements || "";
+    };
     const useSel = this.el.mylist.querySelector("[data-use]");
     if (useSel) useSel.onchange = () => {
       if (!useSel.value) return;
@@ -863,6 +883,9 @@ export class LogicEditor {
 
   /** Shows where the function starts. */
   focusFunction(name) {
+    // (a Blueprint with sheets: the function's own sheet, at its entry)
+    const sheet = (this.data?.sheets || []).find(s => s.name === name);
+    if (sheet) return this.openSheet(name, sheet.entry);
     const entry = (this.data?.nodes || []).find(n => n.type === "func.entry" && (n.params || []).some(p => p.key === "function" && p.value === name));
     if (entry) this.focusNode(entry.id);
   }
@@ -1131,9 +1154,16 @@ export class LogicEditor {
 
   paramHtml(n, p) {
     const attr = `data-param="${lgEsc(p.key)}" data-node="${n.id}"`;
-    const choices = p.choices || [];
+    // (its choices: its own, or a list every node of the Blueprint shares - data.choices)
+    const choices = p.choices || this.data?.choices?.[p.list] || [];
     if (p.kind === "scope") return `<span class="lg-dim" title="A local variable of this function">${lgEsc(p.value)}</span>`;
     if (["choice", "type", "variable", "field", "machine", "state", "sound", "function"].includes(p.kind)) {
+      // (a long shared list - the functions of a large Blueprint - is written into the box when it is opened:
+      // hundreds of options on every node are what made a large graph slow to draw)
+      if (p.list && choices.length > 40) {
+        const now = choices.find(([v]) => v === p.value);
+        return `<select class="lg-par" ${attr} data-list="${lgEsc(p.list)}"><option value="${lgEsc(p.value)}" selected>${lgEsc(now ? now[1] : p.value || "(none)")}</option></select>`;
+      }
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
     }
@@ -1165,7 +1195,16 @@ export class LogicEditor {
       else el.onchange = () => send(node, pin, lgTyped64(el.dataset.t, el.value));
     }
     for (const el of root.querySelectorAll(".lg-par")) {
-      el.addEventListener("pointerdown", e => e.stopPropagation());
+      // (a long shared list is written into its box when the box is first opened: paramHtml)
+      const fill = () => {
+        if (!el.dataset.list) return;
+        const now = el.value, choices = this.data?.choices?.[el.dataset.list] || [];
+        delete el.dataset.list;
+        el.innerHTML = (choices.some(([v]) => v === now) ? "" : `<option value="${lgEsc(now)}" selected>${lgEsc(now || "(none)")}</option>`) +
+          choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === now ? " selected" : ""}>${lgEsc(l)}</option>`).join("");
+      };
+      el.addEventListener("pointerdown", e => { e.stopPropagation(); fill(); });
+      el.addEventListener("focus", fill);
       el.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") el.blur(); });
       el.onchange = () => this.cmd({cmd: "logicParam", node: +el.dataset.node, key: el.dataset.param, value: el.value});
     }
@@ -1402,7 +1441,7 @@ export class LogicEditor {
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
       : `<input data-vk="value" value="${lgEsc(lgNum(v.value))}">`;
-    const refs = (this.data.nodes || []).filter(n => (n.params || []).some(p => p.key === "variable" && p.value === v.name) && !(n.params || []).some(p => p.key === "scope")).length;
+    const refs = this.data.counts?.variables?.[v.name] || 0;
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${lgColor(v.type)}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
@@ -1432,7 +1471,7 @@ export class LogicEditor {
         (this.structOf(p.type) || lgIsKeyed(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : side === "out" ? "No outputs" : "No local variables"}</div>`;
-    const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure" || n.type === "func.call_on") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
+    const refs = this.data.counts?.calls?.[f.name] || 0;
     const ext = !!f.external;
     return `<div class="lg-dh"><i class="lg-dhc" style="background:#6d3fc4"></i>${lgEsc(f.name)}</div><div class="lg-dsub">${ext ? "Function of another Blueprint" : "Function"}</div>
       <div class="lg-dsec"><div class="lg-dst">Function</div>
@@ -1452,7 +1491,7 @@ export class LogicEditor {
   enumDetails(e) {
     const of = t => t === e.name || t === e.name + "_list";
     const vars = (this.data.variables || []).filter(v => of(v.type)).length;
-    const nodes = (this.data.nodes || []).filter(n => (n.params || []).some(p => (p.kind === "type") && of(p.value))).length;
+    const nodes = (this.data.counts?.types?.[e.name] || 0) + (this.data.counts?.types?.[e.name + "_list"] || 0);
     const rows = e.values.map((name, i) => `<div class="lg-frow lg-erow" data-index="${i}"><em>${i}</em>
         <input data-ev="name" class="lg-fname" value="${lgEsc(name)}" spellcheck="false" title="The value's name">
         <button data-ev="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-ev="down" title="Move down"${i === e.values.length - 1 ? " disabled" : ""}>↓</button>
@@ -1472,7 +1511,7 @@ export class LogicEditor {
   structDetails(s) {
     const of = t => t === s.name || t === s.name + "_list";
     const vars = (this.data.variables || []).filter(v => of(v.type)).length;
-    const nodes = (this.data.nodes || []).filter(n => (n.params || []).some(p => (p.kind === "type") && of(p.value))).length;
+    const nodes = (this.data.counts?.types?.[s.name] || 0) + (this.data.counts?.types?.[s.name + "_list"] || 0);
     const without = [s.name, ...this.structsHolding(s.name)];
     // a field's default: in the row for a plain value, below it for a list or a struct
     const value = f => this.enumOf(f.type) && !lgIsList(f.type) ? `<select data-sf="value" class="lg-fval" title="Default">${this.enumOf(f.type).values.map((name, k) => `<option value="${k}"${k === f.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
@@ -1529,7 +1568,7 @@ export class LogicEditor {
       <div class="lg-dtxt">${m.states.length} states, ${m.transitions.length} transitions. Double-click empty space for a new state; select a transition arrow to edit its rule.</div>
       <div class="lg-dacts"><button data-act="rename-m">Rename</button><button data-act="delete-m" class="danger">Delete</button></div>`;
     return `<div class="lg-dh">${lgEsc(d.ownerName)}</div><div class="lg-dsub">${d.owner ? "Actor Blueprint" : "Level Blueprint"}</div>
-      <div class="lg-dtxt">${(d.nodes || []).length} nodes · ${(d.links || []).length} wires · ${(d.variables || []).length} variables. Select a node, a variable or a comment to edit it here.</div>
+      <div class="lg-dtxt">${d.counts?.nodes ?? (d.nodes || []).length} nodes · ${d.counts?.links ?? (d.links || []).length} wires · ${(d.variables || []).length} variables. Select a node, a variable or a comment to edit it here.</div>
       <div class="lg-dsec"><div class="lg-dst">Shortcuts</div><table class="lg-keys">
         <tr><td>Right-click / long press</td><td>Add node</td></tr><tr><td>Drag pin</td><td>Wire (empty space: nodes that fit)</td></tr>
         <tr><td>Alt+click</td><td>Break wire</td></tr><tr><td>Ctrl+drag pin</td><td>Move wires</td></tr><tr><td>Double-click wire</td><td>Reroute knot</td></tr>
@@ -1713,7 +1752,7 @@ export class LogicEditor {
     this.el.results.classList.toggle("open", this.resultsOpen);
     for (const b of this.host.querySelectorAll(".lg-rtabs [data-r]")) b.classList.toggle("on", b.dataset.r === this.results);
     this.host.querySelector(".lg-rfind").hidden = this.results !== "find";
-    const k = JSON.stringify([this.results, this.resultsOpen, d.issues, this.results === "find" ? [this.findQuery, d.nodes?.map(n => [n.id, n.title, n.comment]), d.variables, d.comments] : 0]);
+    const k = JSON.stringify([this.results, this.resultsOpen, d.issues, this.results === "find" ? [this.findQuery, this.studio?.revision, d.nodes?.length, d.variables, d.comments] : 0]);
     if (k === this.resKey) return;
     this.resKey = k;
     let html = "";
@@ -1725,10 +1764,11 @@ export class LogicEditor {
       const q = this.findQuery.trim().toLowerCase();
       if (q) {
         const hits = [];
-        for (const n of d.nodes || []) {
-          const hay = [n.title, n.comment, n.category, ...(n.params || []).map(p => p.value), ...n.inputs.map(p => p.label), ...n.outputs.map(p => p.label)].join(" ").toLowerCase();
-          if (hay.includes(q)) hits.push(`<div class="lg-res" data-node="${n.id}">${lgIco(n.kind === "event" ? "event" : n.kind === "pure" ? "pure" : "action")}<span>${lgEsc(n.title)}</span><em>${lgEsc(n.category || "")}</em></div>`);
-        }
+        // (the engine finds in the whole Blueprint - also on the sheets that are not shown)
+        const found = this.engine.command({cmd: "logicFind", query: q}) || {};
+        for (const h of found.hits || [])
+          hits.push(`<div class="lg-res" data-node="${h.node}">${lgIco(h.kind === "event" ? "event" : h.kind === "pure" ? "pure" : "action")}<span>${lgEsc(h.title)}</span><em>${lgEsc(h.sheet ? h.sheet + " · " : "")}${lgEsc(h.category || "")}</em></div>`);
+        if (found.more) hits.push(`<div class="lg-res none">More than ${(found.hits || []).length} nodes match: type more</div>`);
         for (const c of d.comments || []) if (c.text.toLowerCase().includes(q)) hits.push(`<div class="lg-res" data-node="${c.id}">${lgIco("box")}<span>Comment: ${lgEsc(c.text)}</span></div>`);
         for (const v of d.variables || []) if (v.name.toLowerCase().includes(q)) hits.push(`<div class="lg-res" data-var="${lgEsc(v.name)}"><i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span>Variable ${lgEsc(v.name)}</span><em>${lgEsc(lgTypeName(v.type))}</em></div>`);
         html = hits.join("") || `<div class="lg-res none">Nothing found for "${lgEsc(this.findQuery)}"</div>`;
@@ -1800,8 +1840,22 @@ export class LogicEditor {
     this.applyView();
   }
 
+  /** Shows a function's sheet ("" = the events) and, once it is drawn, the node. */
+  openSheet(name, node = 0) {
+    this.selection.clear();
+    this.selLink = null;
+    this.focusAfter = node;
+    this.cmd({cmd: "logicSheet", function: name});
+  }
+
   focusNode(id) {
     const el = this.el.nodes.querySelector(`.lg-node[data-id="${id}"]`) || this.el.cboxes.querySelector(`[data-cid="${id}"]`);
+    if (!el && this.data?.sheets && this.focusAfter !== id) {
+      // (it stands on a sheet that is not shown: the engine shows that one, then this runs again)
+      this.focusAfter = id;
+      this.cmd({cmd: "logicReveal", node: id});
+      return;
+    }
     if (!el) return;
     const r = this.el.canvas.getBoundingClientRect(), v = this.view;
     v.zoom = 1;

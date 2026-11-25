@@ -30,6 +30,7 @@
 #include <initializer_list>
 #include <list>
 #include <map>
+#include <functional>
 #include <memory>
 #include <new>
 #include <optional>
@@ -562,7 +563,14 @@ template <class T> T* engine_object(long long handle) {
 /// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
 inline kern::logic::EngineObjects g_source_objects;
+/// (the places of the engine the source holds: set back before every call of the engine, read again after it - below)
+inline void places_set();
+inline void places_get();
 inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
+  places_set();
+  struct Again {
+    ~Again() { places_get(); }
+  } again;
   std::vector<Value> out;
   if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
@@ -650,6 +658,35 @@ template <class A, class B> Value arg(const std::pair<A, B>& p);
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got);
 template <class A, class B> bool defined(const std::pair<A, B>& p);
 template <class A, class B> std::string text(const std::pair<A, B>& p);
+// (the language's own types, as a Blueprint's class holds them - in the source where it calls a file of the program that is a
+// Blueprint now, level_blueprints.h: an Int of a fixed width, an Int, a Text, a List, a list of a fixed length; see "the types of a
+// Blueprint's class" below)
+template <class T> Value arg(const kern::logic::Sized<T>& x);
+template <class T> bool same(const kern::logic::Sized<T>& want, const Value& got);
+template <class T> bool defined(const kern::logic::Sized<T>&);
+template <class T> std::string text(const kern::logic::Sized<T>& x);
+template <class T> void take(kern::logic::Sized<T>& to, const Value& v);
+inline Value arg(const kern::logic::Whole& x);
+inline bool same(const kern::logic::Whole& want, const Value& got);
+inline bool defined(const kern::logic::Whole&);
+inline std::string text(const kern::logic::Whole& x);
+inline void take(kern::logic::Whole& to, const Value& v);
+inline Value arg(const kern::logic::Text& x);
+inline bool same(const kern::logic::Text& want, const Value& got);
+inline bool defined(const kern::logic::Text&);
+inline std::string text(const kern::logic::Text& x);
+inline void take(kern::logic::Text& to, const Value& v);
+template <class T> Value arg(const kern::logic::List<T>& x);
+template <class T> bool same(const kern::logic::List<T>& want, const Value& got);
+template <class T> bool defined(const kern::logic::List<T>& x);
+template <class T> std::string text(const kern::logic::List<T>& x);
+template <class T> void take(kern::logic::List<T>& to, const Value& v);
+template <class T, std::size_t N> Value arg(const kern::logic::Fixed<T, N>& x);
+template <class T, std::size_t N> bool same(const kern::logic::Fixed<T, N>& want, const Value& got);
+template <class T, std::size_t N> bool defined(const kern::logic::Fixed<T, N>& x);
+template <class T, std::size_t N> std::string text(const kern::logic::Fixed<T, N>& x);
+template <class T, std::size_t N> void take(kern::logic::Fixed<T, N>& to, const Value& v);
+inline void take(Vec3& to, const Value& v);   // (a Vector of a Blueprint's class: the engine's vector, as the Blueprint holds it)
 /// Entries the test keeps for a view to see (a drawn view, one the engine's stand-in gave): kept to the end.
 template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
   static std::deque<std::vector<U>> kept;
@@ -1395,6 +1432,98 @@ __attribute__((format(printf, 1, 0))) inline std::string formatted(const char* f
   return out;
 }
 
+/// A place of the engine the source holds (`std::vector<ShotEvent>& shots() { return shots_; }`: kern/docs/blueprint_cpp.md,
+/// "Plätze der Engine"). The stand-in of the source's engine object gives a reference to a copy the test keeps: read
+/// from the engine ("<function>@get") when the source calls the function, set back ("<function>@set") before each
+/// further call of the engine and when the source's function returns (places_close), read again after each call - so
+/// the engine sees what the source wrote where the Blueprint, which sets the place with every change, has written it.
+/// Neither is a call of the source (the stand-in and test_engine do not write them down); only the function is.
+struct OpenPlace {
+  std::function<void()> get, set;
+};
+inline std::vector<OpenPlace> g_places;
+inline bool g_places_busy = false;   // (while they are read or set: no other place is)
+/// The fields of the source's objects of the engine (`Mesh::visible`, kern/docs/blueprint_cpp.md "Felder eines Objekts
+/// der Engine"): the stand-in of the object holds each as a field of its own - C++ reads and sets it there, unseen -
+/// and every object that is alive has one FieldSync, which sets them in the engine ("<field>@set") with the places
+/// and reads them from it ("<field>@get") with the places: before and after each call of the engine, as a call of
+/// the source begins and when it returns. Neither is a call of the source; the Blueprint binds a field without a call.
+struct FieldSync {
+  using Fn = void (*)(void* owner, bool set);
+  std::ptrdiff_t at;   // (where it stands in its object: the object of a copy is found the same way)
+  Fn fn;
+  template <class O> FieldSync(O* owner, Fn f) : at(reinterpret_cast<char*>(this) - reinterpret_cast<char*>(static_cast<void*>(owner))), fn(f) { live().insert(this); }
+  FieldSync(const FieldSync& o) : at(o.at), fn(o.fn) { live().insert(this); }
+  FieldSync& operator=(const FieldSync&) { return *this; }   // (it stays its own object's)
+  ~FieldSync() { live().erase(this); }
+  void* owner() const { return const_cast<char*>(reinterpret_cast<const char*>(this)) - at; }
+  static std::set<FieldSync*>& live() {
+    static std::set<FieldSync*> all;
+    return all;
+  }
+};
+inline void fields_sync(bool set) {
+  const std::vector<FieldSync*> all(FieldSync::live().begin(), FieldSync::live().end());
+  for (FieldSync* f : all)
+    if (FieldSync::live().count(f)) f->fn(f->owner(), set);
+}
+inline void places_set() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.set();
+  fields_sync(true);
+  g_places_busy = false;
+}
+inline void places_get() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.get();
+  fields_sync(false);
+  g_places_busy = false;
+}
+/// One field of an object of the source (FieldSync): set in the engine or read from it - an object without a handle
+/// has nothing there.
+template <class T, class Shape> void field_sync(const char* function, const EngineObject& o, T& field, bool set) {
+  if (!o.kern_handle) return;
+  const std::vector<Value> in{value_of(o)};
+  if (set) {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(field));
+    test_engine(g_source_engine, g_source_objects, std::string(function) + "@set", with, none);
+    return;
+  }
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  std::vector<Value> out{Value::zero(f ? f->outputs[0].type : kern::logic::PinType::exec)};
+  if (test_engine(g_source_engine, g_source_objects, std::string(function) + "@get", in, out)) take_as<Shape>(field, out[0]);
+}
+/// The source's function returned: its places are set back, and it holds none.
+inline void places_close() {
+  places_set();
+  g_places.clear();
+}
+template <class T, class Shape> T& engine_place(const char* function, const std::vector<Value>& in) {
+  (void)engine_call(function, in);
+  const auto kept = std::make_shared<T>(quiet<T>());
+  const std::string get = std::string(function) + "@get", set = std::string(function) + "@set";
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  const kern::logic::TypeRef type{f ? f->outputs[0].type : kern::logic::PinType::exec, f && f->outputs[0].of ? f->outputs[0].of : ""};
+  OpenPlace p;
+  p.get = [kept, get, in, type] {
+    std::vector<Value> out{Value::zero(type.type)};
+    if (test_engine(g_source_engine, g_source_objects, get, in, out)) take_as<Shape>(*kept, out[0]);
+  };
+  p.set = [kept, set, in] {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(*kept));
+    test_engine(g_source_engine, g_source_objects, set, with, none);
+  };
+  g_places_busy = true;
+  p.get();
+  g_places_busy = false;
+  g_places.push_back(std::move(p));
+  return *kept;
+}
+
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
 /// entry for entry.)
 inline bool same_value(const Value& a, const Value& b) {
@@ -1631,16 +1760,16 @@ struct Blueprint {
     } began{actor};
     interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
     compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
-    // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
-    // sample, a number raised to a 256-bit power - sets it to what they take.)
-    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    // (The loop guard is the host's: the game's functions loop long - a sound computed sample by sample, a
+    // number raised to a 256-bit power -, and the game sets it to what they take: as here, rules::kLoopBudget.)
+    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;
     interp = interpreted->inst;
     native = compiled->inst;
     SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
     SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
     if (!actors.empty()) {
       source = std::make_unique<RuleBlueprint>(nullptr, nullptr, true, actors);
-      source->rt.budget = 2000000000u;
+      source->rt.budget = sc::rules::kLoopBudget;
       source->host.keeps = &g_source_engine;   // (what the actors ask the engine for the source: what the source asks)
       source->host.keeps_objects = &g_source_objects;
       SC_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
@@ -1659,7 +1788,7 @@ struct Blueprint {
     if (!lost(interpreted) && !lost(compiled)) return false;
     interpreted = std::make_unique<RuleBlueprint>(name, nullptr, false, others);
     compiled = std::make_unique<RuleBlueprint>(name, nullptr, true, others);
-    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;   // (as the game sets it)
     interp = interpreted->inst;
     native = compiled->inst;
     interpreted_actors = {};
@@ -2352,11 +2481,122 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_places.clear();
     g_source_engine.kept.clear();   // (the Callbacks objects of the engine kept from an earlier call: each call begins with an engine that holds none - both sides alike)
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
 };
+
+
+// ---- the types of a Blueprint's class ----
+// A file of the program that is a Blueprint now (BLUEPRINTS.md, "5 - Umschalten") is called by the rest of the program as its
+// class (level_blueprints.h): its values are of the language's own types (kern/logic/nodes.h) and of the structs and enums the
+// Blueprint declares. The test draws, hands over, compares and takes them back as the Blueprint holds them: an Int of a fixed
+// width as the whole number it is, an Int as an Int, a Text as a text, a List and a list of a fixed length entry by entry.
+// (A struct of a class: the test writes its helpers - draw, arg, same, defined, text, take - field by field, in the namespace of
+// its class; an enum of a class is a C++ enum, its values their places.)
+/// A value of the language as the test's plain value of the same: an Int of a fixed width or an Int its i64, a Text its
+/// std::string, an entry of a List<Bool> its bool - anything else itself.
+template <class T> auto plain(const T& x) {
+  if constexpr (kern::logic::is_sized<T>) return static_cast<kern::i64>(x.v);
+  else if constexpr (std::is_same_v<T, kern::logic::Whole>) return static_cast<kern::i64>(x.v);
+  else if constexpr (std::is_same_v<T, kern::logic::Text>) return std::string(x.view());
+  else if constexpr (std::is_same_v<T, kern::logic::Truth>) return static_cast<bool>(x);
+  else return x;
+}
+/// ... and back: the language's value of a plain one.
+template <class T, class P> T unplain(const P& p) {
+  if constexpr (kern::logic::is_sized<T>) return T(static_cast<kern::i64>(p));
+  else if constexpr (std::is_same_v<T, kern::logic::Whole>) {
+    T w;
+    w.v = static_cast<kern::i64>(p);
+    return w;
+  } else if constexpr (std::is_same_v<T, kern::logic::Text>) return T(std::string(p));
+  else return T(p);
+}
+template <class Items> auto plain_list(const Items& items) {
+  using P = decltype(plain(*items.begin()));
+  std::vector<P> out;
+  out.reserve(items.size());
+  for (const auto& x : items) out.push_back(plain(x));
+  return out;
+}
+inline void take(Vec3& to, const Value& v) { to = v.as_vector(); }
+template <class T> Value arg(const kern::logic::Sized<T>& x) { return arg(static_cast<kern::i64>(x.v)); }
+template <class T> bool same(const kern::logic::Sized<T>& want, const Value& got) { return same(static_cast<kern::i64>(want.v), got); }
+template <class T> bool defined(const kern::logic::Sized<T>&) { return true; }
+template <class T> std::string text(const kern::logic::Sized<T>& x) { return text(static_cast<kern::i64>(x.v)); }
+template <class T> void take(kern::logic::Sized<T>& to, const Value& v) { to = kern::logic::Sized<T>(v.as_int()); }
+inline Value arg(const kern::logic::Whole& x) { return arg(static_cast<kern::i64>(x.v)); }
+inline bool same(const kern::logic::Whole& want, const Value& got) { return same(static_cast<kern::i64>(want.v), got); }
+inline bool defined(const kern::logic::Whole&) { return true; }
+inline std::string text(const kern::logic::Whole& x) { return text(static_cast<kern::i64>(x.v)); }
+inline void take(kern::logic::Whole& to, const Value& v) { to.v = v.as_int(); }
+inline Value arg(const kern::logic::Text& x) { return arg(std::string(x.view())); }
+inline bool same(const kern::logic::Text& want, const Value& got) { return same(want.view(), got); }
+inline bool defined(const kern::logic::Text&) { return true; }
+inline std::string text(const kern::logic::Text& x) { return text(std::string(x.view())); }
+inline void take(kern::logic::Text& to, const Value& v) { to = kern::logic::Text(std::string(v.as_text())); }
+template <class T> Value arg(const kern::logic::List<T>& x) { return arg(plain_list(x)); }
+template <class T> bool same(const kern::logic::List<T>& want, const Value& got) { return same(plain_list(want), got); }
+template <class T> bool defined(const kern::logic::List<T>& x) { return defined(plain_list(x)); }
+template <class T> std::string text(const kern::logic::List<T>& x) { return text(plain_list(x)); }
+template <class T> void take(kern::logic::List<T>& to, const Value& v) {
+  using Item = typename kern::logic::List<T>::Item;
+  std::vector<decltype(plain(std::declval<const Item&>()))> items;
+  take(items, v);
+  to.clear();
+  for (const auto& p : items) to.push_back(unplain<Item>(p));
+}
+template <class T, std::size_t N> Value arg(const kern::logic::Fixed<T, N>& x) { return arg(plain_list(x.items)); }
+template <class T, std::size_t N> bool same(const kern::logic::Fixed<T, N>& want, const Value& got) { return same(plain_list(want.items), got); }
+template <class T, std::size_t N> bool defined(const kern::logic::Fixed<T, N>& x) { return defined(plain_list(x.items)); }
+template <class T, std::size_t N> std::string text(const kern::logic::Fixed<T, N>& x) { return text(plain_list(x.items)); }
+/// (a list of a fixed length from a list: cut to its length, what the list does not have zero - as a Blueprint sets it)
+template <class T, std::size_t N> void take(kern::logic::Fixed<T, N>& to, const Value& v) {
+  using Item = typename kern::logic::Fixed<T, N>::Item;
+  std::vector<decltype(plain(std::declval<const Item&>()))> items;
+  take(items, v);
+  for (std::size_t k = 0; k < N; ++k) to.items[k] = k < items.size() ? unplain<Item>(items[k]) : Item{};
+}
+/// The number of values of an enum of a Blueprint's class (KERN_ENUM names them).
+template <class E> std::size_t class_enum_count() {
+  const std::string_view names = kern_enum_names(E{});
+  return names.empty() ? 0 : static_cast<std::size_t>(std::count(names.begin(), names.end(), ',')) + 1;
+}
+/// A drawn value of a type of a Blueprint's class: as the test draws the plain value it is (a struct of the class: the helper
+/// the test writes for it, draw_value in its class's namespace).
+template <class T> T draw_class(Draw& draw) {
+  if constexpr (kern::logic::is_sized<T>) {
+    using N = decltype(T{}.v);
+    return T(std::is_unsigned_v<N> ? static_cast<kern::i64>(draw.below(40)) : static_cast<kern::i64>(draw.whole()));
+  } else if constexpr (std::is_same_v<T, kern::logic::Whole>) {
+    return unplain<T>(static_cast<kern::i64>(draw.whole()));
+  } else if constexpr (std::is_same_v<T, kern::logic::Text>) {
+    return T(draw.word());
+  } else if constexpr (std::is_same_v<T, bool>) {
+    return draw.flag();
+  } else if constexpr (std::is_floating_point_v<T>) {
+    return static_cast<T>(draw.number());
+  } else if constexpr (std::is_same_v<T, Vec3>) {
+    return draw.vector();
+  } else if constexpr (std::is_enum_v<T>) {
+    return enum_value<T>(static_cast<kern::i64>(draw.below(static_cast<u32>(class_enum_count<T>()))));
+  } else if constexpr (requires { typename T::Item; T{}.items; }) {   // (a list of a fixed length: each entry drawn)
+    T out{};
+    for (auto& e : out.items) e = draw_class<typename T::Item>(draw);
+    return out;
+  } else if constexpr (requires { typename T::Item; typename T::Items; }) {   // (a List)
+    using Item = typename T::Item;
+    T out;
+    for (auto& e : draw_list(draw, [&] { return plain(draw_class<std::conditional_t<std::is_same_v<Item, kern::logic::Truth>, bool, Item>>(draw)); }))
+      out.push_back(unplain<Item>(e));
+    return out;
+  } else {
+    return draw_value(draw, static_cast<const T*>(nullptr));   // (a struct of a class: its helper)
+  }
+}
 
 }  // namespace sc::converted

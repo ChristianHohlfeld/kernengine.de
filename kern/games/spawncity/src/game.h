@@ -20,7 +20,7 @@
 #include "destruction.h"
 #include "guided.h"
 #include "combat_detail.h"
-#include "combat_audio.h"
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: combat_audio, combat_audio_cpp ...
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
@@ -157,9 +157,6 @@ class Game {
   void pointer_locked(bool locked) { ctl_.locked = locked; }
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   void voice_capture(kern::Span<const f32> samples, u32 rate);
-  /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
-  Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
-  WaterLook& water_look() { return water_look_; }  // the original's water shader (water_look.h)
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
@@ -417,7 +414,7 @@ class Game {
   bool details_command(const std::string& cmd, std::string& out);
   // SpawnCity's synthesised combat sounds (combat_audio.cpp) registered as "sc:<kind><n>"
   void combat_audio_init();
-  const char* combat_sfx(combat_audio::Kind k);
+  const char* combat_sfx(blueprints::combat_audio::combat_audio_Kind k);
   // world dressing
   void update_lamps();
   std::string map_json();
@@ -641,8 +638,6 @@ class Game {
   /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
   /// draw distances follow it, so a zoomed view shows what an unzoomed one shows nearer.
   f32 view_zoom() const;  // the page runs a WebXR session ("vr 1")
-  Facades windows_;
-  WaterLook water_look_;
   std::unique_ptr<kern::game::GameWorld> world_;
   CityStream city_;
   VehicleArt art_;

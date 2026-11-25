@@ -1,5 +1,6 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
+#include <algorithm>
 #include "kern/app/app.h"
 #include "kern/gfx/renderer.h"
 #include "kern/logic/engine_host.h"
@@ -814,6 +815,63 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// kern::App: the object of the engine a Blueprint is (Graph::implements "App")
+class Implements_App final : public kern::App {
+ public:
+  Implements_App(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {}
+  decltype(std::declval<kern::App&>().configure()) configure() override {
+    if (!by_->has("configure")) return kern::App::configure();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("configure", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<kern::App&>().configure()) kern_r = ev::blank<decltype(std::declval<kern::App&>().configure())>();
+    if (kern_given) ev::Conv<ev::Struct<S_RendererOptions>>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::App&>().extensions()) extensions() override {
+    if (!by_->has("extensions")) return kern::App::extensions();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("extensions", kern_in, kern_out) && !kern_out.empty();
+    kern_kept_extensions.clear();
+    if (kern_given) ev::Conv<ev::List<ev::Int>>::from(o_, kern_out[0], kern_kept_extensions);
+    return decltype(std::declval<kern::App&>().extensions())(kern_kept_extensions.data(), kern_kept_extensions.size());
+  }
+  decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) start(kern::Engine& kern_p0) override {
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("start", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) kern_r = ev::blank<decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>()))>();
+    if (kern_given) ev::Conv<ev::Bool>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::App&>().update(std::declval<kern::Engine&>(), std::declval<kern::Frame const&>())) update(kern::Engine& kern_p0, kern::Frame const& kern_p1) override {
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0)), ev::Conv<ev::Struct<S_Frame>>::to(o_, kern_p1)};
+    std::vector<Value> kern_out;
+    by_->call("update", kern_in, kern_out);
+  }
+  decltype(std::declval<kern::App&>().resized(std::declval<kern::Engine&>())) resized(kern::Engine& kern_p0) override {
+    if (!by_->has("resized")) return kern::App::resized(kern_p0);
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    std::vector<Value> kern_out;
+    by_->call("resized", kern_in, kern_out);
+  }
+  decltype(std::declval<kern::App&>().stop(std::declval<kern::Engine&>())) stop(kern::Engine& kern_p0) override {
+    if (!by_->has("stop")) return kern::App::stop(kern_p0);
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    std::vector<Value> kern_out;
+    by_->call("stop", kern_in, kern_out);
+  }
+
+ private:
+  EngineObjects& o_;
+  std::shared_ptr<Implementer> by_;
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<kern::App&>().extensions())>().data)>>> kern_kept_extensions;
+};
+i64 implements_App(EngineObjects& o, std::shared_ptr<Implementer> by) {
+  return o.own<Implements_App, kern::App>(std::make_unique<Implements_App>(o, std::move(by)));
+}
+
 const EngineCall kCalls[] = {
     {"engine.input.down", &c0},
     {"engine.input.pressed", &c1},
@@ -902,6 +960,11 @@ const EngineMaker kMakers[] = {
     {EngineObjects::kind<kern::Input>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::Input>(handle, std::unique_ptr<kern::Input>(new kern::Input())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));
+
+const EngineImplement kAdapters[] = {
+    {"App", &implements_App},
+};
+const EngineImplements kAllAdapters(kAdapters, std::size(kAdapters));
 
 }  // namespace
 }  // namespace kern::logic

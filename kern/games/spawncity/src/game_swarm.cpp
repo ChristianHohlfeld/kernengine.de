@@ -147,7 +147,7 @@ void Game::swarm_apply_hit(const net::SwarmHit& h) {
       for (Heli& x : C.helis)
         if (x.id == h.id && !x.dead && x.state != Heli::State::down) {
           x.hp -= h.damage;
-          if (x.hp <= 0) { x.state = Heli::State::down; x.v.z = std::fmin(x.v.z, 2.0f); world_->play_sound(combat_sfx(combat_audio::Kind::explosion), x.p, 0.8f, 0.8f, true); }
+          if (x.hp <= 0) { x.state = Heli::State::down; x.v.z = std::fmin(x.v.z, 2.0f); world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::explosion), x.p, 0.8f, 0.8f, true); }
         }
       break;
     case net::SwarmKind::tank:

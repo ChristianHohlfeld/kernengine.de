@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_api.h"
 #include "kern/logic/nodes.h"
 
 namespace kern::logic {
@@ -577,7 +578,10 @@ struct Shape {
     // or an entry's values when they are read outside its own body.
     for (Info& x : n) {
       if (x.pure) { x.member = x.def->memory; continue; }
-      if (!x.event) { x.member = !x.readers.empty() || x.def->memory; continue; }
+      // (a node of the engine that binds a place: its member is the place - the nodes that name it read it
+      // there, not by a wire)
+      const EngineFunction* f = x.event ? nullptr : engine_function(x.def->type);
+      if (!x.event) { x.member = !x.readers.empty() || x.def->memory || (f && f->place); continue; }
       for (const auto& r : x.readers)
         if (at(r.first).place != x.place) x.member = true;
     }
@@ -1343,6 +1347,11 @@ struct Writer {
   /// input of its function (logic::ref_key).
   std::string place_text(int x, int c, const std::string& prefix = {}) {
     std::string r = at(x).node->param(prefix + "variable");
+    if (prefix.empty() && !at(x).node->param("bound").empty()) {
+      // (a place of the engine: the output of the node that bound it - n12.result)
+      const EngineFunction* f = bound_function(s.g, *at(x).node);
+      r = "n" + at(x).node->param("bound") + "." + (f ? f->outputs[0].id : "result");
+    }
     std::vector<std::string> steps;
     if ((prefix.empty() && !names_place(*at(x).def)) || !path_steps(at(x).node->param(prefix + "path"), steps)) return r;
     std::size_t entry = 0;
@@ -1935,6 +1944,17 @@ struct Writer {
     const std::string base = x.def->memory && !x.event ? "kern::Node<" + id + ">" : std::string();
     if (x.def->type == "func.call") return x.node->param("function") + "Result n" + id + ";";
     if (member_fields(x).empty()) return base + " n" + id + ";";
+    if (const EngineFunction* f = engine_function(x.def->type); f && f->place) {
+      // (a place of the engine: its output is the place the node binds - engine_values::Place)
+      std::string type = x.def->type;
+      std::replace(type.begin(), type.end(), '.', '_');
+      std::string r;
+      for (int k : member_fields(x)) {
+        const PinDef& p = x.out[static_cast<std::size_t>(k)];
+        r += p.id == f->outputs[0].id ? type + "_place<" + cpp_type(TypeRef{p.type, p.of}) + "> " + p.id + " = {}; " : fields(x.out, {k}, g);
+      }
+      return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + r + "} n" + id + ";";
+    }
     return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + fields(x.out, member_fields(x), g) + "} n" + id + ";";
   }
   void doc(int ind, const std::string& help) {
@@ -1982,6 +2002,7 @@ struct Writer {
     // (a library: `virtual kern::Library`; what it uses, or a Blueprint uses, are bases beside that)
     out += "struct " + type + " : " + (g.library ? "virtual kern::Library" : g.uses.empty() ? "kern::Blueprint" : "virtual kern::Blueprint");
     for (const std::string& used : g.uses) out += ", virtual " + used;
+    if (!g.implements.empty()) out += ", kern::Implements<" + text_literal(g.implements) + ">";  // (the interface of the engine it is the object of)
     out += " {\n";
     bool own_types = false;  // (a type of a library it uses is the library's: its text has it)
     for (const EnumType& e : g.enums) own_types = own_types || e.from.empty();
@@ -2071,7 +2092,8 @@ struct Writer {
           line(1, (f.remote.empty() ? std::string("KERN_EXTERN ") : "KERN_EXTERN_AS(" + text_literal(f.remote) + ") ") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
           continue;
         }
-        line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
+        line(1, (f.exported.empty() ? std::string() : "KERN_EXPORT_AS(" + text_literal(f.exported) + ", " + text_literal(f.wire) + ") ") + std::string(f.pure ? "KERN_PURE " : "") +
+                    (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
         for (const FunctionPin& l : f.locals) line(2, cpp_type(declared(l)) + " " + l.name + " = " + literal(Value::from_json(l.value, declared(l), g), declared(l), g) + ";");
         // (a path that ends without a Return gives the outputs' defaults)
@@ -2176,6 +2198,7 @@ struct Reader {
     std::string result_of;
     std::string local;  // declared in this function's body (a local of its method), not in the class
     std::vector<std::pair<std::string, TypeRef>> fields;
+    std::vector<std::string> places;  // (per field: the node whose place it is - <node>_place<Type> - or empty)
     std::size_t tok = 0;
   };
   std::map<u32, MemberDecl> members;
@@ -2707,10 +2730,20 @@ struct Reader {
     return false;
   }
   /// Type name = value; ... }   ("{" has been read)
-  bool fields(std::vector<std::pair<std::string, TypeRef>>& out, std::vector<Value>* defaults, const std::string& what) {
+  /// `places`: what a node gives may be a place of the engine it binds - <node>_place<Type> result = {};
+  /// (EngineFunction::place): per field the node's name before "_place", else empty.
+  bool fields(std::vector<std::pair<std::string, TypeRef>>& out, std::vector<Value>* defaults, const std::string& what, std::vector<std::string>* places = nullptr) {
     while (!is("}")) {
       TypeRef t;
       std::string field;
+      if (const Tok& w = peek(); places && w.kind == Tok::id && w.s.size() > 6 && w.s.ends_with("_place") && is("<", 1)) {
+        p += 2;
+        if (!type_here(t) || !expect(">") || !word(field, "the name") || !expect("=") || !expect("{") || !expect("}") || !expect(";")) return false;
+        out.push_back({field, t});
+        places->resize(out.size());
+        places->back() = w.s.substr(0, w.s.size() - 6);
+        continue;
+      }
       if (!type_here(t)) return fail(p, what + ": " + kTypes + shown(peek()));
       if (!word(field, "the name")) return false;
       Value v = zero_of(t, g);
@@ -2719,6 +2752,7 @@ struct Reader {
       if (!expect(";")) return false;
       if (!defaults && !(v == zero_of(t, g))) return fail(at, "what a node gives starts empty: " + field + " = " + literal(zero_of(t, g), t.of, g));
       out.push_back({field, t});
+      if (places) places->resize(out.size());
       if (defaults) defaults->push_back(v);
     }
     return expect("}");
@@ -2852,6 +2886,8 @@ struct Reader {
     std::string docs;
     bool has_docs = false, pure = false, external = false, has_event = false;
     std::string remote;  // (KERN_EXTERN_AS: the name the other Blueprint has the function under)
+    std::string exported, wire;  // (KERN_EXPORT_AS: the C name the program gives the function under, and how its values cross)
+    std::size_t export_at = 0;
     Item event;
     auto take_docs = [&] {
       std::string r = has_docs ? docs : std::string();
@@ -2973,7 +3009,7 @@ struct Reader {
         u32 base = 0;
         take_docs();
         if (accept(":") && !node_base(d.memory, base)) return false;
-        if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+        if (!expect("{") || !fields(d.fields, nullptr, "what a node gives", &d.places) || !member_name(std::move(d), base)) return false;
         continue;
       }
       if (accept("KERN_EVENT")) {
@@ -3007,6 +3043,15 @@ struct Reader {
       }
       if (accept("KERN_PURE")) {
         pure = true;
+        continue;
+      }
+      if (accept("KERN_EXPORT_AS")) {
+        // KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult game_hud(...) { ... }   (Function::exported, Function::wire)
+        export_at = p;
+        if (!expect("(") || !string(exported, "the C name the program gives the function under") || !expect(",") ||
+            !string(wire, "how its inputs and its output cross: \"i32 f32 text -> text\"") || !expect(")"))
+          return false;
+        if (exported.empty()) return fail(export_at, "KERN_EXPORT_AS names the export: KERN_EXPORT_AS(\"game_hud\", \"-> text\")");
         continue;
       }
       if (accept("KERN_EXTERN")) {
@@ -3099,12 +3144,19 @@ struct Reader {
           if (!accept(",")) break;
         }
         f.help = take_docs();
+        f.exported = std::move(exported);
+        f.wire = std::move(wire);
+        exported.clear();
+        wire.clear();
+        if (std::string why; !export_ok(f, &why)) return fail(export_at ? export_at : at, why);
+        export_at = 0;
         it.kind = Item::function;
         it.fn = fn;
         g.functions.push_back(std::move(f));
       }
       it.tok = at + 1;
       if (external && it.kind != Item::function) return fail(at, "KERN_EXTERN stands in front of a function of another Blueprint");
+      if (!exported.empty()) return fail(export_at, "KERN_EXPORT_AS stands in front of a function");
       pure = false;
       if (!expect(")")) return false;
       if (external) {
@@ -3175,7 +3227,26 @@ struct Reader {
   /// everywhere a variable of the Blueprint.
   /// What a name is where the text stands: a local variable or an input of the function whose
   /// body it is, or a variable of the Blueprint (Graph::Root).
+  /// `name` is "n<id>.<output>" of a node already read that binds a place of the engine (EngineFunction::place):
+  /// its id, and in `out` the place (Graph::root_of, Root::bound). 0: it is none.
+  u32 bound_named(const std::string& name, Variable* out = nullptr) const {
+    const std::size_t dot = name.find('.');
+    const u32 id = dot == std::string::npos ? 0 : numbered(name.substr(0, dot), "n");
+    auto it = id ? declared.find(id) : declared.end();
+    if (it == declared.end()) return 0;
+    const EngineFunction* f = engine_function(made[static_cast<std::size_t>(it->second)].def->type);
+    if (!f || !f->place || name.substr(dot + 1) != f->outputs[0].id) return 0;
+    if (out) *out = Variable{name, f->outputs[0].type, {}, {}, f->outputs[0].of ? f->outputs[0].of : ""};
+    return id;
+  }
+  /// The same where the text stands: n<id> . <output> (then `name` is that).
+  u32 bound_ahead(std::string& name, std::size_t q = 0) const {
+    if (peek(q).kind != Tok::id || !is(".", q + 1) || peek(q + 2).kind != Tok::id) return 0;
+    name = peek(q).s + "." + peek(q + 2).s;
+    return bound_named(name);
+  }
   Graph::Root root_here(const std::string& name, Variable& out) const {
+    if (bound_named(name, &out)) return Graph::Root::bound;
     if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
       out = Variable{l->name, l->type, l->value, {}, l->of, l->count};
       return Graph::Root::local;
@@ -3196,6 +3267,7 @@ struct Reader {
   }
   /// The settings of a node that names it (a local variable or an input: with its function as "scope").
   std::vector<std::pair<std::string, std::string>> naming(const std::string& variable) const {
+    if (const u32 id = bound_named(variable)) return {{"bound", std::to_string(id)}};
     std::vector<std::pair<std::string, std::string>> r{{"variable", variable}};
     if (scope.function && (scope.function->local(variable) || scope.function->input(variable))) r.push_back({"scope", scope.function->name});
     return r;
@@ -3211,7 +3283,20 @@ struct Reader {
     if (!m.pure && def->kind != NodeKind::event) { ++scope.column; scope.row = 0; }
     m.column = scope.column;
     m.row = m.pure ? ++scope.row : 0;
+    // (a node that names a place of the engine has the pins of what the node that binds it gives: that node is
+    // read, not yet in the graph - it stands there while the pins are made)
+    bool lent = false;
+    if (const std::string b = m.node.param("bound"); !b.empty()) {
+      const u32 id = numbered("n" + b, "n");
+      if (auto it = id ? declared.find(id) : declared.end(); it != declared.end() && !g.find(id)) {
+        Node e = made[static_cast<std::size_t>(it->second)].node;
+        e.id = id;
+        g.nodes.push_back(std::move(e));
+        lent = true;
+      }
+    }
     lib.pins(m.node, g, m.in, m.out);
+    if (lent) g.nodes.pop_back();
     made.push_back(std::move(m));
     return static_cast<int>(made.size()) - 1;
   }
@@ -3275,6 +3360,15 @@ struct Reader {
       if (is("*", q) && peek(q + 1).kind == Tok::id && peek(q + 1).s == "this" && is(",", q + 2)) q += 3;          // (the object its function runs on: runs_function)
       for (std::size_t k = 0; k < variables; ++k, q += 2) {
         Variable named;
+        if (std::string var; names_place(*def) && bound_ahead(var, q)) {
+          // (a place of the engine: n12.result and what follows it)
+          names.push_back(var);
+          const std::size_t name = q + 2;
+          q += 3;
+          if (!path_ahead(q, path) || !place_fits(var, path, p + name, false)) return -1;
+          --q;
+          continue;
+        }
         if (peek(q).kind != Tok::id || !variable_here(peek(q).s, named)) {
           fail(p + q, fname + " changes a variable: that variable is its first value - " + fname + "(Variable, ...) - not " + shown(peek(q)));
           return -1;
@@ -3295,7 +3389,8 @@ struct Reader {
       if (pd.kind == ParamDef::Kind::path) {
         if (!path.empty()) params.push_back({pd.key, path});
       } else if (pd.kind != ParamDef::Kind::scope) {
-        params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
+        if (pd.kind == ParamDef::Kind::variable && bound_named(names[v_at])) params.push_back({"bound", std::to_string(bound_named(names[v_at++]))});
+        else params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
       } else if (scope.function && !names.empty() && (scope.function->local(names.front()) || scope.function->input(names.front()))) {
         params.push_back({pd.key, scope.function->name});
       }
@@ -3494,6 +3589,14 @@ struct Reader {
     for (const ParamDef& pd : m.def->params) {
       if (pd.kind != ParamDef::Kind::variable) continue;
       const std::string name = m.node.param(pd.key);
+      if (const std::string bound = m.node.param("bound"); name.empty() && !bound.empty()) {
+        // (a place of the engine: n12.result and what follows it)
+        std::string var;
+        if (!a.more() || std::to_string(bound_ahead(var)) != bound) return fail(p, node_name(m.def->type) + ": the place n" + bound + " bound expected, not " + shown(peek()));
+        p += 3;
+        if (!place_rest(node)) return false;
+        continue;
+      }
       if (!a.more() || peek().kind != Tok::id || peek().s != name) return fail(p, node_name(m.def->type) + ": the variable " + name + " expected, not " + shown(peek()));
       ++p;
       if (names_place(*m.def) && !place_rest(node)) return false;
@@ -3559,6 +3662,20 @@ struct Reader {
       }
       if (accept("formula")) return formula(s.tok);
       fail(p, "kern::to<Type>(value) or kern::formula(...) expected, not kern::" + (peek().kind == Tok::id ? peek().s : shown(peek())));
+      return s;
+    }
+    if (std::string var; bound_ahead(var)) {
+      // (a place of the engine, read where it stands: n12.result[i].to)
+      p += 3;
+      std::size_t q = 0;
+      std::string path;
+      if (!path_ahead(q, path) || !place_fits(var, path, p - 1, false)) return s;
+      std::vector<std::pair<std::string, std::string>> params = naming(var);
+      if (!path.empty()) params.push_back({"path", path});
+      const int node = make("var.get", s.tok, std::move(params));
+      if (node < 0 || !place_rest(node)) return s;
+      s.node = node;
+      s.root = true;
       return s;
     }
     if (const u32 id = numbered(t.s, "n")) {
@@ -4121,6 +4238,16 @@ struct Reader {
       scope.first = false;
       return gone();
     }
+    if (std::string var; bound_ahead(var)) {
+      // a place of the engine: n12.result[i].to = value;   n12.result.Score += value;
+      p += 3;
+      const int node = place_step(var, at);
+      if (node < 0) return {};
+      enter(in, node, "", at);
+      const Src s = value();
+      if (failed() || !bind(node, data_inputs(node).front(), s) || !expect(";")) return {};
+      return {out(node, 0)};
+    }
     // n<id>.value = (Variable = value);   a Set / Add whose result is read
     if (numbered(t.s, "n") && is(".", 1) && is("=", 3) && is("(", 4)) {
       const u32 id = numbered(t.s, "n");
@@ -4128,8 +4255,9 @@ struct Reader {
       p += 5;
       const std::size_t name = p;
       std::string var;
-      if (!word(var, "a variable")) return {};
-      if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
+      if (bound_ahead(var)) p += 3;  // (a place of the engine: n12.result[i].to)
+      else if (!word(var, "a variable")) return {};
+      else if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
       const int node = place_step(var, at);  // n<id>.value = (Variable = value);   ... (Place.Field = value);
       if (node < 0 || !declare(id, node, at)) return {};
       enter(in, node, "", at);
@@ -4481,6 +4609,7 @@ struct Reader {
   /// struct Name : virtual kern::Library {                             a library: it keeps nothing, others use it
   /// struct Name : virtual kern::Blueprint, virtual Random {           a Blueprint that uses the library Random
   /// struct Name : virtual kern::Library, virtual Types {              a library that uses one
+  /// struct Name : kern::Blueprint, kern::Implements<"App"> {          the object of an interface of the engine (Graph::implements)
   /// What it uses it has: the libraries' types, and their functions as Random::range(...).
   bool head() {
     if (!expect("struct") || !word(name, "the Blueprint's name") || !expect(":")) return false;
@@ -4495,6 +4624,15 @@ struct Reader {
     }
     while (accept(",")) {
       const std::size_t at = p;
+      if (is("kern") && is("::", 1) && is("Implements", 2)) {   // (last: the interface of the engine it is the object of)
+        p += 3;
+        if (!expect("<")) return false;
+        if (peek().kind != Tok::text) return fail(p, "the name of an interface of the engine expected (kern::Implements<\"App\">), not " + shown(peek()));
+        g.implements = toks[p++].s;
+        if (!expect(">")) return false;
+        if (!is("{")) return fail(p, "kern::Implements<...> is the last base of a Blueprint");
+        break;
+      }
       if (!shared) return fail(base, "a Blueprint that uses libraries is `struct " + name + " : virtual kern::Blueprint, virtual <Library>`");
       if (!expect("virtual")) return false;
       std::string used;
@@ -4852,6 +4990,11 @@ struct Reader {
         for (std::size_t k = 0; same && k < d.fields.size(); ++k) {
           const PinDef& pd = x.out[static_cast<std::size_t>(held[k])];
           same = d.fields[k].first == pd.id && d.fields[k].second == TypeRef{pd.type, pd.of};
+          // (the place a node of the engine binds is declared as its place, and nothing else is)
+          const EngineFunction* f = engine_function(x.def->type);
+          std::string place = f && f->place && pd.id == f->outputs[0].id ? x.def->type : std::string();
+          std::replace(place.begin(), place.end(), '.', '_');
+          same = same && (k < d.places.size() ? d.places[k] : std::string()) == place;
         }
       }
       if (!same) return fail(d.tok, nid + " is " + node_name(x.def->type) + ": " + want);
@@ -5330,6 +5473,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   }
   if (!keep.empty())
     events = "    const bool at_work = self.kern_world.instance && self.kern_world.instance->chains() > 1;\n" + keep + events + "    if (at_work) {" + give_back + " }\n";
+  const bool exports = std::any_of(g.functions.begin(), g.functions.end(), [](const Function& f) { return !f.exported.empty(); });
   std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
                   "// text): glue, not part of the notation - nothing to edit here.\n" +
                   structs +
@@ -5337,7 +5481,12 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
                   "  " + name + " self;\n" +
                   running +
-                  "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n"
+                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on this object - the\n"
+                             "  // instance that started last as this class)\n"
+                             "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; kern::logic::blueprint_object<" + name + "> = &self; }\n"
+                             "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::blueprint_object<" + name + "> = nullptr; }\n"
+                           : "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n") +
+                  "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
                   events +
@@ -5402,6 +5551,57 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
        "[[maybe_unused]] const bool " + name + "_registered =\n"
        "    (kern::logic::register_native_blueprint(" + hash + ", [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new " + name + "_Native()); }), true);\n"
        "}  // namespace\n";
+  // The exports (Function::exported): C functions under their names that call the function on the object of the
+  // instance that runs as this class - nothing looked up by name; without one (the level has not started) they
+  // give zero, an empty text, nothing.
+  for (const Function& f : g.functions) {
+    if (f.exported.empty()) continue;
+    std::vector<std::string> words;
+    std::string out_word;
+    {
+      std::string w;
+      bool arrow = false;
+      for (std::size_t i = 0; i <= f.wire.size(); ++i) {
+        if (i < f.wire.size() && f.wire[i] != ' ') { w += f.wire[i]; continue; }
+        if (w == "->") arrow = true;
+        else if (!w.empty()) (arrow ? out_word : words.emplace_back()) = w;
+        w.clear();
+      }
+    }
+    if (words.size() != f.inputs.size()) {
+      if (error) *error = "the export " + f.exported + ": its wire does not fit the function";
+      return false;
+    }
+    std::string params, args;
+    for (std::size_t k = 0; k < words.size(); ++k) {
+      const std::string a = "a" + std::to_string(k);
+      args += std::string(k ? ", " : "");
+      // (an at is no C parameter: a pointer of C is a list and the place in it - from the host the place is 0)
+      if (words[k] == "at") {
+        args += type(f.inputs[k].type, f.inputs[k].of) + "{}";
+        continue;
+      }
+      params += std::string(params.empty() ? "" : ", ");
+      // (one C parameter each; a text or bytes and the len after them (after their at): the pointer and how many -
+      // a text without one ends at its 0)
+      const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
+      const bool counted = after < words.size() && words[after] == "len";
+      const std::string n = "a" + std::to_string(after);
+      if (words[k] == "text") params += "const char* " + a, args += counted ? "kern::logic::export_text_in(" + a + ", " + n + ")" : "kern::logic::export_text_in(" + a + ")";
+      else if (words[k] == "bytes") params += "const kern::u8* " + a, args += "kern::logic::export_bytes_in(" + a + ", " + n + ")";
+      else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
+      else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
+    }
+    const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : "kern::" + out_word;
+    const std::string none = out_word.empty() ? "return;" : out_word == "text" ? "return \"\";" : "return 0;";
+    s += "KERN_EXPORT(" + f.exported + ") " + ret + " " + f.exported + "(" + params + ") {\n"
+         "  " + name + "* const object = kern::logic::blueprint_object<" + name + ">;\n"
+         "  if (!object) " + none + "\n";
+    if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
+    else if (out_word == "text") s += "  return kern::logic::export_text_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    s += "}\n";
+  }
   out = std::move(s);
   return true;
 }

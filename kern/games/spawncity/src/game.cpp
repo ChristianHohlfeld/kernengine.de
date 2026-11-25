@@ -1,4 +1,5 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
+#include "blueprint_call.h"  // rules::kLoopBudget
 #include "gaps_rules.h"
 #include "jet_seats.h"
 #include "lamps.h"
@@ -7,6 +8,7 @@
 #include "world_traffic.h"
 #include "game_world.h"  // WorldLife (M3 world state)
 #include "game_life.h"   // GameLife (M3 life)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes (blueprints::bind)
 
 #include <algorithm>
 #include <cstdio>
@@ -145,9 +147,8 @@ kern::game::Level Game::build_level() const {
   // device decides and what is still built in code.
   Level l;
   {
-    kern::json::Value doc;
     std::string error;
-    if (!kern::json::parse(rules::level_text(), doc, &error) || !from_json(doc, l, &error)) {
+    if (!from_text(rules::level_text(), l, &error)) {   // (kern::json::parse, then from_json - level.cpp)
       kern::log(kern::LogLevel::error, "SpawnCity: the level file is broken: %s", error.c_str());
       l = Level{};
     }
@@ -264,7 +265,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (windows_.night)
+  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (facades().set_night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
   // logic they run in, and finds each by its name at every call (as a Blueprint does).
@@ -290,6 +291,11 @@ bool Game::start(kern::Engine& e) {
     if (!combat::bind_sandbox(*logic)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_fun(*logic)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_race(*logic)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
+    // The Blueprints the game calls directly, as their classes (level_blueprints.h): each bound once to the
+    // object the logic runs it as. Their loops run under the logic's guard; the game's own functions loop
+    // long (a code encoded bit by bit), so the guard is the one the tests run them with (rules::kLoopBudget).
+    logic->budget = rules::kLoopBudget;
+    if (!blueprints::bind(*logic)) return kern::fail("a Blueprint the game calls as its class is missing from the level or not built as its class");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");
@@ -1606,10 +1612,11 @@ std::string Game::command(const std::string& cmd) {
     // (interpreter, compiled WebAssembly, native C++), functions and nodes.
     std::string s = "[";
     if (kern::logic::Runtime* rt = world_->logic_runtime())
-      for (const auto& inst : rt->instances()) {
+      for (std::size_t i = 0; i < kern::game::blueprint_count(*rt); ++i) {
         char b[256];
-        std::snprintf(b, sizeof b, "%s{\"name\":\"%s\",\"tier\":\"%s\",\"functions\":%zu,\"nodes\":%zu,\"disabled\":%s}", s.size() > 1 ? "," : "", inst->name().c_str(), inst->tier(),
-                      inst->graph().functions.size(), inst->graph().nodes.size(), inst->disabled() ? "true" : "false");
+        std::snprintf(b, sizeof b, "%s{\"name\":\"%s\",\"tier\":\"%s\",\"functions\":%zu,\"nodes\":%zu,\"disabled\":%s}", s.size() > 1 ? "," : "",
+                      kern::game::blueprint_name(*rt, i).c_str(), kern::game::blueprint_tier(*rt, i), kern::game::blueprint_functions(*rt, i), kern::game::blueprint_nodes(*rt, i),
+                      kern::game::blueprint_disabled(*rt, i) ? "true" : "false");
         s += b;
       }
     return s + "]";

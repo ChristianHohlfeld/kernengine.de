@@ -13,9 +13,26 @@
 #
 # kern/build.sh keys its object cache on Kern's own headers only; the game's headers (src/*.h,
 # firmware/*.hpp) go into the flags as a hash, so a header change rebuilds the game's objects.
+#   kern/games/spawncity/build.sh --only-blueprints [out.html]   (default: generated/spawncity_blueprints.html)
+#
+# The way "only Blueprints" (BLUEPRINTS.md, "5 - Umschalten": the end, src/ empty): the level alone, its
+# Blueprints compiled in as C++ classes, as Kern Studio exports any level (tools/export_game.sh) - no line
+# of src/. It goes as far as the level carries; what it still lacks - functions without a Blueprint, the
+# exports the page calls, the engine calling the program's C++, the entry - stands in
+# generated/spawncity_gaps.txt (tools/blueprint_gaps.py; with the log of a run over the whole program:
+# SC_CONVERT_LOG=<convert.log[.xz]>).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
+if [ "${1:-}" = "--only-blueprints" ]; then
+  out="${2:-$root/generated/spawncity_blueprints.html}"
+  mkdir -p "$(dirname "$out")" "$root/generated"
+  "$root/tools/export_game.sh" "$here/level/spawncity.klevel" "$out" "SpawnCity (Blueprints)"
+  python3 -I "$root/tools/blueprint_gaps.py" --level "$here/level/spawncity.klevel" --src "$here/src" \
+    ${SC_CONVERT_LOG:+--log "$SC_CONVERT_LOG"} --out "$root/generated/spawncity_gaps.txt"
+  sed -n 2p "$root/generated/spawncity_gaps.txt"
+  exit 0
+fi
 skip_wasm=0
 if [ "${1:-}" = "--skip-wasm" ]; then skip_wasm=1; shift; fi
 out="${1:-$root/generated/spawncity.html}"
@@ -24,11 +41,14 @@ wasm="$here/web/spawncity.wasm"
 if [ "$skip_wasm" = 0 ]; then
   # The level file (the project: world settings, actors, their Blueprints) as a source the game links.
   # The built game carries what it runs: not the folder "Source" - the Blueprints written from the game's C++, which
-  # stand beside it until their file switches (BLUEPRINTS.md; tools/embed_level.py). The tests take the whole level.
+  # stand beside it until their file switches (BLUEPRINTS.md; tools/embed_level.py) - but for the libraries the
+  # Blueprints that stay use (those of "Program" call libraries of "Source"). The tests take the whole level.
   shipped="${TMPDIR:-/tmp}/spawncity-level-$(printf '%s' "$here" | sha256sum | cut -c1-12).klevel"
   python3 "$here/tools/embed_level.py" "$here/level/spawncity.klevel" "$here/src/level_data.cpp" --without Source --level-out "$shipped"
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
-  "$root/tools/blueprint_cpp.sh" "$shipped" "$here/src/level_blueprints.cpp"
+  # Those of the folder "Program" - files of the game that are Blueprints now - the game's C++ calls as their
+  # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").
+  "$root/tools/blueprint_cpp.sh" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h" Program
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).
@@ -43,8 +63,11 @@ if [ "$skip_wasm" = 0 ]; then
     wrapped+=("$w")
   done
   # (the heap is grown once at start by the game itself - main.cpp start(); the job workers run
-  # the same module and must stay small, so no big initial memory here)
-  "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
+  # the same module and must stay small, so no big initial memory here: Kern's 32 MiB, and the level
+  # the module carries in its data (level_data.cpp: the level as it is embedded) on top - in whole 64 KiB pages)
+  level_bytes=$(wc -c < "$shipped")
+  initial=$(( (33554432 + level_bytes + 65535) / 65536 * 65536 ))
+  KERN_INITIAL_MEMORY="${KERN_INITIAL_MEMORY:-$initial}" "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
 fi
 [ -s "$wasm" ] || { echo "missing $wasm (run without --skip-wasm)" >&2; exit 1; }
 

@@ -1366,6 +1366,255 @@ inline std::vector<Value> numbers(std::initializer_list<f64> v) {
   return r;
 }
 
+// Places of the engine (kern/docs/blueprint_cpp.md, "Plätze der Engine"): a function of the engine that gives a
+// reference to what its object holds (kern::BuildingBuilder::chunks) - its node binds the place once in a run, the
+// nodes of places name it there: read whole, an entry, a field of an entry, a list in it; set, added to, the steps
+// of a list; one beside the list; a list appended, read through a second place on the same list. Then the object ends while the place is bound (Release), and a place is bound on
+// a handle of no object (Read): each naming tells the host "<function>@get", reads the zero of its type and
+// writes into nothing - in every tier the same.
+inline const char* kEnginePlaces = R"kn(
+struct EnginePlaces : kern::Blueprint {
+  // ---- types ----
+  KERN_STRUCT(MeshData) {
+    List<Float> positions = List<Float>{};
+    List<Float> normals = List<Float>{};
+    List<Float> colors = List<Float>{};
+    List<Float> uvs = List<Float>{};
+    List<Float> extra = List<Float>{};
+    Int extra_size = 0;
+    List<Int> indices = List<Int>{};
+  };
+  KERN_STRUCT(GeoChunk) {
+    Int x = 0;
+    Int y = 0;
+    Int items = 0;
+    Int triangles = 0;
+    Int hash = 0;
+    Bool welded = false;
+    MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+  };
+  KERN_STRUCT(WeldStats) {
+    U32 source_vertices = 0;
+    U32 unique_vertices = 0;
+    Int bytes_before = 0;
+    Int bytes_after = 0;
+    Bool indexed = false;
+  };
+
+  // ---- variables ----
+  Int Builder = 0;
+  Int Length = 0;
+  Int At = 0;
+  Int X = 0;
+  Int Items = 0;
+  Float P0 = 0.0;
+  Int Beside = 0;
+  Int Set = 0;
+  List<GeoChunk> Chunks = List<GeoChunk>{};
+  Int LengthAfter = 0;
+  Bool Removed = false;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}};
+  Int Before = 0;
+  Int Gone = 0;
+  Int GoneLength = 0;
+  List<GeoChunk> GoneChunks = List<GeoChunk>{};
+  Int AppendedLength = 0;
+  List<GeoChunk> Appended = List<GeoChunk>{};
+  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  WeldStats Stats = WeldStats{0, 0, 0, 0, false};
+  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+
+  // ---- functions ----
+  void Bind() {
+    engine_building_builder_make(n1);
+    Builder = n1.result;
+    engine_building_builder_chunks(n2, Builder);
+    Length = list_length<GeoChunk>(n2.result);
+  }
+
+  void Change() {
+    engine_building_builder_chunks(n7, Builder);
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<Float>{0.1, 2.5}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 2, List<Int>{1, 2}}});
+    At = n3.index;
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    n7.result[0].items = 7;
+    n5.value = (n7.result[0].x += 3);
+    X = n5.value;
+    n7.result[1].mesh.positions = List<Float>{0.3333333333333333, 4.0};
+    P0 = n7.result[1].mesh.positions[0];
+    n7.result[1].mesh.positions[1] = 0.1;
+    Items = n7.result[0].items;
+    Removed = list_contains<GeoChunk>(n7.result, First);
+    First = list_get<GeoChunk>(n7.result, 1);
+    P0 = math_mul(n7.result[1].mesh.positions[0], 2.0);
+    LengthAfter = list_length<Float>(n7.result[1].mesh.positions);
+    Beside = n7.result[5].x;
+    n6.value = (n7.result[5].x = 9);
+    Set = n6.value;
+    Chunks = n7.result;
+    First = n7.result[0];
+    LengthAfter = list_length<GeoChunk>(n7.result);
+    list_insert(n7.result, 0, First);
+    list_remove_at(n7.result, 1);
+    list_remove(n4, n7.result, First);
+    Removed = n4.removed;
+  }
+
+  void Append() {
+    engine_building_builder_chunks(n10, Builder);
+    engine_building_builder_chunks(n11, Builder);
+    list_append(n10.result, Chunks);
+    list_add(n10.result, First);
+    AppendedLength = list_length<GeoChunk>(n11.result);
+    Appended = n11.result;
+  }
+
+  void Weld() {
+    engine_building_builder_chunks(n12, Builder);
+    n12.result[0].mesh = Soup;
+    engine_weld(n13, n12.result[0].mesh, 0);
+    Stats = n13.result;
+    n12.result[0].mesh = n13.mesh;
+    Welded = n12.result[0].mesh;
+  }
+
+  void Release() {
+    engine_building_builder_chunks(n8, Builder);
+    Before = n8.result[0].x;
+    engine_building_builder_release(Builder);
+    Gone = n8.result[0].x;
+    n8.result[0].x = 4;
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    GoneLength = list_length<GeoChunk>(n8.result);
+    GoneChunks = n8.result;
+  }
+
+  void Read() {
+    engine_building_builder_chunks(n9, Builder);
+    Gone = n9.result[1].x;
+    n9.result[0].items = 4;
+    GoneLength = list_length<GeoChunk>(n9.result);
+  }
+
+  // ---- what nodes give and keep ----
+  struct { Int result = 0; } n1;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
+  struct { Int index = 0; } n3;
+  struct { Bool removed = false; } n4;
+  struct { Int value = 0; } n5;
+  struct { Int value = 0; } n6;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
+};
+)kn";
+
+// Blueprints as objects of interfaces of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): a shader
+// extension whose name and vertex text are Texts, its bind and frame_uniforms taking the engine's objects as handles - and
+// an App with start, update (a struct of the engine) and stop. Called by the names of the interface's functions, as the
+// engine's adapter calls them (engine_interface_a_blueprint_implements plays them through the adapters).
+inline const char* kImplementsWater = R"kn(
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  // ---- variables ----
+  Float Time = 0.25;
+  Int Program = 0;
+  Int Cache = 0;
+  Int Frames = 0;
+
+  // ---- functions ----
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() {
+    return {"water"};
+  }
+
+  struct vertexResult { Text result = ""; };
+  KERN_PURE vertexResult vertex() {
+    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+  }
+
+  void bind(Int program = 0) {
+    Program = program;
+  }
+
+  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+    Cache = cache;
+    Frames += 1;
+  }
+};
+)kn";
+
+inline const char* kImplementsGame = R"kn(
+struct Running : kern::Blueprint, kern::Implements<"App"> {
+  // ---- types ----
+  KERN_STRUCT(Frame) {
+    Float time = 0.0;
+    Float dt = 0.0;
+    Int64 index = Int64{0x0};
+  };
+
+  // ---- variables ----
+  Int Engine = 0;
+  Int Updates = 0;
+  Float Last = 0.0;
+  Bool Stopped = false;
+
+  // ---- functions ----
+  struct startResult { Bool result = false; };
+  startResult start(Int engine = 0) {
+    Engine = engine;
+    return {true};
+  }
+
+  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+    Updates += 1;
+    Last = frame.time;
+  }
+
+  void stop(Int engine = 0) {
+    Stopped = true;
+  }
+};
+)kn";
+
+// A Blueprint as a transport of the engine (net::Transport): what the engine hands it through a pointer with a count
+// beside it is a list; what it writes through a reference and a pointer are outputs of the function.
+inline const char* kImplementsLoop = R"kn(
+struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+  // ---- types ----
+  KERN_STRUCT(net_Address) {
+    Int64 id = Int64{0x0};
+  };
+
+  // ---- variables ----
+  net_Address Last = net_Address{Int64{0x0}};
+  Int Bytes = 0;
+  Int Sent = 0;
+
+  // ---- functions ----
+  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  KERN_PURE addressResult address() {
+    return {net_Address{Int64{0x7}}};
+  }
+
+  struct sendResult { Bool result = false; };
+  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+    Last = to;
+    Bytes = bytes;
+    Sent = list_length<U8>(data);
+    return {true};
+  }
+
+  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
+  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+    return {Bytes, Last, List<Int>{1, 2, 3}};
+  }
+};
+)kn";
+
 inline std::vector<Case> cases() {
   std::vector<Case> all;
   // (a case that uses libraries finds them among the cases before it)
@@ -1611,6 +1860,39 @@ inline std::vector<Case> cases() {
     for (const char* run : engine_case::kRuns)
       if (std::find(c.on_engine.begin(), c.on_engine.end(), run) == c.on_engine.end()) c.on_engine_free.push_back(run);
   }
+  {
+    // Places of the engine: against the host's stand-in (it holds what is behind each place), and on the engine
+    // itself - there the class names the engine's list where it stands, typed, and does what the interpreter does
+    // through the door ("<function>@get", "<function>@set").
+    Case& c = read("EnginePlaces", kEnginePlaces);
+    for (const char* run : {"Bind", "Change", "Append", "Weld", "Release", "Read"}) {
+      c.calls.push_back({run, {}});
+      c.on_engine.push_back(run);
+    }
+  }
+  {
+    Case& c = read("Water", kImplementsWater);
+    c.calls.push_back({"name", {}});
+    c.calls.push_back({"vertex", {}});
+    c.calls.push_back({"bind", {I(5)}});
+    c.calls.push_back({"frame_uniforms", {I(3), I(4)}});
+    c.calls.push_back({"frame_uniforms", {I(0), I(4)}});
+    c.calls.push_back({"vertex", {}});
+  }
+  {
+    Case& c = read("Running", kImplementsGame);
+    c.calls.push_back({"start", {I(2)}});
+    c.calls.push_back({"update", {I(2), Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
+    c.calls.push_back({"update", {I(2), Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
+    c.calls.push_back({"stop", {I(2)}});
+  }
+  {
+    Case& c = read("Loop", kImplementsLoop);
+    const Value at = Value::structure({Value::int64(9)});
+    c.calls.push_back({"address", {}});
+    c.calls.push_back({"send", {at, Value::of(std::vector<i64>{4, 5, 6}), I(3)}});
+    c.calls.push_back({"receive", {Value::structure({Value::int64(0)}), I(2)}});
+  }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
   for (const logic_cases::Case& t : logic_cases::cases()) {
@@ -1805,7 +2087,7 @@ inline bool write_file(const std::string& path, const std::string& text) {
 /// on the engine itself, blueprint_native_on_engine.txt (the interpreter's answers there).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
-                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
+                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"kern/logic/blueprint_class.h\"\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
   std::string runs, expected, on_engine, on_engine_runs, on_engine_free_runs;
   for (const Case& c : all) {
     std::string text, glue, why;
@@ -1895,6 +2177,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
             used +
             "  kern::logic::Instance* inst = rt.add(graph, 0, \"" + c.name + "\");\n  rt.begin();\n  hosted += \"== " + c.name + "\\n\";\n"
             "  if (std::string(inst->tier()) != \"native C++\") hosted += std::string(\"(it runs in the \") + inst->tier() + \", not as its class)\\n\";\n"
+            "  // (the program's own C++ binds the class once, to the object the runtime runs it as - kern/logic/blueprint_class.h)\n"
+            "  if (!kern::logic::bind_blueprint<" + c.name + ">(rt) || &kern::logic::blueprint<" + c.name + ">() != inst->native_object<" + c.name + ">()) hosted += \"(its class is not bound)\\n\";\n"
             "  const auto hosted_variables = [&] {\n    return std::string(\" |\")";
     for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + native_show(inst->get(\"" + v.name + "\"))";
     body += ";\n  };\n";

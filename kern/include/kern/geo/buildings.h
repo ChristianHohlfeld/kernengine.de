@@ -110,6 +110,9 @@ class FootprintStream {
   }
   const f64* data() const { return data_.data(); }
   std::size_t size() const { return data_.size(); }
+  /// The whole stream as a list (data() and size() as one value: what a Blueprint reads of it - its node gives every
+  /// number, not what a pointer shows).
+  const std::vector<f64>& values() const { return data_; }
 
  private:
   std::vector<f64> data_;

@@ -591,6 +591,18 @@ struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
@@ -628,6 +640,11 @@ struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
   const EnumType* enumeration(std::string_view name) const;
@@ -645,11 +662,14 @@ struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   Root root_of(const Node& n, Variable& out, std::string_view prefix = {}) const;
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
-  static bool writable(Root r) { return r == Root::variable || r == Root::local || r == Root::reference; }
+  static bool writable(Root r) { return r == Root::variable || r == Root::local || r == Root::reference || r == Root::bound; }
   /// The place a node's settings name: its variable (variable_of) and from there the path of the
   /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
   /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
@@ -666,6 +686,10 @@ struct Graph {
   /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
   /// more than one. Where the places a call names are looked up (the call's setting "scope").
   std::string body_of(u32 node, const class Library& lib) const;
+  /// body_of for every node at once: the function each node of a body stands in. A node that is in no body, or in the
+  /// bodies of two functions, is not in the map - body_of gives "" for it. One walk over each body, where asking
+  /// body_of node by node walks every body for every node.
+  std::unordered_map<u32, std::string> bodies(const class Library& lib) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
@@ -676,6 +700,10 @@ struct Graph {
 /// The steps of a path (the setting "path" of a node that names a place): ".Wheels[].Slip" is
 /// the field Wheels, a list entry (an empty step), the field Slip. False: no path.
 bool path_steps(std::string_view path, std::vector<std::string>& steps);
+struct EngineFunction;
+/// The function of the node of the engine a node's setting "bound" names (Graph::Root::bound), if that
+/// node is a place of the engine (EngineFunction::place) - `binder` gets that node; else null.
+const EngineFunction* bound_function(const Graph& g, const Node& n, const Node** binder = nullptr);
 /// The path its steps are (path_steps the other way round).
 std::string path_text(const std::vector<std::string>& steps);
 /// How many list entries a path goes through: the node has an index input for each (path_pin).
@@ -692,6 +720,8 @@ bool is_path_pin(std::string_view id);
 std::string ref_key(std::string_view input, std::string_view what);
 
 json::Value graph_to_json(const Graph& g);
+/// Is a function's export (Function::exported, Function::wire) one the glue can write? False: why not.
+bool export_ok(const Function& f, std::string* why = nullptr);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
 
 /// The value something of type `t` has when nothing else is said: the zero of a value type, the
@@ -1124,7 +1154,17 @@ class NativeBlueprint {
   virtual bool call(std::string_view function, std::span<const Value> args, Results& results) = 0;
   virtual bool get(std::string_view variable, Value& out) const = 0;
   virtual bool set(std::string_view variable, const Value& value) = 0;
+  /// The class's object, where `type` is the key of its class (class_key): what the program's own C++
+  /// calls directly (kern/logic/blueprint_class.h). Null for the key of any other class - and from a
+  /// NativeBlueprint that is no Blueprint's class.
+  virtual void* object(const void* type) {
+    (void)type;
+    return nullptr;
+  }
 };
+/// The key of the class T, one in the whole program (an inline variable has one address): what
+/// NativeBlueprint::object is asked by.
+template <class T> inline constexpr char class_key = 0;
 using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
 /// The order of a function's inputs: those by reference come first. An input by value has a
 /// default (`Float by = 0.5`), a reference has none (the call names its place) - and in C++ every
@@ -1209,6 +1249,10 @@ class Instance {
       Value value;
     };
     std::shared_ptr<Beside> beside;
+    /// Or - a place of the engine - the node of the engine that bound it (its compiled index): what is
+    /// there is what the engine holds now, read through the door ("<function>@get") and set back
+    /// ("<function>@set") with the inputs the node was given when it ran.
+    int bound = -1;
     struct Step {
       std::string field;          // a field by its name; empty: a list entry
       i64 index = 0;
@@ -1296,6 +1340,9 @@ class Instance {
   /// interpreter.
   bool compiled() const { return blueprint_ || jit_fn_ >= 0; }
   const char* tier() const { return blueprint_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
+  /// Where it runs as its compiled class T, the object of that class (null: it runs otherwise, or as
+  /// another class) - what the program's own C++ calls directly (kern/logic/blueprint_class.h).
+  template <class T> T* native_object() const { return blueprint_ ? static_cast<T*>(blueprint_->object(&class_key<T>)) : nullptr; }
   i32 id() const { return id_; }
 
   // ---- generated code support (the JIT's modules call these) ----
@@ -1375,6 +1422,10 @@ class Instance {
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
   bool call_class(std::string_view function, std::span<const Value> args, Results& results);  // (the class's: NativeBlueprint::call)
   Value read(const Spot& s) const;
+  /// A place of the engine (Spot::bound): its function, the inputs its node was given, its type and
+  /// what the engine holds there now (the zero of the type where it holds nothing - false: the host
+  /// has been told why).
+  bool bound_now(const Spot& s, std::string& function, std::vector<Value>& in, TypeRef& t, Value& now) const;
   /// How long each list of any length (each map) is that the place goes through, outermost first - up to the first
   /// the place lies beside (Runtime::held_lost: a call that holds the place checks them after it).
   std::vector<std::size_t> lengths_on(const Spot& s) const;
@@ -1504,7 +1555,10 @@ class Runtime {
   void end();
   /// One fixed step: latent actions, timers, state machine timers, Tick events.
   void tick(f32 dt);
-  /// Raises an event (synchronously runs the handlers).
+  /// Raises an event (synchronously runs the handlers): the instances in the order they were added - a game's
+  /// world adds the level's own graph first, then the Blueprints of its actors in the order of the level
+  /// (game::GameWorld::start_logic), and those spawned later after them -, and in each instance its handlers of
+  /// the event in the order of their node ids. Every tier keeps this order.
   void fire(const Event& e);
   /// Custom event by name on every instance (or on `target`'s).
   void call(std::string_view name, ActorRef target = 0, std::vector<std::pair<std::string, Value>> args = {});
@@ -1645,6 +1699,9 @@ class Context {
   std::size_t node_outputs() const { return inst_.nodes_[node_].out.size(); }
   void out(std::string_view pin, Value v);
   void out(std::size_t index, Value v);
+  /// A node of the engine that is a place of the engine binds it: its output `index` holds what the
+  /// node was given (the place's key - Instance::Spot::bound), as it is, not a value of the pin's type.
+  void bind(std::size_t index, std::vector<Value> in);
   /// Exec output ordinal by pin id (for returning from run()).
   int exec(std::string_view pin) const;
   NodeState& state() { return inst_.nodes_[node_].state; }
