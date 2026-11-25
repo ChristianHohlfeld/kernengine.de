@@ -96,11 +96,14 @@ class FixedStepNode final : public kern::logic::NodeType {
   void run() override { game().fixed_step(1.0f / kStepHz); }
 };
 
-// (a method of the one Game; the engine registers a type once - a second call gives the first)
-void Game::register_node() {
-  static FixedStepNode node;
-  kern::logic::register_node_type(&node);
+/// The one fixed-step node type, made where it is first asked for (as facades()).
+FixedStepNode& fixed_step_node() {
+  static FixedStepNode one;
+  return one;
 }
+
+// (a method of the one Game; the engine registers a type once - the same object again changes nothing)
+void Game::register_node() { kern::logic::register_node_type(&fixed_step_node()); }
 
 namespace {
 
