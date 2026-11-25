@@ -19,8 +19,10 @@
 #pragma once
 
 #include <bit>
+#include <chrono>
 #include <climits>
 #include <concepts>
+#include <deque>
 #include <cstring>
 #include <memory>
 #include <optional>
@@ -34,6 +36,7 @@
 #include "converted.h"
 #include "kern/core/fields.h"
 #include "kern/core/map.h"
+#include "kern/core/json.h"
 
 namespace sc::lowered {
 
@@ -79,6 +82,48 @@ template <class T> T* made() {
   all.push_back(std::make_unique<T>());
   return all.back().get();
 }
+/// An object of the engine that only the engine makes - its constructor takes the engine's other objects - and that a
+/// class of the program holds from outside (the game's kern::game::GameWorld: made in Game::start). The test makes it as
+/// the game's tests make it (tests/test_gaps.cpp): the engine's renderer, one for the program, set up as they set it up,
+/// and a world of its own for every call, started with a level of nothing (kern::game::Level as it is made) - in each
+/// program alike, so both sides run in the same world. A class the engine makes so says so here: Made<O>::make().
+template <class O> struct Made;
+template <class O> concept EngineMade = requires { { Made<O>::make() } -> std::same_as<std::unique_ptr<O>>; };
+template <> struct Made<kern::game::GameWorld> {
+  static kern::Renderer& renderer() {
+    static kern::Renderer r;
+    static const bool ready = [] {
+      kern::RendererOptions o;
+      return r.init(o);
+    }();
+    SC_CHECK(ready, "the engine's renderer does not start (as the tests start it)");
+    return r;
+  }
+  static std::unique_ptr<kern::game::GameWorld> make() {
+    auto w = std::make_unique<kern::game::GameWorld>(renderer());
+    const bool started = w->start(kern::game::Level{}, kern::game::SimMode::simulate);
+    SC_CHECK(started, "the engine's world does not start with a level of nothing: %s", kern::last_error());
+    return w;
+  }
+};
+/// An object the engine makes, for a pointer of this call to point at (as made<T>: it lives until the next call begins).
+template <EngineMade T> T* made() {
+  static std::vector<std::unique_ptr<T>> all;
+  static unsigned long long of = 0;
+  if (of != g_call) {
+    all.clear();
+    of = g_call;
+  }
+  all.push_back(Made<T>::make());
+  return all.back().get();
+}
+/// A map (std::map, std::unordered_map, kern::Map) and a set (std::set, std::unordered_set, kern::Set): by what they
+/// are, not by their name - keys, and for a map the values. One of them keeps no order (unordered_*): two are then
+/// the same when they hold the same, in any order.
+template <class T> concept MapLike = requires { typename T::key_type; typename T::mapped_type; } && requires(const T& m) { m.find(std::declval<const typename T::key_type&>()); };
+template <class T> concept SetLike = requires { typename T::key_type; } && !requires { typename T::mapped_type; } &&
+                                     std::is_same_v<typename T::key_type, typename T::value_type> && requires(const T& m) { m.find(std::declval<const typename T::key_type&>()); };
+template <class T> concept Unordered = requires { typename T::hasher; typename T::local_iterator; };
 template <class T> inline constexpr bool is_vec =
     std::is_same_v<T, kern::Vec2> || std::is_same_v<T, kern::Vec3> || std::is_same_v<T, kern::Vec4> || std::is_same_v<T, kern::Quat>;
 template <class T> inline constexpr bool is_text = std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>;
@@ -114,6 +159,18 @@ template <class T> void draw(Draw& d, T& x) {
   else if constexpr (std::is_floating_point_v<U>) x = static_cast<U>(d.number());
   else if constexpr (is_vec<U>) std::apply([&](auto&... c) { ((c = static_cast<f32>(d.number())), ...); }, components(x));
   else if constexpr (std::is_same_v<U, std::string>) x = d.word();
+  else if constexpr (std::is_same_v<U, const char*>) x = d.c_word();   // (a text that lasts: one of the draws' words, never none)
+  else if constexpr (std::is_same_v<U, kern::json::Value>) {
+    // (a value of JSON: null, a flag, a number, a text - or a list or an object of a few of them)
+    switch (d.below(6)) {
+      case 0: x = kern::json::Value(); break;
+      case 1: x = kern::json::Value(d.flag()); break;
+      case 2: x = kern::json::Value(d.number()); break;
+      case 3: x = kern::json::Value(d.word()); break;
+      case 4: x = kern::json::Value::array(); for (u32 n = d.below(3); n > 0; --n) x.push(kern::json::Value(d.number())); break;
+      default: x = kern::json::Value::object(); for (u32 n = d.below(3); n > 0; --n) x.set(d.word(), kern::json::Value(d.number())); break;
+    }
+  }
   else if constexpr (is_vector<U>::value) {
     using E = typename U::value_type;
     if constexpr (std::is_same_v<E, bool>) {
@@ -147,6 +204,16 @@ template <class T> void draw(Draw& d, T& x) {
     x = U{};
     x.reserve(all.size());
     for (std::size_t k = 0; k < all.size(); ++k) x.insert(all.key_at(k));
+  } else if constexpr (MapLike<U>) {
+    x.clear();
+    for (u32 n = d.below(6); n > 0; --n) {
+      auto k = drawn<typename U::key_type>(d);
+      auto v = drawn<typename U::mapped_type>(d);
+      x.insert_or_assign(k, std::move(v));
+    }
+  } else if constexpr (SetLike<U>) {
+    x.clear();
+    for (u32 n = d.below(6); n > 0; --n) x.insert(drawn<typename U::key_type>(d));
   } else if constexpr (is_held<U>) {
     // an object held from outside (a pointer, a std::unique_ptr): one the test makes, each side its own - drawn
     // where the test can draw its class, else as its constructor makes it. Never none: a function that is handed
@@ -164,6 +231,11 @@ template <class T> void draw(Draw& d, T& x) {
         draw(d, *made_here);
         x = made_here;
       }
+    } else if constexpr (EngineMade<O>) {
+      static const bool said = (std::printf("  note: %s: an object of the engine held by a pointer: the engine makes it as the tests do, each side its own (never none)\n", __PRETTY_FUNCTION__), true);
+      (void)said;
+      if constexpr (is_owned<U>::value) x = Made<O>::make();
+      else x = made<O>();
     } else {
       static const bool said = (std::printf("  note: %s: an object held by a pointer that the test cannot make: none (null) on both sides\n", __PRETTY_FUNCTION__), true);
       (void)said;
@@ -186,10 +258,34 @@ template <class T> void draw(Draw& d, T& x) {
 // ---- carried: the same value in the type of the other side (a class of the file is two classes, sc_old's
 // and sc_new's - field by field, by name: source_diff.py checks that they have the same fields). A list and a
 // text get the room the old side's has (its capacity): what the two ask for memory is then compared alike ----
+template <class T> kern::logic::Value as_value(const T& x);
+/// Whether a type holds values of the Blueprint (kern::logic::Value): the old program kept the Blueprint's structs so;
+/// the test draws them on the side where they are structs (draw_pair).
+/// So did it hold texts by a pointer to their characters (const char*), where the new holds std::string: those are
+/// drawn on the new side too, and the old side's pointers point to texts the test keeps.
+template <class T> constexpr bool drawn_on_new();
+template <class T> struct holds_value : std::bool_constant<drawn_on_new<std::remove_cv_t<T>>()> {};
+template <class T> constexpr bool drawn_on_new() {
+  if constexpr (std::is_same_v<T, kern::logic::Value> || std::is_same_v<T, const char*>) return true;
+  else if constexpr (is_vector<T>::value || is_array<T>::value || is_optional<T>::value) return drawn_on_new<std::remove_cv_t<typename T::value_type>>();
+  else if constexpr (std::is_array_v<T>) return drawn_on_new<std::remove_cv_t<std::remove_extent_t<T>>>();
+  else if constexpr (std::is_class_v<T> && HasFields<T>) {
+    using F = decltype(fields(std::declval<T&>()));
+    return []<std::size_t... I>(std::index_sequence<I...>) { return (drawn_on_new<std::remove_cvref_t<std::tuple_element_t<I, F>>>() || ...); }(std::make_index_sequence<std::tuple_size_v<F>>{});
+  } else return false;
+}
+/// The characters of a text the old side points to: kept for as long as the test runs.
+inline const char* kept_text(const std::string& t) {
+  static std::deque<std::string> kept;   // (never given back: a text of a call before may still be pointed to)
+  return kept.emplace_back(t).c_str();
+}
 template <class A, class B> void carry(const A& a, B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_same_v<X, Y> && std::is_trivially_copyable_v<X> && !Named<X> && !std::is_array_v<X>) b = a;
+  if constexpr (std::is_same_v<Y, kern::logic::Value> && !std::is_same_v<X, kern::logic::Value>) b = as_value(a);   // (the struct as the old program held it)
+  else if constexpr (std::is_same_v<Y, const char*> && is_text<X>) b = kept_text(std::string(a));
+  else if constexpr (std::is_same_v<X, const char*> && std::is_same_v<Y, std::string>) b = a ? a : "";
+  else if constexpr (std::is_same_v<X, Y> && std::is_trivially_copyable_v<X> && !Named<X> && !std::is_array_v<X>) b = a;
   else if constexpr (std::is_same_v<X, std::string> && std::is_same_v<Y, std::string>) {
     b.clear();
     b.reserve(a.capacity());
@@ -234,6 +330,25 @@ template <class A, class B> void carry(const A& a, B& b) {
       carry(from, key);
       b.insert(std::move(key));
     }
+  } else if constexpr (MapLike<X> && MapLike<Y>) {
+    // (in the order the old side gives its entries: the new keeps that one)
+    b.clear();
+    if constexpr (requires { b.reserve(a.size()); }) b.reserve(a.size());
+    for (const auto& [k, v] : a) {
+      typename Y::key_type kb{};
+      carry(k, kb);
+      typename Y::mapped_type vb{};
+      carry(v, vb);
+      b.insert_or_assign(kb, std::move(vb));
+    }
+  } else if constexpr (SetLike<X> && SetLike<Y>) {
+    b.clear();
+    if constexpr (requires { b.reserve(a.size()); }) b.reserve(a.size());
+    for (const auto& k : a) {
+      typename Y::key_type kb{};
+      carry(k, kb);
+      b.insert(kb);
+    }
   } else if constexpr (is_held<X> && is_held<Y>) {
     // (the other side's own object, with what the first side's holds: see draw)
     using O = Pointee<Y>;
@@ -265,11 +380,39 @@ template <class A, class B> void carry(const A& a, B& b) {
   }
 }
 
+/// A value drawn for both sides: on the old one and carried to the new - or, where the old holds values of the Blueprint,
+/// on the new one (its structs) and carried to the old.
+template <class P> struct Arg;
+template <class O, class N> void draw_pair(Draw& d, O& old, N& now) {
+  if constexpr (holds_value<std::remove_cv_t<O>>::value && !holds_value<std::remove_cv_t<N>>::value) {
+    draw(d, now);
+    carry(now, old);
+  } else {
+    draw(d, old);
+    carry(old, now);
+  }
+}
+
 // ---- the same, bit for bit ----
+template <class T> kern::logic::Value as_value(const T& x);
 template <class A, class B> bool same(const A& a, const B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_floating_point_v<X>) {
+  if constexpr (std::is_same_v<X, kern::json::Value> && std::is_same_v<Y, kern::json::Value>) {
+    // (a value of JSON, by what it says of itself - its numbers bit for bit)
+    if (a.type() != b.type() || a.as_bool() != b.as_bool() || !same(a.as_number(), b.as_number())) return false;
+    if (a.is_string() && a.as_string() != b.as_string()) return false;
+    if (a.items().size() != b.items().size() || a.members().size() != b.members().size()) return false;
+    for (std::size_t k = 0; k < a.items().size(); ++k)
+      if (!same(a.items()[k], b.items()[k])) return false;
+    for (std::size_t k = 0; k < a.members().size(); ++k)
+      if (a.members()[k].first != b.members()[k].first || !same(a.members()[k].second, b.members()[k].second)) return false;
+    return true;
+  } else if constexpr (std::is_same_v<X, kern::logic::Value> && !std::is_same_v<Y, kern::logic::Value>) {
+    return converted::same_value(a, as_value(b));   // (a value of the Blueprint and the struct the new one holds)
+  } else if constexpr (std::is_same_v<X, kern::logic::Value> && std::is_same_v<Y, kern::logic::Value>) {
+    return converted::same_value(a, b);
+  } else if constexpr (std::is_floating_point_v<X>) {
     static_assert(std::is_same_v<X, Y>, "a number of another type");
     if constexpr (sizeof(X) == 4) return std::bit_cast<u32>(a) == std::bit_cast<u32>(b);
     else if constexpr (sizeof(X) == 8) return std::bit_cast<u64>(a) == std::bit_cast<u64>(b);
@@ -283,6 +426,10 @@ template <class A, class B> bool same(const A& a, const B& b) {
     return std::string_view(a) == std::string_view(b);
   } else if constexpr (std::is_same_v<X, const char*> && std::is_same_v<Y, const char*>) {
     return (a == nullptr) == (b == nullptr) && (a == nullptr || std::strcmp(a, b) == 0);
+  } else if constexpr (std::is_same_v<X, const char*> && is_text<Y>) {
+    return a != nullptr && std::string_view(a) == std::string_view(b);   // (a text by its characters, and the text)
+  } else if constexpr (is_text<X> && std::is_same_v<Y, const char*>) {
+    return b != nullptr && std::string_view(a) == std::string_view(b);
   } else if constexpr (is_vec<X> && std::is_same_v<X, Y>) {
     auto ca = components(a);
     auto cb = components(b);
@@ -320,6 +467,27 @@ template <class A, class B> bool same(const A& a, const B& b) {
       if (!same(ka, kb)) return false;
     }
     return true;
+  } else if constexpr ((MapLike<X> && MapLike<Y>) || (SetLike<X> && SetLike<Y>)) {
+    if (a.size() != b.size()) return false;
+    if constexpr (Unordered<X> || Unordered<Y>) {
+      // (one keeps no order: every entry of the one is the other's - the keys are the program's own numbers and texts)
+      for (const auto& e : a) {
+        if constexpr (MapLike<X>) {
+          const auto it = b.find(static_cast<typename Y::key_type>(e.first));
+          if (it == b.end() || !same(e.first, it->first) || !same(e.second, it->second)) return false;
+        } else {
+          const auto it = b.find(static_cast<typename Y::key_type>(e));
+          if (it == b.end() || !same(e, *it)) return false;
+        }
+      }
+      return true;
+    } else {
+      auto ia = a.begin();
+      auto ib = b.begin();
+      for (; ia != a.end(); ++ia, ++ib)
+        if (!same(*ia, *ib)) return false;
+      return true;
+    }
   } else if constexpr (is_held<X> && is_held<Y>) {
     // (whether each side holds an object, and what the two objects hold)
     return (a == nullptr) == (b == nullptr) && (a == nullptr || same(*a, *b));
@@ -361,6 +529,7 @@ template <class T> struct Arg<kern::Span<T>> {
 template <class T> struct Arg<const kern::Span<T>&> : Arg<kern::Span<T>> {};
 template <class T> struct Arg<const kern::Span<T>> : Arg<kern::Span<T>> {};
 template <class P> void draw(Draw& d, Arg<P>& a) { draw(d, a.v); }
+template <class P, class Q> void draw_pair(Draw& d, Arg<P>& o, Arg<Q>& n) { draw_pair(d, o.v, n.v); }
 template <class P, class Q> void carry(const Arg<P>& a, Arg<Q>& b) { carry(a.v, b.v); }
 template <class P, class Q> bool same(const Arg<P>& a, const Arg<Q>& b) { return same(a.v, b.v); }
 
@@ -444,6 +613,15 @@ template <class T, class F> constexpr F fits(F x) {
   return x;
 }
 
+/// A whole number made a value of an enum whose type is not fixed: one outside the range of its values marks the call.
+template <long long Lo, long long Hi, class N> constexpr N enum_fits(N x) {
+  if (static_cast<long long>(x) < Lo || static_cast<long long>(x) > Hi) {
+    converted::g_open = true;
+    return N{0};
+  }
+  return x;
+}
+
 // ---- a copy of bytes between places of lists (std::memcpy / std::memmove of the source): checked against the
 // lists the source names - a place outside a list, or more bytes than are there, marks the call ----
 struct Place {
@@ -460,6 +638,11 @@ template <class L> Place at_place(L&& list, long long k) {
   else return {list.data() + k, static_cast<std::size_t>(n - k) * sizeof(list.data()[0]), true};
 }
 template <class T> Place value_place(T& v) { return {&v, sizeof v, true}; }
+struct Region;
+inline std::vector<Region>& regions();
+/// The place a pointer of another kind names: in a list the test handed, up to its end; else the test does not know its
+/// room (it stands as it is - the sanitizers watch it).
+inline Place pointer_place(const void* p);
 inline void* copy(Place to, Place from, std::size_t n) {
   if (!to.there || !from.there || n > to.room || n > from.room) {
     converted::g_open = true;
@@ -475,6 +658,71 @@ inline void* move(Place to, Place from, std::size_t n) {
   return n ? std::memmove(const_cast<void*>(to.at), from.at, n) : const_cast<void*>(to.at);
 }
 
+// ---- the places the test hands the old text by a pointer (a list's first entry, one value): an entry by a pointer
+// is checked against them - one outside marks the call. A pointer into another place (a table of the file, a local
+// array) is not the test's: its entry stands as it is (the sanitizers watch it) ----
+struct Region {
+  const char* begin;
+  const char* end;
+};
+inline std::vector<Region>& regions() {
+  static std::vector<Region> r;
+  return r;
+}
+/// A place handed to the old text, for as long as the call runs.
+struct Placed {
+  template <class T> Placed(T* at, std::size_t n) {
+    const char* b = reinterpret_cast<const char*>(at);
+    regions().push_back({b, b + n * sizeof(T)});
+  }
+  ~Placed() { regions().pop_back(); }
+  Placed(const Placed&) = delete;
+  Placed& operator=(const Placed&) = delete;
+};
+inline Place pointer_place(const void* p) {
+  const char* a = static_cast<const char*>(p);
+  for (auto r = regions().rbegin(); r != regions().rend(); ++r)
+    if (a >= r->begin && a <= r->end) return {p, static_cast<std::size_t>(r->end - a), true};
+  return {p, static_cast<std::size_t>(-1), true};
+}
+template <class P, class I> P& entry(P* p, I k) {
+  const char* a = reinterpret_cast<const char*>(p);
+  for (auto r = regions().rbegin(); r != regions().rend(); ++r) {
+    if (a < r->begin || a > r->end) continue;
+    const long long at = static_cast<long long>((a - r->begin) / static_cast<long long>(sizeof(P))) + static_cast<long long>(k);
+    const long long n = static_cast<long long>((r->end - r->begin) / static_cast<long long>(sizeof(P)));
+    if (at < 0 || at >= n) {
+      converted::open_read();   // (marks the call - and gives it up when it goes on so: a loop to a length that is not there)
+      static std::remove_const_t<P> none{};
+      none = std::remove_const_t<P>{};
+      return none;
+    }
+    return p[k];
+  }
+  return p[k];
+}
+
+// ---- a value of the Blueprint (kern::logic::Value), as the old program handed one: what the engine makes of a value of
+// the program (kern::logic::ActorBlueprint's arguments - a flag, a whole number, a decimal, a vector, a text, an enum's
+// value, a plain struct of them, a list) ----
+template <class T> kern::logic::Value as_value(const T& x) {
+  using kern::logic::Value;
+  using U = std::remove_cvref_t<T>;
+  if constexpr (std::is_same_v<U, bool>) return Value::boolean(x);
+  else if constexpr (std::is_enum_v<U>) return Value::enumeration(static_cast<i64>(x));
+  else if constexpr (std::is_integral_v<U>) return Value::integer(static_cast<i64>(x));
+  else if constexpr (std::is_floating_point_v<U>) return Value::number(static_cast<f64>(x));
+  else if constexpr (is_vec<U>) return Value::vector(kern::Vec3(x));
+  else if constexpr (is_text<U>) return Value::text(std::string(x));
+  else if constexpr (is_vector<U>::value) {
+    std::vector<Value> items;
+    for (const auto& e : x) items.push_back(as_value(e));
+    return Value::structures(std::move(items));
+  } else {
+    return std::apply([](const auto&... f) { return Value::structure({as_value(f)...}); }, fields(const_cast<U&>(x)));
+  }
+}
+
 // ---- the world the two sides run in ----
 /// The logic each side's Blueprints of actors run in (the level's actors the file's ActorBlueprints name), and
 /// those actors' variables as they started: before every call both start there; after it they must be the same.
@@ -488,6 +736,13 @@ struct World {
     new_actors.keep(new_side, actors);
   }
   kern::logic::Runtime& logic(bool old) { return old ? old_side.rt : new_side.rt; }
+  /// The running Blueprint of an actor on one side (how the old program bound a file to it).
+  kern::logic::Instance* instance(bool old, const char* actor) {
+    kern::logic::Runtime& rt = logic(old);
+    kern::logic::Instance* i = rt.find(rt.host().find_actor(actor));
+    SC_CHECK(i != nullptr, "the actor %s has no running Blueprint", actor);
+    return i;
+  }
   void before() {
     old_actors.restore();
     new_actors.restore();
@@ -501,6 +756,19 @@ struct World {
   }
 };
 
+/// The rounds of the loops of a call: one that goes round more often than this is given up (not compared).
+inline long g_rounds = 0;
+inline constexpr long kRounds = 500000000;
+inline std::chrono::steady_clock::time_point g_call_began;
+inline void tick() {
+  // (and one that runs longer than a minute: looked at every million rounds)
+  if (((++g_rounds > kRounds) || ((g_rounds & 0xFFFFF) == 0 && std::chrono::steady_clock::now() - g_call_began > std::chrono::seconds(60))) && converted::g_can_bail) {
+    converted::g_can_bail = false;
+    converted::g_open = true;
+    std::longjmp(converted::g_bail, 1);
+  }
+}
+
 /// One side's call: run with the guards armed. False: C++ leaves open what it gives (a guard marked it, or
 /// it read outside a list so long that it was given up - converted::open_read). `asks`: how often it asked
 /// for memory.
@@ -510,6 +778,8 @@ inline cost::Trace g_trace_before, g_trace_last;
 template <class F> bool run(F&& f, long& asks) {
   converted::g_open = false;
   converted::g_open_reads = 0;
+  g_rounds = 0;
+  g_call_began = std::chrono::steady_clock::now();
   if (setjmp(converted::g_bail) != 0) {
     cost::end();
     converted::may_bail(false);
@@ -537,11 +807,19 @@ struct Tally {
   std::string function;
   int compared = 0, outside = 0, wrong = 0, costlier = 0;
   long most_new = 0, with_old = 0;
+  std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(std::string f) : function(std::move(f)) {}
+  /// Another call? Up to kCalls compared ones; of a function whose calls take long, as many as two seconds have room
+  /// for, but twenty at least - and of one whose calls take seconds each (a 256-bit number raised to a power, limb by
+  /// limb), five at least and as many more as twenty seconds have room for (as the converted tests: converted::Tally).
   bool more(int tried) const {
     ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
-    return compared < kCalls && tried < kCalls * 20;
+    if (compared >= kCalls || tried >= kCalls * 20) return false;
+    if (compared >= 20) return seconds() < 2.0;
+    return compared < 5 || seconds() < kLong;
   }
+  static constexpr double kLong = 20.0;
+  double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call: whether both sides said what they give (`defined`), what differs (empty: nothing), how often each
   /// asked for memory.
   void take(bool defined, const std::string& differs, long old_asks, long new_asks, int call) {
@@ -565,7 +843,9 @@ struct Tally {
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
     SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
+    if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s)\n", function.c_str(), compared, seconds());
+    SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
     std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };
@@ -575,6 +855,278 @@ struct Differs {
   std::string text;
   template <class A, class B> void check(const char* what, const A& a, const B& b) {
     if (!same(a, b)) text += (text.empty() ? "" : ", ") + std::string(what);
+  }
+};
+
+
+// ---- the form "two builds" (UEBERGABE 4.2; source_diff.py --builds) ----
+// Each side is the whole program in its state - the old tree (the sources as they stood at --base) and the new -, and
+// the same test is compiled against each and linked into each. The old program writes, call for call, what every
+// compared function gave and left as bytes (each part apart: what it returns, its object, a parameter); the new
+// draws the same calls (the same draws: the classes drawn have the same fields on both sides - source_diff.py checks
+// it) and compares its bytes with those, bit for bit. Nothing of one program is in the other: a class of ~40 files
+// (Game), helpers of the same name in two texts, an old text that would not compile against the new headers - each
+// is in its own program.
+
+/// The bytes a value leaves: every number by its bits, a list by its length and its entries, an object held by a
+/// pointer by whether there is one and what it holds (one already written by its number: the same object twice).
+struct Bytes {
+  std::string b;
+  std::vector<const void*> seen;
+  void raw(const void* p, std::size_t n) { b.append(static_cast<const char*>(p), n); }
+  template <class N> void num(N v) { raw(&v, sizeof v); }
+};
+template <class T> void put(Bytes& o, const T& x) {
+  using X = std::remove_cv_t<T>;
+  if constexpr (std::is_same_v<X, bool>) o.num<unsigned char>(x ? 1 : 0);
+  else if constexpr (std::is_enum_v<X>) o.num(static_cast<long long>(x));
+  else if constexpr (std::is_arithmetic_v<X>) o.num(x);   // (a float by its bits: -0.0 and 0.0, two NaNs, are other bytes)
+  else if constexpr (is_text<X>) {
+    o.num<u64>(x.size());
+    o.raw(x.data(), x.size());
+  } else if constexpr (std::is_same_v<X, const char*> || std::is_same_v<X, char*>) {
+    o.num<unsigned char>(x != nullptr);
+    if (x != nullptr) put(o, std::string_view(x));
+  } else if constexpr (is_vec<X>) {
+    std::apply([&](const auto&... c) { (put(o, c), ...); }, components(x));
+  } else if constexpr (is_vector<X>::value || is_span<X>::value) {
+    o.num<u64>(std::size(x));
+    for (std::size_t k = 0; k < std::size(x); ++k) {
+      if constexpr (std::is_same_v<typename X::value_type, bool>) put(o, static_cast<bool>(x[k]));
+      else put(o, x[k]);
+    }
+  } else if constexpr (is_array<X>::value || std::is_array_v<X>) {
+    for (const auto& e : x) put(o, e);
+  } else if constexpr (is_optional<X>::value) {
+    o.num<unsigned char>(x.has_value());
+    if (x) put(o, *x);
+  } else if constexpr (is_pair<X>::value) {
+    put(o, x.first);
+    put(o, x.second);
+  } else if constexpr (is_map<X>::value) {
+    o.num<u64>(x.size());
+    for (std::size_t k = 0; k < x.size(); ++k) {
+      put(o, x.key_at(k));
+      put(o, x.value_at(k));
+    }
+  } else if constexpr (is_set<X>::value) {
+    o.num<u64>(x.size());
+    for (std::size_t k = 0; k < x.size(); ++k) {
+      const typename X::key_type key = x.key_at(k);
+      put(o, key);
+    }
+  } else if constexpr (is_held<X>) {
+    o.num<unsigned char>(x != nullptr);
+    if (x == nullptr) return;
+    const void* at = &*x;
+    for (std::size_t k = 0; k < o.seen.size(); ++k)
+      if (o.seen[k] == at) {
+        o.num<unsigned char>(1);
+        o.num<u64>(k);
+        return;
+      }
+    o.num<unsigned char>(0);
+    o.seen.push_back(at);
+    put(o, *x);
+  } else if constexpr (HasFields<X>) {
+    std::apply([&](const auto&... f) { (put(o, f), ...); }, fields(x));
+  } else if constexpr (std::is_class_v<X>) {
+    // (a class of the engine that keeps what it holds to itself: what a call left in it is not written - the test says so once)
+    static const bool said = (std::printf("  note: %s: what it holds is its own - not compared\n", __PRETTY_FUNCTION__), true);
+    (void)said;
+  } else {
+    static_assert(sizeof(X) == 0, "a value the test cannot write");
+  }
+}
+template <class T> Bytes bytes_of(const T& x) {
+  Bytes b;
+  put(b, x);
+  return b;
+}
+
+/// The object a method is called on: made by its constructor (value-initialized, as `T x{}`), drawn or not; a
+/// destructor ends it in the call (end()), else it ends with the call.
+/// (an object of the engine that the object holds from outside and that its constructor left none - the game's world,
+/// which Game::start makes: the engine makes it as the tests do, Made - a method runs in the world the program runs in)
+template <class T> void give_engine_made(T& x) {
+  if constexpr (HasFields<T>) {
+    std::apply([](auto&... f) {
+      ([&](auto& v) {
+        using U = std::remove_cvref_t<decltype(v)>;
+        if constexpr (is_held<U>) {
+          if constexpr (EngineMade<Pointee<U>>) {
+            if (v == nullptr) {
+              if constexpr (is_owned<U>::value) v = Made<Pointee<U>>::make();
+              else v = made<Pointee<U>>();
+            }
+          }
+        }
+      }(f), ...);
+    }, fields(x));
+  }
+}
+template <class T> struct Self {
+  void* room = ::operator new(sizeof(T), std::align_val_t(alignof(T)));
+  T* p = ::new (room) T{};
+  Self() { give_engine_made(*p); }
+  Self(const Self&) = delete;
+  Self& operator=(const Self&) = delete;
+  ~Self() {
+    if (p != nullptr) p->~T();
+    ::operator delete(room, std::align_val_t(alignof(T)));
+  }
+  void end() {
+    T* was = p;
+    p = nullptr;
+    was->~T();
+  }
+  T& operator*() { return *p; }
+  T* operator->() { return p; }
+};
+
+/// One compared function in one program: SC_LOWERED_BUILDS=write:<file> (the old program) or check:<file> (the new).
+/// The old draws calls until kCalls of them are ones C++ says what they give (or twenty times as many were drawn) and
+/// writes them all; the new draws exactly as many - the same draws - and compares those both programs say.
+struct Builds {
+  static constexpr int kCalls = Tally::kCalls;
+  struct Call {
+    bool defined = false;
+    long asks = 0;
+    std::vector<std::pair<std::string, std::string>> parts;
+  };
+  std::string function, file;
+  bool writing = false;
+  std::vector<Call> old;   // (write: what this program gives; check: what the old program wrote)
+  std::size_t at = 0;
+  int compared = 0, outside = 0, wrong = 0, costlier = 0, defined_old = 0;
+  long most_new = 0, with_old = 0;
+  Call now;
+  explicit Builds(std::string f) : function(std::move(f)) {
+    const char* how = std::getenv("SC_LOWERED_BUILDS");
+    const std::string h = how ? how : "";
+    writing = h.rfind("write:", 0) == 0;
+    SC_CHECK(writing || h.rfind("check:", 0) == 0, "%s: SC_LOWERED_BUILDS is write:<file> or check:<file> (run_tests.sh sets it), not '%s'", function.c_str(), h.c_str());
+    file = h.size() > 6 ? h.substr(6) : "";
+    if (!writing) read();
+  }
+  // (the record: per function its name and one field; in it per call a head - defined, asks, the number of parts - and
+  // the parts, each a name and its bytes)
+  static void text(std::string& out, const std::string& s) {
+    const u64 n = s.size();
+    out.append(reinterpret_cast<const char*>(&n), sizeof n);
+    out += s;
+  }
+  static bool text(const std::string& in, std::size_t& k, std::string& s) {
+    u64 n = 0;
+    if (k + sizeof n > in.size()) return false;
+    std::memcpy(&n, in.data() + k, sizeof n);
+    k += sizeof n;
+    if (k + n > in.size()) return false;
+    s.assign(in, k, n);
+    k += n;
+    return true;
+  }
+  void read() {
+    std::string all;
+    if (FILE* f = std::fopen(file.c_str(), "rb")) {
+      char buf[65536];
+      for (std::size_t n; (n = std::fread(buf, 1, sizeof buf, f)) > 0;) all.append(buf, n);
+      std::fclose(f);
+    }
+    std::size_t k = 0;
+    std::string name, field;
+    while (text(all, k, name)) {
+      if (!text(all, k, field)) break;
+      if (name != function) continue;
+      std::size_t j = 0;
+      std::string head, part, bytes;
+      while (text(field, j, head)) {
+        Call c;
+        c.defined = head[0] == 1;
+        std::memcpy(&c.asks, head.data() + 1, sizeof c.asks);
+        u32 parts = 0;
+        std::memcpy(&parts, head.data() + 1 + sizeof c.asks, sizeof parts);
+        for (unsigned q = 0; q < parts && text(field, j, part) && text(field, j, bytes); ++q) c.parts.emplace_back(part, bytes);
+        old.push_back(std::move(c));
+      }
+      return;
+    }
+    SC_CHECK(false, "%s: the old program wrote nothing for it (%s)", function.c_str(), file.c_str());
+  }
+  bool more(int tried) {
+    ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
+    now = Call{};
+    if (writing) return defined_old < kCalls && tried < kCalls * 20;
+    return at < old.size();
+  }
+  void part(std::string name, Bytes b) { now.parts.emplace_back(std::move(name), std::move(b.b)); }
+  /// An object a call leaves: as one part (what it holds, every field, compared as a whole - an object held twice is
+  /// the same object), and - where the test has its fields' names - each field once more as a part of its own, so that
+  /// where it differs the test says which fields do.
+  template <class T> void object(const char* name, const T& x) {
+    part(name, bytes_of(x));
+    if constexpr (Named<T> && requires { Fields<std::remove_const_t<T>>::names; }) {
+      constexpr auto& names = Fields<std::remove_const_t<T>>::names;
+      std::size_t k = 0;
+      std::apply([&](const auto&... f) { ((part(std::string(name) + ": " + names[k++], bytes_of(f))), ...); }, fields(x));
+    }
+  }
+  void take(bool defined, long asks, int call) {
+    now.defined = defined;
+    now.asks = defined ? asks : 0;
+    if (writing) {
+      if (defined) ++defined_old;
+      old.push_back(std::move(now));
+      return;
+    }
+    const Call& was = old[at++];
+    if (!defined || !was.defined) {
+      ++outside;
+      return;
+    }
+    ++compared;
+    std::string differs;
+    for (std::size_t q = 0; q < std::max(was.parts.size(), now.parts.size()); ++q) {
+      if (q < was.parts.size() && q < now.parts.size() && was.parts[q] == now.parts[q]) continue;
+      differs += (differs.empty() ? "" : ", ") + (q < now.parts.size() ? now.parts[q].first : was.parts[q].first);
+    }
+    if (!differs.empty() && ++wrong <= 3) std::printf("  %s, call %d: %s\n", function.c_str(), call, differs.c_str());
+    if (now.asks > was.asks) {
+      ++costlier;
+      if (now.asks - was.asks > most_new - with_old) most_new = now.asks, with_old = was.asks;
+    }
+  }
+  ~Builds() {
+    if (writing) {
+      std::string field;
+      for (const Call& c : old) {
+        std::string head(1, c.defined ? 1 : 0);
+        head.append(reinterpret_cast<const char*>(&c.asks), sizeof c.asks);
+        const u32 parts = static_cast<u32>(c.parts.size());   // (an object of ~250 fields: a part each - more than a byte counts)
+        head.append(reinterpret_cast<const char*>(&parts), sizeof parts);
+        text(field, head);
+        for (const auto& [name, b] : c.parts) {
+          text(field, name);
+          text(field, b);
+        }
+      }
+      std::string rec;
+      text(rec, function);
+      text(rec, field);
+      FILE* f = std::fopen(file.c_str(), "ab");
+      SC_CHECK(f != nullptr, "%s: cannot write %s", function.c_str(), file.c_str());
+      if (f != nullptr) {
+        std::fwrite(rec.data(), 1, rec.size(), f);
+        std::fclose(f);
+      }
+      std::printf("  %s: %zu calls written by the old program (%d where C++ says what they give)\n", function.c_str(), old.size(), defined_old);
+      return;
+    }
+    SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
+    SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
+             compared, most_new, with_old);
+    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };
 
