@@ -20,7 +20,7 @@
 #include "destruction.h"
 #include "guided.h"
 #include "combat_detail.h"
-#include "combat_audio.h"
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: combat_audio, combat_audio_cpp ...
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
@@ -417,7 +417,7 @@ class Game {
   bool details_command(const std::string& cmd, std::string& out);
   // SpawnCity's synthesised combat sounds (combat_audio.cpp) registered as "sc:<kind><n>"
   void combat_audio_init();
-  const char* combat_sfx(combat_audio::Kind k);
+  const char* combat_sfx(blueprints::combat_audio::combat_audio_Kind k);
   // world dressing
   void update_lamps();
   std::string map_json();
