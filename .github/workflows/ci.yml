@@ -37,7 +37,23 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Profile the editor
+        if: ${{ inputs.probe == 'editor' }}
+        run: |
+          sudo apt-get install -y gdb > /dev/null 2>&1 || true
+          cd kern; mkdir -p /tmp/o
+          ls third_party/box3d/src/*.c third_party/musl_math/src/*.c | xargs -P 4 -I{} sh -c 'cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -fno-math-errno -w -Ithird_party/box3d/include -Ithird_party/box3d/src -c {} -o /tmp/o/$(echo {} | tr / _).o'
+          (find src -name '*.cpp'; echo tests/gl_stub.cpp; echo tests/prof/prof.cpp) | xargs -P 4 -I{} sh -c 'clang++ -std=c++20 -O2 -g -fno-omit-frame-pointer -ffp-contract=off -fno-exceptions -fno-rtti -w -Iinclude -Ithird_party/box3d/include -Itests -c {} -o /tmp/o/$(echo {} | tr / _).o || echo FAIL {}'
+          clang++ -O2 -g /tmp/o/*.o -o /tmp/prof -lpthread -ldl
+          L=games/spawncity/level/spawncity.klevel
+          for n in life_cpp terrain_cpp; do timeout 600 /tmp/prof $L $n; done
+          (timeout 1500 /tmp/prof $L Game; echo "Game rc=$?") &
+          sleep 45
+          for i in $(seq 1 14); do P=$(pgrep -x prof) || break; echo "=== sample $i"; sudo gdb -p $P -batch -ex "bt 14" 2>/dev/null | grep "^#" | cut -c1-200; sleep 20; done
+          wait
+          exit 0
       - name: Convert
+        if: ${{ inputs.probe != 'editor' }}
         env:
           SOURCES: ${{ inputs.probe }}
         run: |
