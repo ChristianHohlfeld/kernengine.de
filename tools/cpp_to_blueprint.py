@@ -13388,9 +13388,9 @@ class TestWriter:
         struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
         for raw in [qtype(p) for p in kids(d) if p.get("kind") == "ParmVarDecl"] + [re.sub(r"\(.*$", "", qtype(d))]:
-            if self.u.object_of(raw) in self.OWN_LOGIC:
-                # (the logic the level's Blueprints run in is the test's own, no stand-in: GameWorld::logic_runtime
-                # gives it - the stand-in of the engine has none to give, a function that asks for it is not compared)
+            if self.u.object_of(raw) == self.OWN_LOGIC[1]:
+                # (the program's way to call an actor's Blueprint is the test's own, no stand-in: a function of the engine
+                # that hands one between the program and the engine is not compared)
                 raise Wait(f"it hands the logic the Blueprints run in ({self.u.object_of(raw).split('::')[-1]}) between the program and a stand-in of the engine")
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
@@ -13424,6 +13424,12 @@ class TestWriter:
                 params += [(f"const char* {name}", default), ("...", "")]
                 values.append("converted::value_of(kern_text)")
                 formats = name
+            elif self.u.object_of(raw) == self.OWN_LOGIC[0]:
+                # (the logic the Blueprints run in, as a stand-in of the engine gave it - GameWorld::logic_runtime: in
+                # the Blueprint a handle, here the handle as the pointer it stands for, never followed; see the result below)
+                params.append((f"{re.sub(r'^(const\s+)?(?:::)?' + ENGINE + r'::logic::Runtime', lambda m_: (m_.group(1) or '') + '::' + ENGINE + '::logic::Runtime', raw.strip())} {name}", default))
+                at = name if re.search(r"\*\s*(const)?$", raw) else f"&{name}"
+                values.append(f"converted::value_of(static_cast<i64>(reinterpret_cast<std::uintptr_t>({at})))")
             elif self.u.object_of(raw):
                 params.append((f"{self.spell(raw)} {name}", default))
                 values.append(f"converted::value_of({name})")
@@ -13478,9 +13484,16 @@ class TestWriter:
             at = len(params) - 1 + (1 if cls else 0)   # (its place among the parameters, counted from 1 - a method's object first)
             said = f" __attribute__((format(printf, {at}, {at + 1})))"
         k = 0
-        if ret != "void" and ret.endswith("&") and self.u.object_of(ret_raw):
+        if ret != "void" and ret.endswith("&") and self.u.object_of(ret_raw) and self.u.object_of(ret_raw) != self.OWN_LOGIC[0]:
             # (an object of the engine it gives by reference - World& physics(): the one of that handle)
             body.append(f"{ret} kern_result = *converted::engine_object<{self.object_name(self.u.object_of(ret_raw))}>(kern_out[0].as_int());")
+            k = 1
+        elif ret != "void" and self.u.object_of(ret_raw) == self.OWN_LOGIC[0]:
+            # (the logic the Blueprints run in: the handle the stand-in gives, as a pointer the source only hands back to the
+            # engine - 0: none, as the Blueprint has it)
+            ret = re.sub(r"^(?:::)?" + ENGINE + r"::logic::Runtime", "::" + ENGINE + "::logic::Runtime", re.sub(r"^const\s+", "const ", ret_raw.strip()))
+            ret = re.sub(r"^(const\s+)(?:::)?" + ENGINE + r"::logic::Runtime", r"\1::" + ENGINE + "::logic::Runtime", ret)
+            body.append(f"{ret} kern_result = reinterpret_cast<{ret}>(static_cast<std::uintptr_t>(kern_out[0].as_int()));")
             k = 1
         elif ret != "void":
             # (what it gives is made by the test - quietly: an object of the engine in it is no make of the source)
