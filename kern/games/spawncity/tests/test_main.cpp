@@ -45,6 +45,20 @@ static void asked_for_memory(const volatile void* p, std::size_t size) {
 }
 static void gave_memory_back(const volatile void*) {}
 static void count_memory() { __sanitizer_install_malloc_and_free_hooks(asked_for_memory, gave_memory_back); }
+// What the C runtime asks for itself when a function's static registers how it ends (__cxa_atexit keeps its list
+// in blocks and asks for a new one whenever the last is full - which call meets that depends on how many statics
+// the whole process has registered before, not on the function) is not memory the function asks for: operator new
+// does not see it either. So the registration runs with the count off.
+#include <dlfcn.h>
+extern "C" int __cxa_atexit(void (*end)(void*), void* object, void* dso) {
+  using Register = int (*)(void (*)(void*), void*, void*);
+  static const Register next = reinterpret_cast<Register>(dlsym(RTLD_NEXT, "__cxa_atexit"));
+  const bool counted = sc::cost::counting;
+  sc::cost::counting = false;
+  const int r = next(end, object, dso);
+  sc::cost::counting = counted;
+  return r;
+}
 #else
 #include <new>
 void* operator new(std::size_t size) {
