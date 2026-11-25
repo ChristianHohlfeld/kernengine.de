@@ -5483,10 +5483,9 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   running +
                   "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n" +
                   (exports ? "  // (it gives functions to the host under their C names: the exports below call them on the object the program\n"
-                             "  // bound - kern::logic::bind_blueprint, said once, never the instance that happened to start; an object that\n"
-                             "  // ends is bound no more)\n"
-                             "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::blueprint_object<" + name + "> = nullptr; }\n"
-                           : "") +
+                             "  // bound - kern::logic::bind_blueprint, said once, never the instance that happened to start)\n" : "") +
+                  "  // (an object the program bound and that ends is bound no more: kern/logic/blueprint_class.h)\n"
+                  "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::unbind_blueprint<" + name + ">(); }\n" +
                   "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
@@ -5603,7 +5602,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const std::string none = out_word.empty() ? "return;" : piece ? std::string("{ if (out_len) *out_len = 0; return ") + (out_word == "text" ? "\"\"" : "nullptr") + "; }" : "return 0;";
     s += "KERN_EXPORT(" + f.exported + ") " + ret + " " + f.exported + "(" + params + ") {\n"
          "  " + name + "* const object = kern::logic::blueprint_object<" + name + ">;\n"
-         "  if (!object) " + none + "\n";
+         "  if (!object) { kern::logic::export_unbound(\"" + f.exported + "\"); " + none + " }\n";
     if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
     else if (piece) s += "  return kern::logic::export_" + out_word + "_out<&" + f.exported + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ", out_len);\n";
     else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";

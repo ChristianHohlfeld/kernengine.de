@@ -2400,6 +2400,8 @@ struct Host : kern::Blueprint {
   CHECK(glue.find("return kern::logic::export_text_out<&game_hud>(object->") != std::string::npos && glue.find(", out_len);") != std::string::npos);
   // (the exports call the object the program bound - never the instance that started last)
   CHECK(glue.find("blueprint_object<Host> = &self") == std::string::npos);
+  // (called while nothing is bound: an error with the export's name and reason - kern::fail -, then an empty piece)
+  CHECK(glue.find("if (!object) { kern::logic::export_unbound(\"game_hud\"); { if (out_len) *out_len = 0; return \"\"; } }") != std::string::npos);
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -4710,10 +4712,16 @@ TEST(logic_native_blueprints) {
   logic::Instance* second = rt.add(g, 0, "Second");
   rt.begin();
   CHECK(second && second->native_object<Fake>() && &logic::blueprint<Fake>() == inst->native_object<Fake>());
-  CHECK(logic::bind_blueprint<Fake>(*second) && &logic::blueprint<Fake>() == second->native_object<Fake>());
+  // (binding again while one is bound is refused, with an error that says so - the program rebinds on purpose)
+  CHECK(!logic::bind_blueprint<Fake>(*second, "Fake") && std::string(kern::last_error()).find("Fake is bound already") != std::string::npos &&
+        &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  CHECK(logic::rebind_blueprint<Fake>(*second) && &logic::blueprint<Fake>() == second->native_object<Fake>());
   logic::blueprint<Fake>().heat = 8;
   CHECK(second->get("Heat").as_number() == 8 && inst->get("Heat").as_number() == 3);
-  CHECK(logic::bind_blueprint<Fake>(*inst) && logic::blueprint<Fake>().heat == 3);
+  logic::unbind_blueprint<Fake>();
+  CHECK(!logic::blueprint_object<Fake> && logic::bind_blueprint<Fake>(*inst) && logic::blueprint<Fake>().heat == 3);
+  // (an export called while nothing of its class is bound: an error with its name, never a quiet value)
+  CHECK(!logic::export_unbound("game_hud") && std::string(kern::last_error()).find("the export game_hud: no instance of its Blueprint is bound") != std::string::npos);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -4728,7 +4736,7 @@ TEST(logic_native_blueprints) {
   logic::Instance* interpreted = plain.add(g, 0, "Plain");
   CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
   // (no instance there runs as the class: nothing is bound)
-  CHECK(!interpreted->native_object<Fake>() && !logic::bind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
+  CHECK(!interpreted->native_object<Fake>() && !logic::rebind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));

@@ -29,11 +29,20 @@ namespace kern::logic {
 /// The object of the Blueprint class T that the program's C++ calls (null until it is bound).
 template <class T> inline T* blueprint_object = nullptr;
 
-/// Binds the class T to `logic`: the instance there that runs as T (Runtime::native; found once, here)
-/// is from now on what blueprint<T>() gives - until it is bound again (to another runtime: a runtime
-/// that ends takes its objects with it). False: no instance there runs as T (the level has no such
-/// Blueprint, it has errors, or the binary's class was written from another graph).
-template <class T> bool bind_blueprint(Runtime& logic) {
+/// Binding a class: the program says once which object its C++ - and the exports of the class - call. It belongs to
+/// the program, not to a world: one bound object per class. Binding again while one is bound is refused with an
+/// error (kern::fail), unless the program says it rebinds (rebind_blueprint) or has unbound (unbind_blueprint); an
+/// object that ends unbinds itself (the glue of its class).
+template <class T> void unbind_blueprint() { blueprint_object<T> = nullptr; }
+/// Binds the class T to this one instance (it runs as T) - false, and an error, when it does not run as T.
+template <class T> bool rebind_blueprint(Instance& instance, const char* name = "a Blueprint class") {
+  blueprint_object<T> = instance.template native_object<T>();
+  return blueprint_object<T> != nullptr || fail("%s: the instance %s does not run as this class", name, instance.name().c_str());
+}
+/// Binds the class T to the first instance of `logic` that runs as T (Runtime::native; found once, here) - false
+/// when none does (the level has no such Blueprint, it has errors, or the binary's class was written from another
+/// graph: nothing is bound then).
+template <class T> bool rebind_blueprint(Runtime& logic, const char* name = "a Blueprint class") {
   blueprint_object<T> = nullptr;
   for (const auto& inst : logic.instances())
     if (T* object = inst->template native_object<T>()) {
@@ -42,13 +51,18 @@ template <class T> bool bind_blueprint(Runtime& logic) {
     }
   return blueprint_object<T> != nullptr;
 }
-
-/// Binds the class T to this one instance (it runs as T): the program says which, where a runtime runs the
-/// Blueprint more than once. False: it does not run as T (nothing is bound then).
-template <class T> bool bind_blueprint(Instance& instance) {
-  blueprint_object<T> = instance.template native_object<T>();
-  return blueprint_object<T> != nullptr;
+/// Binds the class T (rebind_blueprint) - refused, with an error, while another object of it is bound.
+template <class T> bool bind_blueprint(Runtime& logic, const char* name = "a Blueprint class") {
+  if (blueprint_object<T>) return fail("%s is bound already: the program unbinds it first (unbind_blueprint) or rebinds it (rebind_blueprint)", name);
+  return rebind_blueprint<T>(logic, name);
 }
+template <class T> bool bind_blueprint(Instance& instance, const char* name = "a Blueprint class") {
+  if (blueprint_object<T>) return fail("%s is bound already: the program unbinds it first (unbind_blueprint) or rebinds it (rebind_blueprint)", name);
+  return rebind_blueprint<T>(instance, name);
+}
+/// An export of the class called while none of it is bound: an error with the export's name (kern::fail) - the
+/// export gives nothing then.
+inline bool export_unbound(const char* exported) { return fail("the export %s: no instance of its Blueprint is bound (kern::logic::bind_blueprint)", exported); }
 
 /// The bound object of the class T (bind_blueprint first): its functions are called on it directly.
 template <class T> T& blueprint() { return *blueprint_object<T>; }

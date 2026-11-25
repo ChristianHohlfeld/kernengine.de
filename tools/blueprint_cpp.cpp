@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
                             "\n// (its class: " + piece + "). Change the Blueprint in the level; the build writes this file again.\n"
                             "#include \"kern/logic/blueprint.h\"\n#include \"kern/logic/blueprint_class.h\"  // (the exports of Blueprints: KERN_EXPORT_AS)\n"
                             "#include \"" + piece + "\"\n\n" + std::string("namespace ") + space + " {\n\n" + glue + "\n}  // namespace " + space + "\n\n"
-                            "// (how blueprints::bind binds it)\nnamespace blueprints {\nbool bind_" + space + "(kern::logic::Runtime& logic) { return kern::logic::bind_blueprint<::" + space + "::" + cls + ">(logic); }\n}  // namespace blueprints\n"});
+                            "// (how blueprints::bind binds it)\nnamespace blueprints {\nbool bind_" + space + "(kern::logic::Runtime& logic) { return kern::logic::bind_blueprint<::" + space + "::" + cls + ">(logic, \"" + cls + "\"); }\n}  // namespace blueprints\n"});
       binds.push_back(space);
       out += " (its class: " + piece + ", its glue: " + glue_stem.substr(glue_stem.find_last_of("/\\") + 1) + "_" + space + ".cpp)\n";
     } else {
