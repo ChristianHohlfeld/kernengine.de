@@ -12993,6 +12993,102 @@ TEST(studio_logic_implements) {
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }
 
+// The project in the editor (kern/docs/project.md): a new one, its levels and start level, its settings, its program
+// Blueprints edited in the logic editor like a level's (one undo history for both), libraries found in the project by
+// a world's Blueprint, a name in one place only, saved and opened again - errors with where and why.
+TEST(studio_project) {
+  StudioFixture f;
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  json::Value st = f.s->state();
+  CHECK(st["project"]["name"].as_string() == "Untitled" && st["project"]["levels"].size() == 0 && st["project"]["blueprints"].size() == 0);
+  // a new project: one empty level, the start level
+  CHECK(cmd({{"cmd", "projectNew"}, {"name", "Spiel"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["project"]["name"].as_string() == "Spiel" && st["project"]["levels"].size() == 1 && st["project"]["startLevel"].as_string() == "levels/start.klevel");
+  CHECK(f.s->level().name == "start" && st["project"]["dirty"].as_bool());
+  // program Blueprints: a name once, in one place
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Spiel"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Mathe"}, {"library", true}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Spiel"}})["error"].as_string() == "the project has a Blueprint \"Spiel\" already");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", ""}})["error"].as_string() == "a program Blueprint needs a name");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "move"}, {"name", "Spiel"}})["error"].as_string().find("op must be add, remove or rename") != std::string::npos);
+  CHECK(f.s->project().blueprints.size() == 2 && f.s->project().blueprints[1].logic.library);
+  // a program Blueprint in the logic editor: its edits change the project, not the level, and are undone like any
+  CHECK(!cmd({{"cmd", "logicOpen"}, {"program", "Nope"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"program", "Mathe"}})["ok"].as_bool());
+  const json::Value applied = cmd({{"cmd", "logicCppApply"}, {"text", "struct Mathe : virtual kern::Library {\n  struct clampedResult { Float value = 0.0; };\n"
+                                                                    "  KERN_PURE clampedResult clamped(Float value = 0.0) {\n    return {math_max(value, 0.0)};\n  }\n};\n"}});
+  CHECK(applied["ok"].as_bool());
+  if (!applied["ok"].as_bool()) std::printf("    %s\n", applied["error"].as_string().c_str());
+  CHECK(f.s->project().blueprints[1].logic.functions.size() == 1 && f.s->project().blueprints[1].logic.library);
+  CHECK(cmd({{"cmd", "logicOpen"}, {"program", "Spiel"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["program"].as_bool() && st["logic"]["ownerName"].as_string() == "Spiel" && st["project"]["blueprints"][0]["open"].as_bool());
+  CHECK(st["logic"]["owners"].size() == 2);  // the program's Blueprints, no level graph
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Score"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.size() == 1 && f.s->level().logic.variables.empty());
+  CHECK(st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.empty());
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.size() == 1);
+  CHECK(!cmd({{"cmd", "logicRemoveGraph"}})["ok"].as_bool());
+  // a world's Blueprint finds the project's library; then it may be neither renamed nor removed
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  const game::ActorId cube = f.s->level().actors.back().id;
+  CHECK(cmd({{"cmd", "rename"}, {"id", static_cast<f64>(cube)}, {"name", "Kiste"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(cube)}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Hits"}, {"type", "int"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(!st["logic"]["program"].as_bool() && st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
+  CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Mathe"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "rename"}, {"name", "Mathe"}, {"to", "Rechnen"}})["error"].as_string() ==
+        "the Blueprint Mathe is a library of Kiste (in the level): they name it - change them first");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "remove"}, {"name", "Mathe"}})["error"].as_string().find("is a library of Kiste (in the level)") != std::string::npos);
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Kiste"}})["error"].as_string() ==
+        "the Blueprint Kiste stands in the level (actor " + std::to_string(cube) + ") - a name stands in one place only");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "rename"}, {"name", "Spiel"}, {"to", "MeinSpiel"}})["ok"].as_bool());
+  CHECK(f.s->project().blueprint("MeinSpiel") && !f.s->project().blueprint("Spiel"));
+  // levels, start level and settings: checked as the file is read
+  CHECK(cmd({{"cmd", "projectSet"}, {"startLevel", "levels/wald.klevel"}})["error"].as_string() == "startLevel \"levels/wald.klevel\": is none of the project's levels");
+  json::Value levels = json::Value::array();
+  levels.push("levels/start.klevel");
+  levels.push("levels/wald.klevel");
+  CHECK(cmd({{"cmd", "projectSet"}, {"levels", levels}, {"startLevel", "levels/wald.klevel"}})["ok"].as_bool());
+  json::Value twice = json::Value::array();
+  twice.push("levels/a.klevel");
+  twice.push("levels/a.klevel");
+  CHECK(cmd({{"cmd", "projectSet"}, {"levels", twice}})["error"].as_string() == "levels[1] \"levels/a.klevel\": named twice (also levels[0])");
+  json::Value settings;
+  json::parse(R"({"renderer":{"shadows":false},"heapReserveMb":64})", settings);
+  CHECK(cmd({{"cmd", "projectSet"}, {"settings", settings}})["ok"].as_bool());
+  CHECK(f.s->project().settings.set && f.s->project().settings.heap_reserve_mb == 64 && f.s->project().start_level == "levels/wald.klevel");
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(!f.s->project().settings.set);
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
+  // saved and opened again: the same project
+  const json::Value saved = f.cmd(R"({"cmd":"projectSave"})");
+  CHECK(saved["file"].as_string() == "Spiel.kproject");
+  game::Project back;
+  std::string why;
+  CHECK(game::from_text(saved["text"].as_string(), back, &why) && game::to_text(back) == f.s->project_text());
+  CHECK(f.s->state()["project"]["dirty"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"projectSaved"})")["ok"].as_bool());
+  CHECK(!f.s->state()["project"]["dirty"].as_bool());
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", "{\"format\":\"kern-level\"}"}})["error"].as_string() == "format: not a Kern project (format must be \"kern-project\")");
+  CHECK(f.s->project().name == "Spiel");  // (nothing changed)
+  // a project whose Blueprint has the name of one in the open level: refused, with both places
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", "{\"format\":\"kern-project\",\"blueprints\":[{\"name\":\"Kiste\",\"logic\":{}}]}"}})["error"].as_string() ==
+        "the Blueprint Kiste stands in the level (actor " + std::to_string(cube) + ") and in the project (blueprints[0]) - rename one");
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", saved["text"]}})["ok"].as_bool());
+  CHECK(game::to_text(f.s->project()) == saved["text"].as_string() && !f.s->state()["project"]["dirty"].as_bool());
+  CHECK(!f.s->can_undo());  // opening starts a new history
+}
+
 TEST(studio_logic_libraries) {
   // A library with the editor's commands: a Blueprint that keeps nothing, used by another -
   // which has its types and calls its functions directly. What the user holds of the library

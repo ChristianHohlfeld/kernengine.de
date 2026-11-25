@@ -235,6 +235,7 @@ bool Studio::load_level(game::Level level, bool reset_history) {
     HistoryEntry e;
     e.label = "Open " + level_.name;
     e.level = level_;
+    e.project = project_;
     e.serial = next_serial_++;
     history_.push_back(std::move(e));
     history_index_ = 0;
@@ -264,6 +265,11 @@ bool Studio::load_level_text(std::string_view text, std::string_view name) {
   if (!game::from_text(text, l, &error)) {
     report(std::string(name) + ": " + error, "error");
     return fail("%s", error.c_str());
+  }
+  // A Blueprint of the level whose name stands in the project too: neither wins (kern/docs/project.md 5.).
+  if (const std::vector<std::string> conflicts = game::library_conflicts(l, project_); !conflicts.empty()) {
+    report(std::string(name) + ": " + conflicts.front(), "error");
+    return fail("%s", conflicts.front().c_str());
   }
   load_level(std::move(l));
   for (const game::Issue& i : game::validate(level_)) report(i.text, i.error ? "error" : "warn");
@@ -314,11 +320,12 @@ bool same_document(const game::Level& a, const game::Level& b) {
 
 }  // namespace
 
-bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> selection_before) {
+bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> selection_before, const game::Project* project_before) {
   const std::string key = std::move(coalesce_), transaction = std::move(transaction_);
   coalesce_.clear();
   transaction_.clear();
-  if (same_document(before, level_)) {  // nothing to undo (the selection may still have changed)
+  const bool project_same = !project_before || game::to_text(*project_before) == game::to_text(project_);
+  if (same_document(before, level_) && project_same) {  // nothing to undo (the selection may still have changed)
     changed();
     return false;
   }
@@ -330,10 +337,12 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
   if (merge) {
     HistoryEntry& e = history_.back();
     e.level = level_;
+    e.project = project_;
     e.selection_after = selection;
     e.serial = next_serial_++;
     // A continuous edit that ends where it started is no step at all.
-    if (same_document(history_[history_index_ - 1].level, level_)) {
+    if (same_document(history_[history_index_ - 1].level, level_) &&
+        game::to_text(history_[history_index_ - 1].project) == game::to_text(project_)) {
       history_.pop_back();
       --history_index_;
     }
@@ -342,6 +351,7 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
     HistoryEntry e;
     e.label = label;
     e.level = level_;
+    e.project = project_;
     e.selection_before = std::move(selection_before);
     e.selection_after = selection;
     e.merge_key = key;
@@ -370,13 +380,16 @@ void Studio::step_history(bool forward) {
   if (forward) {
     ++history_index_;
     level_ = history_[history_index_].level;
+    project_ = history_[history_index_].project;
     selection = history_[history_index_].selection_after;
   } else {
     selection = history_[history_index_].selection_before;
     --history_index_;
     level_ = history_[history_index_].level;
+    project_ = history_[history_index_].project;
   }
   level_.camera = camera;
+  program_view_stale_ = true;
   save_due_ = now_ + prefs_.autosave_seconds * 1000;
   changed();
 }
@@ -904,7 +917,7 @@ bool Studio::play(game::SimMode mode) {
       start_local_clients();
       if (prefs_.layout == Layout::single) prefs_.layout = Layout::quad;
     }
-  } else if (!world_->start(level_, mode)) { report(std::string("Could not start: ") + last_error(), "error"); return false; }
+  } else if (world_->set_project(&project_); !world_->start(level_, mode)) { report(std::string("Could not start: ") + last_error(), "error"); return false; }
   for (const std::string& e : world_->events()) report(e, "warn");
   world_->events().clear();
   play_ = mode == game::SimMode::play ? PlayState::playing : PlayState::simulating;

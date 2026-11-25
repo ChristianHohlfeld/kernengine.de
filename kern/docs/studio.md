@@ -118,6 +118,28 @@ Kind-Actors ohne eigenen Body werden beim Simulieren als Compound in den Body de
 
 Fehler wie verwaiste Referenzen oder ungültige Werte verhindern Play; Warnungen erscheinen im Output Log.
 
+## Das Projekt
+
+Ein Level gehört zu einem **Projekt** (`.kproject`, siehe [`project.md`](project.md)): Name, Einstellungen, die Liste
+der Levels mit dem Start-Level und die **Programm-Blueprints** (die App, der Spielstand, Menüs, Bibliotheken des
+Programms). Der Editor zeigt es oben im Outliner unter „Project“ und im Menü File (New Project, Open Project…,
+Save Project); eine `.kproject`-Datei kann auch auf die Seite gezogen werden.
+
+- **Levels**: ein Pfad je Level (relativ zur Projekt-Datei); der angehakte ist das Start-Level. Ein Pfad steht einmal.
+- **Program Blueprints**: hinzufügen (Name, optional als Bibliothek), umbenennen, entfernen; ein Klick öffnet ihn im
+  Blueprint-Editor wie den eines Actors. Seine Bibliotheken findet er nur im Projekt; ein Blueprint eines Levels sucht
+  erst im Level, dann im Projekt (dort bietet der Editor auch die Bibliotheken des Projekts an). Ein Name steht an
+  **einem** Ort: Ein Programm-Blueprint mit dem Namen eines Blueprints im Level wird abgelehnt, ebenso ein Projekt
+  oder ein Level, das so einen Namen mitbringt (Meldung mit beiden Stellen). Eine Bibliothek, die noch jemand
+  benutzt, wird weder umbenannt noch entfernt (die Meldung nennt die Benutzer).
+- **Settings**: der Abschnitt `settings` der Datei als JSON (Renderer, Telefon, Heap).
+
+Jede Änderung am Projekt ist ein Schritt im Verlauf (Undo/Redo zusammen mit dem Level); Öffnen beginnt einen neuen
+Verlauf. Projekt und Level werden getrennt gespeichert; „*“ hinter dem Namen heißt: ungespeicherte Änderungen. Was
+die Seite schickt, prüft der Editor wie den Leser der Datei (dieselben Meldungen mit Stelle und Grund). Kommandos:
+`projectNew`, `projectOpen {text}`, `projectSave`, `projectSaved`, `projectSet {name, levels, startLevel, settings}`,
+`projectBlueprint {op: add|remove|rename, name, to, library}`, `logicOpen {program}` (`kern/src/studio/project.cpp`).
+
 ## Place Actors
 
 Shapes: Cube, Sphere, Cylinder, Cone, Capsule, Plane, Torus, Ramp, Empty Actor · Lights: Point Light · Physics: Physics Cube, Physics Sphere, Physics Barrel, Crate Stack, Pendulum, Hinged Door, Chain, See-Saw, Sock · Players: Soldier, Character, Hover Car, Rolling Ball, Drone, Micro Duck, Micro Duck (Rollers) · Gameplay: Orb, Star, Health Pack, Ammo Box, Goal, Hazard, Damage Zone, Checkpoint, Jump Pad, Teleporter, Message Trigger, Moving Platform, Spinner, Target Dummy, Explosive Barrel · Audio: Audio Source, Ambient Wind, City Ambience, Radio · World: Procedural City (Liste: `src/studio/catalog.cpp`).

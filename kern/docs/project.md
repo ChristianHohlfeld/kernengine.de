@@ -149,6 +149,9 @@ Eingang **World** (Int, der Handle einer GameWorld):
   das Einbetten (`kern/tools/embed_project.py`, `kern/game/embedded.h`). Ein Level hat keinen Abschnitt `"project"`
   mehr (Fehler beim Lesen); `ProjectSettings::program`, `kern/game/level_app.h` und `embed_level.py --split-program`
   sind entfernt.
+- Gebaut (Teil 1b): der Editor „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen,
+  speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
+  `studio_project`, e2e im Modul-Bau.
 - Noch nach diesem Entwurf zu ersetzen:
   - `kern/logic/node_type.h` mit `register_node_type`, einer globalen Anmeldung zur Laufzeit (Teil 2)
   - schwache `kern_create_app`/`kern_project_app`/`kern_project_text` (Teil 3: `kern::run`)
