@@ -123,16 +123,18 @@ inline u32 export_text_length() { return static_cast<u32>(export_kept_text().siz
 /// What a Blueprint's export gives (the glue of its class): a Text, a List of Int (each entry as a u8, as C++
 /// converts it) or a List of Float (each as an f32), given as a program's own C++ gives it (above).
 inline const char* export_text_out(const Text& text) { return export_text(text.view()); }
+// (written straight into the place that is kept: once it holds as many, an export asks for no memory - an audio
+// callback gives its samples every few milliseconds)
 template <class L> const u8* export_bytes_out(const L& bytes) {
-  std::vector<u8> made;
-  made.reserve(bytes.size());
-  for (const auto& b : bytes) made.push_back(static_cast<u8>(Whole(b).v));
-  return export_bytes(made);
+  std::vector<u8>& held = export_kept_bytes();
+  held.resize(bytes.size());
+  for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<u8>(Whole(bytes[i]).v);
+  return held.empty() ? nullptr : held.data();
 }
 template <class L> const f32* export_floats_out(const L& floats) {
-  std::vector<f32> made;
-  made.reserve(floats.size());
-  for (const auto& x : floats) made.push_back(static_cast<f32>(static_cast<f64>(x)));
-  return export_floats(made);
+  std::vector<f32>& held = export_kept_floats();
+  held.resize(floats.size());
+  for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<f32>(static_cast<f64>(floats[i]));
+  return held.empty() ? nullptr : held.data();
 }
 }  // namespace kern::logic

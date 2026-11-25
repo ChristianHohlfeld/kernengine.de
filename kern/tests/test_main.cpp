@@ -7354,6 +7354,34 @@ template <class Work> long memory_asked_by(Work&& work) {
   return engine_probe::asks;
 }
 
+// What an export gives by a pointer is kept in one place for each kind (kern::logic::export_text, export_bytes,
+// export_floats): once that place holds as many, giving again asks for no memory - an audio callback gives its
+// samples every few milliseconds (sc_audio_render), the program's C++ as the glue of a Blueprint's class.
+TEST(logic_export_keeps_its_place) {
+  std::vector<f32> samples(2048, 0.25f);
+  logic::List<f64> wide;
+  for (std::size_t i = 0; i < 2048; ++i) wide.push_back(0.5);
+  logic::List<logic::Whole> bytes;
+  for (int i = 0; i < 64; ++i) bytes.push_back(logic::Whole(static_cast<i64>(i)));
+  const std::string text(200, 'x');
+  logic::export_floats(samples);   // (the first time: the place grows to hold them)
+  logic::export_floats_out(wide);
+  logic::export_bytes_out(bytes);
+  logic::export_text(text);
+  const f32* given = nullptr;
+  const long asked = memory_asked_by([&] {
+    for (int k = 0; k < 8; ++k) {
+      given = logic::export_floats(samples);
+      given = logic::export_floats_out(wide);
+      logic::export_bytes_out(bytes);
+      logic::export_text(text);
+    }
+  });
+  CHECK(asked == 0);
+  if (asked != 0) std::printf("  giving again asked for memory %ld times\n", asked);
+  CHECK(given && given[0] == 0.5f && given[2047] == 0.5f && logic::export_kept_floats().size() == 2048);
+}
+
 // The class calls the engine itself and does what the door does: the same class once with a host that
 // gives it the engine's objects and once with one that has only its door - every value the calls gave is
 // the same, bit for bit, and so is what the host is told of the call that fails; and what the mixer wrote
