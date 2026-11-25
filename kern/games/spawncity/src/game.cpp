@@ -1,4 +1,5 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
+#include "blueprint_call.h"  // rules::kLoopBudget
 #include "gaps_rules.h"
 #include "jet_seats.h"
 #include "lamps.h"
@@ -7,6 +8,7 @@
 #include "world_traffic.h"
 #include "game_world.h"  // WorldLife (M3 world state)
 #include "game_life.h"   // GameLife (M3 life)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes (blueprints::bind)
 
 #include <algorithm>
 #include <cstdio>
@@ -290,6 +292,11 @@ bool Game::start(kern::Engine& e) {
     if (!combat::bind_sandbox(*logic)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_fun(*logic)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_race(*logic)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
+    // The Blueprints the game calls directly, as their classes (level_blueprints.h): each bound once to the
+    // object the logic runs it as. Their loops run under the logic's guard; the game's own functions loop
+    // long (a code encoded bit by bit), so the guard is the one the tests run them with (rules::kLoopBudget).
+    logic->budget = rules::kLoopBudget;
+    if (!blueprints::bind(*logic)) return kern::fail("a Blueprint the game calls as its class is missing from the level or not built as its class");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

@@ -8,7 +8,7 @@ in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--folder <name>]
       [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
-      <include flags...> -- <file.cpp>...
+      [--classes <header.h>=<folder>] <include flags...> -- <file.cpp>...
 
   - the program is the folders of the sources, in the namespace given - and the further folders named
     with --program, each with the namespaces its files declare (vendored code the program includes:
@@ -36,7 +36,17 @@ in the notation, function by function:
     the functions of numbers are kern::math's), and calls it, the Blueprint in the interpreter and
     the Blueprint as its compiled class with the same arguments: what the three give must be the
     same bit for bit;
-  - --texts writes each Blueprint's text into a directory, to read.
+  - --texts writes each Blueprint's text into a directory, to read;
+  - the Blueprints of the level are the program's sources where they stand outside the folder this tool
+    writes (--folder, "Source"): a file that is a Blueprint now - its C++ is gone, the Blueprint in the
+    level is its one source (BLUEPRINTS.md, "5 - Umschalten") - stands in a folder of its own. A run
+    neither rewrites nor drops such a Blueprint (a run over the whole program drops, of its own folder,
+    what it does not write any more). The program's C++ calls it as its class: --classes names the
+    header the build writes their classes into (tools/blueprint_cpp, the same tool, from the same
+    level) and their folder (default: level_blueprints.h=Program, as build.sh writes it). Where the
+    level has Blueprints in that folder, the run writes the header from the level into a folder of its
+    own before it reads the sources, and that folder comes first on the include path; a test includes it
+    by its name (TestWriter: a header that is not in the sources' folder is the build's);
 
 How the Blueprint computes is the Blueprint language's own arithmetic: numbers are 64-bit and
 whole numbers exact, a division by zero gives 0, a vector's components are 32-bit. It is the same
@@ -348,14 +358,15 @@ def c_string(v):
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
-def run_clang(path, namespace, flags):
+def run_clang(path, namespace, flags, name=False):
     """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
-    between runs: a tree of another state of the sources is another tree)."""
+    between runs: a tree of another state of the sources is another tree). `name`: of the declarations whose
+    name has `namespace` in it, as it is (a function outside every namespace - see outside_dumps)."""
     # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
     # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
     # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
     # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", namespace if name else f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -370,6 +381,41 @@ def run_clang(path, namespace, flags):
             break
         o, i = dec.raw_decode(s, j)
         out.append(o)
+    return out
+
+
+def exported_names(path):
+    """The names under which a source file of the program gives functions to its host: `KERN_EXPORT(name)` of
+    the engine's C API (kern/api/c_api.h) - a function with C linkage, outside every namespace."""
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return []
+    return sorted(set(re.findall(r"\b" + ENGINE.upper() + r"_EXPORT\s*\(\s*([A-Za-z_]\w*)\s*\)", text)))
+
+
+def outside_dumps(path, flags):
+    """What a source file of the program has outside every namespace for its host: each function it exports
+    (C linkage: clang names it by its own name, unmangled), dumped by that name - the dump of a namespace does
+    not have it -, and the file's own unnamed namespace outside every namespace (what those functions use there,
+    `(anonymous namespace)::`, of this file only - a declaration a dump of the program's namespace has at the
+    same place is that one). Annotated (annotate)."""
+    names = exported_names(path) if not is_header(path) else []
+    if not names:
+        return []
+    me, out = os.path.abspath(path), []
+    for name in names:
+        st = {"file": ""}
+        for o in run_clang(path, name, flags, name=True):
+            annotate(o, st)
+            if o.get("kind") == "FunctionDecl" and o.get("name") == name and o.get("mangledName") == name and os.path.abspath(o.get("_file") or "?") == me:
+                out.append(o)
+    st = {"file": ""}
+    for o in run_clang(path, "(anonymous namespace)", flags):
+        annotate(o, st)
+        mangled = o.get("mangledName")
+        if os.path.abspath(o.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
+            out.append(o)
     return out
 
 
@@ -761,6 +807,10 @@ class Tree:
             st = {"file": ""}
             for o in dumps:
                 annotate(o, st)
+        if STEADY:
+            place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
+            had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
+            self.more.append(("", [o for o in outside_dumps(self.path, flags) if place(o) not in had]))
         # the engine the program is written against: its types and the functions its headers define
         self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
         st = {"file": ""}
@@ -788,7 +838,7 @@ class Tree:
             self.take(o, self.scope_from(o), seen)
         for space, dumps in self.more:
             for o in dumps:
-                self.take(o, space + "::", seen)
+                self.take(o, space + "::" if space else "", seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for i, n in list(self.decl.items()):
@@ -1259,6 +1309,7 @@ class World:
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
+        self.getters = set()   # (keys of) the functions that give the one object of a state and nothing else - `Game& game() { static Game g; return g; }`: that Blueprint itself (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
@@ -1374,6 +1425,16 @@ def is_nothing(n):
     return b.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or re.sub(r"^const\s+", "", (b.get("type") or {}).get("qualType", "")) in ("std::nullopt_t", "std::nullptr_t", "nullptr_t")
 
 
+# The header of the Blueprints the program calls as their classes, and their folder in the level, as the build
+# writes it (build.sh: tools/blueprint_cpp.sh <level> <out.cpp> <out.h> <folder>; --classes says other ones).
+CLASSES = ["level_blueprints.h", "Program"]
+# A type of such a Blueprint's class, as the compiler names it: the class itself (kern_blueprint_<hash>::qr_code_cpp, which
+# blueprints::qr_code_cpp names) or a type it declares (kern_blueprint_<hash>::qr_code::qr_Code) - tools/blueprint_cpp
+# writes each class into a namespace of its graph's hash.
+CLASS_TYPE = re.compile(r"(?:::)?kern_blueprint_[0-9a-f]{16}::([A-Za-z_]\w*)(?:::([A-Za-z_]\w*))?")
+# The language's own types, as a Blueprint's class has them (kern/logic/nodes.h; BlueprintCore names them Int, U8 ...
+# Text, List): what they are in the notation. (A Bool is C++'s bool, a Float its double, a Vector kern::Vec3.)
+LANGUAGE_TYPES = {"kern::logic::Whole": "Int", "kern::logic::Text": "Text", "kern::logic::Int64": "Int64", "kern::logic::Truth": "Bool"}
 SHAPES = "shapes"   # the library of the types the converter makes of the notation's own (a row of a list of lists, a pair)
 
 
@@ -1700,6 +1761,8 @@ class Unit:
             return None
         if any(ch in r for ch in "*&<["):
             return None
+        if self.clean(r) in LANGUAGE_TYPES:   # (a value of the language as a Blueprint's class holds it - a Text: no object)
+            return None
         try:
             q = self.find_type(self.clean(r).replace("const ", "").strip())
         except Wait:
@@ -1826,6 +1889,9 @@ class Unit:
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
+        said = self.language_type(t)   # (a type of a Blueprint's class, or one of the language's own: what it is)
+        if said is not None:
+            return said
         if t in NUMBER:
             return NUMBER[t]
         if re.fullmatch(r"(?:kern::)?Count<\s*\d+\s*[uU]?\s*>", t):
@@ -2135,7 +2201,8 @@ class Unit:
         """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
         c = self.clean(raw)
         # (T[3][2] has 3 entries, each a T[2]: the first length is the outer one)
-        m = re.match(r"std::array<.*,\s*(\d+)[uUlL]*>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
+        m = (re.match(r"std::array<.*,\s*(\d+)[uUlL]*>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
+             or re.match(r"kern::(?:logic::)?Fixed<.*,\s*(\d+)[uUlL]*>$", c))   # (the language's own: Fixed<Float, 16> of a Blueprint's class)
         return int(m.group(1)) if m else None
 
     def zero(self, t):
@@ -2156,6 +2223,176 @@ class Unit:
             if c == cpp_field:
                 return f, t
         raise Wait(f"{struct_name} has no field {cpp_field}")
+
+    # ---- the Blueprints the program calls as their classes (BLUEPRINTS.md, "5 - Umschalten") ----
+    # A file of the program that is a Blueprint now (its C++ gone; the level's folder CLASSES[1]) is called by the
+    # program's C++ as its class - typed, with the types the Blueprint declares (kern/logic/blueprint_class.h):
+    # `blueprints::qr_code::qr_Code c; kern::logic::blueprint<blueprints::qr_code_cpp>().encode(text, c).Result`.
+    # The compiler sees the classes (the run writes their header from the level), but no declaration of them is
+    # the program's: what they are - the types, their fields, the functions and their pins - is read from the level
+    # (World.actors), and written as the types and calls of that library: `qr_Code c_2;`, `qr_code_cpp::encode(a, c_2)`.
+    def class_library(self, lib):
+        """The Blueprint `lib` of the level, which the program calls as its class: what the level says of it. Else Wait."""
+        info = self.world.actors.get(lib)
+        if info is None or info.get("folder") != CLASSES[1]:
+            raise Wait(f"a type of the Blueprint {lib}'s class, which is not one the program calls as its class (the level's folder {CLASSES[1]})")
+        if not info["library"]:
+            raise Wait(f"the Blueprint {lib}, which keeps something, called as its class (only a library's class is called directly)")
+        return info
+
+    def language_type(self, t):
+        """The notation's type of a type of the language itself (a Blueprint's class has them: kern::logic::Whole is an
+        Int, kern::logic::Sized<unsigned int> a U32, kern::logic::List<T> a List) or of a type a Blueprint's class declares
+        (its struct, its enum). None: neither. `t` is cleaned (Unit.clean)."""
+        if t in LANGUAGE_TYPES:
+            return LANGUAGE_TYPES[t]
+        m = re.fullmatch(r"kern::logic::Sized<(.+)>", t)
+        if m:
+            inner = self.clean(m.group(1))
+            if inner not in WIDTH:
+                raise Wait(f"the language's whole number of the width {inner}")
+            return WIDTH[inner]
+        m = re.fullmatch(r"kern::(?:logic::)?(List|Fixed)<(.+)>", t)
+        if m:
+            entry = template_args(t)[0]
+            return f"List<{self.entry(entry)}>"
+        if re.match(r"kern::logic::(Map|Set|Callback)<", t):
+            raise Wait(f"the language's {t.split('<')[0].split('::')[-1]} as a Blueprint's class holds it (not read yet)")
+        m = CLASS_TYPE.fullmatch(t)
+        if not m:
+            return None
+        lib, name = m.group(1), m.group(2)
+        info = self.class_library(lib)
+        if name is None:
+            raise Wait(f"the class of the Blueprint {lib} as a value (its object is the one the program binds: kern::logic::blueprint)")
+        if name in info["struct_defs"] or name in info["enum_defs"]:
+            return self.class_named(lib, name)
+        if name.endswith("Result") and name[:-len("Result")] in info["function_defs"]:
+            raise Wait(f"what {lib}::{name[:-len('Result')]}() gives, kept as a whole (its outputs are read where it is called: .Result)")
+        raise Wait(f"the type {name} of the Blueprint {lib}'s class, which the level does not have")
+
+    def class_named(self, lib, name):
+        """The struct or enum `name` the Blueprint `lib` names (one of its own, or one of a library it uses - as the
+        level says it, `from`): the type of the Blueprint that declares it."""
+        info = self.class_library(lib)
+        d = info["struct_defs"].get(name) or info["enum_defs"].get(name)
+        if d is None:
+            raise Wait(f"the type {name} of the Blueprint {lib}, which the level does not have")
+        home = d.get("from") or lib
+        if home != lib:
+            if (self.world.actors.get(home) or {}).get("folder") != CLASSES[1]:
+                raise Wait(f"the type {name} of {home}, which the Blueprint {lib} uses: a type of a Blueprint of this run, as a class has it (not read yet)")
+            return self.class_named(home, name)
+        if name in self.type_line:
+            if self.type_home.get(name) != lib:
+                raise Wait(f"two types would be called {name}")
+            return name
+        if name in self.world.taken:
+            raise Wait(f"two types would be called {name} (one of the program's, one of the Blueprint {lib})")
+        if name in info["enum_defs"]:
+            values = list(d.get("values", []))
+            if not values:
+                raise Wait(f"the enum {name} of the Blueprint {lib} without values")
+            self.enum_values[name] = values
+            self.declare(name, f"  KERN_ENUM({name}, {', '.join(values)});", lib, [])
+            return name
+        self.type_line[name] = None   # (said, while its fields are read: one of them may name it)
+        try:
+            fields = []
+            for x in d.get("fields", []):
+                ft, count = self.class_pin(lib, x)
+                fields.append((x["name"], ft, self.level_value(x.get("value"), ft, count, f"the field {x['name']} of {name}"), x["name"]))
+        except Wait:
+            del self.type_line[name]
+            raise
+        del self.type_line[name]
+        if not fields:
+            raise Wait(f"the struct {name} of the Blueprint {lib} has no fields")
+        self.struct_fields[name] = fields
+        # (declared where it stands - in the Blueprint lib, which this run does not write: the line only says that it is
+        # that Blueprint's, main writes no declaration of it - see class_libraries)
+        self.declare(name, f"  KERN_STRUCT({name}) {{}};", lib, [self.part(t) for _, t, _, _ in fields])
+        return name
+
+    def class_pin(self, lib, p):
+        """The notation's type of a pin or a field of the Blueprint `lib` as the level holds it ({"type": "int", "of":
+        "u8"}: a U8), and the length of a list of a fixed length (None: none) - the type its class declares it as
+        (notation.cpp: cpp_type)."""
+        t, of = p.get("type", "float"), p.get("of") or ""
+        base = t[:-len("_list")] if t.endswith("_list") else t
+        words = {"bool": "Bool", "float": "Float", "vector": "Vector", "text": "Text", "int64": "Int64"}
+        if base == "int":
+            word = (of[0].upper() + of[1:]) if of else "Int"
+            if of and word not in WIDTHS:
+                raise Wait(f"a whole number of the width {of} of the Blueprint {lib}")
+        elif base in words:
+            word = words[base]
+        elif base in ("struct", "enum"):
+            word = self.class_named(lib, of)
+        else:
+            raise Wait(f"a {t} of the Blueprint {lib}, as its class has it (not read yet)")
+        count = p.get("count")
+        if t.endswith("_list"):
+            return f"List<{word}>", (int(count) if count else None)
+        if count:
+            raise Wait(f"a {t} of the Blueprint {lib} with a length")
+        return word, None
+
+    def level_value(self, v, t, count=None, what="a default"):
+        """A value as the level holds it (a default of a field), written in the notation as a value of the type `t`."""
+        if t == "Bool" and isinstance(v, bool):
+            return "true" if v else "false"
+        if (t == "Int" or t in WIDTHS) and isinstance(v, int) and not isinstance(v, bool):
+            return str(v)
+        if t == "Float" and isinstance(v, (int, float)) and not isinstance(v, bool):
+            return flit(float(v))
+        if t == "Text" and isinstance(v, str):
+            return text_literal(v.encode("utf-8"))
+        if t == "Vector" and isinstance(v, list) and len(v) == 3:
+            return "Vector{" + ", ".join(flit(float(x)) for x in v) + "}"
+        if t == "Int64" and str(v) == "0":
+            return ZERO["Int64"]
+        if t.startswith(("List<", "Map<", "Set<")) and v in ([], None):
+            return self.zero(t)
+        if t in self.enum_values and isinstance(v, int) and 0 <= v < len(self.enum_values[t]):
+            return f"{t}::{self.enum_values[t][v]}"
+        if t in self.struct_fields and isinstance(v, dict):
+            return t + "{" + ", ".join(self.level_value(v[f], ft, None, what) if f in v else d for f, ft, d, _ in self.struct_fields[t]) + "}"
+        raise Wait(f"{what} as the level holds it ({json.dumps(v)[:40]}), as a {t} (not read yet)")
+
+    def class_function(self, lib, name):
+        """The function `name` of the Blueprint `lib`, which the program calls on its class: what a call of it needs to
+        know (Function, as of another Blueprint), from the level - its inputs in their order (the references first, as
+        its class has them), whether each is a reference (`ref`) or a const reference, what it gives (its Result)."""
+        key = ("class", lib, name)
+        if key in self.stubs:
+            return self.stubs[key]
+        info = self.class_library(lib)
+        fn = info["function_defs"].get(name)
+        if fn is None:
+            raise Wait(f"{name}() of the Blueprint {lib}, which has no such function")
+        g = Function(f"{lib}::{name}")
+        g.unit, g.key, g.cpp, g.text = lib, f"{lib}::{name}", f"{lib}::{name}", "(of another Blueprint)"
+        g.pure = bool(fn.get("pure"))
+        # (what it asks the engine: whether its Blueprint - or one it uses - has a node of the engine; see invoke)
+        g.asks_engine = info["engine"]
+        for i, p in enumerate(fn.get("inputs", [])):
+            pt, count = self.class_pin(lib, p)
+            g.params.append((p["name"], pt))
+            g.kinds.append("ref" if p.get("ref") is True else "const" if p.get("ref") == "const" else "")
+            if count:
+                g.fixed[i] = count
+        if list(g.order()) != list(range(len(g.params))):
+            raise Wait(f"{lib}::{name}() has an input by reference after one by value")
+        g.refs = [i for i, k in enumerate(g.kinds) if k == "ref"]
+        outs = fn.get("outputs", [])
+        if [o.get("name") for o in outs] == ["Result"]:
+            g.value, g.result_fixed = self.class_pin(lib, outs[0])
+            g.result = g.value
+        elif outs:
+            raise Wait(f"{lib}::{name}() gives {len(outs)} outputs (a call of a class reads its Result)")
+        self.stubs[key] = g
+        return g
 
     # ---- what a value makes and ends: the objects of the engine it holds ----
     # An object of the engine a value holds as a field (Session::transport_, LookState::lights) is made where
@@ -3449,10 +3686,14 @@ class Emit:
         assigned = self.assigned(body)
         self.assigned_ids = assigned
         copies = []
+        exported = export_name(d)
+        words = []   # (an export: how each input crosses from the host - wire_word)
         for p in kids(d):
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if exported:
+                words += wire_words(p, words, self.tree.aliases)
             if u.is_logic(raw):
                 # the logic the Blueprint runs in: its own - no input (Unit.is_logic)
                 if re.search(r"\bconst\b", raw):
@@ -3478,7 +3719,9 @@ class Emit:
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
                 f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
-                f.kinds += ["const", ""]
+                # (of an export the list is a value: the host's bytes, made into a list for the call - its inputs stay in
+                # the order of the C parameters)
+                f.kinds += ["" if exported else "const", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
             t = u.place(raw)
@@ -3559,7 +3802,15 @@ class Emit:
         takes = [u.fixed_type(f.params[i][1], f.fixed.get(i)) for i in range(len(f.params))]
         params = ", ".join(f"{takes[i]}& {f.params[i][0]}" if f.kinds[i] == "ref" else f"const {takes[i]}& {f.params[i][0]}" if f.kinds[i] == "const"
                            else f"{takes[i]} {f.params[i][0]} = {u.zero(takes[i])}" for i in f.order())
-        head.append(f"  {'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
+        mark = ""
+        if exported:
+            # (a function the program gives its host under its C name - KERN_EXPORT: the same name, and how its
+            # values cross, one word for each input, from the C signature - Function::exported, Function::wire)
+            gives = wire_out(d, self.tree.aliases)
+            if len(words) != len(f.params) or list(f.order()) != list(range(len(f.params))):
+                raise Wait(f"the export {exported}: its inputs are not its C parameters one by one")
+            mark = f"KERN_EXPORT_AS({text_literal(exported)}, {text_literal(' '.join([*words, *(['->', gives] if gives else [])]))}) "
+        head.append(f"  {mark}{'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
         out = head + [f"    {self.declared(n, t)} {n} = {u.zero(self.declared(n, t))};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
         if f.state and d.get("kind") == "CXXConstructorDecl":
             # the one object of the state is made when the program begins: its Blueprint makes it when it begins
@@ -3614,6 +3865,12 @@ class Emit:
             n = bare(kids(n)[0])
         if n.get("kind") == "UnaryOperator" and n.get("opcode") == "*" and kids(n):
             return self.is_this(kids(n)[0])
+        if n.get("kind") == "CallExpr" and len(kids(n)) == 1 and self.f.state:
+            # (the getter of the one object of the state - `game()` - in a function of its Blueprint: this Blueprint)
+            rid = (callee(n).get("referencedDecl") or {}).get("id")
+            t = (self.tree.body.get(rid) or self.tree.decl.get(rid)) if rid else None
+            return t is not None and function_key(self.tree, t) in self.u.world.getters and \
+                re.sub(r"\b(const|volatile)\b|&", "", qtype(t).split("(")[0]).strip().split("::")[-1] == (self.u.state or "").split("::")[-1]
         return n.get("kind") == "CXXThisExpr"
 
     def at_state(self, n):
@@ -4167,8 +4424,8 @@ class Emit:
                 if target.get("kind") == "DeclRefExpr":
                     root = target.get("referencedDecl", {}).get("id")
                     break
-                if target.get("kind") == "CXXThisExpr":
-                    own = True
+                if target.get("kind") == "CXXThisExpr" or (target.get("kind") == "CallExpr" and self.is_this(target)):
+                    own = True   # (of its object - or of the one object of the state, reached by its getter: is_this)
                     break
                 if target.get("kind") == "ArraySubscriptExpr" and len(kids(target)) == 2:
                     picks.append((target, 1))
@@ -6409,6 +6666,9 @@ class Emit:
             m = callee(n)
             base = kids(m)[0] if kids(m) else None
             name = m.get("name")
+            if self.class_call(n) is not None:   # (a function of a Blueprint's class, called for what it does)
+                self.class_invoke(n)
+                return []
             if self.on_actor(n) is not None:
                 return self.call_on(n, self.on_actor(n))
             if self.actor_bind(n) is not None:
@@ -6942,6 +7202,44 @@ class Emit:
     def is_local_call(self, n):
         return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and (callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
                                                                                             or callee(n).get("referencedDecl", {}).get("id") in self.u.generic)
+
+    # ---- a function of a Blueprint the program calls as its class (Unit.class_library) ----
+    def class_call(self, n):
+        """kern::logic::blueprint<blueprints::qr_code_cpp>().encode(text, c): a call of a function of a Blueprint the
+        program calls as its class, on the one object the program binds of it - (the Blueprint, the function), else None.
+        Its object is reached by kern::logic::blueprint<T>() where it is called (a library keeps nothing: what it is
+        called on is no value of the call)."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or not kids(m):
+            return None
+        base = self.unwrap(kids(m)[0])
+        c = CLASS_TYPE.fullmatch(self.ctype(base))
+        if c is None or c.group(2) is not None:
+            return None
+        self.u.class_library(c.group(1))
+        reach = self.unwrap(kids(base)[0]) if base.get("kind") == "CallExpr" and len(kids(base)) == 1 else {}
+        said = re.sub(r"\s+", "", (reach.get("type") or {}).get("qualType", ""))   # (kern::logic::blueprint<T>: T& ())
+        if reach.get("kind") != "DeclRefExpr" or (reach.get("referencedDecl") or {}).get("name") != "blueprint" or \
+                not re.fullmatch(r"(?:::)?kern_blueprint_[0-9a-f]{16}::" + re.escape(c.group(1)) + r"&\(\)", said):
+            raise Wait(f"the class of the Blueprint {c.group(1)} reached otherwise than by kern::logic::blueprint<T>() where it is called")
+        if m.get("isArrow"):
+            raise Wait("a pointer")
+        return c.group(1), m.get("name")
+
+    def class_invoke(self, n):
+        """A call of a function of a Blueprint's class (class_call): the call of that library's function, as of any
+        other Blueprint - (text, type) of what it gives, or (None, None). The test runs that Blueprint for the source
+        (TestWriter: it binds the class to the source's logic)."""
+        lib, name = self.class_call(n)
+        g = self.u.class_function(lib, name)
+        self.f.on_actors.append((lib, None))
+        return self.invoke(g, kids(n)[1:])
+
+    def language_value(self, n):
+        """Is this a value of one of the language's own types as a Blueprint's class holds it (kern::logic::Sized, Whole,
+        Truth, Text): what C++ converts it to is that value, in the notation."""
+        c = self.ctype(n)
+        return c in LANGUAGE_TYPES or c.startswith("kern::logic::Sized<")
 
     # ---- a function of the Blueprint of an actor of the level: Call on Actor ----
     def on_actor(self, n):
@@ -9529,6 +9827,14 @@ class Emit:
                 return u.constant(d)
             raise Wait(f"a name that is {ref.get('kind')}")
         if k == "MemberExpr":
+            if kids(b) and self.class_call(self.unwrap(kids(b)[0])) is not None:
+                # (what a function of a Blueprint's class gives: its output, Result - the value of the call)
+                if b.get("name") != "Result":
+                    raise Wait(f"the output {b.get('name')} of a function of a Blueprint's class")
+                got = self.class_invoke(self.unwrap(kids(b)[0]))
+                if got[0] is None:
+                    raise Wait("a call without a result as a value")
+                return got
             got = self.spot(b)
             if got is not None:   # a field at a place: read where it stands
                 return got
@@ -10599,6 +10905,20 @@ class Emit:
             return self.made(d, a), "Int"
         t = self.tp(b)
         a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+        if self.language_value(b) and len(a) == 1:
+            # (a value of the language as a Blueprint's class holds it, made of one value: a Text of a std::string, an
+            # Int of a long, a U8 of an int - C++'s conversion of it, as a cast to that number says it: kern::logic::Sized
+            # stores what static_cast<T> gives, Whole what static_cast<i64> gives)
+            c = self.ctype(b)
+            if c.startswith("kern::logic::Sized<") or c == "kern::logic::Whole":
+                if self.language_value(a[0]):
+                    return self.ex(a[0], t), t
+                cast = {"kind": "CXXStaticCastExpr", "castKind": "IntegralCast", "valueCategory": "prvalue", "inner": [a[0]],
+                        "type": {"qualType": self.u.clean(template_args(c)[0]) if c != "kern::logic::Whole" else "long"}}
+                if wire(self.tp(a[0])) not in ("Int", "Float", "Bool", "Int64"):
+                    raise Wait(f"a {t} of a Blueprint's class made of a {self.tp(a[0])}")
+                return self.ex(cast, wire(t)), wire(t)
+            return self.ex(a[0], t), t
         if self.is_box(b):
             it = t[5:-1]
             if not a or self.nothing(a[0]):
@@ -10808,6 +11128,13 @@ class Emit:
         m = callee(b)
         base = kids(m)[0] if kids(m) else None
         name = m.get("name")
+        if self.class_call(b) is not None:   # (what a function of a Blueprint's class gives is read by its output: .Result)
+            raise Wait(f"what {'::'.join(self.class_call(b))}() of a Blueprint's class gives, kept as a whole")
+        if base is not None and (name or "").startswith("operator ") and len(kids(b)) == 1 and self.language_value(base):
+            # (a value of the language as a Blueprint's class holds it - a U8, an Int -, converted by C++ to a number of its
+            # own: the same number - Sized::operator i64, Whole::operator i64, Truth::operator bool&)
+            want = self.tp(b)
+            return self.ex(base, want), want
         if self.actor_get(b) is not None:
             return self.get_on(b, self.actor_get(b))
         if self.actor_bind(b) is not None:
@@ -14518,6 +14845,8 @@ class TestWriter:
                     system.append(f"#include <{m.group(2)}>")
             elif m.group(2).startswith("kern/"):
                 own.append(f'#include "{m.group(2)}"')
+            elif m.group(2) == os.path.basename(CLASSES[0]):
+                own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
             else:
                 own.append(f'#include "{self.source_dir}/{m.group(2)}"')
         # of the file's own `using` lines only those of the standard library: the program's names are the test's own here
@@ -14691,6 +15020,9 @@ class TestWriter:
             for b in dict.fromkeys(bindings):
                 if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
                     add(("bind", b), f"  {b}.bind(bp.source_logic());")
+            for a in actors:   # (the source calls a Blueprint as its class: bound to the object the source's logic runs it as)
+                if a in class_libraries(u.world) and ("class", a) not in dropped:
+                    add(("class", a), f"  SC_CHECK(kern::logic::bind_blueprint<blueprints::{a}>(bp.source_logic()), \"the Blueprint {a} runs as its class\");")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
@@ -14987,7 +15319,7 @@ def survey_one(job):
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
                           "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "keeps": keeps, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
-                          "defaulted": defaulted_maker(d)})
+                          "defaulted": defaulted_maker(d), "gives_state": gives_kept(d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
     # (the variables of the program's namespaces that other files name too: whether each starts at zero)
@@ -15014,6 +15346,81 @@ def survey_one(job):
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
     return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args, "globals": starts,
             "defaulted": sorted(defaulted), "ending": sorted(ending), "constants": constants}
+
+
+def export_name(d):
+    """The C name a function of the program is exported under (exported_names: KERN_EXPORT, C linkage), or None."""
+    name = d.get("name")
+    if d.get("kind") != "FunctionDecl" or not name or d.get("mangledName") != name:
+        return None
+    return name if name in exported_names(d.get("_file") or "") else None
+
+
+C_WORDS = {"int": "i32", "unsigned int": "u32", "float": "f32", "double": "f64",
+           "int32_t": "i32", "uint32_t": "u32", "std::int32_t": "i32", "std::uint32_t": "u32"}
+C_BYTES = ("unsigned char", "uint8_t", "std::uint8_t")
+
+
+def c_type(n, aliases):
+    """The C type of a value, the names the program and the engine give types resolved (`kern::u32`: through
+    `using u32 = std::uint32_t;` - Tree.aliases), spaces as the compiler writes them."""
+    t = n.get("type") or {}
+    t = re.sub(r"\s+", " ", t.get("desugaredQualType") or t.get("qualType") or "").strip()
+    for _ in range(8):
+        def one(m):
+            name = m.group(0).split("::")[-1]
+            got = aliases.get(name)
+            return got if got and m.group(0) not in C_WORDS and m.group(0) not in C_BYTES else m.group(0)
+        u = re.sub(r"(?:\w+::)*\w+", one, t)
+        if u == t:
+            break
+        t = re.sub(r"\s+", " ", u).strip()
+    return t
+
+
+def wire_words(p, before, aliases):
+    """How a parameter of an exported function crosses from the host - one word for each input of the Blueprint it
+    is (Function::wire): a number by its C type, a `const char*` text, a pointer to bytes `bytes at` (a pointer is a
+    list and the place in it - Unit.pointed: from the host the place is 0), and a u32 right after a text or bytes
+    their len."""
+    t = c_type(p, aliases)
+    if t in ("const char *", "const char *const"):
+        return ["text"]
+    if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
+        return ["bytes", "at"]
+    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
+        return ["len"]
+    if t in C_WORDS:
+        return [C_WORDS[t]]
+    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
+
+
+def wire_out(d, aliases):
+    """What an exported function gives its host (the word after ->), or None."""
+    t = re.sub(r"\(.*$", "", c_type(d, aliases)).strip()
+    if t == "void":
+        return None
+    if t in ("const char *", "const char *const"):
+        return "text"
+    if t in C_WORDS:
+        return C_WORDS[t]
+    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)")
+
+
+def gives_kept(d):
+    """Is this function's body `static T x; return x;` - what it keeps, given by reference, and nothing else?
+    (Of the one object of a state: its getter - main.)"""
+    body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+    if body is None or len(kids(body)) != 2 or not re.search(r"&\s*\(", qtype(d)):
+        return False
+    first, last = kids(body)
+    v = kids(first)[0] if first.get("kind") == "DeclStmt" and len(kids(first)) == 1 else {}
+    if v.get("kind") != "VarDecl" or v.get("storageClass") != "static" or last.get("kind") != "ReturnStmt" or len(kids(last)) != 1:
+        return False
+    r = bare(kids(last)[0])
+    while r.get("kind") == "ImplicitCastExpr" and kids(r):
+        r = bare(kids(r)[0])
+    return r.get("kind") == "DeclRefExpr" and (r.get("referencedDecl") or {}).get("id") == v.get("id")
 
 
 def shared_variable(tree, d):
@@ -15145,7 +15552,8 @@ def convert_unit(job):
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
                 and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
-                and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")]   # (a method of a type of a function's body: of that function)
+                and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
+                and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
@@ -15286,6 +15694,84 @@ def apply_to_level(level, folder, blueprints, prune=False):
     shutil.rmtree(scratch, ignore_errors=True)
 
 
+def class_facts(actors, level_actors):
+    """What the program needs of each Blueprint of the level to call it as its class (Unit.class_library): its folder,
+    its types and functions as the level holds them, and whether it - or a library it uses - has a node of the engine
+    (a call of it asks the engine: Emit.invoke). Into `actors` (World.actors), by the actors' names."""
+    graphs = {a["name"]: (a.get("components") or {}).get("logic") for a in level_actors if a.get("name") and (a.get("components") or {}).get("logic")}
+    def engine(name, met):
+        if name in met or name not in graphs:
+            return False
+        met.add(name)
+        g = graphs[name]
+        return any(str(n.get("type", "")).startswith("engine.") for n in g.get("nodes", [])) or any(engine(u, met) for u in g.get("uses", []))
+    for a in level_actors:
+        g = graphs.get(a.get("name"))
+        if g is None or a["name"] not in actors:
+            continue
+        actors[a["name"]].update({"folder": a.get("folder"), "engine": engine(a["name"], set()),
+                                  "struct_defs": {s["name"]: s for s in g.get("structs", []) if s.get("name")},
+                                  "enum_defs": {e["name"]: e for e in g.get("enums", []) if e.get("name")},
+                                  "function_defs": {f["name"]: f for f in g.get("functions", []) if f.get("name") and "::" not in f["name"]}})
+
+
+def class_libraries(world):
+    """The Blueprints the program calls as their classes (the level's folder CLASSES[1]): a run reads them - their types
+    and functions -, it writes none of them (main: no Blueprint text of theirs, no declaration of their types)."""
+    return {name for name, a in world.actors.items() if a.get("folder") == CLASSES[1]}
+
+
+def kept_by_others(level, folder):
+    """What the Blueprints of the level outside `folder` use of the Blueprints of `folder` (the folder this
+    tool writes): {library: {"types": {name: its struct or enum as the level holds it}, "functions": {names},
+    "users": {who uses it}}}. A file that is a Blueprint now (its C++ gone: "5 - Umschalten") still uses the
+    libraries of the files that are not - their types (a shape: a row of a list of lists), their functions. A
+    run keeps what they use: it writes it, or it says why it cannot."""
+    doc = json.load(open(level, encoding="utf-8"))
+    mine = {a["name"] for a in doc.get("actors", []) if a.get("folder") == folder}
+    out = {}
+    for a in doc.get("actors", []):
+        g = (a.get("components") or {}).get("logic")
+        if not g or a.get("folder") == folder:
+            continue
+        for kind in ("structs", "enums"):
+            for t in g.get(kind, []):
+                if t.get("from") in mine:
+                    e = out.setdefault(t["from"], {"types": {}, "functions": set(), "users": set()})
+                    e["types"][t["name"]] = (kind, t)
+                    e["users"].add(a["name"])
+        for f in g.get("functions", []):
+            if f.get("from") in mine:
+                e = out.setdefault(f["from"], {"types": {}, "functions": set(), "users": set()})
+                e["functions"].add(f["name"].split("::")[-1])
+                e["users"].add(a["name"])
+    return out
+
+
+def shape_line(name, struct):
+    """The declaration of a shape (a type this tool makes of the notation's own - a row of a list, a pair) as
+    the level holds it, written as this tool writes it (Unit.element, Unit.pair). None: it is no such shape."""
+    def notation(f):
+        t = f.get("type", "float")
+        base = t[:-5] if t.endswith("_list") else t
+        word = {"int": "Int", "float": "Float", "bool": "Bool", "vector": "Vector", "text": "Text", "int64": "Int64", "actor": "Actor"}.get(base)
+        if word is None and base == "struct":
+            word = f.get("of")
+        if not word:
+            return None
+        return f"List<{word}>" if t.endswith("_list") else word
+    fields = struct.get("fields", [])
+    kinds = [notation(f) for f in fields]
+    if None in kinds:
+        return None
+    if [f["name"] for f in fields] == ["items"] and kinds[0].startswith("List<"):
+        n = fields[0].get("count")
+        return f"  KERN_STRUCT({name}) {{ {Unit.fixed_type(kinds[0], n)} items = {kinds[0]}{{}}; }};"
+    if [f["name"] for f in fields] == ["first", "second"] and all(k in ZERO for k in kinds):
+        return f"  KERN_STRUCT({name}) {{ {kinds[0]} first = {ZERO[kinds[0]]}; {kinds[1]} second = {ZERO[kinds[1]]}; }};"
+    return None
+
+
 def plan_names(world, types, units):
     """What every type of the program is called (World.type_names, World.taken): its own name - and where
     two types have the same one, or a type the name of a Blueprint, they are told apart by where they
@@ -15322,12 +15808,19 @@ def main(argv):
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
     level = folder = test = texts = None
+    classes = tuple(CLASSES)
     flags, more = [], []
     i = 0
     while i < len(opts):
-        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program"):
+        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program", "--classes"):
             v = opts[i + 1]
             if opts[i] == "--level": level = v
+            elif opts[i] == "--classes":
+                # the header of the Blueprints the program calls as their classes, and the folder they stand in
+                header, _, of = v.partition("=")
+                if not header or not of:
+                    raise SystemExit(f"--classes {v}: give the header and the folder, <header.h>=<folder>")
+                classes = (header, of)
             elif opts[i] == "--folder": folder = v
             elif opts[i] == "--test": test = v
             elif opts[i] == "--program":
@@ -15342,7 +15835,29 @@ def main(argv):
             flags.append(opts[i])
             i += 1
     folder = folder or "Source"
-    whole = len(files) > 20   # (a run over the whole program: what it does not write any more goes)
+    # (a run over the whole program: what it does not write any more goes - of its own folder; a Blueprint of
+    # another folder is a source of its own, and the run leaves it as it is)
+    whole = len(files) > 20
+    CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
+    if classes[1] == folder:
+        raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
+    if level and any(a.get("folder") == classes[1] for a in json.load(open(level, encoding="utf-8")).get("actors", [])):
+        # The Blueprints the program calls as their classes: their header, as the build writes it (from the level,
+        # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it. It
+        # is written for this run, into a folder of its own that comes first on the include path (nothing is kept
+        # between runs). One the build left in a folder of the sources is found before it (#include "..." looks
+        # beside the file first): it has to be the same.
+        made = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-classes-", dir=os.environ.get("TMPDIR") or None)
+        header = os.path.join(made, os.path.basename(classes[0]))
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), level, os.path.join(made, "classes.cpp"), header, classes[1]], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"the header {classes[0]} of the Blueprints the program calls as their classes is not to be had (tools/blueprint_cpp.sh): " + (r.stderr or r.stdout).strip()[:2000])
+        for d in sorted({os.path.dirname(os.path.abspath(f)) for f in files}):
+            left = os.path.join(d, os.path.basename(classes[0]))
+            # (the same, but for its first line: which file of the level it was written from - a copy of the level is the same level)
+            if os.path.exists(left) and open(left, encoding="utf-8").read().split("\n", 1)[1:] != open(header, encoding="utf-8").read().split("\n", 1)[1:]:
+                raise SystemExit(f"{left} was written from another state of the level than {level} (the build writes it again)")
+        flags.insert(0, "-I" + made)
     workers = max(1, min(len(files), int(os.environ.get("KERN_JOBS") or os.cpu_count() or 1)))
     import concurrent.futures
     # the names of the engine's nodes: the engine's own tool says them
@@ -15364,6 +15879,7 @@ def main(argv):
                     "structs": {t["name"]: [(x.get("type", "float"), x.get("of", "")) for x in t.get("fields", [])] for t in g.get("structs", []) if t.get("name")},
                     "enums": {t["name"]: len(t.get("values", [])) for t in g.get("enums", []) if t.get("name")},
                     "variables": {v["name"]: (v.get("type", "float"), v.get("of", "")) for v in g.get("variables", []) if v.get("name")}}
+        class_facts(world.actors, json.load(open(level, encoding="utf-8")).get("actors", []))   # (and what a Blueprint's class is: Unit.class_library)
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}
@@ -15440,12 +15956,17 @@ def main(argv):
         # (a static local variable is kept by the program as a variable of a namespace is - but the one object
         # of the state itself, `static Game g;`, is the Blueprint)
         itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
-        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))) and f.get("free") and world.program(f["file"])}
+        # (a function that gives the one object and does nothing else - `Game& game() { static Game g; return g; }` - is
+        # no function of a Blueprint: what it gives is the state's Blueprint itself; who calls it reaches the state)
+        getters = {k for k, f in functions.items() if f.get("gives_state") and f.get("free") and world.program(f["file"])
+                   and f.get("keeps") and all(tuple(p) in itself for p in f["keeps"])}
+        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))
+                                                    or any(c in getters for c in f["calls"])) and f.get("free") and world.program(f["file"]) and k not in getters}
         todo = list(kept)
         while todo:
             for k in callers.get(todo.pop(), ()):
                 f = functions[k]
-                if k not in kept and f.get("free") and world.program(f["file"]):
+                if k not in kept and k not in getters and f.get("free") and world.program(f["file"]):
                     kept.add(k)
                     todo.append(k)
         for k in kept:
@@ -15455,6 +15976,7 @@ def main(argv):
                 world.parts[part] = state
                 unit_of[k] = part
         world.state_functions = kept
+        world.getters = getters
     for blueprint in sorted(set(world.parts.values())):
         for i, part in enumerate(sorted(p for p, b in world.parts.items() if b == blueprint)):
             world.part_numbers[part] = i
@@ -15521,7 +16043,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers, w.state_members = world.actors, world.states, world.parts, world.part_numbers, world.state_members
-        w.pointer_lists, w.globals, w.state_functions = world.pointer_lists, world.globals, world.state_functions
+        w.pointer_lists, w.globals, w.state_functions, w.getters = world.pointer_lists, world.globals, world.state_functions, world.getters
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
@@ -15770,6 +16292,15 @@ def main(argv):
             if name in declared and declared[name][1] != line:
                 raise SystemExit(f"the type {name} is not the same in every Blueprint:\n{declared[name][1]}\n{line} (in {u})")
             declared.setdefault(name, (home, line, list(parts)))
+    # What the Blueprints of the level's other folders use of this run's (files that are Blueprints now): a shape
+    # they name stays in the library of shapes, made as this tool makes it, also where no source names it any more.
+    others = kept_by_others(level, folder) if level and mode == "--convert" else {}
+    for name, (kind, t) in others.get(SHAPES, {}).get("types", {}).items():
+        if name not in declared:
+            line = shape_line(name, t)
+            if line is None:
+                raise SystemExit(f"{', '.join(sorted(others[SHAPES]['users']))} use the type {name} of {SHAPES}, which this run does not make")
+            declared[name] = (None, line, [f["of"] for f in t.get("fields", []) if f.get("of")])
     written = {u for u, r in blue.items() if r["written"]}
     def components(name):
         """The Blueprints the types stand in that a type is made of (a shape: those its parts are made of)."""
@@ -15812,6 +16343,8 @@ def main(argv):
         return placed[name]
     uses = {}
     for u in set(homes) | written:
+        if u in class_libraries(world) and u not in written:
+            continue   # (a Blueprint the program calls as its class: the level's, as it is - its types are declared there)
         mine = sorted(homes.get(u, ()), key=lambda n: (place(n), n))
         called = set(blue[u]["uses"]) if u in written else set()
         named = {home_of(p) for n in mine for p in declared[n][2] if p in declared} | ({home_of(n) for n in blue[u]["types"]} if u in written else set())
@@ -15868,6 +16401,17 @@ def main(argv):
         for u in order:
             open(os.path.join(texts, u + ".cpp"), "w").write(blueprints[u])
     if level and mode == "--convert":
+        # What the Blueprints of the other folders use of this run's Blueprints is there - or the level stays as
+        # it is, and it is said (a library they use is not dropped, a type or function of it does not go missing).
+        for lib, kept in sorted(others.items()):
+            if lib not in blueprints:
+                if whole:
+                    raise SystemExit(f"{', '.join(sorted(kept['users']))} use the Blueprint {lib}, which this run does not write any more: the level is as it was")
+                continue   # (a run over some files: it leaves the Blueprints it does not write as they are)
+            missing = sorted(n for n in kept["types"] if not (n in declared and home_of(n) == lib))
+            missing += sorted(f"{n}()" for n in kept["functions"] if not any(e["name"] == n and not e["wait"] for e in tables.get(lib, {}).values()))
+            if missing:
+                raise SystemExit(f"{', '.join(sorted(kept['users']))} use {', '.join(missing)} of the Blueprint {lib}, which this run does not write: the level is as it was")
         apply_to_level(level, folder, [(u, blueprints[u]) for u in order], prune=whole)
     for f in nowhere:   # (a header's function that needs a source file which is not among those converted)
         if world.program(f["file"]):

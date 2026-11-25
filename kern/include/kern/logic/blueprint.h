@@ -909,6 +909,9 @@ template <Setting Interface> struct Implements {};
 /// Blueprint has under another name (Call on Actor calls it by that one): two actors' Blueprints may each
 /// have an "Update" that looks different.
 #define KERN_EXTERN_AS(name)
+/// KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult game_hud(...) { ... }: the program gives the
+/// function to its host under that C name (logic::Function::exported); the glue the class has writes the export.
+#define KERN_EXPORT_AS(name, wire)
 /// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event
 /// node (for the reader and the editor). Which events reach it decides the runtime, for every
 /// tier the same; the engine calls the method through the Blueprint's glue (logic::native_glue).

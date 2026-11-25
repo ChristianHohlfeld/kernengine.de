@@ -12,6 +12,7 @@ Sache: Man kann sie lesen und ändern, und was man ändert, ist der Blueprint.
 ```
 kern/include/kern/logic/logic.h      to_cpp, from_cpp, apply_cpp, canonical, same_blueprint, cpp_name_ok, cpp_problem, cpp_names, native_ready
 kern/include/kern/logic/blueprint.h  wogegen der Text kompiliert: kern::Blueprint, kern::Node, kern::formula, kern::to, KERN_PURE, KERN_LAYOUT
+kern/include/kern/logic/blueprint_class.h  wie das C++ eines Programms einen Blueprint direkt als seine Klasse ruft: bind_blueprint, blueprint<T>()
 kern/include/kern/logic/nodes.h      was die Knoten rechnen, als typisierte Funktionen – für den Interpreter und für den Text dieselben
 kern/include/kern/game/blueprint_nodes.h  dasselbe für die Gameplay-Knoten (kern::game::nodes) und ihre Aufrufe in der Klasse
 kern/src/logic/notation.cpp          Shape (was steht wo), Writer (Graph → Text), Reader (Text → Graph)
@@ -22,7 +23,7 @@ kern/tests/test_main.cpp             logic_notation_*, studio_logic_cpp_view, lo
 kern/tests/blueprint_native.h        die Fälle des nativen Tests: Blueprints, Aufrufe, der erzeugte Treiber
 kern/tests/game_cases.h              zwei Levels, deren Blueprints jeden Gameplay-Knoten benutzen, mit ihren Szenarien
 kern/tests/game_native_test.cpp      spielt sie im Interpreter und als Klassen und vergleicht
-tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen, die ein Spiel einbindet
+tools/blueprint_cpp.cpp, .sh         die Blueprints eines Levels als C++-Klassen, die ein Spiel einbindet (die eines Ordners, die es direkt ruft, in einem Header)
 tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die Klassen einkompiliert
 ```
 
@@ -37,7 +38,7 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
 | `cpp_names(graph)` | Für Levels von früher: benennt um, was kein C++-Name ist („Ball Seen“ → `BallSeen`), samt allen Verwendungen. Läuft beim Laden eines Levels. |
 | `native_ready(graph, warum)` | Kann ein C++-Compiler den Text dieses Blueprints ausführen, so wie er dasteht? Ja, wenn er fehlerfrei kompiliert und jeder seiner Knoten eine Funktion von `blueprint.h` ist (`NodeDef::native` – in Kerns Bibliothek jeder). |
 | `cpp_class_name(owner, graph)` | Der Klassenname für den Blueprint eines Actors: sein Name als C++-Name, den nichts in der Klasse trägt. |
-| `native_glue(graph, name, text)` | Der Kleber hinter dem Text: macht die Klasse für die Engine beim Namen erreichbar (`logic::NativeBlueprint`) und meldet sie unter dem Hash des Graphen an. Kein Teil der Schreibweise. |
+| `native_glue(graph, name, text)` | Der Kleber hinter dem Text: macht die Klasse für die Engine beim Namen erreichbar (`logic::NativeBlueprint`) und meldet sie unter dem Hash des Graphen an; gibt dem C++ des Programms ihr Objekt (`NativeBlueprint::object`, siehe „Aus C++ direkt“). Kein Teil der Schreibweise. |
 
 ## Stand
 
@@ -1220,6 +1221,33 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+### Exporte: eine Funktion unter festem C-Namen
+Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines
+Programms schreibt dafür `KERN_EXPORT(name)`. Ein Blueprint kann das selbst: Die Funktion trägt den Namen
+und sagt, wie ihre Werte hinüberkommen (`Function::exported`, `Function::wire`; im Level `"export"`,
+`"wire"`):
+
+```cpp
+KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0) { ... }
+```
+
+- Ein Wort je Eingang und je C-Parameter, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner).
+  `i32`, `u32`, `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie,
+  wie C++ wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger auf die
+  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Zeiger auf die Zeichen,
+  gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
+  der Bytes, so viele, wie das `len` danach sagt (es muss folgen). `len`: ein Int-Eingang, die Länge davor
+  (u32) – so kommt das C++ `const char* text, u32 length` eines Programms Wort für Wort herüber.
+  `at`: ein Int-Eingang ohne C-Parameter, direkt nach `bytes` – der Platz in der Liste. Ein Zeiger des C++ ist
+  im Blueprint die Liste und der Platz darin (wie überall, wo der Konverter einen Zeiger liest); vom Host kommt
+  der Anfang, also 0. So wird `const u8* bytes, u32 length` zu `bytes at len`.
+- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
+  die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
+  `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
+  keine, gibt sie 0, einen leeren Text, nichts.
+- Interpreter und JIT haben keine Exporte: ein Export gibt es im Programm, das die Klassen übersetzt.
+- `logic::export_ok` sagt, was nicht passt (der Leser und das Level weisen es ab).
+
 ### Knoten der Engine
 
 Was nur die Engine kann – ein Strahl durch die Physik, ein Mesh zeichnen, einen Ton mischen –, ist
@@ -1987,6 +2015,22 @@ will, was die Funktion selbst kostet, setzt `logic::native_probe`: Der Kleber me
 die Funktion beginnt und wann sie zurück ist – Umwandeln von Argumenten und Ergebnissen liegt
 außerhalb. (Ein Test zählt so, wie oft die Klasse Speicher anfordert, und vergleicht das mit dem
 C++, aus dem der Blueprint stammt.) Ohne Zuhörer ist es ein Vergleich mit null.
+
+**Aus C++ direkt.** Ein Programm, dessen eigenes C++ einen Blueprint des Levels ruft (eine Datei
+des Programms, die zu einem Blueprint geworden ist), ruft ihn als seine Klasse – typisiert, ohne
+Nachschlagen beim Namen, ohne verpackte Werte (`kern/logic/blueprint_class.h`):
+`tools/blueprint_cpp.sh level.klevel out.cpp out.h <Ordner>` schreibt die Klassen der Blueprints
+dieses Ordners des Levels und der Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
+unter ihren Namen im Namensraum `blueprints`), `out.cpp` bindet ihn ein und hat ihren Kleber.
+Das Programm nimmt die Typen der Klasse (`blueprints::qr_code::qr_Code`): ein Typ, eine Referenz
+bindet. Es bindet jede Klasse einmal, wenn die Logik des Levels läuft, an das Objekt, als das die
+Laufzeit den Blueprint ausführt – `kern::logic::bind_blueprint<T>(runtime)` sucht die Instanz,
+die als `T` läuft (`Instance::native_object<T>`, `NativeBlueprint::object` mit dem Schlüssel der
+Klasse, `class_key<T>`); `blueprints::bind(runtime)` tut es für alle des Headers. Danach ist
+`kern::logic::blueprint<T>()` dieses Objekt und ein Aufruf ein Aufruf einer Methode:
+`kern::logic::blueprint<blueprints::qr_code_cpp>().encode(text, code)`. Die Klasse läuft in der Welt
+der Laufzeit – mit ihrer Schleifengrenze (`Runtime::budget`), wie in jeder Stufe. Ein Objekt gilt,
+bis die Laufzeit endet oder neu gebunden wird.
 
 **Als fertiges Spiel.** `tools/export_game.sh level.klevel spiel.html` macht beides in einem
 Zug: die Klassen schreiben, die Engine mit ihnen bauen (`kern/build.sh --studio`, ThinLTO – der

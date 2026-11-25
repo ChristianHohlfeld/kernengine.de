@@ -5,12 +5,13 @@
 #include <map>
 #include <set>
 
+#include "blueprint_call.h"
 #include "lamps.h"
+#include "level_blueprints.h"
 #include "mp_rules.h"
 #include "net_session.h"
 #include "people.h"
 #include "town_sync.h"
-#include "qr_code.h"
 #include "../src/lamps.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
@@ -334,16 +335,26 @@ SC_TEST(mp_host_leaves_the_oldest_takes_over) {
 
 SC_TEST(mp_qr_code_structure) {
   RuleBlueprint mp_rules("Multiplayer", &mp::bind);
+  // The encoder is the level's Blueprint qr_code_cpp (its code: qr_code), called as its class - as the game
+  // calls it (level_blueprints.h), with the game's loop guard.
+  RuleBlueprint qr_rules("qr_code_cpp", nullptr, true, {"qr_code"});
+  qr_rules.rt.budget = rules::kLoopBudget;
+  SC_CHECK(qr_rules.problems.empty() && kern::logic::bind_blueprint<blueprints::qr_code_cpp>(qr_rules.rt) && kern::logic::bind_blueprint<blueprints::qr_code>(qr_rules.rt),
+           "qr_code_cpp and qr_code run as their classes: %s", qr_rules.problems.c_str());
+  auto& qr = kern::logic::blueprint<blueprints::qr_code_cpp>();
+  auto& code = kern::logic::blueprint<blueprints::qr_code>();
   // Decoded with OpenCV during development (versions 1, 5, 10, 11); here the structure.
-  qr::Code c;
-  SC_CHECK(qr::encode("HELLO", c) && c.version == 1 && c.size == 21, "v1 %d", c.version);
-  SC_CHECK(qr::encode("https://kernengine.de/kern/games/spawncity/web/index.html?mp=join&room=lobby&net=public", c) && c.version == 5 && c.size == 37, "v5 %d", c.version);
+  blueprints::qr_code::qr_Code c;
+  SC_CHECK(qr.encode("HELLO", c).Result && c.version == 1 && c.size == 21, "v1 %lld", static_cast<long long>(c.version));
+  SC_CHECK(qr.encode("https://kernengine.de/kern/games/spawncity/web/index.html?mp=join&room=lobby&net=public", c).Result && c.version == 5 && c.size == 37, "v5 %lld", static_cast<long long>(c.version));
   // Finder patterns in three corners, the dark module, timing pattern.
-  for (auto [x, y] : {std::pair{0, 0}, {c.size - 7, 0}, {0, c.size - 7}}) SC_CHECK(c.dark(x, y) && c.dark(x + 6, y + 6) && !c.dark(x + 1, y + 1) && c.dark(x + 3, y + 3), "finder");
-  SC_CHECK(c.dark(8, c.size - 8) && c.dark(8, 6) && !c.dark(9, 6), "dark module and timing");
-  u32 level = 9, mask = 9;
-  SC_CHECK(qr::read_format(c, level, mask) && level == 1 && mask == 0, "format L / mask 0 (%u %u)", level, mask);
-  SC_CHECK(!qr::encode(std::string(3000, 'x'), c), "too long");
+  const i64 size = c.size;
+  auto dark = [&](i64 x, i64 y) { return code.Code_dark(c, x, y).Result; };
+  for (auto [x, y] : {std::pair<i64, i64>{0, 0}, {size - 7, 0}, {0, size - 7}}) SC_CHECK(dark(x, y) && dark(x + 6, y + 6) && !dark(x + 1, y + 1) && dark(x + 3, y + 3), "finder");
+  SC_CHECK(dark(8, size - 8) && dark(8, 6) && !dark(9, 6), "dark module and timing");
+  blueprints::qr_code_cpp::Int level = 9, mask = 9;
+  SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+  SC_CHECK(!qr.encode(std::string(3000, 'x'), c).Result, "too long");
 }
 
 // One world, gap 1: a player's police and sandbox enemies are part of his swarm - the others see

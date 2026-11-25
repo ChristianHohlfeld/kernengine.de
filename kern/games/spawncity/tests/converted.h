@@ -1729,16 +1729,16 @@ struct Blueprint {
     } began{actor};
     interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
     compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
-    // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
-    // sample, a number raised to a 256-bit power - sets it to what they take.)
-    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    // (The loop guard is the host's: the game's functions loop long - a sound computed sample by sample, a
+    // number raised to a 256-bit power -, and the game sets it to what they take: as here, rules::kLoopBudget.)
+    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;
     interp = interpreted->inst;
     native = compiled->inst;
     SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
     SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
     if (!actors.empty()) {
       source = std::make_unique<RuleBlueprint>(nullptr, nullptr, true, actors);
-      source->rt.budget = 2000000000u;
+      source->rt.budget = sc::rules::kLoopBudget;
       source->host.keeps = &g_source_engine;   // (what the actors ask the engine for the source: what the source asks)
       source->host.keeps_objects = &g_source_objects;
       SC_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
@@ -1757,7 +1757,7 @@ struct Blueprint {
     if (!lost(interpreted) && !lost(compiled)) return false;
     interpreted = std::make_unique<RuleBlueprint>(name, nullptr, false, others);
     compiled = std::make_unique<RuleBlueprint>(name, nullptr, true, others);
-    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;   // (as the game sets it)
     interp = interpreted->inst;
     native = compiled->inst;
     interpreted_actors = {};

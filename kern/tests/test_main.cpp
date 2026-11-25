@@ -30,6 +30,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
+#include "kern/logic/blueprint_class.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
@@ -2345,6 +2346,65 @@ struct Ends : kern::Blueprint {
   }
 }
 
+TEST(logic_function_export) {
+  // A function the program gives its host under a fixed C name (Function::exported, KERN_EXPORT_AS): the name
+  // and how its values cross (the wire) are part of the Blueprint - in its graph, its text, both ways - and the
+  // glue of its class writes the C function (logic::native_glue; blueprint_native_test calls the case's).
+  const char* text = R"kn(
+struct Host : kern::Blueprint {
+  struct game_hudResult { Text Result = ""; };
+  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0, Float scale = 0.0) {
+    return {ask};
+  }
+  KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
+  }
+  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  const logic::Function* hud = g.function("game_hud");
+  CHECK(hud && hud->exported == "game_hud" && hud->wire == "text len bytes len i32 f32 -> text");
+  CHECK(g.function("game_tick") && g.function("game_tick")->exported == "game_tick" && g.function("game_tick")->wire == "f64");
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  std::string written;
+  CHECK(logic::to_cpp(g, "Host", written, &error) && written.find("  KERN_EXPORT_AS(\"game_hud\", \"text len bytes len i32 f32 -> text\") game_hudResult game_hud(") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
+  std::string glue;
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
+        glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
+  // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
+  CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
+        glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
+        glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+  // what does not fit is said
+  logic::Function f = hud ? *hud : logic::Function{};
+  CHECK(logic::export_ok(f));
+  f.wire = "text len bytes len i32 -> text";   // (one word too few)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes i32 i32 f32 -> text";   // (bytes without their len)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text at bytes len i32 f32 -> text";   // (an at after a text: a text has no place, it is a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "i32 at bytes len i32 f32 -> text";   // (an at after no bytes)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes len i32 f32 -> text";
+  f.exported = "game hud";
+  CHECK(!logic::export_ok(f));
+  CHECK(!logic::from_cpp(std::string(text).replace(std::string(text).find("\"f64\""), 5, "\"text\""), read, nullptr, &error));
+}
+
 TEST(logic_call_on_actor_by_its_name) {
   // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
   // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
@@ -4603,6 +4663,7 @@ TEST(logic_native_blueprints) {
       heat = value.as_number();
       return true;
     }
+    void* object(const void* type) override { return type == &logic::class_key<Fake> ? this : nullptr; }
   };
   const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"float","value":5}],
     "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"r","type":"float","value":0}]}],
@@ -4616,6 +4677,12 @@ TEST(logic_native_blueprints) {
   CHECK(inst->call_number("Twice", {4}) == 9);
   CHECK(inst->get("Heat").as_number() == 1 && inst->set("Heat", logic::Value::number(3)) && inst->call_number("Twice", {4}) == 11);
   CHECK(!inst->set("Nope", logic::Value::number(1)) && inst->call_number("Nope", {1}, -7) == -7 && inst->has_function("Twice"));
+  // the program's own C++ calls the class directly (kern/logic/blueprint_class.h): bound once to the object the
+  // runtime runs the Blueprint as - what it does there is what the instance has, and the other way round
+  CHECK(inst->native_object<Fake>() && !inst->native_object<FakeLogicHost>());
+  CHECK(logic::bind_blueprint<Fake>(rt) && &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  logic::blueprint<Fake>().heat = 6;
+  CHECK(inst->get("Heat").as_number() == 6 && inst->set("Heat", logic::Value::number(3)) && logic::blueprint<Fake>().heat == 3);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -4629,6 +4696,8 @@ TEST(logic_native_blueprints) {
   plain.native = false;
   logic::Instance* interpreted = plain.add(g, 0, "Plain");
   CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
+  // (no instance there runs as the class: nothing is bound)
+  CHECK(!interpreted->native_object<Fake>() && !logic::bind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
@@ -4636,7 +4705,10 @@ TEST(logic_native_blueprints) {
                            // (the argument is made, the function runs between the two calls a host can measure by, what it gave is handed back)
                            "      kern::f64 in0 = native_arg<kern::f64>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
                            "      kern::logic::native_call(false);\n      results = {to_value(out.r)};",
-                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
+                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }",
+                           // (the object, for the program's C++ that calls the class directly)
+                           "  void* object(const void* type) override { return type == &kern::logic::class_key<Hosted> ? &self : nullptr; }\n",
+                           "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
   {
     // a node that is not a function of blueprint.h (NodeDef::native: a library decides for its own
