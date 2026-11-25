@@ -1235,8 +1235,7 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
 - Ein Wort je Eingang und je C-Parameter, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner).
   `i32`, `u32`, `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie,
   wie C++ wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger auf die
-  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Zeiger auf die Zeichen,
-  gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
+  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Stück (unten). `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
   der Bytes, so viele, wie das `len` danach sagt (es muss folgen). `len`: ein Int-Eingang, die Länge davor
   (u32) – so kommt das C++ `const char* text, u32 length` eines Programms Wort für Wort herüber.
   `at`: ein Int-Eingang ohne C-Parameter, direkt nach `bytes` – der Platz in der Liste. Ein Zeiger des C++ ist
@@ -1244,13 +1243,25 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   der Anfang, also 0. So wird `const u8* bytes, u32 length` zu `bytes at len`. `floats`: wie `bytes`, ein Zeiger
   auf f32 – eine `List<Float>`, jede Zahl, wie C++ ein f32 wandelt (`const f32* samples, u32 count` wird
   `floats at len`).
-- Heraus geht auch eine Liste: `bytes` (eine `List<Int>`) und `floats` (eine `List<Float>`) geben einen Zeiger auf
-  ihre Einträge als u8 bzw. f32 (wie C++ wandelt), gehalten vom Export selbst bis zu seinem nächsten Aufruf; wie viele
-  es sind, weiß der Host (wie beim C++ eines Programms, das `const f32*` gibt). Eine leere Liste gibt keinen (null).
-- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
-  die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
-  `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
-  keine, gibt sie 0, einen leeren Text, nichts.
+- Heraus geht ein Text oder eine Liste – `bytes` (eine `List<Int>`, jeder Eintrag als u8), `floats` (eine
+  `List<Float>`, jede als f32), wie C++ wandelt – als Stück `{Zeiger, Länge}`: Die C-Funktion hat einen letzten
+  Parameter `u32* out_len`, einen Platz, den der Host gibt; sie gibt den Zeiger zurück und schreibt die Länge dorthin.
+  Leer: null (ein Text: `""`), Länge 0. Das Stück gehört dem Export selbst – jede Export-Funktion hält ihren eigenen
+  Platz (`kern::logic::export_text<&f>`, `export_bytes<&f>`, `export_floats<&f>` in `kern/logic/blueprint_class.h`),
+  bis sie das nächste gibt: Kein Export überschreibt, was ein anderer gab, und ein Aufruf auf einem anderen Faden
+  (der Audio-Rückruf) berührt nur seinen Platz. Hält der Platz schon so viel, fragt der Export keinen Speicher an.
+  Das C++ eines Programms gibt ebenso (`return kern::logic::export_text<&sc_hud>(hud_json(), out_len);`); der
+  Konverter liest so einen Export als Funktion, die den Wert gibt, und `out_len` als keinen Eingang.
+- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen, die die
+  Funktion am Objekt ruft, das das Programm gebunden hat (`kern::logic::bind_blueprint<T>(runtime)` – die erste
+  Instanz, die als T läuft – oder `bind_blueprint<T>(instance)` für genau diese; `kern/logic/blueprint_class.h`).
+  Nichts bindet von selbst, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht.
+- **Exporte gehören zum Programm, nicht zu Welten:** je Klasse ist genau ein Objekt gebunden. Ein zweites
+  `bind_blueprint`, solange eines gebunden ist, wird mit Fehler abgewiesen (`kern::fail`: „… is bound already“) – wer
+  umbinden will, sagt es (`rebind_blueprint`) oder löst vorher (`unbind_blueprint`). Ein gebundenes Objekt, das endet,
+  löst sich selbst (Kleber). Wird ein Export gerufen, während nichts gebunden ist, meldet er das über den Fehlerweg der
+  Engine mit seinem Namen und Grund (`kern::logic::export_unbound`: „the export sc_hud: no instance of its Blueprint is
+  bound“) und gibt dann ein leeres Stück – kein stiller Wert.
 - Interpreter und JIT haben keine Exporte: ein Export gibt es im Programm, das die Klassen übersetzt.
 - `logic::export_ok` sagt, was nicht passt (der Leser und das Level weisen es ab).
 

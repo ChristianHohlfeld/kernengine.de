@@ -3696,6 +3696,17 @@ class Emit:
             given = next(returns(d), None)
             if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
                 ret = qtype(kids(given)[0]).strip()
+        self.export_gives = None
+        if export_name(d) and re.search(r"\*\s*(?:const\s*)?$", ret):
+            # an export that gives a text, bytes or floats by a pointer: through the place the program keeps them in
+            # (export_given) - every return gives it so, and the function gives what is kept
+            body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+            returns = [x for x in walk(body or {}) if x.get("kind") == "ReturnStmt"]
+            given = [export_given(self.tree, kids(r)[0]) if kids(r) else None for r in returns]
+            if not returns or any(g is None for g in given):
+                raise Wait(f"the export {export_name(d)} gives a pointer not through kern::logic::export_text, export_bytes or export_floats")
+            self.export_gives = {r["id"]: g for r, g in zip(returns, given)}
+            ret = re.sub(r"^const\s+|\s*&$", "", qtype(given[0]).strip())
         f.value = u.place(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
@@ -3713,6 +3724,18 @@ class Emit:
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
             # (what it keeps from one call to the next, or of the file - changed or not: it may be)
+            if not method and not f.mutates:
+                # (a function of its Blueprint that is no method - an export of main - changes the one object where it
+                # sets a field of it, reached through the object's getter: `game().pad.lx = lx`)
+                def written(x):
+                    if x.get("kind") == "CompoundAssignOperator" or (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or \
+                            (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--")):
+                        n = kids(x)[0] if kids(x) else {}
+                        while bare(n).get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(bare(n)):
+                            n = kids(bare(n))[0]
+                        return n is not kids(x)[0] and self.is_this(n)
+                    return False
+                f.mutates = any(written(x) for x in walk(d))
             f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
                 or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
@@ -3765,6 +3788,11 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if exported and getattr(self, "export_gives", None) and p is [x for x in kids(d) if x.get("kind") == "ParmVarDecl"][-1] and \
+                    re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
+                # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
+                self.export_len_param = p["id"]
+                continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
             if u.is_logic(raw):
@@ -5440,6 +5468,8 @@ class Emit:
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
+            if c and getattr(self, "export_gives", None) and s.get("id") in self.export_gives:
+                c = [self.export_gives[s["id"]]]   # (what an export gives by a pointer: the value kept - export_given)
             made = [x for scope in self.scopes for x in scope]
             if not made:
                 if not c:
@@ -15709,9 +15739,35 @@ def wire_out(d, aliases):
         return None
     if t in ("const char *", "const char *const"):
         return "text"
+    if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
+        return "bytes"
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return "floats"
     if t in C_WORDS:
         return C_WORDS[t]
-    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)")
+    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
+
+
+EXPORT_GIVES = {"export_text": "text", "export_bytes": "bytes", "export_floats": "floats"}
+
+
+def export_given(tree, n):
+    """In an exported function: `return kern::logic::export_text<&f>(x, out_len);` (export_bytes, export_floats -
+    kern/logic/blueprint_class.h) gives x as the export's own piece {pointer, length}, the glue of a Blueprint's class
+    as the program's C++ - so the Blueprint's function gives x. The x, or None."""
+    b = bare(n)
+    while b.get("kind") in ("ImplicitCastExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and kids(b):
+        b = bare(kids(b)[0])
+    if b.get("kind") != "CallExpr" or len(kids(b)) != 3:
+        return None
+    ref = callee(b).get("referencedDecl") or {}
+    decl = tree.decl.get(ref.get("id"))
+    if ref.get("name") not in EXPORT_GIVES or (decl is not None and not (decl.get("_file") or "").replace("\\", "/").endswith("kern/logic/blueprint_class.h")):
+        return None
+    x = bare(kids(b)[1])
+    while x.get("kind") in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ExprWithCleanups") and kids(x):
+        x = bare(kids(x)[0])
+    return x
 
 
 def gives_kept(d):

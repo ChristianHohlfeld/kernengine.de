@@ -367,7 +367,7 @@ export class MpPage {
     this.KernNet = KernNet;
     const mp = this.params.get("mp");
     if (mp !== "host" && mp !== "join" && mp !== "auto") return;
-    const e = this.e, kern = this.kern;
+    const e = this.e, kern = this.kern, lenAt = e.kern_alloc(4);
     const adapter = {
       netPush(from, bytes) {
         const ptr = e.kern_alloc(Math.max(1, bytes.length));
@@ -376,10 +376,12 @@ export class MpPage {
         e.kern_free(ptr);
       },
       netTake() {
-        const ptr = e.sc_net_take();
+        // (the export gives a piece: the pointer, and its length written to lenAt - [u32 length][u32 to_lo][u32 to_hi][bytes])
+        const ptr = e.sc_net_take(lenAt);
         if (!ptr) return null;
+        const length = new Uint32Array(kern.memory.buffer, lenAt, 1)[0];
         const head = new Uint32Array(kern.memory.buffer, ptr, 3);
-        return {to: head[1] + head[2] * 4294967296, bytes: new Uint8Array(kern.memory.buffer, ptr + 12, head[0]).slice()};
+        return {to: head[1] + head[2] * 4294967296, bytes: new Uint8Array(kern.memory.buffer, ptr + 12, Math.min(head[0], length - 12)).slice()};
       },
     };
     const relay = this.params.get("relay") || "", room = this.params.get("room") || (this.params.get("net") === "public" ? MP_LOBBY : "spawncity");
