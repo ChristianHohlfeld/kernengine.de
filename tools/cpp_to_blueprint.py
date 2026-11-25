@@ -79,7 +79,10 @@ value: by its constructor (X_new), in the order of the fields, before the constr
 makes of a field itself too, and of the fields of a value inside it -, and it is released where C++ ends
 the value, in the reverse order: at the end of the block of a local variable, where what owns such a value
 (std::unique_ptr, std::optional) gets another one or is reset. The struct's default is the handle 0. The
-one object of a state is made when its Blueprint begins (Begin Play calls its constructor). What C++ does
+one object of a state is made when its Blueprint begins (Begin Play calls its constructor - the one it
+declares, or C++'s own where it declares none: own_maker), before anything else of it: in the order of the fields,
+what C++ makes of them - and a field whose initializer is computed, no constant (`T* p[2] = {&a(), &b()};`, a call),
+starts at zero and is set there (Unit.computed_init) -, then the constructor's body. What C++ does
 with such values that one handle cannot do the same way - a copy, a move or a temporary of one, one handed
 in or given back by value, a list or a map of them changed - waits (Emit.lifetimes).
 
@@ -1408,6 +1411,16 @@ def defaulted_maker(d):
             and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
 
 
+def own_maker(d, tree, world):
+    """C++'s own constructor of a state (one the class does not declare - the compiler's, defined where the program
+    makes the one object): what C++ does when it makes the object - the fields' initializers, in their order, then
+    nothing - is a step like a declared constructor's: it runs when the state's Blueprint begins (Begin Play), before
+    anything else of it. (A constant initializer is the variable's default; a computed one - `&getter()`, a call - is
+    set there: Unit.computed_init.)"""
+    return (d.get("kind") == "CXXConstructorDecl" and d.get("isImplicit") and tree.owner.get(d["id"]) in world.states
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)) and any(c.get("kind") == "CompoundStmt" for c in kids(d)))
+
+
 def ends_itself(d):
     """Does this destructor do something of its own: a body with statements (not `= default`, not C++'s)?"""
     if d.get("kind") != "CXXDestructorDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted"):
@@ -1540,6 +1553,7 @@ class Unit:
         self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
         self.lives, self.deciding_life = {}, set()       # the program's classes -> what ends with a value of one (life)
         self.makings, self.deciding_making = {}, set()   # the program's classes -> does C++ make more of one than its defaults (needs_making)
+        self.computed_inits = {}   # field id -> is its in-class initializer computed, no constant (computed_init)
         self.interface = set()      # the constants of its header it holds whether a function uses them or not (interface_constants)
         self.interface_waits = []   # (a constant of its header it cannot hold, why)
         self.class_constants = {}   # (a Blueprint called as its class, a constant of it) -> (its name here, its type)
@@ -2553,6 +2567,25 @@ class Unit:
         held = self.held_life(raw)
         return self.making(raw) is not None or (held is not None and held[0] in ("owned", "box") and not is_nothing(init))
 
+    def computed_init(self, c):
+        """Is a field's in-class initializer computed - no constant (`T* p[2] = {&a(), &b()};`, a call, another
+        field) and nothing C++ makes itself (made_by_cpp)? Then its variable starts at zero, and the making of the
+        object sets it: a step where the value is made (Emit.made_parts) - for the one object of a state, its
+        constructor, which runs when its Blueprint begins (C++'s own one too, where the program makes the object)."""
+        if c.get("kind") != "FieldDecl" or not c.get("hasInClassInitializer") or not kids(c):
+            return False
+        init = kids(c)[-1]
+        if self.made_by_cpp(qtype(c), init):
+            return False
+        key = c["id"]
+        if key not in self.computed_inits:
+            try:
+                Const(self).literal(init, self.place(qtype(c)))
+                self.computed_inits[key] = False
+            except Wait:
+                self.computed_inits[key] = True
+        return self.computed_inits[key]
+
     def needs_making(self, q):
         """Does C++ make more of a value of the program's class `q` than the struct's defaults - when its
         constructor is C++'s own: an object of the engine it holds, a value of a class with a constructor of its
@@ -2570,7 +2603,7 @@ class Unit:
                     continue
                 init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
                 held = self.held_life(qtype(c))
-                if self.making(qtype(c)) is not None or (init is not None and held is not None and held[0] in ("owned", "box") and not is_nothing(init)):
+                if self.making(qtype(c)) is not None or (init is not None and held is not None and held[0] in ("owned", "box") and not is_nothing(init)) or self.computed_init(c):
                     need = True
                     break
         finally:
@@ -2710,7 +2743,8 @@ class Unit:
         try:
             t = self.place(qtype(c))
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
-            default = Const(self).literal(init, t) if init is not None and not self.made_by_cpp(qtype(c), init) else self.zero(t)
+            computed = init is not None and self.computed_init(c)   # (set where the object is made: its constructor)
+            default = Const(self).literal(init, t) if init is not None and not computed and not self.made_by_cpp(qtype(c), init) else self.zero(t)
         except Wait as w:
             raise Wait(f"the variable {name} of {self.name}: {w}")
         if c.get("mutable"):
@@ -4767,8 +4801,8 @@ class Emit:
                 node, e, how = e, None, "default"
             if how == "default" and c.get("hasInClassInitializer") and kids(c):
                 e, how = kids(c)[-1], "in_class"
-                if made is None and not (held is not None and held[0] in ("owned", "box") and not is_nothing(e)):
-                    continue   # (the struct's default: what the initializer says)
+                if made is None and not (held is not None and held[0] in ("owned", "box") and not is_nothing(e)) and not u.computed_init(c):
+                    continue   # (the struct's default: what the initializer says - a constant)
                 if not own and any(x.get("kind") == "CXXThisExpr" for x in walk(e)):
                     raise Wait(f"the field {c['name']} of a {q.split('::')[-1]} is made of its other fields, inside another value")
             if how == "default" and made is None:
@@ -15947,7 +15981,7 @@ def convert_unit(job):
         # the functions of its header that need the source file), then the source file's
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                and not ((d.get("isImplicit") and not own_maker(d, tree, world)) or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
