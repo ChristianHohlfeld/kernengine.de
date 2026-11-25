@@ -31,11 +31,11 @@ namespace kern::audio {
 constexpr u32 kOutputChannels = 2;
 constexpr u32 kMaxVoices = 128;
 
-enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count };
+enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count };
 const char* bus_name(Bus b);
 bool parse_bus(std::string_view s, Bus& out);
 
-enum class Rolloff : u8 { inverse = 0, linear, exponential };
+enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential };
 const char* rolloff_name(Rolloff r);
 bool parse_rolloff(std::string_view s, Rolloff& out);
 
@@ -45,7 +45,7 @@ using VoiceId = u64;  // generation << 32 | slot; 0 = none
 inline f32 db_to_gain(f32 db) { return std::pow(10.0f, db / 20.0f); }
 inline f32 gain_to_db(f32 g) { return g > 1e-9f ? 20.0f * std::log10(g) : -180.0f; }
 
-struct ClipInfo {
+struct KERN_BLUEPRINT_TYPE ClipInfo {
   std::string name;
   u32 frames = 0;       // at the mixer rate
   u32 channels = 1;     // 1 or 2
@@ -54,7 +54,7 @@ struct ClipInfo {
   bool loopable = false;  // generated seamless loop
 };
 
-struct PlayParams {
+struct KERN_BLUEPRINT_TYPE PlayParams {
   f32 volume = 1;       // linear gain
   f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
   f32 pan = 0;          // -1 left .. 1 right (2D voices)
@@ -73,19 +73,19 @@ struct PlayParams {
   f32 doppler = 1;        // 0 disables the Doppler shift for this voice
 };
 
-struct BusSettings {
+struct KERN_BLUEPRINT_TYPE BusSettings {
   f32 volume = 1;
   bool muted = false;
   f32 lowpass_hz = 0;     // 0 = off
   f32 reverb_send = 0;    // 0..1 to the master reverb
 };
 
-struct Meter {
+struct KERN_BLUEPRINT_TYPE Meter {
   f32 peak[kOutputChannels] = {};
   f32 rms[kOutputChannels] = {};
 };
 
-struct Stats {
+struct KERN_BLUEPRINT_TYPE Stats {
   u32 voices = 0, audible = 0, virtual_voices = 0, stolen = 0, clips = 0;
   u64 frames_rendered = 0;
   f32 limiter_reduction_db = 0;
@@ -96,7 +96,7 @@ struct Stats {
   f32 peak_hold[kOutputChannels] = {};
 };
 
-struct Listener {
+struct KERN_BLUEPRINT_TYPE Listener {
   Vec3 position;
   Vec3 forward{1, 0, 0}, up{0, 0, 1};
   Vec3 velocity;

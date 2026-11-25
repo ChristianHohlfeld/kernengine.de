@@ -30,7 +30,7 @@ namespace kern {
 
 class Renderer;
 
-struct ExtensionAttribute {
+struct KERN_BLUEPRINT_TYPE ExtensionAttribute {
   const char* key;   // name used by hosts to supply the stream (e.g. "facade")
   u32 size;          // 1..4 floats per vertex
   const char* glsl;  // attribute name in GLSL (e.g. "aFacade")
@@ -67,7 +67,7 @@ class ShaderExtension {
   u32 attribute_base = attr::extension0;
 };
 
-struct ShaderSource {
+struct KERN_BLUEPRINT_TYPE ShaderSource {
   std::string vertex, fragment;
 };
 

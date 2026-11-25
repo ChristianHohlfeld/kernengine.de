@@ -1221,6 +1221,36 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+#### Die Bibliotheken der Engine
+
+Was die Engine über sich selbst sagt, liefert die Engine und nicht das Level eines Spiels. Jeder Header der Engine, den ein
+Blueprint benutzen kann, ist eine **Bibliothek der Engine**. Ihr Name folgt dem Pfad: `kern/physics/physics.h` heißt
+`engine_physics_physics`. Sie enthält die Funktionen, die der Header definiert, und die Typen, die er für Blueprints
+**ausdrücklich kennzeichnet**:
+
+```cpp
+struct KERN_BLUEPRINT_TYPE Pose { Vec3 position; Quat rotation; };      // kern/core/base.h
+enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
+```
+
+- Nur gekennzeichnete Typen sind Werte eines Blueprints. Die übrigen Typen bleiben in der Engine, etwa `logic::Graph`,
+  `game::Level`, `game::Actor` und die Komponenten. Ein Knoten der Engine, der einen ungekennzeichneten Typ nimmt oder
+  gibt, ist kein Knoten (`tools/engine_api.py --list` nennt ihn mit Grund).
+- **Erzeugt beim Bau der Engine:** `tools/engine_api.py --libraries` übersetzt die Header (`tools/cpp_to_blueprint.py
+  --engine <header>`) und schreibt `kern/src/logic/engine_libraries.gen.cpp`. Die Datei steht wie die anderen `*.gen.*`
+  im Repo, deshalb braucht der Bau kein clang. Jede Bibliothek hat eine **Marke** (Hash ihres Textes).
+- **Da in jeder Laufzeit, in jedem Leser und im Editor**, ohne dass ein Level sie enthält (`kern/logic/engine_libraries.h`).
+  `with_engine(blueprints)` ist der eine Weg, auf dem jeder Leser eine Bibliothek findet: Ein Name der Engine ist immer
+  die Bibliothek der Engine. libraries_of, take_libraries, link, from_cpp und apply_cpp gehen ihn selbst.
+- **Ein Level enthält keine Bibliothek der Engine und keine Kopie ihrer Typen oder Funktionen.** Es nennt sie in `uses`
+  und notiert ihre Marken (`"engine": {"engine_physics_physics": "<marke>"}`). Beim Lesen bekommt jeder Blueprint, was er
+  von ihnen benutzt, aus der Engine (`hold_engine`). Bekommt ein Engine-Struct ein Feld dazu, bleibt das Level gültig.
+  Ein Level, das doch eine Kopie hält (einen Akteur `engine_*` oder einen Typ oder eine Funktion mit
+  `"from": "engine_…"`), wird abgelehnt, mit Akteur, Name und Grund. Einen zweiten Leseweg gibt es nicht.
+- Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
+  und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
+- Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.
+
 ### Exporte: eine Funktion unter festem C-Namen
 Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines
 Programms schreibt dafür `KERN_EXPORT(name)`. Ein Blueprint kann das selbst: Die Funktion trägt den Namen

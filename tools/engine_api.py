@@ -2,6 +2,7 @@
 """The engine as nodes: what the engine's headers declare, as nodes of the Blueprint language.
 
   tools/engine_api.py [--list]
+  tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp
 
 A function a header of the engine declares and does not define there is something only the engine
 can do: cast a ray through the physics world, draw a mesh, play a sound. Each is a node - for
@@ -1273,7 +1274,85 @@ def read_engine(flags=()):
     return tree, c2b.Unit(tree, "Engine")
 
 
+# The headers whose types and functions are the engine's libraries (kern/logic/engine_libraries.h): each one library,
+# named by its path (kern/physics/physics.h: engine_physics_physics).
+LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
+                   "gfx/mesh.h", "gfx/passes.h", "gfx/renderer.h", "gfx/shader.h", "logic/logic.h", "math/math.h", "net/client_server.h",
+                   "net/connection.h", "net/reliable.h", "net/transport.h", "physics/physics.h"]
+
+
+def libraries_text(level):
+    """The engine's libraries as the build of the engine has them: each library's JSON - without what it holds of the
+    libraries it uses (the engine gives that when it reads them: kern/logic/engine_libraries.cpp) -, a library after
+    those it uses, with its mark (the hash of its text: what a level that uses it records)."""
+    import hashlib, json
+    graphs = {a["name"]: a["components"]["logic"] for a in level["actors"] if a.get("components", {}).get("logic")}
+    bad = [n for n in graphs if not n.startswith("engine_")]
+    if bad:
+        raise SystemExit(f"engine_api.py --libraries: the engine's libraries would use {', '.join(sorted(bad))} - a library of the engine uses no library of a level")
+    for g in graphs.values():
+        for k in ("structs", "enums", "functions"):
+            if k in g:
+                g[k] = [x for x in g[k] if not x.get("from")]
+                if not g[k]:
+                    del g[k]
+    order, seen = [], set()
+    def visit(n, open_=()):
+        if n in seen:
+            return
+        if n in open_:
+            raise SystemExit(f"engine_api.py --libraries: the engine's libraries {', '.join(open_)} use each other")
+        for u in graphs[n].get("uses", []):
+            if u not in graphs:
+                raise SystemExit(f"engine_api.py --libraries: {n} uses {u}, which is no library of the engine")
+            visit(u, (*open_, n))
+        seen.add(n)
+        order.append(n)
+    for n in sorted(graphs):
+        visit(n)
+    lines = ["// The engine's own libraries: the types and functions of its headers as Blueprints (written by tools/engine_api.py",
+             "// --libraries from the engine's headers - see kern/logic/engine_libraries.h; not edited by hand).",
+             '#include "kern/logic/engine_libraries.h"', "", "namespace kern::logic {", "",
+             "const std::vector<EngineLibraryText>& engine_library_texts() {", "  static const std::vector<EngineLibraryText> all = {"]
+    for n in order:
+        text = json.dumps(graphs[n], separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+        assert ')kl"' not in text
+        mark = hashlib.sha256(text.encode()).hexdigest()[:16]
+        lines.append(f'      {{"{n}", "{mark}", R"kl({text})kl"}},')
+    lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
+    return "\n".join(lines)
+
+
+def write_libraries():
+    """Converts the engine's headers into its libraries (tools/cpp_to_blueprint.py --engine) and writes them."""
+    import json, shutil
+    work = tempfile.mkdtemp(prefix="kern-engine-libraries-")
+    try:
+        driver = os.path.join(work, "program", "engine_libraries.cpp")
+        os.makedirs(os.path.dirname(driver))
+        open(driver, "w").write("".join(f'#include "kern/{h}"\n' for h in LIBRARY_HEADERS))
+        level = os.path.join(work, "engine.klevel")
+        json.dump({"format": "kern-level", "version": 1, "name": "engine", "world": {}, "nextId": 1, "actors": []}, open(level, "w"))
+        cmd = [sys.executable, os.path.join(HERE, "cpp_to_blueprint.py"), "--convert", "kern_engine_libraries", "--level", level]
+        for h in LIBRARY_HEADERS:
+            cmd += ["--engine", os.path.join(KERN, "include", "kern", h)]
+        cmd += [f"-I{KERN}/include", f"-I{KERN}/third_party/box3d/include", "--", driver]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0 or "were not read" in r.stdout + r.stderr:
+            raise SystemExit("engine_api.py --libraries: the engine's headers do not convert:\n" + (r.stdout + r.stderr)[-4000:])
+        text = libraries_text(json.load(open(level)))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    path = os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp")
+    if not os.path.exists(path) or open(path).read() != text:
+        open(path, "w").write(text)
+    print(f"the engine's libraries: {path}")
+
+
 def main(argv):
+    if "--libraries" in argv:   # (the engine's libraries: a run of the converter over the headers - minutes, not seconds)
+        write_libraries()
+        return 0
     tree, unit = read_engine()
     api = Api(tree, unit)
     functions, waiting = [], []

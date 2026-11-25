@@ -138,13 +138,21 @@ CPP_WORDS = set("""alignas alignof and and_eq asm auto bitand bitor bool break c
 constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
-Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
+Bool Int Float Vector Text Actor U8 U16 U32 I8 I16 I32 List Fixed Callback callback loop machine entry detached kern""".split())   # (kOwnWords, kern/src/logic/notation.cpp)
 FORMULA_WORDS = set("min max clamp abs sign copysign remainder floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
 NODES = set()
 NODE_SHAPE = re.compile(r"^(n|go|on|it|machine)\d+$")
+
+
+# --engine <header>: the run writes the engine's own libraries (tools/engine_api.py --libraries) - of each header
+# named so, every function and every type a Blueprint can hold, not only what a program calls. The program is
+# then a file that only includes them.
+ENGINE_RUN = [False]
+ENGINE_HEADERS = set()
+ENGINE_HEADERS_DIR = os.path.join(ROOT, "kern", "include", "kern")   # (the engine's headers: their types are Blueprints' only where marked)
 
 
 def is_word(name):
@@ -1714,7 +1722,7 @@ class Unit:
         """std::pair<A, B>: a struct of its two parts."""
         key = ("pair", a, b)
         if key not in self.structs:
-            name = re.sub(r"\W+", "_", f"{a}_{b}").strip("_") + "_pair"
+            name = re.sub(r"_+", "_", re.sub(r"\W+", "_", f"{a}_{b}")).strip("_") + "_pair"   # (one _ between parts: __ is C++'s own)
             if name in self.type_line:
                 raise Wait(f"two types would be called {name}")
             self.structs[key] = name
@@ -1854,6 +1862,8 @@ class Unit:
                             return True
                     finally:
                         self.deciding.discard(q)
+        if not self.marked(rec):
+            return False   # (plain data the engine keeps to itself: neither a struct of a Blueprint nor an object - see for_blueprints)
         try:
             self.struct(q)
             return False   # (plain data: a struct of the Blueprint)
@@ -2020,10 +2030,23 @@ class Unit:
         t = self.pointed(qtype(p))
         return [f"List<{t}>", "Int"] if t is not None else [self.place(qtype(p))]
 
+    @staticmethod
+    def marked(o):
+        """Is a type marked for Blueprints - or not one of the engine's headers at all?"""
+        f = os.path.abspath(o.get("_file", "") or "")
+        return not f.startswith(ENGINE_HEADERS_DIR + os.sep) or any(isinstance(c, dict) and c.get("kind") == "AnnotateAttr" for c in o.get("inner", ()))
+
+    def for_blueprints(self, q, o):
+        """A type of the engine is a value of a Blueprint only where its header says so (KERN_BLUEPRINT_TYPE,
+        kern/core/base.h): the engine's other types stay inside it."""
+        if not self.marked(o):
+            raise Wait(f"the engine's type {q.split('::')[-1]}, which is not one for Blueprints (its header does not mark it KERN_BLUEPRINT_TYPE)")
+
     def enum(self, q):
         if q in self.enums:
             return self.enums[q]
         o = self.tree.enums[q]
+        self.for_blueprints(q, o)
         numbered, first = [], {}
         for n, x in enum_numbers(o):
             # a value with the number of an earlier one is that value under another name (`kLast = vehicle`)
@@ -2109,6 +2132,7 @@ class Unit:
                 raise Wait(f"the struct {q.split('::')[-1]} contains itself")
             return self.structs[q]
         o = self.tree.records[q]
+        self.for_blueprints(q, o)
         if o.get("bases"):
             raise Wait(f"the class {q.split('::')[-1]} (a base class)")
         self.structs[q] = None
@@ -3011,6 +3035,7 @@ class Unit:
         used = set()
         for f in self.order:
             used.update(word.findall(f.text))
+        used |= getattr(self, "engine_types", set())   # (--engine: every type of the header)
         for name, (_, _, lines) in self.externs.items():   # (what a function of an actor's Blueprint looks like: where it is called)
             if name in used:
                 used.update(word.findall(" ".join(lines)))
@@ -15977,6 +16002,21 @@ def convert_unit(job):
             for f in unit.functions.values():   # (and what those call of it)
                 if f not in unit.all and not f.lifted and f.decl["id"] in unit.function_names:
                     unit.all.append(f)
+            if ENGINE_RUN[0]:   # (a library of the engine has every type its header declares that a Blueprint can hold - not only those its functions name)
+                own = {os.path.abspath(f) for f in files} & ENGINE_HEADERS
+                unit.engine_types = set()
+                for q in sorted(tree.enums):
+                    if os.path.abspath(tree.enums[q].get("_file", "")) in own and not tree.enums[q].get("_local"):
+                        try:
+                            unit.engine_types.add(unit.enum(q))
+                        except Wait:
+                            pass
+                for q in sorted(tree.records):
+                    if os.path.abspath(tree.records[q].get("_file", "")) in own and not tree.records[q].get("_local"):
+                        try:
+                            unit.engine_types.add(unit.struct(q))
+                        except Wait:
+                            pass
             held = (unit.names - world.taken) | set(unit.type_line)
             clash = {n for f in unit.order for n in getattr(f, "local_names", ()) if n in held}
             if clash - reserved:
@@ -16066,6 +16106,10 @@ def apply_to_level(level, folder, blueprints, prune=False):
     """Writes the Blueprints into the level: each is the Blueprint of the actor of its name (made when
     the level has none), read from its text by the engine's own reader - in the order given: a library
     before the Blueprints that use it. All of them, or nothing."""
+    if not ENGINE_RUN[0]:
+        # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
+        # engine has, written by tools/engine_api.py --libraries; a level holds none of them)
+        blueprints = [(name, text) for name, text in blueprints if not name.startswith("engine_")]
     raw = open(level, encoding="utf-8").read()
     doc = json.loads(raw)
     names = {a["name"]: a for a in doc["actors"]}
@@ -16240,6 +16284,11 @@ def main(argv):
                 more.append((d, spaces.split(",")))
             else: texts = v
             i += 2
+        elif opts[i] == "--engine":
+            ENGINE_RUN[0] = True
+            ENGINE_HEADERS.add(os.path.abspath(opts[i + 1]))
+            os.environ["KERN_ENGINE_LIBRARIES"] = "off"   # (tools/blueprint_cpp: the level holds the engine's new libraries, not the built ones)
+            i += 2
         else:
             flags.append(opts[i])
             i += 1
@@ -16411,7 +16460,7 @@ def main(argv):
     program = {world.unit_of(f["file"]) for f in functions.values() if world.program(f["file"])} | set(sources) | set(world.parts)
     # of the Blueprints that are not the program's own (headers of the engine): what the program calls
     wanted = collections.defaultdict(set)
-    todo, seen = [k for k, f in functions.items() if world.program(f["file"])], set()
+    todo, seen = [k for k, f in functions.items() if world.program(f["file"]) or os.path.abspath(f["file"]) in ENGINE_HEADERS], set()
     while todo:
         k = todo.pop()
         if k in seen:
@@ -16428,6 +16477,8 @@ def main(argv):
             unit_files[unit_of[k]].add(functions[k]["file"])
     for u, path in sources.items():
         unit_files[u].add(path)
+    for h in sorted(ENGINE_HEADERS):   # (--engine: a library of the engine also where the header has types only)
+        unit_files[world.unit_of(h)].add(h)
     for p, u in part_of.items():   # (a part is converted in the tree of its file)
         unit_files[p] |= {sources[u]} if u in sources else set()
     for u in set(sources) - set(unit_of.values()):   # (a source file all of whose functions stand in parts has no Blueprint of its own)
@@ -16745,6 +16796,10 @@ def main(argv):
         if home is not None:
             return home
         below = components(name)
+        if not below and ENGINE_RUN[0]:   # (the engine uses no library of a level: a shape of its own stands in the lowest library of the engine that names it)
+            users = sorted(u for u in blue if name in blue[u]["types"])
+            if users:
+                return min(users, key=lambda h: (depth_of(h), h))
         return max(below, key=lambda h: (depth_of(h), h)) if below else SHAPES
     homes = collections.defaultdict(list)
     for name in declared:

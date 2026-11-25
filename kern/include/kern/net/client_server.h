@@ -25,7 +25,7 @@
 
 namespace kern::net {
 
-struct ClientServerConfig {
+struct KERN_BLUEPRINT_TYPE ClientServerConfig {
   u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
   int max_clients = 16;
   f64 timeout = 6;                           // seconds without packets
@@ -35,7 +35,7 @@ struct ClientServerConfig {
   ConnectionConfig connection;
 };
 
-enum class ClientState : i8 {
+enum class KERN_BLUEPRINT_TYPE ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
   error = -1,           // connection error (desync, bad packets)

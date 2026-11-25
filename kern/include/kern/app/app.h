@@ -20,7 +20,7 @@
 namespace kern {
 
 /// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
-enum class Key : u8 {
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
@@ -30,7 +30,7 @@ enum class Key : u8 {
 
 constexpr u32 kMaxTouches = 10;
 
-struct Touch {
+struct KERN_BLUEPRINT_TYPE Touch {
   i32 id = -1;  // < 0: slot unused
   Vec2 start, position, previous;
 };
@@ -71,7 +71,7 @@ class Input {
   bool focused_ = true;
 };
 
-struct Frame {
+struct KERN_BLUEPRINT_TYPE Frame {
   f64 time = 0;   // seconds since start
   f32 dt = 0;     // seconds since the previous frame (clamped to 0.1)
   u64 index = 0;

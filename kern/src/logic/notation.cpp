@@ -17,6 +17,7 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/nodes.h"
@@ -5638,7 +5639,8 @@ bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::stri
   return true;
 }
 
-bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& all) {
+bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& project) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
   if (!r.read()) {
     if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
@@ -5649,7 +5651,8 @@ bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string*
   return true;
 }
 
-bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& all) {
+bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& project) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
   r.before = &before;
   if (!r.read()) {

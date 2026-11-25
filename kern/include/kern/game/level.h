@@ -25,7 +25,7 @@ namespace kern::game {
 
 using ActorId = u32;  // unique within a level, 0 = none
 
-struct Transform {
+struct KERN_BLUEPRINT_TYPE Transform {
   Vec3 position;
   Vec3 rotation;        // Euler degrees (x roll, y pitch, z yaw)
   Vec3 scale{1, 1, 1};
@@ -42,7 +42,7 @@ Transform matrix_transform(const Mat4& m);
 
 // ---- components ----
 
-enum class Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh };
+enum class KERN_BLUEPRINT_TYPE Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh };
 const char* shape_name(Shape s);
 bool parse_shape(std::string_view s, Shape& out);
 

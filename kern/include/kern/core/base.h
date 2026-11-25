@@ -11,6 +11,17 @@
 #include <type_traits>
 #include <utility>
 
+/// A type of the engine a Blueprint holds as a value: a struct or an enum of the engine's libraries
+/// (kern/logic/engine_libraries.h; tools/engine_api.py). Only a type so marked is part of the engine
+/// for Blueprints - a node that takes or gives another type of the engine is no node, and the engine's
+/// other types (logic::Graph, game::Level ...) stay inside it. In front of the name:
+/// struct KERN_BLUEPRINT_TYPE Pose { ... };  enum class KERN_BLUEPRINT_TYPE BodyType : u8 { ... };
+#if defined(__clang__)
+#define KERN_BLUEPRINT_TYPE [[clang::annotate("kern_blueprint_type")]]
+#else
+#define KERN_BLUEPRINT_TYPE
+#endif
+
 /// KERN_CLOCK before a function of the engine that reads a clock: what it gives changes by itself, from one
 /// call to the next with nothing else changed. Its node says so (tools/engine_api.py: EngineFunction::clock) -
 /// a test that plays a program twice does not expect it to give the same twice.
@@ -36,7 +47,7 @@ bool fail(const char* format, ...) __attribute__((format(printf, 1, 2)));
 const char* last_error();
 void clear_error();
 
-enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
+enum class KERN_BLUEPRINT_TYPE LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 void log(LogLevel level, const char* format, ...) __attribute__((format(printf, 2, 3)));
 
 /// Monotonic milliseconds (performance.now() in the browser).

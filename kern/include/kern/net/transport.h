@@ -22,7 +22,7 @@
 
 namespace kern::net {
 
-struct Address {
+struct KERN_BLUEPRINT_TYPE Address {
   u64 id = 0;  // 0 = none
   bool valid() const { return id != 0; }
   bool operator==(const Address&) const = default;
@@ -41,7 +41,7 @@ class Transport {
   virtual void advance_time(f64 time) { (void)time; }
 };
 
-struct SimulatorSettings {
+struct KERN_BLUEPRINT_TYPE SimulatorSettings {
   f32 latency_ms = 0;        // one way
   f32 jitter_ms = 0;         // +- uniform
   f32 loss_percent = 0;
@@ -54,7 +54,7 @@ class Simulator {
  public:
   explicit Simulator(u32 seed = 1) : rng_(seed ? seed : 1) {}
   SimulatorSettings settings;
-  struct Packet {
+  struct KERN_BLUEPRINT_TYPE Packet {
     Address from, to;
     f64 deliver = 0;
     std::vector<u8> data;

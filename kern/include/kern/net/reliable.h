@@ -78,7 +78,7 @@ class SequenceBuffer {
   u16 sequence_ = 0;
 };
 
-struct EndpointConfig {
+struct KERN_BLUEPRINT_TYPE EndpointConfig {
   int max_packet_size = 16 * 1024;     // payload bytes (before fragmentation)
   int fragment_above = 1024;           // bigger packets are fragmented
   int fragment_size = 1024;
@@ -93,7 +93,7 @@ struct EndpointConfig {
   int packet_header_size = 28;         // IPv4 + UDP for bandwidth estimates
 };
 
-struct EndpointStats {
+struct KERN_BLUEPRINT_TYPE EndpointStats {
   f32 rtt_ms = 0;                      // smoothed round trip
   f32 packet_loss = 0;                 // percent
   f32 sent_kbps = 0, received_kbps = 0, acked_kbps = 0;

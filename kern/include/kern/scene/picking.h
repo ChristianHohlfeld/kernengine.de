@@ -8,7 +8,7 @@
 
 namespace kern {
 
-struct PickHit {
+struct KERN_BLUEPRINT_TYPE PickHit {
   u32 mesh = 0;
   u32 instance = 0;
   u32 triangle = 0;
@@ -17,7 +17,7 @@ struct PickHit {
   Vec3 barycentric;
 };
 
-struct PickQuery {
+struct KERN_BLUEPRINT_TYPE PickQuery {
   f32 max_distance = 1800;
   u32 ignore_id = 0;  // 0 = none
   bool include_invisible = false;

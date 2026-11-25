@@ -32,7 +32,7 @@
 
 namespace kern {
 
-struct RendererOptions {
+struct KERN_BLUEPRINT_TYPE RendererOptions {
   i32 width = 960, height = 540;
   bool shadows = false;
   ShadowOptions shadow;
@@ -42,7 +42,7 @@ struct RendererOptions {
 };
 
 /// Linear light colours (x intensity) and atmosphere. Defaults: production day.
-struct Lighting {
+struct KERN_BLUEPRINT_TYPE Lighting {
   Vec3 sun_direction{-0.45f, -0.52f, 0.72f};
   Vec3 sun_color{2.8f, 2.47f, 2.11f};
   Vec3 sky_color{0.469f, 0.609f, 0.85f};
@@ -60,17 +60,17 @@ struct Lighting {
   f32 fog_horizon = 0;         // 0..1: the sky fades into the fog colour at the horizon
 };
 
-struct PointLights {
+struct KERN_BLUEPRINT_TYPE PointLights {
   u32 count = 0;
   f32 pos_range[kMaxPointLights * 4] = {};        // xyz position, w range
   f32 color_intensity[kMaxPointLights * 4] = {};  // rgb colour, w intensity
 };
 
-struct Viewport {
+struct KERN_BLUEPRINT_TYPE Viewport {
   i32 x = 0, y = 0, width = 0, height = 0;
 };
 
-struct RenderParams {
+struct KERN_BLUEPRINT_TYPE RenderParams {
   Vec4 clear_color{0.045f, 0.07f, 0.12f, 1};
   bool has_viewport = false;  // stereo eye / editor view: scissored sub-rectangle, no bloom
   Viewport viewport;
@@ -81,7 +81,7 @@ struct RenderParams {
   u32 framebuffer = 0;        // a render target (create_render_target's framebuffer): drawn there instead of the bound one
 };
 
-struct RenderStats {
+struct KERN_BLUEPRINT_TYPE RenderStats {
   u32 draw_calls = 0, shadow_draw_calls = 0, shadow_resolution = 0;
   bool ao = false;           // ambient occlusion applied this frame
   bool shadow_reused = false;
@@ -91,7 +91,7 @@ struct RenderStats {
   BloomState bloom = BloomState::off;
 };
 
-struct TextureDesc {
+struct KERN_BLUEPRINT_TYPE TextureDesc {
   const u8* rgba = nullptr;  // width * height * 4 bytes
   i32 width = 0, height = 0;
   bool mipmaps = true;

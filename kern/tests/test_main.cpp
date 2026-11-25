@@ -31,6 +31,7 @@
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
 #include "kern/logic/blueprint_class.h"
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
@@ -14776,6 +14777,101 @@ TEST(app_input_and_args) {
   CHECK(e.arg("flag") && !*e.arg("flag"));
   CHECK(e.arg_number("missing", 3) == 3);
   CHECK(e.arg_number("name", 4) == 4);
+}
+
+
+// ---- the engine's own libraries (kern/logic/engine_libraries.h) ----
+
+TEST(engine_libraries_use_no_library_of_a_level) {
+  // What the engine says about itself is the engine's: none of its libraries uses, or holds anything of, a
+  // library that is not the engine's (a library of a level - "shapes" or a game's).
+  const std::vector<std::string>& names = logic::engine_library_names();
+  CHECK(!names.empty());
+  for (const std::string& n : names) {
+    const logic::Graph* g = logic::engine_library(n);
+    CHECK(g && g->library);
+    for (const std::string& u : g->uses) CHECK(logic::is_engine_library(u));
+    for (const logic::StructType& s : g->structs) CHECK(s.from.empty() || logic::is_engine_library(s.from));
+    for (const logic::EnumType& e : g->enums) CHECK(e.from.empty() || logic::is_engine_library(e.from));
+    for (const logic::Function& f : g->functions) CHECK(f.from.empty() || logic::is_engine_library(f.from));
+    CHECK(!logic::engine_library_mark(n).empty());
+  }
+}
+
+TEST(engine_libraries_hold_only_marked_types) {
+  // A type of the engine is a Blueprint's only where its header marks it (KERN_BLUEPRINT_TYPE): physics::Pose is,
+  // the engine's own logic::Graph and game::Level are not.
+  auto has = [](const char* lib, const char* type) {
+    const logic::Graph* g = logic::engine_library(lib);
+    return g && std::any_of(g->structs.begin(), g->structs.end(), [&](const logic::StructType& s) { return s.name == type; });
+  };
+  CHECK(has("engine_physics_physics", "physics_Pose"));
+  CHECK(!has("engine_logic_logic", "logic_Graph"));
+  CHECK(!has("engine_game_level", "game_Level"));
+  CHECK(!has("engine_game_level", "game_Actor"));
+}
+
+namespace {
+/// A level with one Blueprint that keeps a physics::Pose - a type of the engine's library engine_physics_physics.
+game::Level level_with_pose() {
+  logic::Graph g;
+  g.uses = {"engine_physics_physics"};
+  logic::Variable v;
+  v.name = "Where";
+  v.type = logic::PinType::structure;
+  v.of = "physics_Pose";
+  v.value = json::Value::object();
+  g.variables.push_back(v);
+  std::string why;
+  CHECK(logic::take_libraries(g, logic::Blueprints(), &why));  // (the engine's library, found without the level)
+  game::Level l;
+  game::Actor a;
+  a.name = "Probe";
+  a.logic = std::move(g);
+  l.add(std::move(a));
+  return l;
+}
+}  // namespace
+
+TEST(level_holds_no_copy_of_the_engine) {
+  // A level names the engine's libraries and records their marks; it holds no copy of their types. Read back, the
+  // Blueprint has the engine's own type again - whatever fields the engine's struct has now, the level stays valid.
+  const game::Level l = level_with_pose();
+  CHECK(l.actors[0].logic->structs.size() >= 1);
+  const std::string text = game::to_text(l);
+  CHECK(text.find("\"from\": \"engine_physics_physics\"") == std::string::npos);
+  CHECK(text.find("\"engine_physics_physics\": \"" + logic::engine_library_mark("engine_physics_physics") + "\"") != std::string::npos);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));
+  const logic::Graph* engine = logic::engine_library("engine_physics_physics");
+  const logic::StructType* pose = nullptr;
+  for (const logic::StructType& s : back.actors[0].logic->structs)
+    if (s.name == "physics_Pose") pose = &s;
+  CHECK(pose && pose->from == "engine_physics_physics");
+  for (const logic::StructType& s : engine->structs)
+    if (s.name == "physics_Pose") CHECK(pose && logic::same_type(*pose, s));
+  // The marks say what a level was written with: one that is not the engine's now is named, with both.
+  CHECK(logic::engine_changes({{"engine_physics_physics", logic::engine_library_mark("engine_physics_physics")}}).empty());
+  CHECK(logic::engine_changes({{"engine_physics_physics", "0000"}}).find("engine_physics_physics: written with 0000, the engine has ") == 0);
+}
+
+TEST(level_with_a_copy_of_the_engine_is_refused) {
+  // One way: a level that holds a copy of the engine - a library, or a type of one - is refused, with the place and the reason.
+  std::string text = game::to_text(level_with_pose());
+  const std::size_t at = text.find("\"logic\": {");
+  CHECK(at != std::string::npos);
+  text.insert(at + 10, "\"structs\": [{\"name\": \"physics_Pose\", \"from\": \"engine_physics_physics\", \"fields\": []}], ");
+  game::Level l;
+  std::string error;
+  CHECK(!game::from_text(text, l, &error));
+  CHECK(error.find("actor \"Probe\"") == 0 && error.find("the struct physics_Pose is a copy of the engine's library engine_physics_physics") != std::string::npos);
+  // an actor called like a library of the engine
+  game::Level named = level_with_pose();
+  named.actors[0].name = "engine_math_math";
+  error.clear();
+  CHECK(!game::from_text(game::to_text(named), l, &error));
+  CHECK(error.find("actor \"engine_math_math\"") == 0 && error.find("a level does not hold them") != std::string::npos);
 }
 
 }  // namespace

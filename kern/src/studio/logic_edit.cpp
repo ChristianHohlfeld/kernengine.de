@@ -1,5 +1,6 @@
 // Kern Studio: editing logic graphs (the level's and the actors'). Every edit is
 // a level edit (one undo step); the page draws what logic_json() describes.
+#include "kern/logic/engine_libraries.h"
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -406,11 +407,11 @@ namespace {
 /// The Blueprints of a level by the name of the actor that has them: where the libraries a
 /// Blueprint uses are found.
 logic::Blueprints blueprints_of(const game::Level& level) {
-  return [&level](std::string_view name) -> const logic::Graph* {
+  return logic::with_engine([&level](std::string_view name) -> const logic::Graph* {
     for (const game::Actor& a : level.actors)
       if (a.logic && a.name == name) return &*a.logic;
     return nullptr;
-  };
+  });  // (and the engine's own libraries: kern/logic/engine_libraries.h)
 }
 /// Does a Blueprint use the library `name` - itself, or through the libraries it uses?
 bool uses_library(const game::Level& level, const logic::Graph& g, const std::string& name, int depth = 0) {
@@ -806,8 +807,16 @@ json::Value Studio::logic_json() const {
       if (self && uses_library(level_, *other, self->name)) continue;  // (a library does not use what uses it)
       libraries.push(name);
     }
+    // The engine's libraries (kern/logic/engine_libraries.h): every Blueprint can use them; none of them is an actor
+    // of the level, so none can be changed here - the editor shows them as the engine's ("engine": read-only).
+    json::Value engine = json::Value::array();
+    for (const std::string& name : logic::engine_library_names()) {
+      engine.push(name);
+      if (!g->uses_library(name)) libraries.push(name);
+    }
     o.set("uses", std::move(uses));
     o.set("libraries", std::move(libraries));
+    o.set("engineLibraries", std::move(engine));
     // The interface of the engine it is the object of (Graph::implements), and those it could be (kern/docs/blueprint_cpp.md,
     // "Schnittstellen der Engine"): each with the functions the engine calls - a pure one it must have.
     o.set("implements", g->implements);

@@ -66,7 +66,7 @@ constexpr Vec3 hex_color(u32 h) {
   return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f};
 }
 
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -76,7 +76,7 @@ struct Vec4 {
 };
 
 /// Unit quaternion (x, y, z, w).
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -95,7 +95,7 @@ struct Quat {
 };
 
 /// Column-major 4x4 matrix: element (row r, column c) is m[c * 4 + r].
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   static Mat4 identity() { return {}; }
@@ -240,13 +240,13 @@ inline bool invert(const Mat4& src, f64 out[16]) {
   return true;
 }
 
-struct Sphere {
+struct KERN_BLUEPRINT_TYPE Sphere {
   Vec3 center;
   f32 radius = -1;  // < 0: empty
   bool valid() const { return radius >= 0; }
 };
 
-struct Aabb {
+struct KERN_BLUEPRINT_TYPE Aabb {
   Vec3 min{1e30f, 1e30f, 1e30f}, max{-1e30f, -1e30f, -1e30f};
   void extend(Vec3 p) { min = vmin(min, p); max = vmax(max, p); }
   void extend(const Aabb& b) { min = vmin(min, b.min); max = vmax(max, b.max); }
@@ -256,7 +256,7 @@ struct Aabb {
 };
 
 /// Camera description shared by the renderer, picking and stereo rigs.
-struct Camera {
+struct KERN_BLUEPRINT_TYPE Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
   f32 fov = kPi / 3, near = 0.05f, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
