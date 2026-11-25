@@ -14,6 +14,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      probe:
+        description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job"
+        default: ""
 
 permissions:
   contents: write
@@ -21,11 +25,41 @@ permissions:
 # A newer push to a pull request makes its older run moot; on main every push runs to the end, so
 # every green main state is published (a run takes ~17 min and main gets pushes more often).
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ inputs.probe && github.run_id || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # A probe (workflow_dispatch with "probe"): the converter over the named sources on a runner of its own, as mag's "probe" does it - what it
+  # converts, what waits and why, and whether the tests it writes compile. It writes into a copy; the level of the state stays as it is.
+  probe:
+    if: ${{ inputs.probe != '' && inputs.probe != null }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Convert
+        env:
+          SOURCES: ${{ inputs.probe }}
+        run: |
+          W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts"
+          cp kern/games/spawncity/tests/*.h "$W/pt/"; cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"
+          cd kern/games/spawncity
+          set +e
+          KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
+            -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
+          rc=$?; tail -n 200 "$W/convert.log"; echo "convert rc=$rc"; exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe
+          path: |
+            /home/runner/probe/convert.log
+            /home/runner/probe/pt/converted
+            /home/runner/probe/texts
+          retention-days: 2
+
   native:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -42,6 +76,7 @@ jobs:
   # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
   # go with 1/12 of pass 1.
   native-spawncity-build:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
@@ -59,6 +94,7 @@ jobs:
           compression-level: 1
 
   native-spawncity:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     needs: native-spawncity-build
     runs-on: ubuntu-24.04
     timeout-minutes: 75
@@ -84,6 +120,7 @@ jobs:
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
   determinism:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -94,6 +131,7 @@ jobs:
         run: build-mac/kern_lehrer --fingerprint 400 | diff - kern/tests/determinism_fingerprint.txt
 
   build:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -248,6 +286,7 @@ jobs:
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" spawncity-de-dropin
 
   e2e:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -302,6 +341,7 @@ jobs:
   # One input reader for every host (kern.mjs BrowserInput, readGamepad): its contract, the example
   # games and SpawnCity with a real mouse and keyboard - beside the Studio's test, not after it.
   input:
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
