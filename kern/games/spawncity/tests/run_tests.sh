@@ -51,7 +51,17 @@ python3 "$game/tools/embed_level.py" "$game/level/spawncity.klevel" "$game/src/l
 # (and call those of the folder "Program" as their classes, level_blueprints.h, as the game does). The tests
 # call the Blueprints of the program's files as their classes too, wherever they stand: what they prove binds
 # the Blueprint (until the program runs from the level, these still stand in the folder "Source").
-called_by_tests=(terrain_cpp tiles_cpp wanted_cpp combat_rules_cpp equipment_cpp gps_live_cpp nostr_cpp settings_cpp)
+called_by_tests=(
+  terrain_cpp
+  tiles_cpp
+  wanted_cpp
+  combat_rules_cpp
+  equipment_cpp
+  gps_live_cpp
+  nostr_cpp
+  settings_cpp
+  car_cpp
+)
 "$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program "${called_by_tests[@]}"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub, Kern Logic for the rules that are Blueprints, the game layer for the Blueprints
