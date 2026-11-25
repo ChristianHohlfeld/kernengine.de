@@ -1367,11 +1367,14 @@ selbst“).
 
 ### Plätze der Engine
 
-Gibt eine Methode eines Objekts der Engine eine Referenz ohne `const` auf etwas, das das Objekt hält, und
-schlägt sie es nur nach – ihr Rumpf ist genau `return feld_;` (`std::vector<ShotEvent>& shots() { return
-shots_; }`; `tools/engine_api.py` prüft das am Baum, nicht am Namen), keine weiteren Eingänge, und was sie gibt,
-ist selbst kein Objekt der Engine –, dann ist ihr Knoten ein **Platz der Engine** (`EngineFunction::place`, in
-der Liste `place`), keine Kopie. Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
+Sagt eine Methode eines Objekts der Engine in ihrem Header, dass sie ein Platz ist – `KERN_PLACE` vor der Erklärung
+(`kern/core/base.h`: `KERN_PLACE std::vector<ShotEvent>& shots() { return shots_; }`) –, dann ist ihr Knoten ein
+**Platz der Engine** (`EngineFunction::place`, in der Liste `place`), keine Kopie. Ausdrücklich, nicht erkannt: eine
+Methode ohne `KERN_PLACE` ist nie ein Platz, auch wenn ihr Rumpf ein Feld nachschlägt. Wer `KERN_PLACE` schreibt, muss
+einen Platz schreiben: eine Referenz ohne `const` auf etwas, das das Objekt hält, nur nachgeschlagen – der Rumpf genau
+`return feld_;` oder `return feld_[i];` mit dem einen Eingang `i` –, und was sie gibt, ist kein Objekt der Engine.
+Sonst hält `tools/engine_api.py` an und nennt Funktion, Datei, Zeile und Grund (ein `assert` im Rumpf macht aus einem
+Platz nie still eine Kopie). Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
 
 ```cpp
 void Shoot() {
@@ -1581,9 +1584,8 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 **Die Blueprints der Welt.** Was eine Logik laufen lässt, sieht ein Blueprint mit dem Knoten der Engine
 `engine.game.blueprints_running` (`kern::game::blueprints_running(const logic::Runtime&)`, das Handle aus
 `engine.game_world.logic_runtime`): je Blueprint Name, Stufe, Zahl der Funktionen und Knoten seines Graphen, ob er
-angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Ohne Kopie, einzeln: `engine.game.blueprint_count`
-und je Index `blueprint_name` (die Referenz, wo die Logik den Namen hält), `blueprint_tier`, `blueprint_functions`,
-`blueprint_nodes`, `blueprint_disabled` – ein Index ohne Blueprint nennt keinen („“, 0, false). Die Sprache selbst (`kern::logic::`) hat keine
+angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Das ist der eine Weg (keine zweiten Knoten je Index,
+deren Index zwischen zwei Fragen einen anderen Blueprint nennen könnte). Die Sprache selbst (`kern::logic::`) hat keine
 Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `engine_blueprints_running`.
 
 ### Formeln

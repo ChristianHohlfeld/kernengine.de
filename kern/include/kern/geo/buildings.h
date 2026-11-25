@@ -59,7 +59,7 @@ class BuildingBuilder {
   bool step(f64 budget_ms);
   bool done() const { return done_; }
 
-  std::vector<GeoChunk>& chunks() { return chunks_; }
+  KERN_PLACE std::vector<GeoChunk>& chunks() { return chunks_; }
   u32 processed() const { return processed_; }
   u32 built() const { return built_; }
   u32 skipped() const { return skipped_; }

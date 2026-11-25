@@ -1301,6 +1301,9 @@ def main(argv):
     if api.unsaid:   # (a whole number beside a pointer must say in its type that it is its count: no length is guessed)
         raise SystemExit("engine_api.py: a whole number beside a pointer that does not say in its type that it counts what the pointer shows - "
                          "declare it kern::Count<Per> (Per numbers each):\n  " + "\n  ".join(sorted(set(api.unsaid))))
+    if api.false_places:   # (KERN_PLACE says it is a place of the engine: one that cannot be is no copy in its stead)
+        raise SystemExit("engine_api.py: a declaration says KERN_PLACE but is no place of the engine (kern/docs/blueprint_cpp.md, \"Plätze der Engine\"):\n  "
+                         + "\n  ".join(sorted(set(api.false_places))))
     types = [f["type"] for f in functions]
     assert len(set(types)) == len(types), [t for t in types if types.count(t) > 1]
     if "--list" in argv:

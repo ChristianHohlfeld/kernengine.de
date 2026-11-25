@@ -38,7 +38,7 @@ class RoadBuilder {
   bool step(f64 budget_ms);
   bool done() const { return done_; }
   bool failed() const { return failed_; }
-  std::vector<GeoChunk>& chunks() { return chunks_; }
+  KERN_PLACE std::vector<GeoChunk>& chunks() { return chunks_; }
   u32 roads() const { return roads_; }
   u32 triangles() const { return triangles_; }
 

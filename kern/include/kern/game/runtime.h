@@ -248,7 +248,7 @@ class GameWorld {
   void set_alive(ActorId id, bool alive);
   /// Actors whose pose changes while running (dynamic and kinematic bodies).
   void networked_actors(std::vector<ActorId>& out) const;
-  Hud& hud_mut() { return hud_; }
+  KERN_PLACE Hud& hud_mut() { return hud_; }
 
   // ---- replica (network client) ----
   /// Starts `level` as a replica: bodies only follow the poses set here, rules run on the server.
@@ -274,11 +274,11 @@ class GameWorld {
   /// Physics debug geometry as a line list (positions xyz, colours rgb per vertex).
   void debug_lines(bool colliders, bool contacts, bool joints, std::vector<f32>& positions, std::vector<f32>& colors) const;
   /// Messages of the last steps (pickups, joints breaking, ...); cleared by the caller.
-  std::vector<std::string>& events() { return events_; }
+  KERN_PLACE std::vector<std::string>& events() { return events_; }
   /// Sounds of the last steps (jumps, pickups, impacts, ...); cleared by the caller.
-  std::vector<SoundCue>& sound_cues() { return cues_; }
+  KERN_PLACE std::vector<SoundCue>& sound_cues() { return cues_; }
   /// Shots of the last steps (soldiers); presented and then cleared by present().
-  std::vector<ShotEvent>& shots() { return shots_; }
+  KERN_PLACE std::vector<ShotEvent>& shots() { return shots_; }
   /// Applies damage (server / standalone): armor first, death, respawn, score for `attacker`.
   void damage(ActorId target, f32 amount, ActorId attacker, bool head, Vec3 from);
   /// Health of an actor (-1 = no health). Network replicas set what the server sends.
@@ -719,14 +719,5 @@ struct BlueprintRunning {
 /// The Blueprints a logic runs, in the order it runs them (logic::Runtime::instances): what a Blueprint or a tool
 /// shows of them - the node engine.blueprints_running.
 std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic);
-/// The same without a copy, one by one (each a node of the engine - engine.game.blueprint_*): how many Blueprints the
-/// logic runs, and of the one at `at` (in the order it runs them) its name where the logic holds it, how it runs, the
-/// functions and nodes of its graph, whether it stopped. An index the logic has no Blueprint at names none: "", 0, false.
-std::size_t blueprint_count(const logic::Runtime& logic);
-const std::string& blueprint_name(const logic::Runtime& logic, std::size_t at);
-const char* blueprint_tier(const logic::Runtime& logic, std::size_t at);
-std::size_t blueprint_functions(const logic::Runtime& logic, std::size_t at);
-std::size_t blueprint_nodes(const logic::Runtime& logic, std::size_t at);
-bool blueprint_disabled(const logic::Runtime& logic, std::size_t at);
 
 }  // namespace kern::game

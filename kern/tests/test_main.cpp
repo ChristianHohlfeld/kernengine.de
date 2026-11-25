@@ -7830,16 +7830,10 @@ TEST(engine_blueprints_running) {
     const logic::Value first = out[0].item(0);
     CHECK(first.field(0) && first.field(0)->as_text() == "Water" && first.field(2) && first.field(2)->as_int() == static_cast<i64>(water.functions.size()));
   }
-  // one by one, without a copy: the name where the logic holds it; an index of no Blueprint names none
-  CHECK(game::blueprint_count(rt) == 2 && &game::blueprint_name(rt, 1) == &rt.instances()[1]->name() && game::blueprint_name(rt, 2).empty());
-  CHECK(std::string(game::blueprint_tier(rt, 0)) == "interpreter" && std::string(game::blueprint_tier(rt, 9)).empty());
-  CHECK(game::blueprint_functions(rt, 0) == water.functions.size() && game::blueprint_nodes(rt, 1) == game.nodes.size() && game::blueprint_nodes(rt, 2) == 0);
-  CHECK(!game::blueprint_disabled(rt, 0) && !game::blueprint_disabled(rt, 5));
-  const Value logic_handle = Value::integer(objects.adopt(rt));
-  std::vector<Value> one{Value::zero(logic::PinType::text)};
-  CHECK(logic::call_engine(objects, "engine.game.blueprint_name", {logic_handle, Value::integer(1)}, one) && one[0].as_text() == "Running");
-  one = {Value::zero(logic::PinType::integer)};
-  CHECK(logic::call_engine(objects, "engine.game.blueprint_count", {logic_handle}, one) && one[0].as_int() == 2);
+  // (one way: the list - no second way of the same by index, whose index could name a Blueprint that is gone)
+  for (const char* gone : {"engine.game.blueprint_count", "engine.game.blueprint_name", "engine.game.blueprint_tier", "engine.game.blueprint_functions",
+                           "engine.game.blueprint_nodes", "engine.game.blueprint_disabled"})
+    CHECK(logic::engine_function(gone) == nullptr);
   objects.clear();
 }
 

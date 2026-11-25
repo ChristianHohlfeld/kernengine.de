@@ -148,7 +148,7 @@ class Mixer {
   const Listener& listener() const { return listener_; }
   f32 speed_of_sound = 343;
   f32 doppler_factor = 1;   // global scale of the Doppler effect
-  BusSettings& bus(Bus b) { return buses_[static_cast<u32>(b)]; }
+  KERN_PLACE BusSettings& bus(Bus b) { return buses_[static_cast<u32>(b)]; }
   const BusSettings& bus(Bus b) const { return buses_[static_cast<u32>(b)]; }
   /// Reverb character of the master return.
   void set_reverb(f32 room_size, f32 damping, f32 wet);

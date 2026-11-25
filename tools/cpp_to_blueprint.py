@@ -11462,6 +11462,7 @@ class Api:
         self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
         self.implicit_makers = {}   # a class of the engine without a constructor of its own -> the one C++ gives it
         self.unsaid = []   # declarations with a whole number beside a pointer that is no kern::Count<Per> (engine_api.py stops on them)
+        self.false_places = []   # declarations that say KERN_PLACE and are no place - where and why (engine_api.py stops on them)
 
     def unsaid_count(self, d, p, after):
         """A pointer to data (not a handle, not a text) with a whole number beside it that does not say in its
@@ -11853,6 +11854,8 @@ class Api:
         counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
         place, index = False, 0
+        if ret == "void" and self.says(d, "KERN_PLACE"):
+            self.false_places.append(f"{self.home(d)}::{d['name']} ({self.where(d)}): it gives nothing")
         if ret != "void":
             bt, gives_place, handle = self.handed(ret)
             raws["result"] = ret
@@ -11861,8 +11864,18 @@ class Api:
             # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
             # (or an entry of an array the object holds, at the one input - `return buses_[static_cast<u32>(b)];`: its
             # length is known, `index`; an input outside it names no entry, the call fails as it fails without an object)
+            # It is one only where its declaration says so (KERN_PLACE, kern/core/base.h) - a body is not read for it; one
+            # that says so and cannot be one is reported with its place and why (Api.false_places: the generator stops).
             looked = self.looks_up(d) if gives_place and handle is None and method and len(outs) == 1 else None
-            place = looked == 0 and not ins[1:] or bool(looked) and len(ins[1:]) == 1 and ins[1][2] is None
+            fits = looked == 0 and not ins[1:] or bool(looked) and len(ins[1:]) == 1 and ins[1][2] is None
+            if self.says(d, "KERN_PLACE") and not fits:
+                why = ("it is no method of an object of the engine" if not method else
+                       "it gives no reference (not const) to something the object holds" if not gives_place else
+                       "what it gives is an object of the engine itself (its handle, no place)" if handle is not None else
+                       "its body does more than look up a member (`return member_;`, `return member_[i];`)" if looked is None else
+                       "it takes more than the one index of the entry it looks up")
+                self.false_places.append(f"{self.home(d)}::{d['name']} ({self.where(d)}): {why}")
+            place = fits and self.says(d, "KERN_PLACE")
             index = looked if place else 0
         qualified = self.home(d) + "::" + d["name"]
         # (a function that formats a text writes it somewhere - the last error, the log: a step)
@@ -11920,11 +11933,22 @@ class Api:
 
     def reads_clock(self, d):
         """Does the declaration say that the function reads a clock (`KERN_CLOCK f64 now_ms();`, kern/core/base.h)?"""
+        return self.says(d, "KERN_CLOCK")
+
+    def says(self, d, mark):
+        """Does the declaration begin with `mark` (KERN_CLOCK, KERN_PLACE - kern/core/base.h) on its line?"""
         text = self.tree.text(d.get("_file", ""))
         a = d.get("_at", (None, None))[0]
         if a is None or not text:
             return False
-        return re.match(r"\s*KERN_CLOCK\b", text[text.rfind("\n", 0, a) + 1:]) is not None
+        return re.match(r"\s*" + mark + r"\b", text[text.rfind("\n", 0, a) + 1:]) is not None
+
+    def where(self, d):
+        """file:line of a declaration."""
+        text = self.tree.text(d.get("_file", ""))
+        a = d.get("_at", (None, None))[0]
+        line = text.count("\n", 0, a) + 1 if text and a is not None else 0
+        return f"{d.get('_file', '?')}:{line}"
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
