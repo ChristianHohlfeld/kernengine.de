@@ -11192,6 +11192,8 @@ class Emit:
             # own: the same number - Sized::operator i64, Whole::operator i64, Truth::operator bool&)
             want = self.tp(b)
             return self.ex(base, want), want
+        if base is not None and name == "view" and len(kids(b)) == 1 and self.ctype(base) == "kern::logic::Text":
+            return self.ex(base, "Text"), "Text"   # (the characters of a text of the language, as a std::string_view: that text)
         if self.actor_get(b) is not None:
             return self.get_on(b, self.actor_get(b))
         if self.actor_bind(b) is not None:
