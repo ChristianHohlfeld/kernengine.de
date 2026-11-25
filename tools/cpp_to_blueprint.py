@@ -14211,6 +14211,13 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
+            if q in self.u.world.state_implements:
+                # (a class that is the object of an interface of the engine: in the test it is the class as such - the
+                # interface is the engine's, its stand-in has no functions to override; what the engine calls of it the
+                # test calls directly)
+                head, *rest = segments
+                text = re.sub(r"(\b(?:class|struct)\s+\w+(?:\s+final)?)\s*:\s*public\s+(?:::)?[\w:]+", r"\1", head[0], count=1)
+                segments = [(re.sub(r"\boverride\b", "", text), head[1], head[2])] + [(re.sub(r"\)\s*(const\s*)?override\b", lambda m_: ")" + (" " + m_.group(1).strip() if m_.group(1) else ""), x), i_, n_) for x, i_, n_ in rest]
             inside_of = self.local_path(outer(q), local_of(d)) if not self.outside_its_class(q, G.records) else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
@@ -14765,6 +14772,11 @@ class TestWriter:
                     else:
                         inner.append((raw[a0:ma].count("\n"), raw[a0:mb].count("\n"), ("member", m["id"])))
                 text += self.cut(d["_file"], at, b0)
+                if q in self.u.world.state_implements:
+                    # (a class that is the object of an interface of the engine: in the test it is the class as such - the
+                    # interface is the engine's, its stand-in has no functions to override; the test calls them directly)
+                    text = re.sub(r"(\b(?:class|struct)\s+\w+(?:\s+final)?)\s*:\s*public\s+(?:::)?[\w:]+", r"\1", text, count=1)
+                    text = re.sub(r"\s*\boverride\b", "", text)
                 first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";", records=records))
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
