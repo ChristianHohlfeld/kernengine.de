@@ -13616,17 +13616,6 @@ class TestWriter:
                     continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
-            # an interface of the engine a class of the program implements (kern::App, ShaderExtension): its virtual functions
-            # the test's copy of that class overrides, as the engine's header declares them - virtual, with their body there (or
-            # `= 0`) -, so that `override` in the copy has its function. (One the source also calls is that declaration, virtual.)
-            for v in self.overridden(q):
-                called = re.compile(r"\b" + re.escape(v["name"]) + r"\s*\(")
-                if any(called.search(x) for x in decls):
-                    decls = [("  virtual " + x.lstrip()) if called.search(x) and not re.match(r"\s*virtual\b", x) else x for x in decls]
-                    continue
-                text = tree.source(v).strip()
-                if text:
-                    decls.append("  " + (text if re.match(r"virtual\b", text) else "virtual " + text) + ("" if text.endswith(("}", ";")) else ";"))
             if fields.get(q):
                 # (the fields the program reads and sets: its own, kept as the engine's by converted::FieldSync)
                 shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
@@ -13638,6 +13627,17 @@ class TestWriter:
                     syncs.append(f'converted::field_sync<{t}, {shape(t)}>("{f["type"]}", s, s.{f["decl"]["name"]}, set);')
                 decls += [f"  static void kern_sync(void* o, bool set) {{ {name}& s = *static_cast<{name}*>(o); {' '.join(syncs)} }}",
                           f"  converted::FieldSync kern_fields{{this, &{name}::kern_sync}};"]
+            # an interface of the engine a class of the program implements (kern::App, ShaderExtension): its virtual functions
+            # the test's copy of that class overrides, as the engine's header declares them - virtual, with their body there (or
+            # `= 0`) -, so that `override` in the copy has its function. (One the source also calls is that declaration, virtual.)
+            for v in self.overridden(q):
+                called = re.compile(r"\b" + re.escape(v["name"]) + r"\s*\(")
+                if any(called.search(x) for x in decls):
+                    decls = [("  virtual " + x.lstrip()) if called.search(x) and not re.match(r"\s*virtual\b", x) else x for x in decls]
+                    continue
+                text = tree.source(v).strip()
+                if text:
+                    decls.append("  " + (text if re.match(r"virtual\b", text) else "virtual " + text) + ("" if text.endswith(("}", ";")) else ";"))
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
@@ -15748,11 +15748,13 @@ def wire_words(p, before, aliases):
         return ["text"]
     if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
         return ["bytes", "at"]
-    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return ["floats", "at"]
+    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] in (["bytes", "at"], ["floats", "at"])):
         return ["len"]
     if t in C_WORDS:
         return [C_WORDS[t]]
-    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
+    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
 
 
 def wire_out(d, aliases):

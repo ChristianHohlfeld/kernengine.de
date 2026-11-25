@@ -59,7 +59,7 @@ Wait, kids, qtype = c2b.Wait, c2b.kids, c2b.qtype
 
 KERN = os.path.join(os.path.dirname(HERE), "kern")
 # The headers whose functions are nodes: what a game is written against.
-HEADERS = ["core/base.h", "core/jobs.h", "app/app.h", "audio/audio.h", "audio/synth.h", "physics/physics.h", "gfx/mesh.h", "gfx/renderer.h",
+HEADERS = ["core/base.h", "core/jobs.h", "app/app.h", "audio/audio.h", "audio/synth.h", "physics/physics.h", "gfx/mesh.h", "gfx/renderer.h", "app/project.h",
            "geo/mesh_data.h", "geo/primitives.h", "geo/earcut.h", "geo/buildings.h", "geo/roads.h", "game/level.h", "game/sound.h", "game/runtime.h",
            "net/client_server.h"]
 Api, snake = c2b.Api, c2b.snake   # (the converter's own: a call in a game's source and its node have the same pins)

@@ -1262,6 +1262,48 @@ TEST(game_euler_and_transforms) {
   CHECK(!game::parse_hex_color("ff8000", c) && !game::parse_hex_color("#ggg000", c));
 }
 
+// The project's settings (kern/app/project.h): a level without them writes none and starts as the App says; with
+// them they round-trip as written (a 32-bit number as its decimal), stand before the world (a program reads them
+// first), and a phone's part starts from the desktop's shadows.
+TEST(game_level_project_settings) {
+  game::Level l = game::basic_level();
+  CHECK(!l.project.set && game::to_text(l).find("\"project\"") == std::string::npos);
+  l.project.set = true;
+  l.project.renderer.shadows = true;
+  l.project.renderer.shadow.resolution = 2048;
+  l.project.renderer.shadow.extent = 110;
+  l.project.renderer.shadow.bias = 0.0014f;
+  l.project.renderer.ao.quality = AoQuality::medium;
+  l.project.renderer.ao.half_resolution = false;
+  l.project.mobile_set = true;
+  l.project.mobile_shadow.resolution = 1024;
+  l.project.mobile_shadow.bias = 0.0016f;
+  l.project.mobile_shadow.filter = 4;
+  l.project.mobile_ao.quality = AoQuality::low;
+  l.project.heap_reserve_mb = 320;
+  const std::string text = game::to_text(l);
+  CHECK(text.find("\"project\"") < text.find("\"world\""));
+  CHECK(text.find("0.0014,") != std::string::npos);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));
+  CHECK(game::to_text(back) == text);
+  const ProjectSettings& p = back.project;
+  CHECK(p.set && p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
+  CHECK(p.renderer.ao.quality == AoQuality::medium && !p.renderer.ao.half_resolution && p.renderer.bloom.enabled && p.renderer.grade);
+  CHECK(p.mobile_set && p.mobile_shadow.resolution == 1024 && p.mobile_shadow.bias == 0.0016f && p.mobile_shadow.filter == 4 && p.mobile_ao.quality == AoQuality::low);
+  CHECK(p.heap_reserve_mb == 320);
+  // The member alone, as a program carries it (kern_project_text): a phone's part takes the desktop's shadows
+  // where it names none; nothing, or no object, is no settings.
+  ProjectSettings q;
+  CHECK(project_from_text("{\"renderer\":{\"shadow\":{\"extent\":90}},\"mobile\":{\"ao\":{\"quality\":\"low\"}},\"heapReserveMb\":64}", q));
+  CHECK(q.set && q.renderer.shadow.extent == 90 && q.mobile_set && q.mobile_shadow.extent == 90 && q.mobile_ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
+  CHECK(!project_from_text("", q) && !q.set);
+  CHECK(!project_from_text("[1]", q) && !q.set);
+  CHECK(!project_from_text("{broken", q) && !q.set);
+  CHECK(project_from_text("{\"heapReserveMb\":-5}", q) && q.heap_reserve_mb == 0);
+}
+
 TEST(game_level_round_trip_and_validation) {
   game::Level l = game::physics_lab_level();
   const std::string text = game::to_text(l);
@@ -2360,6 +2402,14 @@ struct Host : kern::Blueprint {
   }
   KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
   }
+  struct game_takeResult { List<Int> Result = List<Int>{}; };
+  KERN_EXPORT_AS("game_take", "-> bytes") game_takeResult game_take() {
+    return {List<Int>{}};
+  }
+  struct game_audioResult { List<Float> Result = List<Float>{}; };
+  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<Float>& samples, Int samples_at = 0, Int count = 0, Int rate = 0) {
+    return {samples};
+  }
 };
 )kn";
   logic::Graph g;
@@ -2382,6 +2432,25 @@ struct Host : kern::Blueprint {
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
         glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+  // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
+  // when the list is empty); bytes go out the same way, as u8
+  CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
+        glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3) {") != std::string::npos &&
+        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out(held, ") != std::string::npos);
+  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take() {") != std::string::npos && glue.find("return kern::logic::export_bytes_out(held, ") != std::string::npos);
+  {
+    std::vector<u8> held_bytes;
+    std::vector<f32> held_floats;
+    const f32 in[3] = {0.5f, -1.25f, 3.0f};
+    const logic::List<f64> floats = logic::export_floats_in(in, 3);
+    CHECK(floats.size() == 3 && floats[1] == -1.25);
+    const f32* out = logic::export_floats_out(held_floats, floats);
+    CHECK(out && out[0] == 0.5f && out[2] == 3.0f);
+    const u8 bytes_in[2] = {7, 255};
+    const u8* bytes_out = logic::export_bytes_out(held_bytes, logic::export_bytes_in(bytes_in, 2));
+    CHECK(bytes_out && bytes_out[0] == 7 && bytes_out[1] == 255);
+    CHECK(!logic::export_bytes_out(held_bytes, logic::List<logic::Whole>{}) && !logic::export_floats_out(held_floats, logic::List<f64>{}));   // (nothing: none)
+  }
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -2391,7 +2460,11 @@ struct Host : kern::Blueprint {
   CHECK(!logic::export_ok(f));
   f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of Int, not of a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of Float, not of Int)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats i32 i32 f32 -> text";   // (floats without their len)
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
   CHECK(!logic::export_ok(f));

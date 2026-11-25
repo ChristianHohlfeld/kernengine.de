@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "kern/api/c_api.h"
+#include "kern/app/project.h"
 
 namespace kern {
 
@@ -153,6 +154,36 @@ u64 g_frame = 0;
 bool g_running = false;
 }  // namespace
 
+/// The text of the level's member "project" (kern/app/project.h): a game built from a level defines it (SpawnCity:
+/// tools/embed_level.py writes it into level_data.cpp); without, the App decides (configure(), start()).
+extern "C" __attribute__((weak)) const char* kern_project_text(u32* length) {
+  *length = 0;
+  return nullptr;
+}
+
+namespace kern {
+/// Between the renderer's init and App::start: the heap grown once - one block taken and given back stays in the
+/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece -
+/// and with mobile=1 the phone's shadows and ambient occlusion on the renderer.
+void apply_project_start(const ProjectSettings& p, Engine& e) {
+  if (p.heap_reserve_mb > 0)
+    if (void* reserve = std::malloc(static_cast<std::size_t>(p.heap_reserve_mb) << 20)) std::free(reserve);
+  if (p.mobile_set && e.arg_number("mobile", 0) > 0) {
+    ShadowOptions s = p.mobile_shadow;
+    e.renderer().set_shadows(&s);
+    e.renderer().set_ambient_occlusion(p.mobile_ao);
+  }
+}
+/// The project's settings the program carries (kern_project_text()).
+ProjectSettings program_project() {
+  u32 n = 0;
+  const char* text = kern_project_text(&n);
+  ProjectSettings p;
+  if (text) project_from_text(std::string_view(text, n), p);
+  return p;
+}
+}  // namespace kern
+
 Engine& engine_instance() {
   static Engine engine(c_api_renderer());
   return engine;
@@ -167,10 +198,12 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   if (!g_app) { fail("no application"); return 0; }
   Engine& engine = engine_instance();
   g_engine = &engine;
-  RendererOptions options = g_app->configure();
+  const ProjectSettings project = program_project();
+  RendererOptions options = project.set ? project.renderer : g_app->configure();
   options.width = width;
   options.height = height;
   if (!engine.renderer().init(options, g_app->extensions())) return 0;
+  if (project.set) apply_project_start(project, engine);
   if (!g_app->start(engine)) return 0;
   g_running = true;
   g_start_ms = g_last_ms = -1;

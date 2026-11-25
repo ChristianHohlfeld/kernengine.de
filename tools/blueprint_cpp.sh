@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # The Blueprints of a Kern level as C++ classes a game links (tools/blueprint_cpp.cpp).
 #
-#   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder>]
+#   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]
 #
 # With <out.h> and <folder>: the classes of the Blueprints of that folder of the level - those the
-# program's own C++ calls directly - and of the libraries they use go into <out.h> (see blueprint_cpp.cpp).
+# program's own C++ calls directly - and of the libraries they use go into <out.h> (see blueprint_cpp.cpp); the
+# actors named after the folder too, wherever they stand.
 #
 # Builds the tool with the host compiler - once per state of its sources (Kern Logic, the node
 # library and the tool itself; cached in $TMPDIR/kern-blueprint-cpp) - and runs it. HOST_CXX / HOST_CC override

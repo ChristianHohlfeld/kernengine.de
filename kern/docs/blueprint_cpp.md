@@ -1240,7 +1240,12 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   (u32) – so kommt das C++ `const char* text, u32 length` eines Programms Wort für Wort herüber.
   `at`: ein Int-Eingang ohne C-Parameter, direkt nach `bytes` – der Platz in der Liste. Ein Zeiger des C++ ist
   im Blueprint die Liste und der Platz darin (wie überall, wo der Konverter einen Zeiger liest); vom Host kommt
-  der Anfang, also 0. So wird `const u8* bytes, u32 length` zu `bytes at len`.
+  der Anfang, also 0. So wird `const u8* bytes, u32 length` zu `bytes at len`. `floats`: wie `bytes`, ein Zeiger
+  auf f32 – eine `List<Float>`, jede Zahl, wie C++ ein f32 wandelt (`const f32* samples, u32 count` wird
+  `floats at len`).
+- Heraus geht auch eine Liste: `bytes` (eine `List<Int>`) und `floats` (eine `List<Float>`) geben einen Zeiger auf
+  ihre Einträge als u8 bzw. f32 (wie C++ wandelt), gehalten vom Export selbst bis zu seinem nächsten Aufruf; wie viele
+  es sind, weiß der Host (wie beim C++ eines Programms, das `const f32*` gibt). Eine leere Liste gibt keinen (null).
 - Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
   die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
   `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
@@ -2050,7 +2055,15 @@ des Programms, die zu einem Blueprint geworden ist), ruft ihn als seine Klasse �
 Nachschlagen beim Namen, ohne verpackte Werte (`kern/logic/blueprint_class.h`):
 `tools/blueprint_cpp.sh level.klevel out.cpp out.h <Ordner>` schreibt die Klassen der Blueprints
 dieses Ordners des Levels und der Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
-unter ihren Namen im Namensraum `blueprints`), `out.cpp` bindet ihn ein und hat ihren Kleber.
+unter ihren Namen im Namensraum `blueprints`). Jede dieser Klassen steht in einem Header für sich
+(`out/<Namensraum>.h`, er bindet die Header der Bibliotheken ein, die sie benutzt), mit dem, wie ihre
+Strukturen als Werte gehalten werden (`kern::logic::detail::Held`): jede Datei des Programms, die die
+Klasse einbindet, übersetzt ihre Funktionen auch dort, wo sie einem Knoten der Engine eine Struktur
+geben. Ihr Kleber steht in einer Quelle für sich (`out_<Namensraum>.cpp`, mit dem Binden der Klasse);
+`out.h` bindet alle Header ein, `out.cpp` hält die übrigen Blueprints und `blueprints::bind`. So
+übersetzt jede Datei nur, was ihre Klasse braucht – nebeneinander, mit wenig Speicher je Datei (alle
+Blueprints eines großen Spiels in einer Datei brauchen mehr als 7 GB). Header und Quellen von Klassen,
+die das Level nicht mehr hat, löscht das Werkzeug.
 Das Programm nimmt die Typen der Klasse (`blueprints::qr_code::qr_Code`): ein Typ, eine Referenz
 bindet. Es bindet jede Klasse einmal, wenn die Logik des Levels läuft, an das Objekt, als das die
 Laufzeit den Blueprint ausführt – `kern::logic::bind_blueprint<T>(runtime)` sucht die Instanz,

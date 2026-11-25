@@ -48,8 +48,28 @@ for p in "${pids[@]}"; do wait "$p"; done
 # The level file (the project: world settings, actors, their Blueprints) as a source the game links.
 python3 "$game/tools/embed_level.py" "$game/level/spawncity.klevel" "$game/src/level_data.cpp"
 # ... and its Blueprints as C++ classes, as the game links them: the tests run the rules as the game does
-# (and call those of the folder "Program" as their classes, level_blueprints.h, as the game does).
-"$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program
+# (and call those of the folder "Program" as their classes, level_blueprints.h, as the game does). The tests
+# call the Blueprints of the program's files as their classes too, wherever they stand: what they prove binds
+# the Blueprint (until the program runs from the level, these still stand in the folder "Source").
+called_by_tests=(
+  terrain_cpp
+  tiles_cpp
+  wanted_cpp
+  combat_rules_cpp
+  equipment_cpp
+  gps_live_cpp
+  nostr_cpp
+  settings_cpp
+  perf_cpp
+  look_cpp
+  road_graph_cpp
+  people_cpp
+  world_traffic_cpp
+  controls_cpp
+  touch_play_cpp
+  mp_rules_cpp
+)
+"$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program "${called_by_tests[@]}"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub, Kern Logic for the rules that are Blueprints, the game layer for the Blueprints
 # that ask the world - a ray, an actor), every component the game is built with (kern/build.sh --app

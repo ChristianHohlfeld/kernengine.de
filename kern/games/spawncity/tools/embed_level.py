@@ -13,7 +13,8 @@ switches, its C++ is what runs and its Blueprint stands beside it, bound to it b
 would only load and carry them (most of the level's text). What the actors that stay use as their libraries
 (`uses` of their Blueprints, and what those use) stays with them, wherever it stands: a Blueprint of the folder
 "Program" (a file of the game that is a Blueprint now) calls libraries of "Source" (BLUEPRINTS.md, "5 - Umschalten").
-The tests embed the whole level. --level-out writes the level as it is embedded, for the tools that follow
+The tests embed the whole level. The member "project" (the settings the engine applies at start,
+kern/app/project.h) goes out on its own too: kern_project_text(). --level-out writes the level as it is embedded, for the tools that follow
 (tools/blueprint_cpp.sh).
 """
 import json, pathlib, sys
@@ -60,6 +61,8 @@ if ')KLEVEL"' in text:
 # compilers limit one string literal (64 KiB in the standard): pieces of 8 KiB, joined by the compiler
 pieces = [text[i:i + 8192] for i in range(0, len(text), 8192)] or [""]
 body = "\n".join('    R"KLEVEL(' + p + ')KLEVEL"' for p in pieces)
+# the project's settings the engine applies at start (kern/app/project.h): the member "project", on its own
+project = json.dumps(doc["project"], ensure_ascii=False, separators=(",", ":")) if isinstance(doc.get("project"), dict) else ""
 source = f"""// Generated from level/{level.name} by tools/embed_level.py - do not edit (edit the level).
 #include "rules.h"
 
@@ -72,6 +75,13 @@ std::string_view level_text() {{
 }}
 
 }}  // namespace sc::rules
+
+// The level's "project" for the engine (kern_app_start, kern/app/project.h).
+extern "C" const char* kern_project_text(unsigned* length) {{
+  static const char text[] = R"KLEVEL({project})KLEVEL";
+  *length = sizeof text - 1;
+  return text;
+}}
 """
 if not out.exists() or out.read_text(encoding="utf-8") != source:
     out.write_text(source, encoding="utf-8")

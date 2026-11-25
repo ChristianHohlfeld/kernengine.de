@@ -1066,6 +1066,7 @@ json::Value to_json(const Level& level) {
   o.set("format", "kern-level");
   o.set("version", 1);
   o.set("name", level.name);
+  if (level.project.set) o.set("project", project_to_json(level.project));  // before the world: a program reads it first
   o.set("world", world_to_json(level.world));
   json::Value cam = json::Value::object();
   cam.set("position", vec(level.camera.position));
@@ -1139,6 +1140,7 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   Level l;
   Reader r{doc, error};
   r.string("name", l.name);
+  project_from_json(doc["project"], l.project);
   if (!world_from_json(doc["world"], l.world, error)) return false;
   if (const json::Value* c = doc.find("camera")) {
     Reader cr{*c, error};
