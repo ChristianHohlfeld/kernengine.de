@@ -110,12 +110,12 @@ KERN_EXPORT(sc_image_failed) void sc_image_failed(kern::i32 z, kern::i32 x, kern
 // ---- input the App host does not forward ----
 KERN_EXPORT(sc_gamepad) void sc_gamepad(kern::i32 connected, kern::f32 lx, kern::f32 ly, kern::f32 rx, kern::f32 ry, kern::f32 lt, kern::f32 rt, kern::u32 buttons,
                                         kern::i32 active) {
-  sc::PadState& p = sc::game().pad;
-  p.pressed = buttons & ~p.buttons;
-  p.connected = connected != 0;
-  p.lx = lx; p.ly = ly; p.rx = rx; p.ry = ry; p.lt = lt; p.rt = rt;
-  p.buttons = buttons;
-  p.active = active != 0;
+  // (the pad of the game's one object, named where it is set: its fields)
+  sc::game().pad.pressed = buttons & ~sc::game().pad.buttons;
+  sc::game().pad.connected = connected != 0;
+  sc::game().pad.lx = lx; sc::game().pad.ly = ly; sc::game().pad.rx = rx; sc::game().pad.ry = ry; sc::game().pad.lt = lt; sc::game().pad.rt = rt;
+  sc::game().pad.buttons = buttons;
+  sc::game().pad.active = active != 0;
 }
 /// VR: a controller's pointing ray in the room (WebXR local space: x right, y up, -z forward).
 KERN_EXPORT(sc_vr_hand) void sc_vr_hand(kern::i32 side, kern::i32 valid, kern::f32 px, kern::f32 py, kern::f32 pz, kern::f32 qx, kern::f32 qy, kern::f32 qz, kern::f32 qw) {
