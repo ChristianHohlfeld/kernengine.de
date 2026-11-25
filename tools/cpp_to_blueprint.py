@@ -15204,8 +15204,9 @@ def objects_made(tree):
 
 def engine_interface_of(tree, rec):
     """The interface of the engine a class of the program derives from (kern/docs/blueprint_cpp.md, "Schnittstellen der
-    Engine"): its one base, public, a class of the engine whose functions are all virtual and that holds nothing
-    (`class SpawnCityApp final : public kern::App`) - by the name the Blueprints give it (App); else None."""
+    Engine"): its one base, public, a class of the engine whose functions are all virtual, and what it holds the class
+    does not name (`class SpawnCityApp final : public kern::App`) - [the name the Blueprints give it (App), its pure
+    functions]; else None."""
     bases = rec.get("bases") or []
     if len(bases) != 1 or bases[0].get("access", "public") != "public" or bases[0].get("isVirtual"):
         return None
@@ -15214,8 +15215,18 @@ def engine_interface_of(tree, rec):
     if not q.startswith(ENGINE + "::") or base is None or base.get("bases"):
         return None
     methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
-    if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
+    if not methods or not all(c.get("virtual") for c in methods):
         return None
+    # (what the interface holds - `u32 material_base`, set by the renderer - is the engine's: the engine's object of
+    # the Blueprint holds it; the class must not name it)
+    held = {c["id"] for c in kids(base) if c.get("kind") == "FieldDecl"}
+    if held:
+        mine = rec.get("_q")
+        for d in tree.body.values():
+            if tree.owner.get(d.get("id")) == mine and any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(d)):
+                return None
+        if any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(rec)):
+            return None
     return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
 
 
