@@ -14,8 +14,11 @@
 #include "kern/api/c_api.h"
 #include "kern/kern.h"
 
-namespace {
+namespace sc {
 
+// The game as the App the engine runs (kern::App) - in the program's namespace, its one object made where it is first
+// asked for, as Game's (game()): the state of a Blueprint that implements the interface (kern/docs/blueprint_cpp.md,
+// "Schnittstellen der Engine").
 class SpawnCityApp final : public kern::App {
  public:
   kern::RendererOptions configure() override {
@@ -66,6 +69,15 @@ class SpawnCityApp final : public kern::App {
 
 };
 
+SpawnCityApp& app() {
+  static SpawnCityApp a;
+  return a;
+}
+
+}  // namespace sc
+
+namespace {
+
 std::string g_result;
 const char* result(std::string s) {
   g_result = std::move(s);
@@ -74,10 +86,7 @@ const char* result(std::string s) {
 
 }  // namespace
 
-kern::App* kern_create_app() {
-  static SpawnCityApp app;
-  return &app;
-}
+kern::App* kern_create_app() { return &sc::app(); }
 
 /// Length of the last string an sc_* export returned.
 KERN_EXPORT(sc_result_length) kern::u32 sc_result_length() { return static_cast<kern::u32>(g_result.size()); }
@@ -92,16 +101,17 @@ KERN_EXPORT(sc_offline) void sc_offline() { sc::game().city().go_offline(); }
 
 // ---- elevation tiles (Terrarium PNGs): the page decodes the image, the game the heights ----
 KERN_EXPORT(sc_dem_requests) const char* sc_dem_requests() { return result(sc::game().city().terrain().take_requests()); }
-/// RGBA pixels of a requested elevation tile (width x height x 4 bytes, copied).
-KERN_EXPORT(sc_dem_data) void sc_dem_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 width, kern::u32 height) {
-  sc::game().city().terrain().provide(sc::TileKey{z, x, y}, {rgba, static_cast<std::size_t>(width) * height * 4}, width, height);
+/// RGBA pixels of a requested elevation tile (`length` = width x height x 4 bytes, copied).
+KERN_EXPORT(sc_dem_data) void sc_dem_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 length, kern::u32 width, kern::u32 height) {
+  sc::game().city().terrain().provide(sc::TileKey{z, x, y}, {rgba, length}, width, height);
 }
 KERN_EXPORT(sc_dem_failed) void sc_dem_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().terrain().fail(sc::TileKey{z, x, y}); }
 
 // ---- aerial imagery for the ground colour (world_ground.mjs): the page decodes, the game averages ----
 KERN_EXPORT(sc_image_requests) const char* sc_image_requests() { return result(sc::game().city().terrain().take_image_requests()); }
-KERN_EXPORT(sc_image_data) void sc_image_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 width, kern::u32 height) {
-  sc::game().city().terrain().provide_image(sc::TileKey{z, x, y}, {rgba, static_cast<std::size_t>(width) * height * 4}, width, height);
+/// RGBA pixels of a requested aerial tile (`length` = width x height x 4 bytes, copied).
+KERN_EXPORT(sc_image_data) void sc_image_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* rgba, kern::u32 length, kern::u32 width, kern::u32 height) {
+  sc::game().city().terrain().provide_image(sc::TileKey{z, x, y}, {rgba, length}, width, height);
 }
 KERN_EXPORT(sc_image_failed) void sc_image_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().terrain().fail_image(sc::TileKey{z, x, y}); }
 

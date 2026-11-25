@@ -2360,6 +2360,14 @@ struct Host : kern::Blueprint {
   }
   KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
   }
+  struct game_takeResult { List<Int> Result = List<Int>{}; };
+  KERN_EXPORT_AS("game_take", "-> bytes") game_takeResult game_take() {
+    return {List<Int>{}};
+  }
+  struct game_audioResult { List<Float> Result = List<Float>{}; };
+  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<Float>& samples, Int samples_at = 0, Int count = 0, Int rate = 0) {
+    return {samples};
+  }
 };
 )kn";
   logic::Graph g;
@@ -2382,6 +2390,25 @@ struct Host : kern::Blueprint {
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
         glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+  // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
+  // when the list is empty); bytes go out the same way, as u8
+  CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
+        glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3) {") != std::string::npos &&
+        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out(held, ") != std::string::npos);
+  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take() {") != std::string::npos && glue.find("return kern::logic::export_bytes_out(held, ") != std::string::npos);
+  {
+    std::vector<u8> held_bytes;
+    std::vector<f32> held_floats;
+    const f32 in[3] = {0.5f, -1.25f, 3.0f};
+    const logic::List<f64> floats = logic::export_floats_in(in, 3);
+    CHECK(floats.size() == 3 && floats[1] == -1.25);
+    const f32* out = logic::export_floats_out(held_floats, floats);
+    CHECK(out && out[0] == 0.5f && out[2] == 3.0f);
+    const u8 bytes_in[2] = {7, 255};
+    const u8* bytes_out = logic::export_bytes_out(held_bytes, logic::export_bytes_in(bytes_in, 2));
+    CHECK(bytes_out && bytes_out[0] == 7 && bytes_out[1] == 255);
+    CHECK(!logic::export_bytes_out(held_bytes, logic::List<logic::Whole>{}) && !logic::export_floats_out(held_floats, logic::List<f64>{}));   // (nothing: none)
+  }
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -2391,7 +2418,11 @@ struct Host : kern::Blueprint {
   CHECK(!logic::export_ok(f));
   f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of Int, not of a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of Float, not of Int)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats i32 i32 f32 -> text";   // (floats without their len)
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
   CHECK(!logic::export_ok(f));
@@ -7520,9 +7551,30 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number
+// of it, as C++ has them - not what the pointer alone shows (one entry).
+TEST(engine_footprint_stream_values) {
+  using logic::Value;
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.make", {}, out));
+  const Value fs = out[0];
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.begin", {fs, Value::integer(7), Value::number(1.5), Value::number(9.25)}, none));
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.ring", {fs, Value::of(std::vector<Vec3>{{0, 0, 0}, {4, 0, 0}, {4, 3, 0}}), Value::integer(3)}, none));
+  const FootprintStream* const held = logic::engine_values::object_of<FootprintStream>(objects, fs.as_int(), "footprint_stream");
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(held && logic::call_engine(objects, "engine.footprint_stream.values", {fs}, out) && out[0].size() == held->size());
+  bool same = held != nullptr;
+  for (std::size_t k = 0; same && k < out[0].size(); ++k) same = std::bit_cast<u64>(out[0].item(k).as_number()) == std::bit_cast<u64>(held->data()[k]);
+  CHECK(same && held && held->size() == 1 + 7 + 1 + 6);
+  objects.clear();
+}
+
 // The Blueprints a logic runs, as a Blueprint sees them (engine.game.blueprints_running): each one's name, how it runs, how
 // many functions and nodes its graph has, whether it stopped - in the order the logic runs them; through the door the same.
 TEST(engine_blueprints_running) {
+  using logic::Value;
   FakeLogicHost host;
   logic::Runtime rt(host);
   logic::Graph water, game;
@@ -7541,6 +7593,16 @@ TEST(engine_blueprints_running) {
     const logic::Value first = out[0].item(0);
     CHECK(first.field(0) && first.field(0)->as_text() == "Water" && first.field(2) && first.field(2)->as_int() == static_cast<i64>(water.functions.size()));
   }
+  // one by one, without a copy: the name where the logic holds it; an index of no Blueprint names none
+  CHECK(game::blueprint_count(rt) == 2 && &game::blueprint_name(rt, 1) == &rt.instances()[1]->name() && game::blueprint_name(rt, 2).empty());
+  CHECK(std::string(game::blueprint_tier(rt, 0)) == "interpreter" && std::string(game::blueprint_tier(rt, 9)).empty());
+  CHECK(game::blueprint_functions(rt, 0) == water.functions.size() && game::blueprint_nodes(rt, 1) == game.nodes.size() && game::blueprint_nodes(rt, 2) == 0);
+  CHECK(!game::blueprint_disabled(rt, 0) && !game::blueprint_disabled(rt, 5));
+  const Value logic_handle = Value::integer(objects.adopt(rt));
+  std::vector<Value> one{Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprint_name", {logic_handle, Value::integer(1)}, one) && one[0].as_text() == "Running");
+  one = {Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprint_count", {logic_handle}, one) && one[0].as_int() == 2);
   objects.clear();
 }
 

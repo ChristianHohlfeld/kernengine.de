@@ -1308,7 +1308,7 @@ class World:
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
-        self.state_implements = {}  # such a class that derives from an interface of the engine -> the interface's name (Graph::implements)
+        self.state_implements = {}  # such a class that derives from an interface of the engine -> [the interface's name (Graph::implements), its pure functions]
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.getters = set()   # (keys of) the functions that give the one object of a state and nothing else - `Game& game() { static Game g; return g; }`: that Blueprint itself (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
@@ -3072,11 +3072,14 @@ def actors_called(f, met=None):
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states) - and, with `implements`, the interface of the engine it is the object of
-    (World.state_implements)."""
+    variables of a state (World.states) - and, with `implements` ([name, pure functions]: World.state_implements),
+    the interface of the engine it is the object of: once it has every pure function of it (until then the
+    engine has no object of it - what waits keeps the interface's functions from it, as from any caller)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
+    defines = lambda t, f: re.search(r"(?m)^\s*(?:KERN_\w+\s+)*[\w:<>,]+\s+" + re.escape(f) + r"\(", t)   # (a function's text: its head names it)
+    whole = bool(state and implements) and all(any(defines(t, p) for t in functions) for p in implements[1])
     out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
-           + (f', kern::Implements<"{implements}">' if state and implements else "") + " {"]
+           + (f', kern::Implements<"{implements[0]}">' if whole else "") + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -3707,6 +3710,7 @@ class Emit:
             f.mutates = f.ctor = True
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
+        registered = self.node_registrations(d)   # (a node type of the program: an event of its Blueprint - taken out of the body)
         self.lifetimes(d)
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
         self.dissolve(d)   # (a call of a function that names a place: the place)
@@ -3839,6 +3843,15 @@ class Emit:
         lines += self.block(kids(body))
         if not self.ends(kids(body)) and f.ctor:
             lines.append(self.ret_line(None))
+        events = []
+        for handler, ins, run in registered:
+            held = len(self.locals)
+            steps = self.block(run)
+            if len(self.locals) > held:
+                raise Wait("the run of a node type of the program needs local variables (an event has none)")
+            node = u.next_node
+            u.next_node += 1
+            events += ["", f"  KERN_EVENT(on{node}, {handler})", f"  void on{node}({ins}) {{", *["    " + x for x in steps], "  }"]
         head = []
         doc = u.comment_of(d)
         if f.result is not None:
@@ -3885,8 +3898,114 @@ class Emit:
                 node = u.next_node
                 u.next_node += 1
                 out += ["", f"  KERN_EVENT(on{node}, event_end)", f"  void on{node}() {{", *["    " + x for x in ended], "  }"]
+        out += events
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
+
+    # The events of the language a node type of the program can be (NodeDef::event): its handler, and its inputs.
+    NODE_EVENTS = {"logic.tick": ("event_tick", "Float delta")}
+
+    def node_registrations(self, d):
+        """A node type the program adds to the language (`kern::logic::NodeDef d; d.type = ...; d.kind = NodeKind::event;
+        d.event = "logic.tick"; d.accepts = [](...) { return true; }; d.run = [](Context&) { ...; return kStop; };
+        kern::logic::library().add(std::move(d));`): in a Blueprint it is no value but an event of the Blueprint the
+        function is a function of, which runs what `run` runs (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine":
+        Entscheidung E-c2, register_node). Such statements are taken out of the body; [(handler, its inputs, the
+        statements of `run`)] - one for each. A NodeDef of any other form waits."""
+        body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+        if body is None:
+            return []
+        logic = ENGINE + "::logic::"
+        def bare(x):
+            while x.get("kind") in ("ExprWithCleanups", "ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ParenExpr", "CXXFunctionalCastExpr") and kids(x):
+                x = kids(x)[-1] if x.get("kind") == "CXXFunctionalCastExpr" else kids(x)[0]
+            if x.get("kind") == "CXXConstructExpr" and len(kids(x)) == 1:
+                return bare(kids(x)[0])
+            return x
+        defs = {}
+        for st in kids(body):
+            if st.get("kind") == "DeclStmt" and len(kids(st)) == 1 and kids(st)[0].get("kind") == "VarDecl" and \
+                    re.sub(r"^const\s+", "", qtype(kids(st)[0])).strip() == logic + "NodeDef":
+                defs[kids(st)[0]["id"]] = {"decl": st, "fields": {}, "stmts": [st]}
+        if not defs:
+            return []
+        def of_def(x):
+            x = bare(x)
+            return defs.get((x.get("referencedDecl") or {}).get("id")) if x.get("kind") == "DeclRefExpr" else None
+        added = []
+        for st in kids(body):
+            if any(st is r["decl"] for r in defs.values()):
+                continue
+            e = bare(st)
+            target = value = None
+            if e.get("kind") == "BinaryOperator" and e.get("opcode") == "=" and len(kids(e)) == 2:
+                target, value = kids(e)
+            elif e.get("kind") == "CXXOperatorCallExpr" and callee_name(e) == "operator=" and len(kids(e)) == 3:
+                target, value = kids(e)[1], kids(e)[2]
+            if target is not None:
+                t = bare(target)
+                r = of_def(kids(t)[0]) if t.get("kind") == "MemberExpr" and kids(t) else None
+                if r is not None:
+                    r["fields"][t.get("name")] = bare(value)
+                    r["stmts"].append(st)
+                    continue
+            if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") == "add" and len(kids(e)) == 2:
+                base = bare(kids(callee(e))[0]) if kids(callee(e)) else {}
+                arg = bare(kids(e)[1])
+                if arg.get("kind") == "CallExpr" and callee_name(arg) == "move" and len(kids(arg)) == 2:
+                    arg = kids(arg)[1]
+                r = of_def(arg)
+                if r is not None and base.get("kind") == "CallExpr" and callee_name(base) == "library" and \
+                        (self.tree.decl.get((callee(base).get("referencedDecl") or {}).get("id")) or {}).get("_q", logic + "library").startswith(logic):
+                    r["stmts"].append(st)
+                    added.append(r)
+                    continue
+            for x in walk(st):
+                if of_def(x) is not None:
+                    raise Wait("a node type of the program (NodeDef) used otherwise than set field by field and added to the language")
+        out = []
+        for r in defs.values():
+            if r not in added:
+                raise Wait("a node type of the program (NodeDef) that is not added to the language")
+            f = r["fields"]
+            extra = sorted(set(f) - {"type", "label", "category", "help", "kind", "event", "accepts", "run"})
+            if extra:
+                raise Wait(f"a node type of the program with {', '.join(extra)} (only an event that runs steps is an event of its Blueprint)")
+            kind = f.get("kind")
+            if kind is None or (kind.get("referencedDecl") or {}).get("name") != "event":
+                raise Wait("a node type of the program that is no event")
+            event = f.get("event")
+            if event is None or event.get("kind") != "StringLiteral" or json.loads(event.get("value", '""')) not in self.NODE_EVENTS:
+                raise Wait("a node type of the program for an event that is no event of a Blueprint: " + (event or {}).get("value", "?"))
+            handler, ins = self.NODE_EVENTS[json.loads(event["value"])]
+            def lambda_body(x, what):
+                if x is None or x.get("kind") != "LambdaExpr":
+                    raise Wait(f"a node type of the program whose {what} is no lambda")
+                parts = kids(x)
+                if len(parts) != 2 or parts[0].get("kind") != "CXXRecordDecl" or parts[1].get("kind") != "CompoundStmt":
+                    raise Wait(f"a node type of the program whose {what} captures something")
+                return parts[1]
+            accepts = f.get("accepts")
+            if accepts is not None:
+                a = kids(lambda_body(accepts, "accepts"))
+                lit = bare(kids(a[0])[0]) if len(a) == 1 and a[0].get("kind") == "ReturnStmt" and kids(a[0]) else {}
+                if lit.get("kind") != "CXXBoolLiteralExpr" or lit.get("value") is not True:
+                    raise Wait("a node type of the program that accepts only some events (an event of a Blueprint runs on every one)")
+            run = kids(lambda_body(f.get("run"), "run"))
+            last = run[-1] if run else {}
+            stop = bare(kids(last)[0]) if last.get("kind") == "ReturnStmt" and kids(last) else {}
+            if (stop.get("referencedDecl") or {}).get("name") != "kStop":
+                raise Wait("a node type of the program whose run goes on to another node (it does not end with kStop)")
+            steps = run[:-1]
+            if any(x.get("kind") == "ReturnStmt" for st in steps for x in walk(st)):
+                raise Wait("a node type of the program whose run ends in the middle")
+            params = [x for x in walk(f["run"]) if x.get("kind") == "ParmVarDecl"]
+            if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") in {p_["id"] for p_ in params} for st in steps for x in walk(st)):
+                raise Wait("a node type of the program whose run reads what its node is handed (the Context)")
+            out.append((handler, ins, steps))
+        taken = {id(st) for r in defs.values() for st in r["stmts"]}
+        body["inner"] = [st for st in kids(body) if id(st) not in taken]
+        return out
 
     def ret_line(self, value):
         """The return of the function: what the C++ returns as it is at this place (a constructor: the object)."""
@@ -11921,6 +12040,9 @@ class Held:
         self.templates = {}
         self.freed = {}         # a method that does not use its object, of a class the Blueprint does not have -> (its name as a function, its head, where its body begins)
         self.foreign = collections.OrderedDict()   # what stands in other source files and not here: its place there -> the piece (TestWriter.exports), in their order
+        self.refer = False      # (gathering for exports: a function of another file is named by its key, not taken - see take)
+        self.refs = []          # those keys, in the order they are met: ("@ref", key, the part its body is converted with)
+        self.keys = set()       # the keys of the functions of other files taken (or named)
         self.wanted = set()     # the places of all pieces of other files' tests that are taken
         self.kept = set()       # methods declared in their class here whose body is a piece of another file
         self.declared = {}      # functions declared here whose body is a piece of another file: id -> the declaration
@@ -12165,6 +12287,27 @@ class TestWriter:
             if n.get("_named"):   # (a name for a part of a value - Emit.stood: the source has the name, there for every call)
                 return
             k, ks = n.get("kind"), kids(n)
+            if k == "CallExpr" and len(ks) > 1:
+                # A function of a namespace of the program, called by its name alone with a value of the engine: C++ looks
+                # it up where the call stands and - by the argument - in the engine's namespace, where no function of the
+                # program is. In the test the program and the engine are one namespace: there the argument would bring in
+                # what the program has at its top (slerp of common.h beside gaps::slerp - "ambiguous"). The call names the
+                # function C++ took (the tree says which), by its namespace: what C++ finds without the argument's.
+                c = ks[0]
+                while c.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(c):
+                    c = kids(c)[0]
+                r = self.tree.decl.get((c.get("referencedDecl") or {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
+                if r is not None and r.get("kind") == "FunctionDecl" and self.tree.owner.get(r["id"]) is None and c.get("_at", (None, None))[0] is not None:
+                    first = r
+                    while first.get("previousDecl") in self.tree.decl:
+                        first = self.tree.decl[first["previousDecl"]]
+                    scope = self.tree.scope_of.get(r["id"], "")
+                    path = self.local_path(scope) if scope.rstrip(":") not in self.tree.records else []
+                    ca = c["_at"][0]
+                    by_name = raw[ca:ca + len(r.get("name", ""))] == r.get("name") and not raw[max(lo, ca - 64):ca].rstrip().endswith(("::", ".", "->"))
+                    engine_arg = any(re.search(r"\b" + ENGINE + r"::\w", qtype(x) + " " + str((x.get("type") or {}).get("desugaredQualType", ""))) for x in ks[1:])
+                    if path and by_name and engine_arg and is_header(first.get("_file") or ""):
+                        edits.append((ca, 3, 0, ca, "::".join(path) + "::"))
             # the bytes of a value of a struct with a float, as the program lays them out (Bytes of Struct,
             # Struct of Bytes): the test holds the float as a 64-bit number
             if k == "CallExpr" and callee_name(n) == "bit_cast" and len(ks) == 2:
@@ -13283,6 +13426,26 @@ class TestWriter:
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const}{said};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
+    def overridden(self, q):
+        """The virtual functions of the class `q` of the engine that a function of a class of the program the test holds
+        overrides (by name, as `override` finds it): [declaration], in their order in q."""
+        tree, held = self.tree, getattr(self, "held_members", set())
+        names = set()
+        for i in held:
+            m = tree.decl.get(i) or tree.body.get(i) or {}
+            owner = tree.owner.get(i) or tree.owner.get(m.get("id"))
+            if m.get("kind") != "CXXMethodDecl" or not owner or owner not in tree.records:
+                continue
+            for b in tree.records[owner].get("bases", []) or []:
+                try:
+                    bq = self.u.find_type(self.u.clean(qtype(b)))
+                except Wait:
+                    bq = None
+                if bq == q:
+                    names.add(m.get("name"))
+        return [v for v in kids(tree.records[q]) if v.get("kind") == "CXXMethodDecl" and v.get("virtual") and v.get("name") in names
+                and not v.get("isImplicit") and v.get("_at", (None, None))[1] is not None]
+
     def engine_bases(self, q):
         """The classes of the engine the class `q` of the engine derives from that are objects of it too."""
         out = []
@@ -13391,6 +13554,17 @@ class TestWriter:
                     syncs.append(f'converted::field_sync<{t}, {shape(t)}>("{f["type"]}", s, s.{f["decl"]["name"]}, set);')
                 decls += [f"  static void kern_sync(void* o, bool set) {{ {name}& s = *static_cast<{name}*>(o); {' '.join(syncs)} }}",
                           f"  converted::FieldSync kern_fields{{this, &{name}::kern_sync}};"]
+            # an interface of the engine a class of the program implements (kern::App, ShaderExtension): its virtual functions
+            # the test's copy of that class overrides, as the engine's header declares them - virtual, with their body there (or
+            # `= 0`) -, so that `override` in the copy has its function. (One the source also calls is that declaration, virtual.)
+            for v in self.overridden(q):
+                called = re.compile(r"\b" + re.escape(v["name"]) + r"\s*\(")
+                if any(called.search(x) for x in decls):
+                    decls = [("  virtual " + x.lstrip()) if called.search(x) and not re.match(r"\s*virtual\b", x) else x for x in decls]
+                    continue
+                text = tree.source(v).strip()
+                if text:
+                    decls.append("  " + (text if re.match(r"virtual\b", text) else "virtual " + text) + ("" if text.endswith(("}", ";")) else ";"))
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
@@ -13832,7 +14006,7 @@ class TestWriter:
             self.unguarded = self.guard_all([*(f.decl for f in u.order if not f.lifted), *self.whole.functions.values()])
         return self.whole
 
-    def gather(self, roots, classes=()):
+    def gather(self, roots, classes=(), refer=False):
         """What the source of the functions `roots` (their declarations' ids) and of the classes `classes`
         names, gathered: all a test must hold to compile it. (Nothing else of the program is in reach of the
         test's source: what it names and the test does not hold does not compile - it can not fall back on
@@ -13843,6 +14017,7 @@ class TestWriter:
         vectors = (ENGINE + "::Vec3", ENGINE + "::Vec2")
         converted = self.converted
         G = Held()
+        G.refer = refer
         todo, seen_types = [], set()
         in_value = [False]   # (scanning a value of the engine's logic: an object of it there is a part of that value)
         def want_record(q):
@@ -13984,13 +14159,35 @@ class TestWriter:
             decl = tree.decl.get(i)
             if decl is None or decl.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
-            if function_key(tree, decl) not in self.closures:
+            key = function_key(tree, decl)
+            if G.refer:
+                # (for exports: named by its key, taken where a test takes this one - the export of a function is then its
+                # own file's source alone, whatever the tests of other files hand on: in a circle of functions over files
+                # (A calls B, B calls A) no export holds a copy of another's from the round before, and the rounds settle)
+                if key not in G.keys:
+                    G.keys.add(key)
+                    G.refs.append(("@ref", key, u.world.part_of_function(tree, decl)))
+                return
+            if key not in self.closures:
                 # (the Blueprint whose file it stands in has not handed it on - it is none this one calls, only its test
                 # holds it: a destructor runs what it calls where a value ends. That Blueprint is one this one needs: main)
                 part = u.world.part_of_function(tree, decl)
                 if part is not None and part != u.name:
-                    u.missing.add((part, function_key(tree, decl)))
-            for place in self.closures.get(function_key(tree, decl), ()):
+                    u.missing.add((part, key))
+            take_key(key)
+        def take_key(key):
+            """The pieces of a function of another file, as its file's test hands them on - and, transitively, of the
+            functions of other files those name by their keys."""
+            if key in G.keys:
+                return
+            G.keys.add(key)
+            for place in self.closures.get(key, ()):
+                if isinstance(place, tuple) and place and place[0] == "@ref":
+                    _, other, part = place
+                    if other not in self.closures and part is not None and part != u.name:
+                        u.missing.add((part, other))
+                    take_key(other)
+                    continue
                 if place in G.wanted:
                     continue
                 G.wanted.add(place)
@@ -14317,19 +14514,35 @@ class TestWriter:
     def exports(self, known=()):
         """The test of a file that calls a function of this Blueprint holds that function's source once more,
         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
-        function of the Blueprint that is written and has a name the linker knows: the places of the pieces
-        its test holds, in the order they must stand ({key: [place]}), and the pieces by their places
-        ({place: piece}) - main hands them on to the Blueprints that call these, after this one, and they
-        hand on what they took along with their own."""
+        function of the Blueprint that has a name the linker knows - written or not: its source is what it is, and
+        in a circle of functions over files the test of each needs the other's source before either Blueprint is
+        written -: the places of the pieces its test holds of this file, in the order they must stand, after the
+        keys of the functions of other files it names ({key: [("@ref", key, part)..., place...]}), and the pieces by
+        their places ({place: piece}) - main hands them on to the Blueprints that call these, after this one; a test
+        that takes a function takes what it names by key from those keys' own exports (gather, take_key). An export
+        holds no piece of another file's export: it is the same whatever the other files' tests hand on."""
         self.setup()
         closures, pieces = {}, {}
-        for f in self.u.order:
-            if f.lifted or not f.key or "@" in f.key:
+        listed = {id(f) for f in self.u.order}
+        every = [*self.u.order, *(f for f in getattr(self.u, "all", ()) if id(f) not in listed)]
+        for f in every:
+            if f.lifted or not f.key or "@" in f.key or f.key in closures:
                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
             if f.key in known:
                 continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
-            order = []
-            for place, piece in self.items(self.gather([f.decl["id"]])):
+            if id(f) not in listed and f.decl.get("id") not in self.tree.body and f.decl.get("id") not in self.tree.template_of:
+                continue   # (one whose body this file does not hold: its own file hands it on)
+            if id(f) not in listed and not (f.wait or "").startswith("its test cannot compare it yet"):
+                continue   # (of those not written, the ones only their test holds back: a Blueprint is written of their source)
+            try:
+                G = self.gather([f.decl["id"]], refer=True)
+                held = self.items(G)
+            except Wait:
+                if id(f) in listed:
+                    raise
+                continue   # (what its source names a test can not hold: no other test can take it either)
+            order = list(G.refs)   # (first what it names of other files - their pieces stand before its own)
+            for place, piece in held:
                 pieces.setdefault(place, piece)
                 order.append(place)
             closures[f.key] = order
@@ -14372,7 +14585,7 @@ class TestWriter:
             owner = tree.owner.get(d["id"]) or next((tree.owner[x["id"]] for x in before if x["id"] in tree.owner), None)
             return any(not here(x) for x in before) or (owner is not None and not here(tree.records.get(owner, {})))
         def own(d):   # (of this file alone - not the definition of what a header declares: a function, or a variable `extern i32 kGates;`)
-            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
+            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
         def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
@@ -14909,6 +15122,8 @@ class TestWriter:
         for q in top:
             members[q], left_out = self.members_of(q, functions, templates, G.kept)
             unconverted.update(("member", i) for i in left_out)
+        # (the members the test holds: the stand-in of an interface of the engine has the virtual functions they override)
+        self.held_members = {m["id"] for ms in members.values() for m in ms} - {i for _, i in unconverted}
         # the names the program gives types (`using Bytes32 = ...`), where the test's source uses them
         foreign_texts = [p.get("text") or "".join(t for t, _, _ in p.get("segments", ())) for p in G.foreign.values()]
         texts = [text for _, _, text in [*enum_chunks, *const_chunks, *fn_chunks]] + [self.piece(tree.records[q]) for q in top] + foreign_texts
@@ -15228,6 +15443,9 @@ class TestWriter:
                         if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
                             continue
                         sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
+                        at = re.match(re.escape(path) + r":(\d+):", x)
+                        if at and 0 < int(at.group(1)) <= len(head):   # (and the test's line there, as it was compiled)
+                            sys.stderr.write(f"--- {stem}: line {at.group(1)}: {head[int(at.group(1)) - 1].strip()[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
@@ -15440,11 +15658,13 @@ def wire_words(p, before, aliases):
         return ["text"]
     if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
         return ["bytes", "at"]
-    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return ["floats", "at"]
+    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] in (["bytes", "at"], ["floats", "at"])):
         return ["len"]
     if t in C_WORDS:
         return [C_WORDS[t]]
-    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
+    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
 
 
 def wire_out(d, aliases):
@@ -15572,7 +15792,7 @@ def engine_interface_of(tree, rec):
     methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
     if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
         return None
-    return type_name_of(q)
+    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
 
 
 def state_classes(world, surveys):
@@ -16032,8 +16252,11 @@ def main(argv):
     # A function that is no method but shares a variable of the program - or calls one that does -, when the
     # program has one object (a state): a function of that state's Blueprint, in the part of its file. (A method
     # of another class that does stays where it is, and waits: it would need its object and the state's.)
-    if len(set(world.states.values())) == 1:
-        state = next(iter(world.states.values()))
+    # (the state the program's variables are of: its one state that is no object of an interface of the engine -
+    # an App, a ShaderExtension is the engine's object, called by the engine; its functions are its own)
+    holders = {b for q, b in world.states.items() if q not in world.state_implements}
+    if len(holders) == 1:
+        state = next(iter(holders))
         callers = collections.defaultdict(set)
         for k, f in functions.items():
             for c in f["calls"]:

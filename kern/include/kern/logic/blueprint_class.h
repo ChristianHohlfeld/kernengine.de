@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 #include "kern/api/c_api.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/nodes.h"
@@ -65,6 +66,26 @@ inline List<Whole> export_bytes_in(const u8* bytes, u32 length) {
   out.reserve(length);
   for (u32 i = 0; i < length; ++i) out.push_back(Whole(static_cast<i64>(bytes[i])));
   return out;
+}
+/// Floats that come in (f32, as the host gives them): a List of Float, one entry each, as C++ converts an f32.
+inline List<f64> export_floats_in(const f32* floats, u32 length) {
+  List<f64> out;
+  out.reserve(length);
+  for (u32 i = 0; i < length; ++i) out.push_back(static_cast<f64>(floats[i]));
+  return out;
+}
+/// Bytes the export gives (a List of Int): each entry as a u8, as C++ converts it, kept in `held` - the export's
+/// own, until it gives the next -; the host reads them by the pointer, as many as it knows. An empty list gives none (null).
+inline const u8* export_bytes_out(std::vector<u8>& held, const List<Whole>& bytes) {
+  held.clear();
+  for (const Whole& b : bytes) held.push_back(static_cast<u8>(b.v));
+  return held.empty() ? nullptr : held.data();
+}
+/// Floats the export gives (a List of Float): each entry as an f32, as C++ converts it, kept in `held` as bytes are.
+inline const f32* export_floats_out(std::vector<f32>& held, const List<f64>& floats) {
+  held.clear();
+  for (const f64 x : floats) held.push_back(static_cast<f32>(x));
+  return held.empty() ? nullptr : held.data();
 }
 /// A number as the export gives it (i32, u32, f32, f64): as C++ converts it.
 template <class C, class Out> C export_out(const Out& x) {

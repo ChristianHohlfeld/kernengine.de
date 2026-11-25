@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       probe:
-        description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job"
+        description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job; 'all_program': every Blueprint as a class of the program, each file compiled (tools/all_program.sh)"
         default: ""
 
 permissions:
@@ -42,6 +42,11 @@ jobs:
           SOURCES: ${{ inputs.probe }}
         run: |
           W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts"
+          if [ "$SOURCES" = all_program ]; then  # (the whole game as classes: kern/games/spawncity/tools/all_program.sh)
+            command -v /usr/bin/time > /dev/null || sudo apt-get install -y -qq time > /dev/null
+            KERN_JOBS=4 kern/games/spawncity/tools/all_program.sh "$W/all" > "$W/convert.log" 2>&1; rc=$?
+            tail -n 200 "$W/convert.log"; cp "$W/all/files.txt" "$W/texts/" 2>/dev/null; cp -r "$W/all/logs" "$W/texts/" 2>/dev/null; exit $rc
+          fi
           cp kern/games/spawncity/tests/*.h "$W/pt/"; cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"
           cd kern/games/spawncity
           set +e
@@ -81,6 +86,8 @@ jobs:
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the differential tests build an older state of a source beside today's: tests/run_tests.sh reads it with git archive)
       - name: Build the SpawnCity tests (ASan/UBSan)
         env:
           SC_TEST_OUT: /home/runner/sc-tests
