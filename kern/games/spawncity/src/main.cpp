@@ -79,12 +79,12 @@ kern::App* kern_create_app() { return &sc::app(); }
 namespace sc {
 
 // The exports, in the program's namespace (C names all the same - extern "C").
-// (a text, bytes or floats an export gives: kept by kern::logic::export_text / export_bytes / export_floats until an
-// export gives the next of its kind - as the exports of Blueprints keep theirs; the page reads a text's length with
-// the engine's kern_text_length)
+// (a text, bytes or floats an export gives: a piece {pointer, length} of that export's own place -
+// kern::logic::export_text / export_bytes / export_floats; the pointer is returned, the length written to out_len, a
+// place the page gives - as the exports of Blueprints give theirs)
 
 // ---- map tiles: the page fetches what the game asks for ----
-KERN_EXPORT(sc_tile_requests) const char* sc_tile_requests() { return kern::logic::export_text(game().city().take_requests()); }
+KERN_EXPORT(sc_tile_requests) const char* sc_tile_requests(u32* out_len) { return kern::logic::export_text<&sc_tile_requests>(game().city().take_requests(), out_len); }
 KERN_EXPORT(sc_tile_data) void sc_tile_data(i32 z, i32 x, i32 y, const u8* bytes, u32 length) {
   game().city().provide(TileKey{z, x, y}, {bytes, length});
 }
@@ -92,7 +92,7 @@ KERN_EXPORT(sc_tile_failed) void sc_tile_failed(i32 z, i32 x, i32 y) { game().ci
 KERN_EXPORT(sc_offline) void sc_offline() { game().city().go_offline(); }
 
 // ---- elevation tiles (Terrarium PNGs): the page decodes the image, the game the heights ----
-KERN_EXPORT(sc_dem_requests) const char* sc_dem_requests() { return kern::logic::export_text(game().city().terrain().take_requests()); }
+KERN_EXPORT(sc_dem_requests) const char* sc_dem_requests(u32* out_len) { return kern::logic::export_text<&sc_dem_requests>(game().city().terrain().take_requests(), out_len); }
 /// RGBA pixels of a requested elevation tile (`length` = width x height x 4 bytes, copied).
 KERN_EXPORT(sc_dem_data) void sc_dem_data(i32 z, i32 x, i32 y, const u8* rgba, u32 length, u32 width, u32 height) {
   game().city().terrain().provide(TileKey{z, x, y}, {rgba, length}, width, height);
@@ -100,7 +100,7 @@ KERN_EXPORT(sc_dem_data) void sc_dem_data(i32 z, i32 x, i32 y, const u8* rgba, u
 KERN_EXPORT(sc_dem_failed) void sc_dem_failed(i32 z, i32 x, i32 y) { game().city().terrain().fail(TileKey{z, x, y}); }
 
 // ---- aerial imagery for the ground colour (world_ground.mjs): the page decodes, the game averages ----
-KERN_EXPORT(sc_image_requests) const char* sc_image_requests() { return kern::logic::export_text(game().city().terrain().take_image_requests()); }
+KERN_EXPORT(sc_image_requests) const char* sc_image_requests(u32* out_len) { return kern::logic::export_text<&sc_image_requests>(game().city().terrain().take_image_requests(), out_len); }
 /// RGBA pixels of a requested aerial tile (`length` = width x height x 4 bytes, copied).
 KERN_EXPORT(sc_image_data) void sc_image_data(i32 z, i32 x, i32 y, const u8* rgba, u32 length, u32 width, u32 height) {
   game().city().terrain().provide_image(TileKey{z, x, y}, {rgba, length}, width, height);
@@ -133,11 +133,11 @@ KERN_EXPORT(sc_touch_frame) void sc_touch_frame(f32 w, f32 h, f32 sl, f32 st, f3
 KERN_EXPORT(sc_touch) i32 sc_touch(u32 type, i32 id, f32 x, f32 y, f64 t) {
   return game().touch(type, id, x, y, t) ? 1 : 0;
 }
-KERN_EXPORT(sc_touch_view) const char* sc_touch_view() { return kern::logic::export_text(game().touch_view_json()); }
+KERN_EXPORT(sc_touch_view) const char* sc_touch_view(u32* out_len) { return kern::logic::export_text<&sc_touch_view>(game().touch_view_json(), out_len); }
 
 // ---- presentation ----
-KERN_EXPORT(sc_hud) const char* sc_hud() { return kern::logic::export_text(game().hud_json()); }
-KERN_EXPORT(sc_command) const char* sc_command(const char* text, u32 length) { return kern::logic::export_text(game().command(std::string(text, length))); }
+KERN_EXPORT(sc_hud) const char* sc_hud(u32* out_len) { return kern::logic::export_text<&sc_hud>(game().hud_json(), out_len); }
+KERN_EXPORT(sc_command) const char* sc_command(const char* text, u32 length, u32* out_len) { return kern::logic::export_text<&sc_command>(game().command(std::string(text, length)), out_len); }
 
 // ---- multiplayer: the page moves the datagrams (KernNet) ----
 /// A datagram from peer `from` (split into two 32-bit halves).
@@ -145,7 +145,7 @@ KERN_EXPORT(sc_net_push) void sc_net_push(u32 from_lo, u32 from_hi, const u8* by
   game().net().push((static_cast<u64>(from_hi) << 32) | from_lo, {bytes, length});
 }
 /// The next datagram to send: [u32 length][u32 to_lo][u32 to_hi][bytes], or 0 when none.
-KERN_EXPORT(sc_net_take) const u8* sc_net_take() {
+KERN_EXPORT(sc_net_take) const u8* sc_net_take(u32* out_len) {
   u64 to = 0;
   std::vector<u8> bytes;
   std::vector<u8> out;   // (none: no datagram - the export gives null)
@@ -155,7 +155,7 @@ KERN_EXPORT(sc_net_take) const u8* sc_net_take() {
     std::memcpy(out.data(), head, 12);
     std::memcpy(out.data() + 12, bytes.data(), bytes.size());
   }
-  return kern::logic::export_bytes(out);
+  return kern::logic::export_bytes<&sc_net_take>(out, out_len);
 }
 
 // ---- voice chat: microphone samples (mono, at `rate`) while the mic is on (game_net.cpp) ----
@@ -163,6 +163,6 @@ KERN_EXPORT(sc_voice_push) void sc_voice_push(const f32* samples, u32 count, u32
 
 // ---- audio: Kern's mixer renders, the page plays (KernAudio) ----
 KERN_EXPORT(sc_audio_init) i32 sc_audio_init(u32 rate) { return game().audio_init(rate) ? 1 : 0; }
-KERN_EXPORT(sc_audio_render) const f32* sc_audio_render(u32 frames) { return kern::logic::export_floats(game().audio_render(frames)); }
+KERN_EXPORT(sc_audio_render) const f32* sc_audio_render(u32 frames, u32* out_len) { return kern::logic::export_floats<&sc_audio_render>(game().audio_render(frames), out_len); }
 
 }  // namespace sc

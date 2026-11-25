@@ -92,11 +92,15 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   })();
   // Fresh views each time: the module's memory may have grown (and detached older views).
   const decoder = new TextDecoder();
-  const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, e.kern_text_length()));
+  // A text, bytes or floats an export gives come as a piece: the export returns the pointer and writes the length to
+  // a place the page gives (its last argument, `lenAt`) - each export's own piece, read at once.
+  const lenAt = e.kern_alloc(4);
+  const given = () => new Uint32Array(kern.memory.buffer, lenAt, 1)[0];
+  const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, given()));
   const command = text => {
     const bytes = new TextEncoder().encode(text), ptr = e.kern_alloc(bytes.length + 1);
     new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);
-    const out = str(e.sc_command(ptr, bytes.length));
+    const out = str(e.sc_command(ptr, bytes.length, lenAt));
     e.kern_free(ptr);
     return out;
   };
@@ -144,7 +148,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     }
   }
   function pumpTiles() {
-    const list = JSON.parse(str(e.sc_tile_requests()));
+    const list = JSON.parse(str(e.sc_tile_requests(lenAt)));
     if (list.length) tiles.queue.push(...list);
     if (!tiles.template || tiles.failed) return;
     while (tiles.active < SC_MAX_FETCHES && tiles.queue.length) fetchTile(tiles.queue.shift());
@@ -197,12 +201,12 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   }
   function pumpImages() {
     if (!e.sc_image_requests) return;
-    const list = JSON.parse(str(e.sc_image_requests()));
+    const list = JSON.parse(str(e.sc_image_requests(lenAt)));
     if (list.length) img.queue.push(...list);
     while (img.active < SC_MAX_FETCHES && img.queue.length) fetchImage(img.queue.shift());
   }
   function pumpDem() {
-    const list = JSON.parse(str(e.sc_dem_requests()));
+    const list = JSON.parse(str(e.sc_dem_requests(lenAt)));
     if (list.length) dem.queue.push(...list);
     while (dem.active < SC_MAX_FETCHES && dem.queue.length) fetchDem(dem.queue.shift());
   }
@@ -346,8 +350,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   let audio = null;
   if (KernAudio.supported() && params.get("mute") !== "1") {
     audio = new KernAudio(frames => {
-      const ptr = e.sc_audio_render(frames);
-      return new Float32Array(kern.memory.buffer, ptr, frames * 2).slice();
+      const ptr = e.sc_audio_render(frames, lenAt);
+      return new Float32Array(kern.memory.buffer, ptr, given()).slice();
     });
     const rate = audio.create();
     if (rate && e.sc_audio_init(rate)) setInterval(() => audio.pump(), 20);
@@ -457,7 +461,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     if (!offline) pumpImages();
     jobs?.pump();
     audio?.pump();
-    try { last = JSON.parse(str(e.sc_hud())); } catch { /* keep the last one */ }
+    try { last = JSON.parse(str(e.sc_hud(lenAt))); } catch { /* keep the last one */ }
     if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }
     // vs_combat_presentation.mjs playExplosion: in a multiplayer round the phone buzzes when you
     // go down ([70, 35, 120]) and when a mate does ([65]); the pad never rumbles in SpawnCity.
@@ -480,7 +484,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     // in the headset the page is not seen: its DOM only every 8th frame (style and layout work
     // must not cost the headset frames)
     if (app.inXR && (++xrDomSkip % 8) !== 0) return;
-    const touchView = JSON.parse(str(e.sc_touch_view()));
+    const touchView = JSON.parse(str(e.sc_touch_view(lenAt)));
     if (view) view.update(last, touchView);
     else overlay.update(touchView);
   };
@@ -710,7 +714,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   requestAnimationFrame(tick);
   // hud() reads the game's state now (not the copy of the last drawn frame): a test that sends a
   // command sees its effect at once, however slow the frames are.
-  const hudNow = () => { try { return JSON.parse(str(e.sc_hud())); } catch { return last; } };
+  const hudNow = () => { try { return JSON.parse(str(e.sc_hud(lenAt))); } catch { return last; } };
   window.SpawnCity = {app, command, hud: hudNow, platform, frames: () => frames, tiles, ui, audio: originalAudio};
   return window.SpawnCity;
 }
