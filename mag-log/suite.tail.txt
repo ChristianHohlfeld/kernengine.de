@@ -1,0 +1,80 @@
+  put_array<float>(std::vector<u8> &, const std::vector<float> &): 300 calls compared, 0 not (C++ leaves them open)
+  put_array<unsigned int>(std::vector<u8> &, const std::vector<unsigned int> &): 300 calls compared, 0 not (C++ leaves them open)
+  put_array<double>(std::vector<u8> &, const std::vector<double> &): 300 calls compared, 0 not (C++ leaves them open)
+  put_points(std::vector<u8> &, const std::vector<Vec2> &): 300 calls compared, 0 not (C++ leaves them open)
+  put_spots(std::vector<u8> &, const std::vector<MapFeatures::Spot> &): 300 calls compared, 0 not (C++ leaves them open)
+  Reader::get<unsigned int>(kern::Span<const u8>): 300 calls compared, 13 not (C++ leaves them open)
+  Reader::get<float>(kern::Span<const u8>): 300 calls compared, 13 not (C++ leaves them open)
+  Reader::get<int>(kern::Span<const u8>): 300 calls compared, 13 not (C++ leaves them open)
+  Reader::get<double>(kern::Span<const u8>): 300 calls compared, 8 not (C++ leaves them open)
+  Reader::get<unsigned char>(kern::Span<const u8>): 300 calls compared, 15 not (C++ leaves them open)
+  Reader::array<float>(kern::Span<const u8>, std::vector<float> &): 300 calls compared, 15 not (C++ leaves them open)
+  Reader::array<unsigned int>(kern::Span<const u8>, std::vector<unsigned int> &): 300 calls compared, 10 not (C++ leaves them open)
+  Reader::array<double>(kern::Span<const u8>, std::vector<double> &): 300 calls compared, 15 not (C++ leaves them open)
+  Reader::points(kern::Span<const u8>, std::vector<Vec2> &): 300 calls compared, 15 not (C++ leaves them open)
+  Reader::spots(kern::Span<const u8>, std::vector<MapFeatures::Spot> &): 300 calls compared, 14 not (C++ leaves them open)
+  read_one_chunk(kern::Span<const u8>, Reader &, kern::GeoChunk &): 300 calls compared, 15 not (C++ leaves them open)
+  run_tile(kern::Span<const u8>, std::vector<u8> &): 300 calls compared, 0 not (C++ leaves them open)
+  run_buildings(kern::Span<const u8>, std::vector<u8> &): 300 calls compared, 76 not (C++ leaves them open)
+  tile_input(const TileKey &, f64, f64, kern::Span<const u8>): 300 calls compared, 0 not (C++ leaves them open)
+  read_features(const std::vector<u8> &, MapFeatures &): 300 calls compared, 3 not (C++ leaves them open)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::FootprintStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  buildings_input(const kern::FootprintStream &, const kern::BuildingOptions &): 300 calls compared, 0 not (C++ leaves them open)
+  read_chunks(const std::vector<u8> &, std::vector<kern::GeoChunk> &): 300 calls compared, 165 not (C++ leaves them open)
+ok   lowered_city_jobs_cpp (0.3 s, CPU 0.3 s)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::physics::World *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::physics::World]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::Ragdolls]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = const kern::physics::World *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::CityStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: bool sc::lowered::same(const A &, const B &) [A = kern::physics::World, B = kern::physics::World]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::Ragdolls, B = sc::Ragdolls]: what it holds is its own - not compared
+  Life::update_pigeons(f32, f32, const LifeView &, const CityStream &, Rng &, LifeOut &): 300 calls compared, 0 not (C++ leaves them open)
+ok   lowered_life_cpp (0.1 s, CPU 0.1 s)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::net::HostTransport]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Server>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Client>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::mp::Scoreboard]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::seats::Table]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: bool sc::lowered::same(const A &, const B &) [A = kern::net::HostTransport, B = kern::net::HostTransport]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::mp::Scoreboard, B = sc::mp::Scoreboard]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::seats::Table, B = sc::seats::Table]: what it holds is its own - not compared
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::mp::PoseTimeline]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::mp::NavTimeline]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::mp::VoiceStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::mp::PoseTimeline, B = sc::mp::PoseTimeline]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::mp::NavTimeline, B = sc::mp::NavTimeline]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::mp::VoiceStream, B = sc::mp::VoiceStream]: what it holds is its own - not compared
+  Session::dispatch(u8, u16, const std::vector<u8> &): 300 calls compared, 0 not (C++ leaves them open)
+  Session::deliver(u16, const std::vector<u8> &): 300 calls compared, 0 not (C++ leaves them open)
+ok   lowered_net_session_cpp (0.1 s, CPU 0.1 s)
+  bind_settings(kern::logic::Runtime &): 300 calls compared, 0 not (C++ leaves them open)
+  opt_spec(Opt): 300 calls compared, 0 not (C++ leaves them open)
+  find_opt(std::string_view, Opt &): 300 calls compared, 0 not (C++ leaves them open)
+  Settings::Settings(): 300 calls compared, 0 not (C++ leaves them open)
+  Settings::set(Opt, f32): 300 calls compared, 0 not (C++ leaves them open)
+  Settings::set(std::string_view, std::string_view): 300 calls compared, 0 not (C++ leaves them open)
+  Settings::reset_section(std::string_view): 300 calls compared, 51 not (C++ leaves them open)
+  Settings::values_json(): 300 calls compared, 0 not (C++ leaves them open)
+  Settings::schema_json(): 300 calls compared, 0 not (C++ leaves them open)
+ok   lowered_settings_cpp (2.1 s, CPU 2.1 s)
+  TouchPlay::pointer(u32, i32, f32, f32, f64): 300 calls compared, 0 not (C++ leaves them open)
+ok   lowered_touch_play_cpp (0.0 s, CPU 0.0 s)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::CityStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::physics::World]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: bool sc::lowered::same(const A &, const B &) [A = sc::CityStream, B = sc::CityStream]: what it holds is its own - not compared
+  note: bool sc::lowered::same(const A &, const B &) [A = kern::physics::World, B = kern::physics::World]: what it holds is its own - not compared
+  Marks::blast(Vec3, f32, f32, CityStream &, kern::physics::World &, Rng &, f32, bool): 300 calls compared, 0 not (C++ leaves them open)
+  note: void sc::lowered::draw(Draw &, T &) [T = sc::Terrain]: made by its constructor, not drawn (it keeps what it holds to itself)
+  Marks::add_soot(Vec3, f32, const std::vector<CityStream::Wall> &, const Terrain &, Rng &): 300 calls compared, 0 not (C++ leaves them open)
+  Marks::add_breach(Vec3, f32, f32, const std::vector<CityStream::Wall> &, const Terrain &, kern::physics::World &, Rng &, f32): 300 calls compared, 0 not (C++ leaves them open)
+  Marks::update(f32, const CityStream &, kern::physics::World &): 300 calls compared, 0 not (C++ leaves them open)
+ok   lowered_world_marks_cpp (0.1 s, CPU 0.1 s)
+  TrafficRules::rebuild(const std::vector<Lane> &): 300 calls compared, 0 not (C++ leaves them open)
+  TrafficRules::limit(i32, Vec2, Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, Vec2, bool, View &): 300 calls compared, 25 not (C++ leaves them open)
+ok   lowered_world_traffic_cpp (1.6 s, CPU 1.6 s)
+7 tests, 128 checks, 0 failures (CPU of the tests 4.2 s, 9 at once)
+
+real	21m32,736s
+user	182m46,540s
+sys	3m12,296s
