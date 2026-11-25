@@ -445,7 +445,7 @@ bool libraries_follow(game::Level& level, const game::Project* project, u32 owne
 constexpr std::size_t kCanvasNodes = 2000;
 /// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
 /// with them (logic::link): the rules that follow calls see what a library's function does.
-std::vector<logic::Issue> whole_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
+std::vector<logic::Issue> linked_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
   if (g.uses.empty()) return logic::check(g);
   logic::Graph whole;
   std::string why;
@@ -457,6 +457,14 @@ std::vector<logic::Issue> whole_issues(const game::Level& level, const game::Pro
   std::vector<logic::Issue> issues = logic::check(whole);
   // (what is wrong inside a library is said where the library is open: here only what is this Blueprint's)
   std::erase_if(issues, [&](const logic::Issue& i) { return i.node != 0 && !g.find(i.node); });
+  return issues;
+}
+std::vector<logic::Issue> whole_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
+  std::vector<logic::Issue> issues = linked_issues(level, project, g);
+  // (a Blueprint of a world - one with a project to find libraries in; the program's has none: an export is the
+  // program's - the level is refused with one, Play too; here it is said where the Blueprint is open)
+  if (project)
+    if (const std::string e = game::world_export(g); !e.empty()) issues.push_back({0, true, e});
   return issues;
 }
 /// The Blueprint as an edit sees it: with every type of its libraries - those it does not use

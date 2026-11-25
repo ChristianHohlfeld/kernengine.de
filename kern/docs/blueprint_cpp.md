@@ -1255,7 +1255,12 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
 - Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen, die die
   Funktion am Objekt ruft, das das Programm gebunden hat (`kern::logic::bind_blueprint<T>(runtime)` – die erste
   Instanz, die als T läuft – oder `bind_blueprint<T>(instance)` für genau diese; `kern/logic/blueprint_class.h`).
-  Nichts bindet von selbst, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht.
+  Nichts bindet still, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht. Die
+  Programm-Laufzeit (`kern::game::Program`, `kern/docs/project.md` 4.) bindet beim Start jeden ihrer Blueprints, der als
+  Klasse mit Exporten läuft (`NativeBlueprint::bind_exports`, im Kleber: `bind_blueprint_object`), und löst sie am Ende;
+  zwei Objekte einer solchen Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`).
+  Ein Export in einem Blueprint einer **Welt** wird abgewiesen: beim Lesen des Levels mit Stelle, von `validate`
+  (Play startet nicht) und im Editor als Fehler des offenen Blueprints.
 - **Exporte gehören zum Programm, nicht zu Welten:** je Klasse ist genau ein Objekt gebunden. Ein zweites
   `bind_blueprint`, solange eines gebunden ist, wird mit Fehler abgewiesen (`kern::fail`: „… is bound already“) – wer
   umbinden will, sagt es (`rebind_blueprint`) oder löst vorher (`unbind_blueprint`). Ein gebundenes Objekt, das endet,

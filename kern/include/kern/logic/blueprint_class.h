@@ -60,6 +60,14 @@ template <class T> bool bind_blueprint(Instance& instance, const char* name = "a
   if (blueprint_object<T>) return fail("%s is bound already: the program unbinds it first (unbind_blueprint) or rebinds it (rebind_blueprint)", name);
   return rebind_blueprint<T>(instance, name);
 }
+/// Binds the class T to this object of it (the glue of a class with exports: NativeBlueprint::bind_exports) - refused,
+/// with an error, while another object of it is bound; the same one again: true.
+template <class T> bool bind_blueprint_object(T& object, const char* name = "a Blueprint class") {
+  if (blueprint_object<T> && blueprint_object<T> != &object)
+    return fail("%s is bound already: the program unbinds it first (unbind_blueprint) or rebinds it (rebind_blueprint)", name);
+  blueprint_object<T> = &object;
+  return true;
+}
 /// An export of the class called while none of it is bound: an error with the export's name (kern::fail) - the
 /// export gives nothing then.
 inline bool export_unbound(const char* exported) { return fail("the export %s: no instance of its Blueprint is bound (kern::logic::bind_blueprint)", exported); }

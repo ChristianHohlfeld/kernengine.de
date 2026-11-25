@@ -100,8 +100,20 @@ bool Program::start(const Project& project, std::string* error) {
     if (!b.logic.empty() && !b.logic.library) p->runtime->add(b.logic, static_cast<logic::ActorRef>(i + 1), b.name);
   }
   p->runtime->begin();
+  // the exports of its classes call its Blueprints (kern/logic/blueprint_class.h): each one bound now, for the
+  // program's whole run - an export is the program's, never the instance that happened to start
+  for (const auto& i : p->runtime->instances())
+    if (i && !i->bind_exports()) {
+      const std::string why = last_error();
+      for (const auto& j : p->runtime->instances())
+        if (j) j->unbind_exports();
+      p->runtime->end();
+      return refuse(error, "the program of the project " + project.name + ": the exports of its Blueprint " + i->name() + " - " + why);
+    }
   p->app = program_app(*p->runtime);
   if (!p->app) {
+    for (const auto& j : p->runtime->instances())
+      if (j) j->unbind_exports();
     p->runtime->end();
     return refuse(error, "the Blueprint " + apps + " of the project " + project.name + " gives no App (its object of the engine)");
   }
@@ -130,6 +142,9 @@ std::vector<std::string> Program::said(bool take) {
 
 void Program::end() {
   if (!state_) return;
+  // (its exports call nothing from now on: an export called after the end says so - export_unbound)
+  for (const auto& i : state_->runtime->instances())
+    if (i) i->unbind_exports();
   state_->runtime->end();
   delete state_;
   state_ = nullptr;

@@ -5486,6 +5486,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                              "  // bound - kern::logic::bind_blueprint, said once, never the instance that happened to start)\n" : "") +
                   "  // (an object the program bound and that ends is bound no more: kern/logic/blueprint_class.h)\n"
                   "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::unbind_blueprint<" + name + ">(); }\n" +
+                  (exports ? "  bool bind_exports() override { return kern::logic::bind_blueprint_object<" + name + ">(self, \"" + name + "\"); }\n"
+                             "  void unbind_exports() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::unbind_blueprint<" + name + ">(); }\n" : "") +
                   "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +

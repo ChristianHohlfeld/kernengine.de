@@ -8348,6 +8348,76 @@ TEST(program_world_has_the_project) {
   program.end();
 }
 
+// The exports belong to the program (kern/docs/project.md 4.): the program's runtime binds each of its Blueprints that
+// runs as a class with exports when it starts (NativeBlueprint::bind_exports) and unbinds them at its end - two objects
+// of one such class in the program: the start is refused and names the Blueprint. An export in a Blueprint of a world
+// is refused where the level is read (with the place), by validate (Play does not start) and in the editor (studio).
+TEST(program_binds_the_exports) {
+  struct Exported final : logic::NativeBlueprint {
+    void attach(const logic::BlueprintWorld&) override {}
+    void run(int, int) override {}
+    bool call(std::string_view, std::span<const logic::Value>, logic::Results& results) override { results.clear(); return false; }
+    bool get(std::string_view, logic::Value&) const override { return false; }
+    bool set(std::string_view, const logic::Value&) override { return false; }
+    void* object(const void* type) override { return type == &logic::class_key<Exported> ? this : nullptr; }
+    bool bind_exports() override { return logic::bind_blueprint_object<Exported>(*this, "Exported"); }
+    void unbind_exports() override { if (logic::blueprint_object<Exported> == this) logic::unbind_blueprint<Exported>(); }
+  };
+  std::string error;
+  logic::Graph app, hud;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", app, nullptr, &error));
+  CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
+                        "  struct game_shownResult { Int Result = 0; };\n"
+                        "  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n"
+                        "    return {7};\n"
+                        "  }\n"
+                        "};\n", hud, nullptr, &error));
+  if (!error.empty()) std::printf("program_binds_the_exports: %s\n", error.c_str());
+  CHECK(error.empty() && hud.functions.size() == 1 && hud.functions[0].exported == "game_shown");
+  logic::register_native_blueprint(logic::graph_hash(hud), [] { return std::unique_ptr<logic::NativeBlueprint>(new Exported()); });
+  game::Project pr;
+  pr.name = "Exporte";
+  pr.blueprints = {{"Main", app}, {"Hud", hud}};
+  game::Program program;
+  CHECK(!logic::blueprint_object<Exported>);
+  CHECK(program.start(pr, &error));
+  CHECK(logic::blueprint_object<Exported> && program.runtime() && program.runtime()->instances()[1]->native_object<Exported>() == logic::blueprint_object<Exported>);
+  program.end();
+  CHECK(!logic::blueprint_object<Exported>);   // (the end unbinds them: an export after it says so)
+  // two objects of the class: which one the exports call is not said - refused, with the Blueprint's name
+  game::Project two = pr;
+  two.blueprints.push_back({"Hud2", hud});
+  CHECK(!program.start(two, &error) && !program.running() && !logic::blueprint_object<Exported>);
+  CHECK(error.find("the exports of its Blueprint Hud2") != std::string::npos && error.find("Exported is bound already") != std::string::npos);
+  // in a world: the level is refused where it is read, validate says it, and Play does not start
+  game::Level l = game::basic_level();
+  game::Actor holder;
+  holder.name = "Holder";
+  holder.logic = hud;
+  l.add(holder);
+  std::vector<game::Issue> issues = game::validate(l);
+  CHECK(std::any_of(issues.begin(), issues.end(), [](const game::Issue& i) { return i.error && i.text.find("\"Holder\": the function game_shown is an export (game_shown) - exports belong to the program") == 0; }));
+  game::Level back;
+  CHECK(!game::from_text(game::to_text(l), back, &error) && error.find("actor \"Holder\": the function game_shown is an export (game_shown)") == 0);
+  game::Level graph_has_it = game::basic_level();
+  graph_has_it.logic = hud;
+  CHECK(!game::from_text(game::to_text(graph_has_it), back, &error) && error.find("logic: the function game_shown is an export") == 0);
+}
+
 // The one entry (kern/docs/project.md 4., kern/app/app.h): the program's kern_main hands the engine its App once -
 // kern::run(project) starts the project's program and gives the app runtime its App; the platform then starts it
 // (kern_app_start), drives its frames and stops it - the program ends with the app and starts again with it. A
@@ -13137,6 +13207,20 @@ TEST(studio_logic_implements) {
   CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
+  // an export in a Blueprint of a world: the editor says it where the Blueprint is open (exports belong to the program,
+  // kern/docs/project.md 4.) - the level then does not play
+  std::string text = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
+  const std::size_t end = text.rfind("};");
+  CHECK(end != std::string::npos);
+  text.insert(end, "\n  struct game_shownResult { Int Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
+  json::Value apply = json::Value::object();
+  apply.set("cmd", "logicCppApply");
+  apply.set("text", text);
+  CHECK(f.s->command(apply)["ok"].as_bool());
+  bool said = false;
+  const json::Value checked = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : checked["issues"].items()) said = said || i["text"].as_string().find("exports belong to the program") != std::string::npos;
+  CHECK(said);
 }
 
 // The project in the editor (kern/docs/project.md): a new one, its levels and start level, its settings, its program

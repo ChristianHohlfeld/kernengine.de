@@ -97,6 +97,13 @@ int kern_main() { return kern::run(kern::game::embedded_project()); }
   Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder
   zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
   `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
+- **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
+  Programm-Blueprint. Die Programm-Laufzeit bindet beim Start jeden ihrer Blueprints, der als Klasse mit Exporten
+  läuft (`NativeBlueprint::bind_exports`), und löst sie am Ende (danach meldet ein Export „no instance … is bound“);
+  zwei Objekte derselben Klasse mit Exporten im Programm: der Start bricht ab und nennt den Blueprint. Ein Export in
+  einem Blueprint einer Welt (Level-Graph oder Akteur) ist ein Fehler mit Ort und Grund: beim Lesen des Levels
+  („actor "X": the function f is an export … - exports belong to the program“), in `game::validate` (Play startet
+  nicht) und im Editor am offenen Blueprint. Geprüft: `program_binds_the_exports`, `studio_logic_implements`.
 - Der Bau eines Spiels aus seinem Projekt bettet das Projekt samt seiner Levels ein (`kern/tools/embed_project.py`):
   `kern::game::embedded_project()` (`kern/game/embedded.h`) ist das gelesene Projekt. Die Daten sind Daten des
   Projekts und keine eigenen Symbole. Geprüft: `run_the_program_of_a_project`.
@@ -188,6 +195,10 @@ Eingang **World** (Int, der Handle einer GameWorld):
   schwachen Symbole `kern_create_app`, `kern_project_app`, `kern_project_text` und `kern_game_extensions` sind
   ersatzlos entfernt (Test `run_the_program_of_a_project`). Einstellungen: ein Weg – `App::configure()` ist entfernt,
   Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`). Welten, die
-  das Programm macht, bekommen das Projekt (`program_world_has_the_project`).
+  das Programm macht, bekommen das Projekt (`program_world_has_the_project`). Exporte: die Programm-Laufzeit bindet
+  und löst sie; ein Export in einer Welt wird abgewiesen (`program_binds_the_exports`).
+  OFFEN (SpawnCity): `Game::start` bindet die Klassen des Ordners „Program“ noch an die Logik der Welt
+  (`blueprints::bind(*world_->logic_runtime())`) – sie stehen bis zum Schaltschritt im Level und das Spiel hat eine
+  App aus C++; das Binden fällt weg, sobald der Konverter sie ins Projekt schreibt (`spawncity.kproject`).
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

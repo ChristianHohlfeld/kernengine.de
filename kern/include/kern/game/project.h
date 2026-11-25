@@ -56,6 +56,10 @@ logic::Blueprints program_blueprints(const Project& project);
 /// The Blueprints a world's Blueprint finds as libraries: its level's (by the name of the actor that has it), then
 /// the project's (null: the level's alone).
 logic::Blueprints world_blueprints(const Level& level, const Project* project);
+/// Why a Blueprint of a world may not have the functions it has: one of them is an export (Function::exported) -
+/// exports belong to the program (kern/docs/project.md 4.): "" when none is. A level that holds one is refused when
+/// it is read (with the place), and validate says so.
+std::string world_export(const logic::Graph& graph);
 /// The names that stand in the level (an actor with a Blueprint) and in the project, each with both places:
 /// "the Blueprint Math stands in the level (actor 7) and in the project (blueprints[0]) - rename one". Empty: none.
 std::vector<std::string> library_conflicts(const Level& level, const Project& project);
