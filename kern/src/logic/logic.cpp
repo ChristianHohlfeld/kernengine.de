@@ -1771,6 +1771,7 @@ json::Value graph_to_json(const Graph& g) {
       json::Value o = json::Value::object();
       o.set("name", f.name);
       if (f.pure) o.set("pure", true);
+      if (f.overrides) o.set("overrides", true);
       if (f.external) o.set("external", true);
       if (!f.remote.empty()) o.set("remote", f.remote);
       if (!f.from.empty()) o.set("from", f.from);
@@ -2041,6 +2042,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (f.name.empty() || f.name.size() > 64 + (f.from.empty() ? 0 : f.from.size() + 2)) return bad("a function needs a name (1-64 characters)");
     if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
     f.pure = v["pure"].as_bool();
+    f.overrides = v["overrides"].as_bool();
     f.external = v["external"].as_bool();
     f.remote = v["remote"].as_string();
     if (!f.remote.empty() && !f.external) return bad("function \"" + f.name + "\" has the name of another Blueprint's function, but is none of another Blueprint");
@@ -2394,7 +2396,26 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (g.uses[o] == g.uses[k]) err(0, "the library \"" + g.uses[k] + "\" is used twice");
   // The object of an interface of the engine (Graph::implements): the engine calls its functions of the names of the
   // interface's - each with the inputs and outputs of the interface's function (its node's after the object), every
-  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"). Which of its functions the engine calls,
+  // the Blueprint says (Function::overrides) - a name alone decides nothing: a function of an interface's name that does
+  // not say so, and one that says so the interface has not (a typo), are errors; one the interface has that the
+  // Blueprint has not is said too - the interface's own runs there.
+  if (g.implements.empty()) {
+    for (const Function& f : g.functions)
+      if (f.overrides) err(0, "function \"" + f.name + "\" overrides a function of an interface of the engine (KERN_OVERRIDE), but the Blueprint implements none (kern::Implements<...>)");
+  } else if (const EngineInterface* const i = engine_interface(g.implements)) {
+    std::string names;
+    for (const EngineVirtual& v : i->functions) names += (names.empty() ? "" : ", ") + std::string(v.name);
+    for (const Function& f : g.functions) {
+      const bool there = std::any_of(i->functions.begin(), i->functions.end(), [&](const EngineVirtual& v) { return f.name == v.name; });
+      if (f.overrides && !there) err(0, "function \"" + f.name + "\" overrides " + g.implements + "::" + f.name + ", which " + g.implements + " has not (it has " + names + ")");
+      if (!f.overrides && there && f.from.empty() && !f.external)
+        err(0, "function \"" + f.name + "\" has the name of " + g.implements + "::" + f.name + " but does not say that it overrides it: KERN_OVERRIDE (the engine calls it), or another name");
+    }
+    for (const EngineVirtual& v : i->functions)
+      if (!v.pure && !*v.waits && !g.function(v.name))
+        warn(0, "it implements " + g.implements + " without " + v.name + ": the interface's own runs there (" + v.node + ")");
+  }
   if (!g.implements.empty()) {
     const EngineInterface* const i = engine_interface(g.implements);
     if (!i) {

@@ -2111,6 +2111,13 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         }
         return true;
       }
+      if (op == "overrides") {
+        // (it is a function of the interface the Blueprint implements: the engine calls it - Function::overrides;
+        // check() says where that does not fit)
+        if (f->external) { error = "a function of another Blueprint is not this one's to override with"; return false; }
+        f->overrides = c["value"].as_bool();
+        return true;
+      }
       if (op == "help") { f->help = str("text"); return true; }
       // (side "local": its local variables - edited like its pins; their nodes are the variable
       // nodes that name the function as their "scope")

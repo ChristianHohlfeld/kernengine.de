@@ -7637,7 +7637,7 @@ TEST(engine_footprint_stream_values) {
 }  // namespace
 
 namespace implements_probe {
-struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
   Float Time = 0.25;
   Int Program = 0;
@@ -7646,25 +7646,25 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 
   // ---- functions ----
   struct nameResult { Text result = ""; };
-  KERN_PURE nameResult name() {
+  KERN_OVERRIDE KERN_PURE nameResult name() {
     return {"water"};
   }
 
   struct vertexResult { Text result = ""; };
-  KERN_PURE vertexResult vertex() {
+  KERN_OVERRIDE KERN_PURE vertexResult vertex() {
     return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
   }
 
-  void bind(Int program = 0) {
+  KERN_OVERRIDE void bind(Int program = 0) {
     Program = program;
   }
 
-  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) {
     Cache = cache;
     Frames += 1;
   }
 };
-struct Running : kern::Blueprint, kern::Implements<"App"> {
+struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
     Float time = 0.0;
@@ -7680,24 +7680,24 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 
   // ---- functions ----
   struct startResult { Bool result = false; };
-  startResult start(Int engine = 0) {
+  KERN_OVERRIDE startResult start(Int engine = 0) {
     Engine = engine;
     return {true};
   }
 
-  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
     Updates += 1;
     Last = frame.time;
   }
 
-  void stop(Int engine = 0) {
+  KERN_OVERRIDE void stop(Int engine = 0) {
     Stopped = true;
   }
 };
 }  // namespace implements_probe
 
 namespace implements_probe {
-struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
     Int64 id = Int64{0x0};
@@ -7710,12 +7710,12 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
 
   // ---- functions ----
   struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
-  KERN_PURE addressResult address() {
+  KERN_OVERRIDE KERN_PURE addressResult address() {
     return {net_Address{Int64{0x7}}};
   }
 
   struct sendResult { Bool result = false; };
-  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
     Last = to;
     Bytes = bytes;
     Sent = list_length<U8>(data);
@@ -7723,7 +7723,7 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
   }
 
   struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
-  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
     return {Bytes, Last, List<Int>{1, 2, 3}};
   }
 };
@@ -7896,7 +7896,7 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
-  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
+  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
   const std::vector<logic::Issue> issues = logic::check(wrong);
   const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
   CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is int, not float"));
@@ -7908,10 +7908,58 @@ TEST(engine_interface_a_blueprint_implements) {
   objects.clear();
 }
 
+// Which functions of a Blueprint the engine calls, the Blueprint says (KERN_OVERRIDE, Function::overrides) - the name alone
+// decides nothing: a typo of an interface's function is an error with the functions it has, a function of an interface's
+// name that does not say so is an error, KERN_OVERRIDE without an interface is one; a function of the interface the
+// Blueprint has not is said as a note (the interface's own runs). The interface is its C++ type in the text.
+TEST(engine_interface_overrides_are_said) {
+  auto issues = [](const char* text, std::string* error) {
+    logic::Graph g;
+    std::vector<logic::Issue> r;
+    if (logic::from_cpp(text, g, nullptr, error)) r = logic::check(g);
+    return r;
+  };
+  auto has = [](const std::vector<logic::Issue>& v, bool error, const std::string& text) {
+    for (const logic::Issue& i : v)
+      if (i.error == error && i.text == text) return true;
+    for (const logic::Issue& i : v) std::printf("    (%s) %s\n", i.error ? "error" : "note", i.text.c_str());
+    return false;
+  };
+  std::string error;
+  const auto typo = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void upadte() {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(typo, true, "function \"upadte\" overrides App::upadte, which App has not (it has configure, extensions, start, update, resized, stop)"));
+  const auto unsaid = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  void stop(Int engine = 0) {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(unsaid, true, "function \"stop\" has the name of App::stop but does not say that it overrides it: KERN_OVERRIDE (the engine calls it), or another name"));
+  const auto alone = issues("struct A : kern::Blueprint {\n  // ---- functions ----\n  KERN_OVERRIDE void stop() {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(alone, true, "function \"stop\" overrides a function of an interface of the engine (KERN_OVERRIDE), but the Blueprint implements none (kern::Implements<...>)"));
+  // (an App with what it must have - start and update, its pure ones - and stop, each saying so: no error, and a note
+  // for each it leaves to the interface; read and written again as it is)
+  const char* const said = blueprint_native::kImplementsGame;
+  const auto good = issues(said, &error);
+  CHECK(error.empty() && no_errors(good) && has(good, false, "it implements App without resized: the interface's own runs there (engine.app.resized)") &&
+        has(good, false, "it implements App without configure: the interface's own runs there (engine.app.configure)"));
+  logic::Graph g;
+  std::string text;
+  CHECK(logic::from_cpp(said, g, nullptr, &error) && g.functions.size() == 3 && g.functions[2].name == "stop" && g.functions[2].overrides &&
+        logic::to_cpp(g, "Running", text, &error, logic::library(), false) && text.ends_with(said));   // (written as it was: after the text's head)
+  // (without a pure one: the error says which)
+  const auto bare = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void stop(Int engine = 0) {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(bare, true, "it implements App: it has no function start (the interface's has no body - engine.app.start)"));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back, &error) && back.functions.size() == 3 && back.functions[2].overrides);
+  // (the interface is a type: no text, and only a type of the engine that is one)
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint, kern::Implements<\"App\"> {\n};\n", g, nullptr, &error) &&
+        error.find("the interface of the engine by its C++ type expected (kern::Implements<kern::App>)") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint, kern::Implements<kern::Appp> {\n};\n", g, nullptr, &error) &&
+        error.find("kern::Implements<kern::Appp>: the engine has no interface Appp") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  // ---- variables ----\n  KERN_OVERRIDE Int X = 0;\n};\n", g, nullptr, &error));
+}
+
 // Engine Object of Blueprint (func.engine_object, Runtime::engine_object): the object of the engine another Blueprint is -
-// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - its handle in the
-// host's objects, made once: the same handle every time; 0 where there is no Blueprint that runs, one that implements
-// nothing, or a host without objects of the engine.
+// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - as an Object<I> of
+// the interface its setting names (kern/docs/engine_object.md): the handle in the host's objects and their world, made
+// once - the same every time. Where it cannot be one, the host is told why - each of the four reasons in its own words -
+// and the node gives no object (never a 0 that looks like a handle).
 TEST(engine_object_of_a_blueprint) {
   struct Host : FakeLogicHost {
     logic::EngineObjects objects;
@@ -8064,24 +8112,24 @@ TEST(node_type_of_an_object) {
   logic::Runtime program(program_host);
   logic::Graph ticker;
   std::string error;
-  CHECK(logic::from_cpp("struct Ticker : kern::Blueprint, kern::Implements<\"logic_NodeType\"> {\n"
+  CHECK(logic::from_cpp("struct Ticker : kern::Blueprint, kern::Implements<kern::logic::NodeType> {\n"
                         "  // ---- functions ----\n"
                         "  struct typeResult { Text result = \"\"; };\n"
-                        "  typeResult type() {\n"
+                        "  KERN_OVERRIDE typeResult type() {\n"
                         "    return {\"test.ticker\"};\n"
                         "  }\n"
                         "\n"
                         "  struct labelResult { Text result = \"\"; };\n"
-                        "  labelResult label() {\n"
+                        "  KERN_OVERRIDE labelResult label() {\n"
                         "    return {\"Ticker\"};\n"
                         "  }\n"
                         "\n"
                         "  struct eventResult { Text result = \"\"; };\n"
-                        "  eventResult event() {\n"
+                        "  KERN_OVERRIDE eventResult event() {\n"
                         "    return {\"logic.tick\"};\n"
                         "  }\n"
                         "\n"
-                        "  void run() {\n"
+                        "  KERN_OVERRIDE void run() {\n"
                         "    debug_print(\"ran\", false);\n"
                         "  }\n"
                         "};\n", ticker, nullptr, &error));
@@ -8160,7 +8208,7 @@ TEST(app_from_the_level) {
   game::Actor main;
   main.name = "Main";
   main.folder = "Program";
-  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                      "  // ---- types ----\n"
                      "  KERN_STRUCT(Frame) {\n"
                      "    Float time = 0.0;\n"
@@ -8170,16 +8218,16 @@ TEST(app_from_the_level) {
                      "\n"
                      "  // ---- functions ----\n"
                      "  struct startResult { Bool result = false; };\n"
-                     "  startResult start(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                      "    debug_print(\"start\", false);\n"
                      "    return {true};\n"
                      "  }\n"
                      "\n"
-                     "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                      "    debug_print(\"update\", false);\n"
                      "  }\n"
                      "\n"
-                     "  void stop(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE void stop(Int engine = 0) {\n"
                      "    debug_print(\"stop\", false);\n"
                      "  }\n"
                      "\n"
@@ -12964,7 +13012,7 @@ TEST(studio_logic_implements) {
   CHECK(st["logic"]["implements"].as_string().empty());
   CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
-  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<kern::ShaderExtension> {\n") != std::string::npos);
   bool missing = false;
   const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;

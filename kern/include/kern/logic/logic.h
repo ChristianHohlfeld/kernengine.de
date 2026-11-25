@@ -624,6 +624,10 @@ struct Function {
   /// setting "scope" (the function); two functions may each have a local of one name.
   std::vector<FunctionPin> locals;
   bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of the interface of the engine the Blueprint implements (Graph::implements): the engine calls it, in
+  /// place of the interface's own. Said, not guessed from the name: check refuses a function of an interface's name
+  /// without it and one with it the interface has not. In the Blueprint's C++: KERN_OVERRIDE void update(...).
+  bool overrides = false;
   /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
@@ -686,10 +690,12 @@ struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
-  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
-  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
-  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
-  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  /// The interface of the engine this Blueprint is the object of, by the one rule of the engine's names
+  /// (engine_class_name: kern::ShaderExtension is "ShaderExtension", kern::net::Transport "net_Transport"; empty:
+  /// none) - the engine calls its functions that say they override one of the interface's (Function::overrides;
+  /// kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a
+  /// running one). In C++ the type itself, the last base:
+  ///   struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... KERN_OVERRIDE Text vertex() ... };
   std::string implements;
   bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }

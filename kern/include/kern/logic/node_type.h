@@ -2,7 +2,7 @@
 //
 // A program that adds a node type to the engine's logic (the nodes its level's graphs may hold) gives an object of a
 // class that is a NodeType - the program's C++, or the object of the engine of a Blueprint that implements NodeType
-// (kern::Implements<"logic_NodeType">, the Blueprint in the program's logic runtime) - to register_node_type. The node
+// (kern::Implements<kern::logic::NodeType>, the Blueprint in the program's logic runtime) - to register_node_type. The node
 // type it makes (a NodeDef in library()) is an event node when `event` names an event (it handles each such event:
 // "logic.tick" each fixed step), an action otherwise; its run calls the object's run and ends the chain there.
 // What the type, label and event are is read once, when it is registered.

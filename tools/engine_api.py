@@ -455,7 +455,7 @@ class Calls:
 
     def class_adapter_text(self, q, name, virtuals, need):
         """The engine's object of the interface q that a Blueprint's class is (kern::logic::implementation; the class
-        derives from kern::Implements<"name">): each virtual function calls the class's own function of its name, typed
+        derives from kern::Implements<q>): each virtual function calls the class's own function of its name, typed
         - what the engine hands it made into the class's types where the class reads it (engine_values::Given; an
         object of the engine its handle), what the function gives made into the engine's (Direct::from); one the class
         has not, and one the engine cannot hand to a Blueprint, is the interface's own."""
@@ -521,7 +521,7 @@ class Calls:
                           f"      return {ret}({member}.data(), {member}.size());", "    }", "  }"]
                 continue
             lines += [f"      auto kern_r = {EV}blank<{ret}>();", f"      {EV}Direct<{tg}>::from(kern_o, kern_given, kern_r);", "      return kern_r;", "    }", "  }"]
-        return [f"// {q} that a Blueprint's class is (kern::Implements<\"{name}\">: kern::logic::implementation)",
+        return [f"// {q} that a Blueprint's class is (kern::Implements<{q}>: kern::logic::implementation)",
                 f"template <class B> class {cls} final : public {q} {{",
                 " public:",
                 f"  explicit {cls}(B& b) : b_(b) {{}}",
@@ -534,7 +534,7 @@ class Calls:
                 "  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }",
                 *kept,
                 "};",
-                f'template <> struct InterfaceOf<"{name}"> {{',
+                f'template <> struct InterfaceOf<{q}> {{',
                 f"  template <class B> using adapter = {cls}<B>;",
                 "};", ""]
 

@@ -882,10 +882,10 @@ struct Blueprint : game::BlueprintNodesOf<logic::EngineNodesOf<BlueprintCore>> {
 ///   struct Door : virtual kern::Blueprint, virtual Random { ... n5 = Random::range(Seed, 0.0, 1.0); ... };
 /// (virtual: a Blueprint and the libraries it uses share what a Blueprint is.)
 using Library = Blueprint;
-// (kern::Implements<"ShaderExtension">, the base of a Blueprint that is the object of an interface of the engine:
+// (kern::Implements<kern::ShaderExtension>, the base of a Blueprint that is the object of an interface of the engine:
 // kern/logic/engine_direct.h)
 namespace logic {
-/// The engine's object of the interface the class of a Blueprint implements (its last base kern::Implements<"...">):
+/// The engine's object of the interface the class of a Blueprint implements (its last base kern::Implements<I>):
 /// each function the engine calls is the class's of that name, called typed - what the engine hands it made into the
 /// class's types (an object of the engine its handle in the class's EngineObjects), what it gives into the engine's.
 /// The class must outlive it. (The interpreter's way: logic::engine_implement.)
@@ -922,6 +922,10 @@ template <class B> auto implementation(B& blueprint) {
 #define KERN_CONST static inline const
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
+/// KERN_OVERRIDE void update(Float dt = 0.0) { ... }: a function of the interface of the engine the Blueprint
+/// implements (kern::Implements<kern::App>) - the engine calls it (Function::overrides). A function of an interface's
+/// name without it, and one with it that the interface has not (a typo), are errors of the Blueprint (check).
+#define KERN_OVERRIDE
 /// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:
 /// it has no body here and is called on an actor (func_call_on<"Fn">).
 #define KERN_EXTERN

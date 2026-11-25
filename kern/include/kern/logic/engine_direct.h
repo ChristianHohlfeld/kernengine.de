@@ -39,10 +39,11 @@
 
 namespace kern {
 /// A Blueprint that is the object of an interface of the engine (Graph::implements; kern/docs/blueprint_cpp.md,
-/// "Schnittstellen der Engine") names it as its last base - the engine calls its functions of the interface's names:
-///   struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> { ... Text vertex() { ... } ... };
+/// "Schnittstellen der Engine") names it as its last base - by the interface's C++ type, not by a text. Each function
+/// the engine calls on it says so (KERN_OVERRIDE):
+///   struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... KERN_OVERRIDE Text vertex() { ... } ... };
 /// kern::logic::implementation(blueprint) makes the engine's object of a Blueprint's class (engine_nodes.gen.h).
-template <Setting Interface> struct Implements {};
+template <class Interface> struct Implements {};
 }  // namespace kern
 
 namespace kern::logic::engine_direct {
@@ -51,8 +52,11 @@ template <class M> struct MemberOf {};
 template <class R, class C> struct MemberOf<R C::*> { using type = C; };
 /// The adapter of an interface for a Blueprint's class (engine_nodes.gen.h writes one per interface: `template <class B>
 /// using adapter = ...`).
-template <Setting Interface> struct InterfaceOf;
-template <Setting S> InterfaceOf<S> interface_of(const ::kern::Implements<S>&);
+template <class> inline constexpr bool kNoInterface = false;
+template <class Interface> struct InterfaceOf {
+  static_assert(kNoInterface<Interface>, "kern::Implements<I>: I is no interface of the engine (tools/engine_api.py writes one InterfaceOf per class of the engine with virtual functions that are nodes; kern/docs/blueprint_cpp.md, \"Schnittstellen der Engine\")");
+};
+template <class I> InterfaceOf<I> interface_of(const ::kern::Implements<I>&);
 }  // namespace kern::logic::engine_direct
 
 namespace kern::logic::engine_values {

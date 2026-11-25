@@ -1506,23 +1506,30 @@ Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheid
 Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.
 
 ```cpp
-struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Float Time = 0.0;
   struct nameResult { Text result = ""; };
-  KERN_PURE nameResult name() { return {"water"}; }
-  void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
+  KERN_OVERRIDE KERN_PURE nameResult name() { return {"water"}; }
+  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
 };
 ```
 
 - **Sprache:** `Graph::implements` nennt die Schnittstelle mit ihrem Namen in den Blueprints (`EngineInterface::name`:
-  `App`, `ShaderExtension`, `net_Transport`); JSON `"implements"`, im Text die letzte Basis `kern::Implements<"…">`. Die
-  Funktionen des Blueprints mit den Namen der virtuellen Funktionen sind, was die Engine ruft: jede hat die Eingänge des
+  `App`, `ShaderExtension`, `net_Transport` – die eine Regel der Engine-Namen: der C++-Name unter `kern::`, `::` als `_`,
+  `logic::engine_class_name`); JSON `"implements"`, im Text die letzte Basis mit dem **Typ** der Schnittstelle,
+  `kern::Implements<kern::ShaderExtension>` (kein Text; ein Typ, der keine Schnittstelle ist, ist ein Fehler beim Lesen
+  und in der Klasse ein `static_assert` mit Grund). Welche Funktionen des Blueprints die Engine ruft, sagt jede selbst:
+  `KERN_OVERRIDE` (`Function::overrides`, JSON `"overrides"`) – nicht der Name allein. Sie sind, was die Engine ruft: jede hat die Eingänge des
   Knotens dieser Funktion nach dem ersten (das Objekt ist der Blueprint selbst) und seine Ausgänge, in ihrer Reihenfolge,
   von ihren Typen – ein Objekt der Engine als Handle (`Int engine`), ein Struct der Engine als Struct des Blueprints
   (`Frame frame`), `const char*` als Text.
 - **Regeln (check):** die Schnittstelle gibt es; jede reine virtuelle Funktion hat der Blueprint; jede Funktion mit dem
   Namen einer virtuellen hat deren Eingänge und Ausgänge (keine Referenz: die Engine übergibt Werte) und ist seine eigene;
-  eine Bibliothek ist kein Objekt. Eine nicht reine, die der Blueprint nicht hat, ist die der Schnittstelle.
+  eine Bibliothek ist kein Objekt. Fehler mit Grund: eine Funktion mit `KERN_OVERRIDE`, die die Schnittstelle nicht hat
+  (ein Tippfehler `upadte` – die Meldung nennt die Funktionen der Schnittstelle), eine Funktion mit dem Namen einer
+  virtuellen ohne `KERN_OVERRIDE`, und `KERN_OVERRIDE` in einem Blueprint, der nichts implementiert. Eine nicht reine,
+  die der Blueprint nicht hat, ist die der Schnittstelle – `check` sagt das als Hinweis (kein Fehler), je Funktion.
+  Geprüft: `engine_interface_overrides_are_said`.
 - **Engine:** `tools/engine_api.py` schreibt aus dem Header je Schnittstelle die Tabelle (`engine_interfaces()`,
   `EngineVirtual`: Name, Knoten, rein) und im `engine_calls.gen.cpp` ihres Teils den **Adapter**
   (`Implements_<Name>`, eine Klasse, die von der Schnittstelle erbt): jede virtuelle Funktion gibt dem Blueprint, was die
@@ -1534,7 +1541,7 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
   extensions)`).
 - **Klasse:** `kern::logic::implementation(blueprint)` macht das Objekt der Schnittstelle aus der Klasse eines Blueprints
-  (sie leitet von `kern::Implements<"…">` ab): `ClassImplements_<Name><B>` in `engine_nodes.gen.h`, je virtuelle Funktion
+  (sie leitet von `kern::Implements<I>` ab): `ClassImplements_<Name><B>` in `engine_nodes.gen.h`, je virtuelle Funktion
   die der Klasse gleichen Namens, typisiert gerufen – was die Engine gibt, als `engine_values::Given` (gelesen, wo die
   Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
   Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
@@ -1564,7 +1571,7 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 - **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
   `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
   Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
-  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
+  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<kern::App>` im Text, ihre Funktionen mit `KERN_OVERRIDE`), ihre Overrides sind seine
   Funktionen mit den Namen der Schnittstelle – sobald jede reine geschrieben ist (bis dahin hat die Engine kein Objekt
   von ihm: was noch wartet, hält die Schnittstelle von ihm fern wie jeden Aufrufer); was dann nicht passt, sagt check().
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die

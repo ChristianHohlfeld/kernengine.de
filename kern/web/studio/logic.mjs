@@ -1483,6 +1483,7 @@ export class LogicEditor {
         <div class="lg-drow"><label>Name</label><div><input data-fk="name" value="${lgEsc(f.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label title="A function another actor's Blueprint (or the Level's) has: this Blueprint only says what it looks like and calls it on an actor. It has no body here.">Of another Blueprint</label><div><input type="checkbox" data-fk="external"${ext ? " checked" : ""}></div></div>
         ${ext ? "" : `<div class="lg-drow"><label title="A pure function only computes: it has no exec pins where it is called and runs whenever its outputs are read">Pure</label><div><input type="checkbox" data-fk="pure"${f.pure ? " checked" : ""}></div></div>`}
+        ${ext || !(f.overrides || this.data?.implements) ? "" : `<div class="lg-drow"><label title="A function of the interface of the engine this Blueprint implements (KERN_OVERRIDE): the engine calls it. A function of the interface's name must say so.">Overrides ${lgEsc(this.data?.implements || "")}</label><div><input type="checkbox" data-fk="overrides"${f.overrides ? " checked" : ""}></div></div>`}
         <div class="lg-drow"><label>Description</label><div><input data-fk="help" value="${lgEsc(f.help || "")}"></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows(f.inputs, "in")}<div class="lg-dacts"><button data-act="fn-in">+ Input</button></div></div>
@@ -1633,6 +1634,7 @@ export class LogicEditor {
           const k = f.dataset.fk;
           if (k === "name") { const to = f.value.trim(); if (edit({op: "rename", to})?.ok !== false) this.selFn = to; }
           else if (k === "pure") edit({op: "pure", value: f.checked});
+          else if (k === "overrides") edit({op: "overrides", value: f.checked});
           else if (k === "external") { const p = this.centerWorld(); edit({op: "external", value: f.checked, x: p.x, y: p.y}); }
           else edit({op: "help", text: f.value});
         };

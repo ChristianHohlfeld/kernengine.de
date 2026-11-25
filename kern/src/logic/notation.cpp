@@ -2008,7 +2008,7 @@ struct Writer {
     // (a library: `virtual kern::Library`; what it uses, or a Blueprint uses, are bases beside that)
     out += "struct " + type + " : " + (g.library ? "virtual kern::Library" : g.uses.empty() ? "kern::Blueprint" : "virtual kern::Blueprint");
     for (const std::string& used : g.uses) out += ", virtual " + used;
-    if (!g.implements.empty()) out += ", kern::Implements<" + text_literal(g.implements) + ">";  // (the interface of the engine it is the object of)
+    if (!g.implements.empty()) out += ", kern::Implements<" + engine_class_cpp(g.implements) + ">";  // (the interface of the engine it is the object of: its type)
     out += " {\n";
     bool own_types = false;  // (a type of a library it uses is the library's: its text has it)
     for (const EnumType& e : g.enums) own_types = own_types || e.from.empty();
@@ -2098,7 +2098,7 @@ struct Writer {
           line(1, (f.remote.empty() ? std::string("KERN_EXTERN ") : "KERN_EXTERN_AS(" + text_literal(f.remote) + ") ") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
           continue;
         }
-        line(1, (f.exported.empty() ? std::string() : "KERN_EXPORT_AS(" + text_literal(f.exported) + ", " + text_literal(f.wire) + ") ") + std::string(f.pure ? "KERN_PURE " : "") +
+        line(1, (f.exported.empty() ? std::string() : "KERN_EXPORT_AS(" + text_literal(f.exported) + ", " + text_literal(f.wire) + ") ") + std::string(f.overrides ? "KERN_OVERRIDE " : "") + std::string(f.pure ? "KERN_PURE " : "") +
                     (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
         for (const FunctionPin& l : f.locals) line(2, cpp_type(declared(l)) + " " + l.name + " = " + literal(Value::from_json(l.value, declared(l), g), declared(l), g) + ";");
@@ -2935,7 +2935,8 @@ struct Reader {
   }
   bool declarations() {
     std::string docs;
-    bool has_docs = false, pure = false, external = false, has_event = false;
+    bool has_docs = false, pure = false, external = false, has_event = false, overrides = false;
+    std::size_t override_at = 0;
     std::string remote;  // (KERN_EXTERN_AS: the name the other Blueprint has the function under)
     std::string exported, wire;  // (KERN_EXPORT_AS: the C name the program gives the function under, and how its values cross)
     std::size_t export_at = 0;
@@ -3096,6 +3097,15 @@ struct Reader {
         pure = true;
         continue;
       }
+      if (is("KERN_OVERRIDE")) {
+        // KERN_OVERRIDE void update(...) { ... }   a function of the interface the Blueprint implements (Function::overrides)
+        override_at = p++;
+        overrides = true;
+        const std::size_t q = is("KERN_PURE") ? 1 : 0;
+        if (peek(q).kind != Tok::id || peek(q + 1).kind != Tok::id || !is("(", q + 2))
+          return fail(override_at, "KERN_OVERRIDE stands in front of a function of the interface the Blueprint implements: KERN_OVERRIDE void update(...)");
+        continue;
+      }
       if (accept("KERN_EXPORT_AS")) {
         // KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult game_hud(...) { ... }   (Function::exported, Function::wire)
         export_at = p;
@@ -3163,6 +3173,7 @@ struct Reader {
         Function f;
         f.name = fn;
         f.pure = pure;
+        f.overrides = overrides;
         f.external = external;
         f.remote = std::move(remote);
         remote.clear();
@@ -3208,7 +3219,9 @@ struct Reader {
       it.tok = at + 1;
       if (external && it.kind != Item::function) return fail(at, "KERN_EXTERN stands in front of a function of another Blueprint");
       if (!exported.empty()) return fail(export_at, "KERN_EXPORT_AS stands in front of a function");
+      if (overrides && it.kind != Item::function) return fail(override_at, "KERN_OVERRIDE stands in front of a function of the interface the Blueprint implements");
       pure = false;
+      overrides = false;
       if (!expect(")")) return false;
       if (external) {
         // KERN_EXTERN FnResult Fn(...);   what a function of another Blueprint looks like: no body
@@ -4664,7 +4677,7 @@ struct Reader {
   /// struct Name : virtual kern::Library {                             a library: it keeps nothing, others use it
   /// struct Name : virtual kern::Blueprint, virtual Random {           a Blueprint that uses the library Random
   /// struct Name : virtual kern::Library, virtual Types {              a library that uses one
-  /// struct Name : kern::Blueprint, kern::Implements<"App"> {          the object of an interface of the engine (Graph::implements)
+  /// struct Name : kern::Blueprint, kern::Implements<kern::App> {      the object of an interface of the engine (Graph::implements)
   /// What it uses it has: the libraries' types, and their functions as Random::range(...).
   bool head() {
     if (!expect("struct") || !word(name, "the Blueprint's name") || !expect(":")) return false;
@@ -4682,8 +4695,10 @@ struct Reader {
       if (is("kern") && is("::", 1) && is("Implements", 2)) {   // (last: the interface of the engine it is the object of)
         p += 3;
         if (!expect("<")) return false;
-        if (peek().kind != Tok::text) return fail(p, "the name of an interface of the engine expected (kern::Implements<\"App\">), not " + shown(peek()));
-        g.implements = toks[p++].s;
+        const std::size_t which = p;
+        if (!is("kern")) return fail(p, "the interface of the engine by its C++ type expected (kern::Implements<kern::App>), not " + shown(peek()));
+        if (!engine_class_here(g.implements)) return false;
+        if (!engine_interface(g.implements)) return fail(which, "kern::Implements<" + engine_class_cpp(g.implements) + ">: the engine has no interface " + g.implements + " (" + interface_names() + ")");
         if (!expect(">")) return false;
         if (!is("{")) return fail(p, "kern::Implements<...> is the last base of a Blueprint");
         break;

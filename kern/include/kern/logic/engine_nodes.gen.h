@@ -1689,22 +1689,23 @@ struct S_logic_EnumType {
   };
 };
 struct S_logic_Function {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Function& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::List<ev::Int>>::from(o, f1, x.inputs); ev::Direct<ev::List<ev::Int>>::from(o, f2, x.outputs); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.locals); ev::Direct<ev::Bool>::from(o, f4, x.pure); ev::Direct<ev::Bool>::from(o, f5, x.external); ev::Direct<ev::Text>::from(o, f6, x.remote); ev::Direct<ev::Text>::from(o, f7, x.from); ev::Direct<ev::Text>::from(o, f8, x.exported); ev::Direct<ev::Text>::from(o, f9, x.wire); ev::Direct<ev::Text>::from(o, f10, x.help); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Function& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Int>>(o, x.inputs), ev::made<ev::List<ev::Int>>(o, x.outputs), ev::made<ev::List<ev::Int>>(o, x.locals), ev::made<ev::Bool>(o, x.pure), ev::made<ev::Bool>(o, x.external), ev::made<ev::Text>(o, x.remote), ev::made<ev::Text>(o, x.from), ev::made<ev::Text>(o, x.exported), ev::made<ev::Text>(o, x.wire), ev::made<ev::Text>(o, x.help)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Int>>::pass(o, x.inputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.outputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.locals); ev::Direct<ev::Bool>::pass(o, x.pure); ev::Direct<ev::Bool>::pass(o, x.external); ev::Direct<ev::Text>::pass(o, x.remote); ev::Direct<ev::Text>::pass(o, x.from); ev::Direct<ev::Text>::pass(o, x.exported); ev::Direct<ev::Text>::pass(o, x.wire); ev::Direct<ev::Text>::pass(o, x.help); }
+  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Function& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::List<ev::Int>>::from(o, f1, x.inputs); ev::Direct<ev::List<ev::Int>>::from(o, f2, x.outputs); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.locals); ev::Direct<ev::Bool>::from(o, f4, x.pure); ev::Direct<ev::Bool>::from(o, f5, x.overrides); ev::Direct<ev::Bool>::from(o, f6, x.external); ev::Direct<ev::Text>::from(o, f7, x.remote); ev::Direct<ev::Text>::from(o, f8, x.from); ev::Direct<ev::Text>::from(o, f9, x.exported); ev::Direct<ev::Text>::from(o, f10, x.wire); ev::Direct<ev::Text>::from(o, f11, x.help); }
+  template <class B> static B make(EngineObjects& o, const kern::logic::Function& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Int>>(o, x.inputs), ev::made<ev::List<ev::Int>>(o, x.outputs), ev::made<ev::List<ev::Int>>(o, x.locals), ev::made<ev::Bool>(o, x.pure), ev::made<ev::Bool>(o, x.overrides), ev::made<ev::Bool>(o, x.external), ev::made<ev::Text>(o, x.remote), ev::made<ev::Text>(o, x.from), ev::made<ev::Text>(o, x.exported), ev::made<ev::Text>(o, x.wire), ev::made<ev::Text>(o, x.help)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Int>>::pass(o, x.inputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.outputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.locals); ev::Direct<ev::Bool>::pass(o, x.pure); ev::Direct<ev::Bool>::pass(o, x.overrides); ev::Direct<ev::Bool>::pass(o, x.external); ev::Direct<ev::Text>::pass(o, x.remote); ev::Direct<ev::Text>::pass(o, x.from); ev::Direct<ev::Text>::pass(o, x.exported); ev::Direct<ev::Text>::pass(o, x.wire); ev::Direct<ev::Text>::pass(o, x.help); }
   template <class D, class C, class B> struct Fields {
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::name), decltype(B::name), &kern::logic::Function::name, &B::name> name;
     ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::inputs), decltype(B::inputs), &kern::logic::Function::inputs, &B::inputs> inputs;
     ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::outputs), decltype(B::outputs), &kern::logic::Function::outputs, &B::outputs> outputs;
     ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::locals), decltype(B::locals), &kern::logic::Function::locals, &B::locals> locals;
     ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::pure), decltype(B::pure), &kern::logic::Function::pure, &B::pure> pure;
+    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::overrides), decltype(B::overrides), &kern::logic::Function::overrides, &B::overrides> overrides;
     ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::external), decltype(B::external), &kern::logic::Function::external, &B::external> external;
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::remote), decltype(B::remote), &kern::logic::Function::remote, &B::remote> remote;
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::from), decltype(B::from), &kern::logic::Function::from, &B::from> from;
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::exported), decltype(B::exported), &kern::logic::Function::exported, &B::exported> exported;
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::wire), decltype(B::wire), &kern::logic::Function::wire, &B::wire> wire;
     ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::help), decltype(B::help), &kern::logic::Function::help, &B::help> help;
-    explicit Fields(D* kern_d) : name(kern_d), inputs(kern_d), outputs(kern_d), locals(kern_d), pure(kern_d), external(kern_d), remote(kern_d), from(kern_d), exported(kern_d), wire(kern_d), help(kern_d) { (void)kern_d; }
+    explicit Fields(D* kern_d) : name(kern_d), inputs(kern_d), outputs(kern_d), locals(kern_d), pure(kern_d), overrides(kern_d), external(kern_d), remote(kern_d), from(kern_d), exported(kern_d), wire(kern_d), help(kern_d) { (void)kern_d; }
   };
 };
 struct S_logic_Graph {
@@ -2809,7 +2810,7 @@ struct P_engine_character_mover_settings {
 };
 
 // The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).
-// kern::App that a Blueprint's class is (kern::Implements<"App">: kern::logic::implementation)
+// kern::App that a Blueprint's class is (kern::Implements<kern::App>: kern::logic::implementation)
 template <class B> class ClassImplements_App final : public kern::App {
  public:
   explicit ClassImplements_App(B& b) : b_(b) {}
@@ -2881,11 +2882,11 @@ template <class B> class ClassImplements_App final : public kern::App {
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
   mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<kern::App&>().extensions())>().data)>>> kern_kept_extensions;
 };
-template <> struct InterfaceOf<"App"> {
+template <> struct InterfaceOf<kern::App> {
   template <class B> using adapter = ClassImplements_App<B>;
 };
 
-// kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
+// kern::ShaderExtension that a Blueprint's class is (kern::Implements<kern::ShaderExtension>: kern::logic::implementation)
 template <class B> class ClassImplements_ShaderExtension final : public kern::ShaderExtension {
  public:
   explicit ClassImplements_ShaderExtension(B& b) : b_(b) {}
@@ -3013,11 +3014,11 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
   mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<const kern::ShaderExtension&>().attributes())>().data)>>> kern_kept_attributes;
 };
-template <> struct InterfaceOf<"ShaderExtension"> {
+template <> struct InterfaceOf<kern::ShaderExtension> {
   template <class B> using adapter = ClassImplements_ShaderExtension<B>;
 };
 
-// kern::logic::NodeType that a Blueprint's class is (kern::Implements<"logic_NodeType">: kern::logic::implementation)
+// kern::logic::NodeType that a Blueprint's class is (kern::Implements<kern::logic::NodeType>: kern::logic::implementation)
 template <class B> class ClassImplements_logic_NodeType final : public kern::logic::NodeType {
  public:
   explicit ClassImplements_logic_NodeType(B& b) : b_(b) {}
@@ -3092,11 +3093,11 @@ template <class B> class ClassImplements_logic_NodeType final : public kern::log
   mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
 };
-template <> struct InterfaceOf<"logic_NodeType"> {
+template <> struct InterfaceOf<kern::logic::NodeType> {
   template <class B> using adapter = ClassImplements_logic_NodeType<B>;
 };
 
-// kern::net::Transport that a Blueprint's class is (kern::Implements<"net_Transport">: kern::logic::implementation)
+// kern::net::Transport that a Blueprint's class is (kern::Implements<kern::net::Transport>: kern::logic::implementation)
 template <class B> class ClassImplements_net_Transport final : public kern::net::Transport {
  public:
   explicit ClassImplements_net_Transport(B& b) : b_(b) {}
@@ -3152,7 +3153,7 @@ template <class B> class ClassImplements_net_Transport final : public kern::net:
   mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
 };
-template <> struct InterfaceOf<"net_Transport"> {
+template <> struct InterfaceOf<kern::net::Transport> {
   template <class B> using adapter = ClassImplements_net_Transport<B>;
 };
 

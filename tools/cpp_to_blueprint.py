@@ -3093,14 +3093,20 @@ def actors_called(f, met=None):
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states) - and, with `implements` ([name, pure functions]: World.state_implements),
-    the interface of the engine it is the object of: once it has every pure function of it (until then the
+    variables of a state (World.states) - and, with `implements` ([name, pure functions, all its functions, its C++
+    name]: World.state_implements),
+    the interface of the engine it is the object of (by its C++ type), each of its functions of the interface's names
+    marked KERN_OVERRIDE: once it has every pure function of it (until then the
     engine has no object of it - what waits keeps the interface's functions from it, as from any caller)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
     defines = lambda t, f: re.search(r"(?m)^\s*(?:KERN_\w+\s+)*[\w:<>,]+\s+" + re.escape(f) + r"\(", t)   # (a function's text: its head names it)
     whole = bool(state and implements) and all(any(defines(t, p) for t in functions) for p in implements[1])
     out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
-           + (f', kern::Implements<"{implements[0]}">' if whole else "") + " {"]
+           + (f', kern::Implements<{implements[3]}>' if whole else "") + " {"]
+    if whole:
+        # (each function of the interface's names is what the engine calls: it says so - KERN_OVERRIDE, Function::overrides)
+        functions = [re.sub(r"(?m)^([ \t]*(?:KERN_EXPORT_AS\([^)]*\)\s+)?)(?=(?:KERN_PURE\s+)?[\w:<>,]+\s+(" + "|".join(map(re.escape, implements[2])) + r")\()", r"\1KERN_OVERRIDE ", t, count=1)
+                     for t in functions]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -15842,7 +15848,7 @@ def engine_interface_of(tree, rec):
                 return None
         if any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(rec)):
             return None
-    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
+    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")}), sorted({c["name"] for c in methods}), q]
 
 
 def state_classes(world, surveys):

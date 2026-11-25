@@ -1,5 +1,5 @@
 // The App of a program built from a level: the engine's object of the one Blueprint of the level's program (the folder its
-// project names) that implements the interface App (kern::Implements<"App">, Graph::implements) - Engine Object of Blueprint
+// project names) that implements the interface App (kern::Implements<kern::App>, Graph::implements) - Engine Object of Blueprint
 // (Runtime::engine_object).
 //
 // A program that defines kern_create_app() makes its App itself (that one wins). One that does not gets the
