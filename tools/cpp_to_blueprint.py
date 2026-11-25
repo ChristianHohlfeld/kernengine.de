@@ -4701,7 +4701,9 @@ class Emit:
         """A change of a list or map whose entries end something (Unit.held_life) that the Blueprint does as C++
         does: erase() and pop_back() end the entry they take out, there (ended_entry) - a std::vector moves the
         ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
-        ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
+        ends its entries from the last to the first (kern/core/map.h), clear() of a std::vector from the first
+        to the last (the order its destructor has - ended_many: libstdc++'s _M_erase_at_end, std::_Destroy);
+        push_back(std::move(x)) and
         emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
         and nothing ends; emplace(key, std::move(x)) and try_emplace(key, std::move(x)) of a kern::Map take x into
         the key's new entry - only where the key is new: where it is there, nothing changes and x keeps what it
@@ -4712,7 +4714,7 @@ class Emit:
         if name in ("erase", "pop_back"):
             return name == "pop_back" or len(args) == 1
         if name == "clear":
-            return bool(KEYED_KERN.match(c))
+            return bool(KEYED_KERN.match(c) or re.match(r"std::vector<", c)) and not args
         if name in ("emplace", "try_emplace") and len(args) == 2 and KEYED_KERN.match(c):
             return self.moved_value(args[1])
         if name in ("push_back", "emplace_back") and len(args) == 1:
@@ -4782,12 +4784,13 @@ class Emit:
         return steps + self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};",
                                                               *self.ended_entry(h, f"{place}[{at}]", et)])
 
-    def entries_ended(self, h, kind, row, lv):
-        """The steps that end every entry of a list or map at `lv`, from the last to the first."""
+    def entries_ended(self, h, kind, row, lv, forward=False):
+        """The steps that end every entry of a list or map at `lv`, from the last to the first (forward: from the
+        first to the last)."""
         count, at = self.temp("count", "Int"), self.temp("at", "Int")
         last = self.whole_math("-", count, "1")
         return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
-                *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
+                *self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     @staticmethod
     def goes_to(n, label):
@@ -6452,7 +6455,9 @@ class Emit:
                     # (the entry made of the arguments where it is added, as T(args...) makes it)
                     return before + [f"list_add({lv}, {self.make(it, args)});"] + after
                 if name == "clear":
-                    return before + [f"list_clear({lv});"] + after
+                    h = self.entry_life(self.ctype(base))
+                    ends = self.entries_ended(h, "list", it, lv, forward=True) if h is not None else []   # (each entry ends, from the first: entries_change)
+                    return before + ends + [f"list_clear({lv});"] + after
                 if name == "pop_back":
                     h = self.entry_life(self.ctype(base))
                     if h is not None:   # (the last entry ends)
