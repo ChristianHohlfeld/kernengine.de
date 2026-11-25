@@ -3768,6 +3768,11 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if exported and getattr(self, "export_gives", None) and p is [x for x in kids(d) if x.get("kind") == "ParmVarDecl"][-1] and \
+                    re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
+                # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
+                self.export_len_param = p["id"]
+                continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
             if u.is_logic(raw):
@@ -15772,17 +15777,17 @@ EXPORT_GIVES = {"export_text": "text", "export_bytes": "bytes", "export_floats":
 
 
 def export_given(tree, n):
-    """In an exported function: `return kern::logic::export_text(x);` (export_bytes, export_floats -
-    kern/logic/blueprint_class.h) gives x - the program keeps what an export gives in one place for each kind, the
-    glue of a Blueprint's class as its C++ does - so the Blueprint's function gives x. The x, or None."""
+    """In an exported function: `return kern::logic::export_text<&f>(x, out_len);` (export_bytes, export_floats -
+    kern/logic/blueprint_class.h) gives x as the export's own piece {pointer, length}, the glue of a Blueprint's class
+    as the program's C++ - so the Blueprint's function gives x. The x, or None."""
     b = bare(n)
     while b.get("kind") in ("ImplicitCastExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and kids(b):
         b = bare(kids(b)[0])
-    if b.get("kind") != "CallExpr" or len(kids(b)) != 2:
+    if b.get("kind") != "CallExpr" or len(kids(b)) != 3:
         return None
     ref = callee(b).get("referencedDecl") or {}
-    decl = tree.decl.get(ref.get("id")) or {}
-    if ref.get("name") not in EXPORT_GIVES or not (decl.get("_file") or "").replace("\\", "/").endswith("kern/logic/blueprint_class.h"):
+    decl = tree.decl.get(ref.get("id"))
+    if ref.get("name") not in EXPORT_GIVES or (decl is not None and not (decl.get("_file") or "").replace("\\", "/").endswith("kern/logic/blueprint_class.h")):
         return None
     x = bare(kids(b)[1])
     while x.get("kind") in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ExprWithCleanups") and kids(x):
