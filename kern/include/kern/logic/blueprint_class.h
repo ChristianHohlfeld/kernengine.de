@@ -43,6 +43,13 @@ template <class T> bool bind_blueprint(Runtime& logic) {
   return blueprint_object<T> != nullptr;
 }
 
+/// Binds the class T to this one instance (it runs as T): the program says which, where a runtime runs the
+/// Blueprint more than once. False: it does not run as T (nothing is bound then).
+template <class T> bool bind_blueprint(Instance& instance) {
+  blueprint_object<T> = instance.template native_object<T>();
+  return blueprint_object<T> != nullptr;
+}
+
 /// The bound object of the class T (bind_blueprint first): its functions are called on it directly.
 template <class T> T& blueprint() { return *blueprint_object<T>; }
 
@@ -80,61 +87,51 @@ template <class C, class Out> C export_out(const Out& x) {
   else return static_cast<C>(x);
 }
 
-// What an export gives its host by a pointer - a text, bytes, floats - is kept here until an export gives the next
-// of its kind (one place for each kind, in the whole program: a program's own C++ gives through the same functions
-// as the glue of a class). The host reads it by the pointer at once - a text as far as kern_text_length says
-// (kern/src/api/c_api.cpp), bytes and floats as many as it knows.
-inline std::string& export_kept_text() {
+// What an export gives its host by a pointer - a text, bytes, floats - is a piece {pointer, length}: the export
+// returns the pointer and writes the length where the host says (`out_len`, may be null). The piece is the export's
+// own - each export function keeps its own place (the template's `Export`: the function itself), until that export
+// gives the next - so no export overwrites what another gave, and a call on another thread (the audio callback)
+// touches only its own export's place. Once the place holds as many, giving again asks for no memory.
+// A program's own C++ gives through these, the glue of a Blueprint's class through the *_out ones below.
+template <auto Export> const char* export_text(std::string_view text, u32* out_len) {
   static std::string held;
-  return held;
-}
-inline std::vector<u8>& export_kept_bytes() {
-  static std::vector<u8> held;
-  return held;
-}
-inline std::vector<f32>& export_kept_floats() {
-  static std::vector<f32> held;
-  return held;
-}
-/// A text an export gives: its characters, kept (export_kept_text).
-inline const char* export_text(std::string_view text) {
-  std::string& held = export_kept_text();
   held.assign(text);
+  if (out_len) *out_len = static_cast<u32>(held.size());
   return held.c_str();
 }
-inline const char* export_text(const std::string& text) { return export_text(std::string_view(text)); }
-/// Bytes an export gives: kept (export_kept_bytes); none (null) when there are none.
-inline const u8* export_bytes(Span<const u8> bytes) {
-  std::vector<u8>& held = export_kept_bytes();
+template <auto Export> const char* export_text(const std::string& text, u32* out_len) { return export_text<Export>(std::string_view(text), out_len); }
+/// Bytes an export gives (none: null, length 0).
+template <auto Export> const u8* export_bytes(Span<const u8> bytes, u32* out_len) {
+  static std::vector<u8> held;
   held.assign(bytes.begin(), bytes.end());
+  if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }
-inline const u8* export_bytes(const std::vector<u8>& bytes) { return export_bytes(Span<const u8>(bytes.data(), bytes.size())); }
-/// Floats an export gives: kept (export_kept_floats); none (null) when there are none.
-inline const f32* export_floats(Span<const f32> floats) {
-  std::vector<f32>& held = export_kept_floats();
+template <auto Export> const u8* export_bytes(const std::vector<u8>& bytes, u32* out_len) { return export_bytes<Export>(Span<const u8>(bytes.data(), bytes.size()), out_len); }
+/// Floats an export gives (none: null, length 0).
+template <auto Export> const f32* export_floats(Span<const f32> floats, u32* out_len) {
+  static std::vector<f32> held;
   held.assign(floats.begin(), floats.end());
+  if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }
-inline const f32* export_floats(const std::vector<f32>& floats) { return export_floats(Span<const f32>(floats.data(), floats.size())); }
-/// The length of the text an export gave last.
-inline u32 export_text_length() { return static_cast<u32>(export_kept_text().size()); }
+template <auto Export> const f32* export_floats(const std::vector<f32>& floats, u32* out_len) { return export_floats<Export>(Span<const f32>(floats.data(), floats.size()), out_len); }
 
 /// What a Blueprint's export gives (the glue of its class): a Text, a List of Int (each entry as a u8, as C++
-/// converts it) or a List of Float (each as an f32), given as a program's own C++ gives it (above).
-inline const char* export_text_out(const Text& text) { return export_text(text.view()); }
-// (written straight into the place that is kept: once it holds as many, an export asks for no memory - an audio
-// callback gives its samples every few milliseconds)
-template <class L> const u8* export_bytes_out(const L& bytes) {
-  std::vector<u8>& held = export_kept_bytes();
+/// converts it) or a List of Float (each as an f32) - written straight into the export's own place.
+template <auto Export> const char* export_text_out(const Text& text, u32* out_len) { return export_text<Export>(text.view(), out_len); }
+template <auto Export, class L> const u8* export_bytes_out(const L& bytes, u32* out_len) {
+  static std::vector<u8> held;
   held.resize(bytes.size());
   for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<u8>(Whole(bytes[i]).v);
+  if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }
-template <class L> const f32* export_floats_out(const L& floats) {
-  std::vector<f32>& held = export_kept_floats();
+template <auto Export, class L> const f32* export_floats_out(const L& floats, u32* out_len) {
+  static std::vector<f32> held;
   held.resize(floats.size());
   for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<f32>(static_cast<f64>(floats[i]));
+  if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }
 }  // namespace kern::logic

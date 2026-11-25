@@ -5481,11 +5481,12 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
                   "  " + name + " self;\n" +
                   running +
-                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on this object - the\n"
-                             "  // instance that started last as this class)\n"
-                             "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; kern::logic::blueprint_object<" + name + "> = &self; }\n"
+                  "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n" +
+                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on the object the program\n"
+                             "  // bound - kern::logic::bind_blueprint, said once, never the instance that happened to start; an object that\n"
+                             "  // ends is bound no more)\n"
                              "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::blueprint_object<" + name + "> = nullptr; }\n"
-                           : "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n") +
+                           : "") +
                   "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
@@ -5593,16 +5594,18 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
       else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
     }
-    // (a list that goes out - bytes, floats: a pointer to its entries in the C type, kept until an export gives the next of its kind; none when it is empty)
+    // (a text or a list that goes out - bytes, floats: a piece {pointer, length}; the pointer is returned, the length
+    // written where the host says - a last C parameter out_len -, both of the export's own place: kern/logic/blueprint_class.h)
     const bool listed = out_word == "bytes" || out_word == "floats";
+    const bool piece = listed || out_word == "text";
+    if (piece) params += std::string(params.empty() ? "" : ", ") + "kern::u32* out_len";
     const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : out_word == "bytes" ? "const kern::u8*" : out_word == "floats" ? "const kern::f32*" : "kern::" + out_word;
-    const std::string none = out_word.empty() ? "return;" : out_word == "text" ? "return \"\";" : listed ? "return nullptr;" : "return 0;";
+    const std::string none = out_word.empty() ? "return;" : piece ? std::string("{ if (out_len) *out_len = 0; return ") + (out_word == "text" ? "\"\"" : "nullptr") + "; }" : "return 0;";
     s += "KERN_EXPORT(" + f.exported + ") " + ret + " " + f.exported + "(" + params + ") {\n"
          "  " + name + "* const object = kern::logic::blueprint_object<" + name + ">;\n"
          "  if (!object) " + none + "\n";
     if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
-    else if (out_word == "text") s += "  return kern::logic::export_text_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
-    else if (listed) s += "  return kern::logic::export_" + out_word + "_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    else if (piece) s += "  return kern::logic::export_" + out_word + "_out<&" + f.exported + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ", out_len);\n";
     else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
     s += "}\n";
   }

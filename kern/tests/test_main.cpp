@@ -2384,7 +2384,7 @@ struct Host : kern::Blueprint {
   logic::Graph read;
   CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
   std::string glue;
-  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5, kern::u32* out_len) {") != std::string::npos &&
         glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
   // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
@@ -2393,23 +2393,13 @@ struct Host : kern::Blueprint {
   // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
   // when the list is empty); bytes go out the same way, as u8
   CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
-        glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3) {") != std::string::npos &&
-        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out(object->") != std::string::npos);
-  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take() {") != std::string::npos && glue.find("return kern::logic::export_bytes_out(object->") != std::string::npos);
-  {
-    // (a program's own C++ gives through the same functions, one place for each kind)
-    const f32 in[3] = {0.5f, -1.25f, 3.0f};
-    const logic::List<f64> floats = logic::export_floats_in(in, 3);
-    CHECK(floats.size() == 3 && floats[1] == -1.25);
-    const f32* out = logic::export_floats_out(floats);
-    CHECK(out && out[0] == 0.5f && out[2] == 3.0f && out == logic::export_kept_floats().data());
-    const u8 bytes_in[2] = {7, 255};
-    const u8* bytes_out = logic::export_bytes_out(logic::export_bytes_in(bytes_in, 2));
-    CHECK(bytes_out && bytes_out[0] == 7 && bytes_out[1] == 255);
-    CHECK(!logic::export_bytes_out(logic::List<logic::Whole>{}) && !logic::export_floats_out(logic::List<f64>{}));   // (nothing: none)
-    CHECK(std::string(logic::export_text(std::string("abc"))) == "abc" && logic::export_text_length() == 3 && logic::export_text_out(logic::Text("hello")) == logic::export_kept_text().c_str() &&
-          logic::export_text_length() == 5);
-  }
+        glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3, kern::u32* out_len) {") != std::string::npos &&
+        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out<&game_audio>(object->") != std::string::npos);
+  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take(kern::u32* out_len) {") != std::string::npos && glue.find("return kern::logic::export_bytes_out<&game_take>(object->") != std::string::npos);
+  // (a text, bytes, floats go out as a piece: the pointer returned, the length written to out_len - the export's own)
+  CHECK(glue.find("return kern::logic::export_text_out<&game_hud>(object->") != std::string::npos && glue.find(", out_len);") != std::string::npos);
+  // (the exports call the object the program bound - never the instance that started last)
+  CHECK(glue.find("blueprint_object<Host> = &self") == std::string::npos);
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -4715,6 +4705,15 @@ TEST(logic_native_blueprints) {
   CHECK(logic::bind_blueprint<Fake>(rt) && &logic::blueprint<Fake>() == inst->native_object<Fake>());
   logic::blueprint<Fake>().heat = 6;
   CHECK(inst->get("Heat").as_number() == 6 && inst->set("Heat", logic::Value::number(3)) && logic::blueprint<Fake>().heat == 3);
+  // two instances of the class: the program says which one it calls (and an export calls) - the one bound, not the
+  // one that started last
+  logic::Instance* second = rt.add(g, 0, "Second");
+  rt.begin();
+  CHECK(second && second->native_object<Fake>() && &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  CHECK(logic::bind_blueprint<Fake>(*second) && &logic::blueprint<Fake>() == second->native_object<Fake>());
+  logic::blueprint<Fake>().heat = 8;
+  CHECK(second->get("Heat").as_number() == 8 && inst->get("Heat").as_number() == 3);
+  CHECK(logic::bind_blueprint<Fake>(*inst) && logic::blueprint<Fake>().heat == 3);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -7354,32 +7353,49 @@ template <class Work> long memory_asked_by(Work&& work) {
   return engine_probe::asks;
 }
 
-// What an export gives by a pointer is kept in one place for each kind (kern::logic::export_text, export_bytes,
-// export_floats): once that place holds as many, giving again asks for no memory - an audio callback gives its
-// samples every few milliseconds (sc_audio_render), the program's C++ as the glue of a Blueprint's class.
-TEST(logic_export_keeps_its_place) {
+// What an export gives by a pointer is a piece {pointer, length} of the export's own place (kern::logic::export_text,
+// export_bytes, export_floats and the glue's *_out, kern/logic/blueprint_class.h): two exports called by turns keep
+// what each gave, a second call of one export replaces only its own, and once the place holds as many, giving again
+// asks for no memory (an audio callback gives its samples every few milliseconds). The exports call the object the
+// program bound (bind_blueprint), not the instance that started last: two instances of one class, two bindings.
+namespace export_keys {
+const char* text_a() { return nullptr; }
+const char* text_b() { return nullptr; }
+const f32* audio() { return nullptr; }
+const u8* datagram() { return nullptr; }
+}  // namespace export_keys
+TEST(logic_export_gives_its_own_piece) {
+  u32 len_a = 99, len_b = 99, len_audio = 99, len_bytes = 99;
+  const char* a = logic::export_text<&export_keys::text_a>(std::string("first"), &len_a);
+  const char* b = logic::export_text_out<&export_keys::text_b>(logic::Text("second, longer"), &len_b);
+  CHECK(std::string(a, len_a) == "first" && std::string(b, len_b) == "second, longer" && a != b);
   std::vector<f32> samples(2048, 0.25f);
   logic::List<f64> wide;
   for (std::size_t i = 0; i < 2048; ++i) wide.push_back(0.5);
   logic::List<logic::Whole> bytes;
   for (int i = 0; i < 64; ++i) bytes.push_back(logic::Whole(static_cast<i64>(i)));
-  const std::string text(200, 'x');
-  logic::export_floats(samples);   // (the first time: the place grows to hold them)
-  logic::export_floats_out(wide);
-  logic::export_bytes_out(bytes);
-  logic::export_text(text);
-  const f32* given = nullptr;
+  const f32* audio = logic::export_floats<&export_keys::audio>(samples, &len_audio);
+  const u8* datagram = logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+  // (by turns: each still holds what it gave)
+  a = logic::export_text<&export_keys::text_a>(std::string("third"), &len_a);
+  CHECK(std::string(a, len_a) == "third" && std::string(b, len_b) == "second, longer");
+  CHECK(audio && len_audio == 2048 && audio[2047] == 0.25f && datagram && len_bytes == 64 && datagram[63] == 63);
+  // (none: null, length 0)
+  u32 none = 7;
+  CHECK(!logic::export_bytes<&export_keys::datagram>(std::vector<u8>{}, &none) && none == 0);
+  logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+  logic::export_floats_out<&export_keys::audio>(wide, &len_audio);   // (the glue's place grows once too)
   const long asked = memory_asked_by([&] {
     for (int k = 0; k < 8; ++k) {
-      given = logic::export_floats(samples);
-      given = logic::export_floats_out(wide);
-      logic::export_bytes_out(bytes);
-      logic::export_text(text);
+      audio = logic::export_floats<&export_keys::audio>(samples, &len_audio);
+      audio = logic::export_floats_out<&export_keys::audio>(wide, &len_audio);
+      logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+      logic::export_text<&export_keys::text_a>(std::string_view("third"), &len_a);
     }
   });
   CHECK(asked == 0);
   if (asked != 0) std::printf("  giving again asked for memory %ld times\n", asked);
-  CHECK(given && given[0] == 0.5f && given[2047] == 0.5f && logic::export_kept_floats().size() == 2048);
+  CHECK(audio && audio[0] == 0.5f && len_audio == 2048);
 }
 
 // The class calls the engine itself and does what the door does: the same class once with a host that
