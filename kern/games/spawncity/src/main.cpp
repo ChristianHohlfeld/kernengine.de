@@ -22,17 +22,17 @@ class SpawnCityApp final : public kern::App {
  public:
   // The renderer (desktop and phone) and the heap taken ahead are the project's settings: the level's "project"
   // (kern/app/project.h), which the engine applies before start().
-  kern::Span<kern::ShaderExtension* const> extensions() override {
-    // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk)
-    static kern::ShaderExtension* ext[2] = {&sc::facades(), &sc::water_look()};
-    return {ext, 2};
-  }
+  kern::Span<kern::ShaderExtension* const> extensions() override { return {extensions_, 2}; }
   bool start(kern::Engine& e) override {
     return sc::game().start(e);
   }
   void update(kern::Engine& e, const kern::Frame& f) override { sc::game().update(e, f); }
   void stop(kern::Engine&) override { sc::game().stop(); }
 
+ private:
+  // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk) - the App's own,
+  // made with it
+  kern::ShaderExtension* extensions_[2] = {&sc::facades(), &sc::water_look()};
 };
 
 SpawnCityApp& app() {
