@@ -5578,6 +5578,75 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Text>(this->kern_engine("engine.game.to_text", {to_value(::kern::logic::engine_values::input_value(level)), to_value(indent)}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
+  /// Reads a level; unknown keys are ignored, missing ones take defaults.
+  template <class T1> void engine_game_from_json(Int doc, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_from_json(KernNode& kern_n, Int doc, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
+  template <class T1> void engine_game_from_text(const Text& text, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = text.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_from_text(KernNode& kern_n, const Text& text, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = text.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
   template <class T1> Int engine_game_actor_to_json(const T1& a) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5587,6 +5656,41 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.game.actor_to_json", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
+  template <class T1> void engine_game_actor_from_json(Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.actor_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_actor_from_json(KernNode& kern_n, Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.actor_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
   template <class T1> Int engine_game_world_to_json(const T1& w) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5595,6 +5699,41 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
     return from_value<Int>(this->kern_engine("engine.game.world_to_json", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+  }
+  template <class T1> void engine_game_world_from_json(Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.world_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_world_from_json(KernNode& kern_n, Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.world_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
   }
   /// Problems of a level: errors keep it from playing (dangling references, bad values), warnings point at likely mistakes. True for "", "none", "auto", a known "builtin:<name>" or an imported sound id.
   template <class T1> Bool engine_game_sound_reference_ok(const T1& level, const Text& ref) const {
