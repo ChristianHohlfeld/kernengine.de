@@ -14,3 +14,7 @@ sc_dem_data      height  range 1 64
 sc_image_data    rgba    width * height * 4
 sc_image_data    width   range 64 64
 sc_image_data    height  range 64 64
+# main.cpp before cc86ef3c: a text an export gave was kept in g_result, its length by sc_result_length; since, by
+# kern::logic::export_text and the engine's kern_text_length (web/host.mjs reads e.kern_text_length())
+sc_result_length gone    kern_text_length
+g_result         kept    kern::logic::export_text

@@ -1,0 +1,5 @@
+# What an object holds that the program's code presumes (tools/source_diff.py, the form "two builds"): a drawn object
+# is made to hold it - each line: <class> holds <C++> else <C++ that makes it hold> @ <the place that presumes it>.
+# The fields by their names. A call one side does not survive in code the lowering did not change stays a deviation
+# until a line here explains it (BELEGE.md names the line at the proof).
+sc::Game holds car_index_ < 0 || car_index_ < static_cast<int>(cars_.size()) else car_index_ = cars_.empty() ? -1 : car_index_ % static_cast<int>(cars_.size()) @ game.cpp:369 Game::player_position: cars_[car_index_] when mode_ == car and car_index_ >= 0 (game.h: "an index into cars_, or -1")

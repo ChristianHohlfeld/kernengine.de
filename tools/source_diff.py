@@ -1316,7 +1316,12 @@ class Writer:
         by_id = {f.node["id"]: f for f in m.old.functions}
         # a function of the old that is gone: one only its file knew, compared through every function that called it
         covered = {}
+        gone_exports = {k: c["gone"] for k, c in export_contracts(self.out_dir).items() if c.get("gone")}
         for o in alone:
+            if o.c_name and o.name in gone_exports:
+                # (the page calls another export in its place - exports.txt: e2e/input prove the page, not this test)
+                print(f"    not compared: {o.label()} - gone, the page calls {gone_exports[o.name]} (exports.txt)")
+                continue
             if not o.local:
                 raise Stop(f"{o.label()} of {os.path.basename(m.src)} has no counterpart in the new text (and others than its own file may call it)")
             seen, todo, through = set(), [o.node["id"]], set()
@@ -1855,11 +1860,31 @@ def export_contracts(test_dir):
         c = out.setdefault(name, {"gives": None, "sizes": {}, "ranges": {}})
         if what == "gives":
             c["gives"] = rest
+        elif what in ("gone", "kept"):
+            c[what] = rest   # (an export the page no longer calls - it calls <rest>; a variable that only keeps what exports give)
         elif rest.startswith("range "):
             lo, hi = rest.split()[1:3]
             c["ranges"][what] = (lo, hi)
         else:
             c["sizes"][what] = rest
+    return out
+
+
+def invariants(test_dir):
+    """What an object of a class holds that C++ code of the program presumes (tests/lowered/invariants.txt): a drawn
+    object is made to hold it - `<class> holds <C++> else <C++> @ <the place that presumes it>`, the fields by their
+    names. A call that breaks one is no call the program makes: so the draw does not make it."""
+    out = {}
+    path = os.path.join(test_dir, "invariants.txt")
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding="utf-8"):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        m = re.fullmatch(r"\s*(\S+)\s+holds\s+(.+?)\s+else\s+(.+?)\s+@\s+(.+?)\s*", line.rstrip("\n"))
+        if not m:
+            raise Stop(f"invariants.txt: {line.strip()}: <class> holds <C++> else <C++> @ <place>")
+        out.setdefault(m.group(1).lstrip(":"), []).append((m.group(2), m.group(3), m.group(4)))
     return out
 
 
@@ -1975,13 +2000,13 @@ class BuildsWriter(Writer):
         self.contracts = export_contracts(self.out_dir)
         self.adapters = {}
         for o, n, e in tested:
-            if n.c_name and o.c_name and not e and o.param_types() != n.param_types() and plain(o.ret) == plain(n.ret):
+            if n.c_name and o.c_name and not e and o.param_types() != n.param_types() and canon(o.ret) == canon(n.ret):
                 got = lengths_after_pointers(o, n)
                 if got is not None and all(n.params[k - 1][0] in self.contracts.get(n.name, {}).get("sizes", {}) for k in got):
                     # (an adapter: both draw the old's parameters; the new is handed the length of the drawn entries too)
                     self.adapters[n.name] = got
                     continue
-            if e or o.template or n.template or o.param_types() != n.param_types() or plain(o.ret) != plain(n.ret) or o.kind != n.kind:
+            if e or o.template or n.template or o.param_types() != n.param_types() or canon(o.ret) != canon(n.ret) or o.kind != n.kind:
                 raise Stop(f"{o.label()} -> {n.label()}: the form \"two builds\" compares a function with its counterpart of the same signature - "
                            "one that changed its parameters (the state made explicit, a template made functions) is not compared in it yet")
             if n.c_name and re.search(r"\*\s*$", plain(n.ret)) and not re.search(r"\bchar\s*\*\s*$", plain(n.ret)) and not self.contracts.get(n.name, {}).get("gives"):
@@ -2001,7 +2026,10 @@ class BuildsWriter(Writer):
             used |= set(users.get(o.node["id"], ())) | set(new_users.get(n.node["id"], ()))
         old_state, new_state = dict(m.old.state()), dict(m.new.state())
         self.within = []
+        kept = {k for k, c in self.contracts.items() if c.get("kept")}
         for q in sorted(used):
+            if q in kept and (q not in old_state or q not in new_state):
+                continue   # (it keeps what an export gives, the page reads it by the pointer: compared as what the export gives)
             if q not in old_state or q not in new_state:
                 raise Stop(f"the variable {q} of the file is not in both texts: the form \"two builds\" compares a variable with itself")
             t_old, t_new = self.field_type(old_state[q]), self.field_type(new_state[q])
@@ -2214,6 +2242,20 @@ class BuildsWriter(Writer):
                 out.append(f"struct M{j} {{ friend constexpr auto got(M{j}); }};")
                 out.append(f"template struct Rob<M{j}, &::{n.owner}::{n.name}>;")
                 calls[j] = f"((*self).*got({rob}::M{j}{{}}))"
+        # the invariants of the drawn objects (invariants.txt): held after each draw
+        self.holding = set()
+        for q, rules in invariants(self.out_dir).items():
+            if q not in ties:
+                continue
+            parts, said = ties[q]
+            by = dict(zip(said, parts))
+            sub = lambda t: re.sub(r"(?<![\w.:>])([A-Za-z_]\w*)\b", lambda mm: f"({by[mm.group(1)]})" if mm.group(1) in by else mm.group(1), t)
+            body = []
+            for cond, fix, where in rules:
+                body.append(f"  if (!({sub(cond)})) {{ {sub(fix)}; }}   // ({where})")
+                print(f"    invariant of {q}: {cond} (else {fix}) - {where}")
+            out += [f"[[maybe_unused]] inline void hold(::{q}& x) {{", *body, "}"]
+            self.holding.add(q)
         out += [f"}}  // namespace sc::lowered::builds_{key}", "", "namespace sc::lowered {"]
         for q, (parts, said) in ties.items():
             # (with the fields' names: where an object differs, the test names the fields that do - Builds::object)
@@ -2253,8 +2295,10 @@ class BuildsWriter(Writer):
                 "    for (int call = 0; rec.more(call); ++call) {"]
         inner = ["::sc::lowered::clock_ms = 1000.0 * call;"]   # (the engine's clock, alike on both sides - source_diff.h)
         method = n.method and not n.static and n.kind in ("CXXMethodDecl", "CXXDestructorDecl")
+        key = re.sub(r"\W", "_", self.m.stem)
+        holds = lambda q, x: [f"::sc::lowered::builds_{key}::hold({x});"] if q in getattr(self, "holding", ()) else []
         if method:
-            inner += [f"::sc::lowered::Self<{T}> self;", "if (draw.flag()) ::sc::lowered::draw(draw, *self);"]
+            inner += [f"::sc::lowered::Self<{T}> self;", "if (draw.flag()) ::sc::lowered::draw(draw, *self);"] + holds(n.owner, "*self")
         args, writes = [], []
         con = self.contracts.get(n.name, {"gives": None, "sizes": {}, "ranges": {}}) if n.c_name else {"gives": None, "sizes": {}, "ranges": {}}
         lens = set(self.adapters.get(n.name, ()))
@@ -2287,7 +2331,7 @@ class BuildsWriter(Writer):
             writes.append((f"the variable {q} of the file", f"::{q}"))
         for acc, t in self.objects:
             # (the one object of the program, as Self makes a method's: what the engine makes given, then drawn)
-            inner += [f"::sc::lowered::give_engine_made(::{acc}());", f"if (draw.flag()) ::sc::lowered::draw(draw, ::{acc}());"]
+            inner += [f"::sc::lowered::give_engine_made(::{acc}());", f"if (draw.flag()) ::sc::lowered::draw(draw, ::{acc}());"] + holds(t, f"::{acc}()")
         a = ", ".join(args)
         ret = n.ret and plain(n.ret) != "void" and n.kind not in ("CXXConstructorDecl", "CXXDestructorDecl")
         if n.kind == "CXXDestructorDecl":
