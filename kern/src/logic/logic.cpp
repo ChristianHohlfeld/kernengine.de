@@ -1767,18 +1767,20 @@ bool export_ok(const Function& f, std::string* why) {
     if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return number;
     if (w == "len" || w == "at") return input && p.type == PinType::integer && !p.ref;
     if (w == "text") return p.type == PinType::text && (!p.ref || p.constant);
-    if (w == "bytes") return input && p.type == PinType::integer_list && (!p.ref || p.constant);
+    if (w == "bytes") return p.type == PinType::integer_list && (!p.ref || p.constant);
+    if (w == "floats") return p.type == PinType::number_list && (!p.ref || p.constant);
     return false;
   };
   for (std::size_t k = 0; k < words.size(); ++k) {
-    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; len, at: an Int)");
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; floats: a List of Float; len, at: an Int)");
     const std::size_t before = k >= 2 && words[k - 1] == "at" ? k - 2 : k - 1;
-    if (words[k] == "len" && (k == 0 || (words[before] != "text" && words[before] != "bytes"))) return no("len is the length of the text or the bytes before it (after the bytes' at)");
-    if (words[k] == "at" && (k == 0 || words[k - 1] != "bytes")) return no("at is the place in the bytes before it");
+    const auto many = [](const std::string& x) { return x == "bytes" || x == "floats"; };
+    if (words[k] == "len" && (k == 0 || (words[before] != "text" && !many(words[before])))) return no("len is the length of the text, the bytes or the floats before it (after their at)");
+    if (words[k] == "at" && (k == 0 || !many(words[k - 1]))) return no("at is the place in the bytes or the floats before it");
     const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
-    if (words[k] == "bytes" && (after >= words.size() || words[after] != "len")) return no("bytes are followed by their length: bytes len (or bytes at len)");
+    if (many(words[k]) && (after >= words.size() || words[after] != "len")) return no(words[k] + " are followed by their length: " + words[k] + " len (or " + words[k] + " at len)");
   }
-  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64 or text)");
+  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64, text, bytes: a List of Int, floats: a List of Float)");
   return true;
 }
 
