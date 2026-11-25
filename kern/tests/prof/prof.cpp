@@ -9,6 +9,7 @@
 #include "kern/core/json.h"
 #include "kern/studio/studio.h"
 using namespace kern;
+App* kern_create_app() { return nullptr; }
 int main(int argc, char** argv) {
   Renderer renderer; game::NightWindows windows;
   ShaderExtension* ext[1] = {&windows};
@@ -34,6 +35,14 @@ int main(int argc, char** argv) {
     t = now(); json::Value l = s->state(); const double b = now() - t;
     if (!l["logic"]["exists"].as_bool()) continue;
     std::printf("%-40s open %.2f state %.2f nodes %u\n", name.c_str(), a, b, (unsigned)l["logic"]["nodes"].size()); std::fflush(stdout);
+    const json::Value& sheets = l["logic"]["sheets"];
+    for (u32 k = 0; k < sheets.size(); ++k) {
+      const u32 nn = (u32)sheets[k]["nodes"].as_number();
+      if (k >= 3 && nn < 400) continue;
+      json::Value sc = json::Value::object(); sc.set("cmd", "logicSheet"); sc.set("function", sheets[k]["name"].as_string());
+      s->command(sc); t = now(); json::Value ls = s->state(); const double d = now() - t;
+      std::printf("   sheet %-40s state %.2f nodes %u (of %u) json %zu\n", sheets[k]["name"].as_string().c_str(), d, (unsigned)ls["logic"]["nodes"].size(), nn, json::stringify(ls).size()); std::fflush(stdout);
+    }
   }
   s.reset(); renderer.shutdown();
 }
