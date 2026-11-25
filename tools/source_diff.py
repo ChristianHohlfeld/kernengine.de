@@ -2114,6 +2114,28 @@ class BuildsWriter(Writer):
         return body + ["      " + x for x in inner] + ["    }", "  }"]
 
 
+def compiled(path, m, flags, scratch):
+    """The test as the suite compiles it (-fsyntax-only, the switches of run_tests.sh; the old program's headers beside
+    it as run_tests.sh puts them, sc_base_<commit>/): one that does not compile is no test - the tool says why and
+    leaves none (a value of the old it cannot carry, a type it does not spell ...)."""
+    extra = []
+    if getattr(m, "base_ns", None) and getattr(m, "old_dir", None):
+        inc = os.path.join(scratch, "inc-" + m.base_ns)
+        os.makedirs(inc, exist_ok=True)
+        if not os.path.exists(os.path.join(inc, m.base_ns)):
+            os.symlink(m.old_dir, os.path.join(inc, m.base_ns))
+        extra.append("-I" + inc)
+    r = subprocess.run([C.TestWriter.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra",
+                        "-Wno-unused-parameter", *flags, "-I" + os.path.join(HERE, "..", "kern", "tests"), *extra, path], capture_output=True, text=True)
+    if r.returncode != 0:
+        first = next((x for x in r.stderr.split("\n") if " error: " in x), r.stderr.strip().split("\n")[0] if r.stderr.strip() else "?")
+        if os.path.basename(os.path.dirname(os.path.dirname(path))) == "builds":
+            shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+        else:
+            os.remove(path)
+        raise Stop("its test does not compile: " + re.sub(r"^.*?/(?=[^/]+:\d+:\d+:)", "", first)[:300])
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--base", required=True, help="the commit the lowering started from (the old text)")
@@ -2150,6 +2172,8 @@ def main(argv):
                 w = writer(m, args.test)
                 w.ends = ends
                 path, tested, covered, report = w.write()
+                if path is not None:
+                    compiled(path, m, fl, scratch)
                 if path is None:
                     print(f"{os.path.basename(src)}: every function it had is unchanged since {args.base} (the new text only has more) - no test")
                 else:
