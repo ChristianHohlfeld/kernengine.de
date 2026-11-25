@@ -7,6 +7,8 @@
 #             object the call is compared on (kern_state_now); the test compiles and compares the functions.
 #   bytes.cpp an export that hands a view of the host's bytes on (`sum_of({data, length})` - main.cpp's sc_net_push,
 #             sc_dem_data): those entries, copied (Copy Bytes) - written, not waiting on "a view (Span) of a part of a list".
+#   table.cpp a constant table of structs (`constexpr Spec kTable[]` of weapons.h) named from a namespace that has a
+#             Spec of its own: its type is the one where it is declared (else its texts are read as another struct's Bools).
 # Each case is a program of its own, its Blueprints read into a level of their own, as the game's are: the engine's
 # reader refuses what is wrong (a function read as a value that changes something).
 set -euo pipefail
@@ -49,7 +51,10 @@ tested pad "holder() in the test is that object" 'static_cast<Holder\*>\(kern_st
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
+convert table
+check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
+
 if [ $fail != 0 ]; then
-  for c in pad bytes; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

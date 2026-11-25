@@ -2585,11 +2585,17 @@ class Unit:
         if not (d.get("constexpr") or re.search(r"\bconst\b", raw)):
             # (a library keeps nothing: what every caller of the file's functions shares has no place in the language)
             raise Wait("state outside a function (a variable of the file: a library keeps nothing)")
-        t = self.place(raw)
-        init = kids(d)[-1] if kids(d) and d.get("init") else None
-        if init is None:
-            raise Wait(f"the constant {d.get('name')} is defined elsewhere")
-        lit = Const(self).literal(init, t)
+        # (its type and its value as C++ reads them where it is declared - `constexpr Spec kTable[]` of weapons.h is
+        # weapons::Spec, also when a function of another namespace that has a Spec of its own names it first)
+        looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
+        try:
+            t = self.place(raw)
+            init = kids(d)[-1] if kids(d) and d.get("init") else None
+            if init is None:
+                raise Wait(f"the constant {d.get('name')} is defined elsewhere")
+            lit = Const(self).literal(init, t)
+        finally:
+            self.lookup_scope = looked
         name = self.fresh(self.world.constant_names.get((os.path.abspath(d.get("_file") or "?"), d.get("name"))) or d.get("name", "k"))
         self.names.add(name)
         doc = self.comment_of(d)
@@ -3563,6 +3569,25 @@ class Emit:
             return wire(self.u.rows.get(t, t))   # (a list inside a list is held as a struct of that list: here, the list)
         if self.u.object_of(qtype(n)):
             return "Int"   # (an object of the engine: its handle)
+        b = bare(n)
+        d = None
+        if b.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
+            # (what a function gives, as the compiler names it: as its declaration writes it - `const Spec&` of
+            # weapons::spec is weapons::Spec, looked up where the function is declared, not where it is called)
+            c = callee(b)
+            d = self.tree.decl.get(c.get("referencedMemberDecl") or (c.get("referencedDecl") or {}).get("id"))
+        elif b.get("kind") == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("kind") == "VarDecl":
+            d = self.tree.decl.get(b["referencedDecl"].get("id"))   # (a constant of a namespace: `const Spec kTable[2]` of weapons)
+            here = (self.f.decl or {}) if self.f is not None else {}
+            if d is not None and (self.tree.owner.get(d["id"]) or (here.get("_file") == d.get("_file") and here.get("_at", (None, None))[0] is not None
+                                  and d.get("_at", (None, None))[0] is not None and here["_at"][0] <= d["_at"][0] <= here["_at"][1])):
+                d = None   # (a variable of the function itself, a field: where it is read)
+        if d is not None and d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "VarDecl") and self.u.scope_for(d):
+                looked, self.u.lookup_scope = self.u.lookup_scope, self.u.scope_for(d)
+                try:
+                    return self.u.btype(qtype(n))
+                finally:
+                    self.u.lookup_scope = looked
         return self.u.btype(qtype(n))
 
     def held_type(self, n):
