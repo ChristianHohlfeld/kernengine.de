@@ -5679,6 +5679,8 @@ struct F2805 { friend constexpr auto got(F2805); };
 template struct Rob<F2805, &::sc::town::State::planks>;
 struct F2806 { friend constexpr auto got(F2806); };
 template struct Rob<F2806, &::sc::town::State::marks>;
+struct M1 { friend constexpr auto got(M1); };
+template struct Rob<M1, &::sc::Game::build_level>;
 }  // namespace sc::lowered::builds_game
 
 namespace sc::lowered {
@@ -5765,14 +5767,14 @@ template <> struct Fields<::kern::logic::CommentBox> { template <class X> static
 template <> struct Fields<::kern::logic::EnumType> { template <class X> static auto of(X& x) { return std::tie(x.name, x.values, x.help, x.project, x.from); } static constexpr const char* names[] = {"name", "values", "help", "project", "from"}; };
 template <> struct Fields<::kern::logic::Function> { template <class X> static auto of(X& x) { return std::tie(x.name, x.inputs, x.outputs, x.locals, x.pure, x.external, x.remote, x.from, x.help); } static constexpr const char* names[] = {"name", "inputs", "outputs", "locals", "pure", "external", "remote", "from", "help"}; };
 template <> struct Fields<::kern::logic::FunctionPin> { template <class X> static auto of(X& x) { return std::tie(x.name, x.type, x.value, x.of, x.count, x.ref, x.constant); } static constexpr const char* names[] = {"name", "type", "value", "of", "count", "ref", "constant"}; };
-template <> struct Fields<::kern::logic::Graph> { template <class X> static auto of(X& x) { return std::tie(x.nodes, x.links, x.variables, x.machines, x.functions, x.enums, x.structs, x.comments, x.next_id, x.library, x.uses); } static constexpr const char* names[] = {"nodes", "links", "variables", "machines", "functions", "enums", "structs", "comments", "next_id", "library", "uses"}; };
+template <> struct Fields<::kern::logic::Graph> { template <class X> static auto of(X& x) { return std::tie(x.nodes, x.links, x.variables, x.machines, x.functions, x.enums, x.structs, x.comments, x.next_id, x.library, x.uses, x.implements); } static constexpr const char* names[] = {"nodes", "links", "variables", "machines", "functions", "enums", "structs", "comments", "next_id", "library", "uses", "implements"}; };
 template <> struct Fields<::kern::logic::Instance::CNode> { template <class X> static auto of(X& x) { return std::tie(x.def, x.node, x.in, x.out, x.exec_out, x.exec_out_entry, x.data_in, x.literal, x.exec_in_index, x.outputs, x.state, x.running, x.fresh, x.fed_fresh); } static constexpr const char* names[] = {"def", "node", "in", "out", "exec_out", "exec_out_entry", "data_in", "literal", "exec_in_index", "outputs", "state", "running", "fresh", "fed_fresh"}; };
 template <> struct Fields<::kern::logic::Instance::CNode::Source> { template <class X> static auto of(X& x) { return std::tie(x.node, x.pin); } static constexpr const char* names[] = {"node", "pin"}; };
 template <> struct Fields<::kern::logic::Instance::Frame> { template <class X> static auto of(X& x) { return std::tie(x.function, x.depth, x.stack_base, x.returned, x.results, x.trampoline, x.call_node, x.base, x.outer_refs, x.held, x.lengths, x.kept); } static constexpr const char* names[] = {"function", "depth", "stack_base", "returned", "results", "trampoline", "call_node", "base", "outer_refs", "held", "lengths", "kept"}; };
 template <> struct Fields<::kern::logic::Instance::Kept> { template <class X> static auto of(X& x) { return std::tie(x.parameters, x.locals, x.nodes, x.slots); } static constexpr const char* names[] = {"parameters", "locals", "nodes", "slots"}; };
 template <> struct Fields<::kern::logic::Instance::Local> { template <class X> static auto of(X& x) { return std::tie(x.key, x.init); } static constexpr const char* names[] = {"key", "init"}; };
 template <> struct Fields<::kern::logic::Instance::Machine> { template <class X> static auto of(X& x) { return std::tie(x.def, x.state, x.entered); } static constexpr const char* names[] = {"def", "state", "entered"}; };
-template <> struct Fields<::kern::logic::Instance::Spot> { template <class X> static auto of(X& x) { return std::tie(x.key, x.entry, x.output, x.beside, x.steps); } static constexpr const char* names[] = {"key", "entry", "output", "beside", "steps"}; };
+template <> struct Fields<::kern::logic::Instance::Spot> { template <class X> static auto of(X& x) { return std::tie(x.key, x.entry, x.output, x.beside, x.bound, x.steps); } static constexpr const char* names[] = {"key", "entry", "output", "beside", "bound", "steps"}; };
 template <> struct Fields<::kern::logic::Instance::Spot::Beside> { template <class X> static auto of(X& x) { return std::tie(x.type, x.value); } static constexpr const char* names[] = {"type", "value"}; };
 template <> struct Fields<::kern::logic::Instance::Spot::Step> { template <class X> static auto of(X& x) { return std::tie(x.field, x.index); } static constexpr const char* names[] = {"field", "index"}; };
 template <> struct Fields<::kern::logic::Link> { template <class X> static auto of(X& x) { return std::tie(x.from, x.out, x.to, x.in); } static constexpr const char* names[] = {"from", "out", "to", "in"}; };
@@ -6157,6 +6159,22 @@ SC_TEST(lowered_game_cpp) {
       rec.take(defined, asks, call);
     }
   }
+  {  // Game::build_level()
+    ::sc::lowered::Builds rec("Game::build_level()");
+    ::sc::converted::Draw draw;
+    for (int call = 0; rec.more(call); ++call) {
+      ::sc::lowered::Self<::sc::Game> self;
+      if (draw.flag()) ::sc::lowered::draw(draw, *self);
+      std::optional<std::remove_cvref_t<decltype(((*self).*got(::sc::lowered::builds_game::M1{}))())>> r;
+      long asks = 0;
+      const bool defined = ::sc::lowered::run([&] { r.emplace(((*self).*got(::sc::lowered::builds_game::M1{}))()); }, asks);
+      if (defined) {
+        rec.part("what it returns", ::sc::lowered::bytes_of(r));
+        rec.object("its object", *self);
+      }
+      rec.take(defined, asks, call);
+    }
+  }
   {  // Game::stop()
     ::sc::lowered::Builds rec("Game::stop()");
     ::sc::converted::Draw draw;
@@ -6168,6 +6186,24 @@ SC_TEST(lowered_game_cpp) {
       if (defined) {
         static constexpr const char* ended[] = {"swarm_cruiser_", "life_", "cars_", "remote_car_", "remote_bus_"};
         rec.object_ending("its object", *self, ended);
+      }
+      rec.take(defined, asks, call);
+    }
+  }
+  {  // Game::command(const std::string &)
+    ::sc::lowered::Builds rec("Game::command(const std::string &)");
+    ::sc::converted::Draw draw;
+    for (int call = 0; rec.more(call); ++call) {
+      ::sc::lowered::Self<::sc::Game> self;
+      if (draw.flag()) ::sc::lowered::draw(draw, *self);
+      ::sc::lowered::Arg<const std::string &> a0;
+      ::sc::lowered::draw(draw, a0);
+      std::optional<std::remove_cvref_t<decltype(self->command(a0.get()))>> r;
+      long asks = 0;
+      const bool defined = ::sc::lowered::run([&] { r.emplace(self->command(a0.get())); }, asks);
+      if (defined) {
+        rec.part("what it returns", ::sc::lowered::bytes_of(r));
+        rec.object("its object", *self);
       }
       rec.take(defined, asks, call);
     }
