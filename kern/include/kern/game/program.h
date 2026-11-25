@@ -30,7 +30,9 @@ App* program_app(logic::Runtime& runtime);
 
 /// A program: its project (a copy - the graphs its runtime runs stand in it), its host and its logic runtime. Its host
 /// has no world: its time stands at 0, its random numbers start from a fixed seed, what it prints is kept (said) and
-/// logged, the objects of the engine it makes or is given are its own.
+/// logged, the objects of the engine it makes or is given are its own. A world it makes (a GameWorld of its host) is
+/// given the project when it is made (GameWorld::set_project): its Blueprints find libraries in its level, then in
+/// the project; it must end before the program does (it ends with the program's objects at the latest).
 class Program {
  public:
   Program();

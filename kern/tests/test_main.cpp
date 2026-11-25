@@ -8306,6 +8306,48 @@ TEST(program_from_the_project) {
   renderer.shutdown();
 }
 
+// A world the program makes is a world of its project (kern/docs/project.md 3., 5.): the GameWorld a node makes in
+// the program's host (engine.game_world.make) is given the program's project as it is made - its Blueprints then find
+// libraries in its level, then in the project; a world made in any other host gets none.
+TEST(program_world_has_the_project) {
+  logic::Graph main;
+  std::string error;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", main, nullptr, &error));
+  game::Project pr;
+  pr.name = "Welten";
+  pr.blueprints.push_back({"Main", main});
+  game::Program program;
+  CHECK(program.start(pr, &error));
+  logic::EngineObjects* objects = program.runtime() ? program.runtime()->host().engine_objects() : nullptr;
+  CHECK(objects != nullptr);
+  if (!objects) return;
+  Renderer renderer;
+  std::vector<logic::Value> out(1);
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::integer(objects->adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  game::GameWorld* world = objects->get<game::GameWorld>(out[0].as_int());
+  CHECK(world && world->project() == program.project() && world->project()->name == "Welten");
+  // (made elsewhere: no project)
+  logic::EngineObjects other;
+  CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::integer(other.adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  game::GameWorld* alone = other.get<game::GameWorld>(out[0].as_int());
+  CHECK(alone && alone->project() == nullptr);
+  program.end();
+}
+
 // The one entry (kern/docs/project.md 4., kern/app/app.h): the program's kern_main hands the engine its App once -
 // kern::run(project) starts the project's program and gives the app runtime its App; the platform then starts it
 // (kern_app_start), drives its frames and stops it - the program ends with the app and starts again with it. A

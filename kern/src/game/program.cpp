@@ -5,6 +5,7 @@
 #include <string>
 
 #include "kern/core/base.h"
+#include "kern/game/runtime.h"
 #include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
 
@@ -84,6 +85,13 @@ bool Program::start(const Project& project, std::string* error) {
   if (count > 1) return refuse(error, "more than one Blueprint of the project " + project.name + " implements App: " + apps);
   auto p = std::make_unique<State>();
   p->project = project;
+  // a world the program makes (GameWorld, an object of the engine of its host) is a world of the project: its
+  // Blueprints find libraries in its level, then in the project (kern/docs/project.md 3., 5.)
+  p->host.objects.on_made(
+      [](void* project, logic::EngineObjects::Kind kind, void* object) {
+        if (kind == logic::EngineObjects::kind<GameWorld>()) static_cast<GameWorld*>(object)->set_project(static_cast<const Project*>(project));
+      },
+      &p->project);
   p->runtime = std::make_unique<logic::Runtime>(p->host);
   p->runtime->blueprints = program_blueprints(p->project);
   // (each program Blueprint is an instance of its own; its Self is its place in the project, from 1 - no actor)

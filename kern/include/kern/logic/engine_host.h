@@ -76,7 +76,19 @@ class EngineObjects {
   template <class T, class... Bases> i64 own(std::unique_ptr<T> object) {
     if (!object) return 0;
     T* at = object.release();
-    return put(kinds_of<T, Bases...>(at), [](void* p) { delete static_cast<T*>(p); });
+    Kinds kinds = kinds_of<T, Bases...>(at);
+    const i64 handle = put(kinds, [](void* p) { delete static_cast<T*>(p); });
+    if (made_)
+      for (const auto& [kind, as] : kinds) made_(made_context_, kind, as);
+    return handle;
+  }
+  /// What a host does with each object these come to own (own: made by a node, or given by value) - told once per
+  /// class the object is (kinds_of), right after it is kept. A program's host gives a world the program makes its
+  /// project this way (kern/game/program.h). Null: nothing.
+  using Made = void (*)(void* context, Kind kind, void* object);
+  void on_made(Made m, void* context) {
+    made_ = m;
+    made_context_ = context;
   }
   /// The object of a handle as a T (null: 0, an unknown handle, or one of another class - see `missing`).
   template <class T> T* get(i64 handle) {
@@ -173,6 +185,8 @@ class EngineObjects {
   u64 generation() const { return generation_; }
 
  private:
+  Made made_ = nullptr;
+  void* made_context_ = nullptr;
   struct Entry {
     void* at = nullptr;
     void (*end)(void*) = nullptr;  // (null: the host's own)

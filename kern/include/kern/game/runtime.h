@@ -37,7 +37,7 @@ class NightWindows final : public ShaderExtension {
   const char* vertex() const override;
   const char* fragment_declarations() const override;
   const char* fragment_surface() const override;
-  void bind(const Program& p) override;
+  void bind(const kern::Program& p) override;
   void frame_uniforms(UniformCache& cache, const Renderer&) override;
 
  private:
