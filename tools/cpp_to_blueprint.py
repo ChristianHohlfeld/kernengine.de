@@ -3675,6 +3675,17 @@ class Emit:
             given = next(returns(d), None)
             if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
                 ret = qtype(kids(given)[0]).strip()
+        self.export_gives = None
+        if export_name(d) and re.search(r"\*\s*(?:const\s*)?$", ret):
+            # an export that gives a text, bytes or floats by a pointer: through the place the program keeps them in
+            # (export_given) - every return gives it so, and the function gives what is kept
+            body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+            returns = [x for x in walk(body or {}) if x.get("kind") == "ReturnStmt"]
+            given = [export_given(self.tree, kids(r)[0]) if kids(r) else None for r in returns]
+            if not returns or any(g is None for g in given):
+                raise Wait(f"the export {export_name(d)} gives a pointer not through kern::logic::export_text, export_bytes or export_floats")
+            self.export_gives = {r["id"]: g for r, g in zip(returns, given)}
+            ret = re.sub(r"^const\s+|\s*&$", "", qtype(given[0]).strip())
         f.value = u.place(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
@@ -5505,6 +5516,8 @@ class Emit:
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
+            if c and getattr(self, "export_gives", None) and s.get("id") in self.export_gives:
+                c = [self.export_gives[s["id"]]]   # (what an export gives by a pointer: the value kept - export_given)
             made = [x for scope in self.scopes for x in scope]
             if not made:
                 if not c:
@@ -15674,9 +15687,35 @@ def wire_out(d, aliases):
         return None
     if t in ("const char *", "const char *const"):
         return "text"
+    if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
+        return "bytes"
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return "floats"
     if t in C_WORDS:
         return C_WORDS[t]
-    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)")
+    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
+
+
+EXPORT_GIVES = {"export_text": "text", "export_bytes": "bytes", "export_floats": "floats"}
+
+
+def export_given(tree, n):
+    """In an exported function: `return kern::logic::export_text(x);` (export_bytes, export_floats -
+    kern/logic/blueprint_class.h) gives x - the program keeps what an export gives in one place for each kind, the
+    glue of a Blueprint's class as its C++ does - so the Blueprint's function gives x. The x, or None."""
+    b = bare(n)
+    while b.get("kind") in ("ImplicitCastExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and kids(b):
+        b = bare(kids(b)[0])
+    if b.get("kind") != "CallExpr" or len(kids(b)) != 2:
+        return None
+    ref = callee(b).get("referencedDecl") or {}
+    decl = tree.decl.get(ref.get("id")) or {}
+    if ref.get("name") not in EXPORT_GIVES or not (decl.get("_file") or "").replace("\\", "/").endswith("kern/logic/blueprint_class.h"):
+        return None
+    x = bare(kids(b)[1])
+    while x.get("kind") in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ExprWithCleanups") and kids(x):
+        x = bare(kids(x)[0])
+    return x
 
 
 def gives_kept(d):
