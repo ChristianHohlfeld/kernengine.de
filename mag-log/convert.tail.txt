@@ -1,0 +1,80 @@
+    WorldArt::end (8): written
+    WorldArt::set_mesh (11): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_marks_cpp                15 /   15 functions      376 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): written
+    Marks::add_soot (32): written
+    Marks::add_breach (44): written
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): written
+    Marks::update (13): written
+    Marks::prune_walls (22): written
+    Marks::rebuild (112): written
+    Marks::draw (25): written
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+world_traffic_cpp               9 /    9 functions      308 /    308 lines
+    (test_world_traffic_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_mp_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_wanted_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_spawn_guard_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_combat_detail_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_equipment_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_jet_seats_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_guided_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_gaps_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_town_sync_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_controls_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Game__game_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/tmp/kern-cpp-to-blueprint-pplltfes/Game.cpp: line 24273, column 5: function "sc_gamepad" is read as a value, so it only computes: Set pad.pressed (node 32584527) changes something. Call the function as a step instead (My Blueprint: untick Pure)
+  (the texts: /dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/tmp/kern-cpp-to-blueprint-pplltfes)
+    cell (1): written
+    TrafficRules::rebuild (142): written
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): written
+the Blueprints were not read: the level is as it was
+
+real	119m14,648s
+user	954m35,245s
+sys	35m0,681s

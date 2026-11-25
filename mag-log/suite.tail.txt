@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_equipment_lowered.cpp:938:87: warning: unused variable 'all' [-Wunused-const-variable]
+  938 | template <> struct Values<::sc_old_equipment::sc::Genre> { static constexpr long long all[] = {static_cast<long long>(::sc_old_equipment::sc::Genre::synthwave), static_cast<long long>(::sc_old_equipment::sc::Genre::house), static_cast<long long>(::sc_old_equipment::sc::Genre::lofi), static_cast<long long>(::sc_old_equipment::sc::Genre::chip), static_cast<long long>(::sc_old_equipment::sc::Genre::techno)}; };
+      |                                                                                       ^~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_equipment_lowered.cpp:939:87: warning: unused variable 'all' [-Wunused-const-variable]
+  939 | template <> struct Values<::sc_new_equipment::sc::Genre> { static constexpr long long all[] = {static_cast<long long>(::sc_new_equipment::sc::Genre::synthwave), static_cast<long long>(::sc_new_equipment::sc::Genre::house), static_cast<long long>(::sc_new_equipment::sc::Genre::lofi), static_cast<long long>(::sc_new_equipment::sc::Genre::chip), static_cast<long long>(::sc_new_equipment::sc::Genre::techno)}; };
+      |                                                                                       ^~~
+3 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:406:27: warning: unused variable 'draw' [-Wunused-variable]
+  406 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:422:27: warning: unused variable 'draw' [-Wunused-variable]
+  422 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:438:27: warning: unused variable 'draw' [-Wunused-variable]
+  438 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:454:27: warning: unused variable 'draw' [-Wunused-variable]
+  454 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:470:27: warning: unused variable 'draw' [-Wunused-variable]
+  470 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:486:27: warning: unused variable 'draw' [-Wunused-variable]
+  486 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:502:27: warning: unused variable 'draw' [-Wunused-variable]
+  502 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_guided_lowered.cpp:518:27: warning: unused variable 'draw' [-Wunused-variable]
+  518 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_nostr_lowered.cpp:955:27: warning: unused variable 'draw' [-Wunused-variable]
+  955 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_nostr_lowered.cpp:969:27: warning: unused variable 'draw' [-Wunused-variable]
+  969 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_nostr_lowered.cpp:983:27: warning: unused variable 'draw' [-Wunused-variable]
+  983 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+7 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_spawn_guard_lowered.cpp:253:27: warning: unused variable 'draw' [-Wunused-variable]
+  253 |     ::sc::converted::Draw draw;
+      |                           ^~~~
+1 warning generated.
+8 warnings generated.
+8 warnings generated.
+3 warnings generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:181:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  181 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:229:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  229 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:619:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  619 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:668:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  668 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/test_mp.cpp:356:30: error: non-const lvalue reference to type 'U32' (aka 'Sized<unsigned int>') cannot bind to a value of unrelated type 'blueprints::qr_code_cpp::Int' (aka 'kern::logic::Whole')
+  356 |   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+      |                              ^~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/tests/test_util.h:23:11: note: expanded from macro 'SC_CHECK'
+   23 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-2115-voll-211441-4258/kern/games/spawncity/src/level_blueprints.h:986:56: note: passing argument to parameter 'level_bits' here
+  986 |   read_formatResult read_format(const qr_Code& c, U32& level_bits, U32& mask) {
+      |                                                        ^
+1 error generated.
+4 warnings generated.
+3 warnings generated.
+2 warnings generated.
+2 warnings generated.
+
+real	12m19,359s
+user	373m43,968s
+sys	4m56,106s
