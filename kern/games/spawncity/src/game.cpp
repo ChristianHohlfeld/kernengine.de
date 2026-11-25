@@ -229,7 +229,9 @@ kern::game::Level Game::build_level() const {
     l.add(a);
   }
 
-  // The fixed-step hook: one node of the game's own type in the level graph.
+  // The fixed-step hook: one node of the game's own type in the level graph. (The Blueprint Game has the node type as
+  // its own Event Tick - register_node -, which runs at the same place in a tick while no actor before Game handles
+  // logic.tick: tests/test_entry.cpp. The switch to the Blueprints takes these lines out with src/.)
   kern::logic::Node node;
   node.id = l.logic.next_id++;
   node.type = kNodeType;
