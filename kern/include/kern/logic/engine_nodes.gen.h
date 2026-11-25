@@ -2787,6 +2787,215 @@ struct P_engine_character_mover_settings {
   static C* at(EngineObjects&, Object& self, const In&) { return &self.settings; }
 };
 
+// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).
+// kern::App that a Blueprint's class is (kern::Implements<"App">: kern::logic::implementation)
+template <class B> class ClassImplements_App final : public kern::App {
+ public:
+  explicit ClassImplements_App(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_configure = requires { requires std::is_same_v<typename MemberOf<decltype(&X::configure)>::type, X>; };
+  template <class X> static constexpr bool kern_has_extensions = requires { requires std::is_same_v<typename MemberOf<decltype(&X::extensions)>::type, X>; };
+  template <class X> static constexpr bool kern_has_start = requires { requires std::is_same_v<typename MemberOf<decltype(&X::start)>::type, X>; };
+  template <class X> static constexpr bool kern_has_update = requires { requires std::is_same_v<typename MemberOf<decltype(&X::update)>::type, X>; };
+  template <class X> static constexpr bool kern_has_resized = requires { requires std::is_same_v<typename MemberOf<decltype(&X::resized)>::type, X>; };
+  template <class X> static constexpr bool kern_has_stop = requires { requires std::is_same_v<typename MemberOf<decltype(&X::stop)>::type, X>; };
+  decltype(std::declval<kern::App&>().configure()) configure() override {
+    if constexpr (!kern_has_configure<B>) {
+      return kern::App::configure();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.configure();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().configure())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::App&>().extensions()) extensions() override {
+    if constexpr (!kern_has_extensions<B>) {
+      return kern::App::extensions();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.extensions();
+      kern_kept_extensions.clear();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(kern_o, kern_given, kern_kept_extensions);
+      return decltype(std::declval<kern::App&>().extensions())(kern_kept_extensions.data(), kern_kept_extensions.size());
+    }
+  }
+  decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) start(kern::Engine& kern_p0) override {
+    static_assert(kern_has_start<B>, "a Blueprint that implements App has its function start");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.start(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::App&>().update(std::declval<kern::Engine&>(), std::declval<kern::Frame const&>())) update(kern::Engine& kern_p0, kern::Frame const& kern_p1) override {
+    static_assert(kern_has_update<B>, "a Blueprint that implements App has its function update");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.update(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Frame>, kern::Frame const&>(kern_o, kern_p1));
+    }
+  }
+  decltype(std::declval<kern::App&>().resized(std::declval<kern::Engine&>())) resized(kern::Engine& kern_p0) override {
+    if constexpr (!kern_has_resized<B>) {
+      return kern::App::resized(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.resized(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+    }
+  }
+  decltype(std::declval<kern::App&>().stop(std::declval<kern::Engine&>())) stop(kern::Engine& kern_p0) override {
+    if constexpr (!kern_has_stop<B>) {
+      return kern::App::stop(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.stop(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<kern::App&>().extensions())>().data)>>> kern_kept_extensions;
+};
+template <> struct InterfaceOf<"App"> {
+  template <class B> using adapter = ClassImplements_App<B>;
+};
+
+// kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
+template <class B> class ClassImplements_ShaderExtension final : public kern::ShaderExtension {
+ public:
+  explicit ClassImplements_ShaderExtension(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_name = requires { requires std::is_same_v<typename MemberOf<decltype(&X::name)>::type, X>; };
+  template <class X> static constexpr bool kern_has_attributes = requires { requires std::is_same_v<typename MemberOf<decltype(&X::attributes)>::type, X>; };
+  template <class X> static constexpr bool kern_has_vertex_declarations = requires { requires std::is_same_v<typename MemberOf<decltype(&X::vertex_declarations)>::type, X>; };
+  template <class X> static constexpr bool kern_has_vertex = requires { requires std::is_same_v<typename MemberOf<decltype(&X::vertex)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_declarations = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_declarations)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_discard = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_discard)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_input = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_input)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_surface = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_surface)>::type, X>; };
+  template <class X> static constexpr bool kern_has_bind = requires { requires std::is_same_v<typename MemberOf<decltype(&X::bind)>::type, X>; };
+  template <class X> static constexpr bool kern_has_frame_uniforms = requires { requires std::is_same_v<typename MemberOf<decltype(&X::frame_uniforms)>::type, X>; };
+  template <class X> static constexpr bool kern_has_material_uniforms = requires { requires std::is_same_v<typename MemberOf<decltype(&X::material_uniforms)>::type, X>; };
+  decltype(std::declval<const kern::ShaderExtension&>().name()) name() const override {
+    static_assert(kern_has_name<B>, "a Blueprint that implements ShaderExtension has its function name");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.name();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().name())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().attributes()) attributes() const override {
+    if constexpr (!kern_has_attributes<B>) {
+      return kern::ShaderExtension::attributes();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.attributes();
+      kern_kept_attributes.clear();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ExtensionAttribute>>>::from(kern_o, kern_given, kern_kept_attributes);
+      return decltype(std::declval<const kern::ShaderExtension&>().attributes())(kern_kept_attributes.data(), kern_kept_attributes.size());
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations()) vertex_declarations() const override {
+    if constexpr (!kern_has_vertex_declarations<B>) {
+      return kern::ShaderExtension::vertex_declarations();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.vertex_declarations();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex()) vertex() const override {
+    if constexpr (!kern_has_vertex<B>) {
+      return kern::ShaderExtension::vertex();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.vertex();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().vertex())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations()) fragment_declarations() const override {
+    if constexpr (!kern_has_fragment_declarations<B>) {
+      return kern::ShaderExtension::fragment_declarations();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_declarations();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_discard()) fragment_discard() const override {
+    if constexpr (!kern_has_fragment_discard<B>) {
+      return kern::ShaderExtension::fragment_discard();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_discard();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_discard())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_input()) fragment_input() const override {
+    if constexpr (!kern_has_fragment_input<B>) {
+      return kern::ShaderExtension::fragment_input();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_input();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_input())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_surface()) fragment_surface() const override {
+    if constexpr (!kern_has_fragment_surface<B>) {
+      return kern::ShaderExtension::fragment_surface();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_surface();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_surface())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().bind(std::declval<kern::Program const&>())) bind(kern::Program const& kern_p0) override {
+    if constexpr (!kern_has_bind<B>) {
+      return kern::ShaderExtension::bind(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.bind(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Program>(kern_p0)));
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().frame_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Renderer const&>())) frame_uniforms(kern::UniformCache& kern_p0, kern::Renderer const& kern_p1) override {
+    if constexpr (!kern_has_frame_uniforms<B>) {
+      return kern::ShaderExtension::frame_uniforms(kern_p0, kern_p1);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.frame_uniforms(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::UniformCache>(kern_p0)), ::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Renderer>(kern_p1)));
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().material_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Material const&>(), std::declval<int const*>())) material_uniforms(kern::UniformCache& kern_p0, kern::Material const& kern_p1, int const* kern_p2) override {
+    return kern::ShaderExtension::material_uniforms(kern_p0, kern_p1, kern_p2);   // (the engine cannot hand it to a Blueprint: it is handed a pointer)
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<const kern::ShaderExtension&>().attributes())>().data)>>> kern_kept_attributes;
+};
+template <> struct InterfaceOf<"ShaderExtension"> {
+  template <class B> using adapter = ClassImplements_ShaderExtension<B>;
+};
+
 }  // namespace engine_direct
 
 template <class Core> struct EngineNodesOf : Core {

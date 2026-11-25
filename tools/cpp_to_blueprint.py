@@ -15593,8 +15593,11 @@ def main(argv):
     # A function that is no method but shares a variable of the program - or calls one that does -, when the
     # program has one object (a state): a function of that state's Blueprint, in the part of its file. (A method
     # of another class that does stays where it is, and waits: it would need its object and the state's.)
-    if len(set(world.states.values())) == 1:
-        state = next(iter(world.states.values()))
+    # (the state the program's variables are of: its one state that is no object of an interface of the engine -
+    # an App, a ShaderExtension is the engine's object, called by the engine; its functions are its own)
+    holders = {b for q, b in world.states.items() if q not in world.state_implements}
+    if len(holders) == 1:
+        state = next(iter(holders))
         callers = collections.defaultdict(set)
         for k, f in functions.items():
             for c in f["calls"]:

@@ -7468,6 +7468,118 @@ TEST(engine_footprint_stream_values) {
   objects.clear();
 }
 
+// The same Blueprints as their classes (the texts of the native cases Water and Running, blueprint_native.h, as they
+// stand): kern::logic::implementation makes the engine's object of a class - the engine calls the class's functions
+// typed, what it hands over made into the class's types where they are read.
+}  // namespace
+
+namespace implements_probe {
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  // ---- variables ----
+  Float Time = 0.25;
+  Int Program = 0;
+  Int Cache = 0;
+  Int Frames = 0;
+
+  // ---- functions ----
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() {
+    return {"water"};
+  }
+
+  struct vertexResult { Text result = ""; };
+  KERN_PURE vertexResult vertex() {
+    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+  }
+
+  void bind(Int program = 0) {
+    Program = program;
+  }
+
+  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+    Cache = cache;
+    Frames += 1;
+  }
+};
+struct Running : kern::Blueprint, kern::Implements<"App"> {
+  // ---- types ----
+  KERN_STRUCT(Frame) {
+    Float time = 0.0;
+    Float dt = 0.0;
+    Int64 index = Int64{0x0};
+  };
+
+  // ---- variables ----
+  Int Engine = 0;
+  Int Updates = 0;
+  Float Last = 0.0;
+  Bool Stopped = false;
+
+  // ---- functions ----
+  struct startResult { Bool result = false; };
+  startResult start(Int engine = 0) {
+    Engine = engine;
+    return {true};
+  }
+
+  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+    Updates += 1;
+    Last = frame.time;
+  }
+
+  void stop(Int engine = 0) {
+    Stopped = true;
+  }
+};
+}  // namespace implements_probe
+
+namespace kern::logic::detail {
+template <>
+struct Held<implements_probe::Running::Frame> : HeldBy<implements_probe::Running::Frame, &implements_probe::Running::Frame::time, &implements_probe::Running::Frame::dt,
+                                                       &implements_probe::Running::Frame::index> {};
+}  // namespace kern::logic::detail
+
+namespace {
+
+TEST(engine_interface_a_class_implements) {
+  implements_probe::Water w;
+  implements_probe::Running r;
+  logic::EngineObjects objects;
+  w.kern_world.engine = &objects;
+  r.kern_world.engine = &objects;
+  const auto ext = logic::implementation(w);
+  const auto app = logic::implementation(r);
+  ShaderExtension& e = *ext;
+  App& a = *app;
+  CHECK(std::string(e.name()) == "water" && std::string(e.vertex()) == "vWater = aWater * 0.25;");
+  CHECK(std::string(e.vertex_declarations()).empty() && e.attributes().empty() && std::string(e.fragment_surface()).empty());  // (the interface's own)
+  Program program;
+  UniformCache cache;
+  Renderer renderer;
+  e.bind(program);
+  e.frame_uniforms(cache, renderer);
+  e.frame_uniforms(cache, renderer);
+  CHECK(static_cast<i64>(w.Program) == objects.adopt<Program>(program) && static_cast<i64>(w.Frames) == 2 && static_cast<i64>(w.Cache) == objects.adopt<UniformCache>(cache));
+  Engine engine(renderer);
+  CHECK(a.start(engine) && static_cast<i64>(r.Engine) == objects.adopt<Engine>(engine));
+  Frame f;
+  f.time = 1.5, f.dt = 0.25f, f.index = 3;
+  a.update(engine, f);
+  f.time = 2.0;
+  a.update(engine, f);
+  CHECK(static_cast<i64>(r.Updates) == 2 && r.Last == 2.0 && !r.Stopped);
+  a.resized(engine);
+  CHECK(a.extensions().empty() && !a.configure().shadows);  // (App's own)
+  a.stop(engine);
+  CHECK(r.Stopped);
+  // without the engine's objects (a class a test holds): the handles it is handed are the adapter's own
+  implements_probe::Water alone;
+  const auto other = logic::implementation(alone);
+  other->bind(program);
+  CHECK(static_cast<i64>(alone.Program) != 0);
+  objects.clear();
+}
+
 // The Blueprints a logic runs, as a Blueprint sees them (engine.game.blueprints_running): each one's name, how it runs, how
 // many functions and nodes its graph has, whether it stopped - in the order the logic runs them; through the door the same.
 TEST(engine_blueprints_running) {
@@ -12191,7 +12303,8 @@ TEST(studio_logic_implements) {
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
   bool missing = false;
-  for (const json::Value& i : f.cmd(R"({"cmd":"logicCompile"})")["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
+  const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
   CHECK(missing);
   CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"net_Transport"})")["ok"].as_bool() && !f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
