@@ -62,6 +62,14 @@ sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
 while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
+# SC_BELEG=<file> (the CI's input "beleg": the proof of one lowering in the form "two builds", tests/lowered/BELEGE.md):
+# only what its two programs need - the engine and test_main.cpp - and only that driver, tests/lowered/builds/<file>/.
+beleg="${SC_BELEG:-}"
+if [ -n "$beleg" ]; then
+  [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
+  keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
+  sources=("${keep[@]}")
+fi
 flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests" -I"$out/base")
 # The old programs the differential tests of tests/lowered compare with (tools/source_diff.py): for every commit a
@@ -70,7 +78,7 @@ flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
 # take from what they use. The old program registers nothing at static initialization (the jobs are the
 # program's that stands).
 base_libs=()
-for b in $(cat "$here"/lowered/test_*.cpp 2>/dev/null | sed -n 's|^// base: \([0-9a-f]\{40\}\)$|\1|p' | sort -u); do
+for b in $([ -n "$beleg" ] || cat "$here"/lowered/test_*.cpp 2>/dev/null | sed -n 's|^// base: \([0-9a-f]\{40\}\)$|\1|p' | sort -u); do
   ns="sc_base_${b:0:12}" dir="$out/base/sc_base_${b:0:12}"
   if [ ! -d "$dir" ]; then
     rm -rf "$dir.part" && mkdir -p "$dir.part"
@@ -106,7 +114,7 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"' _ {} "${flags[@]}"
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
-"$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" "${base_libs[@]}" -lm -o "$out/spawncity_tests"
+[ -n "$beleg" ] || "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" "${base_libs[@]}" -lm -o "$out/spawncity_tests"
 # SC_TEST_BUILD_ONLY=1 (the CI: one job builds, the jobs of the tests take its objects - SC_TEST_OUT - and only link): stop here.
 [ "${SC_TEST_BUILD_ONLY:-}" = 1 ] && { echo "built $out/spawncity_tests"; exit 0; }
 # SC_TEST_SHARD=k/n (the CI: n jobs): this job runs the k-th of every n tests, in both passes; the steps after the
@@ -121,11 +129,11 @@ case "$pass" in "" | 1 | 2) ;; *) echo "FAIL SC_TEST_PASS=$pass (1 or 2)"; exit 
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
 # (up to KERN_JOBS tests at once, else as many as there are cores - test_main.cpp; each in its own process, its lines as one piece in the order of the tests)
 rc=0
-[ "$pass" = 2 ] || "$out/spawncity_tests" "$@" || rc=1
+[ "$pass" = 2 ] || [ -n "$beleg" ] || "$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
-if [ $# -eq 0 ] && [ "$pass" != 1 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
+if [ $# -eq 0 ] && [ "$pass" != 1 ] && [ -z "$beleg" ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The differential tests in the form "two builds" (tools/source_diff.py; tests/lowered/builds/<file>/): each side is the
 # whole program in its state - the old tree (the game's sources as they stood at the test's base: these sources with
 # old/ put over them and the files named in gone taken away) and the sources as they stand -, the engine and the level
@@ -137,6 +145,7 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
   bdir="$(dirname "$drv")" stem="$(basename "$bdir")" name="lowered_$(basename "$bdir" | sed 's/[^A-Za-z0-9_]/_/g')_cpp"
   want=0; [ $# -eq 0 ] && want=1
   for a in "$@"; do case "$name" in *"$a"*) want=1 ;; esac; done
+  [ -n "$beleg" ] && { [ "$stem" = "$beleg" ] && want=1 || want=0; }
   [ "$want" = 1 ] && [ "$pass" != 2 ] && [ "$whole" = 1 ] || continue
   bout="$out/builds/$stem"; tree="$bout/tree/src"
   rm -rf "$bout/tree" && mkdir -p "$bout/tree"
@@ -182,6 +191,7 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
   SC_LOWERED_BUILDS="check:$bout/record" "$bout/new" --name "$name" || builds_rc=1
 done
 [ "$builds_rc" = 0 ] || rc=1
+[ -n "$beleg" ] && { echo "beleg $beleg: rc=$rc"; exit "$rc"; }
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
