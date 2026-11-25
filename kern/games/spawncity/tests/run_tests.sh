@@ -182,6 +182,16 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
       printf '%s\n' "${jobs_src[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c 'src="${1%%|*}" o="${1#*|}"; shift; "$cxx" "$@" -c "$src" -o "$o"' _ {} "${sf[@]}"
     fi
     dobj="$bout/driver-$side.o"
+    within="$(sed -n '1,12s#^// within: \([^ ]*\).*#\1#p' "$drv")"
+    if [ -n "$within" ]; then
+      # (a test within its file - it reaches the variables of the file: the file's text with the test appended is the
+      # object of that file, on each side; the test is no object of its own)
+      k=0; for f in "$t"/*.cpp; do [ "$(basename "$f")" = main.cpp ] && continue; [ "$(basename "$f")" = "$within" ] && objs[$k]="$dobj"; k=$((k + 1)); done
+      printf '#include "%s"\n#include "%s"\n' "$t/$within" "$d" > "$bout/within-$side.cpp"
+      "$cxx" "${sf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
+      "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "${objects[@]}" -lm -o "$bout/$side"
+      continue
+    fi
     "$cxx" "${sf[@]}" -c "$d" -o "$dobj"
     "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "$dobj" "${objects[@]}" -lm -o "$bout/$side"
   done

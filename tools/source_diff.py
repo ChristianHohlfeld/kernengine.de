@@ -1835,10 +1835,23 @@ class BuildsWriter(Writer):
                 raise Stop(f"{o.label()}: only its own file can call it - the form \"two builds\" calls what the program's other files can call")
         for label in covered:
             pass   # (a gone helper is compared through its callers, which are compared here)
-        users = m.old.users()
+        # the variables of the file a compared function reads or changes (itself or through what it calls in the file): the
+        # test is then compiled within the file (appended to its text, "// within:"), where it reaches them - each drawn
+        # before every call, alike on both sides, and compared after it. Each is the same variable in the new text (one
+        # that became a field of a struct is the state made explicit - not this form).
+        users, new_users = m.old.users(), m.new.users()
+        used = set()
         for o, n, e in tested:
-            if users.get(o.node["id"]):
-                raise Stop(f"{o.label()} uses the variables of the file ({', '.join(sorted(users[o.node['id']]))}): the form \"two builds\" does not reach them yet")
+            used |= set(users.get(o.node["id"], ())) | set(new_users.get(n.node["id"], ()))
+        old_state, new_state = dict(m.old.state()), dict(m.new.state())
+        self.within = []
+        for q in sorted(used):
+            if q not in old_state or q not in new_state:
+                raise Stop(f"the variable {q} of the file is not in both texts: the form \"two builds\" compares a variable with itself")
+            t_old, t_new = self.field_type(old_state[q]), self.field_type(new_state[q])
+            if plain(t_old) != plain(t_new):
+                raise Stop(f"the variable {q} of the file has another type in the old text ({t_old} -> {t_new})")
+            self.within.append((q, t_new))
         if any(True for _ in m.old.actors()) or any(self.logic_param(t) for o, n, _ in tested for _, t, _ in o.params + n.params):
             raise Stop("the file binds Blueprints of actors: the form \"two builds\" does not run a logic for them yet")
         self.reached = {}       # qualified name -> (side "sc"/"kern", record) of the classes the test draws or writes
@@ -1848,6 +1861,7 @@ class BuildsWriter(Writer):
             if n.owner:
                 roots.append(n.owner)
             roots += [t for _, t, _ in n.params] + [t for _, _, t in n.params] + [n.ret or ""]
+        roots += [t for _, t in self.within]
         self.reach(roots)
         self.check_same()
         text = self.driver(tested)
@@ -1922,6 +1936,8 @@ class BuildsWriter(Writer):
             dd = node.get("definitionData") or {}
             fields = [c for c in kids(node) if c.get("kind") == "FieldDecl"]
             return bool(dd.get("isAggregate")) and not node.get("bases") and bool(fields) and node.get("tagUsed") != "class"
+        if getattr(self, "within", None) and os.path.abspath(node.get("_file") or "?") == os.path.abspath(self.m.src):
+            return True   # (a class of the file itself: the test is compiled within the file)
         return (node.get("_file") or "").endswith((".h", ".hpp"))
 
     def fields_of(self, q, depth=0):
@@ -1999,6 +2015,8 @@ class BuildsWriter(Writer):
                f"// as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed",
                "// function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.",
                f"// base: {m.base}"]
+        if self.within:
+            out.append(f"// within: {os.path.basename(m.src)} (appended to its text on each side: the test reaches the variables of the file)")
         out += [f'#include "{h}"' for h in sorted(headers)]
         out += ['#include "../../../source_diff.h"', ""]
         # the fields, as C++ lets an explicit instantiation reach them (what a class keeps to itself too)
@@ -2074,6 +2092,9 @@ class BuildsWriter(Writer):
             args.append(f"a{k}.get()")
             if re.search(r"&\s*$", t) and not re.match(r"^const\b", t.strip()):
                 writes.append((f"its parameter {pn}", f"a{k}.v"))
+        for q, t in self.within:
+            inner.append(f"::sc::lowered::draw(draw, ::{q});")
+            writes.append((f"the variable {q} of the file", f"::{q}"))
         a = ", ".join(args)
         ret = n.ret and plain(n.ret) != "void" and n.kind not in ("CXXConstructorDecl", "CXXDestructorDecl")
         if n.kind == "CXXDestructorDecl":
