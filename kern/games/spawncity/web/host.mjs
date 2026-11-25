@@ -162,7 +162,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const px = g.getImageData(0, 0, bitmap.width, bitmap.height).data;
       const ptr = e.kern_alloc(px.length);
       new Uint8Array(kern.memory.buffer, ptr, px.length).set(px);
-      e.sc_dem_data(z, x, y, ptr, bitmap.width, bitmap.height);
+      e.sc_dem_data(z, x, y, ptr, px.length, bitmap.width, bitmap.height);
       e.kern_free(ptr);
       dem.done++;
     } catch (error) {
@@ -187,7 +187,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
       const px = g.getImageData(0, 0, 64, 64).data;
       const ptr = e.kern_alloc(px.length);
       new Uint8Array(kern.memory.buffer, ptr, px.length).set(px);
-      e.sc_image_data(z, x, y, ptr, 64, 64);
+      e.sc_image_data(z, x, y, ptr, px.length, 64, 64);
       e.kern_free(ptr);
     } catch (error) {
       e.sc_image_failed?.(z, x, y);  // the ground keeps its fallback colour
