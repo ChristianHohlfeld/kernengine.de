@@ -71,9 +71,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # (the old tree: git archive of the driver's base)
+      - name: Drivers
+        # ("gen:<base> src/a.cpp ...": the drivers are written here, tools/source_diff.py --builds against <base>, then all run)
+        if: ${{ startsWith(inputs.beleg, 'gen:') }}
+        env:
+          GEN: ${{ inputs.beleg }}
+        run: |
+          set -- ${GEN#gen:}; base="$1"; shift
+          cd kern/games/spawncity
+          rm -rf tests/lowered/builds   # (a driver the tree held is of another state: only those written here)
+          for f in "$@"; do
+            python3 ../../../tools/source_diff.py --builds --base "$base" --test tests/lowered -I../../include -I../../third_party/box3d/include -Isrc -- "$f" 2>&1 | grep -v '^    the same: ' || true
+          done
+          ls tests/lowered/builds/*/builds_*.cpp 2>/dev/null || { echo "FAIL no driver"; exit 1; }
       - name: Two builds
         env:
-          SC_BELEG: ${{ inputs.beleg }}
+          SC_BELEG: ${{ startsWith(inputs.beleg, 'gen:') && 'all' || inputs.beleg }}
           SC_TEST_OUT: /home/runner/sc-tests
           KERN_JOBS: 4
         run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
