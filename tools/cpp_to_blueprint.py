@@ -11367,6 +11367,9 @@ class Held:
         self.templates = {}
         self.freed = {}         # a method that does not use its object, of a class the Blueprint does not have -> (its name as a function, its head, where its body begins)
         self.foreign = collections.OrderedDict()   # what stands in other source files and not here: its place there -> the piece (TestWriter.exports), in their order
+        self.refer = False      # (gathering for exports: a function of another file is named by its key, not taken - see take)
+        self.refs = []          # those keys, in the order they are met: ("@ref", key, the part its body is converted with)
+        self.keys = set()       # the keys of the functions of other files taken (or named)
         self.wanted = set()     # the places of all pieces of other files' tests that are taken
         self.kept = set()       # methods declared in their class here whose body is a piece of another file
         self.declared = {}      # functions declared here whose body is a piece of another file: id -> the declaration
@@ -13203,7 +13206,7 @@ class TestWriter:
             self.unguarded = self.guard_all([*(f.decl for f in u.order if not f.lifted), *self.whole.functions.values()])
         return self.whole
 
-    def gather(self, roots, classes=()):
+    def gather(self, roots, classes=(), refer=False):
         """What the source of the functions `roots` (their declarations' ids) and of the classes `classes`
         names, gathered: all a test must hold to compile it. (Nothing else of the program is in reach of the
         test's source: what it names and the test does not hold does not compile - it can not fall back on
@@ -13214,6 +13217,7 @@ class TestWriter:
         vectors = (ENGINE + "::Vec3", ENGINE + "::Vec2")
         converted = self.converted
         G = Held()
+        G.refer = refer
         todo, seen_types = [], set()
         in_value = [False]   # (scanning a value of the engine's logic: an object of it there is a part of that value)
         def want_record(q):
@@ -13355,13 +13359,35 @@ class TestWriter:
             decl = tree.decl.get(i)
             if decl is None or decl.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
-            if function_key(tree, decl) not in self.closures:
+            key = function_key(tree, decl)
+            if G.refer:
+                # (for exports: named by its key, taken where a test takes this one - the export of a function is then its
+                # own file's source alone, whatever the tests of other files hand on: in a circle of functions over files
+                # (A calls B, B calls A) no export holds a copy of another's from the round before, and the rounds settle)
+                if key not in G.keys:
+                    G.keys.add(key)
+                    G.refs.append(("@ref", key, u.world.part_of_function(tree, decl)))
+                return
+            if key not in self.closures:
                 # (the Blueprint whose file it stands in has not handed it on - it is none this one calls, only its test
                 # holds it: a destructor runs what it calls where a value ends. That Blueprint is one this one needs: main)
                 part = u.world.part_of_function(tree, decl)
                 if part is not None and part != u.name:
-                    u.missing.add((part, function_key(tree, decl)))
-            for place in self.closures.get(function_key(tree, decl), ()):
+                    u.missing.add((part, key))
+            take_key(key)
+        def take_key(key):
+            """The pieces of a function of another file, as its file's test hands them on - and, transitively, of the
+            functions of other files those name by their keys."""
+            if key in G.keys:
+                return
+            G.keys.add(key)
+            for place in self.closures.get(key, ()):
+                if isinstance(place, tuple) and place and place[0] == "@ref":
+                    _, other, part = place
+                    if other not in self.closures and part is not None and part != u.name:
+                        u.missing.add((part, other))
+                    take_key(other)
+                    continue
                 if place in G.wanted:
                     continue
                 G.wanted.add(place)
@@ -13688,19 +13714,35 @@ class TestWriter:
     def exports(self, known=()):
         """The test of a file that calls a function of this Blueprint holds that function's source once more,
         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
-        function of the Blueprint that is written and has a name the linker knows: the places of the pieces
-        its test holds, in the order they must stand ({key: [place]}), and the pieces by their places
-        ({place: piece}) - main hands them on to the Blueprints that call these, after this one, and they
-        hand on what they took along with their own."""
+        function of the Blueprint that has a name the linker knows - written or not: its source is what it is, and
+        in a circle of functions over files the test of each needs the other's source before either Blueprint is
+        written -: the places of the pieces its test holds of this file, in the order they must stand, after the
+        keys of the functions of other files it names ({key: [("@ref", key, part)..., place...]}), and the pieces by
+        their places ({place: piece}) - main hands them on to the Blueprints that call these, after this one; a test
+        that takes a function takes what it names by key from those keys' own exports (gather, take_key). An export
+        holds no piece of another file's export: it is the same whatever the other files' tests hand on."""
         self.setup()
         closures, pieces = {}, {}
-        for f in self.u.order:
-            if f.lifted or not f.key or "@" in f.key:
+        listed = {id(f) for f in self.u.order}
+        every = [*self.u.order, *(f for f in getattr(self.u, "all", ()) if id(f) not in listed)]
+        for f in every:
+            if f.lifted or not f.key or "@" in f.key or f.key in closures:
                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
             if f.key in known:
                 continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
-            order = []
-            for place, piece in self.items(self.gather([f.decl["id"]])):
+            if id(f) not in listed and f.decl.get("id") not in self.tree.body and f.decl.get("id") not in self.tree.template_of:
+                continue   # (one whose body this file does not hold: its own file hands it on)
+            if id(f) not in listed and not (f.wait or "").startswith("its test cannot compare it yet"):
+                continue   # (of those not written, the ones only their test holds back: a Blueprint is written of their source)
+            try:
+                G = self.gather([f.decl["id"]], refer=True)
+                held = self.items(G)
+            except Wait:
+                if id(f) in listed:
+                    raise
+                continue   # (what its source names a test can not hold: no other test can take it either)
+            order = list(G.refs)   # (first what it names of other files - their pieces stand before its own)
+            for place, piece in held:
                 pieces.setdefault(place, piece)
                 order.append(place)
             closures[f.key] = order
@@ -13743,7 +13785,7 @@ class TestWriter:
             owner = tree.owner.get(d["id"]) or next((tree.owner[x["id"]] for x in before if x["id"] in tree.owner), None)
             return any(not here(x) for x in before) or (owner is not None and not here(tree.records.get(owner, {})))
         def own(d):   # (of this file alone - not the definition of what a header declares: a function, or a variable `extern i32 kGates;`)
-            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
+            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
         def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
