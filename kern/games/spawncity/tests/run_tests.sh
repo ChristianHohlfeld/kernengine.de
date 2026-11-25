@@ -189,7 +189,10 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
       # object of that file, on each side; the test is no object of its own)
       k=0; for f in "$t"/*.cpp; do [ "$(basename "$f")" = main.cpp ] && continue; [ "$(basename "$f")" = "$within" ] && objs[$k]="$dobj"; k=$((k + 1)); done
       printf '#include "%s"\n#include "%s"\n' "$t/$within" "$d" > "$bout/within-$side.cpp"
-      "$cxx" "${sf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
+      # (main.cpp is no source the tests link: within it, the test is one more object, and its kern_create_app - the
+      # tests' own is in test_main.cpp - goes by another name)
+      wf=(); [ "$within" = main.cpp ] && { wf=(-Dkern_create_app=sc_lowered_kern_create_app); objs+=("$dobj"); }
+      "$cxx" "${sf[@]}" "${wf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
       "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "${objects[@]}" -lm -o "$bout/$side"
       continue
     fi
