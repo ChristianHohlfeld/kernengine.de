@@ -348,7 +348,7 @@ void Game::drone_attack(bool trigger, bool pressed) {
     // the original's HUD (flight_fire_fx.mjs): an impact mark, the crosshair's hit confirm on a target
     if (e.impact) ctl_.impacts[ctl_.impact_serial++ % 8] = e.to;
     if (e.surface >= 2) ++ctl_.drone_hits;
-    world_->play_sound(combat_sfx(combat_audio::Kind::shot), nose, 0.55f, 1.35f, true);
+    world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::shot), nose, 0.55f, 1.35f, true);
     osfx("flight_fire_fx.fire", e.to, e.impact ? hit_material(e.to, e.surface, shot_flesh_) : 0);  // shotSound + playShotBody(1) + playImpactSound(materialKind)
   } else if (pressed && drone_weapon_ == 2) {
     guided_press();  // lock on what is nearest the crosshair and launch (game_guided.cpp)
