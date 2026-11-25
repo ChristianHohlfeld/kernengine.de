@@ -40,6 +40,7 @@ jobs:
       - name: Convert
         env:
           SOURCES: ${{ inputs.probe }}
+          WHY: 'read_input|ctl_discrete|ctl_view_json|look_draw|vr_comfort|look_view_models|look_command|ui_command|ui_gps_update|ui_apply_settings|ui_reset|ui_mix_audio|vr_foot|ctl_hud_json|ctl_command|ui_update'
         run: |
           W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts"
           cp kern/games/spawncity/tests/*.h "$W/pt/"; cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"
