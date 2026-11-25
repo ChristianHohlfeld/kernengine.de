@@ -51,4 +51,9 @@ const char* WaterLook::fragment_surface() const {
 void WaterLook::bind(const kern::Program& p) { u_time_ = p.location("uWaterTime"); }
 void WaterLook::frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) { cache.set_float(u_time_, time); }
 
+WaterLook& water_look() {
+  static WaterLook one;
+  return one;
+}
+
 }  // namespace sc
