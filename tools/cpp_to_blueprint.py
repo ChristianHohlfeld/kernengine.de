@@ -12669,6 +12669,7 @@ class TestWriter:
         """The guards of all the functions the test holds the source of (a function with a place the test
         cannot guard: said, by its declaration's id - see `write`)."""
         self.edits, unguarded, done = {}, {}, set()
+        guarded = []   # (file, place, guards) of each function
         self.kept = {}
         for d in self.held(decls):
             if d["id"] in done:
@@ -12677,9 +12678,13 @@ class TestWriter:
             self.edits.setdefault(d["_file"], []).extend(self.kept_edits(d))
             try:
                 file, edits = self.guard(d)
-                self.edits.setdefault(file, []).extend(edits)
+                guarded.append((file, d.get("_at") or (None, None), edits))
             except Wait as w:
                 unguarded[d["id"]] = str(w)
+        for file, (a, b), edits in guarded:
+            if a is not None and any(f == file and x is not None and x <= a and b <= y and (x, y) != (a, b) for f, (x, y), _ in guarded):
+                continue   # (a method of a class in a function - its guards are the function's: once, or what it puts in stands twice)
+            self.edits.setdefault(file, []).extend(edits)
         for file, edits in self.edits.items():
             self.edits[file] = self.in_turn(edits)
         return unguarded
