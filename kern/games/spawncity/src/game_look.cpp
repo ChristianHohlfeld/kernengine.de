@@ -299,8 +299,8 @@ void Game::look_lighting(f32 dt) {
   night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, lighting, sky);
   r.set_lighting(lighting);
   r.set_sky(sky);
-  windows_.night = night_;
-  water_look_.time = static_cast<f32>(world_->sim_time());  // world_water.mjs uTime
+  facades().set_night(night_);  // (the lit windows: facades.h)
+  water_look().set_time(static_cast<f32>(world_->sim_time()));  // world_water.mjs uTime
   // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
   r.set_shadow_distance(L.software ? 0.0f : kTier[L.gov.tier()].shadow_m);
   const f32 now = static_cast<f32>(time_);

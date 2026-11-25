@@ -2973,7 +2973,9 @@ class Unit:
         if f.wait:
             if (self.world.table.get(key) or {}).get("wait"):
                 self.asked.add(key)   # (it waits where it stands: should it be written later, this Blueprint is converted again - main)
-            raise Wait(f.wait if f.open else f"it calls {f.cpp}(), which waits")
+            # (its own reason stays with it: passed on as it is, a reason would go round a circle of parts and outlive
+            # its cause - the caller waits because the function waits, and leans on it where they are in a circle)
+            raise Wait(f"it calls {f.cpp}(), which waits")
         if getattr(f, "leans", False) and self.converting:
             self.asked.add(key)
             for g in self.converting:
@@ -5127,7 +5129,9 @@ class Emit:
         """A change of a list or map whose entries end something (Unit.held_life) that the Blueprint does as C++
         does: erase() and pop_back() end the entry they take out, there (ended_entry) - a std::vector moves the
         ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
-        ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
+        ends its entries from the last to the first (kern/core/map.h), clear() of a std::vector from the first
+        to the last (the order its destructor has - ended_many: libstdc++'s _M_erase_at_end, std::_Destroy);
+        push_back(std::move(x)) and
         emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
         and nothing ends; emplace(key, std::move(x)) and try_emplace(key, std::move(x)) of a kern::Map take x into
         the key's new entry - only where the key is new: where it is there, nothing changes and x keeps what it
@@ -5138,7 +5142,7 @@ class Emit:
         if name in ("erase", "pop_back"):
             return name == "pop_back" or len(args) == 1
         if name == "clear":
-            return bool(KEYED_KERN.match(c))
+            return bool(KEYED_KERN.match(c) or re.match(r"std::vector<", c)) and not args
         if name in ("emplace", "try_emplace") and len(args) == 2 and KEYED_KERN.match(c):
             return self.moved_value(args[1])
         if name in ("push_back", "emplace_back") and len(args) == 1:
@@ -5208,12 +5212,13 @@ class Emit:
         return steps + self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};",
                                                               *self.ended_entry(h, f"{place}[{at}]", et)])
 
-    def entries_ended(self, h, kind, row, lv):
-        """The steps that end every entry of a list or map at `lv`, from the last to the first."""
+    def entries_ended(self, h, kind, row, lv, forward=False):
+        """The steps that end every entry of a list or map at `lv`, from the last to the first (forward: from the
+        first to the last)."""
         count, at = self.temp("count", "Int"), self.temp("at", "Int")
         last = self.whole_math("-", count, "1")
         return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
-                *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
+                *self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     @staticmethod
     def goes_to(n, label):
@@ -6836,6 +6841,9 @@ class Emit:
                 return []
             if self.on_actor(n) is not None:
                 return self.call_on(n, self.on_actor(n))
+            if self.other_state(n) is not None:
+                got = self.state_call(n)
+                return got if isinstance(got, list) else []   # (what it gives, unread: the call stands before the statement - hoist)
             if self.actor_bind(n) is not None:
                 self.has_blueprint(n, self.actor_bind(n))   # (what it gives is not used: binding is the Blueprint's own, nothing to do)
                 return []
@@ -6889,7 +6897,9 @@ class Emit:
                     # (the entry made of the arguments where it is added, as T(args...) makes it)
                     return before + [f"list_add({lv}, {self.make(it, args)});"] + after
                 if name == "clear":
-                    return before + [f"list_clear({lv});"] + after
+                    h = self.entry_life(self.ctype(base))
+                    ends = self.entries_ended(h, "list", it, lv, forward=True) if h is not None else []   # (each entry ends, from the first: entries_change)
+                    return before + ends + [f"list_clear({lv});"] + after
                 if name == "pop_back":
                     h = self.entry_life(self.ctype(base))
                     if h is not None:   # (the last entry ends)
@@ -7490,6 +7500,36 @@ class Emit:
         if b.get("kind") != "DeclRefExpr" or b.get("referencedDecl", {}).get("id") not in self.logic_params:
             raise Wait("a logic handed on that is not the one the function was given (a Blueprint runs in its own)")
 
+    def other_state(self, n):
+        """A call of a method of the one object of another class of the program that is the state of a Blueprint
+        (`sc::game().start(e)` in SpawnCityApp, whose Blueprint is another): (its Blueprint - an actor of the level -,
+        the method's function there); else None. (Its one object is that Blueprint: reached by its name, Call on Actor.)"""
+        if n.get("kind") != "CXXMemberCallExpr":
+            return None
+        m = callee(n)
+        d = self.tree.decl.get(m.get("referencedMemberDecl"))
+        owner = self.tree.owner.get(d["id"]) if d is not None else None
+        if owner is None or owner not in self.u.world.states or owner == self.u.state:
+            return None
+        return self.u.world.states[owner], d
+
+    def state_call(self, n, gives_type=None):
+        """A method of another state's one object, called (other_state): Call on Actor on its Blueprint, which has the
+        method as its function of the same name - each argument a value the call hands over (a reference has no way
+        to another Blueprint), what it returns the value of the call."""
+        actor, d = self.other_state(n)
+        g = self.u.function(d["id"])
+        if g.self_type is not None or any(g.kinds):
+            raise Wait(f"a reference handed to the Blueprint {actor} (Call on Actor hands values over)")
+        function = g.name.split("::")[-1]
+        values = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
+        if len(values) != len(kids(n)[1:]):
+            raise Wait(f"a call of {function} on the Blueprint {actor} that leaves an argument to its default")
+        t = self.tp(n) if g.result is not None else None
+        if g.result is None:
+            return self.call_on_actor(actor, function, values, [], None, state=True)
+        return self.call_on_actor(actor, function, values, [None], gives_type or t, state=True)
+
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
         is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
@@ -7578,6 +7618,14 @@ class Emit:
                 raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
             places, values = kids(outs)[1:], args[2:]
         function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        return self.call_on_actor(actor, function, values, places, gives_type)
+
+    def call_on_actor(self, actor, function, values, places, gives_type=None, state=False):
+        """Call on Actor: the function `function` of the Blueprint of the actor `actor` runs with `values` - what it gives
+        goes to `places` (None: the value of the call, of type gives_type). `state`: the actor's Blueprint is the state
+        of a class of the program (another one than this Blueprint's - state_call); its function is called as the
+        program calls the method."""
+        u = self.u
         target = u.world.actors.get(actor)
         if target is None:
             raise Wait(f"a call on the Blueprint of the actor {actor}, which the level does not have")
@@ -7621,6 +7669,8 @@ class Emit:
         elif held[:2] != pins:
             raise Wait(f"two calls of {function} on the Blueprint of the actor {actor} with other values (a Blueprint says once what a function of another one looks like)")
         texts = [self.ex(a, t) for a, t in zip(values, in_types)]
+        if state and not gives and gives_type:
+            raise Wait(f"a call of {function} on the Blueprint {actor} as a value, where it gives nothing")
         self.f.pure = False   # (a step: what the other Blueprint does is not known here)
         self.f.on_actors.append((actor, function))
         node = u.next_node
@@ -8611,6 +8661,24 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: insert() at a place of another list")
+            if len(args) == 3 and self.text_range(args[1], args[2]) is not None:
+                # v.insert(at, text.begin(), text.end()): the bytes of a text, each as the list's entry type holds a
+                # char (char_of) - at the end in one go (one request for memory at most, as in C++): the list that
+                # much longer (Set Length), then each byte set where it stands
+                text = self.text_range(args[1], args[2])
+                byte = lambda i: self.char_of(text, i, self.entry_cpp(base))
+                e = self.unwrap(args[0])
+                while e.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(e)) == 1:
+                    e = self.unwrap(kids(e)[0])   # (v.end() made a const_iterator)
+                a, b = self.temp("first", "Int"), self.temp("last", "Int")
+                lines = [f"{a} = 0;", f"{b} = {self.whole_math('-', f'text_length({text})', '1')};"]
+                if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") in ("end", "cend"):
+                    n0 = self.temp("length", "Int")
+                    lines += [f"{n0} = list_length<{it}>({lv});",
+                              f"list_resize({lv}, {self.whole_math('+', n0, f'text_length({text})')}, {self.u.zero(it)});"]
+                    return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, i)}] = {byte(i)};"])
+                p = self.temp("place", "Int")
+                return [f"{p} = {at};"] + lines + self.count_loop(a, b, lambda i: [f"list_insert({lv}, {self.whole_math('+', p, i)}, {byte(i)});"])
             end = "end" in callee(self.unwrap(args[0])).get("name", "") if self.unwrap(args[0]).get("kind") == "CXXMemberCallExpr" else False
             lines = []
             if not end:
@@ -11320,6 +11388,11 @@ class Emit:
             return self.has_blueprint(b, self.actor_bind(b))
         if self.actor_value(b) is not None:
             return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
+        if self.other_state(b) is not None:
+            got = self.state_call(b)
+            if isinstance(got, list):
+                raise Wait("a call on the Blueprint of another state that gives nothing, as a value")
+            return got
         d = self.engine_decl(m.get("referencedMemberDecl"))
         if d is not None:
             return self.engine_value(d, base, kids(b)[1:])

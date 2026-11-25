@@ -565,7 +565,7 @@ std::vector<u8> buildings_input(const kern::FootprintStream& footprints, const k
   for (const auto& c : o.style.roofs) rgb(c);
   rgb(o.style.trim);
   wire::put_f64(b, o.style.trim_mix);
-  std::vector<f64> stream(footprints.data(), footprints.data() + footprints.size());
+  std::vector<f64> stream(footprints.values());
   put_array_f64(b, stream);
   return b;
 }

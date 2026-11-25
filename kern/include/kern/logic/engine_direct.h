@@ -37,6 +37,24 @@
 #include "kern/logic/engine_host.h"
 #include "kern/logic/nodes.h"
 
+namespace kern {
+/// A Blueprint that is the object of an interface of the engine (Graph::implements; kern/docs/blueprint_cpp.md,
+/// "Schnittstellen der Engine") names it as its last base - the engine calls its functions of the interface's names:
+///   struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> { ... Text vertex() { ... } ... };
+/// kern::logic::implementation(blueprint) makes the engine's object of a Blueprint's class (engine_nodes.gen.h).
+template <Setting Interface> struct Implements {};
+}  // namespace kern
+
+namespace kern::logic::engine_direct {
+/// The class a pointer to a member names (its own: `&B::f` of a function B has from a base names the base).
+template <class M> struct MemberOf {};
+template <class R, class C> struct MemberOf<R C::*> { using type = C; };
+/// The adapter of an interface for a Blueprint's class (engine_nodes.gen.h writes one per interface: `template <class B>
+/// using adapter = ...`).
+template <Setting Interface> struct InterfaceOf;
+template <Setting S> InterfaceOf<S> interface_of(const ::kern::Implements<S>&);
+}  // namespace kern::logic::engine_direct
+
 namespace kern::logic::engine_values {
 
 /// A value of the Blueprint type `Tag` (the tags of engine_host.h) between the C++ type B a
