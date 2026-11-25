@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../src/blueprint_call.h"
+#include "../src/combat_rules.h"   // (the game reading the rule actors' tables: Game, C++ until the program runs from the level)
 #include "level_blueprints.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
@@ -31,6 +32,11 @@ SC_TEST(combat_military_escalation) {
     SC_CHECK(bp && !bp->disabled(), "the combat rule Blueprint %s of the level compiles and runs: %s", name, rules.rules.problems.c_str());
     SC_CHECK(bp && std::string(bp->tier()) == "native C++", "it runs as its C++ class");
   }
+  // (runs on C++ until the switch: bind_military ... bind_race are functions of Game - then Game, the level's Blueprint, is tested)
+  kern::logic::Runtime& rt = rules.rules.rt;
+  SC_CHECK(sc::combat::bind_military(rt) && sc::combat::bind_zombies(rt) && sc::combat::bind_sandbox(rt) && sc::combat::bind_fun(rt) && sc::combat::bind_race(rt),
+           "the game reads their tables");
+  for (bool (*unbind)(kern::logic::Runtime&) : {&sc::combat::bind_military, &sc::combat::bind_zombies, &sc::combat::bind_sandbox, &sc::combat::bind_fun, &sc::combat::bind_race}) unbind(no_logic());
   SC_CHECK(rules.bound, "combat_rules_cpp runs as its class");
   if (!rules.bound) return;
   Cr& cr = *rules;
