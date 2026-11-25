@@ -7548,7 +7548,42 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 };
 }  // namespace implements_probe
 
+namespace implements_probe {
+struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+  // ---- types ----
+  KERN_STRUCT(net_Address) {
+    Int64 id = Int64{0x0};
+  };
+
+  // ---- variables ----
+  net_Address Last = net_Address{Int64{0x0}};
+  Int Bytes = 0;
+  Int Sent = 0;
+
+  // ---- functions ----
+  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  KERN_PURE addressResult address() {
+    return {net_Address{Int64{0x7}}};
+  }
+
+  struct sendResult { Bool result = false; };
+  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+    Last = to;
+    Bytes = bytes;
+    Sent = list_length<U8>(data);
+    return {true};
+  }
+
+  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
+  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+    return {Bytes, Last, List<Int>{1, 2, 3}};
+  }
+};
+}  // namespace implements_probe
+
 namespace kern::logic::detail {
+template <>
+struct Held<implements_probe::Loop::net_Address> : HeldBy<implements_probe::Loop::net_Address, &implements_probe::Loop::net_Address::id> {};
 template <>
 struct Held<implements_probe::Running::Frame> : HeldBy<implements_probe::Running::Frame, &implements_probe::Running::Frame::time, &implements_probe::Running::Frame::dt,
                                                        &implements_probe::Running::Frame::index> {};
@@ -7592,6 +7627,36 @@ TEST(engine_interface_a_class_implements) {
   const auto other = logic::implementation(alone);
   other->bind(program);
   CHECK(static_cast<i64>(alone.Program) != 0);
+  objects.clear();
+}
+
+// A Blueprint as a transport of the engine (net::Transport), on the interpreter and as its class: the numbers the engine
+// hands through a pointer with their count are a list; what the Blueprint gives back for `from` is written through the
+// reference, its list through the pointer - no more than the count beside it says room for.
+TEST(engine_interface_with_pointers) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph loop;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsLoop, loop, nullptr, &error) && loop.implements == "net_Transport" && no_errors(logic::check(loop)));
+  logic::Instance* const inst = rt.add(loop, 13, "Loop");
+  rt.begin();
+  logic::EngineObjects objects;
+  implements_probe::Loop cls;
+  cls.kern_world.engine = &objects;
+  const auto by_class = logic::implementation(cls);
+  net::Transport* const by_name = objects.get<net::Transport>(logic::engine_implement(objects, *inst));
+  CHECK(by_name != nullptr);
+  if (!by_name) return;
+  for (net::Transport* t : {by_name, static_cast<net::Transport*>(by_class.get())}) {
+    CHECK(t->address().id == 7);
+    const u8 bytes[3] = {4, 5, 6};
+    CHECK(t->send(net::Address{9}, bytes, 3));
+    net::Address from{0};
+    u8 room[3] = {0, 0, 0xee};
+    CHECK(t->receive(from, room, 2) == 3 && from.id == 9 && room[0] == 1 && room[1] == 2 && room[2] == 0xee);
+  }
+  CHECK(inst->get("Sent").i == 3 && static_cast<i64>(cls.Sent) == 3 && static_cast<i64>(cls.Bytes) == 3);
   objects.clear();
 }
 

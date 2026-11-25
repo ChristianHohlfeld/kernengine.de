@@ -7,6 +7,7 @@
 // (src/<component>/engine_calls.gen.cpp).
 #pragma once
 
+#include <algorithm>
 #include <initializer_list>
 #include <memory>
 #include <string_view>
@@ -2983,7 +2984,7 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
     }
   }
   decltype(std::declval<kern::ShaderExtension&>().material_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Material const&>(), std::declval<int const*>())) material_uniforms(kern::UniformCache& kern_p0, kern::Material const& kern_p1, int const* kern_p2) override {
-    return kern::ShaderExtension::material_uniforms(kern_p0, kern_p1, kern_p2);   // (the engine cannot hand it to a Blueprint: it is handed a pointer)
+    return kern::ShaderExtension::material_uniforms(kern_p0, kern_p1, kern_p2);   // (the engine cannot hand it to a Blueprint: it is handed a pointer without its count)
   }
 
  private:
@@ -2994,6 +2995,66 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
 };
 template <> struct InterfaceOf<"ShaderExtension"> {
   template <class B> using adapter = ClassImplements_ShaderExtension<B>;
+};
+
+// kern::net::Transport that a Blueprint's class is (kern::Implements<"net_Transport">: kern::logic::implementation)
+template <class B> class ClassImplements_net_Transport final : public kern::net::Transport {
+ public:
+  explicit ClassImplements_net_Transport(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_address = requires { requires std::is_same_v<typename MemberOf<decltype(&X::address)>::type, X>; };
+  template <class X> static constexpr bool kern_has_send = requires { requires std::is_same_v<typename MemberOf<decltype(&X::send)>::type, X>; };
+  template <class X> static constexpr bool kern_has_receive = requires { requires std::is_same_v<typename MemberOf<decltype(&X::receive)>::type, X>; };
+  template <class X> static constexpr bool kern_has_advance_time = requires { requires std::is_same_v<typename MemberOf<decltype(&X::advance_time)>::type, X>; };
+  decltype(std::declval<const kern::net::Transport&>().address()) address() const override {
+    static_assert(kern_has_address<B>, "a Blueprint that implements net_Transport has its function address");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.address();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::net::Transport&>().address())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) send(kern::net::Address kern_p0, unsigned char const* kern_p1, kern::Count<1u> kern_p2) override {
+    static_assert(kern_has_send<B>, "a Blueprint that implements net_Transport has its function send");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.send(::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>, kern::net::Address const&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, ::kern::Span<const unsigned char>>(kern_o, ::kern::Span<const unsigned char>(kern_p1, static_cast<std::size_t>(::kern::logic::engine_values::numbers(kern_p2)))), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Int, kern::Count<1u> const&>(kern_o, kern_p2));
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) receive(kern::net::Address& kern_p0, unsigned char* kern_p1, kern::Count<1u> kern_p2) override {
+    static_assert(kern_has_receive<B>, "a Blueprint that implements net_Transport has its function receive");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_g0, kern_g1, kern_g2] = b_.receive(::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>, kern::net::Address&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Int, kern::Count<1u> const&>(kern_o, kern_p2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(kern_o, kern_g1, kern_p0);
+      std::vector<std::remove_pointer_t<decltype(kern_p1)>> kern_w1;
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(kern_o, kern_g2, kern_w1);
+      std::copy_n(kern_w1.begin(), std::min(kern_w1.size(), static_cast<std::size_t>(::kern::logic::engine_values::numbers(kern_p2))), kern_p1);
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(kern_o, kern_g0, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().advance_time(std::declval<double>())) advance_time(double kern_p0) override {
+    if constexpr (!kern_has_advance_time<B>) {
+      return kern::net::Transport::advance_time(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.advance_time(::kern::logic::engine_values::Given<::kern::logic::engine_values::Float, double const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<"net_Transport"> {
+  template <class B> using adapter = ClassImplements_net_Transport<B>;
 };
 
 }  // namespace engine_direct

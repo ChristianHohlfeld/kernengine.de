@@ -330,16 +330,48 @@ class Calls:
             out.append((q, c2b.type_name_of(q), virtuals, waits))
         return out
 
+    def handed(self, f):
+        """How the adapter hands each argument of the virtual function f to a Blueprint and takes back what it writes
+        there: [(kind, ...)] per parameter, or a text - why it cannot. Kinds: ("handle", class) an object of the engine;
+        ("value", pin) a value; ("list", pin, item type, its count's parameter, per) the numbers a pointer shows, as
+        many as the Count beside it says (`send(to, const u8* data, Count<1> bytes)`); ("both", pin) a value it writes
+        through a reference - handed in, set to what the Blueprint gives as that output (`receive(Address& from, ...)`);
+        ("into", out pin, its count's parameter, per) the numbers the Blueprint gives as that output, written through
+        the pointer - no more than the count says room for (`receive(..., u8* data, Count<1> max_bytes)`)."""
+        params, ptypes, out = f["params"], self.ptypes(f), []
+        names = [pin_in for pin_in, _ in params]
+        for i, ((pin_in, pin_out), P) in enumerate(zip(params, ptypes)):
+            pointer = P.rstrip().endswith("*")
+            if pin_in is None:
+                if pin_out not in f.get("counts", {}):
+                    return "writes through a pointer without its count"
+                out.append(("into", pin_out, names.index(f["counts"][pin_out]), f.get("per", {}).get(pin_out, 1)))
+                continue
+            bt, h = next((bt, h) for n_, bt, h in f["ins"] if n_ == pin_in)
+            if h:
+                if pointer:
+                    return "is handed an object of the engine that may be missing"
+                out.append(("handle", h))
+                continue
+            if pointer:
+                if pin_out is not None or not re.search(r"\bconst\s*\*\s*$|^const\b", P.strip()):
+                    return "writes through a pointer it is handed"
+                per = c2b.count_per(ptypes[i + 1]) if i + 1 < len(ptypes) else None
+                if per is None:
+                    return "is handed a pointer without its count"
+                x = re.sub(r"\s*\bconst\s*\*\s*$|\*\s*$", "", re.sub(r"^const\s+", "", P.strip())).strip()
+                out.append(("list", bt, x, i + 1, per))
+                continue
+            if pin_out is not None:
+                out.append(("both", bt, pin_out))
+                continue
+            out.append(("value", bt))
+        return out
+
     def unhanded(self, f):
         """Why the adapter cannot hand the engine's arguments of the virtual function f to a Blueprint ("": it can)."""
-        for (pin_in, pin_out), P in zip(f["params"], self.ptypes(f)):
-            if pin_in is None or pin_out is not None:
-                return "writes through what it is handed"
-            if P.rstrip().endswith("*"):
-                return "is handed a pointer"
-        if len(f["outs"]) > 1:
-            return "gives more than one value"
-        return ""
+        how = self.handed(f)
+        return how if isinstance(how, str) else ""
 
     def adapter_text(self, q, name, virtuals, need):
         """The engine's object of the interface q that a Blueprint is (engine_host.h, Implementer): each virtual
@@ -357,14 +389,41 @@ class Calls:
             lines.append(f"  {ret} {m}({params}){const} override {{")
             if not pure:
                 lines.append(f'    if (!by_->has("{m}")) return {q}::{m}({", ".join(f"kern_p{k}" for k in range(len(ptypes)))});')
-            args = []
-            for k, ((pin_in, _), P) in enumerate(zip(f["params"], ptypes)):
-                bt, h = next((bt, h) for n_, bt, h in f["ins"] if n_ == pin_in)
-                args.append(f"Value::integer(o_.adopt<{h}>(kern_p{k}))" if h else f"ev::Conv<{self.tag(bt, need)}>::to(o_, kern_p{k})")
+            args, back = [], []
+            outs_at = {o: j for j, (o, _, _) in enumerate(f["outs"])}
+            for k, how in enumerate(self.handed(f)):
+                if how[0] == "handle":
+                    args.append(f"Value::integer(o_.adopt<{how[1]}>(kern_p{k}))")
+                elif how[0] == "value":
+                    args.append(f"ev::Conv<{self.tag(how[1], need)}>::to(o_, kern_p{k})")
+                elif how[0] == "list":
+                    _, bt, x, at, per = how
+                    args.append(f"ev::Conv<{self.tag(bt, need)}>::to(o_, kern::Span<const {x}>(kern_p{k}, static_cast<std::size_t>(ev::numbers(kern_p{at}))))")
+                elif how[0] == "both":
+                    args.append(f"ev::Conv<{self.tag(how[1], need)}>::to(o_, kern_p{k})")
+                    back.append(f"if (kern_given && kern_out.size() > {outs_at[how[2]]}) ev::Conv<{self.tag(how[1], need)}>::from(o_, kern_out[{outs_at[how[2]]}], kern_p{k});")
+                else:   # (into: the numbers the Blueprint gives, no more than the room the count says)
+                    _, o_name, at, per = how
+                    bt = f["outs"][outs_at[o_name]][1]
+                    j = outs_at[o_name]
+                    back += [f"if (kern_given && kern_out.size() > {j}) {{",
+                             f"  std::vector<std::remove_pointer_t<decltype(kern_p{k})>> kern_w;",
+                             f"  ev::Conv<{self.tag(bt, need)}>::from(o_, kern_out[{j}], kern_w);",
+                             f"  std::copy_n(kern_w.begin(), std::min(kern_w.size(), static_cast<std::size_t>(ev::numbers(kern_p{at}))), kern_p{k});",
+                             "}"]
             lines.append(f"    const std::vector<Value> kern_in{{{', '.join(args)}}};" if args else "    const std::vector<Value> kern_in;")
             lines.append("    std::vector<Value> kern_out;")
             if not f["outs"]:
                 lines += [f'    by_->call("{m}", kern_in, kern_out);', "  }"]
+                continue
+            if back:
+                lines.append(f'    const bool kern_given = by_->call("{m}", kern_in, kern_out) && !kern_out.empty();')
+                lines += ["    " + x for x in back]
+                if c2b.qtype(d).split("(")[0].strip() == "void":
+                    lines.append("  }")
+                    continue
+                bt = f["outs"][0][1]
+                lines += [f"    {ret} kern_r = ev::blank<{ret}>();", f"    if (kern_given) ev::Conv<{self.tag(bt, need)}>::from(o_, kern_out[0], kern_r);", "    return kern_r;", "  }"]
                 continue
             bt = f["outs"][0][1]
             tg = self.tag(bt, need)
@@ -421,19 +480,39 @@ class Calls:
                 lines.append(f"      return {own};")
                 lines.append("    } else {")
             lines.append("      ::kern::logic::EngineObjects& kern_o = kern_objects();")
-            args = []
-            for k, ((pin_in, _), P) in enumerate(zip(f["params"], ptypes)):
-                bt, h = next((bt, h) for n_, bt, h in f["ins"] if n_ == pin_in)
-                if h:
-                    args.append(f"{EV}handle_as<::kern::logic::Whole>(kern_o.adopt<{h}>(kern_p{k}))")
+            args, back = [], []
+            outs_at = {o: j for j, (o, _, _) in enumerate(f["outs"])}
+            for k, how in enumerate(self.handed(f)):
+                P = ptypes[k]
+                if how[0] == "handle":
+                    args.append(f"{EV}handle_as<::kern::logic::Whole>(kern_o.adopt<{how[1]}>(kern_p{k}))")
+                elif how[0] in ("value", "both"):
+                    args.append(f"{EV}Given<{self.dtag(how[1], need)}, {P}{'' if P.rstrip().endswith('&') else ' const&'}>(kern_o, kern_p{k})")
+                    if how[0] == "both":
+                        back.append(f"{EV}Direct<{self.dtag(how[1], need)}>::from(kern_o, kern_g{outs_at[how[2]]}, kern_p{k});")
+                elif how[0] == "list":
+                    _, bt, x, at, per = how
+                    args.append(f"{EV}Given<{self.dtag(bt, need)}, ::kern::Span<const {x}>>(kern_o, ::kern::Span<const {x}>(kern_p{k}, static_cast<std::size_t>({EV}numbers(kern_p{at}))))")
                 else:
-                    args.append(f"{EV}Given<{self.dtag(bt, need)}, {P}{'' if P.rstrip().endswith('&') else ' const&'}>(kern_o, kern_p{k})")
+                    _, o_name, at, per = how
+                    j = outs_at[o_name]
+                    back += [f"std::vector<std::remove_pointer_t<decltype(kern_p{k})>> kern_w{k};",
+                             f"{EV}Direct<{self.dtag(f['outs'][j][1], need)}>::from(kern_o, kern_g{j}, kern_w{k});",
+                             f"std::copy_n(kern_w{k}.begin(), std::min(kern_w{k}.size(), static_cast<std::size_t>({EV}numbers(kern_p{at}))), kern_p{k});"]
             call = f"b_.{m}({', '.join(args)})"
             if not f["outs"]:
                 lines += [f"      {call};", "    }", "  }"]
                 continue
             tg = self.dtag(f["outs"][0][1], need)
             raw = c2b.qtype(d).split("(")[0].strip()
+            if back:
+                lines.append(f"      const auto& [{', '.join(f'kern_g{j}' for j in range(len(f['outs'])))}] = {call};")
+                lines += ["      " + x for x in back]
+                if raw == "void":
+                    lines += ["    }", "  }"]
+                    continue
+                lines += [f"      auto kern_r = {EV}blank<{ret}>();", f"      {EV}Direct<{tg}>::from(kern_o, kern_g0, kern_r);", "      return kern_r;", "    }", "  }"]
+                continue
             lines.append(f"      const auto& [kern_given] = {call};")
             if re.match(r"(?:kern::)?Span<", raw):
                 member = f"kern_kept_{m}"
@@ -976,7 +1055,7 @@ class Calls:
                 "// (BlueprintWorld::engine - kern/logic/engine_direct.h), and else hands its inputs as values to the host's",
                 "// door (logic::Host::engine). Both do the same; the calls behind the door are written from the same table",
                 "// (src/<component>/engine_calls.gen.cpp).",
-                "#pragma once", "", "#include <initializer_list>", "#include <memory>", "#include <string_view>", "#include <type_traits>", "#include <utility>", "#include <vector>", "",
+                "#pragma once", "", "#include <algorithm>", "#include <initializer_list>", "#include <memory>", "#include <string_view>", "#include <type_traits>", "#include <utility>", "#include <vector>", "",
                 *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_direct.h"', '#include "kern/logic/nodes.h"', "",
                 "namespace kern::logic {", "",
                 "// The engine's enums and structs a pin names, between the type a Blueprint's class holds and the engine's",
@@ -1166,7 +1245,7 @@ class Calls:
                     adapters.append(name)
             text = ["// The engine's nodes on the engine itself: the calls of the functions the headers of this component declare",
                     "// (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).",
-                    *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_host.h"', "",
+                    "#include <algorithm>", *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_host.h"', "",
                     "namespace kern::logic {", "namespace {", "", "namespace ev = engine_values;", "",
                     *self.types_text(need), "", *bodies,
                     "const EngineCall kCalls[] = {", *[f'    {{"{f["type"]}", &c{k}}},' for k, f in enumerate(fs)],

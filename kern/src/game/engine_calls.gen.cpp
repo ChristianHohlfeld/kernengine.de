@@ -1,5 +1,6 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
+#include <algorithm>
 #include "kern/audio/audio.h"
 #include "kern/game/geometry.h"
 #include "kern/game/level.h"
