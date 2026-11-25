@@ -7448,6 +7448,21 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// What a function of the engine reports through a pointer that is null by default (`std::string* error = nullptr`):
+// a further output of its node - game::from_text says why a text is no level, and reads one that is.
+TEST(engine_reports_through_an_optional_pointer) {
+  using logic::Value;
+  const logic::EngineFunction* f = logic::engine_function("engine.game.from_text");
+  CHECK(f && f->outputs.size() == 3 && std::string(f->outputs[2].id) == "error");
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text("{\"format\":\"other\"}"), Value::zero(logic::PinType::structure)}, out));
+  CHECK(!out[0].as_bool() && out[2].as_text() == "not a Kern level (format must be \"kern-level\")");
+  out = {Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text(game::to_text(game::Level{})), Value::zero(logic::PinType::structure)}, out));
+  CHECK(out[0].as_bool() && out[2].as_text().empty());
+}
+
 // A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number
 // of it, as C++ has them - not what the pointer alone shows (one entry).
 TEST(engine_footprint_stream_values) {
@@ -7533,7 +7548,42 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 };
 }  // namespace implements_probe
 
+namespace implements_probe {
+struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+  // ---- types ----
+  KERN_STRUCT(net_Address) {
+    Int64 id = Int64{0x0};
+  };
+
+  // ---- variables ----
+  net_Address Last = net_Address{Int64{0x0}};
+  Int Bytes = 0;
+  Int Sent = 0;
+
+  // ---- functions ----
+  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  KERN_PURE addressResult address() {
+    return {net_Address{Int64{0x7}}};
+  }
+
+  struct sendResult { Bool result = false; };
+  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+    Last = to;
+    Bytes = bytes;
+    Sent = list_length<U8>(data);
+    return {true};
+  }
+
+  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
+  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+    return {Bytes, Last, List<Int>{1, 2, 3}};
+  }
+};
+}  // namespace implements_probe
+
 namespace kern::logic::detail {
+template <>
+struct Held<implements_probe::Loop::net_Address> : HeldBy<implements_probe::Loop::net_Address, &implements_probe::Loop::net_Address::id> {};
 template <>
 struct Held<implements_probe::Running::Frame> : HeldBy<implements_probe::Running::Frame, &implements_probe::Running::Frame::time, &implements_probe::Running::Frame::dt,
                                                        &implements_probe::Running::Frame::index> {};
@@ -7577,6 +7627,36 @@ TEST(engine_interface_a_class_implements) {
   const auto other = logic::implementation(alone);
   other->bind(program);
   CHECK(static_cast<i64>(alone.Program) != 0);
+  objects.clear();
+}
+
+// A Blueprint as a transport of the engine (net::Transport), on the interpreter and as its class: the numbers the engine
+// hands through a pointer with their count are a list; what the Blueprint gives back for `from` is written through the
+// reference, its list through the pointer - no more than the count beside it says room for.
+TEST(engine_interface_with_pointers) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph loop;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsLoop, loop, nullptr, &error) && loop.implements == "net_Transport" && no_errors(logic::check(loop)));
+  logic::Instance* const inst = rt.add(loop, 13, "Loop");
+  rt.begin();
+  logic::EngineObjects objects;
+  implements_probe::Loop cls;
+  cls.kern_world.engine = &objects;
+  const auto by_class = logic::implementation(cls);
+  net::Transport* const by_name = objects.get<net::Transport>(logic::engine_implement(objects, *inst));
+  CHECK(by_name != nullptr);
+  if (!by_name) return;
+  for (net::Transport* t : {by_name, static_cast<net::Transport*>(by_class.get())}) {
+    CHECK(t->address().id == 7);
+    const u8 bytes[3] = {4, 5, 6};
+    CHECK(t->send(net::Address{9}, bytes, 3));
+    net::Address from{0};
+    u8 room[3] = {0, 0, 0xee};
+    CHECK(t->receive(from, room, 2) == 3 && from.id == 9 && room[0] == 1 && room[1] == 2 && room[2] == 0xee);
+  }
+  CHECK(inst->get("Sent").i == 3 && static_cast<i64>(cls.Sent) == 3 && static_cast<i64>(cls.Bytes) == 3);
   objects.clear();
 }
 
@@ -7661,9 +7741,11 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
   app->stop(engine);
   CHECK(a->get("Stopped").b);
-  // an interface no Blueprint implements in this build (a pure function the engine hands a pointer): no object
-  const logic::EngineInterface* const transport = logic::engine_interface("net_Transport");
-  CHECK(transport && *transport->waits && logic::engine_implement(objects, "net_Transport", logic::implementer_of(*w)) == 0);
+  // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
+  // interface's own runs there; an interface the build has not: no object
+  const logic::EngineInterface* const shader = logic::engine_interface("ShaderExtension");
+  CHECK(shader && std::any_of(shader->functions.begin(), shader->functions.end(), [](const logic::EngineVirtual& v) { return std::string(v.name) == "material_uniforms" && *v.waits; }));
+  CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
   CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
@@ -12288,6 +12370,7 @@ TEST(studio_logic_implements) {
   if (f.s->level().actors.empty()) return;
   const game::ActorId id = f.s->level().actors.back().id;
   CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"float"})")["ok"].as_bool());   // (the actor has a Blueprint now)
   json::Value st = f.s->state();
   bool offered = false, transport = false;
   for (const json::Value& i : st["logic"]["interfaces"].items()) {
@@ -12298,7 +12381,9 @@ TEST(studio_logic_implements) {
     }
     transport = transport || i["name"].as_string() == "net_Transport";
   }
-  CHECK(offered && !transport && st["logic"]["implements"].as_string().empty());
+  CHECK(offered);
+  CHECK(transport);
+  CHECK(st["logic"]["implements"].as_string().empty());
   CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
@@ -12306,7 +12391,7 @@ TEST(studio_logic_implements) {
   const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
   CHECK(missing);
-  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"net_Transport"})")["ok"].as_bool() && !f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }

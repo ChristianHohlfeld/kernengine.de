@@ -1580,6 +1580,41 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 };
 )kn";
 
+// A Blueprint as a transport of the engine (net::Transport): what the engine hands it through a pointer with a count
+// beside it is a list; what it writes through a reference and a pointer are outputs of the function.
+inline const char* kImplementsLoop = R"kn(
+struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+  // ---- types ----
+  KERN_STRUCT(net_Address) {
+    Int64 id = Int64{0x0};
+  };
+
+  // ---- variables ----
+  net_Address Last = net_Address{Int64{0x0}};
+  Int Bytes = 0;
+  Int Sent = 0;
+
+  // ---- functions ----
+  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  KERN_PURE addressResult address() {
+    return {net_Address{Int64{0x7}}};
+  }
+
+  struct sendResult { Bool result = false; };
+  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+    Last = to;
+    Bytes = bytes;
+    Sent = list_length<U8>(data);
+    return {true};
+  }
+
+  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
+  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+    return {Bytes, Last, List<Int>{1, 2, 3}};
+  }
+};
+)kn";
+
 inline std::vector<Case> cases() {
   std::vector<Case> all;
   // (a case that uses libraries finds them among the cases before it)
@@ -1850,6 +1885,13 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"update", {I(2), Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
     c.calls.push_back({"update", {I(2), Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
     c.calls.push_back({"stop", {I(2)}});
+  }
+  {
+    Case& c = read("Loop", kImplementsLoop);
+    const Value at = Value::structure({Value::int64(9)});
+    c.calls.push_back({"address", {}});
+    c.calls.push_back({"send", {at, Value::of(std::vector<i64>{4, 5, 6}), I(3)}});
+    c.calls.push_back({"receive", {Value::structure({Value::int64(0)}), I(2)}});
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.

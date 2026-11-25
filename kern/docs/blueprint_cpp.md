@@ -1508,10 +1508,13 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   `KERN_EVENT(onN, event_tick)`, sein Rumpf die Schritte von `run` (Konverter: `Body.node_registrations`; die
   Anmeldung steht nicht mehr im Rumpf). Vorausgesetzt ist, dass das Programm den Knoten in sein Level legt (beim
   Umschalten fällt dieser Knoten aus dem Level: das Ereignis ist er). Jede andere Form wartet mit Grund.
-- **Was noch wartet:** eine virtuelle Funktion, der die Engine einen Zeiger gibt oder die durch das Gegebene schreibt
-  (`ShaderExtension::material_uniforms`, `net::Transport::send/receive`), hat noch keinen Weg zum Blueprint
-  (`EngineVirtual::waits`): dort läuft die der Schnittstelle; ist sie rein (`Transport`), implementiert kein Blueprint die
-  Schnittstelle (`EngineInterface::waits`).
+- **Zeiger und Referenzen:** was die Engine durch einen Zeiger mit einem `Count` daneben gibt, ist eine Liste
+  (`send(to, const u8* data, Count<1> bytes)`); was die Funktion durch eine Referenz schreibt (`Address& from`), ist ein
+  Eingang und ein Ausgang – gesetzt auf das, was der Blueprint gibt; was sie durch einen Zeiger mit Count schreibt
+  (`u8* data, Count<1> max_bytes`), ist ein Ausgang, geschrieben höchstens so weit, wie der Count Raum sagt
+  (`Calls.handed`). Ein Zeiger ohne Count wartet (`ShaderExtension::material_uniforms`, `EngineVirtual::waits`): dort
+  läuft die der Schnittstelle; wäre sie rein, implementierte kein Blueprint die Schnittstelle (`EngineInterface::waits`).
+  Geprüft: `engine_interface_with_pointers` (net::Transport, Interpreter und Klasse), nativer Fall „Loop“.
 - **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
   Schnittstelle (eine mit `?` darf fehlen).
 - **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
