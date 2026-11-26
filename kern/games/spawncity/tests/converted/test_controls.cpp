@@ -14,6 +14,7 @@
 
 namespace converted_controls {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,26 +36,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 namespace controls { struct RateStick {
   f32 full_px_s, tau;
   Vec2 rate;

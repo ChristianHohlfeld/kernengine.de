@@ -14,6 +14,7 @@
 
 namespace converted_road_graph_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };

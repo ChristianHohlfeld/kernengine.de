@@ -15,6 +15,7 @@
 
 namespace converted_game_equipment_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -94,29 +95,6 @@ enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -130,18 +108,36 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
 namespace audio { using ClipId = u32; }
 namespace audio { using VoiceId = u64; }
-namespace audio { struct PlayParams {
+namespace audio { struct KERN_BLUEPRINT_TYPE PlayParams {
   f32 volume = 1;       // linear gain
   f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
   f32 pan = 0;          // -1 left .. 1 right (2D voices)
@@ -167,7 +163,6 @@ struct Mixer : converted::EngineObject {
   void set_volume(const u64& voice, const double& volume, const double& ramp = 0.03) const;
   void set_position(const u64& voice, const Vec3& position, const Vec3& velocity = {}) const;
 };
-namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -178,9 +173,15 @@ struct LightPool : converted::EngineObject {
 struct NightWindows : public ShaderExtension {
   using ShaderExtension::ShaderExtension;
 };
-namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
-namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE SimMode : u8 { none, simulate, play, replica }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE GameStatus : u8 { inactive, playing, won, lost }; }
 struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct BitWriter : converted::EngineObject {
@@ -222,79 +223,27 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
+struct EngineObjects : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Engine : converted::EngineObject {
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct App : converted::EngineObject {
+struct String : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
-namespace audio { struct SynthPatch {
-  Wave wave = Wave::square;
-  f32 volume = 0.5;
-  // envelope (seconds): attack, sustain (with optional punch), release
-  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
-  // pitch
-  f32 frequency = 440;          // Hz at the start
-  f32 slide = 0;                // octaves per second
-  f32 slide_accel = 0;          // octaves per second^2
-  f32 min_frequency = 20;       // the slide stops here
-  f32 vibrato_depth = 0;        // semitones
-  f32 vibrato_rate = 6;         // Hz
-  f32 arp_ratio = 1;            // frequency multiplier after arp_time
-  f32 arp_time = 0;             // seconds, 0 = off
-  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
-  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
-  // filters
-  f32 lowpass = 0;              // Hz, 0 = off
-  f32 lowpass_sweep = 0;        // octaves per second
-  f32 resonance = 0;            // 0..0.95
-  f32 highpass = 0;             // Hz, 0 = off
-  // modulation
-  f32 tremolo_depth = 0, tremolo_rate = 0;
-  f32 repeat = 0;               // seconds: restart the pitch envelope
-  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
-  u32 seed = 1;                 // noise
-}; }
-namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
-namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
-namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
-namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
-struct SoundBank : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
+namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
+namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct TouchControls : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-using audio::SynthPatch; std::vector<f32> render_loop(std::initializer_list<SynthPatch> layers, u32 rate, f32 seconds, f32 peak = 0.8) {
-  std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(seconds * static_cast<f32>(rate)))), 0.0);
-  for (SynthPatch p : layers) {
-    p.attack = 0;
-    p.sustain = seconds + 0.25;
-    p.release = 0;
-    audio::mix_into(out, audio::synthesize(p, rate), 0, rate, 1);
-  }
-  out.resize(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(seconds * static_cast<f32>(rate)))));
-  audio::make_seamless(out, rate, 0.12);
-  audio::normalize(out, peak);
-  return out;
-}
 void drive_loop(Mixer& m, audio::VoiceId& v, audio::ClipId clip, f32 volume, audio::Bus bus, bool spatial = false, Vec3 at = {}) {
   if (!clip) return;
   if (volume < 0.002) {
@@ -321,44 +270,6 @@ void drive_loop(Mixer& m, audio::VoiceId& v, audio::ClipId clip, f32 volume, aud
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static audio::SynthPatch draw_kern__audio__SynthPatch(converted::Draw& draw) {
-  audio::SynthPatch s{};
-  s.wave = converted::enum_value<audio::Wave>(draw.below(7));
-  s.volume = draw.number();
-  s.attack = draw.number();
-  s.sustain = draw.number();
-  s.punch = draw.number();
-  s.release = draw.number();
-  s.frequency = draw.number();
-  s.slide = draw.number();
-  s.slide_accel = draw.number();
-  s.min_frequency = draw.number();
-  s.vibrato_depth = draw.number();
-  s.vibrato_rate = draw.number();
-  s.arp_ratio = draw.number();
-  s.arp_time = draw.number();
-  s.duty = draw.number();
-  s.duty_sweep = draw.number();
-  s.fm_ratio = draw.number();
-  s.fm_depth = draw.number();
-  s.lowpass = draw.number();
-  s.lowpass_sweep = draw.number();
-  s.resonance = draw.number();
-  s.highpass = draw.number();
-  s.tremolo_depth = draw.number();
-  s.tremolo_rate = draw.number();
-  s.repeat = draw.number();
-  s.bitcrush = draw.number();
-  s.seed = static_cast<unsigned int>(draw.below(40));
-  return s;
-}
-namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const audio::SynthPatch& s) { return converted::Value::structure({arg(s.wave), arg(s.volume), arg(s.attack), arg(s.sustain), arg(s.punch), arg(s.release), arg(s.frequency), arg(s.slide), arg(s.slide_accel), arg(s.min_frequency), arg(s.vibrato_depth), arg(s.vibrato_rate), arg(s.arp_ratio), arg(s.arp_time), arg(s.duty), arg(s.duty_sweep), arg(s.fm_ratio), arg(s.fm_depth), arg(s.lowpass), arg(s.lowpass_sweep), arg(s.resonance), arg(s.highpass), arg(s.tremolo_depth), arg(s.tremolo_rate), arg(s.repeat), arg(s.bitcrush), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const audio::SynthPatch& want, const converted::Value& got) { return converted::rows_of(got, 27) && converted::at_place(same(want.wave, (*got.rows)[0]), ".wave") && converted::at_place(same(want.volume, (*got.rows)[1]), ".volume") && converted::at_place(same(want.attack, (*got.rows)[2]), ".attack") && converted::at_place(same(want.sustain, (*got.rows)[3]), ".sustain") && converted::at_place(same(want.punch, (*got.rows)[4]), ".punch") && converted::at_place(same(want.release, (*got.rows)[5]), ".release") && converted::at_place(same(want.frequency, (*got.rows)[6]), ".frequency") && converted::at_place(same(want.slide, (*got.rows)[7]), ".slide") && converted::at_place(same(want.slide_accel, (*got.rows)[8]), ".slide_accel") && converted::at_place(same(want.min_frequency, (*got.rows)[9]), ".min_frequency") && converted::at_place(same(want.vibrato_depth, (*got.rows)[10]), ".vibrato_depth") && converted::at_place(same(want.vibrato_rate, (*got.rows)[11]), ".vibrato_rate") && converted::at_place(same(want.arp_ratio, (*got.rows)[12]), ".arp_ratio") && converted::at_place(same(want.arp_time, (*got.rows)[13]), ".arp_time") && converted::at_place(same(want.duty, (*got.rows)[14]), ".duty") && converted::at_place(same(want.duty_sweep, (*got.rows)[15]), ".duty_sweep") && converted::at_place(same(want.fm_ratio, (*got.rows)[16]), ".fm_ratio") && converted::at_place(same(want.fm_depth, (*got.rows)[17]), ".fm_depth") && converted::at_place(same(want.lowpass, (*got.rows)[18]), ".lowpass") && converted::at_place(same(want.lowpass_sweep, (*got.rows)[19]), ".lowpass_sweep") && converted::at_place(same(want.resonance, (*got.rows)[20]), ".resonance") && converted::at_place(same(want.highpass, (*got.rows)[21]), ".highpass") && converted::at_place(same(want.tremolo_depth, (*got.rows)[22]), ".tremolo_depth") && converted::at_place(same(want.tremolo_rate, (*got.rows)[23]), ".tremolo_rate") && converted::at_place(same(want.repeat, (*got.rows)[24]), ".repeat") && converted::at_place(same(want.bitcrush, (*got.rows)[25]), ".bitcrush") && converted::at_place(same(want.seed, (*got.rows)[26]), ".seed"); }
-[[maybe_unused]] static bool defined(const audio::SynthPatch& s) { return defined(s.wave) && defined(s.volume) && defined(s.attack) && defined(s.sustain) && defined(s.punch) && defined(s.release) && defined(s.frequency) && defined(s.slide) && defined(s.slide_accel) && defined(s.min_frequency) && defined(s.vibrato_depth) && defined(s.vibrato_rate) && defined(s.arp_ratio) && defined(s.arp_time) && defined(s.duty) && defined(s.duty_sweep) && defined(s.fm_ratio) && defined(s.fm_depth) && defined(s.lowpass) && defined(s.lowpass_sweep) && defined(s.resonance) && defined(s.highpass) && defined(s.tremolo_depth) && defined(s.tremolo_rate) && defined(s.repeat) && defined(s.bitcrush) && defined(s.seed); }
-[[maybe_unused]] static std::string text(const audio::SynthPatch& s) { return std::string("{") + text(s.wave) + ", " + text(s.volume) + ", " + text(s.attack) + ", " + text(s.sustain) + ", " + text(s.punch) + ", " + text(s.release) + ", " + text(s.frequency) + ", " + text(s.slide) + ", " + text(s.slide_accel) + ", " + text(s.min_frequency) + ", " + text(s.vibrato_depth) + ", " + text(s.vibrato_rate) + ", " + text(s.arp_ratio) + ", " + text(s.arp_time) + ", " + text(s.duty) + ", " + text(s.duty_sweep) + ", " + text(s.fm_ratio) + ", " + text(s.fm_depth) + ", " + text(s.lowpass) + ", " + text(s.lowpass_sweep) + ", " + text(s.resonance) + ", " + text(s.highpass) + ", " + text(s.tremolo_depth) + ", " + text(s.tremolo_rate) + ", " + text(s.repeat) + ", " + text(s.bitcrush) + ", " + text(s.seed) + "}"; }
-[[maybe_unused]] static void take(audio::SynthPatch& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 27) return; converted::take_as<audio::Wave>(s.wave, (*v.rows)[0]); converted::take_as<double>(s.volume, (*v.rows)[1]); converted::take_as<double>(s.attack, (*v.rows)[2]); converted::take_as<double>(s.sustain, (*v.rows)[3]); converted::take_as<double>(s.punch, (*v.rows)[4]); converted::take_as<double>(s.release, (*v.rows)[5]); converted::take_as<double>(s.frequency, (*v.rows)[6]); converted::take_as<double>(s.slide, (*v.rows)[7]); converted::take_as<double>(s.slide_accel, (*v.rows)[8]); converted::take_as<double>(s.min_frequency, (*v.rows)[9]); converted::take_as<double>(s.vibrato_depth, (*v.rows)[10]); converted::take_as<double>(s.vibrato_rate, (*v.rows)[11]); converted::take_as<double>(s.arp_ratio, (*v.rows)[12]); converted::take_as<double>(s.arp_time, (*v.rows)[13]); converted::take_as<double>(s.duty, (*v.rows)[14]); converted::take_as<double>(s.duty_sweep, (*v.rows)[15]); converted::take_as<double>(s.fm_ratio, (*v.rows)[16]); converted::take_as<double>(s.fm_depth, (*v.rows)[17]); converted::take_as<double>(s.lowpass, (*v.rows)[18]); converted::take_as<double>(s.lowpass_sweep, (*v.rows)[19]); converted::take_as<double>(s.resonance, (*v.rows)[20]); converted::take_as<double>(s.highpass, (*v.rows)[21]); converted::take_as<double>(s.tremolo_depth, (*v.rows)[22]); converted::take_as<double>(s.tremolo_rate, (*v.rows)[23]); converted::take_as<double>(s.repeat, (*v.rows)[24]); converted::take_as<double>(s.bitcrush, (*v.rows)[25]); converted::take_as<unsigned int>(s.seed, (*v.rows)[26]); }
-}
 [[maybe_unused]] static audio::PlayParams draw_kern__audio__PlayParams(converted::Draw& draw) {
   audio::PlayParams s{};
   s.volume = draw.number();
@@ -391,37 +302,9 @@ inline bool Mixer::playing(const u64& voice) const { const std::vector<converted
 inline u64 Mixer::play(const unsigned int& clip, const audio::PlayParams& params) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.play", {converted::value_of(*this), converted::value_of(clip), converted::value_of(params)}); u64 kern_result = converted::quiet<u64>(); converted::take_as<converted::Whole>(kern_result, kern_out[0]); return kern_result; }
 inline void Mixer::set_volume(const u64& voice, const double& volume, const double& ramp) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_volume", {converted::value_of(*this), converted::value_of(converted::shaped<converted::Whole>(voice)), converted::value_of(volume), converted::value_of(ramp)}); }
 inline void Mixer::set_position(const u64& voice, const Vec3& position, const Vec3& velocity) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_position", {converted::value_of(*this), converted::value_of(converted::shaped<converted::Whole>(voice)), converted::value_of(position), converted::value_of(velocity)}); }
-namespace audio { inline void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.mix_into", {converted::value_of(dst), converted::value_of(src), converted::value_of(offset_seconds), converted::value_of(rate), converted::value_of(gain)}); converted::take_as<std::vector<double>>(dst, kern_out[0]); } }
-namespace audio { inline std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.synthesize", {converted::value_of(patch), converted::value_of(rate)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; } }
-namespace audio { inline void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.make_seamless", {converted::value_of(samples), converted::value_of(rate), converted::value_of(crossfade)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
-namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.normalize", {converted::value_of(samples), converted::value_of(peak)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
 
 SC_TEST(converted_game_equipment_cpp) {
   converted::Blueprint bp("game_equipment_cpp");
-  {  // render_loop
-    converted::Tally tally("render_loop");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<audio::SynthPatch>& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::listed(a0, [&](std::initializer_list<audio::SynthPatch> l0) { return converted::counted([&] { return converted_game_equipment_cpp::render_loop(l0, std::move(a1), std::move(a2), std::move(a3)); }); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      std::vector<audio::SynthPatch> a0 = converted::draw_few(draw, [&]() -> audio::SynthPatch { return draw_kern__audio__SynthPatch(draw); });
-      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
-      double a2 = draw.number();
-      double a3 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // drive_loop
     converted::Tally tally("drive_loop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

@@ -14,6 +14,7 @@
 
 namespace converted_mvt {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;

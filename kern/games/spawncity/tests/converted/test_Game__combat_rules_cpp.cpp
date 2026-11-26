@@ -14,6 +14,7 @@
 
 namespace converted_Game__combat_rules_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -36,13 +37,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
 namespace combat { bool bind_military(kern::logic::Runtime& logic); }
 namespace combat { bool bind_zombies(kern::logic::Runtime& logic); }
 namespace combat { bool bind_sandbox(kern::logic::Runtime& logic); }
@@ -493,7 +488,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("bind_military");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__combat_rules_cpp::combat::bind_military(bp.source_logic()); }); return Out_bind_military{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::bind_military(bp.source_logic())); }); return Out_bind_military{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -516,7 +511,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("bind_zombies");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__combat_rules_cpp::combat::bind_zombies(bp.source_logic()); }); return Out_bind_zombies{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::bind_zombies(bp.source_logic())); }); return Out_bind_zombies{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -539,7 +534,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("bind_sandbox");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__combat_rules_cpp::combat::bind_sandbox(bp.source_logic()); }); return Out_bind_sandbox{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::bind_sandbox(bp.source_logic())); }); return Out_bind_sandbox{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -562,7 +557,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("enemy_spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] combat::EnemyType& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::enemy_spec(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] combat::EnemyType& a0) { return converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::enemy_spec(std::move(a0))); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       combat::EnemyType a0 = converted::enum_value<combat::EnemyType>(draw.below(3));
@@ -586,7 +581,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("bind_fun");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__combat_rules_cpp::combat::bind_fun(bp.source_logic()); }); return Out_bind_fun{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::bind_fun(bp.source_logic())); }); return Out_bind_fun{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -609,7 +604,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("contract");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::contract(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::contract(std::move(a0))); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       int a0 = static_cast<int>(draw.whole());
@@ -633,7 +628,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("bind_race");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__combat_rules_cpp::combat::bind_race(bp.source_logic()); }); return Out_bind_race{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::bind_race(bp.source_logic())); }); return Out_bind_race{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -656,7 +651,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("gate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::gate(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return (kern_state_now = s.get(), converted_Game__combat_rules_cpp::combat::gate(std::move(a0))); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       int a0 = static_cast<int>(draw.whole());

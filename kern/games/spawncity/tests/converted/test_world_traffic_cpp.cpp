@@ -15,6 +15,7 @@
 
 namespace converted_world_traffic_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -36,9 +37,9 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
@@ -48,14 +49,9 @@ struct Lane {
   u64 tile = 0;
   bool alive = true;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct TrafficRules {
  public:
   struct Arm { Vec2 dir; f32 width = 6; Vec2 pole; bool has_pole = false; };  // pole: the signal's post, on the kerb corner right of the incoming traffic (relative to the junction)

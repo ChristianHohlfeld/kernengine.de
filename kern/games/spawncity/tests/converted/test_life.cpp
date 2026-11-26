@@ -16,6 +16,7 @@
 
 namespace converted_life {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -40,7 +41,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -57,7 +58,7 @@ struct Quat {
 
 
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -175,7 +176,7 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -192,11 +193,11 @@ struct Bvh : converted::EngineObject {
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
-namespace physics { struct Pose {
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
 }; }

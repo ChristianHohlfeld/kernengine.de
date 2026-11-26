@@ -18,6 +18,7 @@
 
 namespace converted_terrain {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -39,7 +40,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   
@@ -48,13 +49,13 @@ struct Vec4 {
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Renderer;
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -70,7 +71,7 @@ struct GeoProjector {
 
 
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;

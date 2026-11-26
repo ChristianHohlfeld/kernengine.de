@@ -14,6 +14,7 @@
 
 namespace converted_game_controls_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -92,22 +93,6 @@ struct Renderer : converted::EngineObject {
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -121,10 +106,30 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Context : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  bool down(const Key& k) const;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Mixer : converted::EngineObject {
@@ -140,6 +145,12 @@ struct NightWindows : public ShaderExtension {
   using ShaderExtension::ShaderExtension;
 };
 struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct BitWriter : converted::EngineObject {
@@ -181,29 +192,19 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-  bool down(const Key& k) const;
-};
-struct Engine : converted::EngineObject {
+struct EngineObjects : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct App : converted::EngineObject {
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct SoundBank : converted::EngineObject {
+struct String : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

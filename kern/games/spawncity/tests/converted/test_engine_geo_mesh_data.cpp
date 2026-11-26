@@ -13,6 +13,7 @@
 
 namespace converted_engine_geo_mesh_data {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -85,7 +86,7 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;

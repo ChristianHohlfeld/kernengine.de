@@ -9,11 +9,13 @@
 #include <vector>
 #include <algorithm>
 #include "../../src/people.h"
-#include "../../src/person_hit.h"
+#include "../../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "../converted.h"
 
 namespace converted_people_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -38,7 +40,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -46,7 +48,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -64,7 +66,7 @@ struct Quat {
   }
 };
 struct Bvh;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -81,7 +83,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -106,11 +108,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -124,18 +126,17 @@ struct Bvh : converted::EngineObject {
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct QueryFilter {
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
 }; }
-namespace physics { struct RayHit {
+namespace physics { struct KERN_BLUEPRINT_TYPE RayHit {
   bool hit = false;
   Shape shape;
   Body body;
@@ -691,36 +692,14 @@ struct CityStream::Tile {
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -728,6 +707,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -928,53 +910,122 @@ struct People {
   u32 spawns_allowed_ = 0, spawns_denied_ = 0;
   f32 show_ = 170, hide_ = 190;
 };
-enum class BodyPart : u8 { none, legs, torso, head };
-namespace person_hit { constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155; }
-namespace person_hit { inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; } }
-namespace person_hit { inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Vec3 h, f32& t_out) {
-  const Vec3 o = from - c;
-  const f32 po[3] = {converted::wide::dot(o, ax), converted::wide::dot(o, ay), converted::wide::dot(o, az)}, pd[3] = {converted::wide::dot(seg, ax), converted::wide::dot(seg, ay), converted::wide::dot(seg, az)};
-  const f32 hh[3] = {h.x, h.y, h.z};
-  f32 t0 = 0, t1 = 1;
-  for (int a = 0; a < 3; converted::pre_inc(a)) {
-    if (std::fabs(converted::at(pd, a)) < 1e-7) { if (std::fabs(converted::at(po, a)) > converted::at(hh, a)) return false; continue; }
-    f32 ta = (-converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a), tb = (converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a);
-    if (ta > tb) std::swap(ta, tb);
-    t0 = std::fmax(t0, ta);
-    t1 = std::fmin(t1, tb);
-    if (t0 > t1) return false;
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
   }
-  t_out = t0;
-  return true;
+  return d;
 } }
-namespace person_hit { inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
-  const Vec3 o = from - c;
-  const f32 a = converted::wide::dot(seg, seg), b = converted::wide::dot(o, seg), cc = converted::wide::dot(o, o) - r * r;
-  if (a < 1e-9) return false;
-  if (cc <= 0) { t_out = 0; return true; }
-  const f32 disc = b * b - a * cc;
-  if (disc < 0 || b > 0) return false;
-  const f32 t = (-b - kern::math::sqrt(disc)) / a;
-  if (t > 1) return false;
-  t_out = std::fmax(0.0, t);
-  return true;
-} }
-namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_out, f32 pad = 1.0, f32 scale = 1.0) {
-  const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw), l = lean(speed), cl = kern::math::cos(l), sl = kern::math::sin(l);
-  const Vec3 fx{cy, sy, 0}, fy{-sy, cy, 0}, up{0, 0, 1};
-  // the leaning body frame: up tilts forward
-  const Vec3 bz = up * cl + fx * sl, bx = fx * cl - up * sl;
-  const Vec3 hip = feet + up * (kHipZ * scale);
-  BodyPart best = BodyPart::none;
-  f32 bt = 2, t;
-  if (sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
-  // torso 0.24 x 0.42 x 0.6 from the hip up, with the arms beside it (to 0.33 either side)
-  if (box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
-  // the legs, hip to shoe
-  if (box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
-  t_out = bt;
-  return best;
-} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
+struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh }; }
+namespace game { enum class WeaponKind : u8 { rifle, pistol, shotgun, sniper }; }
+namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
+struct Particles : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LightPool : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NightWindows : public ShaderExtension {
+  using ShaderExtension::ShaderExtension;
+};
+namespace game { enum class KERN_BLUEPRINT_TYPE GameStatus : u8 { inactive, playing, won, lost }; }
+struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitWriter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitReader : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WriteStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ReadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeasureStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Endpoint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Connection : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Transport : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Simulator : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LoopbackNetwork : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HostTransport : public Transport {
+  using Transport::Transport;
+};
+struct Client : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Server : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_values { struct Vector {}; } }
+namespace logic { namespace format { namespace Arg { using Kind = :: kern :: logic :: format :: Arg :: Kind; } } }
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+namespace logic { namespace PureNodes { using Vector = Vec3; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameWorld;
+namespace game { namespace nodes { using Vector = Vec3; } }
+struct ShaderExtension;
+struct Renderer;
 namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
 f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
   const f32 bowl = radius * 0.5;
@@ -1079,22 +1130,6 @@ bool Terrain::water_at(f32 x, f32 y) const {
   if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
   return bridges_.empty() || !on_bridge(x, y);
 }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
 namespace spawn { namespace spawn_guard_cpp_local { rules::Blueprint g_rules{"SpawnGuard"}; } }
 namespace spawn { namespace spawn_guard_cpp_local { struct Looker {
   Vec3 eye, forward;
@@ -1418,12 +1453,13 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     if (dist2d(p.pos, from) < self_r) continue;  // the shooter himself
     if (p.kind == Kind::citizen && now < p.knocked_until) continue;  // down as a ragdoll: the body is hidden
     // the body as it is drawn (person_hit.h): legs, the leaning torso with the arms, the head
-    f32 s = 2;
-    const BodyPart part = person_hit::hit(p.pos, p.yaw, p.v, from, to - from, s, 1.08);
-    if (part != BodyPart::none && s < best_s) {
+    f64 t = 2;  // (the Blueprint person_hit, called as its class: its numbers - rules::decimal in, static_cast<f32> out)
+    const blueprints::person_hit::BodyPart part = ::kern::logic::blueprint<blueprints::person_hit>().hit(t, p.pos, rules::decimal(p.yaw), rules::decimal(p.v), from, to - from, 1.08).Result;
+    const f32 s = static_cast<f32>(t);
+    if (part != blueprints::person_hit::BodyPart::none && s < best_s) {
       best_s = s;
       best = static_cast<i32>(i);
-      head = part == BodyPart::head;
+      head = part == blueprints::person_hit::BodyPart::head;
       hit_point = from + (to - from) * s;
     }
   }
@@ -2531,8 +2567,9 @@ struct Out_People_update { People Self; Rng rng; };
 [[maybe_unused]] static std::string text(const Out_People_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.rng) + "}"; }
 
 SC_TEST(converted_people_cpp) {
-  converted::Blueprint bp("people_cpp", {"SpawnGuard"});
+  converted::Blueprint bp("people_cpp", {"SpawnGuard", "person_hit"});
   spawn::spawn_guard_cpp_local::g_rules.bind(bp.source_logic());
+  SC_CHECK(kern::logic::bind_blueprint<blueprints::person_hit>(bp.source_logic()), "the Blueprint person_hit runs as its class");
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

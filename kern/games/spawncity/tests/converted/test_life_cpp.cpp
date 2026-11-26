@@ -14,6 +14,7 @@
 
 namespace converted_life_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -38,7 +39,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -46,7 +47,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -63,7 +64,7 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -156,7 +157,7 @@ struct Mat4 {
 
 };
 struct Bvh;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -173,7 +174,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -198,11 +199,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -216,18 +217,18 @@ struct Bvh : converted::EngineObject {
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
-namespace physics { struct Pose {
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
 }; }
-namespace physics { struct BodySettings {
+namespace physics { struct KERN_BLUEPRINT_TYPE BodySettings {
   BodyType type = BodyType::dynamic;
   Vec3 position;
   Quat rotation;
@@ -236,12 +237,12 @@ namespace physics { struct BodySettings {
   bool enable_sleep = true, awake = true, enabled = true, bullet = false;
   u64 user = 0;  // returned by World::body_user
 }; }
-namespace physics { struct QueryFilter {
+namespace physics { struct KERN_BLUEPRINT_TYPE QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
 }; }
-namespace physics { struct ShapeMaterial {
+namespace physics { struct KERN_BLUEPRINT_TYPE ShapeMaterial {
   f32 density = 1;            // kg/m^3
   f32 friction = 0.6;
   f32 restitution = 0;        // 0..1
@@ -253,7 +254,7 @@ namespace physics { struct ShapeMaterial {
   u64 user = 0;               // returned by World::shape_user
   Surface surface = Surface::none;
 }; }
-namespace physics { struct ShapeSettings {
+namespace physics { struct KERN_BLUEPRINT_TYPE ShapeSettings {
   ShapeKind kind = ShapeKind::box;
   Vec3 center;               // body-local placement of the shape
   Quat rotation;
@@ -264,7 +265,7 @@ namespace physics { struct ShapeSettings {
   Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
   ShapeMaterial material;
 }; }
-namespace physics { struct JointSettings {
+namespace physics { struct KERN_BLUEPRINT_TYPE JointSettings {
   JointType type = JointType::revolute;
   Body body_a, body_b;
   Pose frame_a, frame_b;         // in body-local space
@@ -298,7 +299,7 @@ namespace physics { struct JointSettings {
   u64 user = 0;
 }; }
 namespace physics { physics::Pose frame_from_axis(const Vec3& anchor, const Vec3& axis, const bool& x_axis); }
-namespace physics { struct RayHit {
+namespace physics { struct KERN_BLUEPRINT_TYPE RayHit {
   bool hit = false;
   Shape shape;
   Body body;

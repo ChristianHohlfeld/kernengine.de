@@ -13,6 +13,7 @@
 
 namespace converted_world_art_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -34,7 +35,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -42,7 +43,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -137,8 +138,8 @@ struct Mat4 {
 struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct KERN_BLUEPRINT_TYPE Material {
   Vec4 color{1, 1, 1, 1};
   AlphaMode alpha = AlphaMode::opaque;
   f32 alpha_cutoff = 0.5;
@@ -160,7 +161,7 @@ struct Material {
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -185,7 +186,7 @@ struct MeshData {
   
 };
 struct Renderer;
-struct MeshLook {
+struct KERN_BLUEPRINT_TYPE MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
   u32 texture = 0;      // GPU texture handle (0 = none)
@@ -194,8 +195,8 @@ struct MeshLook {
   bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
 };
 struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -214,7 +215,7 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -295,7 +296,7 @@ WorldArt::PartId WorldArt::part(const MeshData& mesh, const Material& m, bool ti
   look.extra_slot = kMaxExtensionAttributes;
   look.visible = false;
   const Mat4 parked = Mat4::translate({0, 0, -1000});
-  if (!upsert(*r_, p.id, mesh, look, Span<const f32>(parked.m, 16))) { r_->release_id(p.id); return 0; }
+  if (!::converted_world_art_cpp::upsert(*r_, p.id, mesh, look, Span<const f32>(parked.m, 16))) { r_->release_id(p.id); return 0; }
   parts_.push_back(std::move(p));
   return static_cast<PartId>(converted::minus(parts_.size(), 1));
 }
@@ -325,7 +326,7 @@ void WorldArt::set_mesh(u32& slot, const MeshData& mesh, const Material& m) {
   MeshLook look;
   look.material = m;
   if (!slot) slot = r_->allocate_id();
-  if (!upsert(*r_, slot, mesh, look)) { r_->release_id(slot); slot = 0; }
+  if (!::converted_world_art_cpp::upsert(*r_, slot, mesh, look)) { r_->release_id(slot); slot = 0; }
 }
 #undef private
 #undef protected

@@ -14,6 +14,7 @@
 
 namespace converted_game_swarm_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -36,15 +37,16 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 namespace combat { enum class FunEvent : u8 { tick, world_kill_person, world_kill_car, world_kill_bus, world_kill_player, police_kill, emp, escape, damage, drone_destroyed, player_death, cycle_contract }; }
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
-enum class Key : u8 {
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
 struct PoliceDrone {
   bool active = false, sees = false, emp = false, retreating = false;
   Vec3 pos, vel, target, retreat_goal;

@@ -15,6 +15,7 @@
 
 namespace converted_engine_geo_roads {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -54,7 +55,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;

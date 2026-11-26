@@ -14,6 +14,7 @@
 
 namespace converted_game_traffic_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -42,20 +43,15 @@ struct Lane {
   u64 tile = 0;
   bool alive = true;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-enum class Key : u8 {
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
 f32 lane_distance(const Lane& l, Vec2 p) {
   f32 best = 1e9;
   for (std::size_t i = 0; converted::plus(i, 1) < l.points.size(); converted::pre_inc(i)) {

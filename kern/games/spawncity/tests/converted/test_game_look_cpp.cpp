@@ -15,6 +15,7 @@
 
 namespace converted_game_look_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -38,7 +39,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 double now_ms();
 constexpr f32 kPi = 3.14159265358979323846;
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -46,7 +47,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -63,7 +64,7 @@ struct Quat {
 
 
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -155,7 +156,7 @@ struct Mat4 {
 
 
 };
-struct Camera {
+struct KERN_BLUEPRINT_TYPE Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
   f32 fov = kPi / 3, near = 0.05, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
@@ -167,8 +168,8 @@ struct Camera {
 };
 struct Bvh;
 constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct KERN_BLUEPRINT_TYPE Material {
   Vec4 color{1, 1, 1, 1};
   AlphaMode alpha = AlphaMode::opaque;
   f32 alpha_cutoff = 0.5;
@@ -190,7 +191,7 @@ struct Material {
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -269,29 +270,7 @@ namespace CombatArt { enum Shape : u8 { box, sphere, cylinder, cone, glow_box, g
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+namespace logic { using PinType = :: kern :: logic :: PinType; }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -305,18 +284,36 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace GpsLive { enum class View : u8 { eye, follow, map }; }
-namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
 struct Mixer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace combat { enum class Arms : u8 { fists, knife, gun }; }
+namespace game { enum class WeaponKind : u8 { rifle, pistol, shotgun, sniper }; }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -329,6 +326,15 @@ struct NightWindows : public ShaderExtension {
 struct GameWorld : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
 struct BitWriter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -368,30 +374,23 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
+namespace GpsLive { enum class View : u8 { eye, follow, map }; }
+namespace combat { enum class Arms : u8 { fists, knife, gun }; }
 namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Engine : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct App : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct SoundBank : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -400,10 +399,7 @@ struct TouchControls : converted::EngineObject {
 };
 namespace weapons { enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb }; }
 namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
-namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
-namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
-namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
-f64 clock_ms() { return now_ms(); }
+f64 clock_ms() { return ::converted_game_look_cpp::now_ms(); }
 Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 void box(MeshData& m, Vec3 size, u32 color, Vec3 at, const Mat4& extra = Mat4{}) { primitives::append(m, primitives::box(size, srgb(color)), extra * Mat4::translate(at)); }
 void cyl(MeshData& m, f32 r, f32 len, u32 color, Vec3 at, u32 seg = 14, const Mat4& extra = Mat4{}) {

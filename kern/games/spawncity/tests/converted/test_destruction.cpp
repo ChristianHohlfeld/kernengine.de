@@ -16,6 +16,7 @@
 
 namespace converted_destruction {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -42,7 +43,7 @@ struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
 struct Destruction {
  public:

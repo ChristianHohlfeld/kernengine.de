@@ -14,6 +14,7 @@
 
 namespace converted_game_barricades_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -59,15 +60,17 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
 namespace Interiors { struct Door { Vec2 c, d, n; }; }
 namespace Interiors { struct Core { Vec2 o, u, v; }; }
 namespace Interiors { struct Plan {
@@ -87,13 +90,6 @@ namespace Interiors { struct Plan {
   }; }
 namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
 namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
 i64 building_key(const Interiors::Plan& p) {
   if (p.outer.empty()) return 0;
   return (converted::shl_bits(static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)), 32)) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());

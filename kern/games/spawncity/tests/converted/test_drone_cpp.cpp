@@ -34,6 +34,7 @@
 
 namespace converted_drone_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -1479,8 +1480,8 @@ private:
     uint16_t last_navigation_sequence_{};
     bool have_navigation_sequence_{};
 }; }
-enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
-struct Quat {
+enum class KERN_BLUEPRINT_TYPE LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -1497,26 +1498,26 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct Pose {
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
 }; }
-namespace physics { struct QueryFilter {
+namespace physics { struct KERN_BLUEPRINT_TYPE QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
 }; }
-namespace physics { struct RayHit {
+namespace physics { struct KERN_BLUEPRINT_TYPE RayHit {
   bool hit = false;
   Shape shape;
   Body body;

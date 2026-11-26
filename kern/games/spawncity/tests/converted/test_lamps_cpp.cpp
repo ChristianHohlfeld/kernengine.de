@@ -14,6 +14,7 @@
 
 namespace converted_lamps_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -43,7 +44,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Renderer;
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -57,7 +58,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -73,18 +74,18 @@ struct GeoProjector {
 
 
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -579,28 +580,10 @@ struct CityStream::Tile {
   physics::Body old_body;
   bool recollide = false;
 };
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 namespace lamps { bool bind(kern::logic::Runtime& logic); }
 namespace lamps { f32 pole_radius(); }
 namespace lamps { bool worse(u8 state, u8 to); }

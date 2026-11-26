@@ -14,6 +14,7 @@
 
 namespace converted_gaps_rules_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -56,14 +57,8 @@ constexpr f32 kPi = 3.14159265358979323846;
 constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 namespace gaps { bool bind_sirens(kern::logic::Runtime& logic); }
 namespace gaps { f32 horn_low(); }
 namespace gaps { f32 horn_high(); }
@@ -363,11 +358,11 @@ namespace gaps { void VisualPose::update(Vec3 position, Quat rotation, Vec3 anch
   e = raw - offset_;
   err = converted::wide::length(e);
   if (err > p.max_pos) offset_ += e * ((err - p.max_pos) / err);
-  q_ = slerp(q_, target, damping(p.rotation_rate, step));
-  f32 ang = quat_angle(q_, target);
-  if (ang > p.soft_rot) q_ = slerp(q_, target, clampf((ang - p.soft_rot) * damping(p.rot_recovery, step) / ang, 0, 1));
-  ang = quat_angle(q_, target);
-  if (ang > p.max_rot) q_ = slerp(q_, target, 1 - p.max_rot / ang);
+  q_ = gaps::slerp(q_, target, damping(p.rotation_rate, step));
+  f32 ang = gaps::quat_angle(q_, target);
+  if (ang > p.soft_rot) q_ = gaps::slerp(q_, target, clampf((ang - p.soft_rot) * damping(p.rot_recovery, step) / ang, 0, 1));
+  ang = gaps::quat_angle(q_, target);
+  if (ang > p.max_rot) q_ = gaps::slerp(q_, target, 1 - p.max_rot / ang);
   out_p = anchor + offset_;
   out_q = q_;
 } }

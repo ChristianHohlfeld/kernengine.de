@@ -13,6 +13,7 @@
 
 namespace converted_equipment {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -34,22 +35,210 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
 namespace logic { using ActorRef = u32; }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { struct ActorHandle {
+  ActorRef id = 0;
+  bool operator==(const ActorHandle&) const = default;
 }; }
-struct Value;
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { using WorldId = u32; }
+namespace logic { struct ObjectRef {
+  i64 handle = 0;
+  WorldId world = 0;
+  
+  friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+  /// (an order for Sort List: by world, then by handle - the same in every tier)
+  
+
+
+
+}; }
+namespace logic { struct MapKey {
+  i64 i = 0;
+  std::string s;
+  bool operator==(const MapKey&) const = default;
+  
+}; }
+namespace logic { struct Value; }
+namespace logic { using MapEntries = converted::wide::Map<MapKey, Value>; }
+namespace logic { struct Int64 {
+  u64 bits = 0;
+  constexpr Int64() = default;
+  
+  
+  // (Sort List: as u64)
+  // (a key of a Map, a Set)
+}; }
+namespace logic { using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
+                             std::vector<ObjectRef>>; }
+namespace logic { struct Callable {
+  virtual ~Callable() = default;
+  /// Calls the function with `args` (its inputs after the bound place, in their order); `result`
+  /// gets its output. False: it is unbound now (the Blueprint it was made in has ended).
+  
+  /// Of one a Blueprint's class made (logic::detail::NativeCallable): which one (its signature's own mark) - the class
+  /// takes it back as it was. Null: one of the interpreter or the JIT.
+  
+}; }
+namespace logic { struct Value {
+  PinType type = PinType::number;
+  bool b = false;
+  i64 i = 0;
+  f64 n = 0;
+  Vec3 v;
+  std::string s;
+  ActorRef a = 0;
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef). 0 otherwise.
+  WorldId world = 0;
+  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
+  /// whoever changes one (edit) changes its own.
+  std::shared_ptr<const ListItems> list;
+  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
+  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
+  /// declared default - what a field is, is read through the declaration (logic::field_of).
+  std::shared_ptr<const std::vector<Value>> rows;
+  /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
+  /// list's items.
+  std::shared_ptr<const MapEntries> entries;
+  /// A Callback's function and place (none: it is unbound).
+  std::shared_ptr<const Callable> call;
+
+  
+  
+  
+  
+  
+  
+  /// An object of the engine (none: ObjectRef{}).
+  
+  /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
+  
+  /// An Int64: its 64 bits (held in `i`, as they are).
+  
+  /// A value of an enum: its place among the enum's values (the first is 0).
+  
+  /// A list of values of an enum.
+  
+
+
+
+
+
+  /// A value of a struct: its fields' values, in the order of the declaration.
+  
+
+
+
+
+
+  /// A list of structs.
+  
+
+
+
+
+
+  
+  /// A Callback (none: unbound).
+  
+  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
+  /// Whole numbers are held as every Int is (logic::normal).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The items of a list of T - none if this is no such list.
+  
+
+
+
+
+  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
+  /// of structs as Value.)
+  
+
+
+
+  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
+  /// none).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
+  /// field is at its declared default).
+  
+  /// How many fields a struct's value holds.
+  
+  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
+  
+
+
+
+
+  /// The entries of a map or a set (none: empty).
+  
+  /// The entries of a map or a set, to change them: this value's own.
+  
+  /// How many items a list has, how many entries a map or a set (none of these: 0).
+  
+  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
+  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
+  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
+  
+  
+  /// The same for what a place is declared as (TypeRef) - how a graph holds a default and a value
+  /// typed into a pin. A list of a fixed length (the place, a field of a struct) has that length:
+  /// read, what JSON does not say is the zero of its entries; written here, it is said up to its
+  /// last entry that is not that zero (logic::said) - a buffer of 24000 zeros is []. (to_json(g, of),
+  /// above, writes a value in full: every entry - what an inspector shows.)
+  
+  
+  
+}; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 namespace logic { struct Event {
   std::string type;
   ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)

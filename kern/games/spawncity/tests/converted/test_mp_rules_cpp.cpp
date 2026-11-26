@@ -15,6 +15,7 @@
 
 namespace converted_mp_rules_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -87,7 +88,7 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -104,9 +105,9 @@ struct Quat {
 
 
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 constexpr f32 kPi = 3.14159265358979323846;
 constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -149,27 +150,9 @@ struct Rng {
 
 };
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 namespace mp { constexpr f64 kInterpolationDelayMs = 90; }
 namespace mp { constexpr f64 kMaxExtrapolationMs = 100; }
 namespace mp { constexpr f64 kStaleHoldMs = 3000; }

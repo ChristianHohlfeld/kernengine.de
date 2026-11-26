@@ -18,6 +18,7 @@
 
 namespace converted_game_gaps_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -39,7 +40,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -135,7 +136,7 @@ struct Bvh;
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -160,7 +161,7 @@ struct MeshData {
   
 };
 struct Renderer;
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -214,33 +215,11 @@ struct Renderer : converted::EngineObject {
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+namespace logic { using PinType = :: kern :: logic :: PinType; }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -251,17 +230,36 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
-namespace GpsLive { enum class View : u8 { eye, follow, map }; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Mixer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
+namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -272,6 +270,12 @@ struct NightWindows : public ShaderExtension {
   using ShaderExtension::ShaderExtension;
 };
 struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct BitWriter : converted::EngineObject {
@@ -313,32 +317,23 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
+namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
+namespace GpsLive { enum class View : u8 { eye, follow, map }; }
 namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Engine : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct App : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
-namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
-struct SoundBank : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

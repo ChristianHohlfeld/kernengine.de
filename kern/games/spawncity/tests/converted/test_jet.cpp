@@ -13,6 +13,7 @@
 
 namespace converted_jet {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -34,7 +35,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
 constexpr f32 kPi = 3.14159265358979323846;
 struct JetSpec {
   f32 mass = 12000;

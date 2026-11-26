@@ -13,6 +13,7 @@
 
 namespace converted_look {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -34,7 +35,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
+enum class KERN_BLUEPRINT_TYPE LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace look { inline f32 impact_trauma(f32 dv) { return dv < 2.5 ? 0.0 : clampf((dv - 2.5) / 14, 0, 0.7); } }
 namespace look { struct Stabilizer {

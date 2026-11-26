@@ -13,6 +13,7 @@
 
 namespace converted_look_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -34,9 +35,9 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
+enum class KERN_BLUEPRINT_TYPE LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 constexpr f32 kPi = 3.14159265358979323846;
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -53,7 +54,7 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -145,7 +146,7 @@ struct Mat4 {
 
 
 };
-struct Camera {
+struct KERN_BLUEPRINT_TYPE Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
   f32 fov = kPi / 3, near = 0.05, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
@@ -155,8 +156,8 @@ struct Camera {
   bool has_projection = false;
   Mat4 projection = Mat4{};
 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - kern::math::exp(-rate * dt) : 0.0; }
@@ -181,7 +182,7 @@ struct Rng {
 
 
 };
-struct SkyState {
+struct KERN_BLUEPRINT_TYPE SkyState {
   Vec3 sun{-0.45, -0.52, 0.72};
   Vec3 moon{0.4, 0.5, 0.76};
   f32 night = 0;
@@ -190,7 +191,7 @@ struct SkyState {
   f32 blast_age = -1;          // < 0: no shock wave in the clouds
   Vec2 wind{0.012, 0.004};
 };
-struct Lighting {
+struct KERN_BLUEPRINT_TYPE Lighting {
   Vec3 sun_direction{-0.45, -0.52, 0.72};
   Vec3 sun_color{2.8, 2.47, 2.11};
   Vec3 sky_color{0.469, 0.609, 0.85};

@@ -18,6 +18,7 @@
 
 namespace converted_net_session {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -90,7 +91,7 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -107,7 +108,7 @@ struct Quat {
 
 
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -141,7 +142,7 @@ struct Endpoint : converted::EngineObject {
 struct Connection : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { struct Address {
+namespace net { struct KERN_BLUEPRINT_TYPE Address {
   u64 id = 0;  // 0 = none
   
   bool operator==(const Address&) const = default;
@@ -160,7 +161,7 @@ struct HostTransport : public Transport {
   void push_incoming(const net::Address& from, const unsigned char* data, const u32& bytes) const;
   bool take_outgoing(net::Address& to, std::vector<unsigned char>& data) const;
 };
-namespace net { enum class ClientState : i8 {
+namespace net { enum class KERN_BLUEPRINT_TYPE ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
   error = -1,           // connection error (desync, bad packets)
@@ -182,34 +183,12 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -218,6 +197,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {

@@ -14,6 +14,7 @@
 
 namespace converted_vehicle_art_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -43,7 +44,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -60,7 +61,7 @@ struct Quat {
 
 
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -155,8 +156,8 @@ struct Mat4 {
 struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct KERN_BLUEPRINT_TYPE Material {
   Vec4 color{1, 1, 1, 1};
   AlphaMode alpha = AlphaMode::opaque;
   f32 alpha_cutoff = 0.5;
@@ -178,7 +179,7 @@ struct Material {
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -203,7 +204,7 @@ struct MeshData {
   
 };
 struct Renderer;
-struct MeshLook {
+struct KERN_BLUEPRINT_TYPE MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
   u32 texture = 0;      // GPU texture handle (0 = none)
@@ -212,11 +213,11 @@ struct MeshLook {
   bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
 };
 struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   bool body_valid(const physics::Body& body) const;
@@ -322,7 +323,7 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -436,7 +437,7 @@ bool VehicleArt::make(Renderer& r, Part& p, const MeshData& mesh, const Material
   look.extra_slot = kMaxExtensionAttributes;
   look.visible = false;
   const Mat4 parked = Mat4::translate({0, 0, -1000});  // hidden until the first frame places it
-  if (!upsert(r, p.id, mesh, look, Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
+  if (!::converted_vehicle_art_cpp::upsert(r, p.id, mesh, look, Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   return true;
 }
 bool VehicleArt::init(Renderer& r) {

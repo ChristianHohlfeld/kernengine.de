@@ -14,6 +14,7 @@
 
 namespace converted_touch_play_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -159,14 +160,8 @@ struct TouchPlay {
   f32 pad_x_ = 0, pad_y_ = 0, pad_w_ = 0, pad_h_ = 0;
 };
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 namespace controls { void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch); }
 namespace controls { f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height); }
 namespace rules { inline f64 decimal(f32 x) {

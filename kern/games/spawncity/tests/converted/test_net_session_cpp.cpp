@@ -14,6 +14,7 @@
 
 namespace converted_net_session_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -52,11 +53,11 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -93,7 +94,7 @@ struct ReadStream : converted::EngineObject {
 struct MeasureStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { struct EndpointConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE EndpointConfig {
   int max_packet_size = 16 * 1024;     // payload bytes (before fragmentation)
   int fragment_above = 1024;           // bigger packets are fragmented
   int fragment_size = 1024;
@@ -110,8 +111,8 @@ namespace net { struct EndpointConfig {
 struct Endpoint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { enum class ChannelType : u8 { reliable_ordered, unreliable_unordered }; }
-namespace net { struct ChannelConfig {
+namespace net { enum class KERN_BLUEPRINT_TYPE ChannelType : u8 { reliable_ordered, unreliable_unordered }; }
+namespace net { struct KERN_BLUEPRINT_TYPE ChannelConfig {
   ChannelType type = ChannelType::reliable_ordered;
   int send_queue_size = 1024;            // messages (reliable: window)
   int receive_queue_size = 1024;
@@ -122,13 +123,13 @@ namespace net { struct ChannelConfig {
   int block_fragment_size = 1024;
   f32 resend_time = 0.1;                // seconds (at least; RTT * 1.25 when known)
 }; }
-namespace net { struct ConnectionConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE ConnectionConfig {
   std::vector<ChannelConfig> channels{ChannelConfig{}, ChannelConfig{ChannelType::unreliable_unordered}};
   int max_packet_size = 8 * 1024;        // message payload per packet
   int max_message_types = 256;
   EndpointConfig endpoint;
 }; }
-namespace net { struct Message {
+namespace net { struct KERN_BLUEPRINT_TYPE Message {
   u16 id = 0;                            // reliable: sequence within the channel
   u16 type = 0;
   std::vector<u8> data;
@@ -136,7 +137,7 @@ namespace net { struct Message {
 struct Connection : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { struct Address {
+namespace net { struct KERN_BLUEPRINT_TYPE Address {
   u64 id = 0;  // 0 = none
   
   bool operator==(const Address&) const = default;
@@ -155,7 +156,7 @@ struct HostTransport : public Transport {
   void set_address(const net::Address& a) const;
   void advance_time(const double& time) const;
 };
-namespace net { struct ClientServerConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE ClientServerConfig {
   u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
   int max_clients = 16;
   f64 timeout = 6;                           // seconds without packets
@@ -164,7 +165,7 @@ namespace net { struct ClientServerConfig {
   f64 keepalive_interval = 0.1;              // payload packets go out at least this often
   ConnectionConfig connection;
 }; }
-namespace net { enum class ClientState : i8 {
+namespace net { enum class KERN_BLUEPRINT_TYPE ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
   error = -1,           // connection error (desync, bad packets)
@@ -220,34 +221,12 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -256,6 +235,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {

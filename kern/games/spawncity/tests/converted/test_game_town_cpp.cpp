@@ -15,6 +15,7 @@
 
 namespace converted_game_town_cpp {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -43,13 +44,14 @@ inline f32 wrap_pi(f32 a) {
   while (a < -kPi) a += 2 * kPi;
   return a;
 }
-enum class Key : u8 {
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
 int map_layer(char kind) { return kind == 'w' ? 0 : kind == 'g' ? 1 : kind == 'r' ? 2 : 3; }
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }

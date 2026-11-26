@@ -14,6 +14,7 @@
 
 namespace converted_engine_physics_physics {
 namespace converted = ::sc::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,11 +36,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
-namespace physics { struct QueryFilter {
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
