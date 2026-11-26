@@ -8630,9 +8630,9 @@ TEST(world_starts_a_level_of_its_project) {
   CHECK(objects != nullptr);
   if (!objects) return;
   std::vector<logic::Value> out(1);
-  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::integer(objects->adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   const logic::Value made = out[0];
-  game::GameWorld* mine = objects->get<game::GameWorld>(made.as_int());
+  game::GameWorld* mine = objects->get<game::GameWorld>(made.as_object());
   CHECK(mine && mine->project() == program.project());
   const auto start = [&](const char* path) {
     std::vector<logic::Value> given(1);
@@ -8674,12 +8674,12 @@ TEST(program_world_has_the_project) {
   if (!objects) return;
   Renderer renderer;
   std::vector<logic::Value> out(1);
-  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::integer(0)}, out));
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* world = objects->get<game::GameWorld>(out[0].as_object());
   CHECK(world && world->project() == program.project() && world->project()->name == "Welten");
   // (made elsewhere: no project)
   logic::EngineObjects other;
-  CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::object(other.ref(other.adopt<Renderer>(renderer))), logic::Value::integer(0)}, out));
+  CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::object(other.ref(other.adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* alone = other.get<game::GameWorld>(out[0].as_object());
   CHECK(alone && alone->project() == nullptr);
   program.end();
