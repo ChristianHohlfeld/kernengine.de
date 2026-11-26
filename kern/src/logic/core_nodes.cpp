@@ -1609,7 +1609,7 @@ void add_structs(Library& lib) {
     d.inputs = {data("value", "Value", PinType::structure)};
     d.outputs = {bytes_out("bytes", "Bytes")};
     d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
@@ -1641,7 +1641,7 @@ void add_structs(Library& lib) {
     d.inputs = {any_ints("bytes", "Bytes"), data("at", "At", PinType::integer, 0)};
     d.outputs = {data("value", "Value", PinType::structure)};
     d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
