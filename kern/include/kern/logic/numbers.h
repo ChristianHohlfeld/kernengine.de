@@ -327,6 +327,15 @@ template <Floating T> inline T sinh(T a) { return dm::sinh(a); }
 template <Floating T> inline T cosh(T a) { return dm::cosh(a); }
 template <Floating T> inline T tanh(T a) { return dm::tanh(a); }
 template <Floating T> inline T asinh(T a) { return dm::asinh(a); }
+/// acosh, atanh, log2, log1p, exp2, cbrt, remainder, ldexp: the engine's own too (kern/src/math, kern::dm) - ldexp and remainder exact.
+template <Floating T> inline T acosh(T a) { return dm::acosh(a); }
+template <Floating T> inline T atanh(T a) { return dm::atanh(a); }
+template <Floating T> inline T log2(T a) { return dm::log2(a); }
+template <Floating T> inline T log1p(T a) { return dm::log1p(a); }
+template <Floating T> inline T exp2(T a) { return dm::exp2(a); }
+template <Floating T> inline T cbrt(T a) { return dm::cbrt(a); }
+template <Floating T> inline T remainder(T a, T b) { return dm::remainder(a, b); }
+template <Floating T> inline T ldexp(T a, i32 n) { return dm::ldexp(a, static_cast<int>(n)); }
 template <Floating T> inline T log(T a) { return dm::log(a); }
 template <Floating T> inline T log10(T a) { return dm::log10(a); }
 template <Floating T> inline T pow(T a, T b) { return dm::pow(a, b); }
@@ -401,7 +410,7 @@ template <Number T> struct Typed {
 #define KERN_TYPED_IS(name) friend Typed<bool> name(Typed a) requires Floating<T> { return num::name(a.v); }
   KERN_TYPED_1(sqrt) KERN_TYPED_1(floor) KERN_TYPED_1(ceil) KERN_TYPED_1(trunc) KERN_TYPED_1(round)
   KERN_TYPED_1(sin) KERN_TYPED_1(cos) KERN_TYPED_1(tan) KERN_TYPED_1(asin) KERN_TYPED_1(acos) KERN_TYPED_1(atan)
-  KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(sinh) KERN_TYPED_1(cosh) KERN_TYPED_1(tanh) KERN_TYPED_1(asinh) KERN_TYPED_1(log) KERN_TYPED_1(log10)
+  KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(sinh) KERN_TYPED_1(cosh) KERN_TYPED_1(tanh) KERN_TYPED_1(asinh) KERN_TYPED_1(acosh) KERN_TYPED_1(atanh) KERN_TYPED_1(log2) KERN_TYPED_1(log1p) KERN_TYPED_1(exp2) KERN_TYPED_1(cbrt) KERN_TYPED_1(log) KERN_TYPED_1(log10)
   KERN_TYPED_IS(isnan) KERN_TYPED_IS(isinf) KERN_TYPED_IS(isfinite) KERN_TYPED_IS(signbit)
 #undef KERN_TYPED_1
 #undef KERN_TYPED_IS
@@ -432,7 +441,7 @@ template <class A, class B, class C> concept Meet3 = requires { typename meet3<A
   }
 KERN_TYPED_FN2(min, Arithmetic) KERN_TYPED_FN2(max, Arithmetic)
 KERN_TYPED_FN2(atan2, Floating) KERN_TYPED_FN2(pow, Floating) KERN_TYPED_FN2(hypot, Floating) KERN_TYPED_FN2(copysign, Floating)
-KERN_TYPED_FN2(fmin, Floating) KERN_TYPED_FN2(fmax, Floating) KERN_TYPED_FN2(fmod, Floating)
+KERN_TYPED_FN2(fmin, Floating) KERN_TYPED_FN2(fmax, Floating) KERN_TYPED_FN2(fmod, Floating) KERN_TYPED_FN2(remainder, Floating)
 #undef KERN_TYPED_FN2
 template <class A, class B, class C> requires detail::Meet3<A, B, C> && Arithmetic<typename detail::meet3<A, B, C>::type>
 constexpr auto clamp(const A& x, const B& lo, const C& hi) {

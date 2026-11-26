@@ -1,17 +1,19 @@
-// How a program's own C++ calls a function of the Blueprint of one of the level's actors: what Call
+// How a program's own C++ calls a function of the Blueprint of one of the actors of a world: what Call
 // on Actor is in a Blueprint (docs/blueprint_cpp.md, "Aufrufe aus C++"). The C++ names the actor and
-// binds the logic the level's Blueprints run in, once the world has started; a call finds the actor
-// by its name and its running Blueprint - every time, as a Blueprint does -, gives its values in and
-// takes the function's outputs back, typed:
+// binds it - to the world the actor is in (a kern::game::GameWorld the program runs), or to the logic
+// its own Blueprints run in -; a call gives its values in and takes the function's outputs back, typed:
 //
 //   kern::logic::ActorBlueprint rules{"Military"};
-//   if (!rules.bind(logic)) ...      // (the actor has no Blueprint that runs)
+//   if (!rules.bind(world)) ...      // (the world has no actor of that name, or its Blueprint does not run)
 //   f64 chance = 0;
 //   rules.call("HitChance", std::tie(chance), distance, speed);
 //
-// is, written as a Blueprint, func_has_blueprint(actor_find("Military")) and
-// func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance, speed); - the same
-// call in every stage, through the same way of the runtime (Runtime::call_on, Runtime::get_on).
+// is, written as a program's Blueprint that holds the actor (a variable `Rules` of the type Actor),
+// Rules = engine_game_world_actor_named(world, "Military"); func_has_blueprint(Rules) and
+// func_call_on<"HitChance">(Rules, kern::out(n7.chance), distance, speed); - bound to a logic (`bind(logic)`),
+// func_has_blueprint(actor_find("Military")) and func_call_on<"HitChance">(actor_find("Military"), ...): the
+// actor of that name where its Blueprint runs. The same call in every stage, through the same way of the
+// runtime (Runtime::call_on, Runtime::get_on).
 #pragma once
 
 #include <concepts>
@@ -33,11 +35,45 @@ template <class T> struct IsVector : std::false_type {};
 template <class T> struct IsVector<std::vector<T>> : std::true_type {};
 }  // namespace detail
 
+/// A world whose actors a program's C++ reaches (ActorBlueprint::bind): one that names its actors as an Actor of it
+/// (kern::game::GameWorld::actor_named - Actor{} with the reason in last_error where it has none of that name or does
+/// not run), says whether it runs and as which world (every start is a new one) and gives the logic its Blueprints
+/// run in. (A concept, not a class of kern::game: the logic does not know the game; a test's world is one as well.)
+template <class W>
+concept WorldOfActors = requires(W& w, const W& c, std::string_view name) {
+  { c.actor_named(name) } -> std::same_as<ActorHandle>;
+  { c.world_id() } -> std::convertible_to<WorldId>;
+  { c.running() } -> std::convertible_to<bool>;
+  { w.logic_runtime() } -> std::convertible_to<Runtime*>;
+};
+
 struct ActorBlueprint {
   explicit constexpr ActorBlueprint(const char* name) : actor(name) {}
 
-  /// The actor of the level whose Blueprint this is (its name).
+  /// The actor whose Blueprint this is (its name).
   const char* const actor;
+
+  /// Binds it to the actor of its name in `world` - a world the program runs (a kern::game::GameWorld), once it has
+  /// started: the Actor of it is taken now (world.actor_named: its id and the world - kern/docs/project.md 7), and
+  /// from now on every call and every variable it reads goes to that actor's running Blueprint in that world. What it
+  /// gives back is Has Blueprint of that actor; false also where the world has no actor of the name or does not run
+  /// (the reason in last_error) - then every call gives the zeros. When the world stops, or starts again (a new world,
+  /// in which the Actor of the one before names nothing), a call reaches nothing: it gives the zeros, and the reason is
+  /// reported (log, last_error) - as a program's Blueprint that holds the Actor is told. (The world is held by its
+  /// address: it lives for as long as the program binds to it, as every object the C++ holds by reference.)
+  template <WorldOfActors W> bool bind(W& world) {
+    logic_ = nullptr;
+    world_ = &world;
+    reach_ = &reach<W>;
+    handle_ = world.actor_named(actor);
+    if (!handle_.valid()) return false;
+    ActorRef id = 0;
+    Runtime* there = target(id, "Has Blueprint");
+    return there && there->has_blueprint(id);
+  }
+  /// The Actor it is bound to in a world (bind(world)): Actor{} where it is bound to a logic, to none, or the world had
+  /// no actor of its name.
+  ActorHandle handle() const { return handle_; }
 
   /// Binds it to the logic the level's Blueprints run in (the world's Runtime): from now on every call
   /// and every variable it reads goes there - to the actor of its name, found when it is called
@@ -45,8 +81,13 @@ struct ActorBlueprint {
   /// running Blueprint (Runtime::find). What it gives back is whether the actor has a Blueprint that
   /// runs there - Has Blueprint, func_has_blueprint(actor_find(actor)) in a Blueprint, where the logic
   /// is the Blueprint's own. Until it is bound, every call gives the zeros.
+  /// (The logic it is bound to is the one of its actor's world: the logic of a world, or of the program's own
+  /// Blueprints - Runtime::call_on of that logic, with no other world in between.)
   bool bind(Runtime& logic) {
     logic_ = &logic;
+    world_ = nullptr;
+    reach_ = nullptr;
+    handle_ = {};
     return logic.has_blueprint(logic.host().find_actor(actor));
   }
 
@@ -75,20 +116,67 @@ struct ActorBlueprint {
   template <class T> T get(const char* name) const {
     T v{};
     Value held;
-    if (logic_ && logic_->get_on(logic_->host().find_actor(actor), name, pin_of<T>(), held)) taken(held.converted(pin_of<T>()), v);
+    ActorRef id = 0;
+    Runtime* there = target(id, "Get Variable on Actor");
+    if (there && there->get_on(id, name, pin_of<T>(), held)) taken(held.converted(pin_of<T>()), v);
     return v;
   }
   template <class... O, class... A> void call(const char* function, std::tuple<O&...> out, const A&... args) const {
     const std::vector<Value> in{argument(args)...};  // (first the values: one may be read from a place an output goes to)
     std::apply([](O&... o) { ((o = O{}), ...); }, out);
     std::vector<Value> results;
-    if (!logic_ || !logic_->call_on(logic_->host().find_actor(actor), function, in, results, kCaller)) return;
+    ActorRef id = 0;
+    Runtime* there = target(id, "Call on Actor");
+    if (!there || !there->call_on(id, function, in, results, kCaller)) return;
     take(results, out, std::index_sequence_for<O...>{});
   }
 
  private:
-  /// The logic it is bound to (null: none yet).
+  /// The logic it is bound to (null: none yet, or a world).
   Runtime* logic_ = nullptr;
+  /// The world it is bound to (bind(world); null: none, or a logic), how its logic is reached (reach<W>), and the Actor
+  /// of it there.
+  void* world_ = nullptr;
+  Runtime* (*reach_)(void* world, WorldId as, std::string& why) = nullptr;
+  ActorHandle handle_{};
+
+  /// The logic of `world` while it runs as the world `as`, else null and why.
+  template <class W> static Runtime* reach(void* world, WorldId as, std::string& why) {
+    W& w = *static_cast<W*>(world);
+    if (!w.running()) {
+      why = "its world does not run any more (the GameWorld was stopped)";
+      return nullptr;
+    }
+    if (static_cast<WorldId>(w.world_id()) != as) {
+      why = "its world ended and runs again as world " + std::to_string(static_cast<WorldId>(w.world_id())) + ", a new one (in which the Actor of the world before names nothing)";
+      return nullptr;
+    }
+    Runtime* r = w.logic_runtime();
+    if (!r) why = "its world runs no Blueprints";
+    return r;
+  }
+  /// The logic a call of `node` goes to and the actor there (`id`; 0: the Level's): the logic it is bound to and the
+  /// actor of its name there; of a world, its logic while the world runs as the one the Actor is of. Null where it goes
+  /// nowhere - nothing bound, no actor of the name in the world, or a world that ended (reported: log and last_error).
+  Runtime* target(ActorRef& id, const char* node) const {
+    id = 0;
+    if (logic_) {
+      id = logic_->host().find_actor(actor);
+      return logic_;
+    }
+    if (!reach_ || !handle_.valid()) return nullptr;
+    std::string why;
+    Runtime* there = reach_(world_, handle_.world, why);
+    if (!there) {
+      const std::string said = std::string(kCaller) + ": " + node + ": actor " + std::to_string(handle_.id) + " (" + actor + ") is of world " + std::to_string(handle_.world) + " - " + why +
+                               " (kern/docs/project.md 7)";
+      log(LogLevel::error, "%s", said.c_str());
+      fail("%s", said.c_str());
+      return nullptr;
+    }
+    id = handle_.id;
+    return there;
+  }
   /// Who calls, where a call is reported (Runtime::call_on): the program's C++.
   static constexpr const char* kCaller = "the program's C++";
 

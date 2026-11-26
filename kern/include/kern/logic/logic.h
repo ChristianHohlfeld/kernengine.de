@@ -848,7 +848,7 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 ///   operators    as C++ binds them: + - * / % (whole numbers), - ~ ! in front, << >> (the amount any whole
 ///                number), < <= > >= == != (give a bool), & | ^ (whole numbers), && || ! (bools), c ? a : b
 ///   functions    min max abs clamp(x, lo, hi); of floating numbers lerp(a, b, t) sqrt floor ceil trunc round
-///                sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 sinh cosh tanh asinh pow hypot copysign fmin fmax fmod,
+///                sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt pow hypot copysign remainder fmin fmax fmod,
 ///                isnan isinf isfinite signbit (give a bool)
 ///   conversions  num_cast<To, From>(x), num_bit_cast<To, From>(x) - the nodes Cast and Bit Cast
 /// What numbers.h fixes where C++ leaves the result open (a whole number / 0 ...) holds here as well.

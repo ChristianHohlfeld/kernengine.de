@@ -831,7 +831,7 @@ Settings und ist der Titel des Knotens. Sie ist **dieselbe Rechnung wie die Knot
 | | |
 |---|---|
 | Operatoren | `+ - * /`, `%` (ganze Zahlen), `- ~ !` davor, `<< >>`, `& | ^`, `< <= > >= == !=` (geben ein `bool`), `&& ||`, `c ? a : b` – Bindung wie in C++ |
-| Funktionen | `min max abs clamp(x, lo, hi)`, für Kommazahlen `lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 sinh cosh tanh asinh exp expm1 log log10 pow hypot copysign fmin fmax fmod isnan isinf isfinite signbit` (Radiant; die Mathematik der Engine – sinh, cosh, tanh, asinh ihre eigenen, kern/src/math/hyperbolic.c –, beim `f32` die f-Variante) |
+| Funktionen | `min max abs clamp(x, lo, hi)`, für Kommazahlen `lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 sinh cosh tanh asinh acosh atanh exp expm1 exp2 log log10 log2 log1p cbrt pow hypot copysign remainder fmin fmax fmod isnan isinf isfinite signbit` (Radiant; die Mathematik der Engine – sinh … atanh, log2, log1p, exp2, cbrt, remainder ihre eigenen, kern/src/math –, beim `f32` die f-Variante; außerhalb ihres Bereichs geben sie, was C++ gibt: NaN, ±Inf). `ldexp(x, n)` ist der Knoten Ldexp (n ein `i32`) |
 | Umwandlungen | `num_cast<To, From>(x)`, `num_bit_cast<To, From>(x)` |
 
 Gerechnet wird wie in den Knoten (`kern/logic/numbers.h`): ganze Zahlen brechen an ihrer Breite um, `/` und `%` durch 0

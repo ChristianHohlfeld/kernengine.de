@@ -148,7 +148,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor U8 U16 U32 I8 I16 I32 List Fixed Callback callback loop machine entry detached kern""".split())   # (kOwnWords, kern/src/logic/notation.cpp)
-FORMULA_WORDS = set("min max clamp abs copysign floor ceil round trunc sqrt pow exp expm1 log log10 sin cos tan asin acos atan atan2 lerp hypot fmin fmax fmod isnan isinf isfinite signbit sinh cosh tanh asinh "
+FORMULA_WORDS = set("min max clamp abs copysign floor ceil round trunc sqrt pow exp expm1 log log10 sin cos tan asin acos atan atan2 lerp hypot fmin fmax fmod isnan isinf isfinite signbit sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt remainder "
                     "num_cast num_bit_cast true false auto".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
@@ -494,13 +494,16 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "remainder": "remainder", "remainderf": "remainder",
         # (the engine's own hyperbolic functions, kern/src/math/hyperbolic.c: what std::sinh ... of a program is)
         "sinh": "sinh", "sinhf": "sinh", "cosh": "cosh", "coshf": "cosh", "tanh": "tanh", "tanhf": "tanh", "asinh": "asinh", "asinhf": "asinh",
+        "acosh": "acosh", "acoshf": "acosh", "atanh": "atanh", "atanhf": "atanh", "log2": "log2", "log2f": "log2", "log1p": "log1p", "log1pf": "log1p",
+        "exp2": "exp2", "exp2f": "exp2", "cbrt": "cbrt", "cbrtf": "cbrt",
         "isnan": "isnan", "isinf": "isinf", "isfinite": "isfinite", "signbit": "signbit"}
 
 
 # The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
 # every machine computes them the same) - each with how many arguments it takes. A constant of the program
 # computed with one of them is the number the engine gives for it (engine_formula).
-ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2, "sinh": 1, "cosh": 1, "tanh": 1, "asinh": 1}
+ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2, "sinh": 1, "cosh": 1, "tanh": 1, "asinh": 1,
+               "acosh": 1, "atanh": 1, "log2": 1, "log1p": 1, "exp2": 1, "cbrt": 1, "expm1": 1, "log10": 1, "hypot": 2, "remainder": 2}
 _FORMULAS = {}
 
 
@@ -522,9 +525,8 @@ def engine_formula(text):
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
 # (the engine has not these yet - kern/third_party/musl_math: a call of one waits with its place, see Emit.fx)
-MISSING_MATH = ("ldexp", "ldexpf", "acosh", "acoshf", "atanh", "atanhf", "log2", "log2f", "cbrt", "cbrtf",
-                "exp2", "exp2f", "log1p", "log1pf", "remainder", "remainderf")
-MORE_MATH = ("clampf", "hash_u32", "lround", "lroundf", "llround", "llroundf") + MISSING_MATH
+MISSING_MATH = ()   # (every function of <cmath> the converter takes is the engine's: kern::dm, kern/src/math)
+MORE_MATH = ("clampf", "hash_u32", "lround", "lroundf", "llround", "llroundf", "ldexp", "ldexpf") + MISSING_MATH
 
 
 # The engine's functions as nodes in converted code (BLUEPRINTS.md, 6c): handles for the engine's objects,
@@ -2024,7 +2026,7 @@ class Unit:
         which also are not called what the Blueprint has in the end). `among`: the names it must not be,
         where those are not the Blueprint's (a field of a type every Blueprint has the same)."""
         name = sane_name(want)
-        base, i = name, 1
+        base, i = name.rstrip("_") or name, 1   # (world_ again: world_2 - a name the notation writes, not world__2)
         held = self.names if among is None else among
         while name in held or (taken is not None and (name in taken or name in self.reserved)):
             i += 1
@@ -3284,6 +3286,15 @@ class Unit:
         name = sane_name(want)
         if name in self.names:
             raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
+        if self.actor_type(qtype(d)):
+            # the program's way to call the Blueprint of an actor of a world (an ActorBlueprint bound to one: actor_binding):
+            # the Actor of it, which bind() takes from the world - none until then
+            if actor_binding(self.tree, d) == "both":
+                raise Wait(f"the Blueprint of an actor ({d.get('name')}) bound to a world and to a logic: a Blueprint holds the Actor of a world, or names the actor where its logic runs - not both")
+            self.names.add(name)
+            self.state_lines[(1, name)] = [f"  /// (the actor of a world whose Blueprint the program calls: {c_string(actor_literal_of(d)['value']).decode('utf-8') if actor_literal_of(d) else d.get('name')})", f"  Actor {name} = Actor{{}};"]
+            self.state_statics[d["id"]] = (name, "Actor")
+            return (name, "Actor", None) if met else (name, "Actor")
         t = self.place(qtype(d))
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         if shared and init is None and self.world.globals.get(q) is False:
@@ -3318,8 +3329,8 @@ class Unit:
             return False
         if d["id"] not in self.tree.scope_of or self.tree.scope_of[d["id"]].rstrip(":") in self.tree.records:
             return False   # (a local variable - or a static field of a class: the class's)
-        if not self.world.program(d.get("_file") or "?") or self.actor_type(qtype(d)):
-            return False   # (the engine's - or the program's way to call an actor's Blueprint: Call on Actor names the actor)
+        if not self.world.program(d.get("_file") or "?") or (self.actor_type(qtype(d)) and actor_binding(self.tree, d) not in ("world", "both")):
+            return False   # (the engine's - or the program's way to call an actor's Blueprint bound to its logic: Call on Actor names the actor)
         if not (d.get("storageClass") == "static" or "_GLOBAL__N_" in (d.get("mangledName") or "")):
             return True   # (a variable the whole program shares: of its one object)
         if is_header(d.get("_file", "")):
@@ -3522,7 +3533,8 @@ class Unit:
                     if f.self_type is not None:
                         mine = self.struct(self.tree.owner.get(d["id"]))
                         seen += [mine] if not f.ctor else []
-                    seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
+                    # (the logic the Blueprints run in is no input: a Blueprint's own - as the function says it, Emit's f.logic)
+                    seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" and not self.is_logic(qtype(x)) for t in self.param_types(x)]
                     if f.value is not None:
                         seen.append(self.place(qtype(d).split("(")[0].strip()))
                 finally:
@@ -8045,7 +8057,7 @@ class Emit:
         named = self.unwrap(args[0]) if len(args) == 1 else {}
         if named.get("kind") != "StringLiteral":
             raise Wait("a variable of an actor's Blueprint that is not named in so many words")
-        name, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        name, (actor, at) = c_string(named["value"]).decode("utf-8"), self.actor_target(obj)
         target = self.u.world.actors.get(actor)
         if target is None:
             raise Wait(f"a variable of the Blueprint of the actor {actor}, which the level does not have")
@@ -8062,7 +8074,7 @@ class Emit:
             if why:
                 raise Wait(f"the variable {name} of the Blueprint of the actor {actor}: it is {why}")
         self.f.on_actors.append((actor, name))
-        return f'func_get_on<"{name}", {t}>(actor_find({text_literal(actor)}))', t
+        return f'func_get_on<"{name}", {t}>({at})', t
 
     def actor_bind(self, n):
         """rules.bind(logic) - kern::logic::ActorBlueprint::bind: the program binds the actor's Blueprint to the logic
@@ -8079,13 +8091,27 @@ class Emit:
         the C++ binds is the one the function was given (logic_arg) - which a Blueprint does not need given."""
         args = kids(n)[1:]
         if len(args) != 1:
-            raise Wait("an actor's Blueprint bound otherwise than to a logic")
-        self.logic_arg(args[0])
-        actor = self.actor_named(obj)
+            raise Wait("an actor's Blueprint bound otherwise than to a logic or a world")
+        actor, at = self.actor_target(obj)
         if actor not in self.u.world.actors:
             raise Wait(f"the Blueprint of the actor {actor}, which the level does not have")
+        if actor_binding(self.tree, self.actor_decl(obj)) == "world":
+            # bound to a world: the Actor of the actor of its name there (GameWorld::actor_named - its node), kept in the
+            # variable of the program's Blueprint every call on it goes to; what bind gives is Has Blueprint of it
+            world = bare(args[0])
+            q = re.sub(r"^const\s+|\s*&$", "", self.ctype(world)).strip()
+            rec = self.tree.records.get(q)
+            named = next((x for x in kids(rec) if x.get("kind") == "CXXMethodDecl" and x.get("name") == "actor_named"), None) if rec is not None else None
+            if named is None:
+                raise Wait(f"the Blueprint of the actor {actor} bound to a {q}, which names no actor (actor_named)")
+            got, _ = self.engine_value(self.tree.decl.get(named["id"], named), args[0], [self.actor_literal(self.actor_decl(obj))])
+            self.hoist([f"{at} = {got};"])
+            self.f.effect("it changes the Blueprint's variables")
+            self.f.mutates = True
+        else:
+            self.logic_arg(args[0])
         self.f.on_actors.append((actor, None))
-        return f"func_has_blueprint(actor_find({text_literal(actor)}))", "bool"
+        return f"func_has_blueprint({at})", "bool"
 
     def logic_arg(self, a):
         """The logic a call hands on (to ActorBlueprint::bind, to a function's `kern::logic::Runtime&`): in a
@@ -8128,17 +8154,41 @@ class Emit:
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
         is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
+        return self.actor_named_at(self.actor_decl(obj))
+
+    def actor_decl(self, obj):
+        """The variable of the ActorBlueprint `obj` - one the program makes and names here."""
         b = self.unwrap(obj)
         d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
         if d is None or d.get("kind") != "VarDecl" or qtype(d).rstrip().endswith("&"):
             raise Wait("a call on an actor's Blueprint that is not one the program makes and names here (its actor)")
-        made = bare(kids(d)[-1]) if kids(d) else {}
-        while made.get("kind") in ("ExprWithCleanups", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr") and len(kids(made)) == 1:
-            made = bare(kids(made)[0])
-        said = [self.unwrap(x) for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"] if made.get("kind") == "CXXConstructExpr" else []
-        if len(said) != 1 or said[0].get("kind") != "StringLiteral":
+        return d
+
+    def actor_literal(self, d):
+        """The text that names the actor where the ActorBlueprint `d` is made (ActorBlueprint rules{"Lamps"}): its node."""
+        said = actor_literal_of(d)
+        if said is None:
             raise Wait("a call on an actor's Blueprint whose actor is not named in so many words where it is made")
-        return c_string(said[0]["value"]).decode("utf-8")
+        return said
+
+    def actor_target(self, obj):
+        """The actor of the ActorBlueprint `obj` and the Actor a Blueprint calls it on: bound to a world (actor_binding), the
+        variable of the program's Blueprint that holds the Actor bind() took from the world; bound to the logic it runs in,
+        the actor of its name there - actor_find("Lamps"). (its name, the text)"""
+        d = self.actor_decl(obj)
+        actor = self.actor_named_at(d)
+        how = actor_binding(self.tree, d)
+        if how == "both":
+            raise Wait(f"the Blueprint of the actor {actor} bound to a world and to a logic: a Blueprint holds the Actor of a world, or names the actor where its logic runs - not both")
+        if how == "world":
+            if d["id"] not in self.names:
+                raise Wait(f"the Blueprint of the actor {actor} of a world, called by a function that is none of the program's Blueprint (the Actor bind() took is a variable of the Blueprint of the program's one object)")
+            return actor, self.names[d["id"]]
+        return actor, f"actor_find({text_literal(actor)})"
+
+    def actor_named_at(self, d):
+        """The actor the ActorBlueprint `d` is made for, by name."""
+        return c_string(self.actor_literal(d)["value"]).decode("utf-8")
 
     def actor_value(self, n):
         """rules.number("Speed", x), rules.flag("Seen", y) - kern::logic::ActorBlueprint's Call on Actor with one
@@ -8210,10 +8260,10 @@ class Emit:
             if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
                 raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
             places, values = kids(outs)[1:], args[2:]
-        function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
-        return self.call_on_actor(actor, function, values, places, gives_type)
+        function, (actor, at) = c_string(named["value"]).decode("utf-8"), self.actor_target(obj)
+        return self.call_on_actor(actor, function, values, places, gives_type, at=at)
 
-    def call_on_actor(self, actor, function, values, places, gives_type=None, state=False):
+    def call_on_actor(self, actor, function, values, places, gives_type=None, state=False, at=None):
         """Call on Actor: the function `function` of the Blueprint of the actor `actor` runs with `values` - what it gives
         goes to `places` (None: the value of the call, of type gives_type). `state`: the actor's Blueprint is the state
         of a class of the program (another one than this Blueprint's - state_call); its function is called as the
@@ -8270,7 +8320,7 @@ class Emit:
         u.next_node += 1
         if gives:
             u.members.append("  struct { " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + f" }} n{node};")
-        lines = [f'func_call_on<"{local}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
+        lines = [f'func_call_on<"{local}">({at or "actor_find(" + text_literal(actor) + ")"}, kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
         if gives_type:
             self.hoist(lines)
             return f"n{node}.{gives[0]}", gives_type
@@ -10902,6 +10952,9 @@ class Emit:
         if k in CAST + ("ParenExpr",) or k == "UnaryOperator" and b.get("opcode") in ("-", "+", "~", "!") or k == "BinaryOperator" and b.get("opcode") not in ("=", ",") \
                 or k == "ConditionalOperator":
             return bool(kids(b)) and all(self.literal_only(bare(c)) for c in kids(b))
+        if k == "CallExpr" and self.formula_function(b) and MATH.get(callee_name(b)) in ENGINE_MATH and len(kids(b)) - 1 == ENGINE_MATH[MATH[callee_name(b)]]:
+            # (a function of the engine's mathematics of numbers written out - std::cbrt(27.0): the number the engine gives for it)
+            return all(self.literal_only(bare(c)) for c in kids(b)[1:])
         return False
 
     # (the C++ type a number written out has alone, as the formula reads it: 7 an i32, 7u a u32, 0.5 an f64, 0.5f an f32)
@@ -10928,7 +10981,10 @@ class Emit:
             return self.leaf(b, leaves)   # (a character of a C string at a place: read there)
         if t in NUMS and self.literal_only(b):
             # (numbers written out and what C++ computes of them: the number itself, in its type)
-            text = number_literal(Const(self.u).number(b), t)
+            value = Const(self.u).number(b)
+            if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+                raise Wait("a constant that is no number or without end (the language writes no such number out)")
+            text = number_literal(value, t)
             if text == "-9223372036854775807 - 1":
                 return self.leaf(b, leaves, text, t, force=True)
             return f"({text})" if text.startswith("-") else text
@@ -11003,6 +11059,9 @@ class Emit:
             # once (an input of its own where it is more than a name)
             v, lo, hi = (self.leaf(x, leaves, self.ex(x, t), t) for x in a)
             return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
+        if name in ("ldexp", "ldexpf") and len(a) == 2:
+            # (x * 2^n, exact: the node Ldexp - the engine's own; n the int C++ gives it)
+            return self.leaf(None, leaves, f"math_ldexp<{t}>({self.ex(a[0], t)}, {self.ex(a[1], 'i32')})", t)
         if name in ("lround", "lroundf", "llround", "llroundf") and len(a) == 1:
             ft = self.tp(a[0])
             return f"num_cast<{t}, {ft}>(round({self.fx(a[0], leaves)}))"
@@ -13721,6 +13780,15 @@ class TestWriter:
                         while first.get("previousDecl") in self.tree.decl:
                             first = self.tree.decl[first["previousDecl"]]
                         held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
+                    if self.actor_blueprint(vt):
+                        # (the Blueprint of an actor of a world the source calls - an ActorBlueprint bound to the test's world: the
+                        # Actor it holds, as the Blueprint's variable holds it; not drawn - bound to the test's world, as the program binds it)
+                        draws.append(f"  converted::bind_source_world({held});")   # (bound again before each call: a call of the source may have bound it elsewhere)
+                        values.append(f'{{"{variable}", converted::arg({held})}}')
+                        checks.append(f"converted::at_place(converted::same({held}, (*got.rows)[{len(checks)}]), \".{variable}\")")
+                        fine.append("true")
+                        texts.append(f'"{variable} = " + converted::text({held})')
+                        continue
                     try:
                         spelled = self.spell(vt)
                         draws.append(f"  {held} = {self.draw(vt)};")
@@ -14035,6 +14103,15 @@ class TestWriter:
                 text = tree.source(v).strip()
                 if text:
                     decls.append("  " + (text if re.match(r"virtual\b", text) else "virtual " + text) + ("" if text.endswith(("}", ";")) else ";"))
+            if any(re.search(r"\bactor_named\s*\(", x) for x in decls) and all(
+                    any(c.get("kind") == "CXXMethodDecl" and c.get("name") == m for c in kids(tree.records[q])) for m in ("world_id", "running", "logic_runtime")):
+                # a world of actors (kern::logic::WorldOfActors: a GameWorld) - an ActorBlueprint of the source is bound to it: the
+                # stand-in names an actor as the engine answers (actor_named, above), is the world of its Object and runs no actor's
+                # Blueprint - a call on one reaches nothing, as in the Blueprint, where the Actor is of no world it reaches
+                for m, text in (("world_id", "  kern::logic::WorldId world_id() const { return kern_world; }"), ("running", "  bool running() const { return false; }"),
+                                ("logic_runtime", "  kern::logic::Runtime* logic_runtime() { return nullptr; }")):
+                    if not any(re.search(r"\b" + m + r"\s*\(", x) for x in decls):
+                        decls.append(text)
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
@@ -15327,6 +15404,10 @@ class TestWriter:
         for q in tree.records:
             if self.compiled_top(q, records):
                 self.names[q] = "::".join(classes_of(q + "::"))
+        if ACTOR in tree.records and ACTOR not in self.names:
+            # (an Actor the source does not spell itself - what a stand-in of the engine gives, GameWorld::actor_named, where an
+            # ActorBlueprint of the source is bound to a world: the engine's own ActorHandle, its id and its world)
+            self.names[ACTOR] = "::" + ACTOR
         for q in tree.enums:
             if q in enums or self.compiled_top(q, records):
                 self.enum_names[q] = "::".join(classes_of(q.rsplit("::", 1)[0] + "::" if "::" in q else "") + [q.split("::")[-1]])
@@ -15419,8 +15500,9 @@ class TestWriter:
             while first.get("previousDecl") in tree.decl:
                 first = tree.decl[first["previousDecl"]]
             if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
-                bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
-        bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
+                # (bound to a world - actor_binding -: to the test's world, the runtime of the actors for the source, BlueprintRun)
+                bindings.append(("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]), "world" if actor_binding(tree, v) == "world" or actor_binding(tree, first) == "world" else "logic"))
+        bindings += [(name, "logic") for p in G.foreign.values() for name in p.get("actors", ())]
         looked = u.lookup_scope
         for f in u.order:
             d = f.decl
@@ -15851,9 +15933,9 @@ class TestWriter:
                     add(key, text)
             add(None, "\n".join(["", f"KERN_TEST(converted_{stem}) {{",
                                   f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
-            for b in dict.fromkeys(bindings):
+            for b, how in dict.fromkeys(bindings):
                 if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
-                    add(("bind", b), f"  {b}.bind(bp.source_logic());")
+                    add(("bind", b), f"  {b}.bind(bp.source_{how}());")
             for a in actors:   # (the source calls a Blueprint as its class: bound to the object the source's logic runs it as)
                 if a in class_libraries(u.world) and ("class", a) not in dropped:
                     add(("class", a), f"  KERN_CHECK(kern::logic::bind_blueprint<blueprints::{a}>(bp.source_logic()), \"the Blueprint {a} runs as its class\");")
@@ -16293,6 +16375,55 @@ def gives_kept(d):
     return r.get("kind") == "DeclRefExpr" and (r.get("referencedDecl") or {}).get("id") == v.get("id")
 
 
+def actor_bindings(tree):
+    """How the program binds each of its ActorBlueprints (kern::logic::ActorBlueprint, or a class of the program made of
+    it): the id of its variable -> {"world", "logic"} - the kinds its bind() calls are given in the file and its headers.
+    "logic": a kern::logic::Runtime, the logic it runs in (Call on Actor on the actor found by its name there,
+    actor_find); "world": a world the program runs (kern::game::GameWorld - logic::WorldOfActors): the Actor of the
+    actor of its name in that world, which the program's Blueprint holds in a variable (kern/docs/project.md 7)."""
+    got = getattr(tree, "_actor_bindings", None)
+    if got is None:
+        got = collections.defaultdict(set)
+        for f in {id(x): x for x in tree.body.values()}.values():
+            for n in walk(f):
+                if n.get("kind") != "CXXMemberCallExpr" or len(kids(n)) != 2:
+                    continue
+                m = callee(n)
+                if m.get("kind") != "MemberExpr" or m.get("name") != "bind" or not kids(m):
+                    continue
+                base = bare(kids(m)[0])
+                while base.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(base):
+                    base = bare(kids(base)[0])
+                ref = base.get("referencedDecl") or {} if base.get("kind") == "DeclRefExpr" else {}
+                owner = tree.owner.get(m.get("referencedMemberDecl")) or ""
+                if ref.get("kind") != "VarDecl" or not owner.endswith("logic::ActorBlueprint"):
+                    continue
+                given = re.sub(r"^const\s+|\s*&$", "", qtype(bare(kids(n)[1]))).strip()
+                got[ref["id"]].add("logic" if given.endswith("logic::Runtime") else "world")
+        tree._actor_bindings = got
+    return got
+
+
+def actor_literal_of(d):
+    """The StringLiteral that names the actor where the ActorBlueprint `d` is made (ActorBlueprint rules{"Lamps"}), or None."""
+    made = bare(kids(d)[-1]) if kids(d) else {}
+    while made.get("kind") in ("ExprWithCleanups", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr") and len(kids(made)) == 1:
+        made = bare(kids(made)[0])
+    said = [x for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"] if made.get("kind") == "CXXConstructExpr" else []
+    said = [bare(x) for x in said]
+    for i, x in enumerate(said):
+        while x.get("kind") == "ImplicitCastExpr" and kids(x):
+            x = bare(kids(x)[0])
+        said[i] = x
+    return said[0] if len(said) == 1 and said[0].get("kind") == "StringLiteral" else None
+
+
+def actor_binding(tree, d):
+    """How the ActorBlueprint `d` is bound (actor_bindings): "world", "logic", "both" - or None: nowhere here."""
+    kinds = actor_bindings(tree).get(d["id"], set()) if d is not None else set()
+    return None if not kinds else "both" if len(kinds) > 1 else next(iter(kinds))
+
+
 def shared_variable(tree, d):
     """Is this a variable the whole program shares - of one of its namespaces (or a file's own), not const,
     not the program's way to call an actor's Blueprint? (Unit.kept_by_state: a variable of the state.)"""
@@ -16307,7 +16438,9 @@ def shared_variable(tree, d):
             return True
         rec = next((r for q, r in tree.records.items() if q == c or q.endswith("::" + c) or c.endswith("::" + q)), None)
         return depth < 8 and rec is not None and any(actor(b.get("type", {}).get("qualType", ""), depth + 1) for b in rec.get("bases", []) or [])
-    return not actor(qtype(d))
+    # (one bound to a world is a variable of the program's Blueprint - the Actor of it, Unit.state_static -; one bound to a
+    # logic is no value: Call on Actor names the actor where it is called)
+    return not actor(qtype(d)) or actor_binding(tree, d) in ("world", "both")
 
 
 def starts_at_zero(init):

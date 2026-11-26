@@ -42,6 +42,8 @@
 #include "kern/logic/nodes.h"
 #include "logic_cases.h"
 #include "math_names.h"
+#include "hyperbolic_reference.h"
+#include "elementary_reference.h"
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
@@ -9520,6 +9522,74 @@ TEST(program_reaches_actors_of_its_worlds) {
   program.end();
 }
 
+TEST(cpp_reaches_actors_of_its_worlds) {
+  // The program's C++ binds an ActorBlueprint to the actor of its name in a world it runs (bind(world): the Actor of it -
+  // its id and that world, kern/docs/project.md 7) and reaches that actor's Blueprint there, as a program's Blueprint
+  // that holds the Actor does: called, its variable read, Has Blueprint - in that world alone. A world that stops, or
+  // starts again (a new world), is reached no more: the zeros, and the reason said. (The Blueprint of the program that
+  // does the same - the converter's - is compared with this C++ in the interpreter and as its class:
+  // tools/converter_cases worldrules.)
+  game::Level l = game::basic_level();
+  game::Actor door;
+  door.name = "Door";
+  door.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "  Float Speed = 2.5;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit(Int by = 0) {\n"
+                        "    Hits += by;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  cpp_reaches_actors_of_its_worlds (Door): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  static_assert(logic::WorldOfActors<game::GameWorld>);
+  static_assert(!logic::WorldOfActors<logic::Runtime>);
+  {
+    Renderer renderer;
+    game::GameWorld wa(renderer), wb(renderer);
+    logic::ActorBlueprint rules{"Door"}, other{"Door"}, nobody{"Nobody"};
+    // bound before the world runs: no Actor, the reason, the zeros
+    CHECK(!rules.bind(wa) && rules.handle() == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Door\": the world does not run");
+    CHECK(rules.number("Hit", i64{1}) == 0);
+    CHECK(wa.start(l, game::SimMode::play) && wb.start(l, game::SimMode::play));
+    wa.step(1.0f / 60, game::PlayInput{});
+    wb.step(1.0f / 60, game::PlayInput{});
+    const auto hits = [](game::GameWorld& w) { const logic::Instance* i = w.logic_runtime() ? w.logic_runtime()->find(w.find_actor("Door")) : nullptr; return i ? i->get("Hits").as_int() : -1; };
+    // bound to world A: the Actor of A's door (the same id as B's, another world)
+    CHECK(rules.bind(wa) && other.bind(wb));
+    CHECK(rules.handle() == wa.actor_named("Door") && rules.handle().id == door_id && other.handle().id == door_id && rules.handle().world != other.handle().world);
+    CHECK(!nobody.bind(wa) && nobody.handle() == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Nobody\": the world has no actor of that name");
+    CHECK(nobody.number("Hit", i64{1}) == 0 && hits(wa) == 0);
+    i64 got = 0;
+    rules.call("Hit", std::tie(got), i64{2});
+    CHECK(got == 2 && hits(wa) == 2 && hits(wb) == 0);
+    CHECK(rules.number("Hit", i64{3}) == 5 && rules.get<i64>("Hits") == 5 && rules.get<f64>("Speed") == 2.5 && other.get<i64>("Hits") == 0);
+    CHECK(other.number("Hit", i64{1}) == 1 && hits(wa) == 5 && hits(wb) == 1);
+    // ... bound to the world's logic instead: the actor of its name there, as before (no world in between)
+    CHECK(other.bind(*wa.logic_runtime()) && other.handle() == logic::ActorHandle{} && other.get<i64>("Hits") == 5);
+    // world A stops: its Actor reaches nothing, the reason is said
+    wa.stop();
+    clear_error();
+    CHECK(rules.number("Hit", i64{1}) == 0 && rules.get<i64>("Hits") == 0);
+    CHECK(std::string(last_error()) == "the program's C++: Get Variable on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) +
+                                           " - its world does not run any more (the GameWorld was stopped) (kern/docs/project.md 7)");
+    // started again it is a new world: the Actor of the one before names nothing in it - until it is bound again
+    CHECK(wa.start(l, game::SimMode::play));
+    wa.step(1.0f / 60, game::PlayInput{});
+    CHECK(rules.number("Hit", i64{1}) == 0 && hits(wa) == 0);
+    CHECK(std::string(last_error()).find("Call on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) + " - its world ended and runs again as world " +
+                                         std::to_string(wa.world_id()) + ", a new one") != std::string::npos);
+    CHECK(rules.bind(wa) && rules.number("Hit", i64{4}) == 4 && hits(wa) == 4);
+    wa.stop();
+    wb.stop();
+  }
+}
+
 TEST(world_starts_a_level_of_its_project) {
   game::Level a = game::basic_level(), b = game::basic_level();
   a.name = "Erstes";
@@ -13045,6 +13115,262 @@ TEST(math_of_the_standard_library_is_the_engines) {
   if (!read || want != r.digest) std::printf("  digest %016llx (math_names_digest.txt: %016llx)\n", static_cast<unsigned long long>(r.digest), want);
   CHECK(read && want == r.digest);
 }
+
+TEST(hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges) {
+  // sinh, cosh, tanh, asinh are the engine's own (kern/src/math/hyperbolic.c, from the definitions over musl's exp, expm1,
+  // log and sqrt). (1) Against values computed with 200 digits (hyperbolic_reference.h, kern/tests/hyperbolic_reference.py):
+  // the error in ulp of the exact value - at most 2 ulp for f64 (measured 1.95, tanh), at most 1 ulp for f32 (computed in
+  // f64, rounded once: measured 0.50). (2) Their edges and identities, bit for bit.
+  using F = double (*)(double);
+  using G = float (*)(float);
+  const F f64s[] = {[](double x) { return kern::dm::sinh(x); }, [](double x) { return kern::dm::cosh(x); },
+                    [](double x) { return kern::dm::tanh(x); }, [](double x) { return kern::dm::asinh(x); }};
+  const G f32s[] = {[](float x) { return kern::dm::sinh(x); }, [](float x) { return kern::dm::cosh(x); },
+                    [](float x) { return kern::dm::tanh(x); }, [](float x) { return kern::dm::asinh(x); }};
+  const char* names[] = {"sinh", "cosh", "tanh", "asinh"};
+  auto ulps = [](double got, const hyperbolic_reference::Row& row, bool single) {
+    if (!std::isfinite(got)) return 1e9;
+    const int e = std::ilogb(row.hi);
+    const double ulp = single ? std::ldexp(1.0, std::max(e, -126) - 23) : std::ldexp(1.0, std::max(e, -1022) - 52);
+    return std::fabs((got - row.hi) - row.lo) / ulp;
+  };
+  double worst[2][4] = {};
+  double worst_at[2][4] = {};
+  for (const auto& row : hyperbolic_reference::kDouble) {
+    const double e = ulps(f64s[row.fn](row.x), row, false);
+    if (e > worst[0][row.fn]) worst[0][row.fn] = e, worst_at[0][row.fn] = row.x;
+  }
+  for (const auto& row : hyperbolic_reference::kFloat) {
+    const double e = ulps(static_cast<double>(f32s[row.fn](static_cast<float>(row.x))), row, true);
+    if (e > worst[1][row.fn]) worst[1][row.fn] = e, worst_at[1][row.fn] = row.x;
+  }
+  for (int k = 0; k < 4; ++k) {
+    if (worst[0][k] > 2.0) std::printf("  %s (f64): %.3f ulp at %a\n", names[k], worst[0][k], worst_at[0][k]);
+    if (worst[1][k] > 1.0) std::printf("  %s (f32): %.3f ulp at %a\n", names[k], worst[1][k], worst_at[1][k]);
+    CHECK(worst[0][k] <= 2.0);
+    CHECK(worst[1][k] <= 1.0);
+  }
+  CHECK(std::size(hyperbolic_reference::kDouble) > 1000 && std::size(hyperbolic_reference::kFloat) > 1000);
+  // ±0 keep their sign (cosh: 1); ±inf; NaN.
+  const double inf = std::numeric_limits<double>::infinity(), nan = std::numeric_limits<double>::quiet_NaN();
+  for (double z : {0.0, -0.0}) {
+    CHECK(math_names::bits(kern::dm::sinh(z)) == math_names::bits(z) && math_names::bits(kern::dm::tanh(z)) == math_names::bits(z) &&
+          math_names::bits(kern::dm::asinh(z)) == math_names::bits(z) && kern::dm::cosh(z) == 1.0);
+    const float zf = static_cast<float>(z);
+    CHECK(math_names::bits(kern::dm::sinh(zf)) == math_names::bits(zf) && math_names::bits(kern::dm::tanh(zf)) == math_names::bits(zf) &&
+          math_names::bits(kern::dm::asinh(zf)) == math_names::bits(zf) && kern::dm::cosh(zf) == 1.0f);
+  }
+  CHECK(kern::dm::sinh(inf) == inf && kern::dm::sinh(-inf) == -inf && kern::dm::cosh(inf) == inf && kern::dm::cosh(-inf) == inf);
+  CHECK(kern::dm::tanh(inf) == 1.0 && kern::dm::tanh(-inf) == -1.0 && kern::dm::asinh(inf) == inf && kern::dm::asinh(-inf) == -inf);
+  CHECK(std::isnan(kern::dm::sinh(nan)) && std::isnan(kern::dm::cosh(nan)) && std::isnan(kern::dm::tanh(nan)) && std::isnan(kern::dm::asinh(nan)));
+  CHECK(std::isnan(kern::dm::sinh(static_cast<float>(nan))) && std::isnan(kern::dm::asinh(static_cast<float>(nan))));
+  // Where they overflow: sinh and cosh of 710.475 are finite, of 710.476 infinite (ln(2 * DBL_MAX) = 710.4758600739...);
+  // in f32 at 89.41598... (ln(2 * FLT_MAX)).
+  CHECK(std::isfinite(kern::dm::sinh(710.475)) && kern::dm::sinh(710.476) == inf && kern::dm::sinh(-710.476) == -inf);
+  CHECK(std::isfinite(kern::dm::cosh(-710.475)) && kern::dm::cosh(710.476) == inf);
+  CHECK(std::isfinite(kern::dm::sinh(89.4159f)) && std::isinf(kern::dm::sinh(89.4161f)) && std::isinf(kern::dm::cosh(-89.4161f)));
+  // Very small x: sinh x, tanh x, asinh x are x; cosh x is 1. Large: tanh is ±1.
+  for (double t : {1e-10, -3e-12, 1e-300, 5e-324}) {
+    CHECK(kern::dm::sinh(t) == t && kern::dm::tanh(t) == t && kern::dm::asinh(t) == t && kern::dm::cosh(t) == 1.0);
+  }
+  CHECK(kern::dm::tanh(30.0) == 1.0 && kern::dm::tanh(-30.0) == -1.0 && kern::dm::tanh(30.0f) == 1.0f);
+  // Odd and even, bit for bit; |tanh| <= 1; asinh(sinh(x)) is x within 4 ulp.
+  std::uint64_t s = 0x2545f4914f6cdd1dull;
+  int odd = 0, bounded = 0, back = 0, n = 0;
+  for (int i = 0; i < 4000; ++i) {
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double u = static_cast<double>(s >> 11) / 9007199254740992.0;
+    const double x = u * std::ldexp(1.0, static_cast<int>(s % 30) - 25);   // (0 .. 32)
+    const float xf = static_cast<float>(x);
+    ++n;
+    if (math_names::bits(kern::dm::sinh(-x)) == math_names::bits(-kern::dm::sinh(x)) && math_names::bits(kern::dm::cosh(-x)) == math_names::bits(kern::dm::cosh(x)) &&
+        math_names::bits(kern::dm::tanh(-x)) == math_names::bits(-kern::dm::tanh(x)) && math_names::bits(kern::dm::asinh(-x)) == math_names::bits(-kern::dm::asinh(x)) &&
+        math_names::bits(kern::dm::sinh(-xf)) == math_names::bits(-kern::dm::sinh(xf)) && math_names::bits(kern::dm::cosh(-xf)) == math_names::bits(kern::dm::cosh(xf)) &&
+        math_names::bits(kern::dm::tanh(-xf)) == math_names::bits(-kern::dm::tanh(xf)) && math_names::bits(kern::dm::asinh(-xf)) == math_names::bits(-kern::dm::asinh(xf)))
+      ++odd;
+    if (std::fabs(kern::dm::tanh(x)) <= 1.0 && std::fabs(kern::dm::tanh(xf)) <= 1.0f && kern::dm::cosh(x) >= 1.0) ++bounded;
+    const double ulp = std::ldexp(1.0, std::max(std::ilogb(x), -1022) - 52);
+    if (x == 0 || std::fabs(kern::dm::asinh(kern::dm::sinh(x)) - x) <= 4 * ulp) ++back;
+  }
+  if (odd != n || bounded != n || back != n) std::printf("  of %d: odd/even %d, bounded %d, asinh(sinh(x)) = x %d\n", n, odd, bounded, back);
+  CHECK(odd == n && bounded == n && back == n);
+}
+
+TEST(elementary_functions_of_the_engine_are_accurate_exact_and_right_at_their_edges) {
+  // log2, log1p, exp2, cbrt (kern/src/math/elementary.c), acosh, atanh (hyperbolic.c) are the engine's own, written from
+  // their definitions over musl's exp and log; ldexp and remainder are exact (elementary.c). (1) Against
+  // elementary_reference.h (kern/tests/elementary_reference.py: 200 digits with Python decimal, ldexp and remainder exact
+  // with Fraction): the error in ulp of the exact value - at most 2 ulp for f64 (measured: acosh 1.24, log2 1.19, atanh
+  // 1.17, log1p 0.86, exp2 0.66, cbrt 0.50), at most 1 ulp for f32 (computed in f64, rounded once: measured 0.50); ldexp
+  // and remainder 0 ulp - the very bits, also subnormal, at the ties and where they overflow. (2) Their edges and
+  // identities, bit for bit.
+  using F = double (*)(double);
+  using G = float (*)(float);
+  const F f64s[] = {[](double x) { return kern::dm::log2(x); }, [](double x) { return kern::dm::log1p(x); },
+                    [](double x) { return kern::dm::exp2(x); }, [](double x) { return kern::dm::cbrt(x); },
+                    [](double x) { return kern::dm::acosh(x); }, [](double x) { return kern::dm::atanh(x); }};
+  const G f32s[] = {[](float x) { return kern::dm::log2(x); }, [](float x) { return kern::dm::log1p(x); },
+                    [](float x) { return kern::dm::exp2(x); }, [](float x) { return kern::dm::cbrt(x); },
+                    [](float x) { return kern::dm::acosh(x); }, [](float x) { return kern::dm::atanh(x); }};
+  const char* names[] = {"log2", "log1p", "exp2", "cbrt", "acosh", "atanh"};
+  // (the reference is hi + rest ulps of hi, an ulp of a double 2^(e - 52), e >= -1022; of a float 2^(e - 23), e >= -126)
+  auto ulps = [](double got, const elementary_reference::Row& row, bool single) {
+    if (!std::isfinite(got)) return 1e9;
+    const int e = row.hi == 0 ? -1022 : std::ilogb(row.hi);
+    const double ud = std::ldexp(1.0, std::max(e, -1022) - 52);
+    const double u = single ? std::ldexp(1.0, std::max(e, -126) - 23) : ud;
+    return std::fabs((got - row.hi) / u - row.rest * (ud / u));
+  };
+  double worst[2][6] = {};
+  double worst_at[2][6] = {};
+  for (const auto& row : elementary_reference::kAccurateDouble) {
+    const double e = ulps(f64s[row.fn](row.x), row, false);
+    if (e > worst[0][row.fn]) worst[0][row.fn] = e, worst_at[0][row.fn] = row.x;
+  }
+  for (const auto& row : elementary_reference::kAccurateFloat) {
+    const double e = ulps(static_cast<double>(f32s[row.fn](static_cast<float>(row.x))), row, true);
+    if (e > worst[1][row.fn]) worst[1][row.fn] = e, worst_at[1][row.fn] = row.x;
+  }
+  for (int k = 0; k < 6; ++k) {
+    if (worst[0][k] > 2.0) std::printf("  %s (f64): %.3f ulp at %a\n", names[k], worst[0][k], worst_at[0][k]);
+    if (worst[1][k] > 1.0) std::printf("  %s (f32): %.3f ulp at %a\n", names[k], worst[1][k], worst_at[1][k]);
+    CHECK(worst[0][k] <= 2.0);
+    CHECK(worst[1][k] <= 1.0);
+  }
+  CHECK(std::size(elementary_reference::kAccurateDouble) > 1500 && std::size(elementary_reference::kAccurateFloat) > 1400);
+  int exact_wrong = 0;
+  for (const auto& row : elementary_reference::kExactDouble) {
+    const double got = row.fn == 0 ? kern::dm::ldexp(row.x, static_cast<int>(row.y)) : kern::dm::remainder(row.x, row.y);
+    if (math_names::bits(got) != math_names::bits(row.want) && exact_wrong++ < 5)
+      std::printf("  %s(%a, %a) (f64): %a, exact %a\n", row.fn == 0 ? "ldexp" : "remainder", row.x, row.y, got, row.want);
+  }
+  for (const auto& row : elementary_reference::kExactFloat) {
+    const float x = static_cast<float>(row.x), want = static_cast<float>(row.want);
+    const float got = row.fn == 0 ? kern::dm::ldexp(x, static_cast<int>(row.y)) : kern::dm::remainder(x, static_cast<float>(row.y));
+    if (math_names::bits(got) != math_names::bits(want) && exact_wrong++ < 5)
+      std::printf("  %s(%a, %a) (f32): %a, exact %a\n", row.fn == 0 ? "ldexp" : "remainder", row.x, row.y, static_cast<double>(got), row.want);
+  }
+  CHECK(exact_wrong == 0);
+  CHECK(std::size(elementary_reference::kExactDouble) > 3000 && std::size(elementary_reference::kExactFloat) > 3000);
+
+  const double inf = std::numeric_limits<double>::infinity(), nan = std::numeric_limits<double>::quiet_NaN();
+  const float inff = std::numeric_limits<float>::infinity(), nanf = std::numeric_limits<float>::quiet_NaN();
+  const double tiny = std::numeric_limits<double>::denorm_min(), big = std::numeric_limits<double>::max();
+  const float tinyf = std::numeric_limits<float>::denorm_min(), bigf = std::numeric_limits<float>::max();
+  auto same = [](auto a, auto b) { return math_names::bits(a) == math_names::bits(b); };
+  // ±0 keep their sign (exp2: 1, log2: -inf, acosh(1): +0).
+  for (double z : {0.0, -0.0}) {
+    const float zf = static_cast<float>(z);
+    CHECK(same(kern::dm::log1p(z), z) && same(kern::dm::cbrt(z), z) && same(kern::dm::atanh(z), z) && same(kern::dm::ldexp(z, 5), z) &&
+          same(kern::dm::ldexp(z, -5000), z) && same(kern::dm::remainder(z, 3.0), z) && kern::dm::exp2(z) == 1.0 && kern::dm::log2(z) == -inf);
+    CHECK(same(kern::dm::log1p(zf), zf) && same(kern::dm::cbrt(zf), zf) && same(kern::dm::atanh(zf), zf) && same(kern::dm::ldexp(zf, 5), zf) &&
+          same(kern::dm::remainder(zf, 3.f), zf) && kern::dm::exp2(zf) == 1.f && kern::dm::log2(zf) == -inff);
+  }
+  CHECK(same(kern::dm::acosh(1.0), 0.0) && same(kern::dm::log2(1.0), 0.0) && same(kern::dm::acosh(1.f), 0.f) && same(kern::dm::log2(1.f), 0.f));
+  // A zero remainder has the sign of x; remainder by ±inf is x; by 0, or of ±inf, NaN.
+  CHECK(same(kern::dm::remainder(-3.0, 3.0), -0.0) && same(kern::dm::remainder(3.0, -3.0), 0.0) && same(kern::dm::remainder(-6.f, 2.f), -0.f));
+  CHECK(kern::dm::remainder(5.5, inf) == 5.5 && kern::dm::remainder(-5.5, -inf) == -5.5 && kern::dm::remainder(5.5f, inff) == 5.5f);
+  CHECK(std::isnan(kern::dm::remainder(5.5, 0.0)) && std::isnan(kern::dm::remainder(inf, 2.0)) && std::isnan(kern::dm::remainder(-inf, inf)) &&
+        std::isnan(kern::dm::remainder(1.f, -0.f)) && std::isnan(kern::dm::remainder(nan, 2.0)) && std::isnan(kern::dm::remainder(2.0, nan)));
+  // ±inf; NaN; outside the domain NaN (log1p(-1), atanh(±1): ±inf).
+  CHECK(kern::dm::log2(inf) == inf && kern::dm::log1p(inf) == inf && kern::dm::exp2(inf) == inf && same(kern::dm::exp2(-inf), 0.0) &&
+        kern::dm::cbrt(inf) == inf && kern::dm::cbrt(-inf) == -inf && kern::dm::acosh(inf) == inf && kern::dm::ldexp(inf, -3000) == inf &&
+        kern::dm::ldexp(-inf, 7) == -inf);
+  CHECK(kern::dm::log2(inff) == inff && kern::dm::log1p(inff) == inff && kern::dm::exp2(inff) == inff && same(kern::dm::exp2(-inff), 0.f) &&
+        kern::dm::cbrt(-inff) == -inff && kern::dm::acosh(inff) == inff && kern::dm::ldexp(-inff, -300) == -inff);
+  for (double v : {nan, -1.0, -inf, -tiny}) CHECK(std::isnan(kern::dm::log2(v)));
+  for (float v : {nanf, -1.f, -inff, -tinyf}) CHECK(std::isnan(kern::dm::log2(v)));
+  for (double v : {nan, -1.0000000000000002, -2.0, -inf}) CHECK(std::isnan(kern::dm::log1p(v)));
+  for (double v : {nan, 0.9999999999999999, 0.0, -1.0, -inf}) CHECK(std::isnan(kern::dm::acosh(v)));
+  for (float v : {nanf, 0.99999994f, 0.f, -1.f, -inff}) CHECK(std::isnan(kern::dm::acosh(v)));
+  for (double v : {nan, 1.0000000000000002, -1.5, inf}) CHECK(std::isnan(kern::dm::atanh(v)));
+  for (float v : {nanf, 1.0000001f, -1.5f, inff}) CHECK(std::isnan(kern::dm::atanh(v)));
+  CHECK(std::isnan(kern::dm::exp2(nan)) && std::isnan(kern::dm::cbrt(nan)) && std::isnan(kern::dm::ldexp(nan, 3)) && std::isnan(kern::dm::exp2(nanf)) &&
+        std::isnan(kern::dm::cbrt(nanf)) && std::isnan(kern::dm::ldexp(nanf, 3)) && std::isnan(kern::dm::log1p(-2.f)));
+  CHECK(kern::dm::log1p(-1.0) == -inf && kern::dm::log1p(-1.f) == -inff && kern::dm::atanh(1.0) == inf && kern::dm::atanh(-1.0) == -inf &&
+        kern::dm::atanh(-1.f) == -inff);
+  // Where they overflow and end in nothing: exp2 and ldexp at the largest double and float and below the smallest (a tie
+  // to even at half the smallest subnormal: 0), the subnormals between.
+  CHECK(std::isfinite(kern::dm::exp2(1023.9999999999999)) && kern::dm::exp2(1024.0) == inf && kern::dm::exp2(-1074.0) == tiny &&
+        kern::dm::exp2(-1074.5) == tiny && same(kern::dm::exp2(-1075.0), 0.0) && kern::dm::exp2(-1022.0) == std::numeric_limits<double>::min());
+  CHECK(std::isfinite(kern::dm::exp2(127.99999f)) && kern::dm::exp2(128.f) == inff && kern::dm::exp2(-149.f) == tinyf && same(kern::dm::exp2(-150.f), 0.f));
+  CHECK(kern::dm::ldexp(1.0, 1024) == inf && kern::dm::ldexp(big, 1) == inf && kern::dm::ldexp(-big, 1) == -inf && kern::dm::ldexp(0.5, 1024) == 0x1p1023 &&
+        kern::dm::ldexp(std::numeric_limits<double>::min(), -52) == tiny && same(kern::dm::ldexp(1.0, -1075), 0.0) &&
+        same(kern::dm::ldexp(-1.0, -1075), -0.0) && kern::dm::ldexp(3.0, -1076) == tiny && kern::dm::ldexp(3.0, -1075) == 2 * tiny &&
+        kern::dm::ldexp(tiny, 1074) == 1.0 && kern::dm::ldexp(tiny, 2097) == 0x1p1023 && kern::dm::ldexp(tiny, 2098) == inf &&
+        kern::dm::ldexp(1.0, std::numeric_limits<int>::max()) == inf && same(kern::dm::ldexp(-1.0, std::numeric_limits<int>::min()), -0.0) &&
+        kern::dm::ldexp(big, -2097) == 2 * tiny && kern::dm::ldexp(big, -2098) == tiny && same(kern::dm::ldexp(-big, -2099), -0.0));
+  CHECK(kern::dm::ldexp(1.f, 128) == inff && kern::dm::ldexp(bigf, 1) == inff && kern::dm::ldexp(1.f, -149) == tinyf && same(kern::dm::ldexp(1.f, -150), 0.f) &&
+        kern::dm::ldexp(3.f, -151) == tinyf && kern::dm::ldexp(3.f, -150) == 2 * tinyf && kern::dm::ldexp(tinyf, 149) == 1.f &&
+        kern::dm::ldexp(bigf, -277) == tinyf && kern::dm::ldexp(1.f, std::numeric_limits<int>::max()) == inff &&
+        same(kern::dm::ldexp(-1.f, std::numeric_limits<int>::min()), -0.f));
+  // Exact where the value is: log2(2^k) is k, exp2(k) is 2^k - for every power of 2, subnormal ones too.
+  int powers = 0, powers_right = 0;
+  for (int k = -1074; k <= 1023; ++k) {
+    ++powers;
+    const double p = kern::dm::ldexp(1.0, k);
+    if (kern::dm::log2(p) == k && kern::dm::exp2(static_cast<double>(k)) == p) ++powers_right;
+  }
+  for (int k = -149; k <= 127; ++k) {
+    ++powers;
+    const float p = kern::dm::ldexp(1.f, k);
+    if (kern::dm::log2(p) == static_cast<float>(k) && kern::dm::exp2(static_cast<float>(k)) == p) ++powers_right;
+  }
+  if (powers_right != powers) std::printf("  log2(2^k) = k = log2(exp2(k)): %d of %d\n", powers_right, powers);
+  CHECK(powers_right == powers);
+  // cbrt of a cube is its root, exactly (m^3 is a double for m < 2^17; also times 2^(3j), also subnormal).
+  int cubes = 0, cubes_right = 0;
+  for (int m = 1; m < (1 << 17); m += 7) {
+    const double c = static_cast<double>(m) * m * m;
+    for (int j : {-358, -200, 0, 5, 300}) {
+      ++cubes;
+      if (kern::dm::cbrt(kern::dm::ldexp(c, 3 * j)) == kern::dm::ldexp(static_cast<double>(m), j) &&
+          kern::dm::cbrt(-kern::dm::ldexp(c, 3 * j)) == -kern::dm::ldexp(static_cast<double>(m), j))
+        ++cubes_right;
+    }
+  }
+  if (cubes_right != cubes) std::printf("  cbrt(m^3) = m: %d of %d\n", cubes_right, cubes);
+  CHECK(cubes_right == cubes);
+  // Odd functions bit for bit; ldexp undoes itself; remainder: |r| <= |y| / 2, odd in x, even in y, unchanged when x and y
+  // are both scaled by 2^s (exact); acosh(cosh x) = x and atanh(tanh x) = x within 4 ulp, log2(exp2 x) within 2 ulp.
+  std::uint64_t s = 0x2545f4914f6cdd1dull;
+  int odd = 0, undo = 0, rem = 0, back = 0, n = 0;
+  auto ulp_of = [](double v) { return std::ldexp(1.0, std::max(std::ilogb(v), -1022) - 52); };
+  for (int i = 0; i < 4000; ++i) {
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double u = static_cast<double>(s >> 11) / 9007199254740992.0;
+    const double x = u * std::ldexp(1.0, static_cast<int>(s % 60) - 50);   // (0 .. 1024)
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double y = (static_cast<double>(s >> 11) / 9007199254740992.0 - 0.5) * std::ldexp(1.0, static_cast<int>(s % 80) - 40);
+    const float xf = static_cast<float>(x), yf = static_cast<float>(y);
+    ++n;
+    if (same(kern::dm::cbrt(-x), -kern::dm::cbrt(x)) && same(kern::dm::atanh(-u), -kern::dm::atanh(u)) && same(kern::dm::cbrt(-xf), -kern::dm::cbrt(xf)) &&
+        same(kern::dm::atanh(-static_cast<float>(u)), -kern::dm::atanh(static_cast<float>(u))))
+      ++odd;
+    const int sh = static_cast<int>(s % 1001) - 500;
+    if (x == 0 || (kern::dm::ldexp(kern::dm::ldexp(x, sh), -sh) == x && kern::dm::ldexp(kern::dm::ldexp(y, -sh), sh) == y)) ++undo;
+    if (y != 0) {
+      const double r = kern::dm::remainder(x, y);
+      const float rf = kern::dm::remainder(xf, yf);
+      const int sc = static_cast<int>(s % 401) - 200;
+      if (std::fabs(r) <= std::fabs(y) / 2 && same(kern::dm::remainder(-x, y), -r) && same(kern::dm::remainder(x, -y), r) &&
+          same(kern::dm::remainder(kern::dm::ldexp(x, sc), kern::dm::ldexp(y, sc)), kern::dm::ldexp(r, sc)) &&
+          (yf == 0 || (std::fabs(rf) <= std::fabs(yf) / 2 && same(kern::dm::remainder(-xf, yf), -rf))))
+        ++rem;
+    } else {
+      ++rem;
+    }
+    const double c = 1.0 + u * 19.0, t = u - 0.5, l = 0.5 + u * 1.5;
+    if (std::fabs(kern::dm::acosh(kern::dm::cosh(c)) - c) <= 4 * ulp_of(c) &&
+        (t == 0 || std::fabs(kern::dm::atanh(kern::dm::tanh(t)) - t) <= 4 * ulp_of(t)) &&
+        std::fabs(kern::dm::exp2(kern::dm::log2(l)) - l) <= 2 * ulp_of(l))
+      ++back;
+  }
+  if (odd != n || undo != n || rem != n || back != n)
+    std::printf("  of %d: odd %d, ldexp undone %d, remainder %d, acosh(cosh)/atanh(tanh)/exp2(log2) %d\n", n, odd, undo, rem, back);
+  CHECK(odd == n && undo == n && rem == n && back == n);
+}
+
 
 TEST(determinism_is_bit_identical_across_builds_and_platforms) {
   // The duck walks and turns on velstand for 8 s (400 ticks); every tick's exact state is hashed.

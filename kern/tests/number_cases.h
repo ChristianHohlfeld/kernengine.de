@@ -88,6 +88,12 @@ template <class T> void whole_numbers() {
   }
 }
 
+/// The whole numbers ldexp is given: none, small ones, into the subnormal numbers and beyond both ends, int's own ends.
+inline const std::vector<int>& ldexp_edges() {
+  static const std::vector<int> v = {0, 1, -1, 16, -16, 127, 128, -126, -149, -150, 1023, 1024, -1074, -1075, 2098, -2099, std::numeric_limits<int>::max(), std::numeric_limits<int>::min()};
+  return v;
+}
+
 /// Floating numbers: + - * / against C++ in the type itself (f32 rounds every intermediate value), the functions of
 /// <cmath> against C++, sin, exp ... against the engine's musl functions.
 template <class T> void floating_numbers() {
@@ -105,6 +111,8 @@ template <class T> void floating_numbers() {
       else expect(same(num::fmin(a, b), std::fmin(a, b)) && same(num::fmax(a, b), std::fmax(a, b)), "fmin fmax", a, b);
       expect(same(num::copysign(a, b), std::copysign(a, b)), "copysign", a, b);
       expect(same(num::atan2(a, b), static_cast<T>(dm::atan2(a, b))) && same(num::pow(a, b), static_cast<T>(dm::pow(a, b))) && same(num::hypot(a, b), static_cast<T>(dm::hypot(a, b))), "atan2 pow hypot", a, b);
+      // (remainder: IEEE 754's, exact - so C++'s own std::remainder gives the same bits, also by 0 and of infinity: NaN)
+      expect(same(num::remainder(a, b), std::remainder(a, b)), "remainder", a, b);
       for (T c : {T(0), T(1), T(-0.01), T(0.3)}) {
         const T r = a * b + c;  // (C++ in T: -ffp-contract=off, no FMA - each step rounded to T)
         expect(same(num::add(num::mul(a, b), c), r), "a*b+c", a, b);
@@ -115,10 +123,29 @@ template <class T> void floating_numbers() {
     if constexpr (std::is_same_v<T, f32>) {
       expect(same(num::sin(a), kern_musl_sinf(a)) && same(num::cos(a), kern_musl_cosf(a)) && same(num::tan(a), kern_musl_tanf(a)) && same(num::asin(a), kern_musl_asinf(a)) && same(num::acos(a), kern_musl_acosf(a)) && same(num::atan(a), kern_musl_atanf(a)), "trig (musl f)", a);
       expect(same(num::exp(a), kern_musl_expf(a)) && same(num::expm1(a), kern_musl_expm1f(a)) && same(num::log(a), kern_musl_logf(a)) && same(num::log10(a), kern_musl_log10f(a)), "exp log (musl f)", a);
+      expect(same(num::sinh(a), kern_math_sinhf(a)) && same(num::cosh(a), kern_math_coshf(a)) && same(num::tanh(a), kern_math_tanhf(a)) && same(num::asinh(a), kern_math_asinhf(a)) && same(num::acosh(a), kern_math_acoshf(a)) && same(num::atanh(a), kern_math_atanhf(a)), "hyperbolic (the engine's f)", a);
+      expect(same(num::log2(a), kern_math_log2f(a)) && same(num::log1p(a), kern_math_log1pf(a)) && same(num::exp2(a), kern_math_exp2f(a)) && same(num::cbrt(a), kern_math_cbrtf(a)), "log2 log1p exp2 cbrt (the engine's f)", a);
+      for (int n : ldexp_edges()) expect(same(num::ldexp(a, n), kern_math_ldexpf(a, n)) && same(num::ldexp(a, n), std::ldexp(a, n)), "ldexp (the engine's f, exact: C++'s)", a, T(n));
     } else {
       expect(same(num::sin(a), kern_musl_sin(a)) && same(num::cos(a), kern_musl_cos(a)) && same(num::tan(a), kern_musl_tan(a)) && same(num::asin(a), kern_musl_asin(a)) && same(num::acos(a), kern_musl_acos(a)) && same(num::atan(a), kern_musl_atan(a)), "trig (musl)", a);
       expect(same(num::exp(a), kern_musl_exp(a)) && same(num::expm1(a), kern_musl_expm1(a)) && same(num::log(a), kern_musl_log(a)) && same(num::log10(a), kern_musl_log10(a)), "exp log (musl)", a);
+      expect(same(num::sinh(a), kern_math_sinh(a)) && same(num::cosh(a), kern_math_cosh(a)) && same(num::tanh(a), kern_math_tanh(a)) && same(num::asinh(a), kern_math_asinh(a)) && same(num::acosh(a), kern_math_acosh(a)) && same(num::atanh(a), kern_math_atanh(a)), "hyperbolic (the engine's)", a);
+      expect(same(num::log2(a), kern_math_log2(a)) && same(num::log1p(a), kern_math_log1p(a)) && same(num::exp2(a), kern_math_exp2(a)) && same(num::cbrt(a), kern_math_cbrt(a)), "log2 log1p exp2 cbrt (the engine's)", a);
+      for (int n : ldexp_edges()) expect(same(num::ldexp(a, n), kern_math_ldexp(a, n)) && same(num::ldexp(a, n), std::ldexp(a, n)), "ldexp (the engine's, exact: C++'s)", a, T(n));
     }
+  }
+  // Outside what a function is defined for it gives what C++'s gives - IEEE 754's NaN and infinities, never a 0 in their place.
+  {
+    const T inf = std::numeric_limits<T>::infinity(), nan = std::numeric_limits<T>::quiet_NaN();
+    auto is = [&](T got, T want, const char* what) { expect(same(got, want), what, got, want); };
+    is(num::log2(T(0)), -inf, "log2(0) is -inf"), is(num::log2(-T(0)), -inf, "log2(-0) is -inf"), is(num::log2(T(-1)), nan, "log2(-1) is NaN"), is(num::log2(-inf), nan, "log2(-inf) is NaN"), is(num::log2(inf), inf, "log2(inf)");
+    is(num::log1p(T(-1)), -inf, "log1p(-1) is -inf"), is(num::log1p(T(-2)), nan, "log1p(-2) is NaN"), is(num::log1p(inf), inf, "log1p(inf)"), is(num::log1p(-inf), nan, "log1p(-inf) is NaN");
+    is(num::acosh(T(0.5)), nan, "acosh(0.5) is NaN"), is(num::acosh(T(0)), nan, "acosh(0) is NaN"), is(num::acosh(-inf), nan, "acosh(-inf) is NaN"), is(num::acosh(T(1)), T(0), "acosh(1) is 0"), is(num::acosh(inf), inf, "acosh(inf)");
+    is(num::atanh(T(1)), inf, "atanh(1) is inf"), is(num::atanh(T(-1)), -inf, "atanh(-1) is -inf"), is(num::atanh(T(2)), nan, "atanh(2) is NaN"), is(num::atanh(-inf), nan, "atanh(-inf) is NaN");
+    is(num::exp2(-inf), T(0), "exp2(-inf) is 0"), is(num::exp2(inf), inf, "exp2(inf)"), is(num::exp2(T(100000)), inf, "exp2 overflows to inf"), is(num::cbrt(-inf), -inf, "cbrt(-inf)"), is(num::cbrt(T(-27)), T(-3), "cbrt(-27) is -3");
+    is(num::remainder(T(1), T(0)), nan, "remainder(1, 0) is NaN"), is(num::remainder(inf, T(1)), nan, "remainder(inf, 1) is NaN"), is(num::remainder(T(5), inf), T(5), "remainder(5, inf) is 5"), is(num::remainder(T(5), T(2)), T(1), "remainder(5, 2)"), is(num::remainder(T(7), T(2)), T(-1), "remainder(7, 2) is -1");
+    is(num::ldexp(T(1), std::numeric_limits<int>::max()), inf, "ldexp(1, INT_MAX) is inf"), is(num::ldexp(T(-1), std::numeric_limits<int>::min()), -T(0), "ldexp(-1, INT_MIN) is -0"), is(num::ldexp(nan, 3), nan, "ldexp(NaN)");
+    is(num::sinh(inf), inf, "sinh(inf)"), is(num::cosh(-inf), inf, "cosh(-inf)"), is(num::tanh(-inf), T(-1), "tanh(-inf)"), is(num::asinh(-inf), -inf, "asinh(-inf)"), is(num::sinh(nan), nan, "sinh(NaN)");
   }
 }
 
@@ -172,7 +199,11 @@ inline const std::vector<NodeOp>& node_ops() {
       {"and", "math.and", 1, 2}, {"or", "math.or", 1, 2}, {"xor", "math.xor", 1, 2}, {"not", "math.not", 1, 1}, {"shl", "math.shift_left", 1, 2}, {"shr", "math.shift_right", 1, 2},
       {"sqrt", "math.sqrt", 2, 1}, {"floor", "math.floor", 2, 1}, {"ceil", "math.ceil", 2, 1}, {"trunc", "math.trunc", 2, 1}, {"round", "math.round", 2, 1},
       {"sin", "math.sin", 2, 1}, {"cos", "math.cos", 2, 1}, {"tan", "math.tan", 2, 1}, {"atan", "math.atan", 2, 1}, {"exp", "math.exp", 2, 1}, {"log", "math.log", 2, 1},
-      {"pow", "math.pow", 2, 2}, {"atan2", "math.atan2", 2, 2}, {"hypot", "math.hypot", 2, 2}, {"copysign", "math.copysign", 2, 2}, {"fmin", "math.fmin", 2, 2}};
+      {"pow", "math.pow", 2, 2}, {"atan2", "math.atan2", 2, 2}, {"hypot", "math.hypot", 2, 2}, {"copysign", "math.copysign", 2, 2}, {"fmin", "math.fmin", 2, 2},
+      // the functions of <cmath> that are the engine's own (kern/src/math): each a node of f32 and of f64
+      {"asin", "math.asin", 2, 1}, {"acos", "math.acos", 2, 1}, {"expm1", "math.expm1", 2, 1}, {"log10", "math.log10", 2, 1}, {"fmax", "math.fmax", 2, 2},
+      {"sinh", "math.sinh", 2, 1}, {"cosh", "math.cosh", 2, 1}, {"tanh", "math.tanh", 2, 1}, {"asinh", "math.asinh", 2, 1}, {"acosh", "math.acosh", 2, 1}, {"atanh", "math.atanh", 2, 1},
+      {"log2", "math.log2", 2, 1}, {"log1p", "math.log1p", 2, 1}, {"exp2", "math.exp2", 2, 1}, {"cbrt", "math.cbrt", 2, 1}, {"remainder", "math.remainder", 2, 2}, {"ldexp", "math.ldexp", 2, 2}};
   return ops;
 }
 inline const char* const kNumberTypes[] = {"i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"};
@@ -184,6 +215,7 @@ inline bool op_takes(const NodeOp& op, const std::string& t) {
 inline std::pair<const char*, const char*> op_pins(const NodeOp& op) {
   if (std::string(op.name) == "shl" || std::string(op.name) == "shr") return {"a", "by"};
   if (std::string(op.name) == "atan2") return {"y", "x"};
+  if (std::string(op.name) == "ldexp") return {"a", "n"};
   return {"a", "b"};
 }
 /// The Blueprint: one pure function per operation and type, and per conversion (cast_<to>_<from>).
@@ -207,7 +239,7 @@ inline std::string numbers_graph_json() {
     for (const char* t : kNumberTypes) {
       if (!op_takes(op, t)) continue;
       const auto [pa, pb] = op_pins(op);
-      const std::string by = std::string(pb) == "by" ? "i64" : t;
+      const std::string by = std::string(pb) == "by" ? "i64" : std::string(pb) == "n" ? "i32" : t;
       std::vector<std::pair<std::string, std::string>> in{{"a", t}}, wires{{"a", pa}};
       if (op.inputs == 2) in.push_back({"b", by}), wires.push_back({"b", pb});
       const std::string params = std::string(op.op ? "\"op\":\"" + std::string(op.op) + "\"," : "") + "\"type\":\"" + t + "\"";
@@ -304,6 +336,23 @@ inline logic::Value node_reference(const std::string& fn, const std::vector<logi
         if (op == "hypot") return Value::of_number(num::hypot(a, b));
         if (op == "copysign") return Value::of_number(num::copysign(a, b));
         if (op == "fmin") return Value::of_number(num::fmin(a, b));
+        if (op == "fmax") return Value::of_number(num::fmax(a, b));
+        if (op == "asin") return Value::of_number(num::asin(a));
+        if (op == "acos") return Value::of_number(num::acos(a));
+        if (op == "expm1") return Value::of_number(num::expm1(a));
+        if (op == "log10") return Value::of_number(num::log10(a));
+        if (op == "sinh") return Value::of_number(num::sinh(a));
+        if (op == "cosh") return Value::of_number(num::cosh(a));
+        if (op == "tanh") return Value::of_number(num::tanh(a));
+        if (op == "asinh") return Value::of_number(num::asinh(a));
+        if (op == "acosh") return Value::of_number(num::acosh(a));
+        if (op == "atanh") return Value::of_number(num::atanh(a));
+        if (op == "log2") return Value::of_number(num::log2(a));
+        if (op == "log1p") return Value::of_number(num::log1p(a));
+        if (op == "exp2") return Value::of_number(num::exp2(a));
+        if (op == "cbrt") return Value::of_number(num::cbrt(a));
+        if (op == "remainder") return Value::of_number(num::remainder(a, b));
+        if (op == "ldexp") return Value::of_number(num::ldexp(a, args[1].as<i32>()));
       }
       return Value();
     }
@@ -320,6 +369,10 @@ inline std::vector<std::pair<std::string, std::vector<logic::Value>>> numbers_ca
         std::vector<logic::Value> by;
         for (i64 n : {0, 1, 7, 8, 31, 32, 63, 64, 65, -1}) by.push_back(logic::Value::integer(n));
         each.push_back(by);
+      } else if (p.name == "b" && f.name.rfind("ldexp_", 0) == 0) {
+        std::vector<logic::Value> n;
+        for (int k : ldexp_edges()) n.push_back(logic::Value::of_number(static_cast<i32>(k)));
+        each.push_back(n);
       } else {
         each.push_back(node_edges(logic::pin_type_name(p.type)));
       }

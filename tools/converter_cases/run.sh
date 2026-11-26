@@ -70,6 +70,11 @@
 #             caller does not include: its test holds the pieces with the headers of their files - written and compared
 #             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
 #             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   worldrules.cpp + worldmix.cpp  the program's C++ binds an ActorBlueprint to a world it runs (bind(GameWorld&), kern/docs/
+#             blueprint_cpp.md "An einen Actor einer Welt gebunden"): in the Blueprint of the program's one object (Runner) a
+#             variable Actor, set by bind with GameWorld actor named, which every call and read goes to; the tests bind the
+#             source's ActorBlueprint to the test's world (kern::test::BlueprintRun). worldmix: one bound to a world and to a
+#             logic waits, with the reason. worldrules.klevel: the actor Lamps (PoleRadius, Twice).
 #   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
 #             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
 #             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
@@ -80,6 +85,9 @@
 #   running.cpp the logic the Blueprints run in as the engine names it in its own namespace (GameWorld::logic_runtime gives a
 #             `logic::Runtime*`, kern::game::blueprints_running takes one): the test's stand-ins name it by its full name - written
 #             and compared (before: "no type named 'Runtime' in namespace converted_...::logic", the stand-in of GameWorld went).
+#   logicarg.cpp + logicarg_b.cpp  a function that takes the logic the Blueprints run in (kern::logic::Runtime&: no input, the
+#             Blueprint's own) called from another file: what it takes is told the same there and here - written (before: the
+#             converter stopped, "takes and gives ['I32', 'Bool'] there and ['Object<kern::logic::Runtime>', 'I32', 'Bool'] here").
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -251,6 +259,10 @@ logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes
 logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
 tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
 
+convert logicarg logicarg_b
+logged logicarg "both_ready (hands the logic on to a function of another file) is written" '^ +both_ready \([0-9]+\): written'
+logged logicarg "both are compared" '^2 functions of the Blueprints are compared'
+
 convert running
 logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
 logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
@@ -262,6 +274,24 @@ logged blasts "both are compared" '^2 functions of the Blueprints are compared'
 convert far far_b far_rules
 logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
 logged far "all three are compared" '^3 functions of the Blueprints are compared'
+
+convert worldrules worldmix
+check worldrules "the Blueprint of an actor of a world (ActorBlueprint bound to a world) is a variable Actor of the program's Blueprint" yes '^  Actor worldrules_g_lamps = Actor\{\};'
+check worldrules "bind(world): the Actor of the world's actor of its name (GameWorld actor named)" yes 'worldrules_g_lamps = actor_named;'
+check worldrules "... of that world" yes 'actor_named = engine_game_world_actor_named\(world[_0-9]*, "Lamps"\);'
+check worldrules "... and what it gives: Has Blueprint of it" yes 'return \{func_has_blueprint\(worldrules_g_lamps\)\};'
+check worldrules "a call goes to that Actor (Call on Actor)" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, '
+check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", Float>\(worldrules_g_lamps\)'
+check worldrules "no call names the actor by its name in the program's logic" no 'actor_find\("Lamps"\)'
+logged worldrules "bind, radius, twice, Runner::start, Runner::pole and Runner::lit are written" '^Runner/worldrules_cpp +6 / +6 functions'
+logged worldrules "one bound to a world and to a logic waits, with the reason" '^ +radius \([0-9]+\): the Blueprint of an actor \(g_both\) bound to a world and to a logic'
+tested worldrules "the source's ActorBlueprint is bound to the test's world" 'worldrules::g_lamps\.bind\(bp\.source_world\(\)\);'
+# (built and run: the source - its ActorBlueprint bound to the test's world - and the Blueprint, in the interpreter and as its class)
+if INCLUDES="-I$top/worldrules/src" "$here/compare.sh" "$top/worldrules/cases.kproject" "$top/worldrules/cases.klevel" "$top/worldrules/pt/converted" "$top/worldrules/built" > "$top/worldrules/compare.build" 2>&1 &&
+   ! grep -q "does not compile" "$top/worldrules/compare.build" && grep -qE '^ok +converted_Runner__worldrules_cpp' "$top/worldrules/built/compare.log" &&
+   [ "$(grep -oE 'converted::Tally tally\("(bind|radius|twice|start|pole|lit)"\)' "$top/worldrules"/pt/converted/test_*.cpp | sort -u | wc -l)" = 6 ]
+then echo "ok   worldrules: the tests compare the six, the source and the Blueprint in the interpreter and as its class"
+else echo "FAIL worldrules: the tests compare the six: $(grep -m3 -E 'does not compile|FAIL|differ' "$top/worldrules/compare.build" "$top/worldrules/built/compare.log" 2>/dev/null | cut -c1-300)"; fail=1; fi
 
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
@@ -319,6 +349,7 @@ numbers() {   # numbers <case> <how many are compared> <what it holds>
 #   numbers_sum     an f32 sum of 1/60 against a threshold (past 1 after 61 frames in f32)
 #   numbers_i64     a long long past 2^53 (FNV): i64 that wraps
 #   hyperbolic      std::sinh, cosh, tanh, asinh of f64 and of f32 - the engine's own (kern/src/math/hyperbolic.c)
+#   elementary      std::log2 log1p exp2 cbrt acosh atanh ldexp remainder log10 expm1 hypot of f64 and of f32 - the engine's own
 numbers numbers_same 2 "u32 that wraps, u64"
 numbers numbers_engine 3 "the engine's own types"
 tested numbers_engine "the test holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
@@ -331,12 +362,15 @@ numbers hyperbolic 6 "the engine's sinh, cosh, tanh, asinh, f64 and f32"
 check hyperbolic "std::sinh and std::cosh are the engine's" yes 'sinh\(.*cosh\('
 check hyperbolic "std::asinh is the engine's" yes 'asinh\('
 check hyperbolic "std::tanh of an f32 is tanh of the f32 (its f-variant)" yes 'kern::formula<f32>\(\[\]\(auto x\) \{ return tanh\(x\); \}'
+numbers elementary 12 "the engine's log2 log1p exp2 cbrt acosh atanh ldexp remainder log10 expm1 hypot, f64 and f32"
+check elementary "std::log2 of an f32 is log2 of the f32" yes 'log2\(x\)'
+check elementary "std::ldexp is the engine's node Ldexp" yes 'math_ldexp<f32>\('
 
 python3 "$here/compiles.py" || fail=1
 python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg running pieces blasts far worldrules look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

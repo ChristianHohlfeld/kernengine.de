@@ -1810,6 +1810,40 @@ der die Funktion läuft, und die gibt der Aufruf nicht noch einmal mit (der Konv
 Funktion mit einem solchen Parameter, wo jeder Aufruf ihr die Logik weitergibt, die er selbst
 bekommen hat).
 
+**An einen Actor einer Welt gebunden.** Das C++ eines Programms, das eine Welt fährt (ein
+`kern::game::GameWorld`, das es selbst macht – die Blueprints des Programms sind keine ihrer Actors),
+bindet den `ActorBlueprint` an **die Welt**: `bool bind(World&)` für jede Welt von Actors
+(`kern::logic::WorldOfActors`: `actor_named`, `world_id`, `running`, `logic_runtime` – `GameWorld` ist
+eine, ein Test hat eine eigene). `bind` nimmt einmal den Actor seines Namens in dieser Welt
+(`GameWorld::actor_named`: seine Id und die Welt, project.md 7) und gibt Has Blueprint von ihm; jeder
+Aufruf geht danach an den Blueprint genau dieses Actors in genau dieser Welt
+(`Runtime::call_on`/`get_on` ihrer Logik). Läuft die Welt nicht mehr oder ist sie neu gestartet (eine
+neue Welt, in der der Actor der alten nichts nennt), erreicht ein Aufruf nichts: die Nullen, und der
+Grund wird gesagt (`log`, `last_error`: „the program's C++: Call on Actor: actor 1 (Door) is of world 5
+- its world does not run any more (the GameWorld was stopped)“) – kein Zeiger auf eine beendete Logik
+wird gehalten. Die Welt selbst hält er bei ihrer Adresse: Sie lebt, solange das Programm an sie
+bindet, wie jedes Objekt, das C++ als Referenz hält.
+
+```cpp
+kern::logic::ActorBlueprint g_rules{"Controls"};
+bool bind(kern::game::GameWorld& world) { return g_rules.bind(world); }   // (nach world.start…)
+f64 smoothstep01(f64 t) { return g_rules.number("Smoothstep01", t); }
+```
+
+ist als Blueprint des Programms eine Variable vom Typ Actor, die der Konverter
+`<datei>_<name>` nennt (`Actor controls_g_rules = Actor{};`), und `bind` ist
+`controls_g_rules = engine_game_world_actor_named(world, "Controls");` mit
+`func_has_blueprint(controls_g_rules)`; die Aufrufe sind `func_call_on<…>(controls_g_rules, …)`,
+`func_get_on<…>(controls_g_rules)` – die Logik des Programms reicht sie an die Welt des Actors weiter
+(`Host::world_runtime`, project.md 7). Die Funktionen, die ihn rufen, sind darum Funktionen des
+Blueprints des einen Objekts des Programms (des Zustands), wie jede, die eine Variable des Programms
+teilt. Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
+Ein Blueprint hält den Actor einer Welt oder nennt den Actor dort, wo seine Logik läuft – nicht
+beides. Geprüft: `cpp_reaches_actors_of_its_worlds` (kern/tests: zwei Welten mit Actors gleicher Id,
+Interpreter und Klasse, Welt gestoppt und neu gestartet), `tools/converter_cases` (`worldrules`,
+`worldmix`): der Test vergleicht die Quelle – ihr `ActorBlueprint` an die Welt des Tests gebunden
+(`kern::test::BlueprintRun` ist eine) – mit dem Blueprint im Interpreter und als Klasse.
+
 **Ein Weg.** Call on Actor und Get Variable on Actor gehen durch denselben Weg der Laufzeit, gleich wer
 ruft – ein Knoten (mit den Pins, die sein Blueprint erklärt) oder das C++ des Programms (mit seinen
 Typen), in jeder Stufe: `Runtime::call_on(target, function, args, got, caller)` und
@@ -2402,7 +2436,8 @@ Heute (26.11.2026):
   deshalb nicht plattformfest, und sie rechnet anders als ihr Blueprint (Ursache 4 der Messung, z. B. slerp, heading_of).
 - Dazu kann clang Aufrufe selbst ändern: Konstanten falten (mit seiner eigenen, korrekt gerundeten Rechnung), `sin`+`cos` zu
   `sincos` zusammenlegen, `pow(x, 2)` zu `x*x` machen. Das hängt vom Compiler ab, nicht von der Quelle.
-- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt.
+- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt (seit 26.11. alle
+  eigene der Engine, siehe unten).
 
 Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter den Namen der Standardbibliothek, für jedes Ziel.**
 - Ein zweiter Satz der musl-Objekte ohne Umbenennung (oder dünne Hüllen `extern "C" float sinf(float x) { return
@@ -2440,6 +2475,28 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   (±0, ±Inf, NaN, Überlaufschwelle 710,4758…/89,4159…, sinh x = x für kleine x, ungerade/gerade bitgleich, asinh(sinh x) = x
   auf 4 ULP): Engine-Test `hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges`; bitgleich nativ und Wasm:
   `math_of_the_standard_library_is_the_engines` (Digest erweitert).
+- **acosh, atanh, log2, log1p, exp2, cbrt, ldexp, remainder** (je f und d, 26.11.2026) sind ebenfalls eigener Code der Engine
+  (musl_math hat keine davon): acosh/atanh in `kern/src/math/hyperbolic.c`, die übrigen in `kern/src/math/elementary.c`. Exakt
+  (0 ULP, wie IEEE sie definiert): **ldexp** auf den Bits (Exponent verschoben; im Subnormalen einmal gerundet, Gleichstand auf
+  gerade; Überlauf ±Inf, unter der halben kleinsten Subnormalen ±0) und **remainder** (Langdivision der Mantissen: Rest und ob der
+  Quotient ungerade ist; Null mit dem Vorzeichen von x). Genau: log2 = k + log(m)/ln 2 (Produkt mit 1/ln 2 als hi + lo exakt nach
+  Dekker, log2(2^k) = k exakt), log1p = log(u) + (y − (u − 1))/u (Fehler der Summe exakt, Fast2Sum; |y| < 2^-29 Reihe), exp2 =
+  exp(f·ln 2)·2^k mit dem exakten ldexp (exp2(k) = 2^k exakt), cbrt = exp(log(m)/3) und ein Newton-Schritt mit exaktem Rest
+  y³ − m (Dekker), acosh nahe 1 mit mitgeführten Fehlern von Wurzel und Summe, atanh über log1p. f-Varianten in f64, einmal gerundet.
+  In der Sprache sind sie getypte Knoten (`f32`/`f64`, `numbers.h`: `num::acosh` … `num::remainder`, `num::ldexp(x, i32 n)`;
+  Knoten Acosh, Atanh, Log 2, Log 1 Plus, Exp 2, Cube Root, IEEE Remainder, Ldexp; in der Formel `acosh atanh log2 log1p exp2
+  cbrt remainder`, ldexp als Knoten `math_ldexp<T>(x, n)`): jeder ruft die `kern::dm`-Funktion, außerhalb des Definitionsbereichs
+  mit dem, was C++ gibt (IEEE: `log2(0)` = −Inf, `log2(-1)` = NaN, `acosh(0.5)` = NaN, `atanh(1)` = Inf, `remainder(x, 0)` = NaN –
+  keine 0 an ihrer Stelle; Test `numbers_against_cpp`, Knoten == `numbers.h` in `numbers_nodes_interpreter` und als Klasse).
+  Der Konverter schreibt `std::log2` … `std::remainder` (und ihre f-Varianten) als diese Funktionen – kein „the engine has no X
+  yet“ mehr –, Konstanten aus ihnen rechnet die Engine (`engine_formula`); Fall `tools/converter_cases/elementary` (f64 und f32,
+  mit den Rändern) gegen die echte Quelle. (Die alten f64-Funktionen `kern::math::acosh` … in `nodes.h` – außerhalb des Bereichs 0
+  wie log – ruft kein Knoten.) Genauigkeit gegen 200 Stellen bzw. exakt (`kern/tests/elementary_reference.py` → `.h`, Python
+  decimal/Fraction mit ausgeschriebener IEEE-Rundung): f64 ≤ 2 ULP (gemessen acosh 1,24, log2 1,19, atanh 1,17, log1p 0,86,
+  exp2 0,66, cbrt 0,50), f32 ≤ 1 ULP (gemessen 0,50), ldexp/remainder 0 ULP; Ränder (±0, ±Inf, NaN, Definitionsgrenzen,
+  Überlauf/Unterlauf von exp2 und ldexp, Subnormale) und Identitäten (log2(2^k) = k und exp2(k) = 2^k für alle k, cbrt(m³) = m,
+  ungerade bitgleich, ldexp hebt sich auf, remainder ungerade/gerade/skaliert): Engine-Test
+  `elementary_functions_of_the_engine_are_accurate_exact_and_right_at_their_edges`; nativ == Wasm über den math_names-Digest.
 - Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
   umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
 

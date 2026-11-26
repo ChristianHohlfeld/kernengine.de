@@ -1774,6 +1774,7 @@ NodeDef number_node(std::string type, std::string label, std::vector<NumIn> ins,
 #define KERN_NUM1(fn) [](auto t, const Value* v) { using T = typename decltype(t)::type; return P::fn<T>(v[0].as<T>()); }
 #define KERN_NUM2(fn) [](auto t, const Value* v) { using T = typename decltype(t)::type; return P::fn<T>(v[0].as<T>(), v[1].as<T>()); }
 #define KERN_NUM3(fn) [](auto t, const Value* v) { using T = typename decltype(t)::type; return P::fn<T>(v[0].as<T>(), v[1].as<T>(), v[2].as<T>()); }
+#define KERN_NUMN(fn) [](auto t, const Value* v) { using T = typename decltype(t)::type; return P::fn<T>(v[0].as<T>(), v[1].as<i32>()); }
 #define KERN_NUMBY(fn) [](auto t, const Value* v) { using T = typename decltype(t)::type; return P::fn<T>(v[0].as<T>(), v[1].as<i64>()); }
 
 void add_math(Library& lib) {
@@ -1853,12 +1854,21 @@ void add_math(Library& lib) {
   KERN_FLOAT1(cosh, "Cosh", "std::cosh (the engine's own)");
   KERN_FLOAT1(tanh, "Tanh", "std::tanh (the engine's own)");
   KERN_FLOAT1(asinh, "Asinh", "std::asinh (the engine's own)");
+  KERN_FLOAT1(acosh, "Acosh", "std::acosh (the engine's own: kern/src/math/hyperbolic.c)");
+  KERN_FLOAT1(atanh, "Atanh", "std::atanh (the engine's own)");
+  KERN_FLOAT1(log2, "Log 2", "std::log2 (the engine's own: kern/src/math/elementary.c)");
+  KERN_FLOAT1(log1p, "Log 1 Plus", "std::log1p (the engine's own)");
+  KERN_FLOAT1(exp2, "Exp 2", "std::exp2 (the engine's own)");
+  KERN_FLOAT1(cbrt, "Cube Root", "std::cbrt (the engine's own)");
   KERN_FLOAT1(log, "Log", "std::log (of 0: -inf, of a negative number: NaN)");
   KERN_FLOAT1(log10, "Log 10", "std::log10");
 #undef KERN_FLOAT1
   lib.add(number_node<F::floating>("math.atan2", "Atan2", {{"y", "Y"}, {"x", "X", K::exec, 1.0}}, Gives::same, KERN_NUM2(math_atan2), "std::atan2(Y, X): the angle of (X, Y) in radians", "angle"));
   lib.add(number_node<F::floating>("math.pow", "Power", {{"a", "Base", K::exec, 2.0}, {"b", "Exponent", K::exec, 2.0}}, Gives::same, KERN_NUM2(math_pow), "std::pow"));
   lib.add(number_node<F::floating>("math.hypot", "Hypot", ab2, Gives::same, KERN_NUM2(math_hypot), "std::hypot"));
+  lib.add(number_node<F::floating>("math.ldexp", "Ldexp", {{"a", "A"}, {"n", "N", K::i32, 0.0}}, Gives::same, KERN_NUMN(math_ldexp),
+                                   "std::ldexp: A × 2^N, exact (the engine's own: kern/src/math/elementary.c)", "scale exponent"));
+  lib.add(number_node<F::floating>("math.remainder", "IEEE Remainder", ab2, Gives::same, KERN_NUM2(math_remainder), "std::remainder: A - n * B, n the whole number nearest A / B (exact)"));
   lib.add(number_node<F::floating>("math.copysign", "Copy Sign", {{"a", "Magnitude"}, {"b", "Sign", K::exec, 1.0}}, Gives::same, KERN_NUM2(math_copysign),
                                    "The size of Magnitude with the sign of Sign - also the sign of -0 (std::copysign)", "copysign negative zero minus"));
   lib.add(number_node<F::floating>("math.fmin", "Fmin", ab2, Gives::same, KERN_NUM2(math_fmin), "std::fmin: a NaN on one side gives the other"));
@@ -2251,7 +2261,7 @@ void add_formula(Library& lib) {
                    "A formula as one node, in C++: every name in it becomes an input, of the type Types names for it (in the order the names first "
                    "appear). Each operation is the node's of its type - nothing converts but num_cast<To, From>(x). Numbers: 0.5f an f32, 0.5 an "
                    "f64, a whole number the type of what it meets. Operators + - * / % << >> & | ^ ~, comparisons (a bool), && || !, c ? a : b; "
-                   "functions min max abs clamp lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 exp expm1 log log10 pow hypot sinh cosh tanh asinh "
+                   "functions min max abs clamp lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 exp expm1 log log10 pow hypot sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt remainder "
                    "copysign fmin fmax fmod isnan isinf isfinite signbit.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b"), param("types", "Types", ParamDef::Kind::text, "f32 f32")};
   d.outputs = {data("result", "", PinType::f32)};
