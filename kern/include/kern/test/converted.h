@@ -1804,6 +1804,7 @@ struct Blueprint {
     native = compiled->inst;
     KERN_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
     KERN_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
+    if (!interpreted->notes.empty()) std::printf("  notes of the Blueprint %s (no fault - kern::logic::Issue::error false):\n%s", actor, interpreted->notes.c_str());
     if (!actors.empty()) {
       source = std::make_unique<BlueprintRun>(nullptr, nullptr, true, actors);
       source->rt.budget = loop_budget();

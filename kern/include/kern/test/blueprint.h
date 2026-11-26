@@ -244,7 +244,12 @@ struct BlueprintRun {
   } host;
   kern::logic::Runtime rt{host};
   kern::logic::Instance* inst = nullptr;
+  /// What keeps the Blueprint from running as it should: an error of the check (kern::logic::check, Issue::error), a
+  /// Blueprint that is not there or does not link. A test requires none.
   std::string problems;
+  /// What the check says as a note (Issue::error false - an interface's function it leaves to the interface's own, ...):
+  /// no fault - the editor shows it; a test names it in its log, once per Blueprint, and does not fail for it.
+  std::string notes;
   /// How the program binds the C++ that calls it (null: nothing to bind), and what that gave (Has Blueprint,
   /// and whether its tables are as the program needs them).
   bool (*bind)(kern::logic::Runtime&) = nullptr;
@@ -267,7 +272,7 @@ struct BlueprintRun {
       const kern::logic::Graph& g = *held;
       kern::logic::Graph whole;
       if (!kern::logic::link(g, rt.blueprints, whole, &error)) { problems = error; return; }
-      for (const kern::logic::Issue& i : kern::logic::check(whole)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
+      for (const kern::logic::Issue& i : kern::logic::check(whole)) (i.error ? problems : notes) += (i.error ? "error: " : "note: ") + i.text + "\n";
       inst = rt.add(g, 2, actor);
       host.actors.emplace(actor, 2);
     }
