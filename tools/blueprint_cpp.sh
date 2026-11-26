@@ -7,8 +7,8 @@
 # directly - and of the libraries they use go into <out.h> (see blueprint_cpp.cpp); the Blueprints named after
 # it too, wherever they stand.
 #
-# Builds the tool with the host compiler - once per state of its sources (Kern Logic, the node
-# library and the tool itself; cached in $TMPDIR/kern-blueprint-cpp) - and runs it. HOST_CXX / HOST_CC override
+# Builds the tool with the host compiler - once per run (in the folder of this run, kern/tools/run_dir.sh: nothing is
+# kept from one run to the next; a script that calls it often shares it through KERN_RUN_DIR) - and runs it. HOST_CXX / HOST_CC override
 # the compilers (default c++ / cc): they build a program for this machine, whatever the game is
 # built for.
 set -euo pipefail
@@ -18,13 +18,15 @@ cxx="${HOST_CXX:-c++}" cc="${HOST_CC:-cc}"
 sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp" "$root/kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/kern/src/logic" "$root/kern/src/core" -name '*.cpp' | sort)
 key="$({ cat "${sources[@]}"; find "$root/kern/include" -name '*.h' | sort | xargs cat; cat "$root"/kern/third_party/musl_math/src/*.c; echo "$cxx $cc"; } | sha256sum | cut -c1-16)"
-dir="${TMPDIR:-/tmp}/kern-blueprint-cpp/$key"
+. "$root/kern/tools/run_dir.sh"
+dir="$KERN_RUN_DIR/kern-blueprint-cpp/$key"
 bin="$dir/blueprint_cpp"
 if [ ! -x "$bin" ]; then
   mkdir -p "$dir/obj"
-  export cxx cc dir root
+  . "$root/kern/third_party/musl_math/flags.sh"; mathflags="$(kern_math_flags "$cxx")"   # (the engine's mathematics, never computed by the compiler)
+  export cxx cc dir root mathflags
   printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
-    '"$cxx" -std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
+    '"$cxx" -std=c++20 -O1 -ffp-contract=off $mathflags -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
   printf '%s\n' "$root"/kern/third_party/musl_math/src/*.c | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
     '"$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
   "$cxx" "$dir"/obj/*.o -lm -o "$bin.tmp.$$"

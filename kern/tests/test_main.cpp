@@ -41,6 +41,7 @@
 #include "game_cases.h"
 #include "kern/logic/nodes.h"
 #include "logic_cases.h"
+#include "math_names.h"
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
@@ -4341,6 +4342,18 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Odd").as_int() == 10);
       CHECK(inst->get("Flag").as_bool());
       CHECK(std::fabs(inst->get("Avg").as_number() - (std::sqrt(315.0) + (14 - std::sqrt(315.0)) * 0.25)) < 1e-9);
+    }
+    if (std::string(c.name) == "number_edges") {   // (what the nodes compute: the JIT and the classes must give the same - logic_wasm_test, blueprint_native)
+      CHECK(inst->get("ModBig").as_number() == std::fmod(1e20, 3.0));
+      CHECK(inst->get("ModSign").as_number() == -1);   // (fmod(-1, 1) is -0)
+      CHECK(inst->get("RoundHalf").as_int() == 0);     // (round(0.49999999999999994) - not floor(x + 0.5))
+      CHECK(inst->get("RoundBig").as_int() == 4503599627370497LL);
+      CHECK(inst->get("MinNaN").as_number() == 1);     // (min_of(1, NaN): b < a is false - a)
+      CHECK(inst->get("MinZero").as_number() == 1);    // (min_of(0, -0): 0)
+      CHECK(inst->get("MaxZero").as_number() == -1);   // (max_of(-0, 0): -0)
+      CHECK(inst->get("SqrtNaN").as_number() == 0);    // (sqrt(max_of(0, NaN)): sqrt(0))
+      CHECK(inst->get("ClampNaN").as_number() == 5);
+      CHECK(inst->get("FloorZero").as_number() == 1);  // (Floor of -0 is the Int 0)
     }
     if (std::string(c.name) == "gates_and_sequences") {
       // Log = ((0*10+1)*10+1)... once per Go: 6 Go calls -> 111111
@@ -12995,6 +13008,24 @@ TEST(lehrer_ppo_learns_from_collectors_elsewhere) {
   ppo.act(obs, a);
   copy.act(obs, b);
   CHECK(a[0] == b[0] && a[1] == b[1]);
+}
+
+TEST(math_of_the_standard_library_is_the_engines) {
+  // std::sin, sinf, atan2 ... are the engine's musl (third_party/musl_math/src/std_names.c, flags.sh): bit for bit what
+  // kern::dm gives, f32 and f64, edge values and a drawn series, beside each other (sincos) and as constants the compiler
+  // knows. Their digest is the same in every build: tests/math_names_digest.txt (also the WebAssembly module,
+  // math_names_wasm_test.mjs).
+  const math_names::Result r = math_names::run();
+  if (r.differ) std::printf("  %d of %d differ - the first: %s\n", r.differ, r.compared, r.first.c_str());
+  CHECK(r.differ == 0);
+  std::string path = __FILE__;
+  path = path.substr(0, path.find_last_of('/') + 1) + "math_names_digest.txt";
+  FILE* f = std::fopen(path.c_str(), "r");
+  unsigned long long want = 0;
+  const bool read = f && std::fscanf(f, "%llx", &want) == 1;
+  if (f) std::fclose(f);
+  if (!read || want != r.digest) std::printf("  digest %016llx (math_names_digest.txt: %016llx)\n", static_cast<unsigned long long>(r.digest), want);
+  CHECK(read && want == r.digest);
 }
 
 TEST(determinism_is_bit_identical_across_builds_and_platforms) {

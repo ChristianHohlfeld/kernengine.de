@@ -5424,6 +5424,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::text: return "kern::logic::Text";
       case PinType::vector_list: return "kern::List<kern::Vec3>";
       case PinType::text_list: return "kern::List<kern::logic::Text>";
+      case PinType::actor: return "kern::logic::ActorHandle";
       case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
       default: return "kern::logic::ActorHandle";
     }

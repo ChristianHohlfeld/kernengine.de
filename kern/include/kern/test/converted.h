@@ -1991,7 +1991,9 @@ struct Tally {
     if (state) for (const auto& v : *state) given += weight(v.second);
     held += given;
     work += given;
-    if (left || !defined(want)) { ++outside; return; }
+    // (A result that is not a number or endless is compared all the same, by its bits - NaN, ±Inf and -0 are values of
+    // C++ like any other. Only a call that went where C++ says nothing - `left` - is not compared.)
+    if (left) { ++outside; return; }
     // The engine itself (KERN_TEST_ENGINE=real) refused a call the source made: what the source got there is the
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
     // compared calls a function needs stay twenty). (A call refused on a side of the Blueprint only is in

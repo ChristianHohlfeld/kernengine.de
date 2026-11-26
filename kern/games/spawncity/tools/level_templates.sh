@@ -11,7 +11,9 @@ level="${1:-$game/level/spawncity.klevel}"
 cxx="${CXX:-c++}" cc="${CC:-cc}"
 out="${TMPDIR:-/tmp}/sc-level-templates"
 mkdir -p "$out/obj"
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -ffunction-sections -fdata-sections -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src")
+. "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "${CXX:-c++}")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -ffunction-sections -fdata-sections -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src")
 sources=("$here/level_templates.cpp" "$game/src/car.cpp" "$game/src/drone.cpp" "$game/src/jet.cpp" "$kern/src/game/level.cpp" "$kern/src/audio/audio.cpp"
          "$kern/src/game/logic_node_shapes.cpp" "$kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/logic" "$kern/src/core" -name '*.cpp' | sort)

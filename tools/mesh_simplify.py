@@ -97,9 +97,8 @@ def _qem_binary():
     if _QEM is None:
         import os, subprocess, tempfile
         src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qem_simplify.cpp")
-        exe = os.path.join(tempfile.gettempdir(), "kern_qem_simplify_%d" % int(os.path.getmtime(src)))
-        if not os.path.exists(exe):
-            subprocess.run(["c++", "-O2", "-std=c++17", src, "-o", exe], check=True)
+        exe = os.path.join(tempfile.mkdtemp(prefix="kern-qem-"), "qem_simplify")   # (built once in this process - no cache beyond it)
+        subprocess.run(["c++", "-O2", "-std=c++17", src, "-o", exe], check=True)
         _QEM = exe
     return _QEM
 

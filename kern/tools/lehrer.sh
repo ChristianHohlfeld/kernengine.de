@@ -14,7 +14,9 @@ out="${1:-$root/build}"
 mkdir -p "$out/obj/box3d" "$out/obj/musl_math" "$out/obj/cpp"
 cc="${CC:-cc}" cxx="${CXX:-c++}"
 jobs="${KERN_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
-opt=(-O3 -DNDEBUG -ffp-contract=off)
+. "$root/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+opt=(-O3 -DNDEBUG -ffp-contract=off "${mathflags[@]}")
 if [ "${KERN_NATIVE:-1}" = 1 ]; then
   for f in -march=native -mcpu=native; do
     if echo 'int main(){return 0;}' | "$cxx" -x c++ "$f" -o /dev/null - 2>/dev/null; then opt+=("$f"); break; fi

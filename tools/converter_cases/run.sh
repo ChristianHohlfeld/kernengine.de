@@ -23,6 +23,9 @@
 #             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of a program's node types).
 #   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece (the piece
 #             before it went for it).
+#   libraries.py every header of the engine that marks a type for Blueprints has its library; one that has none stops the
+#             converter before it converts anything, with the header; a text that names what the libraries do not have is
+#             found with who and the line (the one check, tools/engine_api.py --check runs it on texts too).
 #   placement.py where the Blueprints stand (place_blueprints, apply_to_level): what a Blueprint of the project uses is
 #             the program's; a source of its own (another folder) the program uses that stands in the level stops the run;
 #             --classes takes the header only (the project says which Blueprints the program calls as their classes).
@@ -37,7 +40,11 @@
 #             - written and compared.
 #   objects.cpp objects of the engine are Object<I> (kern/docs/engine_object.md), never a number: as an input, what a
 #             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
-#             compared, a function of the engine called on one - written and compared, and no Handle of Object.
+#             compared, a function of the engine called on one - written and compared, and no Handle of Object; its classes
+#             compile (a struct of the program with an Object field is held as that Object - before: as an Actor).
+#   localobj.cpp an object of the engine made as a local (`kern::Earcut ec; ec.triangulate(...)`): the Object its make
+#             gives, released where its block ends - written, compared, its class compiles (before: "an object of the
+#             engine as another type (Object<kern::Earcut> where Int is wanted)").
 #   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
 #             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
 #             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
@@ -61,7 +68,7 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
-#   numbers_same.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
+#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
 #             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
 #             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
 #             subset's (f32 intermediate, f32 sum of 1/60 against a threshold, long long past 2^53) - one of them right is a fault of the list.
@@ -72,7 +79,15 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 here="$root/tools/converter_cases"
 top="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($top)" >&2 || trap 'rm -rf "$top"' EXIT
+. "$root/kern/tools/run_dir.sh"   # (the tool of blueprint_cpp.sh and the engine of compare.sh: built once in this run, kept in none)
 fail=0
+classes() {   # classes <case> <what>: the case's Blueprints as classes (tools/blueprint_cpp.sh --project), compiled
+  # (of a copy of the level, written with format and version as a level is read - the case's own stays as the converter wrote it)
+  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(sys.argv[2],'w'))" "$top/$1/cases.klevel" "$top/$1/classes.klevel"
+  if "$root/tools/blueprint_cpp.sh" --project "$top/$1/cases.kproject" "$top/$1/classes.klevel" "$top/$1/classes.cpp" > "$top/$1/classes.log" 2>&1 &&
+     "${CLANGXX:-clang++}" -std=c++20 -fsyntax-only -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" "$top/$1/classes.cpp" > "$top/$1/classes.err" 2>&1
+  then echo "ok   $1: $2"; else echo "FAIL $1: $2: $(grep -m1 'error' "$top/$1/classes.log" "$top/$1/classes.err" | cut -c1-300)"; fail=1; fi
+}
 convert() {   # convert <case> [<file> ...]: the case's program (its files), converted with its test, into a project and a level of their own
   out="$top/${INTO:-}$1"
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
@@ -153,6 +168,13 @@ check objects "a field of a struct" yes 'KERN_STRUCT\(Rig\) \{ Object<kern::audi
 check objects "a function of the engine on an Object" yes 'engine_mixer_sample_rate\(m\)'
 check objects "no Object becomes a number (Handle of Object)" no 'object_handle'
 logged objects "all nine are written and compared" '^9 functions of the Blueprints are compared'
+classes objects "the classes compile: a struct's field that is an Object is held as an Object (Held<Rig>), never as an Actor"
+
+convert localobj
+logged localobj "an object of the engine made as a local (kern::Earcut ec;) is written: an Object, never an Int" '^ +triangles \([0-9]+\): written'
+check localobj "the local holds the Object its class's make gives" yes 'Object<kern::Earcut> ec'
+logged localobj "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+classes localobj "the classes compile"
 
 convert actors
 check actors "an Actor as an input" yes 'void add\(Actor a = Actor\{\}\)'
@@ -256,6 +278,14 @@ SOURCE_NUMBERS=1 convert numbers_same
 logged numbers_same "both passes compare both functions" '^2 functions are compared once more with their source as C\+\+ computes it'
 if right numbers_same; then echo "ok   numbers_same: written, and the same as the source in both passes (u32 that wraps, u64)"
 else echo "FAIL numbers_same: written, and the same as the source in both passes"; cat "$top/numbers_same/numbers.txt" 2>/dev/null; fail=1; fi
+# numbers_engine: the engine's own types (kern::Quat, physics::Pose, physics::BodyType) - in the second pass the test holds them as
+# the engine has them, never a copy; right today, and it must stay so.
+SOURCE_NUMBERS=1 convert numbers_engine
+tested numbers_engine "the second pass holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
+tested numbers_engine "the second pass holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
+logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
+if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
+else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
 # Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
 # the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
 # (red): the number types have come, and the case goes up to numbers_same.
@@ -270,6 +300,7 @@ for c in numbers_f32 numbers_sum numbers_i64; do
 done
 
 python3 "$here/compiles.py" || fail=1
+python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then

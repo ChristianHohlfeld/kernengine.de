@@ -9,18 +9,20 @@
 # more -I switches (the program's folders). Each test and each source is compiled on its own: one that does not compile is
 # said and left out (a source whose functions are then missing: linked without them, said). What the tests print goes to
 # <out folder>/compare.log (the program: tests.bin - no name of a header, the folder is on the include path); the status is the build's - the tests' own verdict is read from the log (tools/source_numbers.py).
-# The engine's objects are kept in $CASES_OBJ (default $TMPDIR/kern-cases-obj), keyed by their source, the switches and every
-# header of the engine.
+# The engine's objects stand in the folder of this run (kern/tools/run_dir.sh - nothing is kept from one run to the next),
+# keyed by their source, the switches and every header of the engine.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 kern="$root/kern"
 project="$1" level="$2" tests="$3" o="$4"; shift 4
-out="${CASES_OBJ:-${TMPDIR:-/tmp}/kern-cases-obj}"
+. "$kern/tools/run_dir.sh"
+out="$KERN_RUN_DIR/kern-cases-obj"
 cxx="${CXX:-${CLANGXX:-clang++}}"
 cc="${CC:-$(dirname "$(command -v "$cxx")")/$(basename "$cxx" | sed 's/clang++/clang/; s/g++/gcc/')}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$o/obj"
 read -r -a more <<< "${INCLUDES:-}"
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
+. "$kern/third_party/musl_math/flags.sh"; read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
 jobs=() objects=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   x="$out/box3d/$(basename "$c" .c).o"; objects+=("$x")
@@ -30,7 +32,7 @@ for c in "$kern"/third_party/musl_math/src/*.c; do
   x="$out/musl/$(basename "$c" .c).o"; objects+=("$x")
   [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $x")
 done
-headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
+headers="$(find "$kern/include" "$kern/src" -name '*.h' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-12)"
 while IFS= read -r f; do
   x="$out/obj/$(echo "$f" | sed "s|$kern/||; s|/|_|g")-$( { echo "$headers ${flags[*]} $cxx"; cat "$f"; } | sha256sum | cut -c1-12).o"
   objects+=("$x")
@@ -44,9 +46,13 @@ fi
 python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(p,'w'))" "$level"
 python3 "$kern/tools/embed_project.py" "$project" "$o/project.cpp" > /dev/null
 # (with the header of the classes the program calls - level_blueprints.h, the converter's --classes - where there are such
-# classes; else without it)
-"$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1 ||
+# classes; else without it, and the header empty: a source of the program that includes it compiles, and what it would call of
+# such a class is not there - said by the link below)
+if ! "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1; then
+  echo "the header of the classes the program calls is empty: $(grep -v '^\s*$' "$o/classes.log" | tail -3 | tr '\n' ' ' | cut -c1-400)"
   "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" > /dev/null
+  printf '#pragma once\n// (no Blueprint the program calls as its class in this project - tools/converter_cases/compare.sh)\n' > "$o/level_blueprints.h"
+fi
 own=("$o/project.cpp" "$o/level_blueprints.cpp" "$tests"/test_*.cpp "$@")
 export cxx o
 printf '%s\n' "${own[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '

@@ -5,6 +5,7 @@ folder's name.
     now: its C++ calls it as its class) is the program's: what it uses is the program's too - into the project;
   - a Blueprint of another folder (a source of its own) that the program uses and that stands in the level is never
     moved: the run stops with its name, folder and reason, and the files stay as they are;
+  - a library of the engine (engine_<header>) stands in neither: the engine has it (kern/logic/engine_libraries.h);
   - --classes takes the header only (which Blueprints the program calls as their classes says the project)."""
 import importlib.util
 import json
@@ -35,6 +36,14 @@ check(placed.get("door", ("", ""))[0] == "level", f"a Blueprint no one of the pr
 check(c2b.place_blueprints({"lib"}, {"lib": []}, {}, {"lib": ""}, {"lib": []})["lib"][0] == "level",
       "without a Blueprint of the program, the same library is a world's")
 
+# a library of the engine (engine_<header>: a source includes the engine's header and calls it) is the engine's: it stands
+# neither in the project - even when the program uses it - nor in the level, and the log says so
+placed = c2b.place_blueprints({"engine_math_math", "app", "door"}, {"engine_math_math": [], "app": ["engine_math_math"], "door": ["engine_math_math"]},
+                              {"app": c2b.APP_INTERFACE}, {"engine_math_math": "", "app": "", "door": ""}, {})
+check(placed.get("engine_math_math", ("", ""))[0] == "engine" and "neither the level nor the project" in placed["engine_math_math"][1],
+      f"a library of the engine the program uses is the engine's, not the project's ({placed.get('engine_math_math')})")
+check(placed.get("app", ("", ""))[0] == "project" and placed.get("door", ("", ""))[0] == "level", "... beside the program's App and a world's door")
+
 # a Blueprint of another folder that the program uses, in the level: the run stops, nothing is written
 d = tempfile.mkdtemp()
 logic = {"kind": "kern-logic", "version": 1, "nextId": 1, "library": True, "variables": [], "nodes": [], "links": [], "machines": [], "functions": []}
@@ -53,6 +62,13 @@ except SystemExit as e:
     check("handmade" in said and "folder Rules" in said and "its place is the project" in said and "the program's App uses it" in said,
           f"a source of its own that the program uses, in the level, stops the run with its name, folder and reason ({said[:160]})")
 check((open(lp).read(), open(pp).read()) == before, "... and the level and the project stay as they are")
+
+# apply_to_level never writes a library of the engine, wherever the placing says it stands (its text is not even read)
+level["actors"] = []
+json.dump(level, open(lp, "w"))
+c2b.apply_to_level(lp, "Cases", [("engine_math_math", "not a text of the notation")], project=pp,
+                   placed={"engine_math_math": ("level", "")})
+check("engine_math_math" not in open(lp).read() + open(pp).read(), "a library of the engine is written neither into the level nor into the project")
 
 # --classes: the header only
 r = subprocess.run([sys.executable, os.path.join(root, "tools", "cpp_to_blueprint.py"), "--convert", "cases", "--folder", "Cases", "--level", lp, "--project", pp,

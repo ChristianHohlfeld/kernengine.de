@@ -27,10 +27,10 @@
 # exported kern_* / game functions. No Emscripten runtime is involved.
 #
 # Every source compiles to its own object in parallel (KERN_JOBS, default: all
-# cores) and ThinLTO links them. Objects are cached in $KERN_OBJ_CACHE (default:
-# $TMPDIR/kern-obj) under a hash of the flags, the source and all headers, so a
-# rebuild only compiles what changed and the Studio and example games share the
-# engine's objects (CI keeps the cache between runs).
+# cores) and ThinLTO links them. Nothing is kept from one run to the next: the
+# objects stand in the folder of this run (kern/tools/run_dir.sh, KERN_RUN_DIR),
+# keyed by the flags, the source and the headers - so within one run (a CI job
+# that builds the Studio and the example games) the engine is compiled once.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -59,7 +59,8 @@ CC="$WASI_SDK/bin/clang"
 mode="${KERN_BUILD:-release}"
 if [ "$mode" = debug ]; then opt=(-O1 -g); lto=(); else opt=(-O3 -flto=thin -DNDEBUG); lto=(-flto=thin); fi
 jobs="${KERN_JOBS:-$(nproc)}"
-cache_root="${KERN_OBJ_CACHE:-${TMPDIR:-/tmp}/kern-obj}"
+. "$here/tools/run_dir.sh"   # (no cache: the folder of this run only)
+cache_root="$KERN_RUN_DIR/kern-obj"
 
 # Conservative feature set: runs on every WebGL2-capable browser (Safari 15+).
 features=(-mcpu=mvp -msign-ext -mbulk-memory -mnontrapping-fptoint -mmutable-globals)
@@ -77,9 +78,11 @@ add_component() { while IFS= read -r f; do sources+=("$f"); done < <(find "$here
 [ "$with_studio" = 1 ] && add_component studio
 [ "$with_lehrer" = 1 ] && add_component lehrer
 
+. "$here/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$CXX")"
 objects=()
 if [ "$with_physics" = 1 ]; then
-  cflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -DBOX3D_DISABLE_SIMD -ffp-contract=off
+  cflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -DBOX3D_DISABLE_SIMD -ffp-contract=off "${mathflags[@]}"
           -I"$here/third_party/box3d/include" -I"$here/third_party/box3d/src" -w)
   key="$(printf '%s ' "${cflags[@]}" "$({ "$CC" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
   cache="$cache_root/box3d-$key"
@@ -134,12 +137,16 @@ for a in "$@"; do
   esac
 done
 cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
-          -fno-exceptions -fno-rtti -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off
+          -fno-exceptions -fno-rtti -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off "${mathflags[@]}"
           -Wall -Wextra -Wno-unused-parameter -Werror=return-type
           "${includes[@]}" "${extra_flags[@]}")
 flags_key="$(printf '%s ' "${cxxflags[@]}" "$({ "$CXX" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
-# Any header or included data (.inc) change rebuilds everything (simple and safe).
-headers_key="$(find "$here/include" "$here/src" "$here/third_party/box3d/include" "$here/third_party/microduck" -name '*.h' -o -name '*.inl' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-16)"
+# Any header or included data (.inc) change rebuilds everything (simple and safe) - the engine's and those of the
+# folders given with -I and of the sources' own folders (a game's headers, kern/tests/logic_cases.h of a test module).
+header_dirs=("$here/include" "$here/src" "$here/third_party/box3d/include" "$here/third_party/microduck")
+for a in "${extra_flags[@]}"; do case "$a" in -I?*) [ -d "${a#-I}" ] && header_dirs+=("$(cd "${a#-I}" && pwd)") ;; esac; done
+for f in "${sources[@]}"; do case "$f" in "$here"/src/*) ;; *) header_dirs+=("$(dirname "$f")") ;; esac; done
+headers_key="$(printf '%s\n' "${header_dirs[@]}" | sort -u | xargs -I{} find {} -name '*.h' -o -name '*.inl' -o -name '*.inc' | sort -u | xargs cat | sha256sum | cut -c1-16)"
 cpp_cache="$cache_root/cpp-$flags_key"
 mkdir -p "$cpp_cache"
 cpp_objects=()

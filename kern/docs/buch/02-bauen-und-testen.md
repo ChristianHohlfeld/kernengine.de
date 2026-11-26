@@ -107,7 +107,7 @@ kern/build.sh /tmp/logic_test.wasm kern/tests/logic_wasm_test.cpp -Ikern/tests
 | `WASI_SDK` | `/opt/wasi-sdk` | Installationsverzeichnis von wasi-sdk |
 | `KERN_BUILD` | `release` | `debug` übersetzt mit `-O1 -g` ohne LTO; sonst `-O3 -flto=thin -DNDEBUG` |
 | `KERN_JOBS` | alle Kerne (`nproc`) | Zahl paralleler Compiler und ThinLTO-Jobs |
-| `KERN_OBJ_CACHE` | `$TMPDIR/kern-obj` (bzw. `/tmp/kern-obj`) | Objekt-Cache |
+| `KERN_RUN_DIR` | neu je Lauf (`kern/tools/run_dir.sh`) | Ordner des Laufs: die Objekte, nur in diesem Lauf |
 
 Hinweis zu `KERN_BUILD=debug`: Der Link-Schritt übergibt in jedem Modus `-Wl,--strip-debug`; das
 fertige Modul enthält daher auch im Debug-Modus keine Debug-Informationen. Der Modus wirkt auf
@@ -160,22 +160,16 @@ cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
 
 Am Ende meldet das Skript `built <out> (<n> bytes)`.
 
-### Paralleles Übersetzen und der Objekt-Cache
+### Paralleles Übersetzen, ohne Zwischenspeicher
 
 Jede Quelle wird in ein eigenes Objekt übersetzt, parallel (`KERN_JOBS`), und ThinLTO linkt sie.
-Damit ein Neubau nur übersetzt, was sich geändert hat, und das Studio und die Beispielspiele die
-Objekte der Engine teilen, gibt es einen Cache:
-
-- **Box3D und musl:** je ein Cache-Ordner unter einem Schlüssel aus Optionen und Compiler-Version
-  (`box3d-<key>`, `musl-math-<key>`); ein Objekt wird neu übersetzt, wenn es fehlt oder älter als
-  seine Quelle oder der neueste Header ist.
-- **C++:** Ordner `cpp-<flags_key>`; jedes Objekt heißt `<name>-<key>.o`, wobei der Schlüssel aus
-  dem Hash **aller** Header und eingebundenen Datendateien (`*.h`, `*.inl`, `*.inc` unter `include`,
-  `src`, Box3Ds `include` und `third_party/microduck`), dem Quellpfad und dem Quellinhalt entsteht. Folge: **Jede Header-Änderung übersetzt alle C++-Quellen neu** –
-  einfach und sicher, wie der Kommentar im Skript sagt.
-- **ThinLTO:** Cache in `$KERN_OBJ_CACHE/thinlto`.
-
-Die CI hält den Cache zwischen Läufen (siehe Abschnitt 2.10).
+**Kein Zwischenspeicher über einen Lauf hinaus** (Vorgabe des Besitzers): Ein Objekt aus einem früheren
+Lauf kann einen Test nicht grün machen. Die Objekte stehen im Ordner des Laufs (`kern/tools/run_dir.sh`,
+`KERN_RUN_DIR`): Das erste Skript eines Laufs legt ihn neu an und löscht ihn an seinem Ende; was es
+aufruft, bekommt ihn über die Umgebung. So baut ein Lauf, der das Studio und die Beispielspiele baut, die
+Engine nur einmal. Ein CI-Job setzt `KERN_RUN_DIR` auf einen Ordner seines frischen Runners. Der Schlüssel
+im Ordner (Hash aus Optionen, Compiler, Quelle und allen Headern der Engine, der `-I`-Ordner und der Ordner
+der Quellen) trennt nur die Bauten desselben Laufs.
 
 ---
 
@@ -243,7 +237,7 @@ kern/tests/run.sh micro_duck                 # nur Tests, deren Name "micro_duck
 ### Was das Skript tut
 
 1. **Box3D** wird einmal **ohne** Sanitizer übersetzt (`-O2 -g -DBOX3D_DISABLE_SIMD
-   -ffp-contract=off`) und gecacht – Fremdcode im Skalar-Pfad wie in WebAssembly.
+   -ffp-contract=off`) – Fremdcode im Skalar-Pfad wie in WebAssembly.
 2. **musl** wird ebenso einmal übersetzt (`-O2 -g -ffp-contract=off -fno-math-errno`).
 3. **Aller Kern-C++-Code** (`kern/src/**/*.cpp`, `gl_stub.cpp`, `test_main.cpp`) wird mit
    **AddressSanitizer und UndefinedBehaviorSanitizer** übersetzt:
@@ -259,7 +253,7 @@ kern/tests/run.sh micro_duck                 # nur Tests, deren Name "micro_duck
 5. **Nur ohne Argumente** folgt der Logik-Export-Test (siehe Abschnitt 2.7).
 
 Umgebungsvariablen: `CXX`/`CC` (Standard `c++`/`cc`), `KERN_TEST_OUT` (Ausgabeordner, Standard
-`$TMPDIR/kern-tests`), `KERN_JOBS`.
+`$KERN_RUN_DIR/kern-tests`; alles wird in jedem Lauf neu übersetzt), `KERN_JOBS`.
 
 ### Das Testprogramm
 
@@ -470,9 +464,8 @@ und WebAssembly bewegen.
 ### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
-2. **wasi-sdk 25** aus dem Cache (Schlüssel `wasi-sdk-25.0-v2`), sonst Download nach `/home/runner/wasi-sdk`.
-3. **Objekt-Cache** `/home/runner/kern-obj` (`KERN_OBJ_CACHE`), Schlüssel `kern-obj-<sha>`, wiederhergestellt
-   mit dem Präfix `kern-obj-` – also vom jüngsten früheren Lauf.
+2. **wasi-sdk 25**: Download nach `/home/runner/wasi-sdk` (in jedem Lauf).
+3. **Kein Objekt-Cache:** die Objekte stehen in `KERN_RUN_DIR` (`/home/runner/kern-run`) und leben nur in diesem Job.
 4. **Bauen:**
 
    ```sh
@@ -582,7 +575,7 @@ Seite.
 | Abbruch mit `runtime error:` / `AddressSanitizer` | UBSan/ASan fanden einen Fehler | der Bericht nennt Datei und Zeile; mit Filter einzeln nachstellen (`run.sh <name>`) |
 | `first differing tick: N` bzw. `diff` gegen den Fingerabdruck schlägt fehl | Simulation rechnet plattformabhängig oder wurde geändert | siehe Abschnitt 2.9 |
 | Logik-Test `runs in "interpreter"` statt `compiled (WebAssembly)` | JIT nicht verfügbar oder Modul nicht übersetzbar | Ausgabe des JIT prüfen; die Engine fällt auf den Interpreter zurück (`logic JIT failed …` in der Konsole) |
-| Jeder kleine Header-Edit baut alles neu | gewollt: Header-Hash im Cache-Schlüssel | – |
+| Jeder kleine Header-Edit baut alles neu | es gibt keinen Zwischenspeicher: jeder Lauf baut alles einmal | – |
 | Browser-Test hängt bei `openStudio` | Seite nicht ausgeliefert oder Modul fehlt; der Test wartet bis 90 s auf `KernStudio.frames() > 5` | Server in der Repository-Wurzel starten, `generated/` bauen |
 | Playwright-Import schlägt fehl | Paket nicht gefunden | `npm install playwright` (CI: 1.56.0) und `NODE_PATH` setzen, wie in der CI |
 | Lehrer: „Start“ meldet einen Ladefehler | `kern_lehrer.wasm` fehlt (`generated/` auf der Entwicklungsseite, sonst neben der Seite) | `kern/build.sh --lehrer generated/kern_lehrer.wasm` |

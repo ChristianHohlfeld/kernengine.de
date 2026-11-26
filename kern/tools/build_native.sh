@@ -8,9 +8,9 @@
 #   --project   embeds the project and its levels (kern/game/embedded.h: kern::game::embedded_project())
 #   --classes   with --project: the Blueprints of the project's levels compiled in as C++ classes
 #   --sanitize  ASan and UBSan, as the engine's tests (kern/tests/run.sh)
-# Arguments ending in .cpp / .cc are sources, the others compiler flags (-I, -D ...). The engine's objects are kept in
-# $KERN_NATIVE_CACHE (default $TMPDIR/kern-native) under a hash of the source, the flags and all headers of the engine:
-# a second game, or the same game again, only compiles what changed. CXX / CC: the compilers (default c++ / cc);
+# Arguments ending in .cpp / .cc are sources, the others compiler flags (-I, -D ...). Nothing is kept from one run to the
+# next: the engine's objects stand in the folder of this run (kern/tools/run_dir.sh, KERN_RUN_DIR), keyed by the source,
+# the flags and the headers - a second program of the same run takes them again. CXX / CC: the compilers (default c++ / cc);
 # KERN_JOBS: how many at once (default: all cores).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,10 +30,13 @@ done
 [ -n "$out" ] || { echo "$usage" >&2; exit 1; }
 [ -z "$classes" ] || [ -n "$project" ] || { echo "build_native.sh: --classes compiles the Blueprints of a project's levels - it needs --project" >&2; exit 1; }
 cxx="${CXX:-c++}" cc="${CC:-cc}" jobs="${KERN_JOBS:-$(nproc)}"
-cache="${KERN_NATIVE_CACHE:-${TMPDIR:-/tmp}/kern-native}"
+. "$here/run_dir.sh"   # (no cache: the folder of this run only)
+cache="$KERN_RUN_DIR/kern-native"
 san=()
 [ "$sanitize" = 1 ] && san=(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
+. "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
 key="$( { echo "${flags[*]} $cxx $cc"; "$cxx" --version 2>/dev/null | head -1; } | sha256sum | cut -c1-12)"
 mkdir -p "$cache/box3d-$key" "$cache/musl-$key" "$cache/obj-$key" "$cache/gen"
 work=()

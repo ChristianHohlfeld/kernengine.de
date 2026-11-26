@@ -1268,6 +1268,12 @@ enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
 - **Erzeugt beim Bau der Engine:** `tools/engine_api.py --libraries` übersetzt die Header (`tools/cpp_to_blueprint.py
   --engine <header>`) und schreibt `kern/src/logic/engine_libraries.gen.cpp`. Die Datei steht wie die anderen `*.gen.*`
   im Repo, deshalb braucht der Bau kein clang. Jede Bibliothek hat eine **Marke** (Hash ihres Textes).
+- **Welche Header Bibliotheken sind**, steht in keiner Liste: Jeder Header unter `kern/include/kern` (ohne `*.gen.h` und
+  `test/`), der einen Typ mit `KERN_BLUEPRINT_TYPE` kennzeichnet, ist genau eine Bibliothek, benannt nach seinem Pfad
+  (`kern/input/actions.h`: `engine_input_actions`; `cpp_to_blueprint.marked_headers`). Fehlt einer im Bau, bricht der
+  Konverter ab, bevor er etwas wandelt, mit Header und Grund. Was ein Text nennt (Bibliothek, Typ, Funktion), prüft er
+  bei jedem Text, den er schreibt – dieselbe Prüfung wie `tools/engine_api.py --check <texte>` (`engine_names_missing`).
+  Fall: `tools/converter_cases/libraries.py`.
 - **Da in jeder Laufzeit, in jedem Leser und im Editor**, ohne dass ein Level sie enthält (`kern/logic/engine_libraries.h`).
   `with_engine(blueprints)` ist der eine Weg, auf dem jeder Leser eine Bibliothek findet: Ein Name der Engine ist immer
   die Bibliothek der Engine. libraries_of, take_libraries, link, from_cpp und apply_cpp gehen ihn selbst.
@@ -1276,6 +1282,10 @@ enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
   von ihnen benutzt, aus der Engine (`hold_engine`). Bekommt ein Engine-Struct ein Feld dazu, bleibt das Level gültig.
   Ein Level, das doch eine Kopie hält (einen Akteur `engine_*` oder einen Typ oder eine Funktion mit
   `"from": "engine_…"`), wird abgelehnt, mit Akteur, Name und Grund. Einen zweiten Leseweg gibt es nicht.
+- **Der Konverter schreibt keine Bibliothek der Engine in Level oder Projekt**, auch wenn eine Quelle des Programms einen
+  Header der Engine einbindet und seine Funktionen ruft (`engine_library`): Er schreibt ihren Text und ihren Test, sein
+  Protokoll sagt „engine_math_math: the engine - a library of the engine …“, und was das Programm von ihr benutzt, ist nie
+  deshalb im Projekt. Nur ein Lauf über die Engine selbst (`--engine`) schreibt sie. Fall: `tools/converter_cases/placement.py`.
 - Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
   und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
 - Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.
@@ -2368,8 +2378,8 @@ nativ und in Wasm gebaut. Stand 26.11.2026, jeweils mit Beleg:
 | Auswertungsreihenfolge wie die Quelle | die Formel-Knoten bilden den Baum von clang nach. Zu prüfen ist, wo der Konverter zusammenfasst (Formel-Lambdas, `math_compare`) | – |
 | sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log10, pow, hypot: dieselbe Funktion überall | **die Sprache: ja** (`kern::dm` = musl_math, auch die f-Varianten, gleich gebaut für alle Ziele; Knoten in `nodes.h` `math::sin` … rufen `dm::` in f64). **Die Quelle: nein** – SpawnCity ruft `std::sin` (197-mal), `std::atan2` (123), `std::hypot` (239) …, `kern::dm` nie. Nativ ist das die libm des Systems (glibc), in Wasm die von wasi-libc. Quelle und Blueprint rufen also verschiedene Funktionen, und nativ und Wasm geben im letzten Bit verschiedene Werte | `grep -c "std::sin(" kern/games/spawncity/src/*` ; `kern/include/kern/core/dmath.h` |
 | Fehlende Funktionen in musl_math | sinh, cosh, tanh, asinh, acosh, atanh, log2, exp2 (nur Tabelle `exp2f_data.c`), log1p, cbrt, ldexp – jeweils f und d. Der Konverter schreibt sie heute als Formeln aus exp/log/pow (`converted::wide::tanh_bp` …): das ist eine andere Funktion als `std::tanh` | `ls kern/third_party/musl_math/src` |
-| sqrt, fabs, floor, ceil, trunc, fmod, remainder, copysign | IEEE-genau, überall gleich (`std::`). Aber der JIT weicht ab: `math.mod` rechnet `a - trunc(a/b)*b` statt `fmod` (für große a/b nicht genau), `math.round` rechnet `copysign(floor(abs(a)+0.5), a)` statt `std::round` (falsch bei 0.49999999999999994 und nahe 2^52) | `kern/src/logic/codegen.cpp` Z. 276-283 |
-| NaN und −0 | der Interpreter nimmt `min_of/max_of` (`b < a ? b : a`), der JIT `f64.min/f64.max` von Wasm (NaN gewinnt, −0 < +0). Für NaN und ±0 geben die zwei Stufen verschiedene Werte. Der Vergleichstest sieht es nicht, denn ein Ergebnis mit NaN/Inf gilt als „left the numbers“ und wird nicht verglichen (`converted::defined`) | `codegen.cpp` Z. 266-267, `kern/core/base.h` `min_of` |
+| sqrt, fabs, floor, ceil, trunc, fmod, remainder, copysign | IEEE-genau, überall gleich (`std::`). Der JIT schreibt Modulo, Round, Min, Max, Clamp und Square Root nicht selbst (bis 26.11.2026 tat er es: `a - trunc(a/b)*b` statt `fmod`, `copysign(floor(abs(a)+0.5), a)` statt `std::round`); er ruft für sie die Funktion des Knotens (`Instance::inline_pure`). Selbst schreibt er nur, was Wasm Bit für Bit wie der Knoten rechnet (Add, Sub, Mul, Div, Abs, Negate, Copy Sign, Lerp, Floor, Compare); eine Ganzzahl hat dabei kein −0 | Fall `number_edges` in `kern/tests/logic_cases.h` (Interpreter, JIT im Job build, Klasse), `kern/src/logic/codegen.cpp` |
+| NaN und −0 | der Knoten nimmt `min_of/max_of` (`b < a ? b : a`), `f64.min/f64.max` von Wasm gäben anderes (NaN gewinnt, −0 < +0): darum ruft der JIT für Min, Max, Clamp und Square Root die Funktion des Knotens (s. o.). Der Vergleichstest vergleicht NaN, ±Inf und −0 nach ihren Bits (B5) | Fall `number_edges`, `kern/core/base.h` `min_of` |
 | f32-Knoten | fehlen (Stufe 3): ein f32-Knoten rechnet in f32 und ruft die f-Funktion von musl (`sinf` …), nicht f64 mit Rundung am Ende | – |
 
 #### Mathe-Funktionen: eine Funktion für Quelle, Engine und Blueprint (Entwurf)
@@ -2404,6 +2414,17 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   run_tests.sh, murmel/tests/engine.sh, tools/blueprint_cpp.sh, tools/converter_cases/compare.sh, all_program.sh,
   level_templates.sh, lehrer.sh, blueprint_bench.sh: ~11 Skripte); sinh/tanh (+f) aus musl nachziehen; ein Engine-Test (std::sin ==
   kern::dm::sin, Bit für Bit, nativ und in Wasm). Klein bis mittel, kein Umschreiben der Quelle.
+- Compiler: Quellen des Teilsatzes und die Engine werden mit clang gebaut (das Spiel: E13). Die Engine-Tests laufen in der CI auch mit
+  GCC 13 (Job `native`); dort gilt dieselbe Mathe nur mit zwei Schaltern mehr (in `flags.sh`, erkannt an `__GNUC__` ohne `__clang__`,
+  nicht am Namen - `c++`/`cc` sind oft GCC): `-frounding-math` (sonst faltet GCC `__builtin_atan2f(1.5f, -2.f)`, was libstdc++s
+  `std::atan2(float, float)` ist, korrekt gerundet und 1 ULP neben musl - voller Lauf Kandidat 9 mit `c++` = GCC 13.3) und
+  `-fdisable-tree-powcabs` (sonst macht GCC aus `__builtin_powf(x, 2)` trotz aller Schalter `x*x`; das rundet einen Gleichstand
+  auf gerade, musls powf nicht: 90.109375f², 663 von 2 Mio. Werten). Jede GCC-Übersetzung sagt dazu eine Zeile „note: disable
+  pass tree-powcabs“. Ein GCC ohne diesen Pass bricht den Bau ab („unknown pass“). Der Test vergleicht auch auf GCC alles, auch
+  `pow(x, 2)`. Auch clang braucht `-fmath-errno`: ohne es macht es aus `__builtin_pow(x, 2)` (libc++, Wasm) `x*x` (CI 45810300304).
+- Gebaut (fbf8eee2): `kern/third_party/musl_math/src/std_names.c` (Hüllen, ohne sinh/tanh/cosh: die fehlen der Engine, und der
+  Konverter lässt eine Funktion, die sie ruft, mit Ort warten) und `kern/third_party/musl_math/flags.sh` (`kern_math_flags`).
+  Engine-Test `math_of_the_standard_library_is_the_engines` (nativ) und `kern/tests/math_names_wasm_test.mjs` (Wasm).
 - Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
   umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
 
