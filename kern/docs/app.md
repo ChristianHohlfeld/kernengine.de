@@ -144,7 +144,7 @@ zwischengespeichert werden, weiß die Engine.
 
 | | |
 |---|---|
-| nativ | `kern/tools/build_native.sh [--project <p.kproject>] [--classes] [--sanitize] -o <programm> [Compiler-Schalter / Quellen …]` – die Engine (ohne Editor und Lehrer, mit der kopflosen Grafik `kern/tests/gl_stub.cpp`) als Objekte, zwischengespeichert unter dem Hash von Quelle, Schaltern und allen Headern (`$KERN_NATIVE_CACHE`, Vorgabe `$TMPDIR/kern-native`); `--project` bettet das Projekt samt Levels ein (`embed_project.py`), `--classes` kompiliert die Blueprints jedes Levels des Projekts als C++-Klassen (`tools/blueprint_cpp.sh`); `--sanitize` mit ASan/UBSan wie die Engine-Tests. |
+| nativ | `kern/tools/build_native.sh [--project <p.kproject>] [--classes] [--sanitize] -o <programm> [Compiler-Schalter / Quellen …]` – die Engine (ohne Editor und Lehrer, mit der kopflosen Grafik `kern/tests/gl_stub.cpp`) als Objekte, zwischengespeichert unter dem Hash von Quelle, Schaltern und allen Headern (`$KERN_NATIVE_CACHE`, Vorgabe `$TMPDIR/kern-native`); `--project` bettet das Projekt samt Levels ein (`embed_project.py`), `--classes` kompiliert jeden Blueprint des Projekts als C++-Klasse (`tools/blueprint_cpp.sh`, über `kern/tools/project_sources.sh`): die jedes Levels und die des Projekts selbst – die des Programms, seine App darunter – einmal, neben denen des ersten Levels (ein Projekt mit eigenen Blueprints ohne Level: Fehler mit Grund); `--sanitize` mit ASan/UBSan wie die Engine-Tests. |
 | Web | `kern/build.sh --app --game --project <p.kproject> [--classes] <out.wasm> [Quellen …]` – dasselbe für WebAssembly. |
 | Spieltest | ein Spieltest ist ein natives Programm des Spiels: `build_native.sh --project … -o test test.cpp quellen.cpp`, dann laufen lassen. Murmel: `tests/run.sh` ruft nur noch das. |
 | Export | `tools/export_game.sh <level.klevel \| spiel.kproject> <out.html> [titel] [Quellen der App …]`: ein Level wie bisher; ein Projekt mit den Quellen seiner App wird eine Seite für sich (Modul, `kern.mjs`, `audio.mjs`, `app.mjs` eingebettet, Titel aus dem Projekt) – kein Spielname, kein fester Pfad zur Engine. |
@@ -152,6 +152,6 @@ zwischengespeichert werden, weiß die Engine.
 | bewusst nicht | ein Bausystem (make/cmake), Bibliotheken der Engine als .a/.so, Bau aus dem Editor heraus. |
 
 Geprüft: CI-Job `native-build` (`kern/tests/native_build/run.sh`: ein Minimalprojekt der Engine selbst – Level im
-Projekt, Aktion, Widget, Stand – mit `--project` und `--classes`, und eine fehlende Quelle als Fehler), CI-Job `murmel`
+Projekt, Aktion, Widget, Stand, ein Programm-Blueprint neben der App, gelesen über `game::running_program()` – mit `--project` und `--classes`, je mit der erwarteten Stufe aller Blueprints, und eine fehlende Quelle als Fehler), CI-Job `murmel`
 (Spieltest über `build_native.sh`, Interpreter und Klassen), `murmel-web` (`kern/build.sh
 --project`), der Export eines Projekts im Job `murmel-web` (die Seite für sich startet das Spiel).

@@ -3,9 +3,66 @@
   "version": 1,
   "name": "Mini",
   "settings": {
-    "input": { "actions": [ { "name": "go", "keys": ["space"] } ], "axes": [] }
+    "input": {
+      "actions": [
+        {
+          "name": "go",
+          "keys": [
+            "space"
+          ]
+        }
+      ],
+      "axes": []
+    }
   },
-  "levels": ["levels/eins.klevel"],
+  "levels": [
+    "levels/eins.klevel"
+  ],
   "startLevel": "levels/eins.klevel",
-  "blueprints": []
+  "blueprints": [
+    {
+      "name": "Zaehlwerk",
+      "logic": {
+        "kind": "kern-logic",
+        "version": 1,
+        "nextId": 3,
+        "variables": [
+          {
+            "name": "Began",
+            "type": "int",
+            "value": 0
+          }
+        ],
+        "nodes": [
+          {
+            "id": 1,
+            "type": "event.begin",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": 2,
+            "type": "var.add",
+            "x": 280,
+            "y": 0,
+            "params": {
+              "variable": "Began"
+            },
+            "values": {
+              "amount": 1
+            }
+          }
+        ],
+        "links": [
+          [
+            1,
+            "then",
+            2,
+            "exec"
+          ]
+        ],
+        "machines": []
+      }
+    }
+  ]
 }

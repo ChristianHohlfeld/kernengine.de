@@ -113,9 +113,13 @@ class ProgramApp final : public App {
 /// program does not start (Program::start says why, in the log) or an App was given already: 1.
 /// (Inline: a program that links the game runtime without the app runtime - a tool, a test - does not need run.)
 namespace detail {
-inline int run_program(const game::Project& project, App* given) {
-  // (the app runtime's one program, kept to the end of the process: the app runtime holds its App)
+/// The app runtime's one program (kern::run's), kept to the end of the process: the app runtime holds its App.
+inline game::ProgramApp& process_program() {
   static game::ProgramApp* const app = new game::ProgramApp;
+  return *app;
+}
+inline int run_program(const game::Project& project, App* given) {
+  game::ProgramApp* const app = &process_program();
   if (app->program.running()) {
     log(LogLevel::error, "kern::run: the program of the project %s runs already - kern_main starts one program, once", app->program.project()->name.c_str());
     return 1;
@@ -127,6 +131,18 @@ inline int run_program(const game::Project& project, App* given) {
 }
 }  // namespace detail
 inline int run(const game::Project& project) { return detail::run_program(project, nullptr); }
+
+namespace game {
+/// The program kern::run started in this process (kern::run(Project), kern::run(App&, Project)), while it runs - from
+/// kern::run until the app stops, and again from the next start of the app (the program starts again with it). A
+/// game's own test reads the program's state there: its runtime (Program::runtime - the variables of its App's
+/// Blueprint, Instance::get; its functions, Instance::call) and the objects of the engine it holds (the worlds it
+/// runs). Null: kern::run started none, or it does not run now (the app stopped).
+inline Program* running_program() {
+  Program& p = detail::process_program().program;
+  return p.running() ? &p : nullptr;
+}
+}  // namespace game
 
 /// The entry of a game whose App is C++ and that has a project (kern/docs/project.md 4.): the project's program runs
 /// beside the App (its Blueprints bound as their classes - what the App's C++ calls, its exports - from before

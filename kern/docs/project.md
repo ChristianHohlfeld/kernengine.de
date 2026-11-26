@@ -320,6 +320,11 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   (`kern/test/test.h`); `kern/tools/test_main.cpp` fährt sie. Die Vergleichstests, die der Konverter schreibt
   (Quelle gegen Blueprint, `kern/test/converted.h`), stehen in derselben Liste (blueprint_cpp.md „Quelle gegen
   Blueprint“). Beispiel: `kern/games/murmel` (`run.sh`, CI-Job `murmel`).
+- **Den Stand eines Programms lesen:** `kern::game::running_program()` (`kern/game/program.h`) ist das Programm, das
+  `kern::run` startete, solange es läuft (bis die App stoppt, wieder ab ihrem nächsten Start; sonst null). Ein Test
+  des Spiels liest dort die Variablen des App-Blueprints (`runtime()->instances()`, `Instance::get`), ruft seine
+  Funktionen (`Instance::call`) und erreicht die Objekte der Engine, die es hält (`runtime()->host().engine_objects()`:
+  seine Welten). Beispiel: `kern/tests/native_build/mini.cpp`.
 - **Konverter:** `tools/converter_cases/run.sh` – kleine Fälle je Form von C++ (auch `program`, `door`, `actors`).
 - **Editor und Browser:** `kern/tests/e2e/studio_e2e.mjs` (Studio, Projekt, Play Project), `blueprint_e2e.mjs`,
   `input_e2e.mjs`; ein Spiel im Browser: CI-Job `murmel-web`.
