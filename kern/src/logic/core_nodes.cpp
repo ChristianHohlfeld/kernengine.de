@@ -1601,7 +1601,8 @@ void add_structs(Library& lib) {
           const Value f = field_of(value, *st, k, g);
           const bytes::Field& at = l.fields[k];
           const PinType t = st->fields[k].type.type;
-          const u64 v = is_number(t) ? f.converted(t).bits() : 0;  // (the field's own bits: it is of the layout's number)
+          // (the field's own bits: it is of the layout's number - a NaN the one NaN, numbers.h seen)
+          const u64 v = is_number(t) ? with_number(t, [&](auto x) { return num::seen_bits(num::of_bits<typename decltype(x)::type>(f.converted(t).bits())); }) : 0;
           bytes::put(out.data(), at, v);
         }
       }
@@ -1927,7 +1928,9 @@ void add_math(Library& lib) {
     d.run = [](Context& c) {
       const Value x = c.in(std::size_t{0});
       const PinType to = number_setting(c.node(), "to", F::number);
-      c.out(std::size_t{0}, Value::of_bits(to, x.bits()));  // (the same bits, the other type: std::bit_cast)
+      // (the same bits, the other type: std::bit_cast - of a NaN the one NaN's, numbers.h seen and reinterpret)
+      const u64 bits = with_number(x.type, [&](auto t) { return num::seen_bits(num::of_bits<typename decltype(t)::type>(x.bits())); });
+      c.out(std::size_t{0}, Value::of_bits(to, bits));
       return kStop;
     };
     lib.add(std::move(d));

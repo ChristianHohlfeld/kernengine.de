@@ -848,8 +848,8 @@ inline bool rows_of(const Value& got, std::size_t n) {
 inline std::string exact(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g", x); return b; }
 
 // ---- is what the Blueprint gives exactly what the source gives? ----
-// (Numbers by their bits: 0.0 and -0.0 are two results.)
-inline bool same_bits(f64 a, f64 b) { return std::bit_cast<kern::u64>(a) == std::bit_cast<kern::u64>(b); }
+// (Numbers by their bits as the language sees them: 0.0 and -0.0 are two results, two NaNs the one NaN - numbers.h, seen.)
+inline bool same_bits(f64 a, f64 b) { return kern::logic::num::same_seen(a, b); }
 inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); }); }
 inline bool same(f32 want, const Value& got) {
   return same_bits(static_cast<f64>(want), got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); });

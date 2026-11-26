@@ -1954,8 +1954,8 @@ template <class S> constexpr bool equal(const S& a, const S& b) {
 /// cut to that many bits, as C++ converts), u64, i64 (an Int64's field), f32, f64 (a Float's). The
 /// bytes are little-endian, on every platform the same; a byte no field covers is 0. A number of
 /// the bytes is taken as C++ takes it to an unsigned char (its last 8 bits); where there are no
-/// bytes - before the list, beyond it - they are 0. A NaN keeps its sign and the upper bits of its
-/// payload and is quiet (on every platform the same - what x86 does).
+/// bytes - before the list, beyond it - they are 0. A NaN is the one quiet NaN of its type (numbers.h,
+/// seen: 0x7fc00000, 0x7ff8000000000000 - on every platform and in every tier the same).
 namespace bytes {
 enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 };
 struct Field {
@@ -2077,7 +2077,7 @@ constexpr u64 widened(Code c, u64 w) {
   return w;
 }
 /// The bits of an entry as the number `c` holds it (num::bits_of).
-template <num::Number T> u64 entry_bits(Code, T v) { return num::bits_of(v); }
+template <num::Number T> u64 entry_bits(Code, T v) { return num::seen_bits(v); }  // (a NaN: the one NaN - numbers.h, seen)
 /// The entry those bits of the number `c` are.
 template <num::Number T> void set_entry(T& to, Code c, u64 w) { to = num::of_bits<T>(widened(c, w)); }
 /// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list

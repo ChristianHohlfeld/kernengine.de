@@ -24,9 +24,9 @@ namespace kern::logic {
 
 namespace {
 /// A floating number as a text: the shortest decimal that gives the same number of its type again (std::to_chars) -
-/// the same text on every machine; inf, -inf, nan as C++'s printf writes them.
+/// the same text on every machine; inf, -inf as C++'s printf writes them, a NaN "nan" (the one NaN - numbers.h, seen).
 template <class T> std::string floating_text(T x) {
-  if (x != x) return std::signbit(x) ? "-nan" : "nan";
+  if (x != x) return "nan";
   if (std::isinf(x)) return x < 0 ? "-inf" : "inf";
   char b[64];
   const auto r = std::to_chars(b, b + sizeof b, x);

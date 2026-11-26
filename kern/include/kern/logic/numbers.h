@@ -175,11 +175,32 @@ template <Number To, Number From> constexpr To cast(From x) {
   else if constexpr (Floating<From> && Integer<To>) return floating_to_integral<To>(x);
   else return static_cast<To>(x);
 }
-/// The bits of x as the type To of the same size (std::bit_cast: f32 <-> u32 / i32, f64 <-> u64 / i64).
+// ---- the one NaN: where the bits of a floating number are seen ----
+// Which NaN an operation gives - its sign, its payload - IEEE 754 and C++ leave open (x86 gives a negative one for 0 * inf,
+// and a compiler may swap the operands of a + b, so the NaN of the other one comes through). The language fixes it as it
+// fixes a division by 0: a NaN is "a NaN" while it is computed with (no step pays for it), and wherever its bits are SEEN -
+// Bit Cast, the bytes of a struct or a list (Struct to Bytes, Copy Bytes), a number as a text, saving and loading, a
+// comparison of results - it is the one quiet NaN: 0x7fc00000 (f32), 0x7ff8000000000000 (f64). The same in every tier.
+template <Floating T> constexpr T seen(T x) {
+  if (x == x) return x;
+  if constexpr (std::same_as<T, f32>) return std::bit_cast<f32>(u32{0x7fc00000u});
+  else return std::bit_cast<f64>(u64{0x7ff8000000000000ull});
+}
+/// The bits of x as they are seen: bits_of, a NaN the one NaN of its type.
+template <Number T> constexpr u64 seen_bits(T x) {
+  if constexpr (Floating<T>) return bits_of(seen(x));
+  else return bits_of(x);
+}
+/// Are a and b the same number as the language sees them: the same bits - two NaNs the same (the one NaN), -0 not 0.
+template <Number T> constexpr bool same_seen(T a, T b) { return seen_bits(a) == seen_bits(b); }
+
+/// The bits of x as the type To of the same size (std::bit_cast: f32 <-> u32 / i32, f64 <-> u64 / i64) - of a NaN the one
+/// NaN's (seen, above).
 template <Number To, Number From>
   requires(sizeof(To) == sizeof(From) && !std::same_as<To, bool> && !std::same_as<From, bool>)
 constexpr To reinterpret(From x) {
-  return std::bit_cast<To>(x);
+  if constexpr (Floating<From>) return std::bit_cast<To>(seen(x));
+  else return std::bit_cast<To>(x);
 }
 
 // ---- arithmetic ----

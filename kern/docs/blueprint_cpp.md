@@ -504,11 +504,22 @@ Quelle als Fehler:
   `abs` der kleinsten signed-Zahl geben sie selbst;
 - `/` und `%` durch 0 geben 0; kleinste signed-Zahl `/ -1` gibt sie selbst, `% -1` gibt 0; sonst auf null zu wie C++;
 - ein Shift geht um die Weite modulo der Breite (wie x86 und WebAssembly); `>>` einer signed-Zahl bringt das Vorzeichen;
-- Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly).
+- Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly);
+- `fmin`/`fmax` von 0 und −0: −0 bzw. 0;
+- **das eine NaN**: welches NaN eine Rechnung gibt (Vorzeichen, Nutzlast), legen IEEE 754 und C++ nicht fest – x86 gibt
+  für `0 * inf` ein negatives, und ein Compiler darf die Operanden von `a + b` tauschen, dann kommt das NaN des anderen
+  durch (GCC mit -O1 tut es). Die Sprache legt es fest: solange gerechnet wird, ist ein NaN „ein NaN“ (kein Schritt zahlt
+  dafür); **wo seine Bits sichtbar werden**, ist es das eine stille NaN `0x7fc00000` (f32) bzw. `0x7ff8000000000000` (f64):
+  Bit Cast (`num_bit_cast`), die Bytes einer Struktur und Copy Bytes, eine Zahl als Text (`nan`), Speichern/Laden (JSON
+  `"nan"`), der Vergleich von Ergebnissen in den Tests (zwei NaN sind gleich, alles andere bitgenau: −0 ≠ 0, ±inf).
+  Eine Funktion in numbers.h (`num::seen`, `seen_bits`, `same_seen`), an genau diesen Übergängen gerufen, im Interpreter,
+  in der Klasse und im JIT (der die Funktion des Knotens ruft) dieselbe. Beleg: `numbers_one_nan_where_its_bits_are_seen`
+  (derselbe Ausdruck mit vertauschten Operanden, NaN beider Vorzeichen, in C++ – gebaut von GCC und clang –, Interpreter
+  und Klasse: an jedem Übergang dieselben Bits).
 Der Rest ist C++: ganze Zahl → schmalere behält die unteren Bits, Zahl → bool ist `!= 0`, ganze Zahl → Fließkomma und
 f64 → f32 die nächste (jenseits von f32: ±inf). Fließkomma ist IEEE 754 wie in C++: `x / 0` ist ±inf, `0 / 0` und
-`sqrt(-1)` NaN. Welche NaN-Bits eine Rechnung ergibt, legen weder C++ noch WebAssembly fest; ein Wert behält seine
-Bits (`Value` hält jede Zahl als ihre Bits).
+`sqrt(-1)` NaN. Ein Wert behält beim Rechnen seine Bits (`Value` hält jede Zahl als ihre Bits); gesehen wird ein NaN
+als das eine NaN (oben).
 
 **Was sich gegenüber den alten Knoten ändert** (vor den Zahl-Typen: ein Float = f64, ein Int als double):
 Divide und Modulo von Fließkommazahlen durch 0 gaben 0 – jetzt IEEE (inf, NaN); Square Root einer negativen Zahl gab 0

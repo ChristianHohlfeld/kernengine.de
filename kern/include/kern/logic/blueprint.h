@@ -841,7 +841,7 @@ struct BlueprintCore : logic::PureNodes {
   template <class B, class T>
     requires logic::num::Number<T>
   static void put_bytes(B* out, const logic::bytes::Field& f, T v) {
-    logic::bytes::put(out, f, logic::num::bits_of(v));
+    logic::bytes::put(out, f, logic::num::seen_bits(v));  // (a NaN: the one NaN - numbers.h, seen)
   }
   template <class B, class T>
     requires logic::num::Number<T>

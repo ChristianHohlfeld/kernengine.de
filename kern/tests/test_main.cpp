@@ -2391,10 +2391,9 @@ template <class T> void formula_is_its_nodes(const FormulaAndNodes& c, std::span
         inst->set("B", logic::Value::of_number(b));
         inst->set("C", logic::Value::of_number(x));
         rt.call("Go");
-        const u64 f = inst->get("F").bits(), n = inst->get("N").bits();
-        // (a NaN is a NaN: which one - its sign, its payload - C++ leaves to the machine and the compiler, numbers.h)
-        const bool both_nan = logic::num::Floating<T> && std::isnan(inst->get("F").as<T>()) && std::isnan(inst->get("N").as<T>());
-        if (f != n && !both_nan) {
+        // (the numbers as the language sees them: a NaN the one NaN - numbers.h, seen)
+        const u64 f = logic::num::seen_bits(inst->get("F").as<T>()), n = logic::num::seen_bits(inst->get("N").as<T>());
+        if (f != n) {
           std::printf("formula \"%s\" of %s, %s %s %s: the formula %llx, its nodes %llx\n", c.formula, t.c_str(), logic::number_as_text(logic::Value::of_number(a)).c_str(),
                       logic::number_as_text(logic::Value::of_number(b)).c_str(), logic::number_as_text(logic::Value::of_number(x)).c_str(), (unsigned long long)f, (unsigned long long)n);
           CHECK((false));
@@ -2416,6 +2415,60 @@ TEST(numbers_size_t_edges) {
   const std::string cls = size_edges::of_the_class(), cpp = size_edges::of_cpp();
   if (cls != size_edges::kWant || cpp != size_edges::kWant) std::printf("class:\n%sC++:\n%s", cls.c_str(), cpp.c_str());
   CHECK(cls == cpp && cpp == size_edges::kWant);
+}
+
+// Which NaN an operation gives, IEEE 754 and C++ leave open (0 * inf on x86 a negative one; a compiler may swap the operands of
+// a + b). The language fixes it (numbers.h, seen): wherever the bits of a number are seen - Bit Cast, the bytes of a struct and
+// Copy Bytes, a number as a text, saving - a NaN is the one quiet NaN. The same expression with its operands swapped gives there
+// the same bits - in C++ (this file, built by GCC and by clang), in the interpreter and in a class.
+TEST(numbers_one_nan_where_its_bits_are_seen) {
+  namespace num = logic::num;
+  volatile f32 zero = 0.0f, inf = std::numeric_limits<f32>::infinity();
+  volatile f32 up = std::bit_cast<f32>(0x7fc00001u), down = std::bit_cast<f32>(0xffc00002u);  // (NaNs of both signs, with payloads)
+  const f32 made[] = {zero * inf, up + down, down + up, up * zero + down, down + up * zero, -up, std::bit_cast<f32>(0x7f800001u)};
+  volatile f64 zero64 = 0.0, inf64 = std::numeric_limits<f64>::infinity();
+  volatile f64 up64 = std::bit_cast<f64>(0x7ff8000000000001ull), down64 = std::bit_cast<f64>(0xfff8000000000002ull);
+  const f64 made64[] = {zero64 * inf64, up64 + down64, down64 + up64, -up64, inf64 - inf64};
+  for (f32 x : made) {
+    CHECK(std::isnan(x));
+    CHECK((num::reinterpret<u32>(x) == 0x7fc00000u && logic::PureNodes::num_bit_cast<u32, f32>(x) == 0x7fc00000u && num::seen_bits(x) == 0x7fc00000u));
+    CHECK((logic::bytes::entry_bits(logic::bytes::Code::f32, x) == 0x7fc00000u && logic::number_as_text(logic::Value::of_number(x)) == "nan"));
+    CHECK((json::stringify(logic::Value::of_number(x).to_json()) == "\"nan\""));
+  }
+  for (f64 x : made64) {
+    CHECK(std::isnan(x));
+    CHECK((num::reinterpret<u64>(x) == 0x7ff8000000000000ull && num::seen_bits(x) == 0x7ff8000000000000ull && logic::number_as_text(logic::Value::of_number(x)) == "nan"));
+  }
+  // (-0 and inf are no NaN: their own bits)
+  CHECK((num::reinterpret<u32>(-0.0f) == 0x80000000u && num::reinterpret<u64>(-std::numeric_limits<f64>::infinity()) == 0xfff0000000000000ull));
+  // the interpreter and the class: a * b + c and c + a * b of NaNs of both signs, through Bit Cast and To Text
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"A","type":"f32","value":0},{"name":"B","type":"f32","value":0},{"name":"C","type":"f32","value":0},
+      {"name":"X","type":"u32","value":0},{"name":"Y","type":"u32","value":0},{"name":"T","type":"text","value":""}],
+    "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"X"}},{"id":3,"type":"var.set","params":{"variable":"Y"}},
+      {"id":4,"type":"var.set","params":{"variable":"T"}},{"id":5,"type":"var.get","params":{"variable":"A"}},{"id":6,"type":"var.get","params":{"variable":"B"}},
+      {"id":7,"type":"var.get","params":{"variable":"C"}},{"id":8,"type":"math.formula","params":{"formula":"a * b + c","types":"f32 f32 f32"}},
+      {"id":9,"type":"math.formula","params":{"formula":"c + a * b","types":"f32 f32 f32"}},{"id":10,"type":"num.bit_cast","params":{"to":"u32","from":"f32"}},
+      {"id":11,"type":"num.bit_cast","params":{"to":"u32","from":"f32"}},{"id":12,"type":"num.text","params":{"type":"f32"}}],
+    "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"],[5,"value",8,"a"],[6,"value",8,"b"],[7,"value",8,"c"],[5,"value",9,"a"],[6,"value",9,"b"],[7,"value",9,"c"],
+      [8,"result",10,"a"],[9,"result",11,"a"],[10,"result",2,"value"],[11,"result",3,"value"],[9,"result",12,"a"],[12,"result",4,"value"]]})");
+  CHECK(no_errors(logic::check(g)));
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  for (f32 a : {f32(zero), f32(up), f32(down)})
+    for (f32 b : {f32(inf), f32(up), f32(down)})
+      for (f32 c : {f32(up), f32(down), 1.0f}) {
+        inst->set("A", logic::Value::of_number(a));
+        inst->set("B", logic::Value::of_number(b));
+        inst->set("C", logic::Value::of_number(c));
+        rt.call("Go");
+        const f32 r = kern::formula<f32, f32, f32>([](auto x, auto y, auto z) { return z + x * y; }, a, b, c);
+        if (std::isnan(r)) {
+          CHECK((inst->get("X").as<u32>() == 0x7fc00000u && inst->get("Y").as<u32>() == 0x7fc00000u && inst->get("T").as_text() == "nan"));
+          CHECK((logic::PureNodes::num_bit_cast<u32, f32>(r) == 0x7fc00000u));
+        }
+      }
 }
 
 TEST(logic_formula_is_its_nodes) {
@@ -2472,11 +2525,11 @@ TEST(logic_formula_is_its_nodes) {
             T r = a * b;
             r = r + c;
             const T fr = kern::formula<T, T, T>([](auto x, auto y, auto z) { return x * y + z; }, a, b, c);
-            CHECK(((std::isnan(fr) && std::isnan(r)) || logic::num::bits_of(fr) == logic::num::bits_of(r)));
+            CHECK((logic::num::same_seen(fr, r)));
             T q = a - b;
             q = q / c;
             const T fq = kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x - y) / z; }, a, b, c);
-            CHECK(((std::isnan(fq) && std::isnan(q)) || logic::num::bits_of(fq) == logic::num::bits_of(q)));
+            CHECK((logic::num::same_seen(fq, q)));
           } else {
             // (C++ computes a narrow one as an int and puts it back, a wide one in two's complement where it is unsigned: the same low bits)
             const T r = static_cast<T>(static_cast<U>(static_cast<U>(a) * static_cast<U>(b)) + static_cast<U>(c));

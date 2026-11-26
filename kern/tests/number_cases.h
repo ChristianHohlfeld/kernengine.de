@@ -20,7 +20,8 @@ namespace num = kern::logic::num;
 
 /// The same value: the same bits - of two NaNs, both NaN (neither C++ nor WebAssembly fix a NaN's bits).
 template <class T> bool same(T a, T b) {
-  if constexpr (std::is_floating_point_v<T>) return (std::isnan(a) && std::isnan(b)) || std::bit_cast<std::conditional_t<sizeof(T) == 4, u32, u64>>(a) == std::bit_cast<std::conditional_t<sizeof(T) == 4, u32, u64>>(b);
+  // (the language's rule, numbers.h seen: two NaNs are the one NaN, every other value its bits - -0 is not 0)
+  if constexpr (num::Number<T>) return num::same_seen(a, b);
   else return a == b;
 }
 
