@@ -310,7 +310,9 @@ def component_of(path):
     """The part of the engine a header belongs to: kern/include/kern/<part>/ - its sources are kern/src/<part>/ (a
     build links the parts kern/build.sh says)."""
     m = re.search(r"/include/kern/(\w+)/", path or "")
-    assert m and os.path.isdir(os.path.join(KERN, "src", m.group(1))), path
+    assert m, path
+    if not os.path.isdir(os.path.join(KERN, "src", m.group(1))):
+        return "core"   # (a part that is its headers alone - math: its functions are inline, every build has core)
     return m.group(1)
 
 

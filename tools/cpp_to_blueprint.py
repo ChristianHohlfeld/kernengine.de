@@ -11981,6 +11981,9 @@ ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (the pin types of the engine's door until its pins have the types of their signatures - stage 6 of the number types:
 # Int an i64, Float an f64, Int64 a u64; an entry of a fixed width - of a List<U8> - its own type, u8)
 ENGINE_PIN = {"bool": "boolean", "Int": "i64", "Float": "f64", "Vector": "vector", "Text": "text", "Int64": "u64", "Actor": "actor"}
+# (Stufe 6, in Arbeit: a function a header defines as a node of its own - KERN_ENGINE_INLINE_NODES=1; off until the door
+# handles every type such a function takes - std::initializer_list, ... - and the native cases cover them)
+ENGINE_INLINE_NODES = os.environ.get("KERN_ENGINE_INLINE_NODES") == "1"
 # (the form of a number of each type - EnginePin::shape, kern/logic/engine_api.h: a letter each)
 NUM_SHAPE = {"bool": "b", "f64": "n", "f32": "f", "i64": "i", "u64": "l", "i32": "w", "u32": "u", "i16": "s", "u16": "r", "i8": "k", "u8": "y"}
 
@@ -12134,7 +12137,7 @@ class Api:
         defined? What such an object holds is the engine's: a Blueprint reaches it through its node only."""
         if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d.get("isImplicit") or d.get("explicitlyDeleted"):
             return False
-        if d["id"] in self.tree.body and not self.of_object(d):
+        if d["id"] in self.tree.body and not self.of_object(d) and not (ENGINE_INLINE_NODES and self.engine_inline(d)):
             return False
         scope = self.tree.scope_of.get(d["id"], "")
         if not scope.startswith(ENGINE + "::") or engine_skipped(scope) and engine_skipped(scope.rstrip(":") + "::" + (d.get("name") or "")):
@@ -12142,6 +12145,16 @@ class Api:
         if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
             return False
         return not (d.get("kind") == "CXXMethodDecl" and not self.public(d))
+
+    def engine_inline(self, d):
+        """A function a header of the engine defines (an inline function of math.h, a method of plain data - Mat4::mul):
+        a node that runs the engine's own function, as a function it only declares (kern/docs/blueprint_cpp.md "Zahl-Typen":
+        the engine's functions are called, not computed again by a graph of the language). Not a virtual function (an
+        interface a Blueprint implements), not one of the language's own helpers (engine_skipped)."""
+        if d.get("virtual") or d.get("constexpr") and d.get("kind") == "CXXConstructorDecl":
+            return False
+        f = os.path.abspath(self.tree.decl_file(d) if hasattr(self.tree, "decl_file") else d.get("_file", "") or "")
+        return f.startswith(ENGINE_HEADERS_DIR + os.sep)
 
     def public(self, d):
         """Is the method `d` public in its class? (The compiler's tree says it by the access specifiers between
