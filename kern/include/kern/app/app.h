@@ -20,23 +20,25 @@
 
 #include "kern/audio/audio.h"
 #include "kern/gfx/renderer.h"
+#include "kern/input/actions.h"
 
 namespace kern {
-
-/// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
 
 constexpr u32 kMaxTouches = 10;
 
 struct Touch {
   i32 id = -1;  // < 0: slot unused
   Vec2 start, position, previous;
+  bool began = false;  // it touched down this frame
+};
+
+/// A gamepad in the browser's standard mapping (kern/docs/app.md 4.): sticks -1..1 (right and up are +1), the
+/// triggers 0..1, the buttons as bits (bit i = PadButton i).
+struct Gamepad {
+  bool connected = false;
+  f32 lx = 0, ly = 0, rx = 0, ry = 0;
+  f32 lt = 0, rt = 0;
+  u32 buttons = 0;
 };
 
 class Input {
@@ -54,6 +56,10 @@ class Input {
   const Touch* touches() const { return touches_; }
   u32 touch_count() const;
   bool focused() const { return focused_; }
+  /// The gamepad (the first connected one, standard mapping) and the buttons pressed down this frame (bits).
+  const Gamepad& gamepad() const { return pad_; }
+  bool pad_down(PadButton b) const { return pad_.buttons & (1u << static_cast<u32>(b)); }
+  bool pad_pressed(PadButton b) const { return pad_pressed_ & (1u << static_cast<u32>(b)); }
 
   // ---- platform side ----
   void key(Key k, bool down);
@@ -62,6 +68,7 @@ class Input {
   void add_wheel(f32 dy) { wheel_ += dy; }
   void touch(i32 id, i32 phase, Vec2 position);  // phase 0 start, 1 move, 2 end/cancel
   void set_focus(bool focused);
+  void set_gamepad(const Gamepad& pad);
   void end_frame();  // clears per-frame edges and deltas
 
  private:
@@ -73,6 +80,8 @@ class Input {
   f32 wheel_ = 0;
   Touch touches_[kMaxTouches];
   bool focused_ = true;
+  Gamepad pad_;
+  u32 pad_pressed_ = 0;
 };
 
 struct Frame {
@@ -91,6 +100,16 @@ class Engine {
   /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime
   /// makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
   audio::Mixer& mixer() { return mixer_; }
+  /// The project's input actions (kern/docs/app.md 4.): `action` held, `action_pressed` pressed down this frame (a key,
+  /// a pad button, a mouse button or a finger of its touch zone), `axis` -1..1 (keys -1/+1, the pad's stick past its
+  /// deadzone, the touch stick - the largest wins). A name the project has none of: false / 0, last_error names it and
+  /// the names there are, the log says it once a name.
+  bool action(const char* name) const;
+  bool action_pressed(const char* name) const;
+  f32 axis(const char* name) const;
+  /// The actions the app runtime gives the engine (the project's settings "input").
+  void set_actions(const InputActions& actions) { actions_ = actions; }
+  const InputActions& actions() const { return actions_; }
   /// Text shown by the host page in its status overlay (empty hides it).
   void set_status(const char* text);
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
@@ -167,6 +186,11 @@ class Engine {
   Renderer& renderer_;
   Input input_;
   audio::Mixer mixer_;
+  InputActions actions_;
+  mutable std::vector<std::string> unknown_actions_;   // (said once each)
+  const ActionBinding* find_action(const char* name) const;
+  const AxisBinding* find_axis(const char* name) const;
+  bool touch_in(TouchZone zone, bool pressed) const;
   Vec4 clear_color_{0.045f, 0.07f, 0.12f, 1};
   bool xr_ = false;
   Vec3 xr_eye_, xr_forward_{1, 0, 0};

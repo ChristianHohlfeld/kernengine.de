@@ -19,8 +19,9 @@ constexpr int kLevels = 2;
 /// Der Pfad des Levels `nummer` (0, 1) im Projekt.
 const char* level_pfad(int nummer);
 
-/// Was die Tastatur eines Frames für die Welt heißt: Pfeile oder WASD rollen, Leertaste springt.
-kern::game::PlayInput steuerung(const kern::Input& input);
+/// Was die Eingabe eines Frames für die Welt heißt: die Achsen moveX, moveY rollen, die Aktion jump springt - welche
+/// Tasten, Knöpfe und Finger das sind, sagt das Projekt (settings.input, kern/docs/app.md 4.).
+kern::game::PlayInput steuerung(const kern::Engine& engine);
 
 /// Der Text der Anzeige: Level, Punkte, Münzen und was gerade los ist.
 std::string anzeige(int level, kern::f32 punkte, kern::u32 muenzen, kern::u32 alle, bool fertig, const std::string& meldung);

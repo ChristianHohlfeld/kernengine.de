@@ -15,16 +15,11 @@ const char* level_pfad(int nummer) {
   return "levels/bruecke.klevel";
 }
 
-game::PlayInput steuerung(const Input& input) {
+game::PlayInput steuerung(const Engine& engine) {
   game::PlayInput in;
-  f32 x = 0, y = 0;
-  if (input.down(Key::left) || input.down(Key::a)) x -= 1;
-  if (input.down(Key::right) || input.down(Key::d)) x += 1;
-  if (input.down(Key::up) || input.down(Key::w)) y += 1;
-  if (input.down(Key::down) || input.down(Key::s)) y -= 1;
-  in.move_x = x;
-  in.move_y = y;
-  in.jump = input.down(Key::space);
+  in.move_x = engine.axis("moveX");
+  in.move_y = engine.axis("moveY");
+  in.jump = engine.action("jump");
   return in;
 }
 
@@ -83,9 +78,9 @@ bool Murmel::lade(int nummer) {
 }
 
 void Murmel::update(Engine& engine, const Frame& frame) {
-  const game::PlayInput in = steuerung(engine.input());
+  const game::PlayInput in = steuerung(engine);
   if (fertig_) {
-    if (engine.input().pressed(Key::enter)) {
+    if (engine.action_pressed("again")) {
       vorher_ = 0;
       fertig_ = false;
       if (!lade(0)) log(LogLevel::error, "%s", last_error());

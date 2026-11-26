@@ -20,6 +20,7 @@
 
 #include "kern/core/json.h"
 #include "kern/gfx/renderer.h"
+#include "kern/input/actions.h"
 
 namespace kern {
 
@@ -33,7 +34,8 @@ struct DeviceProfile {
 struct ProjectSettings {
   RendererOptions renderer;             // the renderer at start (width and height are the page's)
   std::vector<DeviceProfile> profiles;  // the renderer on other devices, by name (the launch argument profile=<name>)
-  u32 heap_reserve_mb = 0;              // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
+  u32 heap_reserve_mb = 0;
+  InputActions input;                   // the player's actions and axes and what is bound to them (kern/docs/app.md 4.)              // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
 
   /// The profile of that name (null: none).
   const DeviceProfile* profile(std::string_view name) const {
@@ -153,6 +155,7 @@ inline json::Value project_to_json(const ProjectSettings& p) {
   }
   o.set("profiles", std::move(profiles));
   o.set("heapReserveMb", p.heap_reserve_mb);
+  if (!p.input.actions.empty() || !p.input.axes.empty()) o.set("input", input_to_json(p.input));
   return o;
 }
 
@@ -168,7 +171,7 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
   out = ProjectSettings{};
   if (!v.is_object()) return fail("must be an object");
   if (v.has("mobile")) return fail("mobile: a device profile is one of \"profiles\" ({\"name\": \"mobile\", \"renderer\": {...}})");
-  if (std::string e = json::unknown_key(v, {"renderer", "profiles", "heapReserveMb"}); !e.empty()) return fail(e);
+  if (std::string e = json::unknown_key(v, {"renderer", "profiles", "heapReserveMb", "input"}); !e.empty()) return fail(e);
   if (std::string e = renderer_from(v["renderer"], out.renderer, "renderer"); !e.empty()) return fail(e);
   if (const json::Value* list = v.find("profiles")) {
     if (!list->is_array()) return fail("profiles: must be a list");
@@ -188,6 +191,10 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
   const f64 mb = v["heapReserveMb"].as_number(0);
   if (!(mb >= 0 && mb < 4096)) return fail("heapReserveMb: from 0 to 4095");
   out.heap_reserve_mb = static_cast<u32>(mb);
+  if (const json::Value* in = v.find("input")) {
+    std::string why;
+    if (!input_from_json(*in, out.input, &why)) return fail(why);
+  }
   return true;
 }
 

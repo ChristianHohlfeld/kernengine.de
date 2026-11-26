@@ -63,6 +63,12 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   const status = () => page.evaluate(() => window.KernStudio.status);
   await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")});
   check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject");
+  // the project's input actions in its settings (kern/docs/app.md 4.): shown, and a wrong name is refused with its place
+  const input = (await state()).project?.settings?.input;
+  check(input?.actions?.some(x => x.name === "jump") && input?.axes?.some(x => x.name === "moveX"), "the editor shows the project's actions and axes (" + JSON.stringify(input ?? null).slice(0, 120) + ")");
+  check(await page.evaluate(() => !!document.querySelector('#projectBody [data-kind="actions"][data-name="jump"] input.binding')), "the project panel has a row for the action jump");
+  const wrong = await cmd({cmd: "projectSet", settings: {...(await state()).project.settings, input: {actions: [{name: "jump", keys: ["spcae"]}]}}});
+  check(wrong?.ok === false && /input\.actions\[0\]\.keys\[0\]: unknown name "spcae"/.test(wrong.error ?? ""), "a key the engine has not is refused with its place (" + (wrong?.error ?? "-") + ")");
   const start = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")).startLevel;
   await cmd({cmd: "open", text: fs.readFileSync(path.join(game, start), "utf8"), name: "wiese"});
   check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "it opens the start level " + start);

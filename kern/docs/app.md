@@ -63,3 +63,29 @@ Ein Spiel füllt nur seinen Mixer; hörbar macht ihn die App-Laufzeit – wie da
 Geprüft: `app_runtime_plays_its_mixer` (Engine-Test), Murmel (nativ: die Töne kommen aus `engine.mixer()`; e2e: die
 Seite hat nach einer Taste einen laufenden AudioContext und zieht nicht-stille Proben).
 
+## 4. Eingabe-Aktionen (B4)
+
+Ein Spiel fragt nach dem, was der Spieler tut („jump“, „moveX“), nicht nach einer Taste. Welche Tasten, Knöpfe des
+Gamepads, Maustasten und Finger das sind, steht als Daten im Projekt.
+
+```json
+"settings": { "input": {
+  "actions": [ { "name": "jump", "keys": ["space"], "pad": ["a"], "mouse": [], "touch": "right" } ],
+  "axes":    [ { "name": "moveX", "negative": ["left", "a"], "positive": ["right", "d"], "pad": "leftX", "deadzone": 0.2, "touch": "stickX" } ]
+} }
+```
+
+| | |
+|---|---|
+| Daten | `kern/input/actions.h`: `InputActions` (`ActionBinding`, `AxisBinding`) in `ProjectSettings::input`, gelesen und geschrieben mit dem Projekt (`input_from_json`: jede Stelle mit Ort; unbekannte Schlüssel und Namen mit der Liste der erlaubten; ein Name doppelt – Aktionen und Achsen teilen ihre Namen – ist ein Fehler). |
+| C++ | `engine.action("jump")` (gehalten), `engine.action_pressed("jump")` (in diesem Frame gedrückt), `engine.axis("moveX")` (−1 … 1: Tasten −1/+1, beide 0; der Stick hinter der Totzone neu auf 0 … 1 skaliert; Touch; der betragsgrößte Wert gewinnt). |
+| Knoten | dieselben drei Funktionen der Engine (aus der Tabelle der Engine: „Action“, „Action Pressed“, „Axis“ mit dem Eingang Name). |
+| Gamepad | `Input::gamepad()` (`Gamepad`: verbunden, `axes[4]` – links x/y, rechts x/y, oben/rechts +1 –, `lt`/`rt` 0 … 1, `buttons` als Bits der Standardbelegung). `kern/web/app.mjs` liest es jeden Frame (`readGamepad`, kern.mjs) und gibt es `kern_app_gamepad`. |
+| Touch | ein Finger, der in der linken Hälfte beginnt, ist der Stick (`stickX`/`stickY`, oben und rechts +1; ein Radius – ein Achtel der kürzeren Seite des Bildes – ist 1); eine Aktion mit `touch` ist gehalten, solange ein Finger in ihrer Hälfte (`left`, `right`) oder irgendwo (`anywhere`) liegt, und gedrückt im Frame, in dem er aufsetzt (`Touch::began`). |
+| Namen | `kern::Key` steht jetzt mit den Namen der Tasten, Knöpfe und Achsen in `kern/input/actions.h` (`key_name`, `parse_key`); `kern/app/app.h` nimmt sie von dort. |
+| Fehler | ein Name, den das Projekt nicht hat: `action`/`axis` geben false/0, `last_error` nennt den Namen und die Namen, die es gibt, und das Log sagt es einmal je Name. |
+| Editor | Projekt-Einstellungen, Abschnitt „Input“: jede Aktion und Achse mit ihren Bindungen, hinzufügen, ändern, entfernen (Befehl `projectSet` mit `settings.input`, dieselben Prüfungen wie beim Lesen). |
+| bewusst nicht | Umbelegen durch den Spieler zur Laufzeit (die Daten sind das Projekt; ein späterer Schritt mit dem Speicher, 5.), gezeichnete Touch-Knöpfe (das ist UI, 6.), Kurven je Spielart. |
+
+Geprüft: `input_actions_of_the_project` (Lesen/Schreiben, Fehler, Tasten, Pad, Touch, Maus). Murmel: `steuerung()` liest
+nur noch `moveX`, `moveY`, `jump` aus seinem Projekt.

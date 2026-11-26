@@ -1404,7 +1404,7 @@ TEST(level_and_project_refuse_unknown_keys) {
     return why;
   };
   CHECK(project("\"start\":\"a\"") == "start: unknown key - one of format, version, name, settings, levels, startLevel, blueprints");
-  CHECK(project("\"settings\":{\"heapReserve\":1}") == "settings: heapReserve: unknown key - one of renderer, profiles, heapReserveMb");
+  CHECK(project("\"settings\":{\"heapReserve\":1}") == "settings: heapReserve: unknown key - one of renderer, profiles, heapReserveMb, input");
   CHECK(project("\"settings\":{\"renderer\":{\"shadw\":1}}") == "settings: renderer.shadw: unknown key - one of shadows, shadow, bloom, ao, grade");
   CHECK(project("\"settings\":{\"renderer\":{\"ao\":{\"radios\":1}}}") == "settings: renderer.ao.radios: unknown key - one of enabled, quality, halfResolution, radius, power, adaptive");
   CHECK(project("\"settings\":{\"profiles\":[{\"name\":\"m\",\"renderer\":{\"bloom\":{\"on\":true}}}]}") == "settings: profiles[0].renderer.bloom.on: unknown key - one of enabled, forced");
@@ -8627,6 +8627,98 @@ TEST(app_runtime_plays_its_mixer) {
   AppRuntime rt2(r2);
   CHECK(rt2.give(other) == 0 && rt2.start(64, 48) && other.rate == 48000);
   rt2.stop();
+}
+
+// Input actions (kern/docs/app.md 4.): the project names actions and axes and binds keys, pad buttons and sticks,
+// mouse buttons and touch to them; the engine answers by the name. Read and written with the project's settings,
+// every error with its place and the names there are.
+TEST(input_actions_of_the_project) {
+  const char* text = R"({"input": {
+    "actions": [{"name": "jump", "keys": ["space"], "pad": ["a"], "mouse": [0], "touch": "right"}],
+    "axes": [{"name": "moveX", "negative": ["left", "a"], "positive": ["right", "d"], "pad": "leftX", "deadzone": 0.2, "touch": "stickX"},
+             {"name": "moveY", "negative": ["down"], "positive": ["up"], "pad": "leftY", "touch": "stickY"}]}})";
+  json::Value v;
+  CHECK(json::parse(text, v));
+  ProjectSettings ps;
+  std::string error;
+  CHECK(project_from_json(v, ps, &error) && ps.input.actions.size() == 1 && ps.input.axes.size() == 2);
+  ProjectSettings back;
+  CHECK(project_from_json(project_to_json(ps), back, &error) && json::stringify(input_to_json(back.input)) == json::stringify(input_to_json(ps.input)));
+  const auto refused = [](const char* t) {
+    json::Value x;
+    ProjectSettings p;
+    std::string why;
+    CHECK(json::parse(t, x) && !project_from_json(x, p, &why));
+    return why;
+  };
+  CHECK(refused(R"({"input": {"action": []}})") == "settings: input.action: unknown key - one of actions, axes");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "keys": ["spcae"]}]}})").find("settings: input.actions[0].keys[0]: unknown name \"spcae\" - one of a, b, c") == 0);
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "pad": ["z"]}]}})").find("input.actions[0].pad[0]: unknown name \"z\" - one of a, b, x, y, lb") != std::string::npos);
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "pad": "left"}]}})").find("input.axes[0].pad: unknown name \"left\" - one of none, leftX, leftY") != std::string::npos);
+  CHECK(refused(R"({"input": {"actions": [{"name": "go"}], "axes": [{"name": "go"}]}})") == "settings: input.axes[0] \"go\": the name stands twice (actions and axes share their names)");
+  CHECK(refused(R"({"input": {"actions": [{"keys": []}]}})") == "settings: input.actions[0]: has no name");
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "deadzone": 1}]}})") == "settings: input.axes[0].deadzone: from 0 to under 1");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "mouse": [3]}]}})").find("mouse[0]: a mouse button is 0 (left)") != std::string::npos);
+  // the engine answers by the name
+  struct Still final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app, ps) == 0 && rt.start(200, 100));
+  Engine& e = rt.engine();
+  Input& in = e.input();
+  CHECK(!e.action("jump") && e.axis("moveX") == 0);
+  in.key(Key::space, true);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.key(Key::space, false);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::right, true);
+  CHECK(e.axis("moveX") == 0);   // (both: none)
+  in.key(Key::a, false);
+  in.key(Key::right, false);
+  // the pad: a button, a stick past its deadzone (scaled back), the largest of all wins
+  Gamepad g;
+  g.connected = true;
+  g.lx = 0.1f;
+  g.buttons = 1u << static_cast<u32>(PadButton::a);
+  in.set_gamepad(g);
+  CHECK(e.action("jump") && e.action_pressed("jump") && e.axis("moveX") == 0);
+  g.lx = 0.6f;
+  in.set_gamepad(g);
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-5f);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::a, false);
+  in.set_gamepad({});
+  in.end_frame();
+  CHECK(!e.action("jump"));
+  // the mouse
+  in.pointer_buttons(1);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.pointer_buttons(0);
+  in.end_frame();
+  // touch: a finger on the right half holds "jump"; one on the left half is the stick (an eighth of 100 px = 1)
+  in.touch(1, 0, {150, 50});
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.touch(1, 2, {150, 50});
+  CHECK(!e.action("jump"));
+  in.touch(2, 0, {40, 50});
+  in.touch(2, 1, {46.25f, 43.75f});
+  CHECK(!e.action("jump"));
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-4f);
+  CHECK_NEAR(e.axis("moveY"), 0.5f, 1e-4f);
+  in.touch(2, 2, {46, 44});
+  // a name the project has not: false / 0, and the reason with the names there are
+  CHECK(!e.action("jmup") && std::string(last_error()) == "the project has no action \"jmup\" (its actions: jump)");
+  CHECK(e.axis("moveZ") == 0 && std::string(last_error()) == "the project has no axis \"moveZ\" (its axes: moveX, moveY)");
+  rt.stop();
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds

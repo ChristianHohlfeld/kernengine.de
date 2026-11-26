@@ -38,6 +38,7 @@ int AppRuntime::give(App& app, const ProjectSettings& settings) {
   }
   app_ = &app;
   settings_ = settings;
+  engine_.set_actions(settings.input);
   return 0;
 }
 
@@ -290,5 +291,10 @@ KERN_EXPORT(kern_app_pointer) void kern_app_pointer(f32 x, f32 y, f32 dx, f32 dy
 }
 KERN_EXPORT(kern_app_wheel) void kern_app_wheel(f32 dy) { input().add_wheel(dy); }
 KERN_EXPORT(kern_app_touch) void kern_app_touch(i32 id, i32 phase, f32 x, f32 y) { input().touch(id, phase, {x, y}); }
+/// The gamepad of this frame (kern/docs/app.md 4.: standard mapping; sticks with up and right +1, triggers 0..1,
+/// buttons as bits); connected 0: none.
+KERN_EXPORT(kern_app_gamepad) void kern_app_gamepad(i32 connected, f32 lx, f32 ly, f32 rx, f32 ry, f32 lt, f32 rt, u32 buttons) {
+  input().set_gamepad({connected != 0, lx, ly, rx, ry, lt, rt, buttons});
+}
 KERN_EXPORT(kern_app_focus) void kern_app_focus(i32 focused) { input().set_focus(focused != 0); }
 KERN_EXPORT(kern_app_stop) void kern_app_stop() { app_runtime().stop(); }

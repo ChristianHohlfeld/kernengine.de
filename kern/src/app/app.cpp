@@ -39,6 +39,7 @@ void Input::touch(i32 id, i32 phase, Vec2 position) {
     if (!slot) return;
     slot->id = id;
     slot->start = slot->position = slot->previous = position;
+    slot->began = true;
   } else if (slot) {
     slot->position = position;
     if (phase == 2) slot->id = -1;
@@ -60,12 +61,112 @@ void Input::set_focus(bool focused) {
   }
 }
 
+void Input::set_gamepad(const Gamepad& pad) {
+  const Gamepad p = pad.connected ? pad : Gamepad{};
+  pad_pressed_ |= p.buttons & ~pad_.buttons;
+  pad_ = p;
+}
+
 void Input::end_frame() {
+  pad_pressed_ = 0;
   for (u8& s : keys_) s &= kDown;
   pressed_buttons_ = 0;
   pointer_delta_ = {};
   wheel_ = 0;
-  for (Touch& t : touches_) t.previous = t.position;
+  for (Touch& t : touches_) { t.previous = t.position; t.began = false; }
+}
+
+// ---- input actions (kern/docs/app.md 4.) ----
+
+namespace {
+bool key_held(const Input& in, const std::vector<Key>& keys) {
+  for (Key k : keys)
+    if (in.down(k)) return true;
+  return false;
+}
+}  // namespace
+
+const ActionBinding* Engine::find_action(const char* name) const {
+  if (const ActionBinding* a = actions_.action(name ? name : "")) return a;
+  std::string names;
+  for (const ActionBinding& a : actions_.actions) names += (names.empty() ? "" : ", ") + a.name;
+  fail("the project has no action \"%s\" (its actions: %s)", name ? name : "", names.empty() ? "none" : names.c_str());
+  for (const std::string& n : unknown_actions_)
+    if (n == (name ? name : "")) return nullptr;
+  unknown_actions_.push_back(name ? name : "");
+  log(LogLevel::error, "%s", last_error());
+  return nullptr;
+}
+
+const AxisBinding* Engine::find_axis(const char* name) const {
+  if (const AxisBinding* a = actions_.axis(name ? name : "")) return a;
+  std::string names;
+  for (const AxisBinding& a : actions_.axes) names += (names.empty() ? "" : ", ") + a.name;
+  fail("the project has no axis \"%s\" (its axes: %s)", name ? name : "", names.empty() ? "none" : names.c_str());
+  for (const std::string& n : unknown_actions_)
+    if (n == (name ? name : "")) return nullptr;
+  unknown_actions_.push_back(name ? name : "");
+  log(LogLevel::error, "%s", last_error());
+  return nullptr;
+}
+
+bool Engine::touch_in(TouchZone zone, bool pressed) const {
+  if (zone == TouchZone::none) return false;
+  const f32 half = static_cast<f32>(width()) * 0.5f;
+  for (u32 i = 0; i < kMaxTouches; ++i) {
+    const Touch& t = input_.touches()[i];
+    if (t.id < 0 || (pressed && !t.began)) continue;
+    if (zone == TouchZone::anywhere || (zone == TouchZone::left) == (t.start.x < half)) return true;
+  }
+  return false;
+}
+
+bool Engine::action(const char* name) const {
+  const ActionBinding* a = find_action(name);
+  if (!a) return false;
+  if (key_held(input_, a->keys)) return true;
+  for (PadButton b : a->pad)
+    if (input_.pad_down(b)) return true;
+  for (u32 b : a->mouse)
+    if (input_.button(b)) return true;
+  return touch_in(a->touch, false);
+}
+
+bool Engine::action_pressed(const char* name) const {
+  const ActionBinding* a = find_action(name);
+  if (!a) return false;
+  for (Key k : a->keys)
+    if (input_.pressed(k)) return true;
+  for (PadButton b : a->pad)
+    if (input_.pad_pressed(b)) return true;
+  for (u32 b : a->mouse)
+    if (input_.button_pressed(b)) return true;
+  return touch_in(a->touch, true);
+}
+
+f32 Engine::axis(const char* name) const {
+  const AxisBinding* a = find_axis(name);
+  if (!a) return 0;
+  f32 best = static_cast<f32>(key_held(input_, a->positive)) - static_cast<f32>(key_held(input_, a->negative));
+  auto take = [&best](f32 v) { if (std::fabs(v) > std::fabs(best)) best = v; };
+  const Gamepad& g = input_.gamepad();
+  if (a->pad != PadAxis::none && g.connected) {
+    const f32 raw = a->pad == PadAxis::left_x ? g.lx : a->pad == PadAxis::left_y ? g.ly : a->pad == PadAxis::right_x ? g.rx : a->pad == PadAxis::right_y ? g.ry : g.rt - g.lt;
+    const f32 m = std::fabs(raw);
+    if (m > a->deadzone) take(std::copysign(std::fmin(1.0f, (m - a->deadzone) / (1.0f - a->deadzone)), raw));
+  }
+  if (a->touch != TouchAxis::none) {
+    // the touch stick: a finger that began on the left half; one radius (an eighth of the shorter side) is 1
+    const f32 radius = static_cast<f32>(max_of(1, min_of(width(), height()))) * kTouchStickShare;
+    for (u32 i = 0; i < kMaxTouches; ++i) {
+      const Touch& t = input_.touches()[i];
+      if (t.id < 0 || t.start.x >= static_cast<f32>(width()) * 0.5f) continue;
+      const f32 d = a->touch == TouchAxis::stick_x ? t.position.x - t.start.x : t.start.y - t.position.y;
+      take(clamp(d / radius, -1.0f, 1.0f));
+      break;
+    }
+  }
+  return clamp(best, -1.0f, 1.0f);
 }
 
 }  // namespace kern
