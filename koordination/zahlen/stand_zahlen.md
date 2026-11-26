@@ -72,7 +72,13 @@ Basis: origin/work-projekt 8e3dc4c6. Entwurf: $S/zahlen_typen.md. Nur Push auf w
 - e1ea5498 Tests teils umgestellt, kAnyWidth-Eingang, Web-Editor (Typnamen, kein umwandelnder Draht).
 - lokal grün: numbers_against_cpp, numbers_nodes_interpreter (>20.000 Aufrufe), dazu 66 weitere Tests (Lauf 6: 68 ok, 11 FAIL,
   dann Abbruch in logic_native_blueprints – samples() ohne neue Zahltypen, behoben im nächsten Commit).
-- CI 45808572877 (e1ea5498) gestartet – Ergebnis offen.
+- 8c49463a Beispielwerte aller Zahltypen (blueprint_native samples), Abstürze bei Typen ohne Beispiele abgefangen.
+- 3615820e Fließkomma-Lesen über scan::real statt std::from_chars (libc++/macOS hat kein from_chars für float: CI 45808572877
+  determinism scheiterte daran). CI 45809444360 (3615820e) gestartet – Ergebnis offen.
+- Lokal (Lauf 9, 8c49463a): 68 ok, 11 FAIL (Liste unter Offen 2), dann Segfault in logic_native_blueprints: die Texte der
+  Klassen-Fälle (kFlow, kStructs …) lesen nicht (kern::to<Text>, f64 in f32-Eingang …), der Test liest dann ins Leere.
+- CI 45808572877 (e1ea5498): native-build rot (Projekt-Test: Level „eins“ liest nicht – alte Typnamen im Projekt/Level des
+  Tests), murmel/murmel-web/converter-cases rot (alte Levels/Konverter, Stufe 5/8), determinism rot (from_chars, behoben).
 
 ## Offen (Datei:Stelle) – für den Nachfolger
 1. **Engine-Bibliotheken** (src/logic/engine_libraries.gen.cpp) enthalten noch "float"/"int" (erzeugt von
@@ -98,3 +104,14 @@ Basis: origin/work-projekt 8e3dc4c6. Entwurf: $S/zahlen_typen.md. Nur Push auf w
    i64/u64 als Text in JS, f32 über Math.fround – Stufe 7. tests/e2e erwarten alte Typnamen.
 7. Kleinere: Literal i64::min nur in literal_here (notation.cpp); Struct of Bytes kopiert die Liste in i64 (core_nodes.cpp,
    struct.of_bytes – Geschwindigkeit); Sort über NaN wie std::stable_sort (keine strenge Ordnung).
+
+## Befund B4 für zahlen3 (von Agent projekt-zahlen1, work-projekt 63416d88): JIT ≠ Interpreter
+kern/src/logic/codegen.cpp (JIT, Wasm) rechnet anders als der Interpreter und die Klasse (kern/include/kern/logic/nodes.h math::):
+- math.mod (Z. ~282): `a - trunc(a/b)*b` statt std::fmod: für große a/b nicht genau (z. B. a=1e17, b=3).
+- math.round (Z. ~273-276): `copysign(floor(|a|+0.5), a)` statt std::round: falsch bei 0.49999999999999994 (gibt 1) und nahe 2^52.
+- math.min/math.max (Z. 266-267): f64.min/f64.max von Wasm (NaN gewinnt, min(-0,+0) = -0) statt min_of/max_of (`b < a ? b : a`).
+- math.sqrt (Z. 271): `sqrt(max(a, 0))` mit f64.max: sqrt(NaN) = NaN, im Interpreter max_of(0, NaN) = 0.
+- convert zu Int (Z. 198-208): eigene Rechnung; zu prüfen gegen logic::whole.
+Bitte prüfen, ob es auf work-zahlen damit weg ist (dort rechnet der JIT keine Zahl mehr selbst). Sonst beheben: der JIT ruft
+die C++-Funktion des Knotens. Ein Engine-Test auf work-projekt ist noch NICHT gebaut (Vorschlag: ein Fall in
+kern/tests/logic_cases.h mit diesen Rändern; logic_wasm_test.mjs vergleicht Interpreter und JIT, und er wird rot).

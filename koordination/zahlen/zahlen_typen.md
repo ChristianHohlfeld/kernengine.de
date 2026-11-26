@@ -133,3 +133,39 @@ die libm des Systems. (2) musl_math bekommt die fehlenden Funktionen (aus musl, 
 round, min und max dieselbe Rechnung wie Interpreter und Klasse (oder ruft deren C++-Funktion). Ein Engine-Test vergleicht
 die Stufen an den Rändern: ±0, NaN, ±Inf, 0.5-Grenzen, 2^52 und große Quotienten. (4) Der Vergleichstest vergleicht auch NaN
 und Inf bitgenau, statt solche Aufrufe auszulassen.
+
+#### Mathe-Funktionen: eine Funktion für Quelle, Engine und Blueprint (Entwurf)
+
+Regel: Eine Quelle im Teilsatz rechnet sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log10, pow, hypot, sinh, tanh …
+mit DENSELBEN Funktionen wie die Engine und der Blueprint. Das sind die musl-Fassungen der Engine (`kern::dm`), für f32 die
+f-Varianten (`sinf` …), auf jeder Plattform, nativ wie in Wasm. Exakte IEEE-Funktionen (sqrt, fabs, floor, ceil, trunc, round,
+fmod, remainder, copysign) dürfen die des Compilers bleiben.
+
+Heute (26.11.2026):
+- Die Quelle von SpawnCity bindet `<cmath>` direkt (46 Dateien) und ruft `std::`: sin 197, cos 147, tan 12, asin 9, acos 15,
+  atan 5, atan2 123, exp 27, log 2, pow 28, hypot 239, sinh 1, tanh 2. Das sind **807 Stellen in 56 Dateien** von `src/`, dazu
+  einige ohne `std::` (sin 3, cos 1, tan 2, exp 2). `kern::dm` ruft sie nie. Die Firmware (`firmware/*.hpp`, nicht änderbar) ruft
+  16-mal std::atan2/cos/sin.
+- Nativ (`kern/tools/build_native.sh`, die Tests `run_tests.sh`) kommt `std::sin` aus der libm des Systems (`-lm`, glibc). In Wasm
+  (`kern/build.sh`, `kern/games/spawncity/build.sh`) kommt es aus der libm von wasi-libc. Die musl der Engine ist umbenannt
+  (`kern_musl_sinf` …, `third_party/musl_math/src/kmath.h`) und wird nur über `kern::dm` gerufen. Eine nativ gebaute Quelle ist
+  deshalb nicht plattformfest, und sie rechnet anders als ihr Blueprint (Ursache 4 der Messung, z. B. slerp, heading_of).
+- Dazu kann clang Aufrufe selbst ändern: Konstanten falten (mit seiner eigenen, korrekt gerundeten Rechnung), `sin`+`cos` zu
+  `sincos` zusammenlegen, `pow(x, 2)` zu `x*x` machen. Das hängt vom Compiler ab, nicht von der Quelle.
+- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt.
+
+Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter den Namen der Standardbibliothek, für jedes Ziel.**
+- Ein zweiter Satz der musl-Objekte ohne Umbenennung (oder dünne Hüllen `extern "C" float sinf(float x) { return
+  kern_musl_sinf(x); }` …), gelinkt vor der libm. Nativ gewinnt die Definition im Programm über glibc, in Wasm das Objekt über das
+  Archiv von wasi-libc. Dazu `-fno-builtin-<name>` für genau diese Funktionen (kein Falten, kein sincos, kein pow→Produkt). So
+  rufen `std::sin`, `kern::dm::sin` und der Knoten dieselbe Funktion. Die Quelle und die Firmware bleiben, wie sie sind.
+- Der Konverter bildet `std::sin` (auf float: `sinf`) auf diese Funktion ab, wie heute `kern::dm`. Eine Mathe-Funktion, die musl_math
+  nicht hat, ist ein Fehler des Konverters mit Ort („std::cbrt: the engine has no cbrt - kern/third_party/musl_math“), keine Formel
+  aus exp/log (heute `converted::wide::tanh_bp` …).
+- Aufwand: die Hüllen (eine Datei, 26 Namen); in die Bauten eintragen (kern/build.sh, kern/tools/build_native.sh, kern/tests/run.sh,
+  run_tests.sh, murmel/tests/engine.sh, tools/blueprint_cpp.sh, tools/converter_cases/compare.sh, all_program.sh,
+  level_templates.sh, lehrer.sh, blueprint_bench.sh: ~11 Skripte); sinh/tanh (+f) aus musl nachziehen; ein Engine-Test (std::sin ==
+  kern::dm::sin, Bit für Bit, nativ und in Wasm). Klein bis mittel, kein Umschreiben der Quelle.
+- Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
+  umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
+
