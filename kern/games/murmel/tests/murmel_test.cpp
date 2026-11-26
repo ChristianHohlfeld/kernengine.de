@@ -12,6 +12,7 @@
 
 #include "kern/app/run.h"
 #include "kern/game/embedded.h"
+#include "kern/game/program.h"
 #include "murmel.h"
 
 extern "C" kern::i32 kern_app_start(kern::i32 width, kern::i32 height);
@@ -116,7 +117,7 @@ void pruefe(bool ok, const char* was) {
 int main(int argc, char** argv) {
   const bool zeigen = argc > 1 && std::strcmp(argv[1], "--spur") == 0;
   murmel::Murmel& spiel = murmel::spiel();
-  pruefe(run(spiel, game::embedded_project().settings) == 0, "kern::run nimmt die App");
+  pruefe(run(spiel, game::embedded_project()) == 0, "kern::run nimmt die App mit dem Projekt");
   const int frames = 60 * 45;
   const Lauf a = spiele(spiel, frames, zeigen);
   std::printf("Lauf 1: Wechsel in Frame %d, geschafft in Frame %d, %.0f Punkte, %u Toene, Anzeige \"%s\"\n", a.wechsel, a.geschafft, a.punkte, a.toene, a.text.c_str());

@@ -49,7 +49,6 @@ class Murmel final : public kern::App {
 
   kern::Renderer* renderer_ = nullptr;
   std::unique_ptr<kern::game::GameWorld> welt_;
-  kern::game::Level geladen_;
   kern::audio::Mixer mixer_;
   std::unique_ptr<kern::game::SoundBank> bank_;
   std::unique_ptr<kern::game::GameAudio> audio_;

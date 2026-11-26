@@ -79,7 +79,9 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (eine Welt aus C++
   bekommt es mit `set_project`), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
   nicht, der Text ist kein Level. Geprüft: `world_starts_a_level_of_its_project` (zwei Levels, Wechsel, Wert bleibt,
-  auch über den Knoten einer Welt des Programms).
+  auch über den Knoten einer Welt des Programms). Eine App in C++ macht es ebenso: `kern/games/murmel/src/murmel.cpp`
+  (`Murmel::lade`: `set_project(&embedded_project())` einmal, dann je Level `start_level`; die Töne der Welt lädt
+  `GameAudio::begin`), nativ belegt vom CI-Job `murmel` (Level 2 im erwarteten Frame, Punkte über beide Levels).
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der
   Level-Graph, dann die Akteure in der Reihenfolge des Levels.
@@ -230,7 +232,7 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
 
 1. Im Editor „Neues Projekt“ wählen. Das legt `spiel.kproject` und ein leeres `levels/start.klevel` an.
 2. Im Projekt einen Blueprint „Spiel“ anlegen, „Implements … App“ wählen und `start`, `update`, `stop` schreiben. In
-   `start` ein GameWorld machen und `startLevel` laden.
+   `start` ein GameWorld machen und mit „Start Level“ das Start-Level starten (3., „Ein Level starten und wechseln“).
 3. Im Level die Akteure und ihre Blueprints anlegen.
 4. Optional ein fester Schritt: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … game_FixedStep“ und
    `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
