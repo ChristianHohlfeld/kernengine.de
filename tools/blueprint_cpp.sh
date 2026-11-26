@@ -24,9 +24,9 @@ if [ ! -x "$bin" ]; then
   mkdir -p "$dir/obj"
   export cxx cc dir root
   printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
-    '"$cxx" -std=c++20 -O1 -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
+    '"$cxx" -std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
   printf '%s\n' "$root"/kern/third_party/musl_math/src/*.c | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
-    '"$cc" -std=c17 -O2 -ffp-contract=off -fwrapv -fno-math-errno -w -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
+    '"$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
   "$cxx" "$dir"/obj/*.o -lm -o "$bin.tmp.$$"
   mv "$bin.tmp.$$" "$bin"
 fi

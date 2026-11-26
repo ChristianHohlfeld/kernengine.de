@@ -37,12 +37,12 @@ pids=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   o="$out/box3d-$tool/$(basename "$c" .c).o"; objects+=("$o")
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ]; then
-    "$cc" -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -fwrapv -w -I"$kern/third_party/box3d/include" -I"$kern/third_party/box3d/src" -c "$c" -o "$o" & pids+=($!)
+    "$cc" -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$kern/third_party/box3d/include" -I"$kern/third_party/box3d/src" -c "$c" -o "$o" & pids+=($!)
   fi
 done
 for c in "$kern"/third_party/musl_math/src/*.c; do
   o="$out/musl-$tool/$(basename "$c" .c).o"; objects+=("$o")
-  if [ ! -f "$o" ] || [ "$c" -nt "$o" ]; then "$cc" -std=c17 -O2 -ffp-contract=off -fwrapv -fno-math-errno -w -c "$c" -o "$o" & pids+=($!); fi
+  if [ ! -f "$o" ] || [ "$c" -nt "$o" ]; then "$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o" & pids+=($!); fi
 done
 for p in "${pids[@]}"; do wait "$p"; done
 # The project and its level (world settings, actors, their Blueprints) as a source the game links - the whole level.
@@ -91,7 +91,7 @@ if [ -n "$beleg" ]; then
   keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$kern"/tools/test_memory.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
   sources=("${keep[@]}")
 fi
-flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti
+flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests" -I"$out/base")
 # The old programs the differential tests of tests/lowered compare with (tools/source_diff.py): for every commit a
 # test names as its base (`// base: <commit>`), the game's sources as they stood there - built as the game's are,

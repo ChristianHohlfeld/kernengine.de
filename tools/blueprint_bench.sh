@@ -9,7 +9,7 @@
 #
 # Writes the classes of the measured Blueprints (tools/blueprint_cpp.sh --classes), builds
 # kern/games/spawncity/tests/bench/ in the game's release build (clang, -O3 -flto=thin -DNDEBUG
-# -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti, as kern/build.sh) and runs it: per case the time per
+# -ffp-contract=off -fno-exceptions -fno-rtti, as kern/build.sh) and runs it: per case the time per
 # call of the source and of the class and their ratio (bench.cpp). The source is measured twice: as
 # the game builds it (src_*.cpp) and in the numbers of the language, as the test of tests/converted
 # compiles it (src64_*.cpp: its test_<file>.cpp, f32 is double) - the class is held to the second.
@@ -29,14 +29,14 @@ bench="$root/kern/games/spawncity/tests/bench"
 # (the actors whose Blueprints are measured - the libraries they use come with them)
 "$root/tools/blueprint_cpp.sh" --classes "$level" "$dir/classes.h" \
   qr_code_cpp nostr_cpp mvt_cpp lamps_cpp perf_cpp settings_cpp combat_audio_cpp jet_seats_cpp wire person_hit common tiles >&2
-flags=(-std=c++20 -O3 -flto=thin -DNDEBUG -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$dir"
+flags=(-std=c++20 -O3 -flto=thin -DNDEBUG -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$dir"
   -I"$tests" -I"$root/kern/games/spawncity/tests/converted" -I"$root/kern/games/spawncity/tests" -I"$root/kern/third_party/box3d/include")
 for f in "$bench"/*.cpp "$root/kern/src/logic/engine_host.cpp"; do  # (engine_host: what the tests' header holds of the engine's objects)
   "$cxx" "${flags[@]}" -c "$f" -o "$dir/$(basename "$f").o" &
   [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
 done
 for f in "$root"/kern/third_party/musl_math/src/*.c; do  # (the language's own sin, cos, exp ..., as kern/build.sh)
-  "${BENCH_CC:-clang-18}" -std=c17 -O3 -flto=thin -ffp-contract=off -fwrapv -fno-math-errno -w -c "$f" -o "$dir/musl_$(basename "$f").o" &
+  "${BENCH_CC:-clang-18}" -std=c17 -O3 -flto=thin -ffp-contract=off -fno-math-errno -w -c "$f" -o "$dir/musl_$(basename "$f").o" &
   [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
 done
 wait

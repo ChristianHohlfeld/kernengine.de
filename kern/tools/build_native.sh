@@ -33,7 +33,7 @@ cxx="${CXX:-c++}" cc="${CC:-cc}" jobs="${KERN_JOBS:-$(nproc)}"
 cache="${KERN_NATIVE_CACHE:-${TMPDIR:-/tmp}/kern-native}"
 san=()
 [ "$sanitize" = 1 ] && san=(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
-flags=(-std=c++20 -O1 -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
+flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
 key="$( { echo "${flags[*]} $cxx $cc"; "$cxx" --version 2>/dev/null | head -1; } | sha256sum | cut -c1-12)"
 mkdir -p "$cache/box3d-$key" "$cache/musl-$key" "$cache/obj-$key" "$cache/gen"
 work=()
@@ -41,12 +41,12 @@ third=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   o="$cache/box3d-$key/$(basename "$c" .c).o"
   third+=("$o")
-  [ -f "$o" ] || work+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -fwrapv -w ${san[*]} -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
+  [ -f "$o" ] || work+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w ${san[*]} -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
 done
 for c in "$kern"/third_party/musl_math/src/*.c; do
   o="$cache/musl-$key/$(basename "$c" .c).o"
   third+=("$o")
-  [ -f "$o" ] || work+=("$cc -std=c17 -O2 -ffp-contract=off -fwrapv -fno-math-errno -w ${san[*]} -c $c -o $o")
+  [ -f "$o" ] || work+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w ${san[*]} -c $c -o $o")
 done
 # (an object per source of the engine, under the hash of the source and all of the engine's headers: a changed
 # header compiles everything again)

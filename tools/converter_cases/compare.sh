@@ -20,15 +20,15 @@ cxx="${CXX:-${CLANGXX:-clang++}}"
 cc="${CC:-$(dirname "$(command -v "$cxx")")/$(basename "$cxx" | sed 's/clang++/clang/; s/g++/gcc/')}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$o/obj"
 read -r -a more <<< "${INCLUDES:-}"
-flags=(-std=c++20 -O1 -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
+flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
 jobs=() objects=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   x="$out/box3d/$(basename "$c" .c).o"; objects+=("$x")
-  [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -fwrapv -w -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $x")
+  [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $x")
 done
 for c in "$kern"/third_party/musl_math/src/*.c; do
   x="$out/musl/$(basename "$c" .c).o"; objects+=("$x")
-  [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fwrapv -fno-math-errno -w -c $c -o $x")
+  [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $x")
 done
 headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
 while IFS= read -r f; do
