@@ -69,6 +69,8 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
     for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
+  if (!pd.enums_only && !pd.structs_only)   // (an object of the engine of each of its interfaces - kern/docs/engine_object.md)
+    for (const EngineInterface& i : engine_interfaces()) r.push_back({PinType::object, i.name});
   if (pd.widths && (!pd.with_lists || pd.width_values))
     for (std::string_view w : kWidthNames) r.push_back({PinType::integer, std::string(w)});
   if (pd.with_lists)
@@ -79,7 +81,7 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
 }
 std::string type_text(const TypeRef& t) {
   if (t.type == PinType::callback) return "callback<" + t.of + ">";  // ("callback<float(float,float)>")
-  if (t.type == PinType::object) return "object<" + t.of + ">";  // ("object<App>")
+  if (element_of(t.type) == PinType::object) return "object<" + t.of + ">" + (is_list(t.type) ? "_list" : "");  // ("object<App>", "object<App>_list")
   if (is_keyed(t.type)) return std::string(pin_type_name(t.type)) + "<" + t.of + ">";  // ("map<int>float>", "set<text>")
   // (a list of a fixed length says its length: "float_list[16]" - in messages; a setting names no such type)
   const std::string length = t.count ? "[" + std::to_string(t.count) + "]" : std::string();
@@ -98,11 +100,14 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     out = t;
     return true;
   }
-  if (text.size() > 8 && text.substr(0, 7) == "object<" && text.back() == '>') {
-    // (an object of the engine of a class the engine names: for now its interfaces - kern/docs/engine_object.md)
-    const std::string of(text.substr(7, text.size() - 8));
+  if (text.size() > 8 && text.substr(0, 7) == "object<") {
+    // (an object of the engine of a class the engine names: for now its interfaces - kern/docs/engine_object.md;
+    // a list of them: "object<App>_list")
+    const bool listed = text.ends_with(">_list");
+    if (!listed && text.back() != '>') return false;
+    const std::string of(text.substr(7, text.size() - 8 - (listed ? 5 : 0)));
     if (!engine_interface(of)) return false;
-    out = {PinType::object, of};
+    out = {listed ? PinType::object_list : PinType::object, of};
     return true;
   }
   for (PinType keyed : {PinType::map, PinType::set}) {
@@ -124,7 +129,7 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     }
   }
   PinType builtin;
-  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && builtin != PinType::object && !declared_type(builtin)) {
+  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && element_of(builtin) != PinType::object && !declared_type(builtin)) {
     // (the types' own names only: a setting holds the one name of its type)
     if (text != pin_type_name(builtin)) return false;
     out = {builtin, {}};
@@ -154,7 +159,7 @@ std::string type_label(const TypeRef& t) {
     for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + type_label(in[k]);
     return s + ")";
   }
-  if (t.type == PinType::object) return t.of.empty() ? "Object" : t.of + " Object";  // ("App Object")
+  if (element_of(t.type) == PinType::object) return (t.of.empty() ? std::string("Object") : t.of + " Object") + (is_list(t.type) ? " List" : "");  // ("App Object")
   if (t.type == PinType::map) return "Map of " + type_label(key_type(t)) + " to " + type_label(value_type(t));
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
@@ -174,7 +179,7 @@ bool fits(const TypeRef& from, const TypeRef& to) {
   if (from.type == PinType::integer_list && to.type == PinType::integer_list) return to.of == kAnyWidth || width_bits(from.of) == width_bits(to.of);
   // (an object of the engine goes where an object of its own class is wanted - never where another class is, never
   // from or to anything else)
-  if (from.type == PinType::object) return from.of == to.of;
+  if (element_of(from.type) == PinType::object) return from.of == to.of;
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
@@ -186,7 +191,7 @@ bool convertible(PinType from, PinType to) {
   // gives each of them)
   if (declared_type(from) || declared_type(to)) return false;
   if (from == PinType::callback || to == PinType::callback) return false;  // (only the engine calls one: it is nothing else)
-  if (from == PinType::object || to == PinType::object) return false;  // (an object of the engine is no number, no text: Handle of Object says it as an Int)
+  if (element_of(from) == PinType::object || element_of(to) == PinType::object) return false;  // (an object of the engine is no number, no text: Handle of Object says it as an Int)
   if (is_keyed(from) || is_keyed(to)) return false;  // (a map is a map of its keys and values, a set a set of its keys)
   if (element_of(from) == PinType::int64 || element_of(to) == PinType::int64) return false;  // (64 bits: the Int64 nodes say what they are as another type)
   if (to == PinType::text) return true;  // everything prints
@@ -405,6 +410,7 @@ std::size_t Value::size() const {
     case PinType::text_list: return std::get<std::vector<std::string>>(*list).size();
     case PinType::actor_list: return std::get<std::vector<ActorHandle>>(*list).size();
     case PinType::int64_list: return std::get<std::vector<Int64>>(*list).size();
+    case PinType::object_list: return std::get<std::vector<ObjectRef>>(*list).size();
     case PinType::enumeration_list: return std::get<std::vector<i64>>(*list).size();
     default: return 0;
   }
@@ -423,6 +429,7 @@ Value Value::item(std::size_t index) const {
     case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
     case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index].id);
     case PinType::int64_list: return int64(std::get<std::vector<Int64>>(*list)[index].bits);
+    case PinType::object_list: return object(std::get<std::vector<ObjectRef>>(*list)[index]);
     case PinType::enumeration_list: return enumeration(std::get<std::vector<i64>>(*list)[index]);
     default: return zero(element_of(type));
   }
@@ -536,6 +543,7 @@ void at_length(Value& v, const TypeRef& t, const Graph& g) {
     case PinType::text: v.edit<std::string>().resize(t.count); break;
     case PinType::actor: v.edit<ActorHandle>().resize(t.count); break;
     case PinType::int64: v.edit<Int64>().resize(t.count); break;
+    case PinType::object: v.edit<ObjectRef>().resize(t.count); break;
     case PinType::structure: v.edit<Value>().resize(t.count, zero_of(TypeRef{PinType::structure, t.of}, g)); break;
     default: break;
   }
@@ -628,6 +636,7 @@ std::size_t said_of(const Value& v, const TypeRef& t, const Graph& g, int depth)
     case PinType::text: for (const auto& x = v.items<std::string>(); n && x[n - 1].empty();) --n; break;
     case PinType::actor: for (const auto& x = v.items<ActorHandle>(); n && x[n - 1] == ActorHandle{};) --n; break;
     case PinType::int64: for (const auto& x = v.items<Int64>(); n && x[n - 1].bits == 0;) --n; break;
+    case PinType::object: for (const auto& x = v.items<ObjectRef>(); n && x[n - 1] == ObjectRef{};) --n; break;
     case PinType::structure: {
       // (the zero of a struct is the struct at its declared defaults: at_length fills up with it)
       const TypeRef item{PinType::structure, t.of};
@@ -906,6 +915,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
         case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
         case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back({x.a}); break;
         case PinType::int64: std::get<std::vector<Int64>>(*held).push_back(Int64(static_cast<u64>(x.i))); break;
+        case PinType::object: std::get<std::vector<ObjectRef>>(*held).push_back({}); break;   // (a list written down holds no objects: they are the engine's)
         case PinType::enumeration: std::get<std::vector<i64>>(*held).push_back(x.i); break;
         default: break;
       }
@@ -920,7 +930,7 @@ bool Value::operator==(const Value& o) const {
     // (an enum's value is no number and no text: it is equal to an enum's value only - and a
     // struct to a struct)
     if (type == PinType::enumeration || o.type == PinType::enumeration || type == PinType::structure || o.type == PinType::structure) return false;
-    if (type == PinType::object || o.type == PinType::object) return false;  // (an object of the engine is no number)
+    if (element_of(type) == PinType::object || element_of(o.type) == PinType::object) return false;  // (an object of the engine is no number)
     if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
     if (is_list(type) || is_list(o.type) || is_keyed(type) || is_keyed(o.type)) return false;
     return as_number() == o.as_number();
@@ -1901,7 +1911,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
   auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
     if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
-    if (is_keyed(type) || type == PinType::callback || type == PinType::object) {  // (an object's: its class; a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
+    if (is_keyed(type) || type == PinType::callback || element_of(type) == PinType::object) {  // (an object's: its class; a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
       of = v["of"].as_string();
       TypeRef t;
       return type_from_text(type_text({type, of}), g, t);
@@ -2254,10 +2264,10 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (f.name == s.fields[b].name) err(0, "struct \"" + s.name + "\" has two fields called \"" + f.name + "\"");
       if (f.type.type == PinType::exec || f.type.type >= PinType::count) { err(0, what + " has no type"); sound = false; }
       TypeRef named = f.type;  // (what names a type of the Blueprint: of a map its values, of a set its keys)
-      if (is_keyed(f.type.type) || f.type.type == PinType::callback || f.type.type == PinType::object) {
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback || element_of(f.type.type) == PinType::object) {
         TypeRef sure;
         if (!type_from_text(type_text(f.type), g, sure)) { err(0, what + " is " + type_text(f.type) + ", which this Blueprint cannot have"); sound = false; continue; }
-        if (f.type.type == PinType::callback || f.type.type == PinType::object) continue;
+        if (f.type.type == PinType::callback || element_of(f.type.type) == PinType::object) continue;
         named = f.type.type == PinType::map ? value_type(f.type) : key_type(f.type);
       }
       if (element_of(named.type) == PinType::enumeration && !g.enumeration(named.of)) { err(0, what + " is of the enum \"" + named.of + "\", which this Blueprint does not have"); sound = false; }
@@ -2275,7 +2285,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   // What is of an enum's or a struct's type names one the Blueprint has, and its default holds
   // values of the enums only.
   auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
-    if (is_keyed(type) || type == PinType::callback || type == PinType::object) {
+    if (is_keyed(type) || type == PinType::callback || element_of(type) == PinType::object) {
       TypeRef sure;
       if (!type_from_text(type_text({type, of}), g, sure)) { err(0, what + " is " + type_text({type, of}) + ", which this Blueprint cannot have"); return; }
       held_ok(0, what, Value::from_json(value, type, g, of), {type, of}, 0);
@@ -3479,6 +3489,7 @@ void set_item(Value& list, std::size_t at, const Value& x) {
     case PinType::text_list: list.edit<std::string>()[at] = x.as_text(); break;
     case PinType::actor_list: list.edit<ActorHandle>()[at] = ActorHandle{x.as_actor()}; break;
     case PinType::int64_list: list.edit<Int64>()[at] = Int64(static_cast<u64>(x.i)); break;
+    case PinType::object_list: list.edit<ObjectRef>()[at] = x.as_object(); break;
     case PinType::enumeration_list: list.edit<i64>()[at] = x.i; break;
     default: break;
   }

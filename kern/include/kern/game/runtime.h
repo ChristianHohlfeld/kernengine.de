@@ -173,7 +173,7 @@ struct KERN_BLUEPRINT_TYPE SimStats {
 struct WalkerMove;  // a walker's one-shot move (runtime_internal.h)
 
 /// What a program does in every fixed step of a world (kern/docs/project.md 6., GameWorld::set_fixed_step): the
-/// program's C++, or the object of the engine of a program Blueprint that implements it (kern::Implements<"game_FixedStep">).
+/// program's C++, or the object of the engine of a program Blueprint that implements it (kern::Implements<kern::game::FixedStep>).
 class FixedStep {
  public:
   virtual ~FixedStep() = default;

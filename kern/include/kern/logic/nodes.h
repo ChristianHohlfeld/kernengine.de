@@ -590,6 +590,19 @@ template <class I> struct Held<Object<I>> {
   static constexpr PinType type = PinType::object;
   static Object<I> from(const Value& v) { return Object<I>{v.as_object()}; }
 };
+template <> struct Held<ObjectRef> {
+  static constexpr PinType type = PinType::object;
+  static ObjectRef from(const Value& v) { return v.as_object(); }
+};
+// A list of objects of the engine of a class: held as the list of their references (ListItems).
+template <class I> struct Held<std::vector<Object<I>>> {
+  static constexpr PinType type = PinType::object_list;
+  static std::vector<Object<I>> from(const Value& v) {
+    std::vector<Object<I>> r;
+    for (const ObjectRef& x : v.items<ObjectRef>()) r.push_back(Object<I>{x});
+    return r;
+  }
+};
 template <> struct Held<Int64> {
   static constexpr PinType type = PinType::int64;
   static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
@@ -710,6 +723,12 @@ inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
 inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 template <class I> Value to_value(Object<I> v) { return Value::object(v.ref); }
+inline Value to_value(ObjectRef v) { return Value::object(v); }
+template <class I> Value to_value(std::vector<Object<I>> v) {
+  std::vector<ObjectRef> refs;
+  for (const Object<I>& x : v) refs.push_back(x.ref);
+  return Value::of(std::move(refs));
+}
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
 template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }

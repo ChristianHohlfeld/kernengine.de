@@ -3896,7 +3896,7 @@ TEST(logic_structs) {
   PinType named = PinType::exec;
   CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
   CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
-  CHECK(logic::kValueTypes == 9 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
+  CHECK(logic::kValueTypes == 10 && logic::list_of(PinType::object) == PinType::object_list && logic::element_of(PinType::object_list) == PinType::object && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
   // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
   for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::number_list, PinType::enumeration_list}) {
     CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
@@ -8118,7 +8118,8 @@ TEST(engine_interface_overrides_are_said) {
   // for each it leaves to the interface; read and written again as it is)
   const char* const said = blueprint_native::kImplementsGame;
   const auto good = issues(said, &error);
-  CHECK(error.empty() && no_errors(good) && has(good, false, "it implements App without resized: the interface's own runs there (engine.app.resized)"));
+  CHECK(error.empty() && no_errors(good) && has(good, false, "it implements App without resized: the interface's own runs there (engine.app.resized)") &&
+        has(good, false, "it implements App without extensions: the interface's own runs there (engine.app.extensions)"));
   logic::Graph g;
   std::string text;
   CHECK(logic::from_cpp(said, g, nullptr, &error) && g.functions.size() == 3 && g.functions[2].name == "stop" && g.functions[2].overrides &&
@@ -8175,6 +8176,11 @@ TEST(engine_object_of_a_blueprint) {
       "    return {object_valid<kern::App>(func_engine_object<kern::App>(actor_find(\"Nobody\")))};\n"
       "  }\n"
       "\n"
+      "  struct bothResult { List<Object<kern::ShaderExtension>> result = List<Object<kern::ShaderExtension>>{}; };\n"
+      "  bothResult both() {\n"
+      "    return {list_make<Object<kern::ShaderExtension>, \"2\">(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")), func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
+      "  }\n"
+      "\n"
       "  struct handleResult { Int result = 0; };\n"
       "  handleResult handle() {\n"
       "    return {object_handle<kern::ShaderExtension>(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
@@ -8201,6 +8207,8 @@ TEST(engine_object_of_a_blueprint) {
   std::string why;
   CHECK(rt.engine_object(11, "ShaderExtension", why) == h && rt.engine_object(11, "ShaderExtension", why) == h);   // (made once)
   CHECK(a->call("handle", {}, got) && got.size() == 1 && got[0].as_int() == h.handle);   // (Handle of Object: the one way to an Int)
+  // (a list of them: List<Object<kern::ShaderExtension>> - what an App gives the engine as its extensions)
+  CHECK(a->call("both", {}, got) && got.size() == 1 && got[0].type == logic::PinType::object_list && got[0].size() == 2 && got[0].item(1).as_object() == h);
   // (each reason in its own words, at the caller - and no object)
   CHECK(a->call("asApp", {}, got) && got.size() == 1 && !got[0].as_object().valid());
   CHECK(host.errors.size() == 1 && host.errors.back() == "Asks: Engine Object of Blueprint: the Blueprint Water implements ShaderExtension, not App");
@@ -8254,6 +8262,18 @@ TEST(object_refs_know_their_world) {
   if (!error.empty()) std::printf("  object_refs_know_their_world: %s\n", error.c_str());
   CHECK(no_errors(logic::check(g)));
   CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::App> Main = 3;\n};\n", g, nullptr, &error));
+  // (a list of them: List<Object<kern::App>>, of no objects as written; no list of Ints is one)
+  CHECK(logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  List<Object<kern::ShaderExtension>> All = List<Object<kern::ShaderExtension>>{};\n};\n", g, nullptr, &error) &&
+        g.variables.size() == 1 && g.variables[0].type == PinType::object_list && g.variables[0].of == "ShaderExtension" && no_errors(logic::check(g)));
+  std::string listed;
+  CHECK(logic::to_cpp(g, "Holds", listed, &error, logic::library(), false) && listed.find("  List<Object<kern::ShaderExtension>> All = List<Object<kern::ShaderExtension>>{};\n") != std::string::npos);
+  CHECK(!logic::fits(TypeRef{PinType::integer_list, ""}, TypeRef{PinType::object_list, "App"}) && !logic::fits(TypeRef{PinType::object_list, "App"}, TypeRef{PinType::object_list, "ShaderExtension"}) &&
+        logic::fits(TypeRef{PinType::object_list, "App"}, TypeRef{PinType::object_list, "App"}));
+  CHECK(logic::type_text(TypeRef{PinType::object_list, "App"}) == "object<App>_list");
+  logic::TypeRef back;
+  CHECK(logic::type_from_text("object<App>_list", g, back) && back.type == PinType::object_list && back.of == "App" && !logic::type_from_text("object<Nothing>_list", g, back));
+  logic::Value made = logic::Value::of(std::vector<logic::ObjectRef>{r, logic::ObjectRef{}});
+  CHECK(made.size() == 2 && made.item(0).as_object() == r && !made.item(1).as_object().valid());
   CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::Nothing> Main = Object<kern::Nothing>{};\n};\n", g, nullptr, &error) &&
         error.find("the engine has no interface Nothing") != std::string::npos);
 }
@@ -8766,7 +8786,7 @@ TEST(run_the_program_of_a_project) {
   CHECK(run(pr) == 1);   // (its program runs already)
   struct Other final : App {
     bool start(Engine&) override { return true; }
-    void update(Engine&, const Frame&) override {}
+    KERN_OVERRIDE void update(Engine&, const Frame&) override {}
   } other;
   CHECK(run(other) == 1);   // (an App was given already: the first stays)
   // the renderer the settings start: the profile the launch argument names, else the project's (an unknown name: the

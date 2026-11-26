@@ -95,6 +95,7 @@ std::string width_of_cpp(std::string_view name) {
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
   if (t.type == PinType::object) return "Object<" + engine_class_cpp(t.of) + ">";  // (Object<kern::App>: kern/docs/engine_object.md)
+  if (t.type == PinType::object_list) return (t.count ? "Fixed<" : "List<") + cpp_type(TypeRef{PinType::object, t.of}) + (t.count ? ", " + std::to_string(t.count) : std::string()) + ">";
   if (t.type == PinType::callback) {  // (Callback<Float(Float, Float)>, Callback<void(Int)>)
     const TypeRef r = callback_result(t);
     std::string s = "Callback<" + (r.type == PinType::exec ? std::string("void") : cpp_type(r)) + "(";
@@ -217,6 +218,11 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
   if (v.type == PinType::callback) return cpp_type(TypeRef{PinType::callback, of}) + "{}";  // (unbound: what a place of one holds until it is set)
   if (v.type == PinType::object) return cpp_type(TypeRef{PinType::object, of}) + "{}";  // (no object: the one a text writes out)
+  if (v.type == PinType::object_list) {  // (List<Object<kern::App>>{Object<kern::App>{}, ...}: no objects in it a text could write)
+    std::string r = cpp_type(TypeRef{PinType::object_list, of}) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k), of, g, depth);
+    return r + "}";
+  }
   if (is_keyed(v.type)) {
     // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
     const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
@@ -2757,6 +2763,23 @@ struct Reader {
           return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
       }
       t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
+      return expect(">");
+    }
+    if ((is("List") || is("Fixed")) && is("Object", 2) && is("<", 3)) {
+      // List<Object<kern::App>>: a list of objects of the engine of one class (Fixed<Object<kern::App>, 4>: of a fixed length)
+      const bool fixed = is("Fixed");
+      p += 2;
+      TypeRef item;
+      if (!type_here(item)) return false;
+      t = {PinType::object_list, item.of};
+      if (fixed) {
+        if (!expect(",")) return false;
+        const Tok length = peek();
+        const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
+        if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<Float, 16>");
+        ++p;
+        t.count = static_cast<u32>(entries);
+      }
       return expect(">");
     }
     if ((is("List") || is("Fixed")) && is("<", 1)) {
@@ -5430,6 +5453,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
     if (t == PinType::object) return "kern::logic::Object<" + engine_class_cpp(of) + ">";  // (kern::logic::Object<kern::App>)
+    if (t == PinType::object_list) return "kern::List<kern::logic::Object<" + engine_class_cpp(of) + ">>";
     if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
       const TypeRef r = callback_result({t, of});
       std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";

@@ -192,7 +192,7 @@ KERN_LAYOUT(Demo) {
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
 | Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
-| Objekt der Engine (eine Schnittstelle der Engine; kern/docs/engine_object.md) | Typ `Object<kern::App>`, kein Objekt `Object<kern::App>{}` – nie eine Zahl |
+| Objekt der Engine (eine Schnittstelle der Engine; kern/docs/engine_object.md) | Typ `Object<kern::App>`, kein Objekt `Object<kern::App>{}` – nie eine Zahl; Liste `List<Object<kern::App>>` |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
