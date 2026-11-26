@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10854:10: warning: variable 'set_property_number_8' set but not used [-Wunused-but-set-variable]
+ 10854 |     Bool set_property_number_8 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10855:10: warning: variable 'set_property_number_9' set but not used [-Wunused-but-set-variable]
+ 10855 |     Bool set_property_number_9 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10856:10: warning: variable 'set_property_number_10' set but not used [-Wunused-but-set-variable]
+ 10856 |     Bool set_property_number_10 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10957:10: warning: unused variable 'xr' [-Wunused-variable]
+ 10957 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10958:10: warning: unused variable 'xr_2' [-Wunused-variable]
+ 10958 |     Bool xr_2 = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10959:10: warning: unused variable 'both' [-Wunused-variable]
+ 10959 |     Bool both = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:10960:10: warning: unused variable 'xr_3' [-Wunused-variable]
+ 10960 |     Bool xr_3 = false;
+       |          ^~~~
+224 warnings and 2 errors generated.
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:11110:34: warning: unused variable 'physics' [-Wunused-variable]
+ 11110 |     Object<kern::physics::World> physics = Object<kern::physics::World>{};
+       |                                  ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:11199:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 11199 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:11202:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 11202 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_4316971c01d4ed48.h:11240:10: warning: unused variable 'actor_alive' [-Wunused-variable]
+ 11240 |     Bool actor_alive = false;
+       |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:180:83: error: no member named 'Terrain_update' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'
+  180 |   for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4);
+      |                                                                                ~~ ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:181:9: error: no type named 'the_RayResult_' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'; did you mean 'kern_blueprint_17004df594bff641::life_cpp::the_RayResult_'?
+  181 |   const Tr::the_RayResult_ h = rig.down(20, 20, 50, 100);
+      |         ^~~~~~~~~~~~~~~~~~
+      |         kern_blueprint_17004df594bff641::life_cpp::the_RayResult_
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_27d72818c8415d80.h:28:15: note: 'kern_blueprint_17004df594bff641::life_cpp::the_RayResult_' declared here
+   28 |   KERN_STRUCT(the_RayResult_) {
+      |               ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:194:6: error: no member named 'Terrain_update' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'
+  194 |   tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 50);
+      |   ~~ ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:207:74: error: no member named 'Terrain_provide_image' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'; did you mean 'Terrain_provide'?
+  207 |     if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) == 3) tr.Terrain_provide_image(t, Tr::TileKey{z, x, y}, field, 256, 256);
+      |                                                                          ^~~~~~~~~~~~~~~~~~~~~
+      |                                                                          Terrain_provide
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/src/level_blueprints/kern_blueprint_10c9e06674d81c18.h:442:8: note: 'Terrain_provide' declared here
+  442 |   void Terrain_provide(Terrain& self, const TileKey& key, List<U8> rgba = List<U8>{}, U32 width = 0, U32 height = 0) {
+      |        ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:210:35: error: no member named 'Terrain_update' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'
+  210 |   for (int i = 0; i < 50; ++i) tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 20);
+      |                                ~~ ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:212:6: error: no member named 'Terrain_update' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'
+  212 |   tr.Terrain_update(t, {200, 0, 0}, {200, 0, 0}, 20);
+      |   ~~ ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-9-voll-135539-25586/kern/games/spawncity/tests/test_terrain.cpp:214:6: error: no member named 'Terrain_update' in 'kern_blueprint_10c9e06674d81c18::terrain_cpp'
+  214 |   tr.Terrain_update(t, {2000, 0, 0}, {2000, 0, 0}, 20);
+      |   ~~ ^
+224 warnings and 1 error generated.
+224 warnings generated.
+224 warnings generated.
+225 warnings generated.
+224 warnings and 14 errors generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+224 warnings generated.
+
+real	17m41,321s
+user	535m53,289s
+sys	11m38,487s
