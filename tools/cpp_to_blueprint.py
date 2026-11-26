@@ -4783,8 +4783,9 @@ class Emit:
             if i is None:
                 return "it changes what is not a variable of its own (through a pointer, a reference, the place a call gives)"
             if i not in own:
-                v = next((x for x in walk(body) if x.get("kind") == "VarDecl" and x.get("id") == i), None) or self.tree.decl.get(i) or {}
-                what = "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
+                v = next((x for x in [*kids(d), *walk(body)] if x.get("kind") in ("VarDecl", "ParmVarDecl") and x.get("id") == i), None) or self.tree.decl.get(i) or {}
+                what = "an input it is handed by reference or pointer" if v.get("kind") == "ParmVarDecl" else \
+                       "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
                        "a variable of the file" if v.get("kind") == "VarDecl" and self.tree.scope_of.get(i) is not None and not any(i == x["id"] for x in walk(body) if x.get("kind") == "VarDecl") else \
                        "a pointer it holds" if "*" in qtype(v) else "what is not its own"
                 return f"it changes {v.get('name') or '?'} ({what})"
