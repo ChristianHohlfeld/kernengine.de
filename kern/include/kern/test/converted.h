@@ -826,6 +826,13 @@ inline bool at_place(bool ok, const std::string& step) {
   if (!ok && g_where_on) g_where = step + g_where;
   return ok;
 }
+/// How far apart the first numbers that differ are (|source - Blueprint|, -1: no number differed - a bool, a text ...):
+/// what a function's "off:" line names as its largest difference (Tally).
+inline double g_where_off = -1;
+inline bool off_at(double want, double got) {
+  if (g_where_on && g_where_off < 0) g_where_off = std::isnan(want) || std::isnan(got) ? INFINITY : std::fabs(want - got);
+  return false;
+}
 /// The place itself that differs: what the source has there and what the Blueprint has (the first one only).
 template <class W, class G> bool differ_at(W&& want, G&& got) {
   if (g_where_on && g_where_leaf.empty()) g_where_leaf = "the source " + want() + ", the Blueprint " + got();
@@ -843,23 +850,23 @@ inline std::string exact(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g"
 // ---- is what the Blueprint gives exactly what the source gives? ----
 // (Numbers by their bits: 0.0 and -0.0 are two results.)
 inline bool same_bits(f64 a, f64 b) { return std::bit_cast<kern::u64>(a) == std::bit_cast<kern::u64>(b); }
-inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); }); }
+inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); }); }
 inline bool same(f32 want, const Value& got) {
-  return same_bits(static_cast<f64>(want), got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); });
+  return same_bits(static_cast<f64>(want), got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); });
 }
 inline bool same(bool want, const Value& got) {
   return got.as_bool() == want || differ_at([&] { return std::string(want ? "true" : "false"); }, [&] { return std::string(got.as_bool() ? "true" : "false"); });
 }
 inline bool same(Vec3 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return at_place(same_bits(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
-         at_place(same_bits(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y") &&
-         at_place(same_bits(want.z, v.z) || differ_at([&] { return exact(want.z); }, [&] { return exact(v.z); }), ".z");
+  return at_place(same_bits(want.x, v.x) || off_at(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
+         at_place(same_bits(want.y, v.y) || off_at(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y") &&
+         at_place(same_bits(want.z, v.z) || off_at(want.z, v.z) || differ_at([&] { return exact(want.z); }, [&] { return exact(v.z); }), ".z");
 }
 inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return at_place(same_bits(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
-         at_place(same_bits(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y");
+  return at_place(same_bits(want.x, v.x) || off_at(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
+         at_place(same_bits(want.y, v.y) || off_at(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y");
 }
 inline bool same(Whole want, const Value& got) {
   return (got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v) ||
@@ -1132,6 +1139,10 @@ template <class T> std::string text(const std::optional<T>& p) { return text_one
 
 // ---- a value the engine's stand-in answered, as the source gets it ----
 inline void take(f64& to, const Value& v) { to = v.as_number(); }
+// (the source's own numbers - KERN_TEST_SOURCE_NUMBERS=1: an f32 of the source's object takes what the Blueprint holds there; a
+// Blueprint's Float of 64 bit that is no f32 is said by the comparison, not here)
+inline void take(f32& to, const Value& v) { to = static_cast<f32>(v.as_number()); }
+inline void take(Vec2& to, const Value& v) { to = Vec2{v.as_vector().x, v.as_vector().y}; }
 inline void take(bool& to, const Value& v) { to = v.as_bool(); }
 inline void take(wide::Vec3& to, const Value& v) { to = wide::Vec3(v.as_vector()); }
 inline void take(wide::Vec2& to, const Value& v) { to = wide::Vec2(v.as_vector().x, v.as_vector().y); }
@@ -1926,6 +1937,8 @@ struct Tally {
   int costlier = 0;                  // calls in which the class asked for memory more often than the source
   int refused = 0;                   // calls not compared: the engine itself refused a call of the source (real_engine)
   std::string first_refused;         // (the first such call of the source: said in the note)
+  double most_off = -1;              // (of the calls that differ: the largest difference of numbers, -1: none of numbers)
+  std::string most_off_said;         // (that call, the place and the values: said in the "off:" line)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   long long most_passes_alone = 0;   // (of the calls compared with the class alone: the most loop passes of one)
   double class_seconds = 0, interpreter_seconds = 0, take_seconds = 0;   // (where the function's time went: said in its "time:" line)
@@ -2071,6 +2084,20 @@ struct Tally {
       if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
     }
     if (equal) return;
+    {   // (of every call that differs: how far - the largest difference is said in the function's "off:" line)
+      const auto off = [&](const Value& got) {
+        g_where_on = true;
+        g_where.clear();
+        g_where_leaf.clear();
+        g_where_off = -1;
+        const bool equal = same(want, got);
+        g_where_on = false;
+        if (!equal && (most_off_said.empty() || g_where_off > most_off))
+          most_off = g_where_off, most_off_said = describe() + ": at " + (g_where.empty() ? std::string("the whole") : g_where) + ": " + g_where_leaf;
+      };
+      if (ib && b.size() == 1) off(b[0]);
+      if (both && ia && a.size() == 1) off(a[0]);
+    }
     if (++wrong <= 3) {
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
                   !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
@@ -2103,6 +2130,11 @@ struct Tally {
     if (refused > 0)
       std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
                   first_refused.c_str());
+    if (wrong > 0) {   // (one line to count by: how many calls differ, and the largest difference - tools/converter_cases, the measurement)
+      char by[40] = "-";
+      if (most_off >= 0) std::snprintf(by, sizeof by, "%.9g", most_off);
+      std::printf("  off: %s: %d of %d calls differ; the largest difference %s (%s)\n", function, wrong, compared, by, most_off_said.c_str());
+    }
     KERN_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
