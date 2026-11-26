@@ -40,7 +40,7 @@ void take(const Cook& c, GrenadeCook& g) {
 }
 }  // namespace
 
-bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
+bool bind(kern::game::GameWorld& world) { return g_rules.bind(world); }
 
 f32 smoothstep01(f32 t) { return static_cast<f32>(g_rules.number("Smoothstep01", rules::decimal(static_cast<f32>(t)))); }
 f32 walk_pad_axis(f32 v) { return static_cast<f32>(g_rules.number("WalkPadAxis", rules::decimal(static_cast<f32>(v)))); }

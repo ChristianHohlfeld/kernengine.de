@@ -89,8 +89,12 @@ await finger("pointerdown", 21, 450, 150);
 await finger("pointerup", 21, 450, 150);
 check(await until(h => h.ctl.device === "touch" && !h.ctl.fingers), "a finger: the touch layout");
 await p.waitForTimeout(1500);
-await finger("pointerdown", 22, 84, 336);  // the left stick's centre (168 px, bottom left)
-check(await until(h => h.ctl.fingers), "a finger on the stick: the game holds it");
+// the left stick's centre: where the page drew it (the original's #soloLeft, Kern's touch overlay), else 168 px bottom left
+const stick = await p.evaluate(() => { const e = [...document.querySelectorAll('#soloLeft, .k-touch [data-stick="move"]')].find(x => x.getBoundingClientRect().width > 20);
+  if (!e) return [84, 336]; const r = e.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)]; });
+await finger("pointerdown", 22, stick[0], stick[1]);
+const held = await until(h => h.ctl.fingers);
+check(held, `a finger on the stick (${stick}): the game holds it` + (held ? "" : ` - there: ${await p.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}#${e.id}.${e.className}` : "nothing"; }, stick)}, ${JSON.stringify((await hud())?.ctl)}`));
 await p.evaluate(() => { const e = new Event("touchend", {bubbles: true}); Object.defineProperty(e, "touches", {value: []}); document.dispatchEvent(e); });
 check(await until(h => !h.ctl.fingers), "no touch left on the glass: the game lets go of the finger");
 await p.mouse.move(460, 270);

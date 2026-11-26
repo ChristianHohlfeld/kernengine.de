@@ -23,14 +23,14 @@
 #include <string>
 
 #include "common.h"
+#include "kern/game/runtime.h"
 #include "kern/logic/logic.h"
 
 namespace sc::controls {
 
-/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
-/// tests the one they run): the Blueprint of the actor "Controls" is found by its name at every call.
-/// True: the actor has a Blueprint that runs there. Unbound, every rule answers 0.
-bool bind(kern::logic::Runtime& logic);
+/// Binds the rules to the actor "Controls" of the world (after its start_level): its Blueprint answers every call.
+/// True: the world runs, has the actor, and its Blueprint runs. Unbound, every rule answers 0.
+bool bind(kern::game::GameWorld& world);
 
 f32 smoothstep01(f32 t);
 
