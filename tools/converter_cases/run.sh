@@ -9,7 +9,8 @@
 #             sc_dem_data): those entries, copied (Copy Bytes) - written, not waiting on "a view (Span) of a part of a list".
 #   table.cpp a constant table of structs (`constexpr Spec kTable[]` of weapons.h) named from a namespace that has a
 #             Spec of its own: its type is the one where it is declared (else its texts are read as another struct's Bools).
-#   program.cpp + door.cpp  a program with its App (a state that implements kern::App - main.cpp's SpawnCityApp), an
+#   program.cpp + door.cpp  a program with its App (a state that implements kern::App, its one object made in the entry
+#             `int kern_main() { static CasesApp app; return kern::run(app); }` as kern/docs/project.md 4. writes it), an
 #             export and the library the export uses, beside a file nothing of the program uses: the App, the export's
 #             Blueprint and what it uses stand in the project, the door in the level - each with its reason in the log
 #             (kern/docs/project.md: a level refuses an export); the project and the level both read, and their classes
@@ -32,7 +33,7 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   cp "$root"/kern/games/spawncity/tests/*.h "$out/pt/"
   echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
-  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
     || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(cat "$out/cases.klevel" "$out/cases.kproject" | grep -c '"logic"')" = 0 ]; then

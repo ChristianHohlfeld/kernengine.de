@@ -186,7 +186,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
 
 ## 7a. Ein Programm aus C++: wohin der Konverter schreibt
 
-`tools/cpp_to_blueprint.py --convert <ns> --level <level.klevel> --project <spiel.kproject>` schreibt jeden Blueprint
+`tools/cpp_to_blueprint.py --convert <ns> --level <level.klevel> --project <spiel.kproject> --folder <ordner>` schreibt jeden Blueprint
 dorthin, wo er nach 1. hingehört – die Regel folgt daraus, was ein Blueprint ist und wer ihn benutzt, nie aus einem
 Namen oder Ordner:
 
@@ -201,7 +201,10 @@ implements App …`, `door_cpp: the level - a world's …`). Ein Blueprint des P
 Level steht (auch einer eines anderen Ordners, eine eigene Quelle), zieht unverändert ins Projekt um – mit eigener
 Zeile im Protokoll. Ein Lauf ohne `--project`, der Programm-Blueprints hat, bricht mit ihren Namen und Gründen ab.
 Projekt-Blueprints tragen wie Akteure einen Ordner (`"folder"`, Ordnung im Editor); der Konverter kennt daran seine
-eigenen. Beide Dateien werden vom Leser der Engine gelesen (`tools/blueprint_cpp.sh --apply <datei> [--with <projekt>]`;
+eigenen – `--folder` ist darum anzugeben (keine Vorgabe). Nur mit `--whole-program` (ein Lauf über das ganze
+Programm, ausdrücklich, nie aus der Zahl der Dateien geschlossen) fällt aus seinem Ordner, was er nicht mehr schreibt.
+Klassen, die das C++ des Programms direkt ruft, nennt `--classes <header.h>=<ordner>` (keine Vorgabe). Das eine Objekt
+der App findet er auch im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }`. Beide Dateien werden vom Leser der Engine gelesen (`tools/blueprint_cpp.sh --apply <datei> [--with <projekt>]`;
 ein Level weist dabei einen Export ab, `game::world_export`) und nur geschrieben, wenn alle Blueprints gelesen sind.
 Die Klassen schreibt `tools/blueprint_cpp.sh --project <spiel.kproject> <level> …` aus beiden. Geprüft:
 `tools/converter_cases/run.sh` (Fall `program` + `door`: App, Export und deren Bibliothek im Projekt, die Tür im

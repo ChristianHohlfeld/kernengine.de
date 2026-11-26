@@ -1578,11 +1578,16 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 - **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
   Schnittstelle (eine mit `?` darf fehlen).
 - **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
-  `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
+  `state_classes`) – `static T x;` in einer Funktion des umgewandelten Namensraums (`Game& game() { static Game g; return g; }`)
+  oder im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }` außerhalb jedes Namensraums –
+  und die das Programm auf keinem anderen Weg macht (Feld, lokale Variable, Wert, `new`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
   Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
   `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
   Funktionen mit den Namen der Schnittstelle – sobald jede reine geschrieben ist (bis dahin hat die Engine kein Objekt
   von ihm: was noch wartet, hält die Schnittstelle von ihm fern wie jeden Aufrufer); was dann nicht passt, sagt check().
+  Ist eine solche Klasse kein Zustand, sagt die Wartemeldung warum („has a base class, and it is no state: 2 objects of
+  it have static storage …“ / „… makes objects of it in other ways too“ / „its base is no interface of the engine“).
+  Die Parameter ihrer Overrides sind Werte in der Reihenfolge von C++ (die Engine reicht Werte: `update(Int, Frame)`).
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.

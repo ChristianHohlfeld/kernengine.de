@@ -6,8 +6,8 @@ is a subset of C++. A game written in ordinary C++ uses more of the language tha
 This tool reads such sources with the compiler's own parser (clang's syntax tree) and writes them
 in the notation, function by function:
 
-  tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--project <name.kproject>] [--folder <name>]
-      [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
+  tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--project <name.kproject>] --folder <name>
+      [--whole-program] [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
       [--classes <header.h>=<folder>] <include flags...> -- <file.cpp>...
 
   - the program is the folders of the sources, in the namespace given - and the further folders named
@@ -41,12 +41,13 @@ in the notation, function by function:
     same bit for bit;
   - --texts writes each Blueprint's text into a directory, to read;
   - the Blueprints of the level are the program's sources where they stand outside the folder this tool
-    writes (--folder, "Source"): a file that is a Blueprint now - its C++ is gone, the Blueprint in the
+    writes (--folder, required: it knows its own by it; --whole-program: a run over the whole program,
+    which drops of its folder what it does not write any more): a file that is a Blueprint now - its C++ is gone, the Blueprint in the
     level is its one source (BLUEPRINTS.md, "5 - Umschalten") - stands in a folder of its own. A run
     neither rewrites nor drops such a Blueprint (a run over the whole program drops, of its own folder,
     what it does not write any more). The program's C++ calls it as its class: --classes names the
     header the build writes their classes into (tools/blueprint_cpp, the same tool, from the same
-    level) and their folder (default: level_blueprints.h=Program, as build.sh writes it). Where the
+    level) and their folder (no default: without it the program calls no Blueprint as its class). Where the
     level has Blueprints in that folder, the run writes the header from the level into a folder of its
     own before it reads the sources, and that folder comes first on the include path; a test includes it
     by its name (TestWriter: a header that is not in the sources' folder is the build's);
@@ -1314,6 +1315,7 @@ class World:
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
+        self.not_states = {}  # a class of the program that has objects with static storage and is no state: why (state_classes)
         self.state_implements = {}  # such a class that derives from an interface of the engine -> [the interface's name (Graph::implements), its pure functions]
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.getters = set()   # (keys of) the functions that give the one object of a state and nothing else - `Game& game() { static Game g; return g; }`: that Blueprint itself (main)
@@ -1434,7 +1436,7 @@ def is_nothing(n):
 
 # The header of the Blueprints the program calls as their classes, and their folder in the level, as the build
 # writes it (build.sh: tools/blueprint_cpp.sh <level> <out.cpp> <out.h> <folder>; --classes says other ones).
-CLASSES = ["level_blueprints.h", "Program"]
+CLASSES = [None, None]   # (none unless --classes names them: no game's build is the default)
 # A type of such a Blueprint's class, as the compiler names it: the class itself (kern_blueprint_<hash>::qr_code_cpp, which
 # blueprints::qr_code_cpp names) or a type it declares (kern_blueprint_<hash>::qr_code::qr_Code) - tools/blueprint_cpp
 # writes each class into a namespace of its graph's hash.
@@ -2133,7 +2135,9 @@ class Unit:
             return self.structs[q]
         o = self.tree.records[q]
         if o.get("bases"):
-            raise Wait(f"the class {q.split('::')[-1]} (a base class)")
+            why = self.world.not_states.get(q) or ("there is no object of it with static storage (a state's one object is made by `static T x;` in a function of the program "
+                                                   "or in the entry kern_main())")
+            raise Wait(f"the class {q.split('::')[-1]} has a base class, and it is no state: {why}")
         self.structs[q] = None
         try:
             fields, taken, declared = [], set(), {}
@@ -2261,7 +2265,7 @@ class Unit:
     def class_library(self, lib):
         """The Blueprint `lib` of the level, which the program calls as its class: what the level says of it. Else Wait."""
         info = self.world.actors.get(lib)
-        if info is None or info.get("folder") != CLASSES[1]:
+        if info is None or CLASSES[1] is None or info.get("folder") != CLASSES[1]:
             raise Wait(f"a type of the Blueprint {lib}'s class, which is not one the program calls as its class (the level's folder {CLASSES[1]})")
         if not info["library"]:
             raise Wait(f"the Blueprint {lib}, which keeps something, called as its class (only a library's class is called directly)")
@@ -2307,7 +2311,7 @@ class Unit:
             raise Wait(f"the type {name} of the Blueprint {lib}, which the level does not have")
         home = d.get("from") or lib
         if home != lib:
-            if (self.world.actors.get(home) or {}).get("folder") != CLASSES[1]:
+            if CLASSES[1] is None or (self.world.actors.get(home) or {}).get("folder") != CLASSES[1]:
                 raise Wait(f"the type {name} of {home}, which the Blueprint {lib} uses: a type of a Blueprint of this run, as a class has it (not read yet)")
             return self.class_named(home, name)
         if name in self.type_line:
@@ -15358,7 +15362,7 @@ class TestWriter:
                     system.append(f"#include <{m.group(2)}>")
             elif m.group(2).startswith("kern/"):
                 own.append(f'#include "{m.group(2)}"')
-            elif m.group(2) == os.path.basename(CLASSES[0]):
+            elif CLASSES[0] and m.group(2) == os.path.basename(CLASSES[0]):
                 own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
             else:
                 own.append(f'#include "{self.source_dir}/{m.group(2)}"')
@@ -16060,7 +16064,29 @@ def objects_made(tree):
             visit(c, in_function)
     for o in [*tree.dumps, *(o for _, dumps in tree.more for o in dumps)]:
         visit(o, False)
+    # (the program's entry, outside every namespace - `int kern_main() { static MyGame app; return kern::run(app); }`,
+    # kern/app/run.h: the object made there is the program's one object of its App, as one in a function of the program)
+    for o in entry_dumps(tree.path, tree.flags):
+        visit(o, False)
     return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
+
+
+def entry_dumps(path, flags):
+    """The program's entry `kern_main()` (kern/app/run.h), where this source file defines it - outside every namespace,
+    so the dump of the program's namespace does not have it: dumped by its name, annotated. [] where it has none."""
+    if is_header(path):
+        return []
+    try:
+        if not re.search(r"\bkern_main\s*\(\s*\)\s*\{", open(path, encoding="utf-8", errors="replace").read()):
+            return []
+    except OSError:
+        return []
+    me, out, st = os.path.abspath(path), [], {"file": ""}
+    for o in run_clang(path, "kern_main", flags, name=True):
+        annotate(o, st)
+        if o.get("kind") == "FunctionDecl" and o.get("name") == "kern_main" and os.path.abspath(o.get("_file") or "?") == me:
+            out.append(o)
+    return out
 
 
 def engine_interface_of(tree, rec):
@@ -16107,9 +16133,14 @@ def state_classes(world, surveys):
     out = {}
     for q, places in statics.items():
         info = records.get(q)
+        if info is not None and len(places) != 1:
+            world.not_states[q] = f"{len(places)} objects of it have static storage (a state has one)"
+        elif info is not None and q in made:
+            world.not_states[q] = "the program makes objects of it in other ways too (a field, a local variable, a value, new)"
         if len(places) != 1 or q in made or info is None or not world.program(info["file"]):
             continue
         if (info["bases"] or info["virtual"]) and not info.get("implements"):
+            world.not_states[q] = "its base is no interface of the engine (one base, public, of the engine, all its functions virtual)"
             continue
         out[q] = type_name_of(q)
         if info.get("implements"):
@@ -16421,7 +16452,7 @@ def class_facts(actors, level_actors):
 def class_libraries(world):
     """The Blueprints the program calls as their classes (the level's folder CLASSES[1]): a run reads them - their types
     and functions -, it writes none of them (main: no Blueprint text of theirs, no declaration of their types)."""
-    return {name for name, a in world.actors.items() if a.get("folder") == CLASSES[1]}
+    return {name for name, a in world.actors.items() if CLASSES[1] is not None and a.get("folder") == CLASSES[1]}
 
 
 def kept_by_others(level, folder, project=None):
@@ -16511,10 +16542,15 @@ def main(argv):
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
     level = project = folder = test = texts = None
+    whole = False
     classes = tuple(CLASSES)
     flags, more = [], []
     i = 0
     while i < len(opts):
+        if opts[i] == "--whole-program":
+            whole = True   # (a run over the whole program: of its own folder, what it does not write any more goes)
+            i += 1
+            continue
         if opts[i] in ("--level", "--project", "--folder", "--test", "--texts", "--program", "--classes"):
             v = opts[i + 1]
             if opts[i] == "--level": level = v
@@ -16538,16 +16574,18 @@ def main(argv):
         else:
             flags.append(opts[i])
             i += 1
-    folder = folder or "Source"
-    # (a run over the whole program: what it does not write any more goes - of its own folder; a Blueprint of
-    # another folder is a source of its own, and the run leaves it as it is)
-    whole = len(files) > 20
+    # The folder of the Blueprints this run writes: it knows its own by it (a Blueprint of another folder is a source of
+    # its own, and the run leaves it as it is; with --whole-program, what the run does not write any more of its own goes).
+    if level and not folder:
+        raise SystemExit("--folder <name>: the folder (in the level and the project) of the Blueprints this run writes - it knows its own by it")
+    if whole and not level:
+        raise SystemExit("--whole-program: a run over the whole program drops, of its folder, what it does not write any more - give the level (--level)")
     CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
-    if classes[1] == folder:
+    if classes[1] is not None and classes[1] == folder:
         raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
     if project and not level:
         raise SystemExit("--project: the run writes the program's Blueprints into the project and the worlds' into a level - give the level too (--level)")
-    if level and any(a.get("folder") == classes[1] for a in blueprints_of(level, project)):
+    if level and classes[1] is not None and any(a.get("folder") == classes[1] for a in blueprints_of(level, project)):
         # The Blueprints the program calls as their classes: their header, as the build writes it (from the level,
         # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it. It
         # is written for this run, into a folder of its own that comes first on the include path (nothing is kept
@@ -16753,7 +16791,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers, w.state_members = world.actors, world.states, world.parts, world.part_numbers, world.state_members
-        w.state_implements = world.state_implements
+        w.state_implements, w.not_states = world.state_implements, world.not_states
         w.pointer_lists, w.globals, w.state_functions, w.getters = world.pointer_lists, world.globals, world.state_functions, world.getters
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}

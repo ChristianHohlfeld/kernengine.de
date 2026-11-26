@@ -23,7 +23,7 @@ cp "$here/level/spawncity.klevel" "$out/all.klevel"
 cp "$here/level/spawncity.kproject" "$out/all.kproject"   # (the program's Blueprints stand in the project: kern/docs/project.md)
 if [ -n "${REFRESH:-}" ]; then
   (cd "$here" && mkdir -p "$out/refresh/converted" "$out/refresh/texts" && cp tests/*.h "$out/refresh/" &&
-   CLANGXX="${CLANGXX:-clang++}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --program firmware=fc,hwcontract \
+   CLANGXX="${CLANGXX:-clang++}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --program firmware=fc,hwcontract --folder Source --classes level_blueprints.h=Program \
      -I../../include -I../../third_party/box3d/include -Isrc --level "$out/all.klevel" --project "$out/all.kproject" --test "$out/refresh/converted" --texts "$out/refresh/texts" \
      -- $REFRESH > "$out/refresh.log" 2>&1)
   echo "refresh ($REFRESH): rc=$? - $(tail -n 3 "$out/refresh.log" | tr '\n' ' ')"

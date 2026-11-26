@@ -8338,7 +8338,7 @@ TEST(program_world_has_the_project) {
                         "};\n", main, nullptr, &error));
   game::Project pr;
   pr.name = "Welten";
-  pr.blueprints.push_back({"Main", main});
+  pr.blueprints.push_back({"Main", main, ""});
   game::Program program;
   CHECK(program.start(pr, &error));
   logic::EngineObjects* objects = program.runtime() ? program.runtime()->host().engine_objects() : nullptr;
@@ -8392,7 +8392,7 @@ TEST(program_beside_an_app_of_cpp) {
   logic::register_native_blueprint(logic::graph_hash(lib), [] { return std::unique_ptr<logic::NativeBlueprint>(new Lib()); });
   game::Project pr;
   pr.name = "Beside";
-  pr.blueprints.push_back({"Codes", lib});
+  pr.blueprints.push_back({"Codes", lib, ""});
   game::Program program;
   CHECK(!logic::blueprint_object<Lib>);
   pr.settings.loop_budget = 12345;
@@ -8421,7 +8421,7 @@ TEST(program_beside_an_app_of_cpp) {
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(error.empty());
-  pr.blueprints.push_back({"Main", app});
+  pr.blueprints.push_back({"Main", app, ""});
   CHECK(!program.start(pr, cpp, &error) && !program.running() && !logic::blueprint_object<Lib>);
   CHECK(error.find("the program's App is C++, and the project Beside has one too: Main implements App") != std::string::npos);
 }
@@ -8465,7 +8465,7 @@ TEST(program_binds_the_exports) {
   logic::register_native_blueprint(logic::graph_hash(hud), [] { return std::unique_ptr<logic::NativeBlueprint>(new Exported()); });
   game::Project pr;
   pr.name = "Exporte";
-  pr.blueprints = {{"Main", app}, {"Hud", hud}};
+  pr.blueprints = {{"Main", app, ""}, {"Hud", hud, ""}};
   game::Program program;
   CHECK(!logic::blueprint_object<Exported>);
   CHECK(program.start(pr, &error));
@@ -8474,7 +8474,7 @@ TEST(program_binds_the_exports) {
   CHECK(!logic::blueprint_object<Exported>);   // (the end unbinds them: an export after it says so)
   // two objects of the class: which one the exports call is not said - refused, with the Blueprint's name
   game::Project two = pr;
-  two.blueprints.push_back({"Hud2", hud});
+  two.blueprints.push_back({"Hud2", hud, ""});
   CHECK(!program.start(two, &error) && !program.running() && !logic::blueprint_object<Exported>);
   CHECK(error.find("the class of its Blueprint Hud2") != std::string::npos && error.find("Exported is bound already") != std::string::npos);
   // in a world: the level is refused where it is read, validate says it, and Play does not start
@@ -8521,7 +8521,7 @@ TEST(run_the_program_of_a_project) {
   CHECK(error.empty() && main.implements == "App");
   game::Project pr;
   pr.name = "Run";
-  pr.blueprints.push_back({"Main", main});
+  pr.blueprints.push_back({"Main", main, ""});
   // no App before kern_main: the start is refused and says what is missing
   CHECK(!kern_app_start(64, 48) && std::string(last_error()).find("kern_main") != std::string::npos);
   // a project whose program does not start: no App is given (the reason is the program's)

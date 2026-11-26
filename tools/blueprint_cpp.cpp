@@ -4,7 +4,7 @@
 //                                                        (builds this file once, then runs it; with --project the
 //                                                        project's Blueprints - the program's - too, a folder of theirs
 //                                                        as an actor's)
-//   tools/blueprint_cpp.sh --apply <level.klevel | name.kproject> [--with <name.kproject>] <name | Level> <text.cpp> [<name> <text.cpp> ...]
+//   tools/blueprint_cpp.sh --apply <level.klevel | name.kproject> [--with <name.kproject>] [--folder <name>] [--level-graph <text.cpp>] [<name> <text.cpp> ...]
 //                                                        (the other way: Blueprints from their C++ texts, into a level -
 //                                                        its libraries found there, then in the project --with names -
 //                                                        or into a project; a level refuses an export)
@@ -88,13 +88,14 @@ const json::Value* graph_in(const json::Value& doc, std::string_view name) {
   return nullptr;
 }
 
-/// In the level or project `doc`, the Blueprint called <name> ("Level": the level's own graph) becomes what the C++
+/// In the level or project `doc`, the Blueprint called <name> becomes what the C++
 /// text says - the text is the Blueprint's other notation (kern/docs/blueprint_cpp.md), read as the editor's C++ view
-/// reads it (Apply). A Blueprint of that name that is not there yet is made: an actor of a level in the folder "Rules",
-/// a Blueprint of a project without a folder. The libraries the text names are the document's other Blueprints - for a
+/// reads it (Apply); `level_graph`: the level's own graph instead. A Blueprint of that name that is not there yet is
+/// made - an actor of a level, a Blueprint of a project -, in `folder` (null: none). The libraries the text names are the document's other Blueprints - for a
 /// level, then those of `with` (its project: kern/docs/project.md 5.). 0: it is there; else the text is no Blueprint
 /// that compiles, or one a level may not hold (an export: game::world_export), and what is wrong is said.
-int apply_one(json::Value& doc, const char* path, const std::string& actor, const char* text_path, const json::Value* with) {
+int apply_one(json::Value& doc, const char* path, const std::string& actor, const char* text_path, const json::Value* with, const char* folder,
+              bool level_graph) {
   std::string text, why;
   if (!read_file(text_path, text)) {
     std::fprintf(stderr, "%s: cannot read it\n", text_path);
@@ -107,7 +108,7 @@ int apply_one(json::Value& doc, const char* path, const std::string& actor, cons
     return of.find(key);
   };
   json::Value* held = nullptr;
-  if (actor == "Level" && !project) {
+  if (level_graph) {
     held = member(doc, "logic", json::Value::object());
   } else {
     json::Value* entries = member(doc, project ? "blueprints" : "actors", json::Value::array());
@@ -119,6 +120,7 @@ int apply_one(json::Value& doc, const char* path, const std::string& actor, cons
     if (!named() && project) {
       json::Value b = json::Value::object();
       b.set("name", actor);
+      if (folder) b.set("folder", folder);
       entries->push(std::move(b));
     } else if (!named()) {
       const f64 id = doc["nextId"].as_number(1);
@@ -130,7 +132,7 @@ int apply_one(json::Value& doc, const char* path, const std::string& actor, cons
       };
       a.set("id", id);
       a.set("name", actor);
-      a.set("folder", "Rules");
+      if (folder) a.set("folder", folder);
       transform.set("position", triple(0));
       transform.set("rotation", triple(0));
       transform.set("scale", triple(1));
@@ -149,7 +151,7 @@ int apply_one(json::Value& doc, const char* path, const std::string& actor, cons
     auto known = others.find(std::string(name));
     if (known != others.end()) return known->second.get();
     std::unique_ptr<logic::Graph> found;
-    const json::Value* logic = name != actor ? graph_in(doc, name) : nullptr;
+    const json::Value* logic = level_graph || name != actor ? graph_in(doc, name) : nullptr;
     if (!logic && with) logic = graph_in(*with, name);
     if (logic) {
       found = std::make_unique<logic::Graph>();
@@ -190,11 +192,26 @@ bool read_doc(const char* path, std::string& text, json::Value& doc) {
   return false;
 }
 
-/// --apply <level.klevel | name.kproject> [--with <name.kproject>] <name> <text.cpp> [<name> <text.cpp> ...]: several
-/// Blueprints in the order given - a library before the Blueprints that use it. The file is written when all of them
-/// were read: all of them, or nothing. A level's Blueprints find libraries in the level, then in the project `--with`
-/// names; a project's only in the project (kern/docs/project.md 5.).
-int apply(const char* path, const char* with_path, int count, char** pairs) {
+/// --apply <level.klevel | name.kproject> [--with <name.kproject>] [--folder <name>] [--level-graph <text.cpp>]
+/// [<name> <text.cpp> ...]: several Blueprints in the order given - a library before the Blueprints that use it; the
+/// level's own graph (--level-graph) after them. The file is written when all of them were read: all of them, or
+/// nothing. A level's Blueprints find libraries in the level, then in the project `--with` names; a project's only in
+/// the project (kern/docs/project.md 5.). A Blueprint that is made stands in `--folder` (none: in no folder).
+int apply(int argc, char** argv) {
+  const char* path = argv[2];
+  const char *with_path = nullptr, *folder = nullptr, *graph_text = nullptr;
+  std::vector<std::pair<std::string, const char*>> pairs;
+  for (int k = 3; k < argc; ++k) {
+    const std::string a = argv[k];
+    if ((a == "--with" || a == "--folder" || a == "--level-graph") && k + 1 < argc) {
+      (a == "--with" ? with_path : a == "--folder" ? folder : graph_text) = argv[++k];
+    } else if (a.starts_with("--") || k + 1 >= argc) {
+      std::fprintf(stderr, "--apply: %s: give <name> <text.cpp> pairs, --with <name.kproject>, --folder <name> or --level-graph <text.cpp>\n", a.c_str());
+      return 2;
+    } else {
+      pairs.push_back({a, argv[++k]});
+    }
+  }
   std::string text, with_text;
   json::Value doc, with;
   if (!read_doc(path, text, doc) || (with_path && !read_doc(with_path, with_text, with))) return 1;
@@ -202,12 +219,17 @@ int apply(const char* path, const char* with_path, int count, char** pairs) {
     std::fprintf(stderr, "%s: --with %s: a Blueprint of the program finds its libraries only in the project (kern/docs/project.md 5.)\n", path, with_path);
     return 2;
   }
+  if (graph_text && is_project(doc)) {
+    std::fprintf(stderr, "%s: --level-graph: a project has no level graph (a level has one)\n", path);
+    return 2;
+  }
   if (with_path && !is_project(with)) {
     std::fprintf(stderr, "--with %s: not a Kern project (format must be \"kern-project\")\n", with_path);
     return 2;
   }
-  for (int k = 0; k + 1 < count; k += 2)
-    if (apply_one(doc, path, pairs[k], pairs[k + 1], with_path ? &with : nullptr) != 0) return 1;
+  for (const auto& [name, file] : pairs)
+    if (apply_one(doc, path, name, file, with_path ? &with : nullptr, folder, false) != 0) return 1;
+  if (graph_text && apply_one(doc, path, "the level's graph", graph_text, with_path ? &with : nullptr, folder, true) != 0) return 1;
   const std::string out = json::stringify(doc, is_project(doc) ? 2 : 1) + "\n";
   if (out != text) {
     FILE* f = std::fopen(path, "wb");
@@ -223,8 +245,7 @@ int apply(const char* path, const char* with_path, int count, char** pairs) {
 
 int main(int argc, char** argv) {
   (void)game::logic_node_shapes_registered();  // the gameplay nodes, as the library knows them
-  if (argc >= 7 && argc % 2 == 1 && std::string(argv[1]) == "--apply" && std::string(argv[3]) == "--with") return apply(argv[2], argv[4], argc - 5, argv + 5);
-  if (argc >= 5 && argc % 2 == 1 && std::string(argv[1]) == "--apply") return apply(argv[2], nullptr, argc - 3, argv + 3);
+  if (argc >= 3 && std::string(argv[1]) == "--apply") return apply(argc, argv);
   if (argc == 2 && std::string(argv[1]) == "--node-names") {
     // (the names the nodes have in a Blueprint's C++ - math_add, list_get ...: nothing else of a Blueprint is called so)
     for (const auto& d : logic::library().all()) {
@@ -256,7 +277,7 @@ int main(int argc, char** argv) {
     argv += 1, argc -= 1;
   }
   if (argc < 3 || (!classes_only && argc != 3 && argc < 5) || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]\n       blueprint_cpp [--project <name.kproject>] --classes <level.klevel> <out.h> <name> [<name> ...]\n       blueprint_cpp --apply <level.klevel | name.kproject> [--with <name.kproject>] <name | Level> <text.cpp> [<name> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+    std::fprintf(stderr, "usage: blueprint_cpp [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]\n       blueprint_cpp [--project <name.kproject>] --classes <level.klevel> <out.h> <name> [<name> ...]\n       blueprint_cpp --apply <level.klevel | name.kproject> [--with <name.kproject>] [--folder <name>] [--level-graph <text.cpp>] [<name> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   // (the header of the Blueprints the program calls by their classes, and the folder they stand in)
