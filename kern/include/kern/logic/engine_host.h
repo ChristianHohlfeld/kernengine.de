@@ -215,10 +215,7 @@ class EngineObjects {
     void* owner = nullptr;          // what `end` ends, if not the object itself: what holds it (MadeWith)
     Kinds kinds;  // its class first, then those it derives from
   };
-  static WorldId next_world() {
-    static WorldId next = 0;
-    return ++next;
-  }
+  static WorldId next_world() { return new_world(); }
   WorldId world_;
   i64 put(Kinds kinds, void (*end)(void*));
   void place(i64 handle, Kinds kinds, void (*end)(void*), void* owner = nullptr);

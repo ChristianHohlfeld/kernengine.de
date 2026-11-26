@@ -17,8 +17,11 @@ using rt::kDegree;
 
 
 namespace {
-logic::Value act(ActorId id) { return logic::Value::actor(static_cast<logic::ActorRef>(id)); }
+/// An actor of the world in an event (0: none).
+logic::Value act(logic::WorldId world, ActorId id) { return logic::Value::actor(id ? logic::ActorHandle{static_cast<logic::ActorRef>(id), world} : logic::ActorHandle{}); }
 }  // namespace
+
+logic::WorldId GameWorld::world_id() const { return logic_host_ ? logic_host_->world() : 0; }
 
 void GameWorld::start_logic() {
   logic_.reset();
@@ -54,8 +57,8 @@ void GameWorld::logic_fire(const char* type, ActorId actor, ActorId other, std::
   e.target = static_cast<logic::ActorRef>(target);
   e.level = true;
   e.key = std::move(key);
-  e.args.push_back({"actor", act(actor)});
-  e.args.push_back({"other", act(other)});
+  e.args.push_back({"actor", act(world_id(), actor)});
+  e.args.push_back({"other", act(world_id(), other)});
   for (auto& x : extra) e.args.push_back(std::move(x));
   if (!target) {  // events about nobody in particular (game over...) reach every graph
     e.target = 0;
@@ -116,7 +119,7 @@ void GameWorld::key_event(const std::string& code, bool down) {
   e.type = "game.key";
   e.key = code;
   e.args.push_back({"pressed", logic::Value::boolean(down)});
-  e.args.push_back({"actor", act(player_)});
+  e.args.push_back({"actor", act(world_id(), player_)});
   logic_->fire(e);
 }
 

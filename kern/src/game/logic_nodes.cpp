@@ -23,8 +23,23 @@ namespace kern::game {
 namespace nodes {
 
 namespace {
-/// An Actor input: the actor given, or Self when it is left empty.
-ActorId or_self(Actor target, Self self) { return target.id ? target.id : self; }
+/// Whose node it is, for a message: the actor of Self by its name, or the Level.
+std::string owner_name(GameWorld& w, Self self) {
+  const game::Actor* a = self ? w.level().find(self) : nullptr;
+  return a ? a->name : std::string("the Level");
+}
+/// The id an Actor input names in this world (logic::Runtime::actor_here - the one check: an actor of another world
+/// names nothing here, and the host is told why, naming the node); 0: none.
+ActorId here(GameWorld& w, Self self, Actor a, const char* node) {
+  if (!a.id) return 0;
+  logic::Runtime* rt = w.logic_runtime();
+  logic::ActorRef id = 0;
+  return rt && rt->actor_here(owner_name(w, self), a, node, id) ? id : 0;
+}
+/// An Actor input: the actor given, or Self when it is left empty (one of another world: none).
+ActorId or_self(GameWorld& w, Self self, Actor target, const char* node) { return target.id ? here(w, self, target, node) : self; }
+/// An actor of this world as a Blueprint holds it (0: none).
+Actor actor_of(GameWorld& w, ActorId id) { return id ? Actor{id, w.world_id()} : Actor{}; }
 Vec3 position(GameWorld& w, ActorId id) {
   Mat4 m;
   return w.actor_matrix(id, m) ? m.translation() : Vec3{};
@@ -35,72 +50,75 @@ Actor actor_player(GameWorld& w, Self, Int index) {
   const std::vector<ActorId> p = w.pawns();
   ActorId a = index == 0 ? w.player() : 0;
   if (!a && index >= 0 && static_cast<std::size_t>(index) < p.size()) a = p[static_cast<std::size_t>(index)];
-  return {a};
+  return actor_of(w, a);
 }
 Int actor_player_count(GameWorld& w, Self) { return static_cast<Int>(w.pawns().size()); }
-Actor actor_find(GameWorld& w, Self, std::string_view name) { return {w.find_actor(name)}; }
+Actor actor_find(GameWorld& w, Self, std::string_view name) { return actor_of(w, w.find_actor(name)); }
 Found actor_find_tag(GameWorld& w, Self, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
-  return {{v.empty() ? 0 : v.front()}, static_cast<Int>(v.size())};
+  return {actor_of(w, v.empty() ? 0 : v.front()), static_cast<Int>(v.size())};
 }
 std::vector<Actor> actor_all_with_tag(GameWorld& w, Self, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
   std::vector<Actor> all;
-  for (ActorId id : v) all.push_back({id});
+  for (ActorId id : v) all.push_back(actor_of(w, id));
   return all;
 }
 Actor actor_random_tag(GameWorld& w, Self, f64* memory, u32 seed, u32 node, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
-  return {v.empty() ? 0 : v[logic::random::next(memory, seed, node) % v.size()]};
+  return actor_of(w, v.empty() ? 0 : v[logic::random::next(memory, seed, node) % v.size()]);
 }
-Bool actor_has_tag(GameWorld& w, Self self, Actor target, std::string_view tag) { return w.has_tag(or_self(target, self), tag); }
+Bool actor_has_tag(GameWorld& w, Self self, Actor target, std::string_view tag) { return w.has_tag(or_self(w, self, target, __func__), tag); }
 Text actor_name(GameWorld& w, Self self, Actor target) {
-  const game::Actor* a = w.level().find(or_self(target, self));
+  const game::Actor* a = w.level().find(or_self(w, self, target, __func__));
   return a ? a->name : Text();
 }
-Bool actor_valid(GameWorld& w, Self, Actor target) { return target.id && w.level().find(target.id) && w.actor_alive(target.id); }
-Vector actor_location(GameWorld& w, Self self, Actor target) { return position(w, or_self(target, self)); }
+Bool actor_valid(GameWorld& w, Self self, Actor target) {
+  const ActorId t = here(w, self, target, __func__);
+  return t && w.level().find(t) && w.actor_alive(t);
+}
+Vector actor_location(GameWorld& w, Self self, Actor target) { return position(w, or_self(w, self, target, __func__)); }
 Vector actor_rotation(GameWorld& w, Self self, Actor target) {
   Mat4 m;
-  return w.actor_matrix(or_self(target, self), m) ? matrix_transform(m).rotation : Vec3{};
+  return w.actor_matrix(or_self(w, self, target, __func__), m) ? matrix_transform(m).rotation : Vec3{};
 }
 Vector actor_forward(GameWorld& w, Self self, Actor target) {
   Mat4 m;
-  return w.actor_matrix(or_self(target, self), m) ? normalize(m.transform_vector({1, 0, 0}), {1, 0, 0}) : Vec3{1, 0, 0};
+  return w.actor_matrix(or_self(w, self, target, __func__), m) ? normalize(m.transform_vector({1, 0, 0}), {1, 0, 0}) : Vec3{1, 0, 0};
 }
 Velocity actor_velocity(GameWorld& w, Self self, Actor target) {
-  const Vec3 v = w.actor_velocity(or_self(target, self));
+  const Vec3 v = w.actor_velocity(or_self(w, self, target, __func__));
   return {v, length(v)};
 }
-Float actor_distance(GameWorld& w, Self self, Actor a, Actor b) { return distance(position(w, or_self(a, self)), position(w, b.id)); }
+Float actor_distance(GameWorld& w, Self self, Actor a, Actor b) { return distance(position(w, or_self(w, self, a, __func__)), position(w, here(w, self, b, __func__))); }
 Health actor_health(GameWorld& w, Self self, Actor target) {
-  const f32 h = w.health_of(or_self(target, self));
+  const f32 h = w.health_of(or_self(w, self, target, __func__));
   return {h, h == 0};
 }
 Score game_score(GameWorld& w, Self) { return {w.hud().score, static_cast<Int>(w.hud().pickups)}; }
 
-void actor_set_location(GameWorld& w, Self self, Actor target, Vector location) { w.teleport(or_self(target, self), location); }
+void actor_set_location(GameWorld& w, Self self, Actor target, Vector location) { w.teleport(or_self(w, self, target, __func__), location); }
 void actor_set_rotation(GameWorld& w, Self self, Actor target, Vector rotation) {
-  const ActorId t = or_self(target, self);
+  const ActorId t = or_self(w, self, target, __func__);
   w.teleport(t, position(w, t), &rotation);
 }
 void actor_move_by(GameWorld& w, Self self, Actor target, Vector offset) {
-  const ActorId t = or_self(target, self);
+  const ActorId t = or_self(w, self, target, __func__);
   w.teleport(t, position(w, t) + offset);
 }
-void actor_set_velocity(GameWorld& w, Self self, Actor target, Vector velocity) { w.set_actor_velocity(or_self(target, self), velocity); }
-void actor_impulse(GameWorld& w, Self self, Actor target, Vector impulse) { w.push_actor(or_self(target, self), impulse, true); }
-void actor_force(GameWorld& w, Self self, Actor target, Vector force) { w.push_actor(or_self(target, self), force, false); }
+void actor_set_velocity(GameWorld& w, Self self, Actor target, Vector velocity) { w.set_actor_velocity(or_self(w, self, target, __func__), velocity); }
+void actor_impulse(GameWorld& w, Self self, Actor target, Vector impulse) { w.push_actor(or_self(w, self, target, __func__), impulse, true); }
+void actor_force(GameWorld& w, Self self, Actor target, Vector force) { w.push_actor(or_self(w, self, target, __func__), force, false); }
 void actor_launch(GameWorld& w, Self self, Actor target, Vector velocity) {
-  const ActorId t = or_self(target, self);
+  const ActorId t = or_self(w, self, target, __func__);
   w.set_actor_velocity(t, w.actor_velocity(t) * Vec3{1, 1, 0} + velocity);
 }
-void actor_simulate(GameWorld& w, Self self, Actor target, Bool simulate) { w.set_simulate_physics(or_self(target, self), simulate); }
+void actor_simulate(GameWorld& w, Self self, Actor target, Bool simulate) { w.set_simulate_physics(or_self(w, self, target, __func__), simulate); }
 void actor_joint_motor(GameWorld& w, Self self, Actor target, Int joint, Bool enable, Float speed, Float force) {
-  w.set_joint_motor(or_self(target, self), static_cast<i32>(joint), enable, static_cast<f32>(speed), static_cast<f32>(force));
+  w.set_joint_motor(or_self(w, self, target, __func__), static_cast<i32>(joint), enable, static_cast<f32>(speed), static_cast<f32>(force));
 }
 void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float impulse, Float damage) {
   const f32 r = static_cast<f32>(max_of(0.1, radius));
@@ -119,24 +137,24 @@ void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float
 Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view template_name, Vector location, Vector rotation, Vector scale) {
   const ActorId id = w.spawn(template_name, Transform{location, rotation, scale});
   if (!id) host.error(std::string("Spawn Actor: ") + last_error());
-  return {id};
+  return actor_of(w, id);
 }
-void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(target, self)); }
-void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled) { w.set_alive(or_self(target, self), enabled); }
+void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(w, self, target, __func__)); }
+void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled) { w.set_alive(or_self(w, self, target, __func__), enabled); }
 void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, std::string_view path, std::string_view value) {
   json::Value v;
   if (!json::parse(value, v)) v = json::Value(value);
-  if (!w.set_property(or_self(target, self), std::string(path), v)) host.error(std::string("Set Property: ") + last_error());
+  if (!w.set_property(or_self(w, self, target, __func__), std::string(path), v)) host.error(std::string("Set Property: ") + last_error());
 }
 void actor_set_light(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color, Float intensity, Float range) {
-  const ActorId t = or_self(target, self);
+  const ActorId t = or_self(w, self, target, __func__);
   // (the light's colour is a #rrggbb text in the level, as the mesh's: Set Color)
   if (!w.set_property(t, "components.light.color", json::Value(hex_color(color))) || !w.set_property(t, "components.light.intensity", json::Value(intensity)) ||
       !w.set_property(t, "components.light.range", json::Value(range)))
     host.error(std::string("Set Light: ") + last_error());
 }
 void actor_set_color(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color) {
-  if (!w.set_material_color(or_self(target, self), color)) host.error(std::string("Set Color: ") + last_error());
+  if (!w.set_material_color(or_self(w, self, target, __func__), color)) host.error(std::string("Set Color: ") + last_error());
 }
 
 void game_message(GameWorld& w, Self, std::string_view text) { w.show_message(std::string(text)); }
@@ -151,27 +169,27 @@ void game_sound(GameWorld& w, Self self, std::string_view sound, Vector location
 void game_particles(GameWorld& w, Self, Vector location, Vector color) { w.particle_burst(location, color * 1.6f); }
 void game_shake(GameWorld& w, Self, Float amount) { w.shake_camera(static_cast<f32>(amount)); }
 void combat_damage(GameWorld& w, Self self, Actor target, Float amount, Actor instigator) {
-  const ActorId t = or_self(target, self);
-  w.damage(t, static_cast<f32>(amount), instigator.id, false, position(w, self ? self : t));
+  const ActorId t = or_self(w, self, target, __func__);
+  w.damage(t, static_cast<f32>(amount), here(w, self, instigator, __func__), false, position(w, self ? self : t));
 }
-void combat_heal(GameWorld& w, Self self, Actor target, Float amount) { w.heal(or_self(target, self), static_cast<f32>(amount)); }
-void combat_kill(GameWorld& w, Self self, Actor target) { w.damage(or_self(target, self), 1e9f, 0, false, {}); }
-void combat_ammo(GameWorld& w, Self self, Actor target, Int rounds) { w.give_ammo(or_self(target, self), static_cast<i32>(rounds)); }
-Trace physics_trace(GameWorld& w, Self, Vector start, Vector end, Actor ignore) {
+void combat_heal(GameWorld& w, Self self, Actor target, Float amount) { w.heal(or_self(w, self, target, __func__), static_cast<f32>(amount)); }
+void combat_kill(GameWorld& w, Self self, Actor target) { w.damage(or_self(w, self, target, __func__), 1e9f, 0, false, {}); }
+void combat_ammo(GameWorld& w, Self self, Actor target, Int rounds) { w.give_ammo(or_self(w, self, target, __func__), static_cast<i32>(rounds)); }
+Trace physics_trace(GameWorld& w, Self self, Vector start, Vector end, Actor ignore) {
   ActorId a = 0;
   Vec3 p, n;
-  const bool hit = w.line_trace(start, end, ignore.id, a, p, n);
-  return {hit, {a}, p, n};
+  const bool hit = w.line_trace(start, end, here(w, self, ignore, __func__), a, p, n);
+  return {hit, actor_of(w, a), p, n};
 }
 namespace {
 /// A Blueprint's whole number as channel bits (a level has 32; anything else: all of them).
 u64 as_bits(Int v) { return v < 0 || v > 0xffffffffll ? ~0ull : static_cast<u64>(v); }
 }  // namespace
-Trace physics_trace_channels(GameWorld& w, Self, Vector start, Vector end, Actor ignore, Int mask, Int category) {
+Trace physics_trace_channels(GameWorld& w, Self self, Vector start, Vector end, Actor ignore, Int mask, Int category) {
   ActorId a = 0;
   Vec3 p, n;
-  const bool hit = w.line_trace(start, end, ignore.id, a, p, n, physics::QueryFilter(as_bits(mask), as_bits(category)));
-  return {hit, {a}, p, n};
+  const bool hit = w.line_trace(start, end, here(w, self, ignore, __func__), a, p, n, physics::QueryFilter(as_bits(mask), as_bits(category)));
+  return {hit, actor_of(w, a), p, n};
 }
 Int physics_channels(GameWorld& w, Self, std::string_view names) { return static_cast<Int>(channel_bits(w.level().world, names)); }
 std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, std::string_view tag) {
@@ -181,32 +199,32 @@ std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, std::string_view tag)
 }
 
 void walker_move(GameWorld& w, Self self, Actor target, Float forward, Float strafe, Float turn, Float duration) {
-  w.walker_command(or_self(target, self), static_cast<f32>(forward), static_cast<f32>(strafe), static_cast<f32>(turn * 3.14159265358979 / 180), static_cast<f32>(duration));
+  w.walker_command(or_self(w, self, target, __func__), static_cast<f32>(forward), static_cast<f32>(strafe), static_cast<f32>(turn * 3.14159265358979 / 180), static_cast<f32>(duration));
 }
 void walker_look(GameWorld& w, Self self, Actor target, Float yaw, Float pitch, Float duration) {
   constexpr f64 k = 3.14159265358979 / 180;
-  w.walker_look(or_self(target, self), static_cast<f32>(yaw * k), static_cast<f32>(pitch * k), static_cast<f32>(duration));
+  w.walker_look(or_self(w, self, target, __func__), static_cast<f32>(yaw * k), static_cast<f32>(pitch * k), static_cast<f32>(duration));
 }
-void walker_autonomous(GameWorld& w, Self self, Actor target, Bool enable) { w.walker_set_autonomous(or_self(target, self), enable); }
-void walker_skill(GameWorld& w, Self self, Actor target, std::string_view move) { w.walker_skill(or_self(target, self), move); }
-void walker_beak(GameWorld& w, Self self, Actor target, Float open) { w.walker_mouth(or_self(target, self), static_cast<f32>(open)); }
-void walker_pet(GameWorld& w, Self self, Actor target, Float seconds) { w.walker_pet(or_self(target, self), static_cast<f32>(seconds)); }
-void walker_hear(GameWorld& w, Self self, Actor target, Bool voice) { w.walker_hear(or_self(target, self), voice); }
-Bool walker_holding(GameWorld& w, Self self, Actor target) { return w.walker_holding(or_self(target, self)); }
-void walker_quack(GameWorld& w, Self self, Actor target) { w.walker_quack(or_self(target, self)); }
+void walker_autonomous(GameWorld& w, Self self, Actor target, Bool enable) { w.walker_set_autonomous(or_self(w, self, target, __func__), enable); }
+void walker_skill(GameWorld& w, Self self, Actor target, std::string_view move) { w.walker_skill(or_self(w, self, target, __func__), move); }
+void walker_beak(GameWorld& w, Self self, Actor target, Float open) { w.walker_mouth(or_self(w, self, target, __func__), static_cast<f32>(open)); }
+void walker_pet(GameWorld& w, Self self, Actor target, Float seconds) { w.walker_pet(or_self(w, self, target, __func__), static_cast<f32>(seconds)); }
+void walker_hear(GameWorld& w, Self self, Actor target, Bool voice) { w.walker_hear(or_self(w, self, target, __func__), voice); }
+Bool walker_holding(GameWorld& w, Self self, Actor target) { return w.walker_holding(or_self(w, self, target, __func__)); }
+void walker_quack(GameWorld& w, Self self, Actor target) { w.walker_quack(or_self(w, self, target, __func__)); }
 Tof walker_tof(GameWorld& w, Self self, Actor target) {
   GameWorld::WalkerSensors s;
-  const bool ok = w.walker_sensors(or_self(target, self), s);
+  const bool ok = w.walker_sensors(or_self(w, self, target, __func__), s);
   return {ok && s.nearest >= 0, ok ? s.nearest : -1.0, ok ? s.nearest_bearing * 180 / 3.14159265358979 : 0.0, ok ? s.free_left : 0.0, ok ? s.free_right : 0.0};
 }
 Sees walker_sees(GameWorld& w, Self self, Actor target, Actor other) {
   bool visible = false;
   f32 bearing = 0, distance = -1;
-  w.walker_sees(or_self(target, self), other.id, visible, bearing, distance);
+  w.walker_sees(or_self(w, self, target, __func__), here(w, self, other, __func__), visible, bearing, distance);
   return {visible, bearing * 180 / 3.14159265358979, distance};
 }
 Robot walker_state(GameWorld& w, Self self, Actor target) {
-  const ActorId robot = or_self(target, self);
+  const ActorId robot = or_self(w, self, target, __func__);
   GameWorld::WalkerSensors s;
   const bool ok = w.walker_sensors(robot, s);
   return {w.walker_state(robot), ok && s.fallen, ok ? s.speed : 0.0};
@@ -230,7 +248,7 @@ GameWorld* world(Context& c) { return static_cast<GameWorld*>(c.host().game()); 
 // What a function gives are the node's data outputs: one value, or a struct with a field per output.
 template <class T> void give(Context& c, std::size_t first, const T& r) { c.out(first, logic::to_value(r)); }
 void give(Context& c, std::size_t first, const nodes::Found& r) {
-  c.out(first, Value::actor(r.actor.id));
+  c.out(first, logic::to_value(r.actor));
   c.out(first + 1, Value::integer(r.count));
 }
 void give(Context& c, std::size_t first, const nodes::Velocity& r) {
@@ -247,7 +265,7 @@ void give(Context& c, std::size_t first, const nodes::Score& r) {
 }
 void give(Context& c, std::size_t first, const nodes::Trace& r) {
   c.out(first, Value::boolean(r.hit));
-  c.out(first + 1, Value::actor(r.actor.id));
+  c.out(first + 1, logic::to_value(r.actor));
   c.out(first + 2, Value::vector(r.location));
   c.out(first + 3, Value::vector(r.normal));
 }
@@ -315,14 +333,14 @@ void bind(logic::Library& lib, const char* type, std::function<int(Context&)> ru
 }
 void bind_actor_nodes(logic::Library& lib) {
   bind(lib, "actor.self", [](Context& c) {
-    if (world(c)) c.out("actor", Value::actor(c.self()));
+    if (world(c)) c.out("actor", c.actor(c.self()));
     return kStop;
   });
   bind(lib, "actor.player", &nodes::actor_player);
   bind(lib, "actor.player_count", &nodes::actor_player_count);
   bind(lib, "actor.find", [](Context& c) {  // (by the host, as in a Blueprint's class: logic::Host::find_actor)
     Value name = c.in(std::size_t{0});
-    c.out(std::size_t{0}, Value::actor(c.host().find_actor(taken<std::string_view>(name))));
+    c.out(std::size_t{0}, c.actor(c.host().find_actor(taken<std::string_view>(name))));
     return kStop;
   });
   bind(lib, "actor.find_tag", &nodes::actor_find_tag);
@@ -362,20 +380,20 @@ void bind_actor_nodes(logic::Library& lib) {
   bind(lib, "actor.destroy", &nodes::actor_destroy);
   bind(lib, "actor.enable", &nodes::actor_enable);
   bind(lib, "actor.set_property", [](Context& c) {
-    const logic::ActorHandle to{c.in_actor("target")};
+    const logic::ActorHandle to = c.in_actor("target");
     const std::string path = c.in_text("path"), text = c.in_text("value");
     if (GameWorld* w = world(c)) nodes::actor_set_property(*w, c.self(), c.host(), to, path, text);
     return 0;
   });
   bind(lib, "actor.set_light", [](Context& c) {
-    const logic::ActorHandle to{c.in_actor("target")};
+    const logic::ActorHandle to = c.in_actor("target");
     const Vec3 color = c.in_vector("color");
     const f64 intensity = c.in_number("intensity"), range = c.in_number("range");
     if (GameWorld* w = world(c)) nodes::actor_set_light(*w, c.self(), c.host(), to, color, intensity, range);
     return 0;
   });
   bind(lib, "actor.set_color", [](Context& c) {
-    const logic::ActorHandle to{c.in_actor("target")};
+    const logic::ActorHandle to = c.in_actor("target");
     const Vec3 color = c.in_vector("color");
     if (GameWorld* w = world(c)) nodes::actor_set_color(*w, c.self(), c.host(), to, color);
     return 0;
@@ -415,7 +433,7 @@ void bind_game_nodes(logic::Library& lib) {
       ++s.index;
     }
     if (s.index >= static_cast<i64>(s.list.size()) || !c.loop_back(Context::kResume)) return c.exec("completed");
-    c.out("actor", Value::actor(s.list[static_cast<std::size_t>(s.index)]));
+    c.out("actor", c.actor(s.list[static_cast<std::size_t>(s.index)]));
     c.out("index", Value::integer(s.index));
     return c.exec("body");
   });

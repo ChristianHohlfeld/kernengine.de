@@ -35,6 +35,9 @@
 #   objects.cpp objects of the engine are Object<I> (kern/docs/engine_object.md), never a number: as an input, what a
 #             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
 #             compared, a function of the engine called on one - written and compared, and no Handle of Object.
+#   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
+#             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
+#             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as the game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -124,6 +127,15 @@ check objects "a field of a struct" yes 'KERN_STRUCT\(Rig\) \{ Object<kern::audi
 check objects "a function of the engine on an Object" yes 'engine_mixer_sample_rate\(m\)'
 check objects "no Object becomes a number (Handle of Object)" no 'object_handle'
 logged objects "all nine are written and compared" '^9 functions of the Blueprints are compared'
+
+convert actors
+check actors "an Actor as an input" yes 'void add\(Actor a = Actor\{\}\)'
+check actors "against none: Same Actor with Actor{}" yes 'logic_not\(actor_equal\(a, Actor\{\}\)\)'
+check actors "a list of them: a List of Actors" yes 'List<Actor> members_ = List<Actor>\{\}'
+check actors "two compared: Same Actor" yes 'actor_equal\('
+check actors "its id: Id of Actor" yes 'actor_id\('
+logged actors "an Actor made of numbers waits, with the reason" '^ +made_of \([0-9]+\): .*an Actor made of numbers: an actor comes from its world'
+logged actors "the five of Crowd are written and compared" '^5 functions of the Blueprints are compared'
 
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'

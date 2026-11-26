@@ -584,7 +584,7 @@ template <> struct Held<Text> {
 };
 template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
-  static ActorHandle from(const Value& v) { return {v.as_actor()}; }
+  static ActorHandle from(const Value& v) { return v.as_actor(); }
 };
 template <class I> struct Held<Object<I>> {
   static constexpr PinType type = PinType::object;
@@ -720,7 +720,7 @@ inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(const Text& v) { return Value::text(v.str()); }
 inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
-inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
+inline Value to_value(ActorHandle v) { return Value::actor(v); }
 inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 template <class I> Value to_value(Object<I> v) { return Value::object(v.ref); }
 inline Value to_value(ObjectRef v) { return Value::object(v); }
@@ -2420,7 +2420,7 @@ inline void native_set(f64& variable, const Value& v) { variable = v.as_number()
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
-inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
+inline void native_set(ActorHandle& variable, const Value& v) { variable = v.as_actor(); }
 template <class I> void native_set(Object<I>& variable, const Value& v) { variable = Object<I>{v.as_object()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
 template <class T, std::size_t N> void native_set(Fixed<T, N>& variable, const Value& v) { variable = from_value<Fixed<T, N>>(v.converted(pin_type_of<Fixed<T, N>>())); }

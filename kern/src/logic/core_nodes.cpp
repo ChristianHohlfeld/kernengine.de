@@ -461,7 +461,7 @@ void add_flow(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Call " + n.param("name", "MyEvent"); };
     d.run = [](Context& c) {
       std::vector<std::pair<std::string, Value>> args{{"actor", c.in("actor")}, {"value", c.in("value")}, {"text", c.in("text")}};
-      c.runtime().call(c.param("name", "MyEvent"), c.in_actor("target"), std::move(args));
+      c.runtime().call(c.instance(), c.param("name", "MyEvent"), c.in_actor("target"), std::move(args));
       return 0;
     };
     d.raises = true;
@@ -2285,7 +2285,7 @@ void add_functions(Library& lib) {
     d.run = [](Context& c) {
       const Function* f = c.instance().graph().function(c.param("function"));
       if (!f) return 0;
-      const ActorRef target = c.in_actor("this");
+      const ActorHandle target = c.in_actor("this");
       std::vector<Value> args, results;
       args.reserve(f->inputs.size());
       for (const FunctionPin& p : f->inputs) args.push_back(c.in(p.name));
@@ -2324,7 +2324,7 @@ void add_functions(Library& lib) {
     d.outputs = {data("result", "Has Blueprint", PinType::boolean)};
     d.keywords = "has blueprint logic running valid other actor remote bound";
     d.run = [](Context& c) {
-      c.out(std::size_t{0}, Value::boolean(c.runtime().has_blueprint(c.in_actor("target"))));
+      c.out(std::size_t{0}, Value::boolean(c.runtime().has_blueprint(c.instance(), c.in_actor("target"))));
       return kStop;
     };
     lib.add(std::move(d));
@@ -2397,6 +2397,32 @@ void add_functions(Library& lib) {
     d.keywords = "object handle int engine";
     d.run = [](Context& c) {
       c.out(std::size_t{0}, Value::integer(c.in("object").as_object().handle));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Same Actor: do two Actors refer to the same actor - the same world and the same id (none and none are the same)
+    NodeDef d = make("actor.equal", "Same Actor", "Actors", NodeKind::pure,
+                     "Do A and B refer to the same actor (or both to none)? An actor of another world is never the same, even with the same id.");
+    d.inputs = {data("a", "A", PinType::actor), data("b", "B", PinType::actor)};
+    d.outputs = {data("result", "Same", PinType::boolean)};
+    d.keywords = "actor same equal identical == compare";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.in("a").as_actor() == c.in("b").as_actor()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("actor.id", "Id of Actor", "Actors", NodeKind::pure,
+                     "The id of an actor in its world, as an Int (0: it refers to none) - to show it or to count with it. There is "
+                     "no way back: no Int becomes an Actor (an actor comes from its world: Self, Find Actor, Spawn Actor, an event).");
+    d.inputs = {data("actor", "Actor", PinType::actor)};
+    d.outputs = {data("result", "Id", PinType::integer)};
+    d.keywords = "actor id number int handle";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::integer(c.in("actor").as_actor().id));
       return kStop;
     };
     lib.add(std::move(d));

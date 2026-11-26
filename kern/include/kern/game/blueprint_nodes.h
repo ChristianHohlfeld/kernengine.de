@@ -132,11 +132,13 @@ template <class Core> struct BlueprintNodesOf : Core {
   logic::ActorRef kern_self() const { return this->kern_world.self; }
 
   // ---- actors: values ----
-  Actor actor_self() const { return kern_game() ? Actor{kern_self()} : Actor{}; }
+  /// An actor of the world the class runs in (0: none) - what the interpreter's Context::actor gives.
+  Actor kern_actor(logic::ActorRef id) const { return id && this->kern_world.host ? Actor{id, this->kern_world.host->world()} : Actor{}; }
+  Actor actor_self() const { return kern_game() ? kern_actor(kern_self()) : Actor{}; }
   Actor actor_player(Int index) const { GameWorld* g = kern_game(); return g ? nodes::actor_player(*g, kern_self(), index) : Actor{}; }
   Int actor_player_count() const { GameWorld* g = kern_game(); return g ? nodes::actor_player_count(*g, kern_self()) : 0; }
   /// (by the host: a game's finds the actor of its world - logic::Host::find_actor)
-  Actor actor_find(const Text& name) const { return this->kern_world.host ? Actor{this->kern_world.host->find_actor(name)} : Actor{}; }
+  Actor actor_find(const Text& name) const { return this->kern_world.host ? kern_actor(this->kern_world.host->find_actor(name)) : Actor{}; }
   nodes::Found actor_find_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_find_tag(*g, kern_self(), tag) : nodes::Found{}; }
   List<Actor> actor_all_with_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_all_with_tag(*g, kern_self(), tag) : List<Actor>(); }
   template <class N> Actor actor_random_tag(N& n, const Text& tag) {
@@ -250,7 +252,7 @@ template <class Core> struct BlueprintNodesOf : Core {
       first = false;
       const std::size_t at = static_cast<std::size_t>(n.memory[0]);
       if (at >= n.list.size() || !self.kern_pass()) return false;
-      n.actor = {n.list[at]};
+      n.actor = self.kern_actor(n.list[at]);
       n.index = static_cast<i64>(at);
       return true;
     }

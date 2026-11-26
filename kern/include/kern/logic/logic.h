@@ -158,16 +158,28 @@ inline i64 whole_add(i64 a, i64 b) {
   return whole(static_cast<f64>(a) + static_cast<f64>(b));
 }
 
-/// An actor on a pin (`Actor` in a Blueprint's C++): its id, 0 = none.
-struct ActorHandle {
-  ActorRef id = 0;
-  bool operator==(const ActorHandle&) const = default;
-};
-
 /// The number of a world: of one collection of objects of the engine (EngineObjects::world) - of a GameWorld, of a
 /// program's runtime. 0 is none. A reference to an object of the engine or (kern/docs/engine_object.md) to an actor
 /// says in which world it is: looked up in another one, it names nothing - and says so.
 using WorldId = u32;
+/// A new number of a world: one of its own in the process, from 1 on (what EngineObjects and a host without them take).
+WorldId new_world();
+
+/// An actor as a Blueprint holds it (PinType::actor, `Actor` in its C++): its id in its world, and that world
+/// (kern/docs/project.md 7). {0, 0} is none - what a variable of the type starts as. An actor comes only from its
+/// world (Self, Find Actor, Spawn Actor, an event): no number becomes one; the one way to an Int is the node Id of
+/// Actor. Used in another world it names nothing there - not the actor with the same id - and the node says why.
+struct ActorHandle {
+  ActorRef id = 0;
+  WorldId world = 0;
+  constexpr bool valid() const { return id != 0 && world != 0; }
+  friend constexpr bool operator==(ActorHandle, ActorHandle) = default;
+  /// (an order for Sort List: by world, then by id - the same in every tier)
+  friend constexpr auto operator<=>(ActorHandle a, ActorHandle b) {
+    if (a.world != b.world) return a.world <=> b.world;
+    return a.id <=> b.id;
+  }
+};
 
 /// An object of the engine as a Blueprint holds it (PinType::object, Object<I> in its C++): its handle in the
 /// objects of its world, and that world. Which class it is of says its type (TypeRef::of), not the value.
@@ -268,7 +280,8 @@ struct Value {
   Vec3 v;
   std::string s;
   ActorRef a = 0;
-  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef). 0 otherwise.
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef) or of an actor
+  /// (PinType::actor: `a` is its id there - ActorHandle). 0 otherwise.
   WorldId world = 0;
   /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
   /// whoever changes one (edit) changes its own.
@@ -288,7 +301,8 @@ struct Value {
   static Value number(f64 x) { Value r; r.type = PinType::number; r.n = x; return r; }
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
-  static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// An actor (none: ActorHandle{}).
+  static Value actor(ActorHandle x) { Value r; r.type = PinType::actor; r.a = x.id; r.world = x.world; return r; }
   /// An object of the engine (none: ObjectRef{}).
   static Value object(ObjectRef x) { Value r; r.type = PinType::object; r.i = x.handle; r.world = x.world; return r; }
   /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
@@ -395,7 +409,8 @@ struct Value {
   f64 as_number() const;
   Vec3 as_vector() const;
   std::string as_text() const;
-  ActorRef as_actor() const;
+  /// The actor it refers to; of a value of another type: none (no number becomes an actor).
+  ActorHandle as_actor() const { return type == PinType::actor ? ActorHandle{a, world} : ActorHandle{}; }
   Value converted(PinType to) const;
   json::Value to_json() const;
   static Value from_json(const json::Value& j, PinType type);
@@ -1039,6 +1054,10 @@ std::vector<Issue> check(const Graph& g, const Library& lib = library());
 /// What logic can do to the world. The game implements it (GameWorld), tests can fake it.
 class Host {
  public:
+  Host() = default;
+  /// A host whose actors are of this world (where it has no objects of the engine): two sides a test compares, set
+  /// up alike, are given the same one - as EngineObjects(world).
+  explicit Host(WorldId world) : own_world_(world) {}
   virtual ~Host() = default;
   virtual f64 time() const = 0;                          // simulation seconds
   virtual void print(const std::string& text, bool screen) = 0;
@@ -1052,6 +1071,10 @@ class Host {
   /// a host without a world names none - unless it is one that names actors of its own (a test's: the
   /// instances of a runtime by name, for Call on Actor and Get Variable on Actor).
   virtual ActorRef find_actor(std::string_view name);
+  /// The world of the actors this host's runtime names (an Actor's WorldId, kern/docs/project.md 7): the world of its
+  /// objects of the engine (engine_objects) - a GameWorld's actors and its objects are one world -, and for a host
+  /// without them one of its own (new_world, the same for the host's life).
+  WorldId world();
   /// A function of the engine, by the name of its node - what the engine's nodes do in the
   /// interpreter, with the JIT, and in a Blueprint's class that has no objects of the engine
   /// (kern/logic/engine_api.h; see engine_objects below). `in`: the node's inputs in their order; `out`: its outputs, given as
@@ -1070,6 +1093,9 @@ class Host {
   /// and calls jit_ready(id, function) when it is linked. False: no compiler here (interpreter).
   virtual bool jit_compile(const std::vector<u8>& module, i32 id);
   virtual void jit_release(i32 function);
+
+ private:
+  WorldId own_world_ = 0;
 };
 
 /// The platform's compiler for generated WebAssembly (the browser's, through kern.mjs).
@@ -1655,15 +1681,23 @@ class Runtime {
   /// no such function or fewer outputs. The call is a chain of its own (it counts for how deep
   /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
   /// the middle of a call of that function has its own values back afterwards.
-  void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
+  void call_on(Instance& caller, std::string_view function, ActorHandle target, const std::vector<Value>& args, std::vector<Value>& results);
   /// The same into places the caller holds, one for each of its outputs (a Blueprint's class:
   /// BlueprintCore::func_call_on - no memory asked for where the target is a class too): gives how
   /// many of them hold an output of the declared function (the declared defaults where the call gave none).
-  std::size_t call_on(Instance& caller, std::string_view function, ActorRef target, std::span<const Value> args, std::span<Value> results);
+  std::size_t call_on(Instance& caller, std::string_view function, ActorHandle target, std::span<const Value> args, std::span<Value> results);
   /// Get Variable on Actor: the variable `name` of the Blueprint of `target` as a value of `type` (what
   /// a variable of that type holds when nothing else is said - its zero - where the target has none:
   /// no such Blueprint, no such variable, one of a type that does not become `type`).
-  Value get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type);
+  Value get_on(const Instance& caller, std::string_view name, ActorHandle target, const TypeRef& type);
+  /// The id an Actor of the Blueprint `caller` names in this runtime (kern/docs/project.md 7): true with its id (0: none - an empty
+  /// Target, which means what the node says). False where it is of another world than the host's (Host::world): it
+  /// names nothing here, not the actor of the same id - the host is told why, naming the Blueprint and `node`. The
+  /// one check of every node that reaches another actor's Blueprint, in every tier.
+  bool actor_here(std::string_view caller, ActorHandle a, std::string_view node, ActorRef& id);
+  /// Has Blueprint and Call Event of a Blueprint (an Actor of it: actor_here first).
+  bool has_blueprint(const Instance& caller, ActorHandle target);
+  void call(const Instance& caller, std::string_view name, ActorHandle target, std::vector<std::pair<std::string, Value>> args);
   /// The one way of Call on Actor, whoever calls: a Blueprint's node (call_on above, with the pins it
   /// declares) and the program's C++ (ActorBlueprint, with its own types) - in every tier. Runs
   /// `function` of the Blueprint of `target` (0: the Level's) with `args` to its end; `got`: what the
@@ -1691,7 +1725,7 @@ class Runtime {
   ObjectRef engine_object(ActorRef target, std::string_view interface, std::string& why);
   /// The same for the node (in every tier): what fails is told to the host - "<caller>: Engine Object of
   /// Blueprint: <why>" - and gives none.
-  ObjectRef engine_object(const Instance& caller, ActorRef target, std::string_view interface);
+  ObjectRef engine_object(const Instance& caller, ActorHandle target, std::string_view interface);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.
@@ -1784,7 +1818,9 @@ class Context {
   i64 in_int(std::string_view pin) { return in(pin).as_int(); }
   Vec3 in_vector(std::string_view pin) { return in(pin).as_vector(); }
   std::string in_text(std::string_view pin) { return in(pin).as_text(); }
-  ActorRef in_actor(std::string_view pin) { return in(pin).as_actor(); }
+  ActorHandle in_actor(std::string_view pin) { return in(pin).as_actor(); }
+  /// An actor of the node's world as a Value: id 0 is none (of no world).
+  Value actor(ActorRef id);
   /// The list entries of the node's path (the setting "path"): its index inputs, each read once,
   /// in the path's order - what Instance::place and Instance::change take.
   std::vector<i64> path();

@@ -561,7 +561,7 @@ check((await cmd({cmd: "logicCppApply", text: `struct Asker : kern::Blueprint {
 
   KERN_EVENT(on1, event_begin)
   void on1() {
-    func_call_on<"Twice">(Actor{0}, kern::out(n2.out), 21.0);
+    func_call_on<"Twice">(Actor{}, kern::out(n2.out), 21.0);
     game_message(kern::to<Text>(n2.out));
   }
 

@@ -365,7 +365,7 @@ std::string Value::as_text() const {
     case PinType::number: return number_text(n);
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
-    case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
+    case PinType::actor: return a ? "actor " + std::to_string(a) + " of world " + std::to_string(world) : "none";
     case PinType::object: return i ? "object " + std::to_string(i) + " of world " + std::to_string(world) : "no object";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
     case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)
@@ -427,19 +427,12 @@ Value Value::item(std::size_t index) const {
     case PinType::number_list: return number(std::get<std::vector<f64>>(*list)[index]);
     case PinType::vector_list: return vector(std::get<std::vector<Vec3>>(*list)[index]);
     case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
-    case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index].id);
+    case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index]);
     case PinType::int64_list: return int64(std::get<std::vector<Int64>>(*list)[index].bits);
     case PinType::object_list: return object(std::get<std::vector<ObjectRef>>(*list)[index]);
     case PinType::enumeration_list: return enumeration(std::get<std::vector<i64>>(*list)[index]);
     default: return zero(element_of(type));
   }
-}
-
-ActorRef Value::as_actor() const {
-  if (type == PinType::actor) return a;
-  if (type == PinType::integer) return static_cast<ActorRef>(max_of<i64>(0, i));
-  if (type == PinType::number) return static_cast<ActorRef>(max_of(0.0, n));
-  return 0;
 }
 
 Value Value::converted(PinType to) const {
@@ -450,7 +443,7 @@ Value Value::converted(PinType to) const {
     case PinType::number: return number(as_number());
     case PinType::vector: return vector(as_vector());
     case PinType::text: return text(as_text());
-    case PinType::actor: return actor(as_actor());
+    case PinType::actor: return zero(to);  // (nothing but an actor is one: an actor comes from its world, no number becomes one)
     case PinType::int64: return zero(to);  // (nothing else is one: Int to Int64, Float to Int64 say how)
     case PinType::enumeration: return enumeration(as_int());
     case PinType::structure: return zero(to);  // (nothing but a struct is one: its default - zero_of)
@@ -589,7 +582,7 @@ bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g,
     case PinType::number: return bits(a.n, b.n);
     case PinType::vector: return bits32(a.v.x, b.v.x) && bits32(a.v.y, b.v.y) && bits32(a.v.z, b.v.z);
     case PinType::text: return a.s == b.s;
-    case PinType::actor: return a.a == b.a;
+    case PinType::actor: return a.a == b.a && a.world == b.world;
     case PinType::int64: return a.i == b.i;
     case PinType::callback: return !a.call == !b.call;  // (what it calls is compared by calling it: the stand-in of the engine)
     case PinType::object: return a.i == b.i && a.world == b.world;
@@ -893,7 +886,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
       else if (j.is_number()) v.v = Vec3{1, 1, 1} * static_cast<f32>(j.as_number());
       break;
     case PinType::text: v.s = j.is_string() ? j.as_string() : j.is_null() ? std::string() : json::stringify(j); break;
-    case PinType::actor: v.a = j.is_number() ? static_cast<ActorRef>(max_of(0.0, j.as_number())) : 0; break;
+    case PinType::actor: break;  // (an actor written down is none: one comes only from its world - check says so of another)
     case PinType::int64:  // ("18446744073709551615": its bits as a u64; a number - a small one - as it is)
       v.i = static_cast<i64>(j.is_string() ? std::strtoull(j.as_string().c_str(), nullptr, 0) : j.is_number() ? static_cast<u64>(whole(j.as_number())) : 0);
       break;
@@ -913,7 +906,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
         case PinType::number: std::get<std::vector<f64>>(*held).push_back(x.n); break;
         case PinType::vector: std::get<std::vector<Vec3>>(*held).push_back(x.v); break;
         case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
-        case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back({x.a}); break;
+        case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back(x.as_actor()); break;
         case PinType::int64: std::get<std::vector<Int64>>(*held).push_back(Int64(static_cast<u64>(x.i))); break;
         case PinType::object: std::get<std::vector<ObjectRef>>(*held).push_back({}); break;   // (a list written down holds no objects: they are the engine's)
         case PinType::enumeration: std::get<std::vector<i64>>(*held).push_back(x.i); break;
@@ -944,7 +937,7 @@ bool Value::operator==(const Value& o) const {
     case PinType::number: return n == o.n;
     case PinType::vector: return v.x == o.v.x && v.y == o.v.y && v.z == o.v.z;
     case PinType::text: return s == o.s;
-    case PinType::actor: return a == o.a;
+    case PinType::actor: return a == o.a && world == o.world;
     case PinType::int64: return i == o.i;
     case PinType::enumeration: return i == o.i;
     case PinType::callback: return !call == !o.call;  // (bound or not: what it calls, a call says)
@@ -3487,7 +3480,7 @@ void set_item(Value& list, std::size_t at, const Value& x) {
     case PinType::number_list: list.edit<f64>()[at] = x.as_number(); break;
     case PinType::vector_list: list.edit<Vec3>()[at] = x.as_vector(); break;
     case PinType::text_list: list.edit<std::string>()[at] = x.as_text(); break;
-    case PinType::actor_list: list.edit<ActorHandle>()[at] = ActorHandle{x.as_actor()}; break;
+    case PinType::actor_list: list.edit<ActorHandle>()[at] = x.as_actor(); break;
     case PinType::int64_list: list.edit<Int64>()[at] = Int64(static_cast<u64>(x.i)); break;
     case PinType::object_list: list.edit<ObjectRef>()[at] = x.as_object(); break;
     case PinType::enumeration_list: list.edit<i64>()[at] = x.i; break;
@@ -3886,10 +3879,24 @@ void Runtime::clear() {
   trace_.clear();
 }
 
-Value Runtime::get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type) {
+bool Runtime::actor_here(std::string_view caller, ActorHandle a, std::string_view node, ActorRef& id) {
+  id = 0;
+  if (!a.id) return true;   // (none: an empty Target - what the node does then is its own)
+  const WorldId here = host_.world();
+  if (a.world == here) {
+    id = a.id;
+    return true;
+  }
+  host_.error(std::string(caller) + ": " + std::string(node) + ": actor " + std::to_string(a.id) + " is of world " + std::to_string(a.world) + ", this Blueprint runs in world " +
+              std::to_string(here) + " - an actor names nothing in another world (kern/docs/project.md 7)");
+  return false;
+}
+
+Value Runtime::get_on(const Instance& caller, std::string_view name, ActorHandle actor, const TypeRef& type) {
   const Graph& g = caller.graph();
   Value v;
-  if (!get_on(target, name, type.type, v)) return zero_of(type, g);
+  ActorRef target = 0;
+  if (!actor_here(caller.name(), actor, "Get Variable on Actor", target) || !get_on(target, name, type.type, v)) return zero_of(type, g);
   return from_outside(v, type, g);
 }
 
@@ -3904,6 +3911,16 @@ bool Runtime::get_on(ActorRef target, std::string_view name, PinType as, Value& 
 bool Runtime::has_blueprint(ActorRef target) {
   const Instance* i = find(target);
   return i && !i->disabled_;
+}
+
+bool Runtime::has_blueprint(const Instance& caller, ActorHandle actor) {
+  ActorRef target = 0;
+  return actor_here(caller.name(), actor, "Has Blueprint", target) && has_blueprint(target);
+}
+
+void Runtime::call(const Instance& caller, std::string_view name, ActorHandle actor, std::vector<std::pair<std::string, Value>> args) {
+  ActorRef target = 0;
+  if (actor_here(caller.name(), actor, "Call Event", target)) call(name, target, std::move(args));
 }
 
 ObjectRef Runtime::engine_object(ActorRef target, std::string_view interface, std::string& why) {
@@ -3938,32 +3955,38 @@ ObjectRef Runtime::engine_object(ActorRef target, std::string_view interface, st
   return i->engine_object_;
 }
 
-ObjectRef Runtime::engine_object(const Instance& caller, ActorRef target, std::string_view interface) {
+ObjectRef Runtime::engine_object(const Instance& caller, ActorHandle actor, std::string_view interface) {
+  ActorRef target = 0;
+  if (!actor_here(caller.name(), actor, "Engine Object of Blueprint", target)) return {};
   std::string why;
   const ObjectRef r = engine_object(target, interface, why);
   if (!r.valid()) host_.error(caller.name() + ": Engine Object of Blueprint: " + why);
   return r;
 }
 
-void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {
+void Runtime::call_on(Instance& caller, std::string_view function, ActorHandle actor, const std::vector<Value>& args, std::vector<Value>& results) {
   results.clear();
   const Graph& g = caller.graph();
   const Function* declared = g.function(function);
   if (declared)
     for (const FunctionPin& p : declared->outputs) results.push_back(Value::from_json(p.value, logic::declared(p), g));
   std::vector<Value> got;
+  ActorRef target = 0;
+  if (!actor_here(caller.name(), actor, "Call on Actor", target)) return;
   if (!call_on(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got, caller.name()) || !declared) return;
   for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
     results[k] = from_outside(got[k], logic::declared(declared->outputs[k]), g);
 }
 
-std::size_t Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, std::span<const Value> args, std::span<Value> results) {
+std::size_t Runtime::call_on(Instance& caller, std::string_view function, ActorHandle actor, std::span<const Value> args, std::span<Value> results) {
   // (as call_on above: the declared outputs, each what the call gave as the declared type, its default where it gave none)
   const Graph& g = caller.graph();
   const Function* declared = g.function(function);
   const std::size_t n = declared ? min_of(results.size(), declared->outputs.size()) : 0;
   std::size_t given = 0;
-  if (!call_on_into(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, results, given, caller.name()) || !declared) given = 0;
+  ActorRef target = 0;
+  if (!actor_here(caller.name(), actor, "Call on Actor", target)) given = 0;
+  else if (!call_on_into(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, results, given, caller.name()) || !declared) given = 0;
   for (std::size_t k = 0; k < n; ++k) {
     const FunctionPin& p = declared->outputs[k];
     results[k] = k < given ? from_outside(results[k], logic::declared(p), g) : Value::from_json(p.value, logic::declared(p), g);
@@ -4417,6 +4440,8 @@ Instance::Spot Context::spot(std::string_view prefix) {
   inst_.spot(node(), prefix, indices, s);
   return s;
 }
+
+Value Context::actor(ActorRef id) { return Value::actor(id ? ActorHandle{id, host().world()} : ActorHandle{}); }
 
 Value Context::in(std::string_view pin) {
   const Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
