@@ -11521,6 +11521,8 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
+        if name == "get" and not a and bt == "Int" and re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(qtype(base)).strip()) and self.u.object_of(qtype(base)):
+            return self.ex(base, "Int"), "Int"   # (an object of the engine held as its own - unique_ptr<T>::get(): its handle)
         if name == "operator bool" and not a and self.ctype(base) == "std::_Bit_reference":
             return self.value(base)   # (an entry of a std::vector<bool>, read)
         if name == "operator bool" and not a and self.u.object_of(qtype(base)):

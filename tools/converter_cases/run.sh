@@ -16,6 +16,8 @@
 #             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of game.cpp).
 #   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece ("too many errors"
 #             in the test of game.cpp: the piece before it went for it).
+#   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
+#             (Murmel's welt_.get(), B8) - written and compared.
 # Each case is a program of its own, its Blueprints read into a level of their own, as the game's are: the engine's
 # reader refuses what is wrong (a function read as a value that changes something).
 set -euo pipefail
@@ -68,6 +70,10 @@ convert nodekind
 logged nodekind "is_event is written" '^ +is_event \([0-9]+\): written$'
 tested nodekind "its test has the engine's NodeKind itself" 'using NodeKind = :: kern :: logic :: NodeKind;'
 
+convert ownget
+logged ownget "Holder::world (unique_ptr::get()) is written" '^ +Holder::world \([0-9]+\): written$'
+logged ownget "both are compared" '^2 functions of the Blueprints are compared'
+
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
@@ -77,6 +83,6 @@ check table "width_and_glock is written, the table as weapons' Specs" yes 'weapo
 python3 "$here/compiles.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
