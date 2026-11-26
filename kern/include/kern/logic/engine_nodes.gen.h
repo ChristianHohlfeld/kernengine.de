@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "kern/app/app.h"
+#include "kern/app/project.h"
 #include "kern/audio/audio.h"
 #include "kern/audio/synth.h"
 #include "kern/core/base.h"
@@ -1542,6 +1543,26 @@ struct P_engine_road_builder_chunks {
   static constexpr const char* get = "engine.road_builder.chunks@get";
   static constexpr const char* set = "engine.road_builder.chunks@set";
   static C* at(EngineObjects&, Object& self, const In&) { return &self.chunks(); }
+};
+struct P_engine_device_profile_name {
+  using Object = kern::DeviceProfile;
+  using C = std::remove_reference_t<decltype((std::declval<kern::DeviceProfile&>().name))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  using In = std::tuple<>;
+  static constexpr const char* pin = "device_profile";
+  static constexpr const char* get = "engine.device_profile.name@get";
+  static constexpr const char* set = "engine.device_profile.name@set";
+  static C* at(EngineObjects&, Object& self, const In&) { return &self.name; }
+};
+struct P_engine_device_profile_renderer {
+  using Object = kern::DeviceProfile;
+  using C = std::remove_reference_t<decltype((std::declval<kern::DeviceProfile&>().renderer))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>;
+  using In = std::tuple<>;
+  static constexpr const char* pin = "device_profile";
+  static constexpr const char* get = "engine.device_profile.renderer@get";
+  static constexpr const char* set = "engine.device_profile.renderer@set";
+  static C* at(EngineObjects&, Object& self, const In&) { return &self.renderer; }
 };
 struct P_engine_mesh_id {
   using Object = kern::Mesh;
@@ -4829,6 +4850,29 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::object_as<::kern::logic::Object<::kern::game::FixedStep>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::game::FixedStep>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
     return from_value<::kern::logic::Object<::kern::game::FixedStep>>(this->kern_engine("engine.game_world.fixed_step_handler", {to_value(game_world)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::game::FixedStep>>()));
+  }
+  /// The project's device profile this world runs on (kern/app/project.h DeviceProfile; "": none): a start (start, start_level) lays its world settings on the level's - the level's first, then the profile's keys. A world of the program has the launch argument profile=<name> (GameWorld(Engine&)); a host without a program sets it here. A name the project has no profile of keeps the world from starting (the names it has are said).
+  void engine_game_world_set_profile(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& name) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_profile"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a0);
+      kern_self->set_profile(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.game_world.set_profile", {to_value(game_world), to_value(name)}, {});
+  }
+  Text engine_game_world_profile(::kern::logic::Object<::kern::game::GameWorld> game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.profile"); return Text{}; }
+      decltype(auto) kern_r = kern_self->profile();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.game_world.profile", {to_value(game_world)}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   void engine_game_world_stop(::kern::logic::Object<::kern::game::GameWorld> game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14399,6 +14443,43 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.bvh.release", {to_value(bvh)}, {});
+  }
+  /// Makes a DeviceProfile of the engine: its handle (the host keeps it until it is released).
+  void engine_device_profile_make() {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      (void)kern_o->own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile()));
+      return;
+    }
+    this->kern_engine("engine.device_profile.make", {}, {PinType::object});
+  }
+  template <class KernNode> void engine_device_profile_make(KernNode& kern_n) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern_n.result = ::kern::logic::engine_values::object_as<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_o->own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile())));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.device_profile.make", {}, {PinType::object});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// Ends the DeviceProfile (its destructor): the handle is none after it.
+  void engine_device_profile_release(::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      if (!::kern::logic::engine_values::release_of<kern::DeviceProfile>(*kern_o, device_profile.ref, "device_profile", "DeviceProfile")) { this->kern_engine_failed("engine.device_profile.release"); return; }
+      return;
+    }
+    this->kern_engine("engine.device_profile.release", {to_value(device_profile)}, {});
+  }
+  /// The place kern::DeviceProfile::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_device_profile_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_device_profile_name, B>;
+  template <class KernNode> void engine_device_profile_name(KernNode& kern_n, ::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    kern_n.result.kern_bind(this->kern_world, device_profile.ref, {}, nullptr);
+  }
+  /// The place kern::DeviceProfile::renderer gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_device_profile_renderer_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_device_profile_renderer, B>;
+  template <class KernNode> void engine_device_profile_renderer(KernNode& kern_n, ::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    kern_n.result.kern_bind(this->kern_world, device_profile.ref, {}, nullptr);
   }
   /// Makes a Earcut of the engine: its handle (the host keeps it until it is released).
   void engine_earcut_make() {

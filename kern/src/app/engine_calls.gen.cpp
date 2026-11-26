@@ -2,6 +2,7 @@
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
 #include <algorithm>
 #include "kern/app/app.h"
+#include "kern/app/project.h"
 #include "kern/gfx/renderer.h"
 #include "kern/logic/engine_host.h"
 
@@ -10,14 +11,23 @@ namespace {
 
 namespace ev = engine_values;
 
+struct E_AoQuality { using type = kern::AoQuality; static constexpr type values[] = {kern::AoQuality::low, kern::AoQuality::medium, kern::AoQuality::high, kern::AoQuality::ultra}; };
 struct E_BloomState { using type = kern::BloomState; static constexpr type values[] = {kern::BloomState::off, kern::BloomState::active, kern::BloomState::disabled_slow_device, kern::BloomState::unsupported}; };
 struct E_Key { using type = kern::Key; static constexpr type values[] = {kern::Key::unknown, kern::Key::a, kern::Key::b, kern::Key::c, kern::Key::d, kern::Key::e, kern::Key::f, kern::Key::g, kern::Key::h, kern::Key::i, kern::Key::j, kern::Key::k, kern::Key::l, kern::Key::m, kern::Key::n, kern::Key::o, kern::Key::p, kern::Key::q, kern::Key::r, kern::Key::s, kern::Key::t, kern::Key::u, kern::Key::v, kern::Key::w, kern::Key::x, kern::Key::y, kern::Key::z, kern::Key::digit0, kern::Key::digit1, kern::Key::digit2, kern::Key::digit3, kern::Key::digit4, kern::Key::digit5, kern::Key::digit6, kern::Key::digit7, kern::Key::digit8, kern::Key::digit9, kern::Key::left, kern::Key::right, kern::Key::up, kern::Key::down, kern::Key::space, kern::Key::enter, kern::Key::escape, kern::Key::tab, kern::Key::backspace, kern::Key::shift_left, kern::Key::shift_right, kern::Key::control_left, kern::Key::control_right, kern::Key::alt_left, kern::Key::alt_right, kern::Key::count}; };
+struct S_AoOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::AoOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::AoOptions& x); };
+struct S_BloomOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::BloomOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::BloomOptions& x); };
 struct S_Camera { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Camera& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Camera& x); };
 struct S_Frame { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Frame& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Frame& x); };
 struct S_Mat4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Mat4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
 struct S_RenderStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::RenderStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::RenderStats& x); };
+struct S_RendererOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::RendererOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::RendererOptions& x); };
+struct S_ShadowOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::ShadowOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::ShadowOptions& x); };
 struct S_Touch { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Touch& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Touch& x); };
 struct S_Vec4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Vec4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
+Value S_AoOptions::to(EngineObjects& o, const kern::AoOptions& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Enum<E_AoQuality>>::to(o, x.quality), ev::Conv<ev::Bool>::to(o, x.half_resolution), ev::Conv<ev::Float>::to(o, x.radius), ev::Conv<ev::Float>::to(o, x.power), ev::Conv<ev::Bool>::to(o, x.adaptive)}); }
+void S_AoOptions::from(EngineObjects& o, const Value& v, kern::AoOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(1)) ev::Conv<ev::Enum<E_AoQuality>>::from(o, *f, x.quality); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.half_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.radius); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.power); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.adaptive); }
+Value S_BloomOptions::to(EngineObjects& o, const kern::BloomOptions& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Bool>::to(o, x.forced), ev::Conv<ev::Bool>::to(o, x.grade)}); }
+void S_BloomOptions::from(EngineObjects& o, const Value& v, kern::BloomOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(1)) ev::Conv<ev::Bool>::from(o, *f, x.forced); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.grade); }
 Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Float>::to(o, x.fov), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Float>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
 void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
 Value S_Frame::to(EngineObjects& o, const kern::Frame& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.time), ev::Conv<ev::Float>::to(o, x.dt), ev::Conv<ev::Int64>::to(o, x.index)}); }
@@ -26,6 +36,10 @@ Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structur
 void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.m); }
 Value S_RenderStats::to(EngineObjects& o, const kern::RenderStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.draw_calls), ev::Conv<ev::Int>::to(o, x.shadow_draw_calls), ev::Conv<ev::Int>::to(o, x.shadow_resolution), ev::Conv<ev::Bool>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.shadow_reused), ev::Conv<ev::Float>::to(o, x.triangles), ev::Conv<ev::Int>::to(o, x.instances), ev::Conv<ev::Int>::to(o, x.culled_meshes), ev::Conv<ev::Int>::to(o, x.visible_meshes), ev::Conv<ev::Float>::to(o, x.cpu_ms), ev::Conv<ev::Float>::to(o, x.gpu_ms), ev::Conv<ev::Enum<E_BloomState>>::to(o, x.bloom)}); }
 void S_RenderStats::from(EngineObjects& o, const Value& v, kern::RenderStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.draw_calls); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.shadow_draw_calls); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.shadow_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.ao); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.shadow_reused); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.triangles); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.instances); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.culled_meshes); if (const Value* f = v.field(8)) ev::Conv<ev::Int>::from(o, *f, x.visible_meshes); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.cpu_ms); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.gpu_ms); if (const Value* f = v.field(11)) ev::Conv<ev::Enum<E_BloomState>>::from(o, *f, x.bloom); }
+Value S_RendererOptions::to(EngineObjects& o, const kern::RendererOptions& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.width), ev::Conv<ev::Int>::to(o, x.height), ev::Conv<ev::Bool>::to(o, x.shadows), ev::Conv<ev::Struct<S_ShadowOptions>>::to(o, x.shadow), ev::Conv<ev::Struct<S_BloomOptions>>::to(o, x.bloom), ev::Conv<ev::Struct<S_AoOptions>>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.grade)}); }
+void S_RendererOptions::from(EngineObjects& o, const Value& v, kern::RendererOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.width); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.shadows); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_ShadowOptions>>::from(o, *f, x.shadow); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_BloomOptions>>::from(o, *f, x.bloom); if (const Value* f = v.field(5)) ev::Conv<ev::Struct<S_AoOptions>>::from(o, *f, x.ao); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.grade); }
+Value S_ShadowOptions::to(EngineObjects& o, const kern::ShadowOptions& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.resolution), ev::Conv<ev::Float>::to(o, x.extent), ev::Conv<ev::Float>::to(o, x.bias), ev::Conv<ev::Int>::to(o, x.filter)}); }
+void S_ShadowOptions::from(EngineObjects& o, const Value& v, kern::ShadowOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.resolution); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.extent); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.bias); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.filter); }
 Value S_Touch::to(EngineObjects& o, const kern::Touch& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.id), ev::Conv<ev::Vector>::to(o, x.start), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Vector>::to(o, x.previous)}); }
 void S_Touch::from(EngineObjects& o, const Value& v, kern::Touch& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.start); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.previous); }
 Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.x), ev::Conv<ev::Float>::to(o, x.y), ev::Conv<ev::Float>::to(o, x.z), ev::Conv<ev::Float>::to(o, x.w)}); }
@@ -761,8 +775,53 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.engine.make: kern::Engine::Engine
+// engine.device_profile.make: kern::DeviceProfile::DeviceProfile
 bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile()))));
+  return true;
+}
+
+// engine.device_profile.release: kern::DeviceProfile::~DeviceProfile
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "device_profile", r)) return false;
+  return ev::release_of<kern::DeviceProfile>(o, r, "device_profile", "DeviceProfile");
+}
+
+// engine.device_profile.name: kern::DeviceProfile::name
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->name);
+  return true;
+}
+
+// engine.device_profile.name@set: what stands at the place kern::DeviceProfile::name gives
+bool c76_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->name);
+  return true;
+}
+
+// engine.device_profile.renderer: kern::DeviceProfile::renderer
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
+  if (!self) return false;
+  ev::give<ev::Struct<S_RendererOptions>>(o, out, 0, self->renderer);
+  return true;
+}
+
+// engine.device_profile.renderer@set: what stands at the place kern::DeviceProfile::renderer gives
+bool c77_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
+  if (!self) return false;
+  ev::take<ev::Struct<S_RendererOptions>>(o, in, 1, self->renderer);
+  return true;
+}
+
+// engine.engine.make: kern::Engine::Engine
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   out[0] = Value::object(o.ref(o.own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*a0)))));
@@ -770,20 +829,20 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.release: kern::Engine::~Engine
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "engine", r)) return false;
   return ev::release_of<kern::Engine>(o, r, "engine", "Engine");
 }
 
 // engine.input.make: kern::Input::Input
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Input>(std::unique_ptr<kern::Input>(new kern::Input()))));
   return true;
 }
 
 // engine.input.release: kern::Input::~Input
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "input", r)) return false;
   return ev::release_of<kern::Input>(o, r, "input", "Input");
@@ -912,14 +971,23 @@ const EngineCall kCalls[] = {
     {"engine.app.update", &c71},
     {"engine.app.resized", &c72},
     {"engine.app.stop", &c73},
-    {"engine.engine.make", &c74},
-    {"engine.engine.release", &c75},
-    {"engine.input.make", &c76},
-    {"engine.input.release", &c77},
+    {"engine.device_profile.make", &c74},
+    {"engine.device_profile.release", &c75},
+    {"engine.device_profile.name", &c76},
+    {"engine.device_profile.renderer", &c77},
+    {"engine.engine.make", &c78},
+    {"engine.engine.release", &c79},
+    {"engine.input.make", &c80},
+    {"engine.input.release", &c81},
+    {"engine.device_profile.name@get", &c76},
+    {"engine.device_profile.name@set", &c76_set},
+    {"engine.device_profile.renderer@get", &c77},
+    {"engine.device_profile.renderer@set", &c77_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
 const EngineMaker kMakers[] = {
+    {EngineObjects::kind<kern::DeviceProfile>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::DeviceProfile>(handle, std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile())); }},
     {EngineObjects::kind<kern::Engine>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::Engine>>(); auto& d0 = made->keep(new kern::Renderer()); made->object.emplace(d0); return o.put_made<kern::Engine>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::Input>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::Input>(handle, std::unique_ptr<kern::Input>(new kern::Input())); }},
 };
