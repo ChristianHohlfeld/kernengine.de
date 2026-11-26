@@ -614,77 +614,67 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 
 // engine.building_builder.make: kern::BuildingBuilder::BuildingBuilder
 bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::BuildingBuilder>(std::unique_ptr<kern::BuildingBuilder>(new kern::BuildingBuilder())));
+  out[0] = Value::object(o.ref(o.own<kern::BuildingBuilder>(std::unique_ptr<kern::BuildingBuilder>(new kern::BuildingBuilder()))));
   return true;
 }
 
 // engine.building_builder.release: kern::BuildingBuilder::~BuildingBuilder
 bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::BuildingBuilder>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no BuildingBuilder that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "building_builder", r)) return false;
+  return ev::release_of<kern::BuildingBuilder>(o, r, "building_builder", "BuildingBuilder");
 }
 
 // engine.earcut.make: kern::Earcut::Earcut
 bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Earcut>(std::unique_ptr<kern::Earcut>(new kern::Earcut())));
+  out[0] = Value::object(o.ref(o.own<kern::Earcut>(std::unique_ptr<kern::Earcut>(new kern::Earcut()))));
   return true;
 }
 
 // engine.earcut.release: kern::Earcut::~Earcut
 bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Earcut>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Earcut that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "earcut", r)) return false;
+  return ev::release_of<kern::Earcut>(o, r, "earcut", "Earcut");
 }
 
 // engine.footprint_stream.make: kern::FootprintStream::FootprintStream
 bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::FootprintStream>(std::unique_ptr<kern::FootprintStream>(new kern::FootprintStream())));
+  out[0] = Value::object(o.ref(o.own<kern::FootprintStream>(std::unique_ptr<kern::FootprintStream>(new kern::FootprintStream()))));
   return true;
 }
 
 // engine.footprint_stream.release: kern::FootprintStream::~FootprintStream
 bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::FootprintStream>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no FootprintStream that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "footprint_stream", r)) return false;
+  return ev::release_of<kern::FootprintStream>(o, r, "footprint_stream", "FootprintStream");
 }
 
 // engine.road_builder.make: kern::RoadBuilder::RoadBuilder
 bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::RoadBuilder>(std::unique_ptr<kern::RoadBuilder>(new kern::RoadBuilder())));
+  out[0] = Value::object(o.ref(o.own<kern::RoadBuilder>(std::unique_ptr<kern::RoadBuilder>(new kern::RoadBuilder()))));
   return true;
 }
 
 // engine.road_builder.release: kern::RoadBuilder::~RoadBuilder
 bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::RoadBuilder>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no RoadBuilder that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "road_builder", r)) return false;
+  return ev::release_of<kern::RoadBuilder>(o, r, "road_builder", "RoadBuilder");
 }
 
 // engine.road_stream.make: kern::RoadStream::RoadStream
 bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::RoadStream>(std::unique_ptr<kern::RoadStream>(new kern::RoadStream())));
+  out[0] = Value::object(o.ref(o.own<kern::RoadStream>(std::unique_ptr<kern::RoadStream>(new kern::RoadStream()))));
   return true;
 }
 
 // engine.road_stream.release: kern::RoadStream::~RoadStream
 bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::RoadStream>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no RoadStream that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "road_stream", r)) return false;
+  return ev::release_of<kern::RoadStream>(o, r, "road_stream", "RoadStream");
 }
 
 const EngineCall kCalls[] = {

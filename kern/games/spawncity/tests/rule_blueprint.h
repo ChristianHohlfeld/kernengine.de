@@ -33,6 +33,10 @@ inline bool real_engine() {
 /// own beyond them, its jobs (kern/core/jobs.h): none, the next numbered 1, run where the program pumps them, so that
 /// when a job runs is fixed by the calls alone. Every side begins the same (a job's number is no count of the sides
 /// that ran before it).
+/// The world of the objects of the engine of every side a test compares (kern/docs/engine_object.md): one number, so
+/// that each side holds the same ObjectRefs - the source's (converted::EngineObject), the Blueprint's on the engine
+/// itself; no EngineObjects of the process is given it (theirs count from 1).
+inline constexpr kern::logic::WorldId kTestWorld = 0x7e57;
 inline void fresh_engine(kern::logic::EngineObjects& objects) {
   objects.clear();
   objects.on_missing(kern::logic::engine_make_default);
@@ -165,7 +169,7 @@ struct RuleBlueprint {
     /// The engine of a test: the stand-in, which answers by the outputs' forms and keeps every call - or the
     /// engine itself (real_engine), with the objects of this side.
     kern::logic::EngineStandIn stand_in;
-    kern::logic::EngineObjects objects;
+    kern::logic::EngineObjects objects{kTestWorld};
     /// (another that keeps the calls, where a test compares them with those of other code: else this one's -
     /// with the objects of that code)
     kern::logic::EngineStandIn* keeps = nullptr;

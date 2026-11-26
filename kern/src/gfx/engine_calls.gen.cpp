@@ -349,7 +349,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   std::vector<kern::Mesh*> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -358,6 +358,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 5, a4);
+  if (!o.error.empty()) return false;
   decltype(auto) r = self->draw(kern::Span<kern::Mesh* const>(a0.data(), a0.size()), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
@@ -820,7 +821,8 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::RendererOptions const&>>();
   ev::take<ev::Struct<S_RendererOptions>>(o, in, 1, a0);
   std::vector<kern::ShaderExtension*> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Handle>>(o, in, 2, a1);
+  if (!o.error.empty()) return false;
   decltype(auto) r = self->init(a0, kern::Span<kern::ShaderExtension* const>(a1.data(), a1.size()));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -995,7 +997,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a0);
   decltype(auto) r = self->mesh(std::move(a0));
-  out[0] = Value::integer(ev::handle_of<kern::Mesh>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::Mesh>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1004,7 +1006,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->meshes();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, r);
   return true;
 }
 
@@ -1197,7 +1199,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->ambient_occlusion();
-  out[0] = Value::integer(ev::handle_of<kern::AmbientOcclusionPass>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::AmbientOcclusionPass>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1206,7 +1208,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->shadow();
-  out[0] = Value::integer(ev::handle_of<kern::SunShadowMap>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::SunShadowMap>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1307,7 +1309,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->extensions();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, r);
   return true;
 }
 
@@ -1422,7 +1424,8 @@ bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 // engine.build_standard_shader: kern::build_standard_shader
 bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<kern::ShaderExtension*> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 0, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 0, a0);
+  if (!o.error.empty()) return false;
   decltype(auto) r = kern::build_standard_shader(kern::Span<kern::ShaderExtension* const>(a0.data(), a0.size()));
   ev::give<ev::Struct<S_ShaderSource>>(o, out, 0, r);
   return true;
@@ -1430,32 +1433,28 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 
 // engine.ambient_occlusion_pass.make: kern::AmbientOcclusionPass::AmbientOcclusionPass
 bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::AmbientOcclusionPass>(std::unique_ptr<kern::AmbientOcclusionPass>(new kern::AmbientOcclusionPass())));
+  out[0] = Value::object(o.ref(o.own<kern::AmbientOcclusionPass>(std::unique_ptr<kern::AmbientOcclusionPass>(new kern::AmbientOcclusionPass()))));
   return true;
 }
 
 // engine.ambient_occlusion_pass.release: kern::AmbientOcclusionPass::~AmbientOcclusionPass
 bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::AmbientOcclusionPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no AmbientOcclusionPass that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "ambient_occlusion_pass", r)) return false;
+  return ev::release_of<kern::AmbientOcclusionPass>(o, r, "ambient_occlusion_pass", "AmbientOcclusionPass");
 }
 
 // engine.bloom_pass.make: kern::BloomPass::BloomPass
 bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::BloomPass>(std::unique_ptr<kern::BloomPass>(new kern::BloomPass())));
+  out[0] = Value::object(o.ref(o.own<kern::BloomPass>(std::unique_ptr<kern::BloomPass>(new kern::BloomPass()))));
   return true;
 }
 
 // engine.bloom_pass.release: kern::BloomPass::~BloomPass
 bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::BloomPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no BloomPass that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "bloom_pass", r)) return false;
+  return ev::release_of<kern::BloomPass>(o, r, "bloom_pass", "BloomPass");
 }
 
 // engine.light_pool.make: kern::LightPool::LightPool
@@ -1464,32 +1463,28 @@ bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Int>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a1);
-  out[0] = Value::integer(o.own<kern::LightPool>(std::unique_ptr<kern::LightPool>(new kern::LightPool(std::move(a0), std::move(a1)))));
+  out[0] = Value::object(o.ref(o.own<kern::LightPool>(std::unique_ptr<kern::LightPool>(new kern::LightPool(std::move(a0), std::move(a1))))));
   return true;
 }
 
 // engine.light_pool.release: kern::LightPool::~LightPool
 bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::LightPool>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no LightPool that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "light_pool", r)) return false;
+  return ev::release_of<kern::LightPool>(o, r, "light_pool", "LightPool");
 }
 
 // engine.mesh.make: kern::Mesh::Mesh
 bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Mesh>(std::unique_ptr<kern::Mesh>(new kern::Mesh())));
+  out[0] = Value::object(o.ref(o.own<kern::Mesh>(std::unique_ptr<kern::Mesh>(new kern::Mesh()))));
   return true;
 }
 
 // engine.mesh.release: kern::Mesh::~Mesh
 bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Mesh>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Mesh that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "mesh", r)) return false;
+  return ev::release_of<kern::Mesh>(o, r, "mesh", "Mesh");
 }
 
 // engine.mesh.id: kern::Mesh::id
@@ -1878,47 +1873,41 @@ bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 
 // engine.particles.make: kern::Particles::Particles
 bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Particles>(std::unique_ptr<kern::Particles>(new kern::Particles())));
+  out[0] = Value::object(o.ref(o.own<kern::Particles>(std::unique_ptr<kern::Particles>(new kern::Particles()))));
   return true;
 }
 
 // engine.particles.release: kern::Particles::~Particles
 bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Particles>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Particles that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "particles", r)) return false;
+  return ev::release_of<kern::Particles>(o, r, "particles", "Particles");
 }
 
 // engine.program.make: kern::Program::Program
 bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Program>(std::unique_ptr<kern::Program>(new kern::Program())));
+  out[0] = Value::object(o.ref(o.own<kern::Program>(std::unique_ptr<kern::Program>(new kern::Program()))));
   return true;
 }
 
 // engine.program.release: kern::Program::~Program
 bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Program>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Program that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "program", r)) return false;
+  return ev::release_of<kern::Program>(o, r, "program", "Program");
 }
 
 // engine.renderer.make: kern::Renderer::Renderer
 bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Renderer>(std::unique_ptr<kern::Renderer>(new kern::Renderer())));
+  out[0] = Value::object(o.ref(o.own<kern::Renderer>(std::unique_ptr<kern::Renderer>(new kern::Renderer()))));
   return true;
 }
 
 // engine.renderer.release: kern::Renderer::~Renderer
 bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Renderer>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Renderer that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "renderer", r)) return false;
+  return ev::release_of<kern::Renderer>(o, r, "renderer", "Renderer");
 }
 
 // engine.shader_extension.material_base: kern::ShaderExtension::material_base
@@ -1955,47 +1944,41 @@ bool c164_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 
 // engine.sky_pass.make: kern::SkyPass::SkyPass
 bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::SkyPass>(std::unique_ptr<kern::SkyPass>(new kern::SkyPass())));
+  out[0] = Value::object(o.ref(o.own<kern::SkyPass>(std::unique_ptr<kern::SkyPass>(new kern::SkyPass()))));
   return true;
 }
 
 // engine.sky_pass.release: kern::SkyPass::~SkyPass
 bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::SkyPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no SkyPass that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "sky_pass", r)) return false;
+  return ev::release_of<kern::SkyPass>(o, r, "sky_pass", "SkyPass");
 }
 
 // engine.sun_shadow_map.make: kern::SunShadowMap::SunShadowMap
 bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::SunShadowMap>(std::unique_ptr<kern::SunShadowMap>(new kern::SunShadowMap())));
+  out[0] = Value::object(o.ref(o.own<kern::SunShadowMap>(std::unique_ptr<kern::SunShadowMap>(new kern::SunShadowMap()))));
   return true;
 }
 
 // engine.sun_shadow_map.release: kern::SunShadowMap::~SunShadowMap
 bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::SunShadowMap>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no SunShadowMap that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "sun_shadow_map", r)) return false;
+  return ev::release_of<kern::SunShadowMap>(o, r, "sun_shadow_map", "SunShadowMap");
 }
 
 // engine.texture_desc.make: kern::TextureDesc::TextureDesc
 bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::TextureDesc>(std::unique_ptr<kern::TextureDesc>(new kern::TextureDesc())));
+  out[0] = Value::object(o.ref(o.own<kern::TextureDesc>(std::unique_ptr<kern::TextureDesc>(new kern::TextureDesc()))));
   return true;
 }
 
 // engine.texture_desc.release: kern::TextureDesc::~TextureDesc
 bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::TextureDesc>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no TextureDesc that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "texture_desc", r)) return false;
+  return ev::release_of<kern::TextureDesc>(o, r, "texture_desc", "TextureDesc");
 }
 
 // engine.texture_desc.width: kern::TextureDesc::width
@@ -2080,17 +2063,15 @@ bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 
 // engine.uniform_cache.make: kern::UniformCache::UniformCache
 bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::UniformCache>(std::unique_ptr<kern::UniformCache>(new kern::UniformCache())));
+  out[0] = Value::object(o.ref(o.own<kern::UniformCache>(std::unique_ptr<kern::UniformCache>(new kern::UniformCache()))));
   return true;
 }
 
 // engine.uniform_cache.release: kern::UniformCache::~UniformCache
 bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::UniformCache>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no UniformCache that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "uniform_cache", r)) return false;
+  return ev::release_of<kern::UniformCache>(o, r, "uniform_cache", "UniformCache");
 }
 
 // kern::ShaderExtension: the object of the engine a Blueprint is (Graph::implements "ShaderExtension")
@@ -2170,13 +2151,13 @@ class Implements_ShaderExtension final : public kern::ShaderExtension {
   }
   decltype(std::declval<kern::ShaderExtension&>().bind(std::declval<kern::Program const&>())) bind(kern::Program const& kern_p0) override {
     if (!by_->has("bind")) return kern::ShaderExtension::bind(kern_p0);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Program>(kern_p0))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Program>(kern_p0)))};
     std::vector<Value> kern_out;
     by_->call("bind", kern_in, kern_out);
   }
   decltype(std::declval<kern::ShaderExtension&>().frame_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Renderer const&>())) frame_uniforms(kern::UniformCache& kern_p0, kern::Renderer const& kern_p1) override {
     if (!by_->has("frame_uniforms")) return kern::ShaderExtension::frame_uniforms(kern_p0, kern_p1);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::UniformCache>(kern_p0)), Value::integer(o_.adopt<kern::Renderer>(kern_p1))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::UniformCache>(kern_p0))), Value::object(o_.ref(o_.adopt<kern::Renderer>(kern_p1)))};
     std::vector<Value> kern_out;
     by_->call("frame_uniforms", kern_in, kern_out);
   }

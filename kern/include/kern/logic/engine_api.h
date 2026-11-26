@@ -43,7 +43,7 @@ struct EnginePin {
   const char* id;     // the pin: the parameter's name in the engine's header ("result": what the function returns)
   PinType type;
   const char* of;     // a struct or an enum (or a list of them): its name
-  const char* shape;  // the value's form, written out: n i b v t, l (Int64), h (a handle of an object made - never 0), e<values>, {fields}, [items], [N items] (N entries: `f32 m[16]`), [?item] (no entry or one: std::optional)
+  const char* shape;  // the value's form, written out: n i b v t, l (Int64), o (an Object of the engine, or none), h (an Object made - never none), e<values>, {fields}, [items], [N items] (N entries: `f32 m[16]`), [?item] (no entry or one: std::optional)
   /// An output list the engine writes through a pointer, with their count beside it (`void render(f32*
   /// out, Count<2> frames)`): the input that is the count - the room the call says it has ("" for any other pin).
   const char* count = "";
@@ -127,6 +127,9 @@ void add_engine_nodes(Library& lib);
 /// "<function>@get" gives there is what "<function>@set" set there last (at first a value of the output's
 /// form, made from the call) - and neither is a call it keeps: the function was called once, when the place
 /// was bound; what is read and set there after is the engine's memory, as in C++.
+/// The world of the stand-in's objects (an ObjectRef it gives: kern/docs/engine_object.md) - one no EngineObjects is
+/// given (theirs count from 1): what it gives names nothing in the engine's objects.
+inline constexpr WorldId kStandInWorld = 0xffffffffu;
 struct EngineStandIn {
   std::vector<std::string> calls;  // "engine.world.pose(1, {2, 0})" ...
   std::map<std::string, Value> places;  // "engine.game_world.shots(1)" -> what is there

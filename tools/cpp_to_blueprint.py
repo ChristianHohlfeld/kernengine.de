@@ -206,6 +206,26 @@ ZERO.update({w: "0" for w in WIDTHS})
 def wire(t):
     """The type of what a place of the Blueprint type `t` gives a pin: an Int for a whole number of a fixed width."""
     return "Int" if t in WIDTHS else t
+
+
+# An object of the engine (a class with a life of its own - the physics world, the renderer, an App) is in a Blueprint
+# an Object<I> of its class, never a number (kern/docs/engine_object.md): `Object<kern::physics::World>`, its default
+# `Object<kern::physics::World>{}` (none). The one way to an Int is the node Handle of Object (object_handle<I>).
+def object_type(q):
+    """The Blueprint type of an object of the engine's class `q` ("kern::physics::World")."""
+    return f"Object<{q}>"
+
+
+def object_class(t):
+    """The class of the engine of a Blueprint type Object<q> (its C++ name), else None."""
+    m = re.fullmatch(r"Object<\s*(.+?)\s*>", t or "")
+    return m.group(1) if m else None
+
+
+def engine_class_name(q):
+    """The Blueprint's name of a class of the engine - the one rule of the engine's names (logic::engine_class_name):
+    kern::App is App, kern::physics::World physics_World."""
+    return re.sub(r"^(?:::)?kern::", "", q).replace("::", "_")
 # (functions of numbers a formula has, by the names C++ calls them)
 MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
@@ -1779,6 +1799,20 @@ class Unit:
             self.engine = Api(self.tree, self)
         return self.engine
 
+    def engine_class_is(self, a, b):
+        """Is an object of the engine's class `a` one of `b` - the same class, or one it derives from (a HostTransport is a
+        net::Transport)? As logic::engine_class_is: what goes where in C++ goes there in the Blueprint."""
+        if a == b:
+            return True
+        for base in (self.tree.records.get(a) or {}).get("bases", []) or []:
+            try:
+                bq = self.find_type(self.clean(qtype(base)))
+            except Wait:
+                continue
+            if bq is not None and bq != a and self.engine_class_is(bq, b):
+                return True
+        return False
+
     def object_of(self, raw, by_value=True):
         """The class of the engine a type holds as an object with a life of its own - the physics world, the
         renderer, the mixer: however it is held - by a pointer, a reference, as a value or owned
@@ -1922,8 +1956,9 @@ class Unit:
         cb = self.callback_type(raw) if "*" not in re.sub(r"<.*>|\(.*\)", "", raw) else None
         if cb:
             return cb
-        if self.object_of(raw):
-            return "Int"
+        q = self.object_of(raw)
+        if q:
+            return object_type(q)
         t = self.clean(raw)
         said = self.language_type(t)   # (a type of a Blueprint's class, or one of the language's own: what it is)
         if said is not None:
@@ -2263,6 +2298,8 @@ class Unit:
     def zero(self, t):
         if t in ZERO:
             return ZERO[t]
+        if object_class(t):
+            return t + "{}"   # (none: no object)
         if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
             return t + "{}"
         if t.startswith(("List<", "Map<", "Set<", "Callback<")):
@@ -9910,6 +9947,15 @@ class Emit:
         have, want = wire(have), wire(want)   # (a place of a fixed width takes an Int: it keeps its low bits)
         if want is None or have == want:
             return text
+        if object_class(have) or object_class(want):
+            # an object of the engine (kern/docs/engine_object.md): one of a class goes where one of a class it derives
+            # from is wanted, as in C++; as a Bool it is whether there is one (C++ asks a pointer so); nothing else
+            # becomes one, and it becomes nothing else - no number
+            if object_class(have) and want == "Bool":
+                return f"object_valid<{object_class(have)}>({text})"
+            if object_class(have) and object_class(want) and self.u.engine_class_is(object_class(have), object_class(want)):
+                return text
+            raise Wait(f"an object of the engine as another type ({have} where {want} is wanted)")
         if want == "Int64" and have in ("Int", "Float", "Bool"):
             return self.to64(text, have)
         if have == "Int64" and want in ("Int", "Float", "Bool"):
@@ -10141,7 +10187,8 @@ class Emit:
             if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
                 return f'math_compare<">=">({self.cast("Float", self.pointer_of(inner)[1])}, 0.0)', "Bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
-                return "0", "Int"   # (no object of the engine: the handle 0)
+                t = object_type(self.u.object_of(qtype(b)))
+                return t + "{}", t   # (no object of the engine: none)
             if ck in ("FunctionToPointerDecay", "BuiltinFnToFnPtr"):
                 raise Wait("a function as a value")
             if ck == "ToVoid":
@@ -10257,15 +10304,16 @@ class Emit:
             if op == "*" and self.is_this(b) and self.f.self_type is not None:
                 return self.self_name, self.f.self_type
             if op in ("*", "&") and (self.u.object_of(qtype(b), by_value=True) or self.u.object_of(qtype(kids(b)[0]), by_value=True)):
-                return self.ex(kids(b)[0], "Int"), "Int"   # (an object of the engine and a pointer to it: one handle)
+                t = object_type(self.u.object_of(qtype(b), by_value=True) or self.u.object_of(qtype(kids(b)[0]), by_value=True))
+                return self.ex(kids(b)[0], t), t   # (an object of the engine and a pointer to it: one Object)
             implementing = self.implementing_state(kids(b)[0]) if op == "&" and kids(b) else None
             if implementing is not None:
                 # (&sc::facades(): the one object of a state that is an object of an interface of the engine - what
-                # the engine is handed as that object: Engine Object of Blueprint on its Blueprint, as that interface;
-                # its handle, as long as the engine's functions take their objects as Ints - kern/docs/engine_object.md)
+                # the engine is handed as that object: Engine Object of Blueprint on its Blueprint, as that interface -
+                # an Object of it, kern/docs/engine_object.md)
                 actor, interface = implementing
                 cpp = "kern::" + interface.replace("_", "::")
-                return f"object_handle<{cpp}>(func_engine_object<{cpp}>(actor_find({text_literal(actor)})))", "Int"
+                return f"func_engine_object<{cpp}>(actor_find({text_literal(actor)}))", object_type(cpp)
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":
@@ -11118,7 +11166,8 @@ class Emit:
         if self.is_slot(b):
             return self.value(self.held_by(b))
         if ops and not b.get("_op") and name in ("operator->", "operator*") and len(ops) == 1 and self.u.object_of(qtype(ops[0])):
-            return self.ex(ops[0], "Int"), "Int"   # (an owned object of the engine: its handle)
+            t = object_type(self.u.object_of(qtype(ops[0])))
+            return self.ex(ops[0], t), t   # (an owned object of the engine: its Object)
         if ops and not b.get("_op") and self.is_reverse_iter(ops[0]):
             # an iterator through a list from its end is the place it holds (REVERSE_ITERATOR): later for it is
             # a lower place
@@ -11273,12 +11322,13 @@ class Emit:
             self.moved_into(x, b.get("ctorType", {}).get("qualType", ""))
         if u.object_of(qtype(b)):
             a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+            t = object_type(u.object_of(qtype(b)))
             if len(a) == 1 and u.object_of(qtype(a[0])) and self.maker_of(b) is None:
-                return self.ex(a[0], "Int"), "Int"   # (a handle handed on)
+                return self.ex(a[0], t), t   # (an Object handed on)
             d = self.maker_of(b)
             if d is None:
                 raise Wait("an object of the engine made by what is not a constructor of it")
-            return self.made(d, a), "Int"
+            return self.made(d, a), t
         t = self.tp(b)
         a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
         if self.language_value(b) and len(a) == 1:
@@ -11568,13 +11618,14 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
-        if name == "get" and not a and bt == "Int" and re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(qtype(base)).strip()) and self.u.object_of(qtype(base)):
-            return self.ex(base, "Int"), "Int"   # (an object of the engine held as its own - unique_ptr<T>::get(): its handle)
+        if name == "get" and not a and object_class(bt) and re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(qtype(base)).strip()) and self.u.object_of(qtype(base)):
+            return self.ex(base, bt), bt   # (an object of the engine held as its own - unique_ptr<T>::get(): its Object)
         if name == "operator bool" and not a and self.ctype(base) == "std::_Bit_reference":
             return self.value(base)   # (an entry of a std::vector<bool>, read)
         if name == "operator bool" and not a and self.u.object_of(qtype(base)):
-            # (what holds an object of the engine - std::unique_ptr - as a Bool: is there one; none is the handle 0)
-            return f'math_compare<"!=">({self.cast("Float", self.ex(base, "Int"))}, 0.0)', "Bool"
+            # (what holds an object of the engine - std::unique_ptr - as a Bool: is there one)
+            t = object_type(self.u.object_of(qtype(base)))
+            return f"object_valid<{object_class(t)}>({self.ex(base, t)})", "Bool"
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
@@ -11721,7 +11772,7 @@ class Api:
         except Wait:
             pass
         if q is not None and q in self.tree.records and self.opaque(q):
-            return "Int", False, q
+            return object_type(q), False, q
         if pointer:
             # a pointer to data the function only reads: a value that may be missing (teleport's rotation) or
             # the first of several (samples, with their count beside them) - the list of them, none for null
@@ -11734,9 +11785,11 @@ class Api:
         return self.u.btype(r), writes, None
 
     def pin(self, bt):
-        """(pin type, the struct or enum it names) of a Blueprint type."""
+        """(pin type, the struct, enum or class of the engine it names) of a Blueprint type."""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
+        if object_class(bt):
+            return "object", engine_class_name(object_class(bt))
         if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is an int list of "u8")
             return "integer", bt.lower()
         if callback_parts(bt):
@@ -11759,6 +11812,8 @@ class Api:
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN or bt in WIDTHS:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[wire(bt)]
+        if object_class(bt):
+            return "o"   # (an object of the engine - or none; `h` where it is always one: what a maker gives)
         if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
             r, a = callback_parts(bt)
             return "c" + (self.shape(r) if r else "") + "(" + "".join(self.shape(x) for x in a) + ")"
@@ -11917,7 +11972,7 @@ class Api:
             self.shape(bt)
         return {"type": f"engine.{group}.make" + (f"_{nth}" if nth > 1 else ""), "cpp": q + "::" + q.split("::")[-1], "label": "Make " + q.split("::")[-1],
                 "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(d) or f"Makes a {q.split('::')[-1]} of the engine: its handle (the host keeps it until it is released).",
-                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q,
+                "value": False, "ins": ins, "outs": [("result", object_type(q), q)], "params": params, "decl": d, "role": "make", "class": q,
                 # (what it gives is the handle of the object it made - a constructor of C++ always makes one: never the
                 # handle 0, which names none; the form `h`, Api.shape)
                 "shapes": {"result": "h"}}
@@ -11930,7 +11985,7 @@ class Api:
         group = snake(q.split("::")[-1])
         return {"type": f"engine.{group}.release", "cpp": q + "::~" + q.split("::")[-1], "label": "Release " + q.split("::")[-1],
                 "category": "Engine: " + q.split("::")[-1], "help": f"Ends the {q.split('::')[-1]} (its destructor): the handle is none after it.",
-                "value": False, "ins": [(group, "Int", q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
+                "value": False, "ins": [(group, object_type(q), q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
 
     def fields(self, q):
         """The fields of an object of the engine (a class with a handle) a program reads and sets - `Mesh::visible`,
@@ -11968,7 +12023,7 @@ class Api:
                 self.shape(bt, raw)
                 out.append(({"type": f"engine.{group}.{c['name']}", "cpp": f"{q}::{c['name']}", "label": c["name"].replace("_", " ").title(),
                              "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(c), "value": False, "place": True, "field": True,
-                             "ins": [(group, "Int", q)], "outs": [("result", bt, None)], "params": [], "decl": c, "class": q, "counts": {}, "per": {},
+                             "ins": [(group, object_type(q), q)], "outs": [("result", bt, None)], "params": [], "decl": c, "class": q, "counts": {}, "per": {},
                              "clock": False, "raws": {"result": raw}}, c))
             except Wait as w:
                 out.append((w, c))
@@ -12018,7 +12073,7 @@ class Api:
             return name
         if method:
             if self.opaque(owner):
-                ins.append((name_of(snake(owner.split("::")[-1])), "Int", owner))
+                ins.append((name_of(snake(owner.split("::")[-1])), object_type(owner), owner))
             else:
                 st = u.struct(owner)
                 ins.append((name_of("self"), st, None))
@@ -13636,7 +13691,7 @@ class TestWriter:
                 # the Blueprint a handle, here the handle as the pointer it stands for, never followed; see the result below)
                 params.append((f"{re.sub(r'^(const\s+)?(?:::)?' + ENGINE + r'::logic::Runtime', lambda m_: (m_.group(1) or '') + '::' + ENGINE + '::logic::Runtime', raw.strip())} {name}", default))
                 at = name if re.search(r"\*\s*(const)?$", raw) else f"&{name}"
-                values.append(f"converted::value_of(static_cast<i64>(reinterpret_cast<std::uintptr_t>({at})))")
+                values.append(f"converted::logic_value({at})")
             elif self.u.object_of(raw):
                 params.append((f"{self.spell(raw)} {name}", default))
                 values.append(f"converted::value_of({name})")
@@ -13693,14 +13748,14 @@ class TestWriter:
         k = 0
         if ret != "void" and ret.endswith("&") and self.u.object_of(ret_raw) and self.u.object_of(ret_raw) != self.OWN_LOGIC[0]:
             # (an object of the engine it gives by reference - World& physics(): the one of that handle)
-            body.append(f"{ret} kern_result = *converted::engine_object<{self.object_name(self.u.object_of(ret_raw))}>(kern_out[0].as_int());")
+            body.append(f"{ret} kern_result = *converted::engine_object<{self.object_name(self.u.object_of(ret_raw))}>(kern_out[0].as_object());")
             k = 1
         elif ret != "void" and self.u.object_of(ret_raw) == self.OWN_LOGIC[0]:
             # (the logic the Blueprints run in: the handle the stand-in gives, as a pointer the source only hands back to the
             # engine - 0: none, as the Blueprint has it)
             ret = re.sub(r"^(?:::)?" + ENGINE + r"::logic::Runtime", "::" + ENGINE + "::logic::Runtime", re.sub(r"^const\s+", "const ", ret_raw.strip()))
             ret = re.sub(r"^(const\s+)(?:::)?" + ENGINE + r"::logic::Runtime", r"\1::" + ENGINE + "::logic::Runtime", ret)
-            body.append(f"{ret} kern_result = reinterpret_cast<{ret}>(static_cast<std::uintptr_t>(kern_out[0].as_int()));")
+            body.append(f"{ret} kern_result = converted::logic_pointer<{ret}>(kern_out[0]);")
             k = 1
         elif ret != "void":
             # (what it gives is made by the test - quietly: an object of the engine in it is no make of the source)

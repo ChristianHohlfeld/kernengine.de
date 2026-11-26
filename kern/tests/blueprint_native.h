@@ -1533,8 +1533,8 @@ inline const char* kImplementsWater = R"kn(
 struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
   Float Time = 0.25;
-  Int Program = 0;
-  Int Cache = 0;
+  Object<kern::Program> Program = Object<kern::Program>{};
+  Object<kern::UniformCache> Cache = Object<kern::UniformCache>{};
   Int Frames = 0;
 
   // ---- functions ----
@@ -1548,11 +1548,11 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
     return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
   }
 
-  KERN_OVERRIDE void bind(Int program = 0) {
+  KERN_OVERRIDE void bind(Object<kern::Program> program = Object<kern::Program>{}) {
     Program = program;
   }
 
-  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) {
+  KERN_OVERRIDE void frame_uniforms(Object<kern::UniformCache> cache = Object<kern::UniformCache>{}, Object<kern::Renderer> renderer = Object<kern::Renderer>{}) {
     Cache = cache;
     Frames += 1;
   }
@@ -1569,24 +1569,24 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
   };
 
   // ---- variables ----
-  Int Engine = 0;
+  Object<kern::Engine> Engine = Object<kern::Engine>{};
   Int Updates = 0;
   Float Last = 0.0;
   Bool Stopped = false;
 
   // ---- functions ----
   struct startResult { Bool result = false; };
-  KERN_OVERRIDE startResult start(Int engine = 0) {
+  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Engine = engine;
     return {true};
   }
 
-  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
     Updates += 1;
     Last = frame.time;
   }
 
-  KERN_OVERRIDE void stop(Int engine = 0) {
+  KERN_OVERRIDE void stop(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Stopped = true;
   }
 };

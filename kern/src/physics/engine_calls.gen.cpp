@@ -1192,17 +1192,15 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 
 // engine.character_mover.make: kern::physics::CharacterMover::CharacterMover
 bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::physics::CharacterMover>(std::unique_ptr<kern::physics::CharacterMover>(new kern::physics::CharacterMover())));
+  out[0] = Value::object(o.ref(o.own<kern::physics::CharacterMover>(std::unique_ptr<kern::physics::CharacterMover>(new kern::physics::CharacterMover()))));
   return true;
 }
 
 // engine.character_mover.release: kern::physics::CharacterMover::~CharacterMover
 bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::physics::CharacterMover>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no CharacterMover that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "character_mover", r)) return false;
+  return ev::release_of<kern::physics::CharacterMover>(o, r, "character_mover", "CharacterMover");
 }
 
 // engine.character_mover.settings: kern::physics::CharacterMover::settings
@@ -1223,32 +1221,28 @@ bool c97_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 
 // engine.mouse_grab.make: kern::physics::MouseGrab::MouseGrab
 bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::physics::MouseGrab>(std::unique_ptr<kern::physics::MouseGrab>(new kern::physics::MouseGrab())));
+  out[0] = Value::object(o.ref(o.own<kern::physics::MouseGrab>(std::unique_ptr<kern::physics::MouseGrab>(new kern::physics::MouseGrab()))));
   return true;
 }
 
 // engine.mouse_grab.release: kern::physics::MouseGrab::~MouseGrab
 bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::physics::MouseGrab>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no MouseGrab that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "mouse_grab", r)) return false;
+  return ev::release_of<kern::physics::MouseGrab>(o, r, "mouse_grab", "MouseGrab");
 }
 
 // engine.world.make: kern::physics::World::World
 bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::physics::World>(std::unique_ptr<kern::physics::World>(new kern::physics::World())));
+  out[0] = Value::object(o.ref(o.own<kern::physics::World>(std::unique_ptr<kern::physics::World>(new kern::physics::World()))));
   return true;
 }
 
 // engine.world.release: kern::physics::World::~World
 bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::physics::World>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no World that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "world", r)) return false;
+  return ev::release_of<kern::physics::World>(o, r, "world", "World");
 }
 
 const EngineCall kCalls[] = {

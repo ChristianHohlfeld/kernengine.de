@@ -75,8 +75,12 @@ struct NativeTestHost : kern::logic::Host {
 /// objects, and the class calls the engine's functions on them itself (kern/logic/engine_direct.h); else
 /// every call comes through its door. It counts the calls that came through the door and keeps what it
 /// was told of calls that failed, in their order.
+/// The world of the objects of a host of a case on the engine itself: one number for every such host, so that two
+/// sides a test compares, set up alike, hold the same ObjectRefs (kern/docs/engine_object.md) - no EngineObjects of the
+/// process is given it (theirs count from 1).
+inline constexpr kern::logic::WorldId kNativeTestWorld = 0x7e57;
 struct NativeEngineHost : NativeTestHost {
-  kern::logic::EngineObjects objects;
+  kern::logic::EngineObjects objects{kNativeTestWorld};
   bool direct = false;
   long door = 0;
   std::string told;
