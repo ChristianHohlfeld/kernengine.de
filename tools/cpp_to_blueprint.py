@@ -1405,6 +1405,8 @@ class World:
         self.table = {}        # a function's key -> what a call of it needs to know (of the Blueprints written before)
         self.wanted = None     # of a Blueprint that is not the program's own: the functions to write (keys)
         self.bars = {}         # a function's key -> why it is not written this time
+        self.reaching = set()  # the keys of functions of other Blueprints that call - themselves or through others - one that waits
+                               # for a reason of its own (main: reaching_own): no one leans on them, they wait
         self.nodes = set()     # the names of the engine's nodes (NODES)
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
@@ -3138,7 +3140,8 @@ class Unit:
                 raise Wait(f"{self.cpp_name(d)}() of the Blueprint {self.world.parts.get(part, part)} is not written")
             # A function of another part of this Blueprint that waits only because what it calls waits - it may be in a
             # circle with this one: called as written, a step, leaning on it (main: written in the end, or this waits too)
-            leans = e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
+            leans = (e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
+                     and key not in self.world.reaching)
             why_waits = e["wait"]
             if leans:
                 e = dict(e, wait=None, pure=False, effects=[*e.get("effects", []), "it leans on a function of its circle"])
@@ -17132,7 +17135,11 @@ def main(argv):
         w.state_implements, w.not_states = world.state_implements, world.not_states
         w.pointer_lists, w.globals, w.state_functions, w.getters = world.pointer_lists, world.globals, world.state_functions, world.getters
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
-        w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
+        # (what is written but calls - itself or through others - one that waits for a reason of its own waits for it:
+        # given so, whoever calls it waits in this round, however long the chain - reaching_own)
+        w.table = {k: (dict(e, wait=f"it calls {reach[k]}(), which waits") if k in reach and not e["wait"] else e)
+                   for d in need for k, e in tables.get(d, {}).items()}
+        w.reaching = {k for d in need for k in tables.get(d, {}) if k in reach}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
             for d in sorted(need):
@@ -17174,7 +17181,41 @@ def main(argv):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
         of what they gave the Blueprints it may call give now."""
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
-                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
+                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())),
+                tuple(sorted((k, reach[k]) for d in needs[u] for k in tables.get(d, {}) if k in reach)))
+
+    def reaching_own():
+        """Of the functions written so far, those that wait in the end because what they call waits: each that calls -
+        itself or through others, over every Blueprint and part - one that waits for a reason of its own (not only
+        because what it calls waits: follow_on). A function -> the one it calls on that way (its name). Taken from the
+        tables of the round before, at once over the whole chain: a chain of calls over parts waits in one round, not
+        one link a round."""
+        every = {k: e for u in tables for k, e in tables[u].items()}
+        named = collections.defaultdict(set)
+        for k, e in every.items():
+            named[(e["unit"], e["cpp"])].add(k)
+        callers = collections.defaultdict(set)
+        for k, e in every.items():
+            if not e["wait"]:
+                on = set(e.get("calls", ())) | set(e.get("leans", ()))
+            else:
+                m = follow_on(e["wait"]) and (re.match(r"it calls (.*)\(\), which waits$", e["wait"]) or re.match(r"(.*)\(\) of the Blueprint \S+ is not written$", e["wait"]))
+                on = set(named.get((e["unit"], m.group(1)), ())) if m else set()
+            for c in on & set(every):
+                callers[c].add(k)
+        own = sorted(k for k, e in every.items() if e["wait"] and not follow_on(e["wait"]))
+        out, todo = {}, list(own)
+        seen = set(own)
+        while todo:   # (breadth first, in the order of the keys: the same whatever the order the round was done in)
+            nxt = []
+            for c in todo:
+                for k in sorted(callers.get(c, ())):
+                    if k not in seen:
+                        seen.add(k)
+                        out[k] = every[c]["cpp"]
+                        nxt.append(k)
+            todo = sorted(nxt)
+        return out
 
     def pin_circles():
         """At the fixpoint: what leaned (Unit.foreign) on a function of another part of its Blueprint, and calls -
@@ -17208,7 +17249,30 @@ def main(argv):
                 pinned = True
         return pinned
 
+    def why_again(now, asks):
+        """Why the round is needed: per Blueprint of it, what is new in what it is given (one line, for the log)."""
+        first, gave_anew, other = [], set(), collections.Counter()
+        for u in now:
+            if u not in given:
+                first.append(u)
+                continue
+            a, b = asks[u], given[u]
+            if a[:2] != b[:2]:
+                other["what it is made of"] += 1
+            gave_anew |= {d for (d, v), (d2, v2) in zip(a[2], b[2]) if v != v2} if [d for d, _ in a[2]] == [d for d, _ in b[2]] else set()
+            if [d for d, _ in a[2]] != [d for d, _ in b[2]]:
+                other["it calls more Blueprints"] += 1
+            if a[3] != b[3]:
+                other["more of it waits for good"] += 1
+            if a[4] != b[4]:
+                other["what waits of what it calls"] += 1
+        said = ([f"{len(first)} for the first time"] if first else []) + \
+               ([f"what {', '.join(sorted(gave_anew)[:4])}{f' and {len(gave_anew) - 4} more' if len(gave_anew) > 4 else ''} gave is new"] if gave_anew else []) + \
+               [f"{why} ({n})" for why, n in sorted(other.items())]
+        return "; ".join(said)
+
     while True:
+        reach = reaching_own()
         needs = {u: need_of(u) for u in deps}
         asks = {u: asked_of(u, needs) for u in deps}
         new = {u for u in deps if given.get(u) != asks[u]}
@@ -17275,7 +17339,7 @@ def main(argv):
         met[state] = rounds + 1
         now = sorted(u for u in new if all(d not in new or u in needs[d] for d in needs[u]))
         rounds += 1
-        print(f"round {rounds}: {len(now)} Blueprints", flush=True)
+        print(f"round {rounds}: {len(now)} Blueprints - {why_again(now, asks)}", flush=True)
         jobs = {u: job_of(u) for u in now}   # (all of the round's from the same state, before any of them is done)
         # (the longest first: as long as it took the last time, or - the first time - as long as its files are)
         first = sorted(now, key=lambda u: (u in took, -took.get(u, 0), -sum(os.path.getsize(f) for f in unit_files[u]), u))
