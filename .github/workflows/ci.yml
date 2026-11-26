@@ -70,8 +70,8 @@ jobs:
             tail -n 200 "$W/convert.log"; cp "$W/all/files.txt" "$W/texts/" 2>/dev/null; cp -r "$W/all/logs" "$W/all/link.log" "$W/all/run.log" "$W/all/refresh.log" "$W/all/web.log" "$W/texts/" 2>/dev/null; exit $rc
           fi
           cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"; cp kern/games/spawncity/level/spawncity.kproject "$W/pt/l.kproject"
-          if [ "$KERN_TEST_SOURCE_NUMBERS" = 1 ]; then   # (the tests are built: from a level and a project of no Blueprint but what this probe writes - the level's others may be older than the engine)
-            python3 -c "import json,sys; d=sys.argv[1]; l=json.load(open(d+'/l.klevel')); l['actors']=[]; json.dump(l,open(d+'/l.klevel','w')); p=json.load(open(d+'/l.kproject')); p['blueprints']=[]; p['levels']=['l.klevel']; p['startLevel']='l.klevel'; json.dump(p,open(d+'/l.kproject','w'))" "$W/pt"
+          if [ "$KERN_TEST_SOURCE_NUMBERS" = 1 ]; then   # (the tests are built: from a level of no Blueprint but what this probe writes - the level's others may be older than the engine - and the project's Blueprints, the classes the program calls (people.cpp: person_hit); one that does not build is said by compare.sh)
+            python3 -c "import json,sys; d=sys.argv[1]; l=json.load(open(d+'/l.klevel')); l['actors']=[]; json.dump(l,open(d+'/l.klevel','w')); p=json.load(open(d+'/l.kproject')); p['levels']=['l.klevel']; p['startLevel']='l.klevel'; json.dump(p,open(d+'/l.kproject','w'))" "$W/pt"
           fi
           cd kern/games/spawncity
           set +e
