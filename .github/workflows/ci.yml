@@ -479,4 +479,42 @@ jobs:
           for g in hello orbrun; do cp _site/kern/examples/$g/$g.wasm kern/examples/$g/; done
           python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
           sleep 1
+          # (the engine's cases: no game - the game's page is the job input-spawncity)
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772
+
+  input-spawncity:
+    # the game's case: SpawnCity's page with its input check (the engine's input test above needs no game)
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: _site
+      - name: Playwright (cached)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/e2e
+            ~/.cache/ms-playwright
+          key: playwright-1.56.0
+      - name: Input test
+        run: |
+          set -euo pipefail
+          [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
+          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
+          # within three minutes, the test runs with what the runner image has.
+          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
+          timeout 180 /tmp/e2e/node_modules/.bin/playwright install-deps chromium || echo "::warning::playwright install-deps failed: Ubuntu's archive is not reachable"
+          # the example games as built, next to their pages; SpawnCity as the drop-in for spawncity.de
+          for g in hello orbrun; do cp _site/kern/examples/$g/$g.wasm kern/examples/$g/; done
+          python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
+          sleep 1
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772 "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1"
