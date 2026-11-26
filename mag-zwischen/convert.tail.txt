@@ -1,0 +1,80 @@
+    Reader::get_f32 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_f64 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_vec3 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_quat (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_bytes (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Reader::get_u16(), a step)
+    Reader::done (1): written
+
+where the Blueprints stand (kern/docs/project.md):
+  Arondight45_DroneFC_Core: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  blueprint_call: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  controls: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  drone_art: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_audio_audio: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_audio_synth: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_game_runtime: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_input_actions: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_math_math: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  settings: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  shapes: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  sound_fx: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  spiel: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  touch_play: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_StateControl: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  controls_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_gfx_mesh: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_physics_physics: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt: the project - the program's city_jobs_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  settings_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  sound_fx_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  spiel_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  tiles: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  touch_play_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  wire: the project - the program's city_jobs_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_HardwareSensors: the project - the program's Arondight45_FirmwareRuntime uses it - a Blueprint of the program finds its libraries only in the project
+  common: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  engine_geo_mesh_data: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt_cpp: the project - the program's city_jobs_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  rigid_spec: the project - the program's drone_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_FirmwareRuntime: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  drone_art_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_geo_buildings: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  drone: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  engine_geo_roads: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  drone_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  terrain: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  tiles_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_jobs_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  terrain_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  SpawnCity: the project - it exports sc_tile_data, sc_tile_failed, sc_offline, sc_dem_data and 8 more - exports belong to the program
+
+496 of 564 functions of the program are written as Blueprints (5975 of 6691 lines), and 17 of the engine's headers that they call: 43 Blueprints - 12 of source files, 1 of states, 30 of headers and of shapes
+488 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   170)   it calls clearance_pad_axis(), which waits
+    40 (   158)   the Blueprint of the actor Controls of a world, called by a function that is none of the program's Blueprint (the Actor bind() took is a variable of the Blueprint of the program's one object)
+     1 (    72)   it calls gamepad_axis(), which waits
+     1 (    71)   it calls SpawnCity::settings_command(), which waits
+     1 (    52)   it calls SpawnCity::apply_settings(), which waits
+     1 (    48)   it calls hint_line(), which waits
+     1 (    47)   it calls bind(), which waits
+     4 (    40)   the Blueprint of the actor Settings of a world, called by a function that is none of the program's Blueprint (the Actor bind() took is a variable of the Blueprint of the program's one object)
+     1 (    32)   it calls Settings::reset_section(), which waits
+     4 (     4)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'out_len_')
+     1 (     4)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'touch' in 'converted_SpawnCity__main_cpp::SpawnCity' - that went with pointer: no member named 'clearance_pad_axis' in namespace 'converted_SpawnCity__main_cpp::controls'; did you mean 'sc::controls::clearance_pad_axis'?)
+     1 (     4)   it calls Settings::set(), which waits
+     1 (     4)   it calls TouchPlay::pointer(), which waits
+     4 (     4)   it calls Devices::input(), which waits
+     1 (     1)   it calls SpawnCity::hud_json(), which waits
+     1 (     1)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'command' in 'converted_SpawnCity__main_cpp::SpawnCity' - that went with settings_command: no member named 'reset_section' in 'converted_SpawnCity__main_cpp::Settings')
+     1 (     1)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: cannot initialize return object of type 'const f32 *' (aka 'const double *') with an rvalue of type 'const f32 *' (aka 'const float *'))
+     1 (     1)   it calls SpawnCity::start(), which waits
+     1 (     1)   it calls SpawnCity::update(), which waits
+     1 (     1)   it calls SpawnCity::stop(), which waits
+
+real	6m10,297s
+user	19m19,686s
+sys	1m18,667s
