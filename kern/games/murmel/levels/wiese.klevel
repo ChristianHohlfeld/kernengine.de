@@ -10,7 +10,7 @@
   ],
   "stepHz": 60,
   "title": "Murmel 1: Wiese",
-  "goal": "collect_all",
+  "goal": "collectAll",
   "player": 2,
   "killZ": -20,
   "groundColor": "#2f5a2a",

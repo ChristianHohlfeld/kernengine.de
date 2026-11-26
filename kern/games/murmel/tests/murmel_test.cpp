@@ -51,11 +51,17 @@ void steuere(const game::GameWorld& w) {
     for (const game::Actor& a : w.level().actors)
       if (a.trigger) { ziel = &a; break; }
   if (!ziel) return;
-  const Vec3 d{ziel->transform.position.x - p.x, ziel->transform.position.y - p.y, 0};
+  // (wohin: zum Ziel mit höchstens 3 m/s, minus was die Murmel schon an Fahrt hat - sie kreist nicht um die Münze)
+  const Vec3 v = w.actor_velocity(w.player());
+  const Vec3 weg{ziel->transform.position.x - p.x, ziel->transform.position.y - p.y, 0};
+  const f32 lang = std::sqrt(weg.x * weg.x + weg.y * weg.y) + 1e-6f;
+  const f32 soll = std::fmin(3.0f, 1.5f * lang);
+  const Vec3 d{weg.x / lang * soll - v.x, weg.y / lang * soll - v.y, 0};
   const f32 yaw = w.camera_yaw() * kPi / 180;
   const Vec3 vor{std::cos(yaw), std::sin(yaw), 0}, rechts{vor.y, -vor.x, 0};
   const f32 f = d.x * vor.x + d.y * vor.y, r = d.x * rechts.x + d.y * rechts.y;
   const f32 n = std::sqrt(f * f + r * r) + 1e-6f;
+  if (n < 0.3f) { taste(Key::up, false); taste(Key::down, false); taste(Key::right, false); taste(Key::left, false); return; }
   taste(Key::up, f > 0.35f * n);
   taste(Key::down, f < -0.35f * n);
   taste(Key::right, r > 0.35f * n);

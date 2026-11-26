@@ -10,7 +10,7 @@
   ],
   "stepHz": 60,
   "title": "Murmel 2: Bruecke",
-  "goal": "collect_all",
+  "goal": "collectAll",
   "player": 2,
   "killZ": -20,
   "groundColor": "#2f5a2a",
@@ -292,7 +292,7 @@
       0
      ],
      "period": 3,
-     "mode": "ping_pong"
+     "mode": "pingPong"
     }
    }
   },

@@ -41,7 +41,7 @@ std::string anzeige(int level, f32 punkte, u32 muenzen, u32 alle, bool fertig, c
 }
 
 f32 Murmel::punkte() const {
-  if (!welt_) return vorher_;
+  if (!welt_ || fertig_) return vorher_;   // (fertig: die Punkte des letzten Levels sind schon in vorher_)
   return vorher_ + welt_->hud().score;
 }
 
