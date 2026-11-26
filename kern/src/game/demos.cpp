@@ -49,6 +49,25 @@ BodyComponent body(Motion motion, f32 mass = 0) {
   return b;
 }
 
+/// The template a joining player's pawn is a copy of (world.pawnTemplate, GameWorld::add_pawn): the player `player`
+/// with its children, called as it is - added last (the ids before stay). The level's player stays its actor.
+void pawn_template(Level& l, ActorId player) {
+  std::vector<Actor> subtree;
+  if (const Actor* p = l.find(player)) subtree.push_back(*p);
+  for (std::size_t i = 0; i < subtree.size(); ++i)
+    for (const Actor& a : l.actors)
+      if (a.parent == subtree[i].id) subtree.push_back(a);
+  std::vector<std::pair<ActorId, ActorId>> ids;
+  for (Actor& a : subtree) {
+    const ActorId old = a.id;
+    a.id = 0;
+    for (const auto& [o, n] : ids) if (a.parent == o) a.parent = n;
+    if (ids.empty()) { a.is_template = true; a.parent = 0; }
+    ids.push_back({old, l.add(a).id});
+  }
+  if (!subtree.empty()) l.world.pawn_template = subtree[0].name;
+}
+
 /// sRGB colour whose linear value is `linear` divided by its largest component.
 Vec3 emissive_color(Vec3 linear, f32* strength) {
   const f32 m = max_of(linear.x, max_of(linear.y, linear.z));
@@ -191,6 +210,7 @@ Level orb_run_level() {
   l.camera.position = {car.transform.position.x, car.transform.position.y - 38, 13};
   l.camera.yaw = 90;
   l.camera.pitch = -15;
+  pawn_template(l, car_id);   // (multiplayer: every joining player drives a copy)
   return l;
 }
 
@@ -438,6 +458,7 @@ Level shooting_range_level() {
   l.camera.position = {-52, -14, 9};
   l.camera.yaw = 28;
   l.camera.pitch = -18;
+  pawn_template(l, sid);   // (multiplayer: every joining player is a copy of the soldier)
   return l;
 }
 
@@ -672,7 +693,7 @@ Level physics_lab_level() {
   roll.camera_distance = 9;
   roll.camera_height = 3;
   player.controller = roll;
-  l.add(player);
+  const ActorId player_id = l.add(player).id;
   const Vec3 stars[5] = {{-14, 4, 1.2f}, {-4, -6, 1.2f}, {10, 0, 1.2f}, {0, 6, 4.2f}, {24, 6, 5.5f}};
   for (int i = 0; i < 5; ++i) {
     char name[32];
@@ -722,6 +743,7 @@ Level physics_lab_level() {
   l.camera.position = {-30, -30, 18};
   l.camera.yaw = 42;
   l.camera.pitch = -26;
+  pawn_template(l, player_id);   // (multiplayer: every joining player rolls a copy)
   return l;
 }
 
