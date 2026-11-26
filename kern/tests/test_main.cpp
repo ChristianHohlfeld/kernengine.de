@@ -1348,6 +1348,28 @@ TEST(game_project_round_trip) {
   CHECK(!game::from_text(old, was, &error) && error.find("project:") == 0 && error.find(".kproject") != std::string::npos);
 }
 
+// A level that does not read says where and why: the part it reads (the world, a component of an actor) and, for a
+// value that is none of a list of names, the value and the names there are.
+TEST(level_errors_say_where_and_which_values) {
+  game::Level l = game::basic_level();
+  std::string text = game::to_text(l), error;
+  game::Level back;
+  std::string goal = text;
+  goal.replace(goal.find("\"goal\": \"none\""), std::string("\"goal\": \"none\"").size(), "\"goal\": \"collect_all\"");
+  CHECK(!game::from_text(goal, back, &error));
+  CHECK(error == "world.goal: unknown value \"collect_all\" - one of none, collectAll, reachGoal, survive, score");
+  game::Actor ball;
+  ball.name = "Ball";
+  ball.controller = game::ControllerComponent{};
+  l.add(ball);
+  text = game::to_text(l);
+  const std::string mode = "\"mode\": \"hovercar\"";
+  CHECK(text.find(mode) != std::string::npos);
+  text.replace(text.find(mode), mode.size(), "\"mode\": \"rollin\"");
+  CHECK(!game::from_text(text, back, &error));
+  CHECK(error.find("actor \"Ball\": controller.mode: unknown value \"rollin\" - one of hovercar, rolling, character") == 0);
+}
+
 // A project that does not read says where and why.
 TEST(game_project_errors) {
   const auto why = [](const std::string& text) {

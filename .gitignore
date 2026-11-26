@@ -11,3 +11,4 @@ kern/games/spawncity/src/level_blueprints.cpp
 kern/games/spawncity/src/level_blueprints.h
 kern/games/spawncity/src/level_blueprints/
 kern/games/spawncity/src/level_blueprints_kern_blueprint_*.cpp
+kern/games/murmel/web/*.wasm
