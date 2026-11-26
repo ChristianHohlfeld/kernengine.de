@@ -1592,6 +1592,16 @@ bool link(const Graph& g, const Blueprints& project, Graph& out, std::string* er
   }
   for (const auto& [library, ids] : copied) {
     const Graph& l = *all(library);
+    // (a node that names a place of the engine names the node that binds it - "bound", an id of the library: that
+    // node here, which came along with the same body)
+    for (const auto& [id, here] : ids) {
+      const std::string b = l.find(id) ? l.find(id)->param("bound") : std::string();
+      if (b.empty() || b.find_first_not_of("0123456789") != std::string::npos || b.size() > 9) continue;
+      auto binder = ids.find(static_cast<u32>(std::stoul(b)));
+      if (binder == ids.end()) return say(error, "the library " + library + " names a place of the engine (bound " + b + ") whose node is not in the same function");
+      for (Node& n : out.nodes)
+        if (n.id == here) n.set_param("bound", std::to_string(binder->second));
+    }
     for (const Link& link : l.links) {
       auto from = ids.find(link.from), to = ids.find(link.to);
       if (from == ids.end() || to == ids.end()) continue;
