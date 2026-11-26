@@ -25,7 +25,7 @@ convert() {   # convert <case>: the case's program, converted with its test, int
   for h in "$root"/kern/games/spawncity/src/*.h; do [ -e "$out/src/$(basename "$h")" ] || cp "$h" "$out/src/"; done
   cp "$root"/kern/games/spawncity/tests/*.h "$out/pt/"
   echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
-  (cd "$out" && python3 "$root/tools/cpp_to_blueprint.py" --convert sc -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --test "$out/pt/converted" --texts "$out/texts" -- "src/$1.cpp" > "$out/convert.log" 2>&1) \
     || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(grep -c '"logic"' "$out/cases.klevel")" = 0 ]; then
@@ -45,6 +45,11 @@ convert pad
 check pad "take_pad is written" yes '\bvoid take_pad\('
 check pad "take_pad (writes through a reference) is a step, not KERN_PURE" no 'KERN_PURE[^(]*\btake_pad\('
 check pad "doubled (only its own values) is a value: KERN_PURE" yes 'KERN_PURE doubledResult doubled\('
+logged() {    # logged <case> <what> <pattern in its log>
+  if grep -qE -- "$3" "$top/$1/convert.log"; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
+}
+logged pad "the log says why take_pad is a step" '^ +take_pad \([0-9]+\): written \(a step: it changes p \(a reference it declares\)\)'
+logged pad "the log says doubled is a value" '^ +doubled \([0-9]+\): written$'
 tested pad "take_pad's test calls it on the object compared on" 'kern_state_now = s.get\(\), .*take_pad\('
 tested pad "holder() in the test is that object" 'static_cast<Holder\*>\(kern_state_now\)\)\.pad'
 

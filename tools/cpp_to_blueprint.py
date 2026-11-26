@@ -1441,10 +1441,22 @@ SHAPES = "shapes"   # the library of the types the converter makes of the notati
 
 # ---- one Blueprint -------------------------------------------------------------------------------
 class Function:
+    @property
+    def pure(self):
+        """The one decision whether a function is a value (KERN_PURE: it only computes - how often and in which order
+        it is read makes no difference) or a step: it is a value when its body has no effect beyond its own values
+        (`effects`, each said where the conversion finds it - `effect`). The reasons are in the log (FUNCTIONS=1)."""
+        return not self.effects
+
+    def effect(self, why):
+        """Something the function does beyond working out a value (a step): why, once."""
+        if why not in self.effects:
+            self.effects.append(why)
+
     def __init__(self, name):
         self.name = name
         self.cpp = name
-        self.pure = True
+        self.effects = []     # what its body does beyond working out a value - each with its reason (effect); see pure
         self.asks_engine = False   # (it calls the engine - itself or through what it calls: the engine sees each call)
         self.params = []      # (name, type)
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
@@ -2379,7 +2391,8 @@ class Unit:
             raise Wait(f"{name}() of the Blueprint {lib}, which has no such function")
         g = Function(f"{lib}::{name}")
         g.unit, g.key, g.cpp, g.text = lib, f"{lib}::{name}", f"{lib}::{name}", "(of another Blueprint)"
-        g.pure = bool(fn.get("pure"))
+        if not fn.get("pure"):
+            g.effect(f"a step of the Blueprint {lib}")
         # (what it asks the engine: whether its Blueprint - or one it uses - has a node of the engine; see invoke)
         g.asks_engine = info["engine"]
         g.class_defaults = []   # (what an input is where a call leaves it out: its default, as the level holds it)
@@ -2833,7 +2846,7 @@ class Unit:
                 if f not in self.converting:
                     raise Wait(f"{f.cpp}() is being converted")
                 for g in self.converting[self.converting.index(f):]:
-                    g.pure = False
+                    g.effect(f"it calls itself through {f.cpp}() (a circle: a value has none)")
                     if g is not f:
                         self.leaning.setdefault(g.key, set()).add(f.key)
             self.called(f.key)
@@ -2926,13 +2939,14 @@ class Unit:
             leans = e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
             why_waits = e["wait"]
             if leans:
-                e = dict(e, wait=None, pure=False)
+                e = dict(e, wait=None, pure=False, effects=[*e.get("effects", []), "it leans on a function of its circle"])
             # (a function of another part of this Blueprint is one of its own: called by its name)
             f = Function(e["name"] if e["unit"] == self.name else f"{e['unit']}::{e['name']}")
             f.unit, f.key, f.cpp, f.decl, f.file = e["unit"], key, e["cpp"], d, d.get("_file", "")
             f.wait = e["wait"]
             f.text = "" if e["wait"] else "(of another Blueprint)"
-            f.pure, f.params, f.kinds, f.result, f.indexes = e["pure"], [tuple(x) for x in e["params"]], list(e["kinds"]), e["result"], e["indexes"]
+            f.effects = [] if e["pure"] else list(e.get("effects") or ["a step (as written before)"])
+            f.params, f.kinds, f.result, f.indexes = [tuple(x) for x in e["params"]], list(e["kinds"]), e["result"], e["indexes"]
             f.fixed, f.result_fixed = {int(k): v for k, v in e["fixed"].items()}, e["result_fixed"]
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
@@ -2985,7 +2999,7 @@ class Unit:
         if getattr(f, "leans", False) and self.converting:
             self.asked.add(key)
             for g in self.converting:
-                g.pure = False   # (in a circle: a step)
+                g.effect(f"in a circle with {f.cpp}(), which leans on it")
             self.leaning.setdefault(self.converting[-1].key, set()).add(key)
         if f.unit == self.name:
             self.called(key)
@@ -2998,7 +3012,7 @@ class Unit:
 
     def entry_of(self, f):
         """What a call of a function of this Blueprint needs to know, for the table of the whole program."""
-        return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
+        return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "effects": list(f.effects), "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
@@ -3722,7 +3736,7 @@ class Emit:
             f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
                 or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
-                f.pure = False   # (it changes the Blueprint's variables: a step)
+                f.effect("it changes the Blueprint's variables")
         if d.get("kind") == "CXXConstructorDecl" and not f.state:
             # a constructor: a function that makes the object - it begins as the struct's default (the
             # defaults of the class's data), then what C++ makes of its fields (made_parts), then its body
@@ -3762,7 +3776,8 @@ class Emit:
         if not f.state and u.state is not None and any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in u.state_pointers for x in walk(d)):
             # (it reaches the state through a field of its object that holds it: the Blueprint's variables, which it may
             # change - a step)
-            f.sees_state, f.pure = True, False
+            f.sees_state = True
+            f.effect("it reaches the state through a field that holds it")
         assigned = self.assigned(body)
         self.assigned_ids = assigned
         copies = []
@@ -3826,10 +3841,11 @@ class Emit:
             if not kind and p["id"] in assigned:  # (an input by value is not a variable: what the body changes is a local copy)
                 copies.append((p, name, t))
         if "ref" in f.kinds:
-            f.pure = False   # (it changes a place of its caller: a step, not a value)
-        if (f.pure or (f.state and not f.mutates)) and self.writes_outside(d, body):
-            f.pure = False   # (it changes what is not its own - through a reference, a pointer, a call's place: a step)
-            if f.state:
+            f.effect("it changes a place of its caller (a reference input)")
+        outside = self.writes_outside(d, body)
+        if outside:
+            f.effect(outside)
+            if f.state and not f.mutates:
                 f.mutates = True   # (of a function of a state: what it changes may be the state's - through its getter, `game().pad`)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
@@ -4408,7 +4424,7 @@ class Emit:
         if len(kinds) != len(a) - 1:
             raise Wait("a format whose conversions are not its values")
         fmt, values = self.format_values(fmt, a[1:], kinds)
-        self.f.pure = False   # (a step: the log gets a line)
+        self.f.effect("it writes a line to the log")
         return self.take_pre() + [f"debug_print(text_format<{text_literal(fmt.encode('latin-1'))}>({', '.join(['-1'] + values)}), false);"]
 
     # ---- a function that names a place ----
@@ -4738,12 +4754,12 @@ class Emit:
     named_places = frozenset()
 
     def writes_outside(self, d, body):
-        """Does the function change anything but its own values - its locals and its inputs by value? What it
+        """What the function changes that is not its own value (a reason, see Function.effect) - or None. Does it change anything but its own values - its locals and its inputs by value? What it
         changes through a reference it declares (`PadState& p = game().pad; p.pressed = …`), through a pointer, at
         the place a call gives, a variable of the file or a field of an object: then it is a step, never a value
         (a function read as a value only computes)."""
         if body is None:
-            return False
+            return None
         own = {p["id"] for p in kids(d) if p.get("kind") == "ParmVarDecl" and "&" not in qtype(p) and "*" not in qtype(p)}
         own |= {v["id"] for v in walk(body) if v.get("kind") == "VarDecl" and v.get("storageClass") != "static"
                 and not qtype(v).rstrip().endswith("&") and "*" not in qtype(v)}
@@ -4763,7 +4779,16 @@ class Emit:
                             if not (x.get("name") or "").startswith("__") and x["id"] not in own:
                                 own.add(x["id"])
                                 grew = True
-        return any(i is None or i not in own for i in self.assigned(body, steps=True))
+        for i in sorted(self.assigned(body, steps=True), key=lambda x: (x is not None, str(x))):
+            if i is None:
+                return "it changes what is not a variable of its own (through a pointer, a reference, the place a call gives)"
+            if i not in own:
+                v = next((x for x in walk(body) if x.get("kind") == "VarDecl" and x.get("id") == i), None) or self.tree.decl.get(i) or {}
+                what = "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
+                       "a variable of the file" if v.get("kind") == "VarDecl" and self.tree.scope_of.get(i) is not None and not any(i == x["id"] for x in walk(body) if x.get("kind") == "VarDecl") else \
+                       "a pointer it holds" if "*" in qtype(v) else "what is not its own"
+                return f"it changes {v.get('name') or '?'} ({what})"
+        return None
 
     def steps_in(self, n):
         """Does working out this expression change something (a call that changes its object or what it is
@@ -4840,7 +4865,7 @@ class Emit:
         if u.engine_table().get(f["type"]) != (False, [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], []):
             raise Wait(f"the release of a {q.split('::')[-1]} (its node is another one in the engine)")
         u.engine_calls[f["decl"]["id"] + ":release"] = f
-        self.f.pure = False
+        self.f.effect(f"it releases a {q.split('::')[-1]} of the engine")
         return [f'if (math_compare<"!=">({self.cast("Float", handle)}, 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
 
     # ---- the objects of the engine a value holds: made with it, ended with it (Unit.held_life) ----
@@ -4976,7 +5001,7 @@ class Emit:
         g = self.u.function(dtor["id"])
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
-        self.f.pure = False
+        self.f.effect(f"it ends a {q.split('::')[-1]} (its destructor runs)")
         if g.state:
             if not self.f.state:
                 raise Wait(f"the end of the state {q.split('::')[-1]} outside a function of its Blueprint")
@@ -7728,7 +7753,7 @@ class Emit:
         texts = [self.ex(a, t) for a, t in zip(values, in_types)]
         if state and not gives and gives_type:
             raise Wait(f"a call of {function} on the Blueprint {actor} as a value, where it gives nothing")
-        self.f.pure = False   # (a step: what the other Blueprint does is not known here)
+        self.f.effect(f"it calls {function} on the Blueprint of {actor}")
         self.f.on_actors.append((actor, function))
         node = u.next_node
         u.next_node += 1
@@ -7882,7 +7907,7 @@ class Emit:
         if f["value"]:
             tmp = self.temp(d["name"], outs[0][1])
             return first + [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
-        self.f.pure = False   # (a step of the engine: the function changes something outside itself)
+        self.f.effect(f"it runs the engine's {f['type']}")
         if not outs:
             return first + [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
@@ -9417,7 +9442,7 @@ class Emit:
         handle = self.ex(kids(b)[0], "Int")   # (the object: its handle - also where C++ points at it)
         u.engine_calls[fd["id"]] = f
         self.f.asks_engine = True
-        self.f.pure = False   # (it binds a place of the engine: a statement before the one it stands in)
+        self.f.effect(f"it binds a place of the engine ({f['type']})")
         node = u.next_node
         u.next_node += 1
         fn = f["type"].replace(".", "_")
@@ -9759,7 +9784,8 @@ class Emit:
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
-            self.f.mutates, self.f.pure = True, False   # (what a function of the state it calls changes, it changes)
+            self.f.mutates = True   # (what a function of the state it calls changes, it changes)
+            self.f.effect(f"it calls {g.cpp}(), which changes the state")
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
             # an argument the call leaves out: the default the function's declaration gives it
@@ -9826,7 +9852,7 @@ class Emit:
             # a function that changes something outside itself (a place of its caller, a step of the engine) is
             # called as a step: the call keeps what it gave (n12 = F(...); n12.Result), and who calls it is such a
             # function too
-            self.f.pure = False
+            self.f.effect(f"it calls {g.cpp}(), a step")
             if gives is None:
                 self.hoist([f"{g.name}({', '.join(texts)});"])
             else:
@@ -16145,7 +16171,7 @@ def convert_unit(job):
     variables, functions, members, types = unit.parts()
     return {"name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
-            "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
+            "said": [f"    {f.cpp} ({f.lines}): " + (("written" + ("" if f.pure else f" (a step: {'; '.join(f.effects)})")) if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue(),
