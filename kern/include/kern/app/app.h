@@ -132,8 +132,27 @@ class Engine {
   /// The host of the slots (default: the platform's, kern/app/storage.h - natively the folder of the launch parameter
   /// saves=<folder>, else kern-saves). The slots read so far are read again from it.
   void set_storage(StorageHost& host);
-  /// Text shown by the host page in its status overlay (empty hides it).
+  /// The status line (kern/docs/app.md 6.): a text widget "status" at the top left that stays until it changes
+  /// (empty: gone) - the widgets' one way for a lasting line (loading, an error before the first frame).
   void set_status(const char* text);
+  /// Widgets, immediate mode (kern/docs/app.md 6.): named in every frame they are seen; x, y 0..1 in the view (0,0
+  /// top left), the widget hung by the same point of itself. An id: 1..64 characters, once a frame; a widget that is
+  /// none (an id, a place not finite) is not shown and last_error says why.
+  void ui_text(const char* id, const char* text, f32 x, f32 y);
+  /// A bar: `value` 0..1, `width` a share of the view's width.
+  void ui_bar(const char* id, const char* label, f32 value, f32 x, f32 y, f32 width);
+  /// A button: true in the frame after it was clicked or tapped.
+  bool ui_button(const char* id, const char* label, f32 x, f32 y);
+  /// A menu: `items` one a line ('\n'); the index chosen in the frame after the choice, else -1.
+  i32 ui_menu(const char* id, const char* items, f32 x, f32 y);
+  /// The widgets as the page got them last (JSON) - natively, what a test reads.
+  const std::string& ui_json() const { return ui_sent_; }
+  // ---- platform side (the app runtime) ----
+  /// An event of the page for the next frame: a button (index 0) or a menu's entry.
+  void ui_event(std::string_view id, i32 index);
+  void ui_begin();
+  /// The frame's widgets to the page, when they changed.
+  void ui_end();
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
   void request_pointer_lock(bool lock);
   /// Launch parameter `key` from the host (the page's query string by default), or `fallback`.
@@ -214,6 +233,17 @@ class Engine {
     json::Value values;     // key -> {"int": "..."} / {"float": x} / {"bool": b} / {"text": "..."}
     std::string broken;     // the host's text is no kern-save (why): not read, not written over
   };
+  struct Widget {
+    std::string kind, id, text;
+    f32 value = 0, x = 0, y = 0, width = 0;
+  };
+  std::string status_;
+  std::vector<Widget> widgets_;
+  std::vector<std::pair<std::string, i32>> ui_pending_, ui_events_;
+  std::string ui_sent_;
+  mutable std::vector<std::string> ui_said_;
+  bool ui_add(Widget w);
+  i32 ui_event_of(const std::string& id) const;
   StorageHost* storage_ = nullptr;
   std::vector<Slot> slots_;
   std::string loaded_text_;

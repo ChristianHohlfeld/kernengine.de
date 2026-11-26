@@ -21,9 +21,91 @@ export const KEY_CODES = Object.freeze([
 const KEY_INDEX = new Map(KEY_CODES.map((code, i) => [code, i]));
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Tab"]);
 
+const UI_STYLE = `
+.kern-ui { position: fixed; pointer-events: none; overflow: hidden; font: 15px system-ui, sans-serif; color: #eef3f8; z-index: 5; }
+.kern-ui > * { position: absolute; max-width: 90%; box-sizing: border-box; }
+.kern-ui-text { padding: 6px 10px; background: rgba(0,0,0,.5); border-radius: 6px; white-space: pre; }
+.kern-ui-bar { width: 25%; padding: 4px 8px; background: rgba(0,0,0,.5); border-radius: 6px; }
+.kern-ui-bar > div { height: 8px; margin-top: 3px; background: rgba(255,255,255,.2); border-radius: 4px; overflow: hidden; }
+.kern-ui-bar > div > div { height: 100%; background: #f2c230; }
+.kern-ui button { pointer-events: auto; font: inherit; color: inherit; padding: 8px 16px; margin: 2px 0; background: rgba(20,40,70,.85);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 8px; cursor: pointer; display: block; width: 100%; }
+.kern-ui button:hover, .kern-ui button:focus-visible { background: rgba(40,80,140,.95); outline: none; }
+.kern-ui-menu { padding: 6px; background: rgba(0,0,0,.55); border-radius: 10px; min-width: 12em; }
+`;
+
+/** The widgets' layer over `canvas`: `show(list)` draws the list the engine handed over, `event(id, index)` goes back. */
+function mountUi(canvas, event, onStatus) {
+  const doc = canvas.ownerDocument;
+  if (!doc.getElementById("kern-ui-style")) {
+    const st = doc.createElement("style");
+    st.id = "kern-ui-style";
+    st.textContent = UI_STYLE;
+    doc.head.appendChild(st);
+  }
+  const layer = doc.createElement("div");
+  layer.className = "kern-ui";
+  doc.body.appendChild(layer);
+  const fit = () => {
+    const r = canvas.getBoundingClientRect();
+    Object.assign(layer.style, {left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px"});
+  };
+  fit();
+  const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+  observer?.observe(canvas);
+  addEventListener("resize", fit);
+  let status = null;
+  return {
+    layer,
+    show(list) {
+      fit();
+      layer.replaceChildren();
+      let st = "";
+      for (const w of list) {
+        if (w.status) { st = w.text; if (onStatus) continue; }
+        let el;
+        if (w.kind === "text") { el = doc.createElement("div"); el.className = "kern-ui-text"; el.textContent = w.text; }
+        else if (w.kind === "bar") {
+          el = doc.createElement("div");
+          el.className = "kern-ui-bar";
+          el.style.width = (w.width * 100) + "%";
+          el.textContent = w.label;
+          const track = doc.createElement("div"), fill = doc.createElement("div");
+          fill.style.width = (w.value * 100) + "%";
+          track.appendChild(fill);
+          el.appendChild(track);
+        } else if (w.kind === "button") {
+          el = doc.createElement("button");
+          el.textContent = w.label;
+          el.style.width = "auto";
+          el.addEventListener("click", ev => { ev.stopPropagation(); event(w.id, 0); });
+        } else if (w.kind === "menu") {
+          el = doc.createElement("div");
+          el.className = "kern-ui-menu";
+          w.items.forEach((item, i) => {
+            const b = doc.createElement("button");
+            b.textContent = item;
+            b.addEventListener("click", ev => { ev.stopPropagation(); event(w.id, i); });
+            el.appendChild(b);
+          });
+        } else continue;
+        el.dataset.id = w.id;
+        el.dataset.kind = w.kind;
+        // the widget hangs by the same point of itself: x = 1 right-aligned, 0.5 centred
+        Object.assign(el.style, {left: (w.x * 100) + "%", top: (w.y * 100) + "%", transform: `translate(${-w.x * 100}%, ${-w.y * 100}%)`});
+        layer.appendChild(el);
+      }
+      if (st !== status) { status = st; onStatus?.(st); }
+    },
+    dispose() { observer?.disconnect(); removeEventListener("resize", fit); layer.remove(); },
+  };
+}
+
 /**
  * Starts the app in `canvas`. Module source: one of bytes / base64 / url / module.
- * `onStatus(text)` receives kern::Engine::set_status text.
+ * The app's widgets (kern::Engine::ui_text, ui_bar, ui_button, ui_menu and the status line set_status) are drawn
+ * over the canvas (class kern-ui); `onStatus(text)`, when given, receives the status line instead (a page that
+ * draws it itself).
  * `maxPixelRatio` caps the drawing-buffer density (default: full device ratio).
  * `audio` (default true): the engine's mixer (kern::Engine::mixer) is heard - after the page's first gesture, paused
  * while it is hidden (kern/web/audio.mjs); false: no sound device (a page that plays its own).
@@ -43,7 +125,15 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   const gl = canvas.getContext("webgl2", {alpha: false, antialias: false, depth: true, powerPreference: "high-performance", ...contextAttributes});
   if (!gl) throw Error("WebGL2 required");
   kern.attachContext(canvas, gl);
-  kern.statusSink = text => onStatus?.(text);
+  // the app's widgets (kern/docs/app.md 6.): drawn over the canvas; the status line goes to onStatus when the page
+  // draws it itself
+  const ui = mountUi(canvas, (id, index) => {
+    const text = kern.encoder.encode(id), ptr = e.kern_alloc(text.length + 1);
+    kern.u8.set(text, ptr);
+    e.kern_app_ui_event(ptr, text.length, index);
+    e.kern_free(ptr);
+  }, onStatus);
+  kern.uiSink = json => ui.show(JSON.parse(json));
   let input = null;
   kern.pointerLockSink = lock => { if (lock) input?.lock(); else input?.unlock(); };  // kern::Engine::request_pointer_lock
   const ratio = () => Math.min(globalThis.devicePixelRatio || 1, maxPixelRatio);
@@ -217,6 +307,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
       cancelAnimationFrame(handle);
       observer?.disconnect();
       for (const off of listeners) off();
+      ui.dispose();
       e.kern_app_stop();
     },
   };

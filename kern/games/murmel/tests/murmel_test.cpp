@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "kern/app/run.h"
+#include "kern/app/runtime.h"
 #include "kern/game/embedded.h"
 #include "murmel.h"
 
@@ -20,6 +21,7 @@ extern "C" kern::i32 kern_app_frame(kern::f64 now_ms, kern::i32 page_hidden);
 extern "C" void kern_app_key(kern::u32 key, kern::i32 down);
 extern "C" void kern_app_stop();
 extern "C" void kern_app_set_args(const char* text, kern::u32 length);
+extern "C" void kern_app_ui_event(const char* id, kern::u32 length, kern::i32 index);
 extern "C" const kern::f32* kern_app_audio(kern::u32 frames, kern::u32* out_len);
 
 using namespace kern;
@@ -34,6 +36,10 @@ struct Lauf {
   u32 toene = 0;
   std::string text;
   std::string erster_text;          // die Anzeige nach dem ersten Frame
+  std::string widgets_mitte;        // die Widgets der Seite in Frame 200 (Level 1) und am Ende
+  std::string widgets_ende;
+  int nach_wahl_level = -1;         // das Level, nachdem im Menü am Ende "Nur Level 2" gewählt wurde
+  bool nach_wahl_fertig = true;
   std::string stufen;               // wie die Blueprints der Welt laufen (am Ende, im Level 2)
   f32 lautest = 0;                  // der lauteste Wert, den die App-Laufzeit aus dem Mixer der Engine gab
 };
@@ -91,6 +97,7 @@ Lauf spiele(murmel::Murmel& spiel, int frames, bool zeigen) {
     const f32* pcm = kern_app_audio(800, &n);
     for (u32 k = 0; k < n; ++k) l.lautest = std::fmax(l.lautest, std::fabs(pcm[k]));
     if (i == 0) l.erster_text = spiel.text();
+    if (i == 200) l.widgets_mitte = app_runtime().engine().ui_json();
     if (spiel.level() == 1 && vorher == 0 && l.wechsel < 0) l.wechsel = i;
     if (spiel.fertig() && !war_fertig && l.geschafft < 0) l.geschafft = i;
     if (i % 60 == 0) {
@@ -108,6 +115,13 @@ Lauf spiele(murmel::Murmel& spiel, int frames, bool zeigen) {
   l.punkte = spiel.punkte();
   l.toene = spiel.toene();
   l.text = spiel.text();
+  l.widgets_ende = app_runtime().engine().ui_json();
+  // das Menü am Ende, wie die Seite es meldet: "Nur Level 2" (Eintrag 1) - im nächsten Frame beginnt Level 2
+  kern_app_ui_event("weiter", 6, 1);
+  kern_app_frame(frames * (1000.0 / 60.0), 0);
+  kern_app_frame((frames + 1) * (1000.0 / 60.0), 0);
+  l.nach_wahl_level = spiel.level();
+  l.nach_wahl_fertig = spiel.fertig();
   for (u32 k = 0; k < static_cast<u32>(Key::count); ++k) taste(static_cast<Key>(k), false);
   kern_app_stop();
   return l;
@@ -147,6 +161,12 @@ int main(int argc, char** argv) {
   std::printf("Stufen: %s\n", a.stufen.c_str());
   pruefe(a.stufen == std::string("Level: ") + MURMEL_STUFE + "; Sprungfeld: " + MURMEL_STUFE + "; ", "die Blueprints laufen als " MURMEL_STUFE);
   pruefe(spiel.bestwert() == MURMEL_PUNKTE, "der Bestwert ist der Punktestand des Laufs");
+  // die Anzeige sind Widgets der Engine (kern/docs/app.md 6.): Text, Balken, am Ende das Menü
+  std::printf("Widgets in Frame 200: %s\nWidgets am Ende: %s\n", a.widgets_mitte.c_str(), a.widgets_ende.c_str());
+  pruefe(a.widgets_mitte.find("\"kind\":\"text\",\"id\":\"stand\"") != std::string::npos && a.widgets_mitte.find("\"kind\":\"bar\",\"id\":\"muenzen\"") != std::string::npos,
+         "im Spiel: der Stand als Text, die Muenzen als Balken");
+  pruefe(a.widgets_ende.find("\"kind\":\"menu\",\"id\":\"weiter\"") != std::string::npos && a.widgets_ende.find("Nur Level 2") != std::string::npos, "am Ende: das Menue");
+  pruefe(a.nach_wahl_level == 1 && !a.nach_wahl_fertig, "die Wahl im Menue startet Level 2");
   pruefe(a.text.find("(Bestwert 65)") != std::string::npos, "die Anzeige nennt den Bestwert");
   // ein zweiter Lauf derselben App (die App-Laufzeit startet sie neu): dieselbe Spur, Zeile für Zeile - und der
   // Bestwert kommt aus dem Stand, den der erste schrieb

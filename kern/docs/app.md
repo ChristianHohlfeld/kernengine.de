@@ -106,3 +106,31 @@ der Sprache** (Int, Float, Bool, Text). Jeder Aufruf, der etwas ändert, schreib
 
 Geprüft: `app_storage_slots` (Werte aller Typen, Fehler, Host-Fehler, kaputter Stand). Murmel: der Bestwert
 (Slot `murmel`, Schlüssel `best`) steht in der Anzeige und überlebt einen Neustart der App.
+
+## 6. Anzeige: Widgets (B5)
+
+Ein kleiner, vollständiger Satz Widgets, **sofort-Modus**: die App nennt in jedem Frame, was zu sehen ist; was sie in
+einem Frame nicht nennt, verschwindet. Die Seite zeichnet sie (HTML über dem Bild, `kern/web/app.mjs`), Klicks und
+Berührungen kommen als Ereignisse zurück.
+
+| Widget | C++ / Knoten | |
+|---|---|---|
+| Text an Stelle | `engine.ui_text(id, text, x, y)` | `x`, `y` 0 … 1 im Bild (0,0 oben links); das Widget hängt mit demselben Punkt seiner selbst daran (x = 1: rechtsbündig, 0.5: mittig) – eine Angabe reicht für Ecken, Ränder und Mitte. Zeilenumbruch mit `\n`. |
+| Balken | `engine.ui_bar(id, label, value, x, y, width)` | `value` 0 … 1 (außerhalb: begrenzt), `width` Anteil der Bildbreite |
+| Knopf | `engine.ui_button(id, label, x, y)` → Bool | true in dem Frame nach dem Klick/Tippen (oder Enter/Leertaste auf dem Knopf mit Fokus) |
+| Menü/Liste | `engine.ui_menu(id, items, x, y)` → Int | `items` durch `\n` getrennt; der Index des gewählten Eintrags in dem Frame nach der Wahl, sonst −1 |
+| Statuszeile | `engine.set_status(text)` | **auf die Widgets abgebildet**: der Text-Widget `status` oben links, der bleibt, bis er sich ändert (leer: weg). |
+
+- **Warum set_status bleibt und abgebildet wird:** sie ist der eine Weg für eine *bleibende* Zeile (Laden, Fehler vor
+  dem ersten Frame), die anderen Widgets sind Frame für Frame. Beide gehen durch dieselbe Liste und dieselbe
+  Zeichnung; `onStatus` von `runKernApp` gibt es nur noch, damit eine Seite, die die Statuszeile selbst gestaltet,
+  sie bekommt (dann zeichnet die Ebene sie nicht). Der eigene Host-Aufruf `status` ist entfernt.
+- Fehler: eine Id außerhalb 1–64 Zeichen oder doppelt in einem Frame, Koordinaten nicht endlich: das Widget wird nicht
+  gezeigt, `last_error` sagt warum, das Log einmal je Id.
+- Plattform: `kern_env.ui(json)` nach jedem Frame, in dem sich die Liste geändert hat; `kern_app_ui_event(id, index)`
+  zurück (Knopf: 0, Menü: der Eintrag). Nativ hält `AppRuntime::engine().ui_json()` die letzte Liste.
+- Bewusst nicht: Layout-Container, Bilder, Eingabefelder, Gestaltung je Widget (das Aussehen ist das der Seite,
+  `.kern-ui` in app.mjs), Navigation mit dem Gamepad, ein UI-Editor (Widgets sind Aufrufe der App, keine Daten).
+
+Geprüft: `app_ui_widgets` (Liste, Ereignisse, Fehler, Status), Murmel: Punkte/Level als Text, Münzen als Balken, am Ende
+ein Menü „Noch einmal / Nur Level 2“; das e2e liest die Widgets der Seite und wählt im Menü.

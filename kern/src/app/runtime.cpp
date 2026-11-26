@@ -58,7 +58,10 @@ bool AppRuntime::start(i32 width, i32 height) {
   if (!engine_.mixer().ready() && !engine_.mixer().init(48000)) return fail("the mixer did not start: %s", last_error());
   // (what went wrong before the start is not its reason)
   clear_error();
-  if (!app_->start(engine_)) {
+  engine_.ui_begin();
+  const bool started = app_->start(engine_);
+  engine_.ui_end();   // (the status line of the start, before the first frame)
+  if (!started) {
     const std::string why = *last_error() ? last_error() : "its start() gave false and named no reason (an App says why with kern::fail)";
     engine_.renderer().shutdown();
     return fail("the App did not start: %s", why.c_str());
@@ -83,7 +86,9 @@ bool AppRuntime::frame(f64 now_ms, bool page_hidden) {
   if (!running_) return false;
   engine_.set_xr(false);
   const Frame frame = next_frame(now_ms);
+  engine_.ui_begin();
   app_->update(engine_, frame);
+  engine_.ui_end();
   engine_.input().end_frame();
   if (engine_.renderer().lost()) return true;
   RenderParams params;
@@ -134,7 +139,9 @@ bool AppRuntime::frame_xr(f64 now_ms, i32 count, const f32* views) {
       if (hf.x * hf.x + hf.z * hf.z > 1e-6f) engine_.set_xr_head_yaw(std::atan2(-hf.x, -hf.z) * (180.0f / kPi));
     }
   }
+  engine_.ui_begin();
   app_->update(engine_, frame);
+  engine_.ui_end();
   engine_.input().end_frame();
   if (engine_.renderer().lost()) return true;
   Camera cam = engine_.renderer().camera();
@@ -296,5 +303,7 @@ KERN_EXPORT(kern_app_touch) void kern_app_touch(i32 id, i32 phase, f32 x, f32 y)
 KERN_EXPORT(kern_app_gamepad) void kern_app_gamepad(i32 connected, f32 lx, f32 ly, f32 rx, f32 ry, f32 lt, f32 rt, u32 buttons) {
   input().set_gamepad({connected != 0, lx, ly, rx, ry, lt, rt, buttons});
 }
+/// A widget's event from the page (kern/docs/app.md 6.): a button (index 0) or a menu's entry - for the next frame.
+KERN_EXPORT(kern_app_ui_event) void kern_app_ui_event(const char* id, u32 length, i32 index) { app_runtime().engine().ui_event({id, length}, index); }
 KERN_EXPORT(kern_app_focus) void kern_app_focus(i32 focused) { input().set_focus(focused != 0); }
 KERN_EXPORT(kern_app_stop) void kern_app_stop() { app_runtime().stop(); }

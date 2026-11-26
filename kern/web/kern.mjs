@@ -275,7 +275,7 @@ export class KernModule {
     this.timer = null;
     this.drawBufferLists = new Map();
     this.heightSampler = null;  // (x, y) => ground height, used by the geometry builders
-    this.statusSink = null;     // (text) => void, kern::Engine::set_status
+    this.uiSink = null;         // (json) => void, the app's widgets after a frame they changed in (kern/docs/app.md 6.)
     this.pointerLockSink = null;  // (lock) => void, kern::Engine::request_pointer_lock
   }
 
@@ -366,7 +366,7 @@ export class KernModule {
     const env = {
       now: () => performance.now(),
       terrain_height: (x, y) => (self.heightSampler ? Number(self.heightSampler(x, y)) : 0),
-      status: (ptr, length) => self.statusSink?.(self.string(ptr, length)),
+      ui: (ptr, length) => self.uiSink?.(self.string(ptr, length)),
       pointer_lock: lock => self.pointerLockSink?.(lock !== 0),
       // the app's save slots (kern/docs/app.md 5., kern/app/storage.h): the page's localStorage under
       // "kern-save:<the page's folder>:<slot>" - two games on one site keep apart by their path

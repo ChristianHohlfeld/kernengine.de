@@ -35,7 +35,9 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   // a best score the page's storage holds already (kern/docs/app.md 5.: localStorage, the page's folder, the slot)
   await page.addInitScript(() => localStorage.setItem("kern-save:/kern/games/murmel/web/:murmel", JSON.stringify({format: "kern-save", version: 1, values: {best: {int: "42"}}})));
   await page.goto(base + "/kern/games/murmel/web/index.html");
-  const text = () => page.evaluate(() => document.getElementById("status").textContent);
+  // the game's display: the engine's widgets on the page (kern/docs/app.md 6.)
+  const text = () => page.evaluate(() => document.querySelector('.kern-ui [data-id="stand"]')?.textContent ?? "");
+  const coins = () => page.evaluate(() => document.querySelector('.kern-ui [data-id="muenzen"][data-kind="bar"]')?.textContent ?? "");
   const punkte = async () => Number((/Punkte (\d+)/.exec(await text()) || [])[1] ?? -1);
   check(await until(async () => /Level 1\/2/.test(await text()), 90000), "the game page starts level 1 (" + (await text()).split("\n")[0] + ")");
   check(await punkte() === 0, "it starts with 0 points");
@@ -44,7 +46,8 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   await page.keyboard.down("ArrowUp");
   check(await until(async () => await punkte() >= 10, 90000), "an arrow key rolls the marble over a coin: the points go up (" + (await text()).split("\n")[0] + ")");
   await page.keyboard.up("ArrowUp");
-  check(await until(async () => /Muenzen [1-3]\/3/.test(await text())), "the display counts the coin");
+  check(await until(async () => /Muenzen [1-3]\/3/.test(await coins())), "the bar counts the coin (" + (await coins()) + ")");
+  check(await page.evaluate(() => { const f = document.querySelector('.kern-ui [data-id="muenzen"] > div > div'); return f && parseFloat(f.style.width) > 30; }), "the bar is filled a third and more");
   // the sound (kern/docs/app.md 3.): the page's key was the gesture - the engine's mixer plays, the host pulls it
   const heard = () => page.evaluate(() => window.__kernApp?.audio);
   check(await until(async () => (await heard())?.state === "running"), "the key unlocked the sound device (" + JSON.stringify(await heard()) + ")");

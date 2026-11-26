@@ -23,8 +23,8 @@ const char* level_pfad(int nummer);
 /// Tasten, Knöpfe und Finger das sind, sagt das Projekt (settings.input, kern/docs/app.md 4.).
 kern::game::PlayInput steuerung(const kern::Engine& engine);
 
-/// Der Text der Anzeige: Level, Punkte, Münzen und was gerade los ist.
-std::string anzeige(int level, kern::f32 punkte, kern::u32 muenzen, kern::u32 alle, bool fertig, const std::string& meldung, kern::i64 bestwert);
+/// Der Text des Stands (das Widget "stand" oben links): Level, Punkte und Bestwert - am Ende "Geschafft!".
+std::string anzeige(int level, kern::f32 punkte, bool fertig, kern::i64 bestwert);
 
 /// Das Spiel: eine App der Engine.
 class Murmel final : public kern::App {

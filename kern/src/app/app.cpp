@@ -1,4 +1,4 @@
-// The application framework's own objects: Input bookkeeping and the Engine's host calls (status, pointer lock,
+// The application framework's own objects: Input bookkeeping and the Engine's host calls (pointer lock,
 // launch parameters). The app runtime - the App's start, frames and stop, and the C ABI the platform layer
 // (kern/web/app.mjs) drives - is kern/src/app/runtime.cpp.
 #include "kern/app/app.h"
@@ -174,22 +174,13 @@ f32 Engine::axis(const char* name) const {
 #if defined(__wasm__)
 #define KERN_ENV(name) __attribute__((import_module("kern_env"), import_name(#name)))
 extern "C" {
-KERN_ENV(status) void kern_env_status(const char* text, kern::u32 length);
 KERN_ENV(pointer_lock) void kern_env_pointer_lock(kern::i32 lock);
 }
 #else
-static void kern_env_status(const char* text, kern::u32 length) { std::printf("[status] %.*s\n", static_cast<int>(length), text); }
 static void kern_env_pointer_lock(kern::i32) {}
 #endif
 
 namespace kern {
-
-void Engine::set_status(const char* text) {
-  static char last[512] = {};
-  if (std::strncmp(last, text, sizeof last - 1) == 0) return;
-  std::snprintf(last, sizeof last, "%s", text);
-  kern_env_status(text, static_cast<u32>(std::strlen(text)));
-}
 
 void Engine::request_pointer_lock(bool lock) { kern_env_pointer_lock(lock ? 1 : 0); }
 

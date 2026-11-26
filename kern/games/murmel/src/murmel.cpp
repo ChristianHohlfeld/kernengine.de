@@ -23,17 +23,14 @@ game::PlayInput steuerung(const Engine& engine) {
   return in;
 }
 
-std::string anzeige(int level, f32 punkte, u32 muenzen, u32 alle, bool fertig, const std::string& meldung, i64 bestwert) {
+std::string anzeige(int level, f32 punkte, bool fertig, i64 bestwert) {
   char zeile[200];
   if (fertig) {
-    std::snprintf(zeile, sizeof zeile, "Geschafft! %d Punkte (Bestwert %lld) - Enter: noch einmal", static_cast<int>(punkte), static_cast<long long>(bestwert));
+    std::snprintf(zeile, sizeof zeile, "Geschafft! %d Punkte (Bestwert %lld)", static_cast<int>(punkte), static_cast<long long>(bestwert));
     return zeile;
   }
-  std::snprintf(zeile, sizeof zeile, "Level %d/%d   Punkte %d   Muenzen %u/%u   Bestwert %lld", level + 1, kLevels, static_cast<int>(punkte), muenzen, alle,
-                static_cast<long long>(bestwert));
-  std::string text = zeile;
-  if (!meldung.empty()) text += "\n" + meldung;
-  return text;
+  std::snprintf(zeile, sizeof zeile, "Level %d/%d   Punkte %d   Bestwert %lld", level + 1, kLevels, static_cast<int>(punkte), static_cast<long long>(bestwert));
+  return zeile;
 }
 
 Murmel& spiel() {
@@ -84,10 +81,12 @@ bool Murmel::lade(int nummer) {
 void Murmel::update(Engine& engine, const Frame& frame) {
   const game::PlayInput in = steuerung(engine);
   if (fertig_) {
-    if (engine.action_pressed("again")) {
+    // das Menü am Ende (kern/docs/app.md 6.: gewählt im Frame davor) - oder die Aktion again
+    const i32 wahl = engine.ui_menu("weiter", "Noch einmal\nNur Level 2", 0.5f, 0.6f);
+    if (wahl >= 0 || engine.action_pressed("again")) {
       vorher_ = 0;
       fertig_ = false;
-      if (!lade(0)) log(LogLevel::error, "%s", last_error());
+      if (!lade(wahl == 1 ? 1 : 0)) log(LogLevel::error, "%s", last_error());
     }
   } else {
     welt_->step(frame.dt, in);
@@ -121,8 +120,15 @@ void Murmel::update(Engine& engine, const Frame& frame) {
   bank_->prepare(4);
   audio_->update(*welt_, kamera_, frame.dt);
   const game::Hud& hud = welt_->hud();
-  text_ = anzeige(level_, punkte(), hud.pickups, hud.pickups_total, fertig_, hud.message_age < 3.0f ? hud.message : std::string(), bestwert_);
-  engine.set_status(text_.c_str());
+  // die Anzeige: der Stand oben links, die Münzen als Balken oben rechts, eine Meldung der Welt in der Mitte
+  text_ = anzeige(level_, punkte(), fertig_, bestwert_);
+  engine.ui_text("stand", text_.c_str(), 0, 0);
+  if (!fertig_) {
+    char muenzen[64];
+    std::snprintf(muenzen, sizeof muenzen, "Muenzen %u/%u", hud.pickups, hud.pickups_total);
+    engine.ui_bar("muenzen", muenzen, hud.pickups_total ? static_cast<f32>(hud.pickups) / static_cast<f32>(hud.pickups_total) : 0.0f, 1, 0, 0.25f);
+    if (hud.message_age < 3.0f && !hud.message.empty()) engine.ui_text("meldung", hud.message.c_str(), 0.5f, 0.2f);
+  }
 }
 
 void Murmel::stop(Engine& engine) {

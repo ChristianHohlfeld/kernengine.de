@@ -8780,6 +8780,51 @@ TEST(app_storage_slots) {
   CHECK(native2.load_int("t", "n", 0) == 3 && native2.erase_saved("t") && native2.load_int("t", "n", 0) == 0);
 }
 
+// Widgets (kern/docs/app.md 6.), immediate mode: what the App names in a frame is the list the page gets after it
+// (only when it changed); a button's or a menu's event from the page answers in the next frame; the status line is
+// the one widget that stays; a widget that is none is not shown and says why.
+TEST(app_ui_widgets) {
+  struct Hud final : App {
+    int frame = 0;
+    bool clicked = false;
+    i32 chosen = -2;
+    bool start(Engine& e) override { e.set_status("loading"); return true; }
+    void update(Engine& e, const Frame&) override {
+      ++frame;
+      if (frame == 2) e.set_status("");
+      e.ui_text("score", "Points 3", 0, 0);
+      e.ui_bar("coins", "Coins", 1.5f, 1, 0, 0.25f);
+      clicked = e.ui_button("again", "Again", 0.5f, 0.5f);
+      chosen = e.ui_menu("menu", "Play\nQuit", 0.5f, 0.7f);
+      if (frame == 3) e.ui_text("score", "twice", 0, 1);
+      if (frame == 4) e.ui_text("", "no id", 0, 0);
+      if (frame == 5) e.ui_text("bad", "nowhere", std::nanf(""), 0);
+    }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0 && rt.start(64, 48));
+  Engine& e = rt.engine();
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true}])");   // (the status of the start)
+  CHECK(rt.frame(0, false));
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true},{"kind":"text","id":"score","x":0,"y":0,"text":"Points 3"},)"
+                       R"({"kind":"bar","id":"coins","x":1,"y":0,"label":"Coins","value":1,"width":0.25},{"kind":"button","id":"again","x":0.5,"y":0.5,"label":"Again"},)"
+                       R"({"kind":"menu","id":"menu","x":0.5,"y":0.699999988079071,"items":["Play","Quit"]}])");
+  CHECK(!app.clicked && app.chosen == -1);
+  // the page's events: in the next frame, once
+  e.ui_event("again", 0);
+  e.ui_event("menu", 1);
+  CHECK(rt.frame(16, false) && app.clicked && app.chosen == 1 && e.ui_json().find("\"status\"") == std::string::npos);   // (status "" : gone)
+  CHECK(rt.frame(32, false) && !app.clicked && app.chosen == -1);
+  CHECK(std::string(last_error()) == "the widget text \"score\": the id stands twice in this frame - it is not shown");
+  CHECK(rt.frame(48, false) && std::string(last_error()) == "the widget text \"\": an id is 1 to 64 characters - it is not shown");
+  CHECK(rt.frame(64, false) && std::string(last_error()) == "the widget text \"bad\": its place, value or width is not a finite number - it is not shown");
+  // an entry the menu has not: no choice
+  e.ui_event("menu", 7);
+  CHECK(rt.frame(80, false) && app.chosen == -1);
+  rt.stop();
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).

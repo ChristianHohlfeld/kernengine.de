@@ -3912,7 +3912,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.engine.set_storage", {to_value(engine), to_value(host)}, {});
   }
-  /// Text shown by the host page in its status overlay (empty hides it).
+  /// The status line (kern/docs/app.md 6.): a text widget "status" at the top left that stays until it changes (empty: gone) - the widgets' one way for a lasting line (loading, an error before the first frame).
   void engine_engine_set_status(Int engine, const Text& text) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -3923,6 +3923,162 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.engine.set_status", {to_value(engine), to_value(text)}, {});
+  }
+  /// Widgets, immediate mode (kern/docs/app.md 6.): named in every frame they are seen; x, y 0..1 in the view (0,0 top left), the widget hung by the same point of itself. An id: 1..64 characters, once a frame; a widget that is none (an id, a place not finite) is not shown and last_error says why.
+  void engine_engine_ui_text(Int engine, const Text& id, const Text& text, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(text);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      kern_self->ui_text(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_text", {to_value(engine), to_value(id), to_value(text), to_value(x), to_value(y)}, {});
+  }
+  /// A bar: `value` 0..1, `width` a share of the view's width.
+  void engine_engine_ui_bar(Int engine, const Text& id, const Text& label, Float value, Float x, Float y, Float width) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_bar"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, value, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a3);
+      auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a4);
+      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, width, kern_a5);
+      kern_self->ui_bar(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_bar", {to_value(engine), to_value(id), to_value(label), to_value(value), to_value(x), to_value(y), to_value(width)}, {});
+  }
+  /// A button: true in the frame after it was clicked or tapped.
+  void engine_engine_ui_button(Int engine, const Text& id, const Text& label, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_button"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_button(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.ui_button", {to_value(engine), to_value(id), to_value(label), to_value(x), to_value(y)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_ui_button(KernNode& kern_n, Int engine, const Text& id, const Text& label, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.ui_button"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_button(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.ui_button", {to_value(engine), to_value(id), to_value(label), to_value(x), to_value(y)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// A menu: `items` one a line ('\n'); the index chosen in the frame after the choice, else -1.
+  void engine_engine_ui_menu(Int engine, const Text& id, const Text& items, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_menu"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(items);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_menu(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.ui_menu", {to_value(engine), to_value(id), to_value(items), to_value(x), to_value(y)}, {PinType::integer});
+  }
+  template <class KernNode> void engine_engine_ui_menu(KernNode& kern_n, Int engine, const Text& id, const Text& items, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.ui_menu"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(items);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_menu(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.ui_menu", {to_value(engine), to_value(id), to_value(items), to_value(x), to_value(y)}, {PinType::integer});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The widgets as the page got them last (JSON) - natively, what a test reads.
+  Text engine_engine_ui_json(Int engine) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_json"); return Text{}; }
+      decltype(auto) kern_r = kern_self->ui_json();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.engine.ui_json", {to_value(engine)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  /// ---- platform side (the app runtime) ---- An event of the page for the next frame: a button (index 0) or a menu's entry.
+  void engine_engine_ui_event(Int engine, const Text& id, Int index) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_event"); return; }
+      const std::string_view kern_a0 = id.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index, kern_a1);
+      kern_self->ui_event(kern_a0, std::move(kern_a1));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_event", {to_value(engine), to_value(id), to_value(index)}, {});
+  }
+  void engine_engine_ui_begin(Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_begin"); return; }
+      kern_self->ui_begin();
+      return;
+    }
+    this->kern_engine("engine.engine.ui_begin", {to_value(engine)}, {});
+  }
+  /// The frame's widgets to the page, when they changed.
+  void engine_engine_ui_end(Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_end"); return; }
+      kern_self->ui_end();
+      return;
+    }
+    this->kern_engine("engine.engine.ui_end", {to_value(engine)}, {});
   }
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
   void engine_engine_request_pointer_lock(Int engine, Bool lock) {
