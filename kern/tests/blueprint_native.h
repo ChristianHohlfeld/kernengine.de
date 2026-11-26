@@ -1414,7 +1414,7 @@ struct EnginePlaces : kern::Blueprint {
   };
 
   // ---- variables ----
-  Int Builder = 0;
+  Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
   Int Length = 0;
   Int At = 0;
   Int X = 0;
@@ -1509,7 +1509,7 @@ struct EnginePlaces : kern::Blueprint {
   }
 
   // ---- what nodes give and keep ----
-  struct { Int result = 0; } n1;
+  struct { Object<kern::BuildingBuilder> result = Object<kern::BuildingBuilder>{}; } n1;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
   struct { Int index = 0; } n3;
   struct { Bool removed = false; } n4;
