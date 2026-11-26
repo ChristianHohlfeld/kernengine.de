@@ -140,3 +140,7 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - konverter8: bind(GameWorld&) entworfen und im Bau (Fall worldrules/worldmix), noch nicht gepusht. C++-Form: `g_rules.bind(w)`.
 - work-zahlen af3fb833 (Glue-Fix Exporte); CI 45875999709 (47aa67f5) rot — Jobs offen. Editor c836e0f5 eingemischt, CI 45877234547 läuft; e2e-Beleg 45874580610 grün.
 - mathe (acht Funktionen): läuft, noch kein Push.
+
+## Nachtrag 26.11. 20:16 — FREIGABE des Besitzers
+- Wörtlich: „Mach alles final und du hast von mir das Go für main merge fully". → Nach Abschluss darf der Koordinator nach main mischen (ohne Rückfrage). Bedingungen bleiben: ganzes Gate grün (auch SpawnCity-Jobs mit verkleinertem Spiel), Deploy nur bei grüner CI, kein force-push, Changelog-Eintrag (Berliner Zeit) für das, was live geht.
+- Weg: work-konverter(bind an Welt) → work-projekt; work-zahlen(+Editor, Murmel bitgenau) → work-projekt; work-spiel einmischen, voller Lauf auf mag (Kandidat 10), Level neu → Gate ganz grün → Changelog → main.
