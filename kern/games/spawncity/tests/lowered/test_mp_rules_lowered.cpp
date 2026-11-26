@@ -2660,8 +2660,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // locate_map_peer(Vec2, f32, f32, f32, f32, f32)  ->  locate_map_peer(Vec2, f32, f32, f32, f32, f32)
-    ::sc::lowered::Tally tally("locate_map_peer(Vec2, f32, f32, f32, f32, f32)");
+  {  // locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)  ->  locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)
+    ::sc::lowered::Tally tally("locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
@@ -2677,8 +2677,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kVoiceRadius, ::sc_new_mp_rules::sc::mp::kVoiceRadius);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kPingRemoveM, ::sc_new_mp_rules::sc::mp::kPingRemoveM);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::g_palette, ::sc_new_mp_rules::sc::mp::g_palette);
-      ::sc::lowered::Arg<Vec2> o0;
-      ::sc::lowered::Arg<Vec2> n0;
+      ::sc::lowered::Arg<kern::Vec2> o0;
+      ::sc::lowered::Arg<kern::Vec2> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<f32> o1;
       ::sc::lowered::Arg<f32> n1;
@@ -2720,8 +2720,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // safe_mobile_marker_point(Vec2, f32, f32, bool)  ->  safe_mobile_marker_point(Vec2, f32, f32, bool)
-    ::sc::lowered::Tally tally("safe_mobile_marker_point(Vec2, f32, f32, bool)");
+  {  // safe_mobile_marker_point(kern::Vec2, f32, f32, bool)  ->  safe_mobile_marker_point(kern::Vec2, f32, f32, bool)
+    ::sc::lowered::Tally tally("safe_mobile_marker_point(kern::Vec2, f32, f32, bool)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
@@ -2737,8 +2737,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kVoiceRadius, ::sc_new_mp_rules::sc::mp::kVoiceRadius);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kPingRemoveM, ::sc_new_mp_rules::sc::mp::kPingRemoveM);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::g_palette, ::sc_new_mp_rules::sc::mp::g_palette);
-      ::sc::lowered::Arg<Vec2> o0;
-      ::sc::lowered::Arg<Vec2> n0;
+      ::sc::lowered::Arg<kern::Vec2> o0;
+      ::sc::lowered::Arg<kern::Vec2> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<f32> o1;
       ::sc::lowered::Arg<f32> n1;
@@ -2819,8 +2819,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // PingBoard::toggle(u8, Vec3, u32, f64)  ->  PingBoard::toggle(u8, Vec3, u32, f64)
-    ::sc::lowered::Tally tally("PingBoard::toggle(u8, Vec3, u32, f64)");
+  {  // PingBoard::toggle(u8, kern::Vec3, u32, f64)  ->  PingBoard::toggle(u8, kern::Vec3, u32, f64)
+    ::sc::lowered::Tally tally("PingBoard::toggle(u8, kern::Vec3, u32, f64)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
@@ -2843,8 +2843,8 @@ SC_TEST(lowered_mp_rules_cpp) {
       ::sc::lowered::Arg<u8> o0;
       ::sc::lowered::Arg<u8> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<u32> o2;
       ::sc::lowered::Arg<u32> n2;

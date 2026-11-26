@@ -448,19 +448,19 @@ template <> struct Values<::sc::AreaKind> { static constexpr long long all[] = {
 
 namespace sc {
 SC_TEST(lowered_road_graph_cpp) {
-  {  // RoadGraph::path(Vec2, Vec2, std::vector<Vec2> &)  ->  RoadGraph::path(Vec2, Vec2, std::vector<Vec2> &)
-    ::sc::lowered::Tally tally("RoadGraph::path(Vec2, Vec2, std::vector<Vec2> &)");
+  {  // RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)  ->  RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)
+    ::sc::lowered::Tally tally("RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_road_graph::sc::RoadGraph o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
       ::sc_new_road_graph::sc::RoadGraph n_self{};
       ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<Vec2> o0;
-      ::sc::lowered::Arg<Vec2> n0;
+      ::sc::lowered::Arg<kern::Vec2> o0;
+      ::sc::lowered::Arg<kern::Vec2> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec2> o1;
-      ::sc::lowered::Arg<Vec2> n1;
+      ::sc::lowered::Arg<kern::Vec2> o1;
+      ::sc::lowered::Arg<kern::Vec2> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<std::vector<Vec2> &> o2;
       ::sc::lowered::Arg<std::vector<Vec2> &> n2;
