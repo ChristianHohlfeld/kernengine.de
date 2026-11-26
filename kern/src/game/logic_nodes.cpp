@@ -386,14 +386,14 @@ void bind_actor_nodes(logic::Library& lib) {
     return 0;
   });
   bind(lib, "actor.set_light", [](Context& c) {
-    const logic::ActorHandle to{c.in_actor("target")};
+    const logic::ActorHandle to = c.in_actor("target");
     const Vec3 color = c.in_vector("color");
     const f64 intensity = c.in_number("intensity"), range = c.in_number("range");
     if (GameWorld* w = world(c)) nodes::actor_set_light(*w, c.self(), c.host(), to, color, intensity, range);
     return 0;
   });
   bind(lib, "actor.set_color", [](Context& c) {
-    const logic::ActorHandle to{c.in_actor("target")};
+    const logic::ActorHandle to = c.in_actor("target");
     const Vec3 color = c.in_vector("color");
     if (GameWorld* w = world(c)) nodes::actor_set_color(*w, c.self(), c.host(), to, color);
     return 0;

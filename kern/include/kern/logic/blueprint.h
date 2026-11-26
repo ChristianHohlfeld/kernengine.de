@@ -193,14 +193,15 @@ struct BlueprintCore : logic::PureNodes {
   /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{}).
   template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
     logic::ActorRef to = 0;
-    if (kern_world.runtime && kern_actor_here(target, "Call Event", to))
-      kern_world.runtime->call(Name.view(), to, {{"actor", logic::Value::actor(actor)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
+    if (logic::Runtime* there = kern_runtime_of(target, "Call Event", to))
+      there->call(Name.view(), to, {{"actor", logic::Value::actor(actor)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
   }
-  /// The id an Actor names in the runtime of the class (Runtime::actor_here: one of another world names nothing, and the
-  /// host is told why). A class without a runtime reaches no actor.
-  bool kern_actor_here(Actor a, std::string_view node, logic::ActorRef& id) const {
+  /// The runtime that runs the Blueprint of an Actor, and its id there (Runtime::runtime_of: the class's own for an actor
+  /// of its world, a world the program runs for a program's Blueprint; null - the host is told why - where none). A
+  /// class without a runtime reaches no actor.
+  logic::Runtime* kern_runtime_of(Actor a, std::string_view node, logic::ActorRef& id) const {
     id = 0;
-    return kern_world.runtime && kern_world.runtime->actor_here(kern_world.instance ? std::string_view(kern_world.instance->name()) : std::string_view("a class"), a, node, id);
+    return kern_world.runtime ? kern_world.runtime->runtime_of(kern_world.instance ? std::string_view(kern_world.instance->name()) : std::string_view("a class"), a, node, id) : nullptr;
   }
 
   /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{}: the Level's)
@@ -222,14 +223,16 @@ struct BlueprintCore : logic::PureNodes {
   template <Setting Name, class T> T func_get_on(Actor target) {
     logic::Value held;
     logic::ActorRef id = 0;
-    if (!kern_actor_here(target, "Get Variable on Actor", id) || !kern_world.runtime->get_on(id, Name.view(), logic::pin_type_of<T>(), held)) return T{};
+    logic::Runtime* there = kern_runtime_of(target, "Get Variable on Actor", id);
+    if (!there || !there->get_on(id, Name.view(), logic::pin_type_of<T>(), held)) return T{};
     return logic::from_value<T>(held.converted(logic::pin_type_of<T>()));
   }
   /// Has Blueprint: does `target` (Actor{}: the Level) have a Blueprint that runs - what Call on Actor
   /// and Get Variable on Actor reach? func_has_blueprint(actor_find("Wanted")).
   Bool func_has_blueprint(Actor target) const {
     logic::ActorRef id = 0;
-    return kern_actor_here(target, "Has Blueprint", id) && kern_world.runtime->has_blueprint(id);
+    logic::Runtime* there = kern_runtime_of(target, "Has Blueprint", id);
+    return there && there->has_blueprint(id);
   }
   /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` is as the interface I
   /// (Runtime::engine_object: what fails is told to the host, as in the interpreter) -

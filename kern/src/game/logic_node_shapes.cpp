@@ -225,7 +225,7 @@ void add_actor_nodes(logic::Library& lib) {
                      {data("spawned", "Spawned", PinType::actor)},
                      "A copy of a template of the level (an actor marked Template, with its children, components and Blueprint) - replicated to every player.",
                      "create instantiate clone copy template");
-    d.params = {param("template", "Template name", ParamDef::Kind::text, "")};
+    d.params = {param("template", "Template", ParamDef::Kind::actor_template, "")};
     // (which templates a level has is known when it runs: an unknown or empty name is an error then, naming them)
     lib.add(std::move(d));
   }

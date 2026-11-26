@@ -1461,13 +1461,14 @@ TEST(game_level_round_trip_and_validation) {
   CHECK(back.actors.size() == l.actors.size());
   CHECK(game::validate(back).empty() || !game::validate(back)[0].error);
   for (const game::Issue& i : game::validate(back)) CHECK(!i.error);
-  // Orb Run round-trips too and has 24 orbs, one player, a city.
+  // Orb Run round-trips too and has 24 orbs, one player, a city (and the template of a joining player's car).
   const game::Level orb = game::orb_run_level();
   game::Level orb2;
   CHECK(game::from_text(game::to_text(orb), orb2, &error));
   u32 orbs = 0, players = 0, cities = 0;
-  for (const game::Actor& a : orb2.actors) { orbs += a.pickup ? 1 : 0; players += a.controller ? 1 : 0; cities += a.city ? 1 : 0; }
+  for (const game::Actor& a : orb2.actors) { orbs += a.pickup ? 1 : 0; players += a.controller && !a.is_template ? 1 : 0; cities += a.city ? 1 : 0; }
   CHECK(orbs == 24 && players == 1 && cities == 1);
+  CHECK(!orb2.world.pawn_template.empty() && game::default_player(orb2) != 0);
   for (const game::Issue& i : game::validate(orb2)) CHECK(!i.error);
   // Rejections and repairs.
   CHECK(!game::from_text("{\"format\":\"other\"}", back, &error));
@@ -3793,6 +3794,9 @@ TEST(world_spawn_errors) {
   // No template of that name: the level's templates are named.
   CHECK(f.world->spawn("Barrel", {}).id == 0);
   CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  // A player's pawn is a copy of a template too (add_pawn: the one way of copying) - with a player controller.
+  CHECK(f.world->add_pawn("Barrel") == 0 && std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  CHECK(f.world->add_pawn("Crate") == 0 && std::string(last_error()) == "add pawn: the template \"Crate\" has no player controller");
   // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
   CHECK(f.world->spawn("", {}).id == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
   // An actor of the world is no template.
@@ -3836,6 +3840,27 @@ TEST(world_spawn_errors) {
       if (a.name == "Crate") { a.controller = game::ControllerComponent{}; x.world.player = a.id; }
     CHECK(game::default_player(x) == 0);   // (a template's controller is no player of the world)
     CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
+  }
+  {
+    // Spawn Actor names a template of the level: the level's check knows them (the node alone is valid with its default).
+    game::Level x = template_level();
+    x.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.spawn","params":{"template":"Nothing"}},
+      {"id":3,"type":"actor.spawn"},{"id":4,"type":"actor.spawn","params":{"template":"Crate"}}],"links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})");
+    std::vector<std::string> errors;
+    for (const game::Issue& i : game::validate(x)) if (i.error) errors.push_back(i.text);
+    CHECK(errors.size() == 2);
+    CHECK(errors.size() == 2 && errors[0] == "the level's graph: Spawn Actor (node 2) names no template of the level: \"Nothing\" - its templates: Crate, Coin");
+    CHECK(errors.size() == 2 && errors[1] == "the level's graph: Spawn Actor (node 3) names no template - its templates: Crate, Coin");
+    CHECK(!f.world->start(x, game::SimMode::simulate));
+    CHECK(no_errors(logic::check(x.logic)));   // (the graph alone: valid - its nodes with their defaults)
+  }
+  {
+    // world.pawnTemplate names a template with a player controller.
+    game::Level x = template_level();
+    x.world.pawn_template = "Barrel";
+    CHECK(first_error(x) == "world.pawnTemplate \"Barrel\" is no template of the level (its templates: Crate, Coin)");
+    x.world.pawn_template = "Crate";
+    CHECK(first_error(x) == "world.pawnTemplate \"Crate\": the template has no player controller");
   }
   {
     // "template" in the file must be true or false.
@@ -5303,7 +5328,7 @@ TEST(game_blueprints_as_classes) {
   for (const char* happened :
        {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
         "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
-        "event: Logic error: Spawn Actor: no template \"Nothing\" - the level's templates: Template", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
+"event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
     if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
     CHECK(played.text.find(happened) != std::string::npos);
   }
@@ -8982,6 +9007,196 @@ TEST(program_from_the_project) {
 // starts level A, ends it, starts level B - what it keeps (here: points) is its own and stays. The project holds the
 // texts of its levels (Project::level_texts; embedded_project() fills them); errors say why: no project, a path that is
 // none of its levels (named), a level not loaded, a text that is no level.
+// A device profile's world settings (kern/app/project.h DeviceProfile::world): laid on the level's when a world of
+// the project starts it - the level's first, then the profile's keys; unknown keys are errors with the names.
+TEST(world_takes_its_device_profile) {
+  game::Level a = game::basic_level();
+  a.world.shadow_distance = 110;
+  a.world.step_hz = 240;
+  game::Project pr;
+  pr.name = "Geraete";
+  pr.levels = {"a.klevel"};
+  pr.level_texts = {{"a.klevel", game::to_text(a)}};
+  std::string error;
+  // In the file: a profile with "world".
+  const char* text = R"({"format":"kern-project","version":1,"name":"Geraete","levels":["a.klevel"],"settings":{"profiles":[
+    {"name":"mobile","renderer":{},"world":{"shadowDistance":70,"substeps":2}},{"name":"laptop"}]}})";
+  game::Project read;
+  CHECK(game::from_text(text, read, &error));
+  CHECK(read.settings.profile("mobile") && read.settings.profile("mobile")->world["shadowDistance"].as_number() == 70);
+  CHECK(read.settings.profile("laptop") && read.settings.profile("laptop")->world.size() == 0);
+  // It is written as it is read.
+  game::Project again;
+  CHECK(game::from_text(game::to_text(read), again, &error) && again.settings.profile("mobile")->world["substeps"].as_number() == 2);
+  // A key WorldSettings does not have: where, and the names it has.
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"shadowDistanz":70}}]}})", read, &error));
+  CHECK(error.find("settings: profiles[0] \"mobile\".world: unknown key \"shadowDistanz\" - one of ") != std::string::npos && error.find("shadowDistance") != std::string::npos);
+  // A value the level's reader does not take; a world that is no object.
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"groundColor":"green"}}]}})", read, &error) && error.find("groundColor") != std::string::npos);
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":7}]}})", read, &error) && error.find("profiles[0].world: must be an object") != std::string::npos);
+  // A world of the project with the profile: the level's settings, the profile's keys on top.
+  CHECK(game::from_text(text, read, &error));
+  read.level_texts = pr.level_texts;
+  Renderer renderer;
+  game::GameWorld world(renderer);
+  world.set_project(&read);
+  CHECK(world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(world.level().world.shadow_distance == 110 && world.level().world.substeps == a.world.substeps);   // (no profile: the level's)
+  world.stop();
+  world.set_profile("mobile");
+  CHECK(world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(world.level().world.shadow_distance == 70 && world.level().world.substeps == 2 && world.level().world.step_hz == 240);
+  world.stop();
+  world.set_profile("tablet");
+  CHECK(!world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(std::string(last_error()) == "start: the device profile \"tablet\" is none of the project's (it has: mobile, laptop)");
+}
+
+// A program reaches the actors of the worlds it runs (kern/docs/project.md 7): its host looks up the runtime of the
+// world an Actor names (Host::world_runtime) - read a variable, call a function, raise an event, ask Has Blueprint -,
+// in the interpreter and in a Blueprint's class alike; an actor of a world that does not run any more reaches nothing
+// and says why; a world reaches no actor of the program and none of another world.
+TEST(program_reaches_actors_of_its_worlds) {
+  game::Level l = game::basic_level();
+  l.name = "Raum";
+  game::Actor door;
+  door.name = "Door";
+  door.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "  Int Bumps = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit() {\n"
+                        "    Hits += 1;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Bump\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    Bumps += 1;\n"
+                        "  }\n"
+                        "  KERN_EVENT(on2, event_custom<\"Back\">)\n"
+                        "  void on2(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n3.hits));\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n3;\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Door): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  logic::Graph main;
+  error.clear();
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint {\n"
+                        "  Int Got = -1;\n"
+                        "  Int Seen = -1;\n"
+                        "  Bool Has = false;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  KERN_EXTERN HitResult Hit();\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
+                        "    Got = n2.hits;\n"
+                        "    flow_call<\"Bump\">(actor, Actor{}, 0.0, \"\");\n"
+                        "    Seen = func_get_on<\"Bumps\", Int>(actor);\n"
+                        "    Has = func_has_blueprint(actor);\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n2;\n"
+                        "};\n", main, nullptr, &error));
+  if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Main): %s\n", error.c_str());
+  game::Project pr;
+  pr.name = "Fern";
+  pr.levels = {"raum.klevel"};
+  pr.level_texts = {{"raum.klevel", game::to_text(l)}};
+  pr.blueprints.push_back({"Main", main, ""});
+  struct Cpp final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } cpp;
+  game::Program program;
+  CHECK(program.start(pr, cpp, &error));
+  logic::Runtime* rt = program.runtime();
+  logic::EngineObjects* objects = rt ? rt->host().engine_objects() : nullptr;
+  CHECK(objects != nullptr);
+  if (!rt || !objects) return;
+  // two worlds of the program, of the same level: their doors have the same id
+  Renderer renderer;
+  const auto make = [&]() -> game::GameWorld* {
+    std::vector<logic::Value> out(1);
+    if (!logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out)) return nullptr;
+    game::GameWorld* w = objects->get<game::GameWorld>(out[0].as_object());
+    return w && w->start_level("raum.klevel", game::SimMode::play) ? w : nullptr;
+  };
+  game::GameWorld* wa = make();
+  game::GameWorld* wb = make();
+  CHECK(wa && wb && wa != wb);
+  if (!wa || !wb) return;
+  CHECK(objects->all<game::GameWorld>() == (std::vector<game::GameWorld*>{wa, wb}));
+  wa->step(1.0f / 60, game::PlayInput{});
+  wb->step(1.0f / 60, game::PlayInput{});
+  const logic::ActorHandle a_door = wa->actor_named("Door"), b_door = wb->actor_named("Door");
+  CHECK(a_door.id == door_id && b_door.id == door_id && a_door.world == wa->world_id() && b_door.world == wb->world_id() && a_door.world != b_door.world);
+  CHECK(wa->actor_named("Nobody") == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Nobody\": the world has no actor of that name");
+  CHECK(rt->host().world() != wa->world_id() && rt->host().world() != wb->world_id());   // (the program is no world of them)
+  const auto var = [](game::GameWorld* w, const char* name) { const logic::Instance* i = w->logic_runtime() ? w->logic_runtime()->find(w->find_actor("Door")) : nullptr; return i ? i->get(name).as_int() : -1; };
+  const auto main_now = [&](const char* name) { const logic::Instance* i = rt->find(1); return i ? i->get(name) : logic::Value{}; };
+  const auto poke = [&](logic::ActorHandle who) { rt->call("Poke", 0, {{"actor", logic::Value::actor(who)}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}}); };
+  program.said();
+  // world A's door from the program: called, its event raised, its variable read - B's door is not touched
+  poke(a_door);
+  CHECK(var(wa, "Hits") == 1 && var(wa, "Bumps") == 1 && var(wb, "Hits") == 0 && var(wb, "Bumps") == 0);
+  CHECK(main_now("Got").as_int() == 1 && main_now("Seen").as_int() == 1 && main_now("Has").as_bool());
+  poke(b_door);
+  CHECK(var(wa, "Hits") == 1 && var(wb, "Hits") == 1 && var(wb, "Bumps") == 1 && main_now("Got").as_int() == 1);
+  CHECK(program.said().empty());
+  // a program Blueprint's class reaches them the same way (BlueprintCore::kern_runtime_of - Runtime::runtime_of)
+  struct Reach : kern::Blueprint {
+    Bool Has = false;
+    Int Hits = -1;
+    void run(Actor x) {
+      Has = func_has_blueprint(x);
+      Hits = func_get_on<"Hits", Int>(x);
+    }
+  } reach;
+  reach.kern_world.host = &rt->host();
+  reach.kern_world.runtime = rt;
+  reach.run(a_door);
+  CHECK(reach.Has && reach.Hits == 1);
+  // world B stops: its door reaches nothing any more, and the program is told why
+  wb->stop();
+  poke(b_door);
+  CHECK(var(wa, "Hits") == 1 && main_now("Got").as_int() == 0 && main_now("Seen").as_int() == 0 && !main_now("Has").as_bool());
+  bool told = false;
+  for (const std::string& e : program.said())
+    told |= e.find("error: Main: Call on Actor: actor " + std::to_string(door_id) + " is of world " + std::to_string(b_door.world) + ", this Blueprint runs in world " +
+                   std::to_string(rt->host().world()) + " - its world does not run any more (the GameWorld was stopped)") != std::string::npos;
+  CHECK(told);
+  reach.run(b_door);
+  CHECK(!reach.Has && reach.Hits == 0);
+  // started again it is a new world: the Actor of the world before names nothing in it
+  CHECK(wb->start_level("raum.klevel", game::SimMode::play) && wb->world_id() != b_door.world);
+  program.said();
+  poke(b_door);
+  told = false;
+  for (const std::string& e : program.said()) told |= e.find("- no world of this program runs as world " + std::to_string(b_door.world)) != std::string::npos;
+  CHECK(told && var(wb, "Hits") == 0);
+  // a world reaches no actor of the program (and none of another world): Door of A, given the program's Main
+  wa->events().clear();
+  wa->logic_runtime()->call("Back", door_id, {{"actor", logic::Value::actor(logic::ActorHandle{1, rt->host().world()})}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+  wa->logic_runtime()->call("Back", door_id, {{"actor", logic::Value::actor(wb->actor_named("Door"))}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+  wa->step(1.0f / 60, game::PlayInput{});
+  int refused = 0;
+  for (const std::string& e : wa->events()) refused += e.find("Logic error: Door: Call on Actor: actor ") != std::string::npos && e.find("- an actor names nothing in another world") != std::string::npos;
+  CHECK(refused == 2 && var(wa, "Hits") == 1 && var(wb, "Hits") == 0);
+  wa->stop();
+  wb->stop();
+  program.end();
+}
+
 TEST(world_starts_a_level_of_its_project) {
   game::Level a = game::basic_level(), b = game::basic_level();
   a.name = "Erstes";
@@ -9064,12 +9279,20 @@ TEST(program_world_has_the_project) {
   CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* world = objects->get<game::GameWorld>(out[0].as_object());
   CHECK(world && world->project() == program.project() && world->project()->name == "Welten");
+  CHECK(world && world->profile().empty());   // (no device profile: the start's)
+  // the program's device profile (kern::run hands it Engine::profile): a world it makes from now on runs on it
+  program.set_profile("mobile");
+  CHECK(program.profile() == "mobile");
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
+  game::GameWorld* profiled = objects->get<game::GameWorld>(out[0].as_object());
+  CHECK(profiled && profiled->project() == program.project() && profiled->profile() == "mobile");
   // (made elsewhere: no project)
   logic::EngineObjects other;
   CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::object(other.ref(other.adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* alone = other.get<game::GameWorld>(out[0].as_object());
-  CHECK(alone && alone->project() == nullptr);
+  CHECK(alone && alone->project() == nullptr && alone->profile().empty());
   program.end();
+  CHECK(program.profile().empty());
 }
 
 // A world a program makes from its Engine is a world of its project (kern/docs/project.md 3.): an App of C++ run with
@@ -10446,6 +10669,7 @@ TEST(net_game_soldier_replication) {
   for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {40, 40, 0.5f};
   add_soldier(l, {0, 0, 0.8f});
   const game::ActorId dummy = add_dummy(l, {12, 0, 0.725f});
+  game_cases::add_pawn_template(l, "Soldier");   // (the joining players' pawns: world.pawnTemplate)
   net::LoopbackNetwork hub(5);
   hub.simulator().settings.latency_ms = 40;
   hub.simulator().settings.jitter_ms = 5;
@@ -10534,6 +10758,7 @@ TEST(net_game_replicates_logic_changes) {
   crate.body = game::BodyComponent{};
   crate.is_template = true;   // (the copies are in the world, the template is not: kern/docs/runtime_actors.md)
   l.add(crate);
+  game_cases::add_pawn_template(l, "Soldier");   // (the joining players' pawns: world.pawnTemplate)
   l.logic = logic_graph(R"({"nodes":[{"id":1,"type":"game.input","params":{"action":"interact"}},
       {"id":2,"type":"actor.find","values":{"name":"Door"}},{"id":3,"type":"actor.set_location","values":{"location":[10,0,4.5]}},
       {"id":4,"type":"actor.set_color","values":{"color":[1,0,0]}},{"id":5,"type":"actor.spawn","params":{"template":"Crate"},"values":{"location":[2,2,3]}}],
@@ -10631,6 +10856,9 @@ TEST(net_game_server_and_clients) {
   crate.body = game::BodyComponent{};
   const game::ActorId crate_id = l.add(crate).id;
   l.world.goal = game::GameGoal::collect_all;
+  game_cases::add_pawn_template(l, "Ball");   // (the joining players' pawns: copies of a template, world.pawnTemplate)
+  game::ActorId ball_template = 0;
+  for (const game::Actor& a : l.actors) if (a.is_template && a.name == "Ball") ball_template = a.id;
 
   net::LoopbackNetwork hub(11);
   hub.simulator().settings.latency_ms = 30;
@@ -10661,7 +10889,7 @@ TEST(net_game_server_and_clients) {
   CHECK(w1.pawns().size() == 3 && w2.pawns().size() == 3);  // everyone sees everyone
   const game::ActorId p1 = w1.player(), p2 = w2.player();
   CHECK(p1 != ball_id && p2 != ball_id && p1 != p2);
-  CHECK(w1.pawn_source(p1) == ball_id);
+  CHECK(ball_template && w1.pawn_source(p1) == ball_template);   // (the template it is a copy of)
   // Client 1 rolls forward (+X, its camera looks along the ball's facing).
   forward1.move_y = 1;
   Mat4 m0;
@@ -15787,6 +16015,13 @@ TEST(studio_blueprint_breakpoints_pause_the_game) {
   CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"spawner"})")["ok"].as_bool());
   u32 spawn = 0;
   for (const logic::Node& n : f.s->level().logic.nodes) if (n.type == "actor.spawn") spawn = n.id;
+  // (the spawner copies a template of the level: the Cube is made one, the node names it - else Play is refused,
+  // the level's check names the templates: world_spawn_errors)
+  game::ActorId cube = 0;
+  for (const game::Actor& a : f.s->level().actors) if (a.name == "Cube") cube = a.id;
+  CHECK(f.cmd(("{\"cmd\":\"select\",\"id\":" + std::to_string(cube) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"template","value":true})")["ok"].as_bool());
+  CHECK(f.cmd(("{\"cmd\":\"logicParam\",\"node\":" + std::to_string(spawn) + ",\"key\":\"template\",\"value\":\"Cube\"}").c_str())["ok"].as_bool());
   json::Value bp = json::Value::object();
   bp.set("cmd", "logicBreakpoint");
   bp.set("node", spawn);

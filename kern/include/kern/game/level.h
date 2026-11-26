@@ -360,6 +360,9 @@ struct WorldSettings {
   f32 time_limit = 0;           // seconds, 0 = none
   f32 score_target = 0;         // GameGoal::score
   u32 player = 0;               // the actor the player controls (0 = the first with a Player Controller)
+  /// The template a joining player's pawn is a copy of (GameWorld::add_pawn; NetGame takes it for every player who
+  /// joins). "": none - a level for one player.
+  std::string pawn_template;
   bool observer = false;        // Play starts with a free camera: fly and watch, drag bodies (F8 takes over the player)
   // audio
   f32 master_volume = 1;
@@ -462,6 +465,10 @@ json::Value actor_to_json(const Actor& a);
 bool actor_from_json(const json::Value& v, Actor& out, std::string* error = nullptr);
 json::Value world_to_json(const WorldSettings& w);
 bool world_from_json(const json::Value& v, WorldSettings& out, std::string* error = nullptr);
+/// Lays `keys` (an object with keys of a level's "world", as a device profile holds them: kern/app/project.h) on `w`.
+/// False - `error` says which key and why - for a key WorldSettings does not have (the names it has are given) or a
+/// value the level's reader does not take; `w` is then unchanged.
+bool overlay_world(const json::Value& keys, WorldSettings& w, std::string* error = nullptr);
 
 struct Issue {
   bool error = true;  // false: a warning, the level still plays

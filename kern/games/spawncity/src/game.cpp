@@ -98,29 +98,6 @@ Game::~Game() {
 // ---------------------------------------------------------------------------------------------
 // level
 
-kern::game::Level Game::build_level() const {
-  using namespace kern::game;
-  // The level file is the project (level/spawncity.klevel, rules.h): the world's settings - the
-  // 480 s day, the fog of stylized_world_style.mjs, no ground plane (the terrain's tiles are the
-  // ground), a kill plane far below (real terrain lies under the origin in places), the city's
-  // ambience -, the actors that carry the rules as Blueprints, the player (with its head: where it
-  // starts) and the vehicles as templates (Game::start spawns them - kern/docs/runtime_actors.md;
-  // tools/level_templates.cpp wrote them). What follows is what the device decides.
-  Level l;
-  {
-    std::string error;
-    if (!from_text(rules::level_text(), l, &error)) {   // (kern::json::parse, then from_json - level.cpp)
-      kern::log(kern::LogLevel::error, "SpawnCity: the level file is broken: %s", error.c_str());
-      l = Level{};
-    }
-  }
-  l.world.step_hz = kStepHz;
-  l.world.substeps = substeps_;
-  l.world.shadow_distance = mobile_ ? 70 : 110;
-  l.world.ground_color = {0.36f, 0.40f, 0.31f};
-  return l;
-}
-
 bool Game::start(kern::Engine& e) {
   engine_ = &e;
   mobile_ = e.arg_number("mobile", 0) > 0;
@@ -128,8 +105,7 @@ bool Game::start(kern::Engine& e) {
   // original's world_rigid_body_runtime.mjs: FIXED_DT 1/60, SOLVER_SUBSTEPS 4) - here as one
   // sub-step per 240 Hz step (the game's own step, so collisions are found 240 times a second
   // too). Four sub-steps on top of 240 Hz were 960 solver passes a second: four times the work
-  // for nothing, the largest cost of a street full of cars.
-  substeps_ = static_cast<i32>(kern::clamp(e.arg_number("substeps", 1), 1.0, 8.0));
+  // for nothing, the largest cost of a street full of cars. (The level's world.substeps: 1.)
   city_.building_budget = mobile_ ? 2600 : 4000;  // world_city_buildings.mjs MAX_FOOTPRINTS 2600 (a desktop draws more of the city)
   lat_ = e.arg_number("lat", kKonstanzLat);
   lon_ = e.arg_number("lon", kKonstanzLon);
@@ -140,9 +116,18 @@ bool Game::start(kern::Engine& e) {
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (facades().set_night)
+  // The world of the program: the engine's renderer and project (the night of the facades: game_look.cpp,
+  // facades().set_night). Its level is the project's (level/spawncity.klevel, rules.h): the world's settings - the
+  // 240 Hz step, the 480 s day, the fog of stylized_world_style.mjs, no ground plane (the terrain's tiles are the
+  // ground), a kill plane far below, the city's ambience -, the actors that carry the rules as Blueprints, the player
+  // (with its head: where it starts) and the vehicles as templates (spawned below - kern/docs/runtime_actors.md). What
+  // the device decides (the shadow's reach on a phone) is the project's device profile "mobile" (profile=mobile:
+  // kern/docs/project.md 2.).
+  world_ = std::make_unique<GameWorld>(e);
   take_fixed_step();
-  if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
+  if (!world_->start_level("spawncity.klevel", kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
+  if (world_->level().world.step_hz != kStepHz)   // (the vehicles' force models run at this rate: FixedStepper)
+    return kern::fail("SpawnCity: the level steps at %g Hz, the game's fixed step is %g Hz (level/spawncity.klevel world.stepHz)", world_->level().world.step_hz, kStepHz);
   // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
   // logic they run in, and finds each by its name at every call (as a Blueprint does).
   {

@@ -107,6 +107,10 @@ class Engine {
   const game::Project* project() const { return project_; }
   /// Program side (kern/game/program.h, while its App runs): the project of the program.
   void set_project(const game::Project* project) { project_ = project; }
+  /// The device profile the program runs with (the launch argument profile=<name>, kern/app/project.h; "": none) - its
+  /// renderer started the renderer, its world settings lie on a level a world of the program starts (GameWorld(Engine&)).
+  const std::string& profile() const { return profile_; }
+  void set_profile(std::string name) { profile_ = std::move(name); }
   /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime
   /// makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
   audio::Mixer& mixer() { return mixer_; }
@@ -234,6 +238,7 @@ class Engine {
  private:
   Renderer& renderer_;
   const game::Project* project_ = nullptr;
+  std::string profile_;
   Input input_;
   audio::Mixer mixer_;
   InputActions actions_;

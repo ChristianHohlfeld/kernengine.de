@@ -14,7 +14,11 @@
   "killZ": -3000,
   "ambience": "builtin:city",
   "ambienceVolume": 0.35,
-  "reverb": 0.2
+  "reverb": 0.2,
+  "stepHz": 240,
+  "substeps": 1,
+  "shadowDistance": 110,
+  "groundColor": "#5c664f"
  },
  "nextId": 326,
  "actors": [

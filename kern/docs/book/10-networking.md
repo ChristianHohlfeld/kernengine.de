@@ -267,7 +267,8 @@ counters, headshot, kill, dead, damage direction.
 2. **Connection changes:** a new client gets the welcome, then the existing pawns (the host's and
    those of other clients), then everything logic has changed so far (first the spawns, then the
    properties, in order), then the dead actors. After that the server creates the client's pawn
-   (`GameWorld::add_pawn`) and announces it to everyone. A client that left loses its pawn
+   (`GameWorld::add_pawn` of the level's `world.pawnTemplate`; a level without one is for one player: the
+   join is logged as an error) and announces it to everyone with the template's name. A client that left loses its pawn
    (`remove_pawn`, `kUnpawn` to all).
 3. **Inputs:** per client the newest wins; older or duplicate ticks are discarded. Jump, reload and
    fire count if they appear in **any** of the newly arrived redundant inputs – a tap between two
@@ -303,7 +304,7 @@ For each client, `server_send_snapshots` builds a snapshot of its own:
 2. **Reliable messages:**
    - `kWelcome`: compare the checksum – a different level is refused with "the server plays a
      different level" and disconnected. Otherwise `world.start_replica(level)`.
-   - `kPawn`: `add_pawn(source, actor)` with **the server's ID**; if it is the client's own slot, it
+   - `kPawn`: `add_pawn(template, actor)` with **the server's ID** (no template: the level's own player, known); if it is the client's own slot, it
      becomes the local pawn.
    - `kUnpawn`, `kAlive`, `kSpawn` (with the server's ID), `kProperty` (`set_property`).
 3. **Unreliable messages:**

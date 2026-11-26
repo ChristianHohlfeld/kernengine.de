@@ -46,6 +46,7 @@ bool AppRuntime::start(i32 width, i32 height) {
   if (running_) return true;
   if (!app_) return fail("no App: the program's kern_main() hands the engine its App with kern::run (kern/docs/project.md 4.)");
   RendererOptions options = start_renderer(settings_, engine_);
+  engine_.set_profile(engine_.arg("profile", ""));   // (the device profile: also the world settings of a world of the program)
   options.width = width;
   options.height = height;
   clear_error();

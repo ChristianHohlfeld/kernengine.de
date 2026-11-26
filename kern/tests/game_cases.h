@@ -132,7 +132,6 @@ struct Level : kern::Blueprint {
     actor_spawn<"Template">(n50, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0}, Vector{1.0, 1.0, 1.0});
     Made = n50.spawned;
     Log = text_append(Log, actor_name(n50.spawned), ";");
-    actor_spawn<"Nothing">(Vector{0.0, 9.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0});
   }
 
   KERN_EVENT(on10, event_custom<"Remove">)
@@ -408,6 +407,26 @@ struct Level : kern::Blueprint {
 };
 )kn";
 
+/// A template for the players who join (world.pawnTemplate, GameWorld::add_pawn): a copy of the level's actor `name` and
+/// its children, called so too (kern/docs/runtime_actors.md - the level's own player stays an actor of the level).
+inline void add_pawn_template(game::Level& l, const std::string& name) {
+  std::vector<game::Actor> subtree;
+  for (const game::Actor& a : l.actors)
+    if (a.name == name && !a.parent) { subtree.push_back(a); break; }
+  for (std::size_t i = 0; i < subtree.size(); ++i)
+    for (const game::Actor& a : l.actors)
+      if (a.parent == subtree[i].id) subtree.push_back(a);
+  std::vector<std::pair<game::ActorId, game::ActorId>> ids;
+  for (game::Actor& a : subtree) {
+    const game::ActorId old = a.id;
+    a.id = 0;
+    for (const auto& [o, n] : ids) if (a.parent == o) a.parent = n;
+    if (ids.empty()) a.is_template = true;
+    ids.push_back({old, l.add(a).id});
+  }
+  l.world.pawn_template = name;
+}
+
 inline logic::Graph blueprint(const char* text, std::string* error, const logic::Blueprints& all = {}) {
   logic::Graph g;
   std::string why;
@@ -555,6 +574,7 @@ inline game::Level arena(std::string* error = nullptr) {
     tpl.tags.push_back("made");
     tpl.is_template = true;   // (not in the world: Spawn Actor copies it - kern/docs/runtime_actors.md)
     l.add(tpl);
+    add_pawn_template(l, "Soldier");   // (a second player joins: w.add_pawn - last, the ids before stay)
   }
   l.logic = blueprint(kLevel, &why);
   if (error) *error = why;
@@ -686,7 +706,7 @@ inline void arena_scenario(Stage& s) {
   s.in.interact = false;
   s.tick(2);
   s.show("input, a key, interact");
-  w.add_pawn();  // a second player
+  w.add_pawn(w.level().world.pawn_template);  // a second player
   s.tick(5);
   s.show("a player joined");
   s.call("Combat", me, 40, "");

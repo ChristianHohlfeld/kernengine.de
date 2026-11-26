@@ -3892,11 +3892,30 @@ bool Runtime::actor_here(std::string_view caller, ActorHandle a, std::string_vie
   return false;
 }
 
+Runtime* Runtime::runtime_of(std::string_view caller, ActorHandle a, std::string_view node, ActorRef& id) {
+  id = 0;
+  if (!a.id) return this;   // (none: an empty Target - what the node does then is its own, here)
+  const WorldId here = host_.world();
+  if (a.world == here) {
+    id = a.id;
+    return this;
+  }
+  std::string why;
+  if (Runtime* there = host_.world_runtime(a.world, why)) {
+    id = a.id;
+    return there;
+  }
+  host_.error(std::string(caller) + ": " + std::string(node) + ": actor " + std::to_string(a.id) + " is of world " + std::to_string(a.world) + ", this Blueprint runs in world " +
+              std::to_string(here) + " - " + why + " (kern/docs/project.md 7)");
+  return nullptr;
+}
+
 Value Runtime::get_on(const Instance& caller, std::string_view name, ActorHandle actor, const TypeRef& type) {
   const Graph& g = caller.graph();
   Value v;
   ActorRef target = 0;
-  if (!actor_here(caller.name(), actor, "Get Variable on Actor", target) || !get_on(target, name, type.type, v)) return zero_of(type, g);
+  Runtime* there = runtime_of(caller.name(), actor, "Get Variable on Actor", target);
+  if (!there || !there->get_on(target, name, type.type, v)) return zero_of(type, g);
   return from_outside(v, type, g);
 }
 
@@ -3915,12 +3934,13 @@ bool Runtime::has_blueprint(ActorRef target) {
 
 bool Runtime::has_blueprint(const Instance& caller, ActorHandle actor) {
   ActorRef target = 0;
-  return actor_here(caller.name(), actor, "Has Blueprint", target) && has_blueprint(target);
+  Runtime* there = runtime_of(caller.name(), actor, "Has Blueprint", target);
+  return there && there->has_blueprint(target);
 }
 
 void Runtime::call(const Instance& caller, std::string_view name, ActorHandle actor, std::vector<std::pair<std::string, Value>> args) {
   ActorRef target = 0;
-  if (actor_here(caller.name(), actor, "Call Event", target)) call(name, target, std::move(args));
+  if (Runtime* there = runtime_of(caller.name(), actor, "Call Event", target)) there->call(name, target, std::move(args));
 }
 
 ObjectRef Runtime::engine_object(ActorRef target, std::string_view interface, std::string& why) {
@@ -3972,8 +3992,9 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorHandle a
     for (const FunctionPin& p : declared->outputs) results.push_back(Value::from_json(p.value, logic::declared(p), g));
   std::vector<Value> got;
   ActorRef target = 0;
-  if (!actor_here(caller.name(), actor, "Call on Actor", target)) return;
-  if (!call_on(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got, caller.name()) || !declared) return;
+  Runtime* there = runtime_of(caller.name(), actor, "Call on Actor", target);
+  if (!there) return;
+  if (!there->call_on(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got, caller.name()) || !declared) return;
   for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
     results[k] = from_outside(got[k], logic::declared(declared->outputs[k]), g);
 }
@@ -3985,8 +4006,9 @@ std::size_t Runtime::call_on(Instance& caller, std::string_view function, ActorH
   const std::size_t n = declared ? min_of(results.size(), declared->outputs.size()) : 0;
   std::size_t given = 0;
   ActorRef target = 0;
-  if (!actor_here(caller.name(), actor, "Call on Actor", target)) given = 0;
-  else if (!call_on_into(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, results, given, caller.name()) || !declared) given = 0;
+  Runtime* there = runtime_of(caller.name(), actor, "Call on Actor", target);
+  if (!there) given = 0;
+  else if (!there->call_on_into(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, results, given, caller.name()) || !declared) given = 0;
   for (std::size_t k = 0; k < n; ++k) {
     const FunctionPin& p = declared->outputs[k];
     results[k] = k < given ? from_outside(results[k], logic::declared(p), g) : Value::from_json(p.value, logic::declared(p), g);

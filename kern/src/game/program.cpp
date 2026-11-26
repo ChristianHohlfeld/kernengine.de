@@ -37,6 +37,19 @@ class ProgramHost : public logic::Host {
     return false;
   }
   logic::EngineObjects* engine_objects() override { return &objects; }
+  /// The program reaches the actors of the worlds it runs (kern/docs/project.md 7): the logic runtime of the GameWorld of
+  /// its objects that runs as `world` - none where that world ended (stopped, or started again: a new world) or is none
+  /// the program made.
+  logic::Runtime* world_runtime(logic::WorldId world, std::string& why) override {
+    for (GameWorld* w : objects.all<GameWorld>())
+      if (w->world_id() == world) {
+        if (w->running() && w->logic_runtime()) return w->logic_runtime();
+        why = w->running() ? "its world runs no Blueprints" : "its world does not run any more (the GameWorld was stopped)";
+        return nullptr;
+      }
+    why = "no world of this program runs as world " + std::to_string(world) + " (it ended and started again as a new world, or the program did not make it)";
+    return nullptr;
+  }
   void engine_failed(std::string_view function) override { error(std::string(function) + ": " + objects.error); }
 
   std::vector<std::string> said;
@@ -57,6 +70,7 @@ struct Program::State {
   ProgramHost host;
   std::unique_ptr<logic::Runtime> runtime;
   App* app = nullptr;
+  std::string profile;   // (set_profile: the device profile a world the program makes runs on)
 };
 
 App* program_app(logic::Runtime& rt) {
@@ -93,11 +107,17 @@ bool Program::begin(const Project& project, App* given, std::string* error) {
   p->project = project;
   // a world the program makes (GameWorld, an object of the engine of its host) is a world of the project: its
   // Blueprints find libraries in its level, then in the project (kern/docs/project.md 3., 5.)
+  // Blueprints find libraries in its level, then in the project (kern/docs/project.md 3., 5.) - and it runs on the
+  // program's device profile (set_profile), as a world an App of C++ makes from its Engine (GameWorld(Engine&))
   p->host.objects.on_made(
-      [](void* project, logic::EngineObjects::Kind kind, void* object) {
-        if (kind == logic::EngineObjects::kind<GameWorld>()) static_cast<GameWorld*>(object)->set_project(static_cast<const Project*>(project));
+      [](void* state, logic::EngineObjects::Kind kind, void* object) {
+        if (kind != logic::EngineObjects::kind<GameWorld>()) return;
+        const State& s = *static_cast<const State*>(state);
+        GameWorld& w = *static_cast<GameWorld*>(object);
+        w.set_project(&s.project);
+        w.set_profile(s.profile);
       },
-      &p->project);
+      p.get());
   p->runtime = std::make_unique<logic::Runtime>(p->host);
   p->runtime->blueprints = program_blueprints(p->project);
   p->runtime->budget = p->project.settings.loop_budget;   // (the loop guard is the project's: settings "loopBudget")
@@ -135,6 +155,14 @@ bool Program::start(std::string_view project_text, std::string* error) {
   std::string why;
   if (!from_text(project_text, project, &why)) return refuse(error, "the program's project: " + why);
   return start(project, error);
+}
+
+void Program::set_profile(std::string name) {
+  if (state_) state_->profile = std::move(name);
+}
+const std::string& Program::profile() const {
+  static const std::string none;
+  return state_ ? state_->profile : none;
 }
 
 bool Program::running() const { return state_ != nullptr; }

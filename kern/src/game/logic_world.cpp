@@ -264,26 +264,21 @@ bool GameWorld::set_material_color(ActorId id, Vec3 color) {
   return set_property(id, "components.mesh.material.color", json::Value(hex_color(color)));
 }
 
-logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
-  const std::string name(template_name);
-  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return {}; }
-  const Actor* src = nullptr;
+const Actor* GameWorld::find_template(std::string_view name) const {
   std::string known;
   for (const Actor& a : templates_.actors) {
     if (!a.is_template) continue;
-    if (a.name == template_name) { src = &a; break; }
+    if (a.name == name) return &a;
     known += (known.empty() ? "" : ", ") + a.name;
   }
-  if (!src) {
-    if (known.empty()) fail("no template \"%s\" - the level has no templates (an actor with \"template\": true)", name.c_str());
-    else fail("no template \"%s\" - the level's templates: %s", name.c_str(), known.c_str());
-    return {};
-  }
-  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return {}; }
-  for (int i = 0; i < 3; ++i)
-    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return {}; }
+  if (known.empty()) fail("no template \"%.*s\" - the level has no templates (an actor with \"template\": true)", static_cast<int>(name.size()), name.data());
+  else fail("no template \"%.*s\" - the level's templates: %s", static_cast<int>(name.size()), name.data(), known.c_str());
+  return nullptr;
+}
+
+std::vector<ActorId> GameWorld::place_copy(const Actor& src, const Transform& at, ActorId id) {
   // The template's subtree in the level's order (root first).
-  std::vector<const Actor*> subtree{src};
+  std::vector<const Actor*> subtree{&src};
   for (std::size_t i = 0; i < subtree.size(); ++i)
     for (ActorId k : templates_.children(subtree[i]->id))
       if (const Actor* c = templates_.find(k)) subtree.push_back(c);
@@ -296,7 +291,7 @@ logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transf
   }
   for (std::size_t i = 0; i < subtree.size(); ++i)
     if (level_.find(root + static_cast<ActorId>(i)) || templates_.find(root + static_cast<ActorId>(i))) {
-      fail("spawn \"%s\": the ids %u..%u are taken", name.c_str(), root, root + static_cast<ActorId>(subtree.size() - 1));
+      fail("\"%s\": the ids %u..%u are taken", src.name.c_str(), root, root + static_cast<ActorId>(subtree.size() - 1));
       return {};
     }
   std::unordered_map<ActorId, ActorId> remap;
@@ -305,7 +300,7 @@ logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transf
   for (const Actor* a : subtree) {
     Actor copy = *a;
     copy.id = remap[a->id];
-    if (a == src) {
+    if (a == &src) {
       copy.is_template = false;
       copy.parent = 0;
       copy.transform = at;
@@ -342,19 +337,40 @@ logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transf
     body_of_actor_[sb->plan.owner] = sb.get();
     bodies_.push_back(std::move(sb));
   }
-  if (mode_ != SimMode::replica) {
+  if (mode_ != SimMode::replica)
     for (ActorId aid : created) if (const Actor* a = level_.find(aid)) create_joints(*a);
+  return created;
+}
+
+void GameWorld::begin_copies(const std::vector<ActorId>& created) {
+  if (!logic_) return;
+  for (ActorId aid : created)
+    if (const Actor* a = level_.find(aid); a && a->logic && !a->logic->empty()) logic_->add(*a->logic, static_cast<logic::ActorRef>(aid), a->name);
+  logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
+}
+
+logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
+  const std::string name(template_name);
+  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return {}; }
+  const Actor* src = find_template(template_name);
+  if (!src) return {};
+  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return {}; }
+  for (int i = 0; i < 3; ++i)
+    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return {}; }
+  const std::vector<ActorId> created = place_copy(*src, at, id);
+  if (created.empty()) {
+    const std::string why = last_error();
+    fail("spawn %s", why.c_str());
+    return {};
+  }
+  if (mode_ != SimMode::replica) {
     for (ActorId aid : created) init_combat(aid);
-    SpawnChange c{name, root, at};
+    SpawnChange c{name, created[0], at};
     spawn_changes_.push_back(c);
     if (spawn_log_.size() < 4096) spawn_log_.push_back(c);
-    if (logic_) {
-      for (ActorId aid : created)
-        if (const Actor* a = level_.find(aid); a && a->logic && !a->logic->empty()) logic_->add(*a->logic, static_cast<logic::ActorRef>(aid), a->name);
-      logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
-    }
+    begin_copies(created);
   }
-  return {root, world_id_};   // (the root, an Actor of this world: kern/docs/project.md 7)
+  return {created[0], world_id_};   // (the root, an Actor of this world: kern/docs/project.md 7)
 }
 
 void GameWorld::destroy_actor(ActorId id) {
@@ -495,6 +511,20 @@ ActorId GameWorld::find_actor(std::string_view name) const {
   for (const Actor& a : level_.actors) if (a.name == name && actor_alive(a.id)) return a.id;
   for (const Actor& a : level_.actors) if (a.name == name) return a.id;
   return 0;
+}
+
+logic::ActorHandle GameWorld::actor_named(std::string_view name) const {
+  const std::string n(name);
+  if (!running()) {
+    fail("actor named \"%s\": the world does not run", n.c_str());
+    return {};
+  }
+  const ActorId id = find_actor(name);
+  if (!id) {
+    fail("actor named \"%s\": the world has no actor of that name", n.c_str());
+    return {};
+  }
+  return {static_cast<logic::ActorRef>(id), world_id_};
 }
 
 void GameWorld::actors_with_tag(std::string_view tag, std::vector<ActorId>& out) const {

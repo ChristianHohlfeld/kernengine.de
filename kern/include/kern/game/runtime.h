@@ -224,7 +224,8 @@ class GameWorld {
 
   // ---- simulation ----
   /// Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that
-  /// stands in the level and in the project (library_conflicts) keeps it from starting.
+  /// stands in the level and in the project (library_conflicts) keeps it from starting; with a device profile too
+  /// (set_profile), its world settings lie on the level's (the level's, then the profile's keys).
   bool start(const Level& level, SimMode mode);
   /// Starts the level of its project at `path` (as the project's "levels" name it: Project::level_text) - how a
   /// program starts a world and changes to the next one (stop, then start_level of the next; what the program keeps -
@@ -239,6 +240,12 @@ class GameWorld {
   void set_fixed_step(FixedStep* step) { fixed_step_ = step; }
   FixedStep* fixed_step_handler() const { return fixed_step_; }
   const Project* project() const { return project_; }
+  /// The project's device profile this world runs on (kern/app/project.h DeviceProfile; "": none): a start (start,
+  /// start_level) lays its world settings on the level's - the level's first, then the profile's keys. A world of the
+  /// program has the launch argument profile=<name> (GameWorld(Engine&)); a host without a program sets it here. A name
+  /// the project has no profile of keeps the world from starting (the names it has are said).
+  void set_profile(std::string name) { profile_ = std::move(name); }
+  const std::string& profile() const { return profile_; }
   void stop();
   bool running() const { return mode_ != SimMode::none; }
   /// Counts start() calls (restart included): listeners notice a fresh run.
@@ -262,12 +269,14 @@ class GameWorld {
   f32 sim_time() const { return sim_time_; }
 
   // ---- players (multiplayer) ----
-  /// Adds a player pawn: a copy of `source` (0 = the level's player actor) with its children,
-  /// placed next to the spawn. `id` forces the root's id (network clients mirror the server);
-  /// children follow with consecutive ids. Returns the pawn's root actor (0 on failure).
-  ActorId add_pawn(ActorId source = 0, ActorId id = 0);
+  /// Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn
+  /// makes one - the one way of copying (kern/docs/runtime_actors.md) -, placed next to the level's player start.
+  /// `id` forces the root's id (a network client mirrors its server); children follow with consecutive ids. The
+  /// level's own player (world.player) is an actor of the level, never a copy. Returns the pawn's root actor (0, with
+  /// the reason: the world does not run, no such template, it has no controller, the ids are taken).
+  ActorId add_pawn(std::string_view template_name, ActorId id = 0);
   bool remove_pawn(ActorId pawn);
-  /// The actor a pawn was copied from (the pawn itself for the level's own player).
+  /// The template a pawn was copied from (the pawn itself for the level's own player).
   ActorId pawn_source(ActorId pawn) const;
   /// Input of a remote player's pawn (used in the next fixed steps).
   void set_pawn_input(ActorId pawn, const PlayInput& input);
@@ -338,6 +347,11 @@ class GameWorld {
   /// The world of this world's actors and its objects of the engine (0: it never ran): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of
   /// the level before names nothing in the next.
   logic::WorldId world_id() const;
+  /// The actor of this name as an Actor of this world (logic::ActorHandle: its id and world_id) - what a program holds
+  /// of a world's actor to reach its Blueprint (kern/docs/project.md 7: Call on Actor, Get Variable on Actor, Call Event
+  /// from a program Blueprint). Actor{} with the reason (last_error): the world does not run, it has no actor of that
+  /// name. (find_actor gives the id within the world.)
+  logic::ActorHandle actor_named(std::string_view name) const;
   /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
   /// Off: the interpreter or the JIT, whatever the program has - read when the game starts.
   bool logic_native = true;
@@ -611,6 +625,7 @@ class GameWorld {
   // presentation
   Level level_;                  // edited level (sync) or the running copy (start)
   const Project* project_ = nullptr;  // where the libraries the level does not have are found (set_project)
+  std::string profile_;               // the project's device profile whose world settings a start lays on the level's
   FixedStep* fixed_step_ = nullptr;   // the program's fixed step (set_fixed_step)
   Level edit_level_;             // what sync() last saw (restored by stop())
   std::unordered_map<ActorId, std::unique_ptr<Visual>> visuals_;
@@ -758,6 +773,13 @@ class GameWorld {
   std::vector<PropertyChange> prop_changes_, prop_log_;
   std::vector<SpawnChange> spawn_changes_, spawn_log_;
   Level templates_;   // the level's templates and their children (start: not in level_)
+  /// The template of that name (null with the reason: the level's templates named).
+  const Actor* find_template(std::string_view name) const;
+  /// A copy of the template `src` with its children at `at` (root's id `id`, 0: the next free): actors, presentation,
+  /// bodies, joints - what spawn and add_pawn share; empty with the reason (the ids are taken).
+  std::vector<ActorId> place_copy(const Actor& src, const Transform& at, ActorId id);
+  /// The copies' Blueprints, and their Begin Play now (in the running step's budget).
+  void begin_copies(const std::vector<ActorId>& created);
   std::unordered_map<ActorId, std::pair<Vec3, Quat>> replica_poses_;
 };
 

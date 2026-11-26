@@ -1165,7 +1165,7 @@ export class LogicEditor {
     // (its choices: its own, or a list every node of the Blueprint shares - data.choices)
     const choices = p.choices || this.data?.choices?.[p.list] || [];
     if (p.kind === "scope") return `<span class="lg-dim" title="A local variable of this function">${lgEsc(p.value)}</span>`;
-    if (["choice", "type", "variable", "field", "machine", "state", "sound", "function"].includes(p.kind)) {
+    if (["choice", "type", "variable", "field", "machine", "state", "sound", "function", "template"].includes(p.kind)) {
       // (a long shared list - the functions of a large Blueprint - is written into the box when it is opened:
       // hundreds of options on every node are what made a large graph slow to draw)
       if (p.list && choices.length > 40) {

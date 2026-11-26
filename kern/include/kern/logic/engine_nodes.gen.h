@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "kern/app/app.h"
+#include "kern/app/project.h"
 #include "kern/app/storage.h"
 #include "kern/audio/audio.h"
 #include "kern/audio/synth.h"
@@ -1563,6 +1564,26 @@ struct P_engine_road_builder_chunks {
   static constexpr const char* set = "engine.road_builder.chunks@set";
   static C* at(EngineObjects&, Object& self, const In&) { return &self.chunks(); }
 };
+struct P_engine_device_profile_name {
+  using Object = kern::DeviceProfile;
+  using C = std::remove_reference_t<decltype((std::declval<kern::DeviceProfile&>().name))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  using In = std::tuple<>;
+  static constexpr const char* pin = "device_profile";
+  static constexpr const char* get = "engine.device_profile.name@get";
+  static constexpr const char* set = "engine.device_profile.name@set";
+  static C* at(EngineObjects&, Object& self, const In&) { return &self.name; }
+};
+struct P_engine_device_profile_renderer {
+  using Object = kern::DeviceProfile;
+  using C = std::remove_reference_t<decltype((std::declval<kern::DeviceProfile&>().renderer))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>;
+  using In = std::tuple<>;
+  static constexpr const char* pin = "device_profile";
+  static constexpr const char* get = "engine.device_profile.renderer@get";
+  static constexpr const char* set = "engine.device_profile.renderer@set";
+  static C* at(EngineObjects&, Object& self, const In&) { return &self.renderer; }
+};
 struct P_engine_mesh_id {
   using Object = kern::Mesh;
   using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().id))>;
@@ -2593,6 +2614,29 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::object_as<::kern::logic::Object<::kern::Input>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::Input>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
     return from_value<::kern::logic::Object<::kern::Input>>(this->kern_engine("engine.engine.input_2", {to_value(engine)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::Input>>()));
+  }
+  /// The device profile the program runs with (the launch argument profile=<name>, kern/app/project.h; "": none) - its renderer started the renderer, its world settings lie on a level a world of the program starts (GameWorld(Engine&)).
+  Text engine_engine_profile(::kern::logic::Object<::kern::Engine> engine) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.profile"); return Text{}; }
+      decltype(auto) kern_r = kern_self->profile();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.engine.profile", {to_value(engine)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  void engine_engine_set_profile(::kern::logic::Object<::kern::Engine> engine, const Text& name) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.set_profile"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a0);
+      kern_self->set_profile(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.engine.set_profile", {to_value(engine), to_value(name)}, {});
   }
   /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
   void engine_engine_mixer(::kern::logic::Object<::kern::Engine> engine) {
@@ -5590,6 +5634,29 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<::kern::logic::Object<::kern::game::FixedStep>>(this->kern_engine("engine.game_world.fixed_step_handler", {to_value(game_world)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::game::FixedStep>>()));
   }
+  /// The project's device profile this world runs on (kern/app/project.h DeviceProfile; "": none): a start (start, start_level) lays its world settings on the level's - the level's first, then the profile's keys. A world of the program has the launch argument profile=<name> (GameWorld(Engine&)); a host without a program sets it here. A name the project has no profile of keeps the world from starting (the names it has are said).
+  void engine_game_world_set_profile(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& name) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_profile"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a0);
+      kern_self->set_profile(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.game_world.set_profile", {to_value(game_world), to_value(name)}, {});
+  }
+  Text engine_game_world_profile(::kern::logic::Object<::kern::game::GameWorld> game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.profile"); return Text{}; }
+      decltype(auto) kern_r = kern_self->profile();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.game_world.profile", {to_value(game_world)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
   void engine_game_world_stop(::kern::logic::Object<::kern::game::GameWorld> game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5819,36 +5886,34 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Float>(this->kern_engine("engine.game_world.sim_time", {to_value(game_world)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
-  /// ---- players (multiplayer) ---- Adds a player pawn: a copy of `source` (0 = the level's player actor) with its children, placed next to the spawn. `id` forces the root's id (network clients mirror the server); children follow with consecutive ids. Returns the pawn's root actor (0 on failure).
-  void engine_game_world_add_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, Int source, Int id) {
+  /// ---- players (multiplayer) ---- Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn makes one - the one way of copying (kern/docs/runtime_actors.md) -, placed next to the level's player start. `id` forces the root's id (a network client mirrors its server); children follow with consecutive ids. The level's own player (world.player) is an actor of the level, never a copy. Returns the pawn's root actor (0, with the reason: the world does not run, no such template, it has no controller, the ids are taken).
+  void engine_game_world_add_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.add_pawn"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
+      const std::string_view kern_a0 = template_name.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_r = kern_self->add_pawn(std::move(kern_a0), std::move(kern_a1));
+      decltype(auto) kern_r = kern_self->add_pawn(kern_a0, std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(source), to_value(id)}, {PinType::integer});
+    this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(template_name), to_value(id)}, {PinType::integer});
   }
-  template <class KernNode> void engine_game_world_add_pawn(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, Int source, Int id) {
+  template <class KernNode> void engine_game_world_add_pawn(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.add_pawn"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
+      const std::string_view kern_a0 = template_name.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_r = kern_self->add_pawn(std::move(kern_a0), std::move(kern_a1));
+      decltype(auto) kern_r = kern_self->add_pawn(kern_a0, std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(source), to_value(id)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(template_name), to_value(id)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_game_world_remove_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, Int pawn) {
@@ -5878,7 +5943,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.remove_pawn", {to_value(game_world), to_value(pawn)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  /// The actor a pawn was copied from (the pawn itself for the level's own player).
+  /// The template a pawn was copied from (the pawn itself for the level's own player).
   Int engine_game_world_pawn_source(::kern::logic::Object<::kern::game::GameWorld> game_world, Int pawn) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -6545,6 +6610,18 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
     return from_value<Int>(this->kern_engine("engine.game_world.world_id", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+  }
+  /// The actor of this name as an Actor of this world (logic::ActorHandle: its id and world_id) - what a program holds of a world's actor to reach its Blueprint (kern/docs/project.md 7: Call on Actor, Get Variable on Actor, Call Event from a program Blueprint). Actor{} with the reason (last_error): the world does not run, it has no actor of that name. (find_actor gives the id within the world.)
+  Actor engine_game_world_actor_named(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.actor_named"); return Actor{}; }
+      const std::string_view kern_a0 = name.view();
+      decltype(auto) kern_r = kern_self->actor_named(kern_a0);
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Actor>::template make<Actor>(*kern_o, kern_r);
+    }
+    return from_value<Actor>(this->kern_engine("engine.game_world.actor_named", {to_value(game_world), to_value(name)}, {PinType::actor})[0].converted(pin_type_of<Actor>()));
   }
   /// A key of this machine's keyboard while playing ("KeyF", "Digit1"...): On Key events.
   void engine_game_world_key_event(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& code, Bool down) {
@@ -15198,6 +15275,43 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.bvh.release", {to_value(bvh)}, {});
+  }
+  /// Makes a DeviceProfile of the engine: its handle (the host keeps it until it is released).
+  void engine_device_profile_make() {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      (void)kern_o->own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile()));
+      return;
+    }
+    this->kern_engine("engine.device_profile.make", {}, {PinType::object});
+  }
+  template <class KernNode> void engine_device_profile_make(KernNode& kern_n) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern_n.result = ::kern::logic::engine_values::object_as<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_o->own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile())));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.device_profile.make", {}, {PinType::object});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// Ends the DeviceProfile (its destructor): the handle is none after it.
+  void engine_device_profile_release(::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      if (!::kern::logic::engine_values::release_of<kern::DeviceProfile>(*kern_o, device_profile.ref, "device_profile", "DeviceProfile")) { this->kern_engine_failed("engine.device_profile.release"); return; }
+      return;
+    }
+    this->kern_engine("engine.device_profile.release", {to_value(device_profile)}, {});
+  }
+  /// The place kern::DeviceProfile::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_device_profile_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_device_profile_name, B>;
+  template <class KernNode> void engine_device_profile_name(KernNode& kern_n, ::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    kern_n.result.kern_bind(this->kern_world, device_profile.ref, {}, nullptr);
+  }
+  /// The place kern::DeviceProfile::renderer gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_device_profile_renderer_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_device_profile_renderer, B>;
+  template <class KernNode> void engine_device_profile_renderer(KernNode& kern_n, ::kern::logic::Object<::kern::DeviceProfile> device_profile) {
+    kern_n.result.kern_bind(this->kern_world, device_profile.ref, {}, nullptr);
   }
   /// Makes a Earcut of the engine: its handle (the host keeps it until it is released).
   void engine_earcut_make() {

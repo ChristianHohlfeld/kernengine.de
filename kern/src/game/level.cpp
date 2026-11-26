@@ -1048,6 +1048,7 @@ json::Value world_to_json(const WorldSettings& w) {
   o.set("timeLimit", num(w.time_limit));
   o.set("scoreTarget", num(w.score_target));
   o.set("player", w.player);
+  o.set("pawnTemplate", w.pawn_template);
   if (w.observer) o.set("observer", true);
   o.set("masterVolume", num(w.master_volume));
   o.set("music", w.music);
@@ -1057,6 +1058,25 @@ json::Value world_to_json(const WorldSettings& w) {
   o.set("reverb", num(w.reverb));
   o.set("doppler", num(w.doppler));
   return o;
+}
+
+bool overlay_world(const json::Value& keys, WorldSettings& w, std::string* error) {
+  if (!keys.is_object()) { if (error) *error = "must be an object (keys of a level's \"world\")"; return false; }
+  json::Value doc = world_to_json(w);
+  for (const auto& [k, v] : keys.members()) {
+    if (!doc.find(k)) {
+      std::string names;
+      for (const auto& [n, x] : doc.members()) names += (names.empty() ? "" : ", ") + n;
+      if (error) *error = "unknown key \"" + k + "\" - one of " + names;
+      return false;
+    }
+    doc.set(k, v);
+  }
+  WorldSettings out;
+  std::string why;
+  if (!world_from_json(doc, out, &why)) { if (error) *error = why; return false; }
+  w = out;
+  return true;
 }
 
 bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error) {
@@ -1088,6 +1108,7 @@ bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error)
   r.number("timeLimit", w.time_limit, 0, 1e6);
   r.number("scoreTarget", w.score_target, 0, 1e9);
   r.uinteger("player", w.player);
+  r.string("pawnTemplate", w.pawn_template);
   r.boolean("observer", w.observer);
   r.number("masterVolume", w.master_volume, 0, 4);
   r.string("music", w.music);
@@ -1416,6 +1437,35 @@ std::vector<Issue> validate(const Level& level) {
   for (const char* ref : {level.world.music.c_str(), level.world.ambience.c_str()})
     if (!sound_reference_ok(level, ref)) out.push_back({false, 0, std::string("world sound \"") + ref + "\" does not exist (it is silent)"});
   if (players > 1) out.push_back({false, 0, "more than one actor has a player controller; the first one is possessed"});
+  // Spawn Actor names a template of the level (kern/docs/runtime_actors.md): a check that knows the level - the node
+  // alone is valid with its default (it is the library's; which templates there are, the level says).
+  {
+    std::string names;
+    for (const Actor& a : level.actors) if (a.is_template) names += (names.empty() ? "" : ", ") + a.name;
+    auto spawns = [&](const logic::Graph& g, ActorId owner, const std::string& who) {
+      for (const logic::Node& n : g.nodes) {
+        if (n.type != "actor.spawn") continue;
+        const std::string t = n.param("template", "");
+        bool known = false;
+        for (const Actor& a : level.actors) known |= a.is_template && a.name == t;
+        if (known) continue;
+        const std::string have = names.empty() ? "the level has none (an actor with \"template\": true)" : "its templates: " + names;
+        out.push_back({true, owner, who + ": Spawn Actor (node " + std::to_string(n.id) + ") " +
+                                        (t.empty() ? "names no template - " : "names no template of the level: \"" + t + "\" - ") + have});
+      }
+    };
+    spawns(level.logic, 0, "the level's graph");
+    for (const Actor& a : level.actors)
+      if (a.logic) spawns(*a.logic, a.id, "\"" + (a.name.empty() ? "actor " + std::to_string(a.id) : a.name) + "\"");
+  }
+  if (!level.world.pawn_template.empty()) {
+    const Actor* t = nullptr;
+    std::string names;
+    for (const Actor& a : level.actors)
+      if (a.is_template) { names += (names.empty() ? "" : ", ") + a.name; if (a.name == level.world.pawn_template) t = &a; }
+    if (!t) out.push_back({true, 0, "world.pawnTemplate \"" + level.world.pawn_template + "\" is no template of the level (its templates: " + (names.empty() ? std::string("none") : names) + ")"});
+    else if (!t->controller) out.push_back({true, t->id, "world.pawnTemplate \"" + t->name + "\": the template has no player controller"});
+  }
   if (level.world.player && template_of(level, level.world.player))
     out.push_back({true, level.world.player, "world.player is a template or a part of one (a template is not in the world)"});
   if (level.world.goal == GameGoal::reach_goal) {

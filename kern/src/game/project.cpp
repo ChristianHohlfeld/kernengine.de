@@ -84,6 +84,12 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
   if (const json::Value* s = doc.find("settings")) {
     std::string why;
     if (!project_from_json(*s, p.settings, &why)) return fail(error, why);
+    // (a profile's world settings: keys of a level's "world" - the level's reader decides, kern/game/level.h overlay_world)
+    for (std::size_t i = 0; i < p.settings.profiles.size(); ++i) {
+      WorldSettings probe;
+      if (!overlay_world(p.settings.profiles[i].world, probe, &why))
+        return fail(error, "settings: profiles[" + std::to_string(i) + "] \"" + p.settings.profiles[i].name + "\".world: " + why);
+    }
   }
   if (const json::Value* ls = doc.find("levels")) {
     if (!ls->is_array()) return fail(error, "levels: must be a list of paths");

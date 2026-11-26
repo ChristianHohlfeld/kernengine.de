@@ -429,7 +429,10 @@ struct GameWorld::Traffic {
 
 GameWorld::GameWorld(Renderer& renderer, NightWindows* windows) : r_(renderer), windows_(windows) { (void)logic_nodes_registered(); }
 
-GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) { project_ = engine.project(); }
+GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) {
+  project_ = engine.project();
+  profile_ = engine.profile();   // (the device profile the program runs with: kern/app/project.h)
+}
 
 GameWorld::~GameWorld() {
   stop();
@@ -1245,9 +1248,24 @@ bool GameWorld::start_level(std::string_view path, SimMode mode) {
   return start(level, mode);
 }
 
-bool GameWorld::start(const Level& level, SimMode mode) {
+bool GameWorld::start(const Level& given, SimMode mode) {
   ++session_;
   if (mode == SimMode::none) return fail("choose Simulate or Play");
+  // The device profile's world settings on the level's (kern/docs/project.md 2.: the level's, then the profile's keys).
+  Level profiled;
+  const bool overlay = project_ && !profile_.empty();
+  if (overlay) {
+    const DeviceProfile* d = project_->settings.profile(profile_);
+    if (!d) {
+      std::string names;
+      for (const DeviceProfile& p : project_->settings.profiles) names += (names.empty() ? "" : ", ") + p.name;
+      return fail("start: the device profile \"%s\" is none of the project's (it has: %s)", profile_.c_str(), names.empty() ? "none" : names.c_str());
+    }
+    profiled = given;
+    std::string why;
+    if (!overlay_world(d->world, profiled.world, &why)) return fail("start: the device profile \"%s\".world: %s", profile_.c_str(), why.c_str());
+  }
+  const Level& level = overlay ? profiled : given;
   if (running()) stop();
   for (const Issue& i : validate(level))
     if (i.error) return fail("%s", i.text.c_str());
@@ -2318,76 +2336,32 @@ void GameWorld::set_local_pawn(ActorId pawn) {
   camera_reset_ = true;
 }
 
-ActorId GameWorld::add_pawn(ActorId source, ActorId id) {
-  if (!running()) return 0;
+ActorId GameWorld::add_pawn(std::string_view template_name, ActorId id) {
+  if (!running()) { fail("add pawn \"%.*s\": the world does not run", static_cast<int>(template_name.size()), template_name.data()); return 0; }
   if (id && pawn_of(id)) return id;  // known already (a network client hears about pawns more than once)
-  if (!source) source = player_ && edit_level_.find(player_) ? player_ : default_player(edit_level_);
-  const Actor* src = edit_level_.find(source);
-  if (!src || !src->controller) { fail("no player actor to copy"); return 0; }
-  // The source's subtree in document order (root first), from the unmodified level.
-  std::vector<const Actor*> subtree{src};
-  for (std::size_t i = 0; i < subtree.size(); ++i)
-    for (ActorId k : edit_level_.children(subtree[i]->id))
-      if (const Actor* c = edit_level_.find(k)) subtree.push_back(c);
-  ActorId root = id ? id : level_.next_id;
-  for (const Actor& a : level_.actors) root = id ? root : max_of(root, a.id + 1);
-  for (std::size_t i = 0; i < subtree.size(); ++i)
-    if (level_.find(root + static_cast<ActorId>(i))) { fail("pawn ids are taken"); return 0; }
-  std::unordered_map<ActorId, ActorId> remap;
-  for (std::size_t i = 0; i < subtree.size(); ++i) remap[subtree[i]->id] = root + static_cast<ActorId>(i);
-  // Next to the spawn: a ring around the original player start, one place per pawn.
+  const Actor* src = find_template(template_name);
+  if (!src) return 0;
+  if (!src->controller) { fail("add pawn: the template \"%s\" has no player controller", src->name.c_str()); return 0; }
+  // Next to the spawn: a ring around the level's player start (the template where none is), one place per pawn; the
+  // template's own scale.
   const u32 n = static_cast<u32>(pawns_.size());
   const f32 angle = static_cast<f32>(n) * 2.39996323f;
   const f32 radius = 3.5f + 1.2f * std::sqrt(static_cast<f32>(n));
-  const Mat4 src_world = edit_level_.world_matrix(source);
+  const ActorId start = default_player(edit_level_);
+  Transform at = matrix_transform(start ? edit_level_.world_matrix(start) : transform_matrix(src->transform));
+  at.scale = src->transform.scale;
+  at.position += Vec3{kern::dm::cos(angle) * radius, kern::dm::sin(angle) * radius, 0.3f};
+  const std::vector<ActorId> created = place_copy(*src, at, id);
+  if (created.empty()) {
+    const std::string why = last_error();
+    fail("add pawn %s", why.c_str());
+    return 0;
+  }
+  const ActorId root = created[0];
   auto pawn = std::make_unique<Pawn>();
-  pawn->source = source;
+  pawn->source = src->id;
   pawn->actor = root;
-  std::vector<ActorId> created;
-  for (const Actor* a : subtree) {
-    Actor copy = *a;
-    copy.id = remap[a->id];
-    if (a == src) {
-      copy.parent = 0;
-      const Transform t = matrix_transform(src_world);
-      copy.transform = t;
-      copy.transform.position += Vec3{kern::dm::cos(angle) * radius, kern::dm::sin(angle) * radius, 0.3f};
-      copy.name = a->name + " " + std::to_string(n + 1);
-    } else {
-      copy.parent = remap.count(a->parent) ? remap[a->parent] : 0;
-    }
-    for (JointComponent& j : copy.joints)
-      if (remap.count(j.target)) j.target = remap[j.target];
-    level_.add(copy);
-    created.push_back(copy.id);
-    alive_[copy.id] = true;
-    order_.push_back(copy.id);
-  }
-  level_.next_id = max_of(level_.next_id, root + static_cast<ActorId>(subtree.size()));
   pawn->actors = created;
-  for (ActorId aid : created) {
-    world_[aid] = level_.world_matrix(aid);
-    if (const Actor* a = level_.find(aid); a && a->mesh) sync_actor_mesh(*a, world_[aid]);
-  }
-  // Bodies and joints of the copy (planned on the copy alone).
-  Level part;
-  part.world = level_.world;
-  for (ActorId aid : created) part.actors.push_back(*level_.find(aid));
-  for (BodyPlan& plan : plan_bodies(part)) {
-    if (!plan.owner) continue;
-    auto sb = std::make_unique<SimBody>();
-    sb->body = create_body(plan);
-    if (!sb->body.valid()) continue;
-    if (const Actor* owner = level_.find(plan.owner)) sb->scale = placement_of(level_.world_matrix(owner->id)).scale;
-    if (mode_ == SimMode::replica) physics_.set_body_type(sb->body, physics::BodyType::kinematic);
-    actor_of_body_[sb->body.id] = plan.owner;
-    sb->plan = std::move(plan);
-    body_of_actor_[sb->plan.owner] = sb.get();
-    bodies_.push_back(std::move(sb));
-  }
-  if (mode_ != SimMode::replica)
-    for (ActorId aid : created)
-      if (const Actor* a = level_.find(aid)) create_joints(*a);
   if (auto b = body_of_actor_.find(root); b != body_of_actor_.end()) {
     const physics::Pose p = physics_.pose(b->second->body);
     pawn->spawn_position = p.position;
@@ -2397,13 +2371,8 @@ ActorId GameWorld::add_pawn(ActorId source, ActorId id) {
   Pawn* raw = pawn.get();
   pawns_.push_back(std::move(pawn));
   for (ActorId aid : created) init_combat(aid);
-  if (logic_)
-    for (ActorId aid : created)
-      if (const Actor* a = level_.find(aid); a && a->logic && !a->logic->empty()) logic_->add(*a->logic, static_cast<logic::ActorRef>(aid), a->name);
-  if (logic_) {
-    logic_->begin();
-    logic_fire("game.pawn_added", root, 0);
-  }
+  begin_copies(created);
+  if (logic_) logic_fire("game.pawn_added", root, 0);
   if (mode_ == SimMode::play || mode_ == SimMode::replica) {  // replicas: the capsule size for the camera
     Pawn* keep = pw_;
     pw_ = raw;
