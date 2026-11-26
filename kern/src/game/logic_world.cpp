@@ -344,9 +344,11 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
     SpawnChange c{name, root, at};
     spawn_changes_.push_back(c);
     if (spawn_log_.size() < 4096) spawn_log_.push_back(c);
-    if (logic_)
+    if (logic_) {
       for (ActorId aid : created)
         if (const Actor* a = level_.find(aid); a && a->logic && !a->logic->empty()) logic_->add(*a->logic, static_cast<logic::ActorRef>(aid), a->name);
+      logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
+    }
   }
   return root;
 }
