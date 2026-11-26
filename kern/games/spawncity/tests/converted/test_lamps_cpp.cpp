@@ -14,6 +14,7 @@
 
 namespace converted_lamps_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -43,7 +44,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Renderer;
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -57,7 +58,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -73,24 +74,52 @@ struct GeoProjector {
 
 
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
-namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+namespace mvt { struct Value {
+  enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
+  std::string s;
+  f64 n = 0;
+  bool b = false;
+}; }
+namespace mvt { struct Feature {
+  u64 id = 0;
+  GeomType type = GeomType::unknown;
+  std::vector<std::pair<u32, u32>> tags;  // key index, value index into the layer
+  /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
+  std::vector<std::vector<Vec2>> parts;
+}; }
+namespace mvt { struct Layer {
+  std::string name;
+  u32 extent = 4096;
+  std::vector<std::string> keys;
+  std::vector<Value> values;
+  std::vector<Feature> features;
+  /// The value of a tag on a feature: its index in `values` (-1 when absent).
+  
+  
+  
+}; }
+namespace mvt { struct Tile {
+  std::vector<Layer> layers;
+  /// The layer of that name: its index in `layers` (-1 when the tile has none).
+  
+}; }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -579,28 +608,224 @@ struct CityStream::Tile {
   physics::Body old_body;
   bool recollide = false;
 };
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
+namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { using ActorRef = u32; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { using WorldId = u32; }
+namespace logic { struct ActorHandle {
+  ActorRef id = 0;
+  WorldId world = 0;
+  
+  friend constexpr bool operator==(ActorHandle, ActorHandle) = default;
+  /// (an order for Sort List: by world, then by id - the same in every tier)
+  
+
+
+
 }; }
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { struct ObjectRef {
+  i64 handle = 0;
+  WorldId world = 0;
+  
+  friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+  /// (an order for Sort List: by world, then by handle - the same in every tier)
+  
+
+
+
+}; }
+namespace logic { struct MapKey {
+  i64 i = 0;
+  std::string s;
+  bool operator==(const MapKey&) const = default;
+  
+}; }
+namespace logic { struct Value; }
+namespace logic { using MapEntries = converted::wide::Map<MapKey, Value>; }
+namespace logic { struct Int64 {
+  u64 bits = 0;
+  constexpr Int64() = default;
+  
+  
+  // (Sort List: as u64)
+  // (a key of a Map, a Set)
+}; }
+namespace logic { using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
+                             std::vector<ObjectRef>>; }
+namespace logic { struct Callable {
+  virtual ~Callable() = default;
+  /// Calls the function with `args` (its inputs after the bound place, in their order); `result`
+  /// gets its output. False: it is unbound now (the Blueprint it was made in has ended).
+  
+  /// Of one a Blueprint's class made (logic::detail::NativeCallable): which one (its signature's own mark) - the class
+  /// takes it back as it was. Null: one of the interpreter or the JIT.
+  
+}; }
+namespace logic { struct Value {
+  PinType type = PinType::number;
+  bool b = false;
+  i64 i = 0;
+  f64 n = 0;
+  Vec3 v;
+  std::string s;
+  ActorRef a = 0;
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef) or of an actor
+  /// (PinType::actor: `a` is its id there - ActorHandle). 0 otherwise.
+  WorldId world = 0;
+  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
+  /// whoever changes one (edit) changes its own.
+  std::shared_ptr<const ListItems> list;
+  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
+  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
+  /// declared default - what a field is, is read through the declaration (logic::field_of).
+  std::shared_ptr<const std::vector<Value>> rows;
+  /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
+  /// list's items.
+  std::shared_ptr<const MapEntries> entries;
+  /// A Callback's function and place (none: it is unbound).
+  std::shared_ptr<const Callable> call;
+
+  
+  
+  
+  
+  
+  /// An actor (none: ActorHandle{}).
+  
+  /// An object of the engine (none: ObjectRef{}).
+  
+  /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
+  
+  /// An Int64: its 64 bits (held in `i`, as they are).
+  
+  /// A value of an enum: its place among the enum's values (the first is 0).
+  
+  /// A list of values of an enum.
+  
+
+
+
+
+
+  /// A value of a struct: its fields' values, in the order of the declaration.
+  
+
+
+
+
+
+  /// A list of structs.
+  
+
+
+
+
+
+  
+  /// A Callback (none: unbound).
+  
+  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
+  /// Whole numbers are held as every Int is (logic::normal).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The items of a list of T - none if this is no such list.
+  
+
+
+
+
+  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
+  /// of structs as Value.)
+  
+
+
+
+  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
+  /// none).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
+  /// field is at its declared default).
+  
+  /// How many fields a struct's value holds.
+  
+  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
+  
+
+
+
+
+  /// The entries of a map or a set (none: empty).
+  
+  /// The entries of a map or a set, to change them: this value's own.
+  
+  /// How many items a list has, how many entries a map or a set (none of these: 0).
+  
+  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
+  
+
+  
+  
+  
+  
+  
+  /// The actor it refers to; of a value of another type: none (no number becomes an actor).
+  
+  
+  
+  
+  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
+  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
+  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
+  
+  
+  /// The same for what a place is declared as (TypeRef) - how a graph holds a default and a value
+  /// typed into a pin. A list of a fixed length (the place, a field of a struct) has that length:
+  /// read, what JSON does not say is the zero of its entries; written here, it is said up to its
+  /// last entry that is not that zero (logic::said) - a buffer of 24000 zeros is []. (to_json(g, of),
+  /// above, writes a value in full: every entry - what an inspector shows.)
+  
+  
+  
+}; }
+namespace logic { struct State {
+  u32 id = 0;
+  std::string name;
+  f32 x = 0, y = 0;
+  bool initial = false;
+}; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 namespace lamps { bool bind(kern::logic::Runtime& logic); }
 namespace lamps { f32 pole_radius(); }
 namespace lamps { bool worse(u8 state, u8 to); }

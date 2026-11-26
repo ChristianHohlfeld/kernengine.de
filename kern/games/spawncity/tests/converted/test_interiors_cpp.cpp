@@ -15,6 +15,7 @@
 
 namespace converted_interiors_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -41,22 +42,16 @@ struct KeyIndex : converted::EngineObject {
 };
 struct Earcut : converted::EngineObject {
   Earcut();
-  void triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const;
-  ~Earcut();
-  Earcut(const Earcut&) = default;
-  Earcut(Earcut&&) = default;
-  Earcut& operator=(const Earcut&) = default;
-  Earcut& operator=(Earcut&& o) noexcept;
 };
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
-  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+  
   
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -73,7 +68,7 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -166,38 +161,16 @@ struct Mat4 {
 
 };
 struct Bvh;
-constexpr u32 kMaxExtensionAttributes = 2;
-constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
-  Vec4 color{1, 1, 1, 1};
-  AlphaMode alpha = AlphaMode::opaque;
-  f32 alpha_cutoff = 0.5;
-  f32 roughness = 1.0;
-  f32 metalness = 0.0;
-  Vec3 emissive{0, 0, 0};      // linear HDR colour added after lighting (feeds bloom)
-  bool unlit = false;
-  bool double_sided = false;
-  bool cast_shadow = true;
-  bool frustum_culled = true;
-  bool viewmodel = false;      // first-person layer: drawn last after a depth clear
-  bool linear_colors = false;  // vertex colours are linear (skip the sRGB decode)
-  bool lines = false;          // line list (pairs of vertices), always unlit, never casts shadows or is picked
-  /// Parameters owned by shader extensions (see ShaderExtension::material_keys).
-  i32 params[kMaxMaterialParams] = {};
-
-  
-};
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
   std::vector<u32> indices;
 
-  u32 vertex_count() const { return static_cast<u32>(converted::quot(positions.size(), 3)); }
+  
   
   
 
@@ -216,21 +189,6 @@ struct MeshData {
   
 };
 struct Renderer;
-struct MeshLook {
-  Material material;
-  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
-  u32 texture = 0;      // GPU texture handle (0 = none)
-  bool visible = true;
-  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
-  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
-};
-struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
-struct WeldStats {
-  u32 source_vertices = 0, unique_vertices = 0;
-  std::size_t bytes_before = 0, bytes_after = 0;
-  bool indexed = false;
-};
-WeldStats weld(MeshData& mesh, const unsigned long& min_saving = 0);
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -243,7 +201,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -268,11 +226,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -286,58 +244,22 @@ struct Bvh : converted::EngineObject {
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   bool remove(const unsigned int& id) const;
-  unsigned int allocate_id() const;
-  void release_id(const unsigned int& id) const;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
-namespace physics { struct Pose {
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
-}; }
-namespace physics { struct BodySettings {
-  BodyType type = BodyType::dynamic;
-  Vec3 position;
-  Quat rotation;
-  Vec3 linear_velocity, angular_velocity;
-  f32 linear_damping = 0, angular_damping = 0, gravity_scale = 1;
-  bool enable_sleep = true, awake = true, enabled = true, bullet = false;
-  u64 user = 0;  // returned by World::body_user
-}; }
-namespace physics { struct ShapeMaterial {
-  f32 density = 1;            // kg/m^3
-  f32 friction = 0.6;
-  f32 restitution = 0;        // 0..1
-  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
-  bool sensor = false;
-  u64 category_bits = 1, mask_bits = ~0ull;
-  i32 group_index = 0;
-  bool contact_events = true, sensor_events = true, hit_events = false;
-  u64 user = 0;               // returned by World::shape_user
-  Surface surface = Surface::none;
-}; }
-namespace physics { struct ShapeSettings {
-  ShapeKind kind = ShapeKind::box;
-  Vec3 center;               // body-local placement of the shape
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5;         // sphere, capsule
-  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
-  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
-  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
-  ShapeMaterial material;
 }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   bool body_valid(const physics::Body& body) const;
   void destroy_body(const physics::Body& body) const;
-  physics::Body create_body(const physics::BodySettings& settings) const;
-  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
   bool joint_valid(const physics::Joint& joint) const;
   void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
 };
@@ -347,12 +269,38 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-constexpr f32 kPi = 3.14159265358979323846;
-enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline Quat yaw_quat(f32 yaw) { return Quat::axis_angle({0, 0, 1}, yaw); }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
-namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+namespace mvt { struct Value {
+  enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
+  std::string s;
+  f64 n = 0;
+  bool b = false;
+}; }
+namespace mvt { struct Feature {
+  u64 id = 0;
+  GeomType type = GeomType::unknown;
+  std::vector<std::pair<u32, u32>> tags;  // key index, value index into the layer
+  /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
+  std::vector<std::vector<Vec2>> parts;
+}; }
+namespace mvt { struct Layer {
+  std::string name;
+  u32 extent = 4096;
+  std::vector<std::string> keys;
+  std::vector<Value> values;
+  std::vector<Feature> features;
+  /// The value of a tag on a feature: its index in `values` (-1 when absent).
+  
+  
+  
+}; }
+namespace mvt { struct Tile {
+  std::vector<Layer> layers;
+  /// The layer of that name: its index in `layers` (-1 when the tile has none).
+  
+}; }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -440,11 +388,11 @@ struct Terrain {
   std::vector<Vec4> needs;
 
   // ---- heights (one truth for physics, rendering, walkers, cars) ----
-  f32 elevation(f32 x, f32 y) const;
+  
   /// Height of a 5 m node: elevation + craters, water basins carved (terrainNodeHeightAt).
-  f32 node_height(f32 x, f32 y) const;
+  
   /// The static ground surface at (x, y): the node heights on the SW-NE triangles.
-  f32 height(f32 x, f32 y) const;
+  
   
   /// Where a building stands: the lowest ground along its outline (buildingGroundBase).
   
@@ -455,7 +403,7 @@ struct Terrain {
   /// A waterway line `width` wide; `speed` m/s current along it (river 1.6, canal 0.5, else 1.1).
   
   
-  bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
+    // open water here (not under a bridge)
   
   
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
@@ -534,9 +482,9 @@ struct Terrain {
   struct CorridorSet { u64 owner = 0; Vec4 bounds, box; converted::wide::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
-  i32 corridor_set(f32 x, f32 y) const;
   
-  f32 road_level(f32 x, f32 y, f32 h) const;
+  
+  
   struct Tint { u64 owner; Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
   converted::wide::Map<u64, Image> images_;
@@ -548,13 +496,13 @@ struct Terrain {
 
   
   
-  Vec4 interior(const Grid& g) const;
   
   
-  f32 grid_at(const Grid& g, f32 x, f32 y) const;
-  bool water_cell(i32 cx, i32 cy) const;
   
-  bool on_bridge(f32 x, f32 y) const;
+  
+  
+  
+  
   
   
   
@@ -593,7 +541,6 @@ struct Terrain {
   std::vector<Vec4> changes_;
   TerrainStats stats_;
 };
-f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 struct Lane {
   std::vector<Vec2> points;
   f32 width = 6;
@@ -645,7 +592,7 @@ struct CityStream {
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
-  f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
+  
   /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
   
   
@@ -685,12 +632,12 @@ struct CityStream {
   struct BuildingRef { u64 tile = 0; u32 index = 0; };
   struct AreaRef { u64 key = 0; u64 tile = 0; u32 index = 0; };
   /// The map features of a tile (of a tile that is not loaded: none).
-  const MapFeatures& features(u64 tile) const;
+  
   /// What a reference names, while its tile is loaded.
-  const MapFeatures::Building& building(const BuildingRef& ref) const { return converted::at(features(ref.tile).buildings, ref.index); }
+  
   
   /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
-  void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
+  
   /// Every built tile (their map features: the minimap, web/view.mjs).
   
   /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
@@ -864,13 +811,13 @@ struct Interiors {
   };
   /// Builds the plan of a building (outer ring first, then courtyards); `door_ground` is the
   /// ground height in front of the main door. False: not enterable (too small, too big, odd).
-  static bool build(const MapFeatures::Building& b, f32 door_ground, Plan& out);
+  
   /// The doors of a footprint (the longest edge, a second one on the opposite side when big).
   static std::vector<Door> doors_of(const std::vector<Vec2>& outer_ccw, f32 area);
 
   
   void clear();
-  void update(f32 dt, f32 now, Vec3 feet, bool on_foot, CityStream& city);
+  
   void draw(LifeArt& art, f32 now, Vec3 eye) const;
   void hud(std::string& s) const;
   /// "interior" (state), "interior go" (to the nearest building's door), "interior up" (onto
@@ -883,7 +830,7 @@ struct Interiors {
   
 
  private:
-  void activate(const CityStream::BuildingRef& ref, CityStream& city, f32 ground);
+  
   void release(CityStream& city);
   Renderer* r_ = nullptr;
   World* world_ = nullptr;
@@ -1006,128 +953,6 @@ void LifeArt::put(Part& p, const Mat4& m, Vec3 tint) {
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
 }
 namespace cityjobs { constexpr u32 kTile = 1, kBuildings = 2; }
-void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const {
-  for (const auto& [k, t] : tiles_) {
-    if (converted::present(t)->state != Tile::State::ready && converted::present(t)->state != Tile::State::collision) continue;
-    for (std::size_t i = 0; i < converted::present(t)->features.buildings.size(); converted::pre_inc(i)) {
-      const MapFeatures::Building& b = converted::at(converted::present(t)->features.buildings, i);
-      if (b.rings.empty() || converted::at(b.rings, 0).size() < 3) continue;
-      f32 x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-      for (Vec2 q : converted::at(b.rings, 0)) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
-      if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k, static_cast<u32>(i)});
-    }
-  }
-}
-namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
-f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
-  const f32 bowl = radius * 0.5;
-  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
-  if (r >= radius) return 0;
-  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
-  return rim * kern::math::exp(-(k * k)) * (1 - x);
-}
-namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
-Vec4 Terrain::interior(const Grid& g) const {
-  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
-}
-f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
-  if (g.n < 2) return 0;
-  const f32 lim = static_cast<f32>(g.n) - 1.001;
-  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
-  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
-  const f32 tx = fx - i, ty = fy - j;
-  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
-  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
-}
-f32 Terrain::elevation(f32 x, f32 y) const {
-  if (!grid_ready_) return 0.0;
-  // the window that knows the place (its interior); else any that holds it; else the player's,
-  // held at its edge (far ground nobody stands on: the horizon)
-  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
-  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
-  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
-  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
-  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
-  return grid_at(grid_, x, y) - ref_height_;
-}
-namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
-namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
-i32 Terrain::corridor_set(f32 x, f32 y) const {
-  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
-  for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
-    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
-    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
-  }
-  return -1;
-}
-f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
-  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
-  // junctions blend smoothly, no steps
-  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
-  if (at < 0) return h;
-  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
-  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
-  if (it == set.grid.end()) return h;
-  f32 best = 0, sw = 0, sh = 0;
-  for (const CorridorSeg& s : it->second) {
-    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
-    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
-    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
-    if (w <= 0) continue;
-    const f32 ws = w * w * (3 - 2 * w);
-    sw += ws;
-    sh += ws * (s.ha + (s.hb - s.ha) * t);
-    best = std::fmax(best, w);
-  }
-  if (sw <= 0) return h;
-  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
-}
-f32 Terrain::node_height(f32 x, f32 y) const {
-  const f32 e = elevation(x, y);
-  f32 h = road_level(x, y, e);
-  for (const Crater& c : craters_) {
-    const f32 dx = x - c.c.x, dy = y - c.c.y;
-    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
-    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
-    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
-  }
-  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
-  return h;
-}
-f32 Terrain::height(f32 x, f32 y) const {
-  // terrain_surface.mjs triangleHeightAt: the SW-NE diagonal of every 5 m cell.
-  const f32 x0 = std::floor(x / kStep) * kStep, y0 = std::floor(y / kStep) * kStep;
-  const f32 u = (x - x0) / kStep, v = (y - y0) / kStep;
-  const f32 a = node_height(x0, y0), d = node_height(x0 + kStep, y0 + kStep);
-  return u >= v ? a + (node_height(x0 + kStep, y0) - a) * (u - v) + (d - a) * v : a + (node_height(x0, y0 + kStep) - a) * (v - u) + (d - a) * u;
-}
-bool Terrain::water_cell(i32 cx, i32 cy) const {
-  // the 256 bits of the cell's 64 m block
-  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
-  if (it == water_.end()) return false;
-  const u32 idx = static_cast<u32>(converted::plus(converted::times((cy & 15), 16), (cx & 15)));
-  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
-}
-bool Terrain::on_bridge(f32 x, f32 y) const {
-  for (const Bridge& b : bridges_) {
-    const f32 dx = x - b.c.x, dy = y - b.c.y;
-    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
-    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
-    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
-  }
-  return false;
-}
-bool Terrain::water_at(f32 x, f32 y) const {
-  if (water_.empty()) return false;
-  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
-  return bridges_.empty() || !on_bridge(x, y);
-}
-namespace city_stream_cpp_local { const MapFeatures kNoFeatures{}; }
-const MapFeatures& CityStream::features(u64 tile) const {
-  const auto it = tiles_.find(tile);
-  return it != tiles_.end() ? converted::present(it->second)->features : city_stream_cpp_local::kNoFeatures;
-}
 void CityStream::recollide(Tile&) {
   // the collision is the working set around the player: a new set without the entered building
   near_.dirty = true;
@@ -1146,13 +971,9 @@ void CityStream::exclude_building(u64 tile, i32 index) {
     if (it != tiles_.end()) { converted::present(it->second)->skip = index; recollide(*converted::present(it->second)); }
   }
 }
-constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8, kDoorH = 2.55, kWallIn = 0.3;
-constexpr u32 kMaxClosedDoors = 24, kMaxLevels = 12;
+constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8, kDoorH = 2.55;
 constexpr f32 kLane = 1.2, kCoreW = 2 * kLane + 0.2, kLand = 1.3, kRun = 3.6, kCoreL = 2 * kLand + kRun, kSlab = 0.25, kRoofHouse = 2.7;
-constexpr f32 kRelease = 45;
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
-const Vec3 kWall = rgb(0xe9e4da), kStairWall = rgb(0xdad8d2), kAccent = rgb(0x7f9a8a), kOak = rgb(0x8a5f3a), kStone = rgb(0x7a746b), kCeil = rgb(0xedebe6),
-           kConcrete = rgb(0x767675), kRiser = rgb(0xa9a39a), kDark = rgb(0x24262a), kTrim = rgb(0x5e3f2a);
 f32 signed_area(const std::vector<Vec2>& r) {
   f32 a = 0;
   for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += converted::at(r, j).x * converted::at(r, i).y - converted::at(r, i).x * converted::at(r, j).y;
@@ -1228,26 +1049,6 @@ void wall(Interiors::Plan& P, Vec2 p0, Vec2 p1, f32 z0, f32 z1, Vec3 col, bool v
   const Vec3 a{p0.x, p0.y, z0}, b{p1.x, p1.y, z0}, c{p1.x, p1.y, z1}, d{p0.x, p0.y, z1};
   if (visual) vquad(P, a, b, c, d, col);
   if (collide) cquad(P, a, b, c, d, true);
-}
-void slab(Interiors::Plan& P, const std::vector<Vec2>& outer, const std::vector<std::vector<Vec2>>& holes, f32 z, Vec3 col, bool up, bool visual, bool collide) {
-  std::vector<f64> xy;
-  std::vector<u32> hs, tris;
-  for (Vec2 p : outer) xy.insert(xy.end(), {p.x, p.y});
-  for (const auto& h : holes) {
-    if (h.size() < 3) continue;
-    hs.push_back(static_cast<u32>(converted::quot(xy.size(), 2)));
-    for (Vec2 p : h) xy.insert(xy.end(), {p.x, p.y});
-  }
-  if (xy.size() < 6) return;
-  Earcut ec;
-  ec.triangulate(xy.data(), static_cast<u32>(converted::quot(xy.size(), 2)), hs.data(), static_cast<u32>(hs.size()), tris);
-  for (std::size_t i = 0; converted::plus(i, 2) < tris.size(); converted::plus_to(i, 3)) {
-    Vec3 p[3];
-    for (int k = 0; k < 3; converted::pre_inc(k)) converted::at(p, k) = {static_cast<f32>(converted::at(xy, converted::at(tris, converted::plus(i, k)) * 2)), static_cast<f32>(converted::at(xy, converted::at(tris, converted::plus(i, k)) * 2 + 1)), z};
-    if ((converted::wide::cross(p[1] - p[0], p[2] - p[0]).z < 0) == up) std::swap(p[1], p[2]);
-    if (visual) vtri(P, p[0], p[1], p[2], col);
-    if (collide) ctri(P, p[0], p[1], p[2]);
-  }
 }
 void box(Interiors::Plan& P, Vec3 c, Vec3 size, f32 yaw, Vec3 col, bool collide) {
   const Vec3 h = size * 0.5;
@@ -1336,312 +1137,6 @@ std::vector<Interiors::Door> Interiors::doors_of(const std::vector<Vec2>& outer,
       if (converted::at(edges, i).n.x * converted::at(edges, 0).n.x + converted::at(edges, i).n.y * converted::at(edges, 0).n.y < -0.3) { out.push_back(mk(converted::at(edges, i))); break; }
   return out;
 }
-bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) {
-  P = Plan{};
-  if (b.rings.empty()) return false;
-  P.outer = clean(converted::at(b.rings, 0));
-  if (P.outer.size() < 3) return false;
-  const bool reversed = signed_area(P.outer) < 0;  // Kern's facade counts along the original ring
-  if (reversed) std::reverse(P.outer.begin(), P.outer.end());
-  for (std::size_t i = 1; i < b.rings.size(); converted::pre_inc(i)) {
-    std::vector<Vec2> h = clean(converted::at(b.rings, i));
-    if (h.size() < 3) continue;
-    if (signed_area(h) > 0) std::reverse(h.begin(), h.end());
-    P.holes.push_back(std::move(h));
-  }
-  P.area = signed_area(P.outer);
-  for (const auto& h : P.holes) P.area -= std::fabs(signed_area(h));
-  if (P.area < 24 || P.area > 40000) return false;
-  P.inner = offset_ring(P.outer, kWallIn);
-  for (const auto& h : P.holes) P.inner_holes.push_back(offset_ring(h, kWallIn));
-  if (signed_area(P.inner) < 8) return false;
-  P.doors = doors_of(P.outer, P.area);
-  if (P.doors.empty()) return false;
-  Vec2 centroid{};
-  for (Vec2 p : P.outer) centroid = centroid + p * (1.0 / static_cast<f32>(P.outer.size()));
-  Vec2 axis{1, 0};
-  f32 best = 0;
-  for (std::size_t i = 0; i < P.outer.size(); converted::pre_inc(i)) {
-    const Vec2 d = converted::at(P.outer, converted::rem((converted::plus(i, 1)), P.outer.size())) - converted::at(P.outer, i);
-    const f32 l = hypot_bp(d.x, d.y);
-    if (l > best) { best = l; axis = d * (1 / l); }
-  }
-  // storeys line up with the facade: Kern's BuildingBuilder draws every storey at
-  // 3.1 + 0.5 * ((seed >> 12) % 1000) / 1000 m (the windows' rows), as SpawnCity's interiors follow
-  // its facade shader (building_interiors.mjs: facadeParams floorH)
-  const u32 seed = b.seed;
-  P.floor_h = 3.1 + 0.5 * static_cast<f32>((seed >> 12) % 1000) / 1000.0;
-  const f32 ground_storey = P.floor_h;
-  const f32 base0 = std::fmax(b.base, door_ground) + 0.03;
-  P.base = b.base;
-  P.top = b.top;
-  if (P.top - base0 < 2.8) return false;
-  P.levels.push_back(base0);
-  bool capped = false;
-  CoreFit core;
-  if (P.top - base0 > ground_storey + 2.7) core = find_core(P.inner, P.inner_holes, P.holes, P.doors, centroid, axis);
-  if (core.ok) {
-    for (f32 z = std::fmax(P.base + ground_storey, base0 + 2.7); z + 2.7 <= P.top - 0.05; z += P.floor_h) {
-      if (P.levels.size() >= kMaxLevels) { capped = true; break; }
-      P.levels.push_back(z);
-    }
-  }
-  P.has_core = core.ok && P.levels.size() > 1;
-  P.core = core.core;
-  const u32 F = static_cast<u32>(P.levels.size());
-  P.roof_access = P.has_core && !capped && P.top - converted::at(P.levels, F - 1) <= P.floor_h + 1.8 && P.area < 12000;
-  const f32 ceil_top = capped ? converted::at(P.levels, F - 1) + P.floor_h - kSlab : F == 1 && P.top - base0 > ground_storey + 0.5 ? P.base + ground_storey - kSlab : P.top - 0.3;
-  auto ceil_of = [&](u32 k) { return k + 1 < F ? converted::at(P.levels, k + 1) - kSlab : ceil_top; };
-  const Core& C = P.core;
-  auto CP = [&](f32 u, f32 v) { return C.o + C.u * u + C.v * v; };
-  auto rect = [&](f32 u0, f32 v0, f32 u1, f32 v1) {
-    std::vector<Vec2> r = {CP(u0, v0), CP(u1, v0), CP(u1, v1), CP(u0, v1)};
-    if (signed_area(r) < 0) std::reverse(r.begin(), r.end());
-    return r;
-  };
-  auto cw = [](std::vector<Vec2> r) { if (signed_area(r) > 0) std::reverse(r.begin(), r.end()); return r; };
-  const f32 wall_top = P.roof_access ? P.top + kRoofHouse : ceil_top;
-  // ---- walls: the facade line and the inner face, each with the door openings
-  for (int ring = 0; ring < 2; converted::pre_inc(ring)) {
-    const std::vector<Vec2>& R = ring == 0 ? P.outer : P.inner;
-    const f32 inset = ring == 0 ? 0 : kWallIn;
-    for (std::size_t i = 0; i < R.size(); converted::pre_inc(i)) {
-      const Vec2 a = converted::at(R, i), bb = converted::at(R, converted::rem((converted::plus(i, 1)), R.size()));
-      const Vec2 d = bb - a;
-      const f32 len = hypot_bp(d.x, d.y);
-      if (len < 0.02) continue;
-      const Vec2 u = d * (1 / len);
-      f32 g0 = 0, g1 = 0;
-      const bool gap = door_gap(P.doors, a, bb, inset, g0, g1);
-      std::vector<std::pair<f32, f32>> solid;  // along the edge, below the lintel
-      if (gap) { solid.push_back({0, std::fmax(0.0, g0)}); solid.push_back({std::fmin(len, g1), len}); }
-      else solid.push_back({0, len});
-      // collision: from the footprint base to the roof
-      for (auto [s0, s1] : solid) wall(P, a + u * s0, a + u * s1, P.base - 0.5, P.top, kWall, false, true);
-      if (gap) wall(P, a + u * g0, a + u * g1, base0 + kDoorH, P.top, kWall, false, true);
-      if (ring == 0) continue;
-      // inside: per storey, window openings exactly where the facade draws its windows (Kern's
-      // facade: a column every 3 m from the ring's edge start, the pane over 22-78 % of it and 28-78 %
-      // of the storey, from the first storey up to 1 m under the roof) - they show the city
-      const f32 len_o = hypot_bp(converted::at(P.outer, converted::rem((converted::plus(i, 1)), P.outer.size())).x - converted::at(P.outer, i).x, converted::at(P.outer, converted::rem((converted::plus(i, 1)), P.outer.size())).y - converted::at(P.outer, i).y);
-      const f32 to_inner = len / std::fmax(0.01, len_o);
-      for (u32 k = 0; k < F; ++k) {
-        const f32 z0 = converted::at(P.levels, k), z1 = ceil_of(k), zn = k + 1 < F ? converted::at(P.levels, k + 1) : z1 + 0.3;
-        const f32 row = std::floor((z0 + 0.5 - P.base) / P.floor_h);
-        const f32 sill = P.base + (row + 0.28) * P.floor_h, head = std::fmin(z1 - 0.05, P.base + (row + 0.78) * P.floor_h);
-        std::vector<std::pair<f32, f32>> wins;
-        const bool rows = row >= 1 && P.base + (row + 0.78) * P.floor_h <= P.top - 1 && head > sill + 0.3;
-        for (f32 c0 = 0; rows && c0 + 2.34 <= len_o; c0 += 3) {
-          f32 w0 = c0 + 0.66, w1 = c0 + 2.34;
-          if (reversed) { const f32 t0 = len_o - w1; w1 = len_o - w0; w0 = t0; }
-          wins.push_back({w0 * to_inner, w1 * to_inner});
-        }
-        std::stable_sort(wins.begin(), wins.end(), [](const std::pair<f32, f32>& a, const std::pair<f32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
-        // the full band below the sill and above the head, solid pieces between the windows
-        f32 t = 0;
-        for (auto [w0, w1] : wins) {
-          wall(P, a + u * t, a + u * w0, z0, z1, kWall, true, false);
-          wall(P, a + u * w0, a + u * w1, z0, sill, kWall, true, false);
-          wall(P, a + u * w0, a + u * w1, head, z1, kWall, true, false);
-          // the pane (building_interiors.mjs glass: clear, slightly tinted, one transparent mesh),
-          // halfway between the inner face and the facade
-          const Vec2 g0 = a + u * w0 + Vec2{u.y, -u.x} * (kWallIn * 0.5), g1 = a + u * w1 + Vec2{u.y, -u.x} * (kWallIn * 0.5);
-          const Vec3 q[4] = {{g0.x, g0.y, sill}, {g1.x, g1.y, sill}, {g1.x, g1.y, head}, {g0.x, g0.y, head}};
-          const Vec3 gn = converted::wide::normalize(converted::wide::cross(q[1] - q[0], q[2] - q[0]), {1, 0, 0});
-          for (int v : {0, 1, 2, 0, 2, 3}) P.glass.push(converted::at(q, v), gn, {0.62, 0.70, 0.74}, {0, 0});
-          t = w1;
-        }
-        if (k == 0 && gap) {
-          // the door opening in the lobby wall
-          if (t < g0) wall(P, a + u * t, a + u * g0, z0, z1, kWall, true, false);
-          wall(P, a + u * g0, a + u * g1, z0 + kDoorH, z1, kWall, true, false);
-          t = std::fmax(t, g1);
-        }
-        wall(P, a + u * t, a + u * len, z0, z1, kWall, true, false);
-        wall(P, a, bb, z1, zn, kWall, true, false);  // slab edge band
-        wall(P, a, bb, z0, z0 + 0.1, kTrim, true, false);  // skirting
-      }
-    }
-  }
-  // courtyards: walls without doors
-  for (std::size_t h = 0; h < P.holes.size(); converted::pre_inc(h))
-    for (int ring = 0; ring < 2; converted::pre_inc(ring)) {
-      const std::vector<Vec2>& R = ring == 0 ? converted::at(P.holes, h) : converted::at(P.inner_holes, h);
-      for (std::size_t i = 0; i < R.size(); converted::pre_inc(i)) wall(P, converted::at(R, i), converted::at(R, converted::rem((converted::plus(i, 1)), R.size())), ring ? base0 : P.base - 0.5, ring ? ceil_top : P.top, kWall, ring == 1, true);
-    }
-  // door reveals (walls of the opening between the two rings), lintel, threshold
-  for (const Door& d : P.doors) {
-    const Vec2 o0 = d.c - d.d * (kDoorW / 2), o1 = d.c + d.d * (kDoorW / 2), i0 = o0 - d.n * kWallIn, i1 = o1 - d.n * kWallIn;
-    wall(P, o0, i0, base0, base0 + kDoorH, kStone, true, true);
-    wall(P, i1, o1, base0, base0 + kDoorH, kStone, true, true);
-    vquad(P, {o0.x, o0.y, base0 + kDoorH}, {o1.x, o1.y, base0 + kDoorH}, {i1.x, i1.y, base0 + kDoorH}, {i0.x, i0.y, base0 + kDoorH}, kStone);
-    const Vec2 f0 = o0 + d.n * 0.6, f1 = o1 + d.n * 0.6;
-    vquad(P, {f0.x, f0.y, base0 - 0.01}, {f1.x, f1.y, base0 - 0.01}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, kStone);
-    cquad(P, {f0.x, f0.y, base0}, {f1.x, f1.y, base0}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, false);
-  }
-  // ---- floors, ceilings, the roof
-  std::vector<std::vector<Vec2>> floor_holes;
-  for (const auto& h : P.inner_holes) floor_holes.push_back(cw(h));
-  std::vector<std::vector<Vec2>> core_holes = floor_holes;
-  if (P.has_core) core_holes.push_back(cw(rect(0, 0, kCoreW, kCoreL)));
-  for (u32 k = 0; k < F; ++k) {
-    const f32 z = converted::at(P.levels, k);
-    slab(P, P.inner, k == 0 ? floor_holes : core_holes, z, k == 0 ? kStone : kOak, true, true, true);
-    if (k > 0) {
-      slab(P, P.inner, core_holes, z - kSlab, kCeil, false, true, false);  // the ceiling of the storey below
-      // the near landing in the core at this floor
-      slab(P, rect(0, 0, kCoreW, kLand), {}, z, kConcrete, true, true, true);
-      slab(P, rect(0, 0, kCoreW, kLand), {}, z - kSlab, kCeil, false, true, false);
-    }
-  }
-  std::vector<std::vector<Vec2>> roof_holes;
-  for (const auto& h : P.holes) roof_holes.push_back(h);
-  if (P.roof_access) roof_holes.push_back(cw(rect(0, kLand, kCoreW, kCoreL)));
-  slab(P, P.inner, P.roof_access ? std::vector<std::vector<Vec2>>{floor_holes.begin(), floor_holes.end()} : floor_holes, ceil_top, kCeil, false, true, false);
-  if (P.roof_access) slab(P, rect(0, 0, kCoreW, kLand), {}, P.top, kConcrete, true, true, false);
-  slab(P, P.outer, roof_holes, P.top, kConcrete, true, false, true);
-  // ---- the stair core: walls, divider, flights, landings
-  if (P.has_core) {
-    const f32 z0 = base0;
-    auto cwall = [&](f32 u0, f32 v0, f32 u1, f32 v1, f32 za, f32 zb, Vec3 col) { wall(P, CP(u0, v0), CP(u1, v1), za, zb, col, true, true); };
-    cwall(0, 0, 0, kCoreL, z0, wall_top, kStairWall);
-    cwall(kCoreW, 0, kCoreW, kCoreL, z0, wall_top, kStairWall);
-    cwall(0, kCoreL, kCoreW, kCoreL, z0, wall_top, kStairWall);
-    cwall(kLane + 0.1, kLand, kLane + 0.1, kLand + kRun, z0, wall_top - (P.roof_access ? kRoofHouse : 0), kAccent);
-    std::vector<std::pair<f32, f32>> stairs;
-    for (u32 k = 0; k + 1 < F; ++k) stairs.push_back({converted::at(P.levels, k), converted::at(P.levels, k + 1) - converted::at(P.levels, k)});
-    if (P.roof_access) stairs.push_back({converted::at(P.levels, F - 1), P.top - converted::at(P.levels, F - 1)});
-    for (auto [z, R] : stairs) {
-      const f32 half = R / 2;
-      auto P3 = [&](f32 u, f32 v, f32 h) { const Vec2 q = CP(u, v); return Vec3{q.x, q.y, h}; };
-      // ramps for walking (collision), steps for the eye
-      cquad(P, P3(0, kLand, z), P3(kLane, kLand, z), P3(kLane, kLand + kRun, z + half), P3(0, kLand + kRun, z + half), true);
-      cquad(P, P3(kCoreW - kLane, kLand + kRun, z + half), P3(kCoreW, kLand + kRun, z + half), P3(kCoreW, kLand, z + R), P3(kCoreW - kLane, kLand, z + R), true);
-      slab(P, rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half, kConcrete, true, true, true);
-      slab(P, rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half - 0.2, kCeil, false, true, false);
-      const u32 n = std::max<u32>(6, static_cast<u32>(std::lround(half / 0.18)));
-      const f32 rise = half / static_cast<f32>(n), tread = kRun / static_cast<f32>(n);
-      const f32 yaw = kern::math::atan2(C.v.y, C.v.x);
-      for (u32 s = 0; s < n; ++s) {
-        const f32 top_a = z + rise * static_cast<f32>(s + 1), top_b = z + half + rise * static_cast<f32>(s + 1);
-        const Vec2 ca = CP(kLane / 2, kLand + tread * (static_cast<f32>(s) + 0.5)), cb = CP(kCoreW - kLane / 2, kLand + kRun - tread * (static_cast<f32>(s) + 0.5));
-        box(P, {ca.x, ca.y, top_a - rise * 0.5}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
-        box(P, {cb.x, cb.y, top_b - rise * 0.5}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
-      }
-    }
-    if (!P.roof_access) cwall(0, kLand, kLane, kLand, converted::at(P.levels, F - 1), converted::at(P.levels, F - 1) + 1.1, kDark);  // the railing at the top
-    else {
-      // the stair house on the roof: a lid over the core
-      slab(P, rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse, kConcrete, false, true, true);
-      slab(P, rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse + 0.01, kConcrete, true, true, true);
-    }
-  }
-  // ---- furniture and ceiling lights (building_interiors.mjs placeProps: desks, sofas, shelves,
-  // beds, tables, plants; panels on a 3.6 m grid)
-  f32 x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (Vec2 p : P.inner) { x0 = std::fmin(x0, p.x); x1 = std::fmax(x1, p.x); y0 = std::fmin(y0, p.y); y1 = std::fmax(y1, p.y); }
-  auto free_spot = [&](Vec2 p, f32 clear) {
-    if (!pip(p, P.inner) || ring_dist(p, P.inner) < clear) return false;
-    for (const auto& h : P.inner_holes)
-      if (pip(p, h) || ring_dist(p, h) < clear) return false;
-    for (const Door& d : P.doors)
-      if (hypot_bp(d.c.x - p.x, d.c.y - p.y) < 3.2) return false;
-    if (P.has_core) {
-      const Vec2 q = p - C.o;
-      const f32 u = q.x * C.u.x + q.y * C.u.y, v = q.x * C.v.x + q.y * C.v.y;
-      if (u > -1.5 && u < kCoreW + 1.5 && v > -3.0 && v < kCoreL + 1.5) return false;
-    }
-    return true;
-  };
-  const f32 yaw0 = kern::math::atan2(axis.y, axis.x);
-  for (u32 k = 0; k < F; ++k) {
-    const f32 z = converted::at(P.levels, k), zc = ceil_of(k);
-    u32 placed = 0, lamps = 0;
-    for (f32 x = x0 + 1.8; x < x1 && placed < 10; x += 3.4)
-      for (f32 y = y0 + 1.8; y < y1 && placed < 10; y += 3.4) {
-        const Vec2 p{x, y};
-        const u32 h = hash_key(seed + k * 131, static_cast<u32>(converted::plus(converted::times(static_cast<i32>(converted::fits<int>(x * 7)), 31), static_cast<i32>(converted::fits<int>(y * 13)))));
-        if (h % 100 > 38 || !free_spot(p, 1.3)) continue;
-        const f32 yaw = yaw0 + (h >> 8 & 3) * kPi / 2;
-        // the lobby gets a reception desk first (building_interiors.mjs reception), then lounge pieces
-        const u32 kind = k == 0 ? (placed == 0 ? 9u : 3u + (h >> 12) % 3 + ((h >> 14) & 1) * 3u) : (h >> 12) % 9;
-        switch (kind) {
-          case 0:  // desk with a screen and a chair
-            box(P, {p.x, p.y, z + 0.37}, {1.6, 0.8, 0.74}, yaw, kOak, true);
-            box(P, Vec3{p.x, p.y, z + 1.0} + yaw_quat(yaw).rotate({0, 0.22, 0}), {0.62, 0.035, 0.38}, yaw, rgb(0x111214), false);
-            box(P, Vec3{p.x, p.y, z + 0.25} + yaw_quat(yaw).rotate({0, -0.7, 0}), {0.5, 0.5, 0.5}, yaw, rgb(0x3a3f47), false);
-            break;
-          case 1:  // bed
-            box(P, {p.x, p.y, z + 0.27}, {1.72, 2.18, 0.54}, yaw, rgb(0xeeece6), true);
-            box(P, Vec3{p.x, p.y, z + 0.55} + yaw_quat(yaw).rotate({0, 1.05, 0}), {1.74, 0.08, 1.1}, yaw, rgb(0x5e3f2a), false);
-            break;
-          case 2:  // shelf
-            box(P, {p.x, p.y, z + 0.95}, {1.2, 0.36, 1.9}, yaw, rgb(0xeeece6), true);
-            break;
-          case 3:  // sofa
-            box(P, {p.x, p.y, z + 0.3}, {2.1, 0.92, 0.6}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), true);
-            box(P, Vec3{p.x, p.y, z + 0.66} + yaw_quat(yaw).rotate({0, 0.36, 0}), {2.1, 0.2, 0.5}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), false);
-            break;
-          case 4:  // table
-            box(P, {p.x, p.y, z + 0.37}, {0.9, 0.9, 0.74}, yaw, rgb(0xefe9df), true);
-            break;
-          case 6: {  // armchair and a floor lamp
-            const Quat q = yaw_quat(yaw);
-            box(P, {p.x, p.y, z + 0.22}, {0.86, 0.84, 0.44}, yaw, rgb(0x8a4f3c + (h & 0x070707)), true);
-            box(P, Vec3{p.x, p.y, z + 0.66} + q.rotate({0, 0.34, 0}), {0.86, 0.18, 0.56}, yaw, rgb(0x8a4f3c + (h & 0x070707)), false);
-            box(P, Vec3{p.x, p.y, z + 0.75} + q.rotate({0.75, 0.2, 0}), {0.04, 0.04, 1.45}, yaw, kDark, false);
-            box(P, Vec3{p.x, p.y, z + 1.55} + q.rotate({0.75, 0.2, 0}), {0.36, 0.36, 0.26}, yaw, rgb(0xf4e4c2), false);
-            break;
-          }
-          case 7: {  // dining table with four chairs
-            const Quat q = yaw_quat(yaw);
-            box(P, {p.x, p.y, z + 0.38}, {1.8, 0.9, 0.76}, yaw, rgb(0x5e3f2a), true);
-            for (f32 cx : {-0.45, 0.45})
-              for (f32 cy : {-0.68, 0.68}) box(P, Vec3{p.x, p.y, z + 0.45} + q.rotate({cx, cy, 0}), {0.44, 0.42, 0.9}, yaw, rgb(0xb98b5c), false);
-            break;
-          }
-          case 8: {  // kitchen counter
-            box(P, {p.x, p.y, z + 0.45}, {2.4, 0.6, 0.9}, yaw, rgb(0xeeece6), true);
-            box(P, {p.x, p.y, z + 0.915}, {2.44, 0.64, 0.04}, yaw, rgb(0x3d3f42), false);
-            break;
-          }
-          case 9: {  // reception desk with a brass band
-            const Quat q = yaw_quat(yaw);
-            box(P, {p.x, p.y, z + 0.55}, {2.8, 0.75, 1.1}, yaw, rgb(0x5e3f2a), true);
-            box(P, {p.x, p.y, z + 1.12}, {2.9, 0.85, 0.05}, yaw, rgb(0xd9d6cf), false);
-            box(P, Vec3{p.x, p.y, z + 0.55} + q.rotate({0, -0.39, 0}), {2.6, 0.01, 0.5}, yaw, rgb(0xc7a35a), false);
-            break;
-          }
-          default:  // plant
-            box(P, {p.x, p.y, z + 0.21}, {0.4, 0.4, 0.42}, yaw, rgb(0xd9d4ca), true);
-            box(P, {p.x, p.y, z + 0.9}, {0.6, 0.6, 0.9}, yaw + 0.4, rgb(0x3d6b33), false);
-            break;
-        }
-        ++placed;
-        ++P.furniture;
-      }
-    for (f32 x = x0 + 1.8; x < x1 && lamps < 24; x += 3.6)
-      for (f32 y = y0 + 1.8; y < y1 && lamps < 24; y += 3.6)
-        if (pip({x, y}, P.inner) && ring_dist({x, y}, P.inner) > 0.8) { P.lamps.push_back({x, y, zc - 0.02}); ++lamps; }
-  }
-  // air conditioners on the roof (building_interiors.mjs ac), clear of the stair house
-  if (P.roof_access) {
-    u32 ac = 0;
-    for (f32 x = x0 + 2; x < x1 - 1 && ac < 3; x += 5)
-      for (f32 y = y0 + 2; y < y1 - 1 && ac < 3; y += 5) {
-        const Vec2 q{x, y};
-        if (!pip(q, P.inner) || ring_dist(q, P.inner) < 1.5) continue;
-        const Vec2 c = q - C.o;
-        const f32 cu = c.x * C.u.x + c.y * C.u.y, cv = c.x * C.v.x + c.y * C.v.y;
-        if (cu > -2.5 && cu < kCoreW + 2.5 && cv > -3.5 && cv < kCoreL + 2.5) continue;
-        if (h01(seed, 900 + ac * 7 + static_cast<u32>(converted::fits<unsigned int>(x * 3 + y))) > 0.5) continue;
-        box(P, {q.x, q.y, P.top + 0.55}, {1.5, 1.1, 1.1}, yaw0, rgb(0xa9adb1), true);
-        box(P, {q.x, q.y, P.top + 1.12}, {0.8, 0.8, 0.05}, yaw0, rgb(0x2c2f33), false);
-        ++ac;
-      }
-  }
-  return !P.points.empty();
-}
 void Interiors::clear() {
   if (r_ && mesh_id_) { r_->remove(mesh_id_); mesh_id_ = 0; }
   if (r_ && glass_id_) { r_->remove(glass_id_); glass_id_ = 0; }
@@ -1653,50 +1148,6 @@ void Interiors::clear() {
 void Interiors::release(CityStream& city) {
   clear();
   city.exclude_building(0, -1);
-}
-void Interiors::activate(const CityStream::BuildingRef& ref, CityStream& city, f32 ground) {
-  Plan plan;
-  if (!build(city.building(ref), ground, plan)) return;
-  clear();
-  plan_ = std::move(plan);
-  physics::BodySettings bs;
-  bs.type = physics::BodyType::fixed;
-  body_ = world_->create_body(bs);
-  physics::ShapeSettings ss;
-  ss.kind = physics::ShapeKind::mesh;
-  ss.points = Span<const Vec3>(plan_.points.data(), plan_.points.size());
-  ss.indices = Span<const u32>(plan_.indices.data(), plan_.indices.size());
-  ss.material.friction = 0.7;
-  ss.material.category_bits = kCatWorld;
-  if (!world_->create_shape(body_, ss).valid()) { clear(); return; }
-  weld(plan_.mesh);
-  mesh_id_ = r_->allocate_id();
-  MeshLook look;
-  look.material.roughness = 0.85;
-  look.material.double_sided = true;
-  look.material.cast_shadow = false;
-  look.extra_slot = kMaxExtensionAttributes;
-  if (!upsert(*r_, mesh_id_, plan_.mesh, look)) { r_->release_id(mesh_id_); mesh_id_ = 0; }
-  plan_.mesh = MeshData{};
-  if (plan_.glass.vertex_count()) {
-    glass_id_ = r_->allocate_id();
-    MeshLook glass;
-    glass.material.roughness = 0.05;
-    glass.material.color = {1, 1, 1, 0.22};
-    glass.material.alpha = AlphaMode::blend;
-    glass.material.double_sided = true;
-    glass.material.cast_shadow = false;
-    glass.material.emissive = {0.02, 0.025, 0.03};
-    glass.extra_slot = kMaxExtensionAttributes;
-    if (!upsert(*r_, glass_id_, plan_.glass, glass)) { r_->release_id(glass_id_); glass_id_ = 0; }
-    plan_.glass = MeshData{};
-  }
-  active_ = true;
-  tile_ = ref.tile;
-  index_ = ref.index;
-  door_angle_.assign(converted::count(plan_.doors.size()), 0);
-  city.exclude_building(tile_, static_cast<i32>(index_));
-  ++built_;
 }
 bool Interiors::inside(Vec3 p) const {
   if (!active_ || !pip({p.x, p.y}, plan_.outer)) return false;
@@ -1711,61 +1162,6 @@ i32 Interiors::level_at(Vec3 p) const {
     if (p.z >= converted::at(plan_.levels, i) - 0.3) k = static_cast<i32>(i);
   if (plan_.roof_access && p.z >= plan_.top - 0.3) k = static_cast<i32>(plan_.levels.size());
   return k;
-}
-void Interiors::update(f32 dt, f32 now, Vec3 feet, bool on_foot, CityStream& city) {
-  feet_ = feet;
-  const Vec2 f{feet.x, feet.y};
-  if (active_) {
-    for (std::size_t i = 0; i < plan_.doors.size(); converted::pre_inc(i)) {
-      const Door& d = converted::at(plan_.doors, i);
-      const bool near = hypot_bp(f.x - d.c.x, f.y - d.c.y) < 2.6 && std::fabs(feet.z - converted::at(plan_.levels, 0)) < 2;
-      converted::at(door_angle_, i) += clampf((near ? 1.45 : 0.0) - converted::at(door_angle_, i), -dt * 3.2, dt * 3.2);
-    }
-    const bool in = inside(feet);
-    if (in && !was_inside_) ++entered_;
-    was_inside_ = in;
-  }
-  if (now < next_scan_) return;
-  next_scan_ = now + 0.5;
-  std::vector<CityStream::BuildingRef> near;
-  city.buildings_near(f, kDoorsRadius, near);
-  // which building is the player at? (inside it, or the nearest outline within ACTIVATE)
-  i32 best = -1;  // (its place in `near`)
-  f32 best_d = kActivate;
-  for (std::size_t i = 0; i < near.size(); converted::pre_inc(i)) {
-    const std::vector<Vec2>& o = converted::at(city.building(converted::at(near, i)).rings, 0);
-    const f32 d = pip(f, o) ? 0 : ring_dist(f, o);
-    if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
-  }
-  if (active_) {
-    const f32 d = pip(f, plan_.outer) ? 0 : ring_dist(f, plan_.outer);
-    const bool keep = inside(feet) || d < kRelease;
-    const bool other = best >= 0 && !(converted::at(near, static_cast<std::size_t>(best)).tile == tile_ && converted::at(near, static_cast<std::size_t>(best)).index == index_) && best_d < 0.5 * d && !inside(feet);
-    if (!keep || other || (!on_foot && d > kActivate)) release(city);
-  }
-  if (!active_ && on_foot && best >= 0) {
-    const f32 ground = city.ground_height(f.x, f.y);
-    activate(converted::at(near, static_cast<std::size_t>(best)), city, ground);
-  }
-  // closed doors of the buildings around (the nearest MAX_CLOSED_DOORS)
-  std::vector<std::pair<f32, Closed>> doors;
-  for (const CityStream::BuildingRef& r : near) {
-    if (active_ && r.tile == tile_ && r.index == index_) continue;
-    const MapFeatures::Building& b = city.building(r);
-    std::vector<Vec2> o = clean(converted::at(b.rings, 0));
-    if (o.size() < 3) continue;
-    if (signed_area(o) < 0) std::reverse(o.begin(), o.end());
-    const f32 area = signed_area(o);
-    if (area < 24 || area > 40000 || b.top - b.base < 2.8) continue;
-    for (const Door& d : doors_of(o, area)) {
-      const f32 dist = hypot_bp(d.c.x - f.x, d.c.y - f.y);
-      if (dist > kDoorsRadius) continue;
-      doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(b.base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, kern::math::atan2(d.d.y, d.d.x)}});
-    }
-  }
-  std::stable_sort(doors.begin(), doors.end(), [](const std::pair<f32, Closed>& a, const std::pair<f32, Closed>& b) { return a.first < b.first; });
-  closed_.clear();
-  for (std::size_t i = 0; i < doors.size() && i < kMaxClosedDoors; converted::pre_inc(i)) closed_.push_back(converted::at(doors, i).second);
 }
 void Interiors::draw(LifeArt& art, f32 now, Vec3 eye) const {
   (void)now;
@@ -1916,21 +1312,6 @@ bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, std::
 [[maybe_unused]] static bool defined(const CoreFit& s) { return defined(s.ok) && defined(s.core); }
 [[maybe_unused]] static std::string text(const CoreFit& s) { return std::string("{") + text(s.ok) + ", " + text(s.core) + "}"; }
 [[maybe_unused]] static void take(CoreFit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<bool>(s.ok, (*v.rows)[0]); converted::take_as<Interiors::Core>(s.core, (*v.rows)[1]); }
-[[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
-  MapFeatures::Building s{};
-  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-  s.base = draw.number();
-  s.top = draw.number();
-  s.seed = static_cast<unsigned int>(draw.below(40));
-  s.full_top = draw.number();
-  s.leveled = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MapFeatures::Building& s) { return converted::Value::structure({arg(s.rings), arg(s.base), arg(s.top), arg(s.seed), arg(s.full_top), arg(s.leveled)}); }
-[[maybe_unused]] static bool same(const MapFeatures::Building& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.rings, (*got.rows)[0]), ".rings") && converted::at_place(same(want.base, (*got.rows)[1]), ".base") && converted::at_place(same(want.top, (*got.rows)[2]), ".top") && converted::at_place(same(want.seed, (*got.rows)[3]), ".seed") && converted::at_place(same(want.full_top, (*got.rows)[4]), ".full_top") && converted::at_place(same(want.leveled, (*got.rows)[5]), ".leveled"); }
-[[maybe_unused]] static bool defined(const MapFeatures::Building& s) { return defined(s.rings) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.full_top) && defined(s.leveled); }
-[[maybe_unused]] static std::string text(const MapFeatures::Building& s) { return std::string("{") + text(s.rings) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.full_top) + ", " + text(s.leveled) + "}"; }
-[[maybe_unused]] static void take(MapFeatures::Building& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<double>(s.base, (*v.rows)[1]); converted::take_as<double>(s.top, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<double>(s.full_top, (*v.rows)[4]); converted::take_as<bool>(s.leveled, (*v.rows)[5]); }
 [[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
   physics::Body s{};
   s.id = static_cast<u64>(draw.bits());
@@ -1980,7 +1361,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static std::string text(const Interiors& s) { return std::string("{") + text(s.r_) + ", " + text(s.world_) + ", " + text(s.active_) + ", " + text(converted::shaped<converted::Whole>(s.tile_)) + ", " + text(s.index_) + ", " + text(s.plan_) + ", " + text(s.mesh_id_) + ", " + text(s.glass_id_) + ", " + text(s.body_) + ", " + text(s.door_angle_) + ", " + text(s.closed_) + ", " + text(s.next_scan_) + ", " + text(s.feet_) + ", " + text(s.entered_) + ", " + text(s.built_) + ", " + text(s.was_inside_) + "}"; }
 [[maybe_unused]] static void take(Interiors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<World*>(s.world_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<converted::Whole>(s.tile_, (*v.rows)[3]); converted::take_as<unsigned int>(s.index_, (*v.rows)[4]); converted::take_as<Interiors::Plan>(s.plan_, (*v.rows)[5]); converted::take_as<unsigned int>(s.mesh_id_, (*v.rows)[6]); converted::take_as<unsigned int>(s.glass_id_, (*v.rows)[7]); converted::take_as<physics::Body>(s.body_, (*v.rows)[8]); converted::take_as<std::vector<double>>(s.door_angle_, (*v.rows)[9]); converted::take_as<std::vector<Interiors::Closed>>(s.closed_, (*v.rows)[10]); converted::take_as<double>(s.next_scan_, (*v.rows)[11]); converted::take_as<Vec3>(s.feet_, (*v.rows)[12]); converted::take_as<unsigned int>(s.entered_, (*v.rows)[13]); converted::take_as<unsigned int>(s.built_, (*v.rows)[14]); converted::take_as<bool>(s.was_inside_, (*v.rows)[15]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
-  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
   s.x = draw.number();
   s.y = draw.number();
@@ -2093,6 +1473,21 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const TileKey& s) { return defined(s.z) && defined(s.x) && defined(s.y); }
 [[maybe_unused]] static std::string text(const TileKey& s) { return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 [[maybe_unused]] static void take(TileKey& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.z, (*v.rows)[0]); converted::take_as<int>(s.x, (*v.rows)[1]); converted::take_as<int>(s.y, (*v.rows)[2]); }
+[[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
+  MapFeatures::Building s{};
+  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.base = draw.number();
+  s.top = draw.number();
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.full_top = draw.number();
+  s.leveled = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MapFeatures::Building& s) { return converted::Value::structure({arg(s.rings), arg(s.base), arg(s.top), arg(s.seed), arg(s.full_top), arg(s.leveled)}); }
+[[maybe_unused]] static bool same(const MapFeatures::Building& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.rings, (*got.rows)[0]), ".rings") && converted::at_place(same(want.base, (*got.rows)[1]), ".base") && converted::at_place(same(want.top, (*got.rows)[2]), ".top") && converted::at_place(same(want.seed, (*got.rows)[3]), ".seed") && converted::at_place(same(want.full_top, (*got.rows)[4]), ".full_top") && converted::at_place(same(want.leveled, (*got.rows)[5]), ".leveled"); }
+[[maybe_unused]] static bool defined(const MapFeatures::Building& s) { return defined(s.rings) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.full_top) && defined(s.leveled); }
+[[maybe_unused]] static std::string text(const MapFeatures::Building& s) { return std::string("{") + text(s.rings) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.full_top) + ", " + text(s.leveled) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Building& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<double>(s.base, (*v.rows)[1]); converted::take_as<double>(s.top, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<double>(s.full_top, (*v.rows)[4]); converted::take_as<bool>(s.leveled, (*v.rows)[5]); }
 [[maybe_unused]] static MapFeatures::Road draw_MapFeatures__Road(converted::Draw& draw) {
   MapFeatures::Road s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -2490,17 +1885,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const CityStream& s) { return defined(s.anchor) && defined(s.view_lead) && defined(s.building_budget) && defined(s.ring) && defined(s.extra_foci) && defined(s.mate_ring) && defined(s.training_offline) && defined(s.damage_serial_) && defined(s.furniture_serial_) && defined(s.ground_changes_) && defined(s.near_) && defined(s.ms_) && defined(s.start_ms_) && defined(s.worst_) && defined(s.worst_at_) && defined(s.worst_step_) && defined(s.worst_step_ms_) && defined(s.rebuilds_) && defined(s.relays_) && defined(s.upload_count_) && defined(converted::shaped<converted::Whole>(s.upload_vertices_)) && defined(s.focus_) && defined(s.vis_at_) && defined(s.vis_ahead_) && defined(s.vis_ms_) && defined(s.damage_) && defined(s.damage_log_) && defined(s.damage_quiet_) && defined(s.r_) && defined(s.world_) && defined(s.proj_) && defined(s.origin_tile_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_)) && defined(s.requests_) && defined(s.lanes_) && defined(s.offline_) && defined(s.real_tiles_) && defined(s.stats_) && defined(s.terrain_) && defined(s.terrain_changes_) && defined(converted::shaped<converted::Whole>(s.excl_tile_)) && defined(s.excl_index_); }
 [[maybe_unused]] static std::string text(const CityStream& s) { return std::string("{") + text(s.anchor) + ", " + text(s.view_lead) + ", " + text(s.building_budget) + ", " + text(s.ring) + ", " + text(s.extra_foci) + ", " + text(s.mate_ring) + ", " + text(s.training_offline) + ", " + text(s.damage_serial_) + ", " + text(s.furniture_serial_) + ", " + text(s.ground_changes_) + ", " + text(s.near_) + ", " + text(s.ms_) + ", " + text(s.start_ms_) + ", " + text(s.worst_) + ", " + text(s.worst_at_) + ", " + text(s.worst_step_) + ", " + text(s.worst_step_ms_) + ", " + text(s.rebuilds_) + ", " + text(s.relays_) + ", " + text(s.upload_count_) + ", " + text(converted::shaped<converted::Whole>(s.upload_vertices_)) + ", " + text(s.focus_) + ", " + text(s.vis_at_) + ", " + text(s.vis_ahead_) + ", " + text(s.vis_ms_) + ", " + text(s.damage_) + ", " + text(s.damage_log_) + ", " + text(s.damage_quiet_) + ", " + text(s.r_) + ", " + text(s.world_) + ", " + text(s.proj_) + ", " + text(s.origin_tile_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_)) + ", " + text(s.requests_) + ", " + text(s.lanes_) + ", " + text(s.offline_) + ", " + text(s.real_tiles_) + ", " + text(s.stats_) + ", " + text(s.terrain_) + ", " + text(s.terrain_changes_) + ", " + text(converted::shaped<converted::Whole>(s.excl_tile_)) + ", " + text(s.excl_index_) + "}"; }
 [[maybe_unused]] static void take(CityStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 42) return; converted::take_as<Vec3>(s.anchor, (*v.rows)[0]); converted::take_as<Vec3>(s.view_lead, (*v.rows)[1]); converted::take_as<unsigned int>(s.building_budget, (*v.rows)[2]); converted::take_as<int>(s.ring, (*v.rows)[3]); converted::take_as<std::vector<Vec3>>(s.extra_foci, (*v.rows)[4]); converted::take_as<int>(s.mate_ring, (*v.rows)[5]); converted::take_as<bool>(s.training_offline, (*v.rows)[6]); converted::take_as<unsigned int>(s.damage_serial_, (*v.rows)[7]); converted::take_as<unsigned int>(s.furniture_serial_, (*v.rows)[8]); converted::take_as<std::vector<Vec4>>(s.ground_changes_, (*v.rows)[9]); converted::take_as<CityStream::NearCollision>(s.near_, (*v.rows)[10]); converted::take_as<StreamStats>(s.ms_, (*v.rows)[11]); converted::take_as<double>(s.start_ms_, (*v.rows)[12]); converted::take_as<double>(s.worst_, (*v.rows)[13]); converted::take_as<double>(s.worst_at_, (*v.rows)[14]); converted::take_as<const char*>(s.worst_step_, (*v.rows)[15]); converted::take_as<double>(s.worst_step_ms_, (*v.rows)[16]); converted::take_as<unsigned int>(s.rebuilds_, (*v.rows)[17]); converted::take_as<unsigned int>(s.relays_, (*v.rows)[18]); converted::take_as<unsigned int>(s.upload_count_, (*v.rows)[19]); converted::take_as<converted::Whole>(s.upload_vertices_, (*v.rows)[20]); converted::take_as<Vec3>(s.focus_, (*v.rows)[21]); converted::take_as<Vec2>(s.vis_at_, (*v.rows)[22]); converted::take_as<Vec2>(s.vis_ahead_, (*v.rows)[23]); converted::take_as<double>(s.vis_ms_, (*v.rows)[24]); converted::take_as<converted::wide::Map<unsigned int, CityStream::Damage>>(s.damage_, (*v.rows)[25]); converted::take_as<std::vector<unsigned int>>(s.damage_log_, (*v.rows)[26]); converted::take_as<bool>(s.damage_quiet_, (*v.rows)[27]); converted::take_as<Renderer*>(s.r_, (*v.rows)[28]); converted::take_as<World*>(s.world_, (*v.rows)[29]); converted::take_as<GeoProjector>(s.proj_, (*v.rows)[30]); converted::take_as<TileKey>(s.origin_tile_, (*v.rows)[31]); converted::take_as<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_, (*v.rows)[32]); converted::take_as<std::vector<TileKey>>(s.requests_, (*v.rows)[33]); converted::take_as<std::vector<Lane>>(s.lanes_, (*v.rows)[34]); converted::take_as<bool>(s.offline_, (*v.rows)[35]); converted::take_as<unsigned int>(s.real_tiles_, (*v.rows)[36]); converted::take_as<StreamStats>(s.stats_, (*v.rows)[37]); converted::take_as<Terrain>(s.terrain_, (*v.rows)[38]); converted::take_as<std::vector<Vec4>>(s.terrain_changes_, (*v.rows)[39]); converted::take_as<converted::Whole>(s.excl_tile_, (*v.rows)[40]); converted::take_as<int>(s.excl_index_, (*v.rows)[41]); }
-[[maybe_unused]] static CityStream::BuildingRef draw_CityStream__BuildingRef(converted::Draw& draw) {
-  CityStream::BuildingRef s{};
-  s.tile = static_cast<u64>(draw.bits());
-  s.index = static_cast<unsigned int>(draw.below(40));
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const CityStream::BuildingRef& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.tile)), arg(s.index)}); }
-[[maybe_unused]] static bool same(const CityStream::BuildingRef& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[0]), ".tile") && converted::at_place(same(want.index, (*got.rows)[1]), ".index"); }
-[[maybe_unused]] static bool defined(const CityStream::BuildingRef& s) { return defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.index); }
-[[maybe_unused]] static std::string text(const CityStream::BuildingRef& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.index) + "}"; }
-[[maybe_unused]] static void take(CityStream::BuildingRef& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.tile, (*v.rows)[0]); converted::take_as<unsigned int>(s.index, (*v.rows)[1]); }
 [[maybe_unused]] static LifeArt::Part draw_LifeArt__Part(converted::Draw& draw) {
   LifeArt::Part s{};
   s.id = static_cast<unsigned int>(draw.below(40));
@@ -2553,91 +1937,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const LifeArt& s) { return defined(s.r_) && defined(s.box_) && defined(s.ball_) && defined(s.cyl_) && defined(s.glow_) && defined(s.bones_); }
 [[maybe_unused]] static std::string text(const LifeArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.box_) + ", " + text(s.ball_) + ", " + text(s.cyl_) + ", " + text(s.glow_) + ", " + text(s.bones_) + "}"; }
 [[maybe_unused]] static void take(LifeArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<LifeArt::Part>(s.box_, (*v.rows)[1]); converted::take_as<LifeArt::Part>(s.ball_, (*v.rows)[2]); converted::take_as<LifeArt::Part>(s.cyl_, (*v.rows)[3]); converted::take_as<LifeArt::Part>(s.glow_, (*v.rows)[4]); converted::take_as<std::vector<Ragdolls::Draw>>(s.bones_, (*v.rows)[5]); }
-[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
-  Quat s{};
-  s.x = draw.number();
-  s.y = draw.number();
-  s.z = draw.number();
-  s.w = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
-[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
-[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
-[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
-[[maybe_unused]] static physics::BodySettings draw_kern__physics__BodySettings(converted::Draw& draw) {
-  physics::BodySettings s{};
-  s.type = converted::enum_value<physics::BodyType>(draw.below(3));
-  s.position = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.linear_velocity = draw.vector();
-  s.angular_velocity = draw.vector();
-  s.linear_damping = draw.number();
-  s.angular_damping = draw.number();
-  s.gravity_scale = draw.number();
-  s.enable_sleep = draw.flag();
-  s.awake = draw.flag();
-  s.enabled = draw.flag();
-  s.bullet = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::BodySettings& s) { return converted::Value::structure({arg(s.type), arg(s.position), arg(s.rotation), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.linear_damping), arg(s.angular_damping), arg(s.gravity_scale), arg(s.enable_sleep), arg(s.awake), arg(s.enabled), arg(s.bullet), arg(converted::shaped<converted::Whole>(s.user))}); }
-[[maybe_unused]] static bool same(const physics::BodySettings& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.type, (*got.rows)[0]), ".type") && converted::at_place(same(want.position, (*got.rows)[1]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.linear_velocity, (*got.rows)[3]), ".linear_velocity") && converted::at_place(same(want.angular_velocity, (*got.rows)[4]), ".angular_velocity") && converted::at_place(same(want.linear_damping, (*got.rows)[5]), ".linear_damping") && converted::at_place(same(want.angular_damping, (*got.rows)[6]), ".angular_damping") && converted::at_place(same(want.gravity_scale, (*got.rows)[7]), ".gravity_scale") && converted::at_place(same(want.enable_sleep, (*got.rows)[8]), ".enable_sleep") && converted::at_place(same(want.awake, (*got.rows)[9]), ".awake") && converted::at_place(same(want.enabled, (*got.rows)[10]), ".enabled") && converted::at_place(same(want.bullet, (*got.rows)[11]), ".bullet") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[12]), ".user"); }
-[[maybe_unused]] static bool defined(const physics::BodySettings& s) { return defined(s.type) && defined(s.position) && defined(s.rotation) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.gravity_scale) && defined(s.enable_sleep) && defined(s.awake) && defined(s.enabled) && defined(s.bullet) && defined(converted::shaped<converted::Whole>(s.user)); }
-[[maybe_unused]] static std::string text(const physics::BodySettings& s) { return std::string("{") + text(s.type) + ", " + text(s.position) + ", " + text(s.rotation) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.gravity_scale) + ", " + text(s.enable_sleep) + ", " + text(s.awake) + ", " + text(s.enabled) + ", " + text(s.bullet) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
-[[maybe_unused]] static void take(physics::BodySettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<physics::BodyType>(s.type, (*v.rows)[0]); converted::take_as<Vec3>(s.position, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[3]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[4]); converted::take_as<double>(s.linear_damping, (*v.rows)[5]); converted::take_as<double>(s.angular_damping, (*v.rows)[6]); converted::take_as<double>(s.gravity_scale, (*v.rows)[7]); converted::take_as<bool>(s.enable_sleep, (*v.rows)[8]); converted::take_as<bool>(s.awake, (*v.rows)[9]); converted::take_as<bool>(s.enabled, (*v.rows)[10]); converted::take_as<bool>(s.bullet, (*v.rows)[11]); converted::take_as<converted::Whole>(s.user, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
-  physics::ShapeMaterial s{};
-  s.density = draw.number();
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  s.rolling_resistance = draw.number();
-  s.sensor = draw.flag();
-  s.category_bits = static_cast<u64>(draw.bits());
-  s.mask_bits = static_cast<u64>(draw.bits());
-  s.group_index = static_cast<int>(draw.whole());
-  s.contact_events = draw.flag();
-  s.sensor_events = draw.flag();
-  s.hit_events = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  s.surface = converted::enum_value<physics::Surface>(draw.below(4));
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
-[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.density, (*got.rows)[0]), ".density") && converted::at_place(same(want.friction, (*got.rows)[1]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[2]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[3]), ".rolling_resistance") && converted::at_place(same(want.sensor, (*got.rows)[4]), ".sensor") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]), ".category_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]), ".mask_bits") && converted::at_place(same(want.group_index, (*got.rows)[7]), ".group_index") && converted::at_place(same(want.contact_events, (*got.rows)[8]), ".contact_events") && converted::at_place(same(want.sensor_events, (*got.rows)[9]), ".sensor_events") && converted::at_place(same(want.hit_events, (*got.rows)[10]), ".hit_events") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]), ".user") && converted::at_place(same(want.surface, (*got.rows)[12]), ".surface"); }
-[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
-[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
-  physics::ShapeSettings s{};
-  s.kind = converted::enum_value<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  static std::deque<std::vector<Vec3>> kept_points;
-  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
-  s.points = {kept_points.back().data(), kept_points.back().size()};
-  static std::deque<std::vector<unsigned int>> kept_indices;
-  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
-  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
-  s.material = draw_kern__physics__ShapeMaterial(draw);
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
-[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]), ".points") && converted::at_place(same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]), ".indices") && converted::at_place(same(want.material, (*got.rows)[8]), ".material"); }
-[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
-[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
-}
 [[maybe_unused]] static physics::Joint draw_kern__physics__Joint(converted::Draw& draw) {
   physics::Joint s{};
   s.id = static_cast<u64>(draw.bits());
@@ -2650,93 +1949,20 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
 }
-[[maybe_unused]] static WeldStats draw_kern__WeldStats(converted::Draw& draw) {
-  WeldStats s{};
-  s.source_vertices = static_cast<unsigned int>(draw.below(40));
-  s.unique_vertices = static_cast<unsigned int>(draw.below(40));
-  s.bytes_before = static_cast<unsigned long>(draw.below(40));
-  s.bytes_after = static_cast<unsigned long>(draw.below(40));
-  s.indexed = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const WeldStats& s) { return converted::Value::structure({arg(s.source_vertices), arg(s.unique_vertices), arg(s.bytes_before), arg(s.bytes_after), arg(s.indexed)}); }
-[[maybe_unused]] static bool same(const WeldStats& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.source_vertices, (*got.rows)[0]), ".source_vertices") && converted::at_place(same(want.unique_vertices, (*got.rows)[1]), ".unique_vertices") && converted::at_place(same(want.bytes_before, (*got.rows)[2]), ".bytes_before") && converted::at_place(same(want.bytes_after, (*got.rows)[3]), ".bytes_after") && converted::at_place(same(want.indexed, (*got.rows)[4]), ".indexed"); }
-[[maybe_unused]] static bool defined(const WeldStats& s) { return defined(s.source_vertices) && defined(s.unique_vertices) && defined(s.bytes_before) && defined(s.bytes_after) && defined(s.indexed); }
-[[maybe_unused]] static std::string text(const WeldStats& s) { return std::string("{") + text(s.source_vertices) + ", " + text(s.unique_vertices) + ", " + text(s.bytes_before) + ", " + text(s.bytes_after) + ", " + text(s.indexed) + "}"; }
-[[maybe_unused]] static void take(WeldStats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned int>(s.source_vertices, (*v.rows)[0]); converted::take_as<unsigned int>(s.unique_vertices, (*v.rows)[1]); converted::take_as<unsigned long>(s.bytes_before, (*v.rows)[2]); converted::take_as<unsigned long>(s.bytes_after, (*v.rows)[3]); converted::take_as<bool>(s.indexed, (*v.rows)[4]); }
-[[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
-  Material s{};
-  s.color = draw_kern__Vec4(draw);
-  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
-  s.alpha_cutoff = draw.number();
-  s.roughness = draw.number();
-  s.metalness = draw.number();
-  s.emissive = draw.vector();
-  s.unlit = draw.flag();
-  s.double_sided = draw.flag();
-  s.cast_shadow = draw.flag();
-  s.frustum_culled = draw.flag();
-  s.viewmodel = draw.flag();
-  s.linear_colors = draw.flag();
-  s.lines = draw.flag();
-  converted::fill_array(s.params, [&]() -> int { return static_cast<int>(draw.whole()); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
-[[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
-[[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
-[[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
-[[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
-  MeshLook s{};
-  s.material = draw_kern__Material(draw);
-  s.extra_slot = static_cast<unsigned int>(draw.below(40));
-  s.texture = static_cast<unsigned int>(draw.below(40));
-  s.visible = draw.flag();
-  s.layers = static_cast<unsigned int>(draw.below(40));
-  s.pick_bvh = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
-[[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
-[[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
-[[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
 inline Earcut::Earcut() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.make", {}); converted::take_made(*this, kern_out[0]); }
-inline void Earcut::triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.triangulate", {converted::value_of(*this), converted::value_of(std::vector<double>(xy, xy + converted::room(xy, 2 * static_cast<std::size_t>(vertex_count)))), converted::value_of(vertex_count), converted::value_of(std::vector<unsigned int>(hole_starts, hole_starts + converted::room(hole_starts, 1 * static_cast<std::size_t>(hole_count)))), converted::value_of(hole_count), converted::value_of(out)}); converted::take_as<std::vector<unsigned int>>(out, kern_out[0]); }
-inline Earcut::~Earcut() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {converted::value_of(*this)}); }
-inline Earcut& Earcut::operator=(Earcut&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
-inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
-inline physics::Body World::create_body(const physics::BodySettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_body", {converted::value_of(*this), converted::value_of(settings)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
 inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
-inline WeldStats weld(MeshData& mesh, const unsigned long& min_saving) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.weld", {converted::value_of(mesh), converted::value_of(min_saving)}); WeldStats kern_result = converted::quiet<WeldStats>(); converted::take_as<WeldStats>(kern_result, kern_out[0]); converted::take_as<MeshData>(mesh, kern_out[1]); return kern_result; }
-inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 struct Out_door_gap { bool Result; double t0; double t1; };
 [[maybe_unused]] static bool same(const Out_door_gap& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.t0, (*got.rows)[1]), ".t0") && converted::at_place(same(want.t1, (*got.rows)[2]), ".t1"); }
 [[maybe_unused]] static bool defined(const Out_door_gap& s) { return defined(s.Result) && defined(s.t0) && defined(s.t1); }
 [[maybe_unused]] static std::string text(const Out_door_gap& s) { return std::string("{") + text(s.Result) + ", " + text(s.t0) + ", " + text(s.t1) + "}"; }
-struct Out_Interiors_build { bool Result; Interiors::Plan P; };
-[[maybe_unused]] static bool same(const Out_Interiors_build& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.P, (*got.rows)[1]), ".P"); }
-[[maybe_unused]] static bool defined(const Out_Interiors_build& s) { return defined(s.Result) && defined(s.P); }
-[[maybe_unused]] static std::string text(const Out_Interiors_build& s) { return std::string("{") + text(s.Result) + ", " + text(s.P) + "}"; }
 struct Out_Interiors_release { Interiors Self; CityStream city; };
 [[maybe_unused]] static bool same(const Out_Interiors_release& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.city, (*got.rows)[1]), ".city"); }
 [[maybe_unused]] static bool defined(const Out_Interiors_release& s) { return defined(s.Self) && defined(s.city); }
 [[maybe_unused]] static std::string text(const Out_Interiors_release& s) { return std::string("{") + text(s.Self) + ", " + text(s.city) + "}"; }
-struct Out_Interiors_activate { Interiors Self; CityStream city; };
-[[maybe_unused]] static bool same(const Out_Interiors_activate& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.city, (*got.rows)[1]), ".city"); }
-[[maybe_unused]] static bool defined(const Out_Interiors_activate& s) { return defined(s.Self) && defined(s.city); }
-[[maybe_unused]] static std::string text(const Out_Interiors_activate& s) { return std::string("{") + text(s.Self) + ", " + text(s.city) + "}"; }
-struct Out_Interiors_update { Interiors Self; CityStream city; };
-[[maybe_unused]] static bool same(const Out_Interiors_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.city, (*got.rows)[1]), ".city"); }
-[[maybe_unused]] static bool defined(const Out_Interiors_update& s) { return defined(s.Self) && defined(s.city); }
-[[maybe_unused]] static std::string text(const Out_Interiors_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.city) + "}"; }
 struct Out_Interiors_command { Interiors Self; bool Result; std::string out; std::optional<Vec3> go; };
 [[maybe_unused]] static bool same(const Out_Interiors_command& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.out, (*got.rows)[2]), ".out") && converted::at_place(same(want.go, (*got.rows)[3]), ".go"); }
 [[maybe_unused]] static bool defined(const Out_Interiors_command& s) { return defined(s.Self) && defined(s.Result) && defined(s.out) && defined(s.go); }
@@ -3069,34 +2295,6 @@ KERN_TEST(converted_interiors_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // slab
-    converted::Tally tally("slab");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors::Plan& a0, [[maybe_unused]] std::vector<Vec2>& a1, [[maybe_unused]] std::vector<std::vector<Vec2>>& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4, [[maybe_unused]] bool& a5, [[maybe_unused]] bool& a6, [[maybe_unused]] bool& a7) { converted::counted([&] { return converted_interiors_cpp::slab(a0, a1, a2, std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      Interiors::Plan a0 = draw_Interiors__Plan(draw);
-      std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
-      std::vector<std::vector<Vec2>> a2 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-      double a3 = draw.number();
-      Vec3 a4 = draw.vector();
-      bool a5 = draw.flag();
-      bool a6 = draw.flag();
-      bool a7 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // box
     converted::Tally tally("box");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -3197,29 +2395,6 @@ KERN_TEST(converted_interiors_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Interiors::build
-    converted::Tally tally("Interiors_build");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MapFeatures::Building& a0, [[maybe_unused]] double& a1, [[maybe_unused]] Interiors::Plan& a2) { auto r = converted::counted([&] { return Interiors::build(a0, std::move(a1), a2); }); return Out_Interiors_build{std::move(r), std::move(a2)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      MapFeatures::Building a0 = draw_MapFeatures__Building(draw);
-      double a1 = draw.number();
-      Interiors::Plan a2 = draw_Interiors__Plan(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
-    }
-  }
   {  // Interiors::clear
     converted::Tally tally("Interiors_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -3256,30 +2431,6 @@ KERN_TEST(converted_interiors_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
-    }
-  }
-  {  // Interiors::activate
-    converted::Tally tally("Interiors_activate");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors& a0, [[maybe_unused]] CityStream::BuildingRef& a1, [[maybe_unused]] CityStream& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.activate(a1, a2, std::move(a3)); }); return Out_Interiors_activate{std::move(a0), std::move(a2)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Interiors a0 = draw_Interiors(draw);
-      CityStream::BuildingRef a1 = draw_CityStream__BuildingRef(draw);
-      CityStream a2 = draw_CityStream(draw);
-      double a3 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
@@ -3329,32 +2480,6 @@ KERN_TEST(converted_interiors_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Interiors::update
-    converted::Tally tally("Interiors_update");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] CityStream& a5) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5); }); return Out_Interiors_update{std::move(a0), std::move(a5)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Interiors a0 = draw_Interiors(draw);
-      double a1 = draw.number();
-      double a2 = draw.number();
-      Vec3 a3 = draw.vector();
-      bool a4 = draw.flag();
-      CityStream a5 = draw_CityStream(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a5), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // Interiors::draw

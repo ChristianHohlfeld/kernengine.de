@@ -14,6 +14,7 @@
 
 namespace converted_combat_rules_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -36,8 +37,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 namespace combat { struct MilitaryClock {
   bool active = false;

@@ -14,6 +14,7 @@
 
 namespace converted_Game__mp_rules_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,13 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
 namespace mp { bool bind(::kern::logic::Runtime& logic); }
 namespace mp { const std::vector<u32>& palette(); }
 namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
@@ -108,7 +103,7 @@ KERN_TEST(converted_Game__mp_rules_cpp) {
     converted::Tally tally("bind");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__mp_rules_cpp::mp::bind(bp.source_logic()); }); return Out_bind{State_Game{s.get()}, std::move(r)}; };
+    const auto run = [&]() { auto r = converted::counted([&] { return (kern_state_now = s.get(), converted_Game__mp_rules_cpp::mp::bind(bp.source_logic())); }); return Out_bind{State_Game{s.get()}, std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
@@ -131,7 +126,7 @@ KERN_TEST(converted_Game__mp_rules_cpp) {
     converted::Tally tally("palette");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { return converted::counted([&] { return converted_Game__mp_rules_cpp::mp::palette(); }); };
+    const auto run = [&]() { return converted::counted([&] { return (kern_state_now = s.get(), converted_Game__mp_rules_cpp::mp::palette()); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)

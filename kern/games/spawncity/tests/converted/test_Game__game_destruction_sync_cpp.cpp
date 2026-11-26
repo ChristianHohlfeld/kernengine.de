@@ -15,6 +15,7 @@
 
 namespace converted_Game__game_destruction_sync_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -36,17 +37,17 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
+enum class KERN_BLUEPRINT_TYPE LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 constexpr f32 kPi = 3.14159265358979323846;
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
-  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+  
   
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -63,7 +64,7 @@ struct Quat {
 
 
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -155,7 +156,7 @@ struct Mat4 {
 
 
 };
-struct Camera {
+struct KERN_BLUEPRINT_TYPE Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
   f32 fov = kPi / 3, near = 0.05, far = 1800;
   bool orthographic = false;  // parallel projection (editor top/front/side views)
@@ -167,11 +168,11 @@ struct Camera {
 };
 struct Bvh;
 constexpr u32 kMaxPointLights = 16;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -196,44 +197,19 @@ struct MeshData {
   
 };
 struct Renderer;
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
-namespace physics { struct Pose {
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
 }; }
-namespace physics { struct ShapeMaterial {
-  f32 density = 1;            // kg/m^3
-  f32 friction = 0.6;
-  f32 restitution = 0;        // 0..1
-  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
-  bool sensor = false;
-  u64 category_bits = 1, mask_bits = ~0ull;
-  i32 group_index = 0;
-  bool contact_events = true, sensor_events = true, hit_events = false;
-  u64 user = 0;               // returned by World::shape_user
-  Surface surface = Surface::none;
-}; }
-namespace physics { struct ShapeSettings {
-  ShapeKind kind = ShapeKind::box;
-  Vec3 center;               // body-local placement of the shape
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5;         // sphere, capsule
-  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
-  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
-  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
-  ShapeMaterial material;
-}; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  void destroy_shape(const physics::Shape& shape) const;
-  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
   bool joint_valid(const physics::Joint& joint) const;
   void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
   bool body_valid(const physics::Body& body) const;
@@ -245,7 +221,6 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 struct Rng {
   // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
   // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
@@ -359,10 +334,6 @@ struct Car {
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Earcut : converted::EngineObject {
-  Earcut();
-  void triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const;
-};
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -375,7 +346,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -400,11 +371,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -417,10 +388,40 @@ struct Bvh : converted::EngineObject {
 };
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  bool remove(const unsigned int& id) const;
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
-namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+namespace mvt { struct Value {
+  enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
+  std::string s;
+  f64 n = 0;
+  bool b = false;
+}; }
+namespace mvt { struct Feature {
+  u64 id = 0;
+  GeomType type = GeomType::unknown;
+  std::vector<std::pair<u32, u32>> tags;  // key index, value index into the layer
+  /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
+  std::vector<std::vector<Vec2>> parts;
+}; }
+namespace mvt { struct Layer {
+  std::string name;
+  u32 extent = 4096;
+  std::vector<std::string> keys;
+  std::vector<Value> values;
+  std::vector<Feature> features;
+  /// The value of a tag on a feature: its index in `values` (-1 when absent).
+  
+  
+  
+}; }
+namespace mvt { struct Tile {
+  std::vector<Layer> layers;
+  /// The layer of that name: its index in `layers` (-1 when the tile has none).
+  
+}; }
+namespace mvt { struct Piece {
+  std::size_t at = 0, end = 0;
+}; }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -554,7 +555,7 @@ struct Terrain {
 
   // ---- craters ----
   /// A bowl of `radius` (rim included) and `depth` (terrain_craters.mjs craterProfile, scaled).
-  void add_crater(Vec2 at, f32 radius, f32 depth);
+  
   /// Whether a circle (x, y, r) touches a crater (the roads drape finely there: city_stream.cpp).
   
 
@@ -565,7 +566,7 @@ struct Terrain {
   struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } };
   void crater_list(std::vector<CraterRec>& out) const;
   /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
-  void set_craters(const std::vector<CraterRec>& list);
+  
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
   
 
@@ -624,7 +625,7 @@ struct Terrain {
   
   
   
-  void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);
+  
   
   
   
@@ -775,9 +776,9 @@ struct CityStream {
   /// its map feature. Its 160 m mesh chunk is rebuilt as a job and swapped in one step, its
   /// collider replaced alone. The damage outlives the tile (a re-streamed tile keeps it) until
   /// clear_damage().
-  bool damage_building(u64 tile, u32 index, f32 new_top, bool leveled);
+  
   /// Every building back to its full height (RESET).
-  void clear_damage();
+  
   
   /// Counts every height a building lost (marks on the walls drop what hangs in the air: world_marks.cpp).
   
@@ -787,13 +788,13 @@ struct CityStream {
   /// Every damaged building (also those whose tile is not loaded here).
   void damage_list(std::vector<DamageRec>& out) const;
   /// The seeds whose damage changed since the last call (what this machine has to tell).
-  std::vector<u32> take_damage_log() { return std::move(damage_log_); }
-  bool damage_of(u32 seed, DamageRec& out) const;
+  
+  
   /// Merge damage from another machine: only ever lower (the lowest height anybody saw wins, so
   /// every machine ends at the same city whatever order the reports come in). A loaded building
   /// is lowered at once (drawing, collider), an unloaded one when its tile streams in. Returns
   /// whether anything changed. `log`: whether this change is ours to tell again (host relays).
-  bool merge_damage(const std::vector<DamageRec>& list, bool log);
+  
 
  private:
   u32 damage_serial_ = 0;
@@ -841,7 +842,7 @@ struct CityStream {
   
   
   
-  physics::Shape building_shape(physics::Body body, const MapFeatures::Building& b);
+  
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
   converted::wide::Map<u32, Damage> damage_;
@@ -909,36 +910,6 @@ struct CityStream::Tile {
   physics::Body old_body;
   bool recollide = false;
 };
-struct Facades final {
- public:
-  f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
-  
-  
-  
-  
-  
-  
-  
-  
-
- private:
-  u32 u_night_ = 0;
-};
-struct WaterLook final {
- public:
-  f32 time = 0;  // seconds (uTime)
-  
-  
-  
-  
-  
-  
-  
-  
-
- private:
-  u32 u_time_ = 0;
-};
 struct CombatArt {
  public:
   enum Shape : u8 { box, sphere, cylinder, cone, glow_box, glow_sphere, smoke, fade_sphere, fade_ring, kShapes };
@@ -981,19 +952,19 @@ struct Destruction {
   
   
   /// RESET / a new city: every building whole, no debris, no points lost.
-  void reset(CityStream& city);
+  
 
   struct Stats { u32 pieces = 0, torn = 0, hits = 0, collapsed = 0; };
   
   /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
   /// points a blast here took (since the last call), and those another machine reports.
-  std::vector<std::pair<u32, f32>> take_points_log() { return std::move(points_log_); }
+  
   void points_list(std::vector<std::pair<u32, f32>>& out) const {
     out.clear();
     for (const auto& [seed, hp] : points_) out.emplace_back(seed, hp);
     std::stable_sort(out.begin(), out.end(), [](const std::pair<u32, f32>& a, const std::pair<u32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
   }
-  bool merge_points(const std::vector<std::pair<u32, f32>>& list, bool log);
+  
 
  private:
   // what fracture needs of a broken building (a copy: the tile may go while a piece flies)
@@ -1013,7 +984,7 @@ struct Destruction {
   
   
   
-  void free_torn(Torn& t);
+  
 
   Renderer* r_ = nullptr;
   converted::wide::Map<u32, f32> points_;  // structural points left, by building seed
@@ -1026,37 +997,240 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
+namespace logic { using ActorRef = u32; }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { using WorldId = u32; }
+namespace logic { struct ActorHandle {
+  ActorRef id = 0;
+  WorldId world = 0;
+  
+  friend constexpr bool operator==(ActorHandle, ActorHandle) = default;
+  /// (an order for Sort List: by world, then by id - the same in every tier)
+  
+
+
+
 }; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { enum class TriggerKind : u8 { event, timer, condition, automatic }; }
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { struct ObjectRef {
+  i64 handle = 0;
+  WorldId world = 0;
+  
+  friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+  /// (an order for Sort List: by world, then by handle - the same in every tier)
+  
+
+
+
+}; }
+namespace logic { struct MapKey {
+  i64 i = 0;
+  std::string s;
+  bool operator==(const MapKey&) const = default;
+  
+}; }
+namespace logic { struct Value; }
+namespace logic { using MapEntries = converted::wide::Map<MapKey, Value>; }
+namespace logic { struct Int64 {
+  u64 bits = 0;
+  constexpr Int64() = default;
+  
+  
+  // (Sort List: as u64)
+  // (a key of a Map, a Set)
+}; }
+namespace logic { using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
+                             std::vector<ObjectRef>>; }
+namespace logic { struct Callable {
+  virtual ~Callable() = default;
+  /// Calls the function with `args` (its inputs after the bound place, in their order); `result`
+  /// gets its output. False: it is unbound now (the Blueprint it was made in has ended).
+  
+  /// Of one a Blueprint's class made (logic::detail::NativeCallable): which one (its signature's own mark) - the class
+  /// takes it back as it was. Null: one of the interpreter or the JIT.
+  
+}; }
+namespace logic { struct Value {
+  PinType type = PinType::number;
+  bool b = false;
+  i64 i = 0;
+  f64 n = 0;
+  Vec3 v;
+  std::string s;
+  ActorRef a = 0;
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef) or of an actor
+  /// (PinType::actor: `a` is its id there - ActorHandle). 0 otherwise.
+  WorldId world = 0;
+  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
+  /// whoever changes one (edit) changes its own.
+  std::shared_ptr<const ListItems> list;
+  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
+  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
+  /// declared default - what a field is, is read through the declaration (logic::field_of).
+  std::shared_ptr<const std::vector<Value>> rows;
+  /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
+  /// list's items.
+  std::shared_ptr<const MapEntries> entries;
+  /// A Callback's function and place (none: it is unbound).
+  std::shared_ptr<const Callable> call;
+
+  
+  
+  
+  
+  
+  /// An actor (none: ActorHandle{}).
+  
+  /// An object of the engine (none: ObjectRef{}).
+  
+  /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
+  
+  /// An Int64: its 64 bits (held in `i`, as they are).
+  
+  /// A value of an enum: its place among the enum's values (the first is 0).
+  
+  /// A list of values of an enum.
+  
+
+
+
+
+
+  /// A value of a struct: its fields' values, in the order of the declaration.
+  
+
+
+
+
+
+  /// A list of structs.
+  
+
+
+
+
+
+  
+  /// A Callback (none: unbound).
+  
+  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
+  /// Whole numbers are held as every Int is (logic::normal).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The items of a list of T - none if this is no such list.
+  
+
+
+
+
+  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
+  /// of structs as Value.)
+  
+
+
+
+  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
+  /// none).
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
+  /// field is at its declared default).
+  
+  /// How many fields a struct's value holds.
+  
+  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
+  
+
+
+
+
+  /// The entries of a map or a set (none: empty).
+  
+  /// The entries of a map or a set, to change them: this value's own.
+  
+  /// How many items a list has, how many entries a map or a set (none of these: 0).
+  
+  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
+  
+
+  
+  
+  
+  
+  
+  /// The actor it refers to; of a value of another type: none (no number becomes an actor).
+  
+  
+  
+  
+  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
+  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
+  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
+  
+  
+  /// The same for what a place is declared as (TypeRef) - how a graph holds a default and a value
+  /// typed into a pin. A list of a fixed length (the place, a field of a struct) has that length:
+  /// read, what JSON does not say is the zero of its entries; written here, it is said up to its
+  /// last entry that is not that zero (logic::said) - a buffer of 24000 zeros is []. (to_json(g, of),
+  /// above, writes a value in full: every entry - what an inspector shows.)
+  
+  
+  
+}; }
+namespace logic { struct Node {
+  u32 id = 0;
+  std::string type;                                   // registry key, e.g. "flow.branch"
+  f32 x = 0, y = 0;                                   // canvas position (px)
+  std::vector<std::pair<std::string, Value>> values;  // literals of unlinked inputs, by pin id
+  std::vector<std::pair<std::string, std::string>> params;  // node settings (variable name, event name, key...)
+  std::string comment;
+  
+  
+  
+  
+}; }
+namespace logic { using TriggerKind = :: kern :: logic :: TriggerKind; }
+namespace logic { struct State {
+  u32 id = 0;
+  std::string name;
+  f32 x = 0, y = 0;
+  bool initial = false;
+}; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
-namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { using NodeKind = :: kern :: logic :: NodeKind; }
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1066,9 +1240,20 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct Event {
+  std::string type;
+  ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
+  bool level = false;                  // with a target: the level graph (Self = none) receives it too
+  std::string key;                     // event-specific match (custom event name, key code, action...)
+  std::vector<std::pair<std::string, Value>> args;
+  
+}; }
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1105,7 +1290,184 @@ namespace detail { struct CriticalClock {
   
   
 }; }
-namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
+namespace audio { constexpr u32 kOutputChannels = 2; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
+namespace audio { using ClipId = u32; }
+namespace audio { using VoiceId = u64; }
+namespace audio { struct KERN_BLUEPRINT_TYPE Meter {
+  f32 peak[kOutputChannels] = {};
+  f32 rms[kOutputChannels] = {};
+}; }
+namespace audio { struct KERN_BLUEPRINT_TYPE Stats {
+  u32 voices = 0, audible = 0, virtual_voices = 0, stolen = 0, clips = 0;
+  u64 frames_rendered = 0;
+  f32 limiter_reduction_db = 0;
+  Meter master;
+  Meter buses[static_cast<u32>(Bus::count)];
+  /// Master peak with hold: falls back at 20 dB per second (a meter's needle, so a short sound
+  /// stays visible between two reads of the stats).
+  f32 peak_hold[kOutputChannels] = {};
+}; }
+struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+enum class PadButton : u8 { a, b, x, y, lb, rb, lt, rt, back, start, ls, rs, up, down, left, right, home, count };
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace game { using ActorId = u32; }
+namespace game { enum class KERN_BLUEPRINT_TYPE Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh }; }
+namespace game { enum class JointKind : u8 { hinge, slider, ball, fixed, distance, wheel, motor, parallel, no_collision }; }
+namespace game { enum class ControlMode : u8 { hovercar, rolling, character, flyer, vehicle, soldier, walker }; }
+namespace game { enum class CameraMode : u8 { chase, first_person, top_down }; }
+namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
+namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
+namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+struct Particles : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LightPool : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine;
+struct NightWindows : public ShaderExtension {
+  using ShaderExtension::ShaderExtension;
+};
+namespace game { struct KERN_BLUEPRINT_TYPE PlayInput {
+  f32 move_x = 0, move_y = 0, up = 0;  // -1..1 (right, forward, up)
+  bool jump = false, boost = false;
+  bool camera = false;                 // held: switches the vehicle view (chase / low interior) on press
+  bool handbrake = false;              // vehicles: rear handbrake (drift)
+  u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
+  f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
+  f32 turn_deg = 0;                    // heading change as it is (no sensitivity, no zoom): VR room turn, snap turn (CCW +)
+  f32 speed_scale = 1;                 // soldier: the walk speed times this (VR arm-swing running: the arms' power; the gun stays usable)
+  f32 zoom = 0;                        // camera distance change (wheel)
+  // Remote players: the direction their camera looks (degrees) for camera-relative movement.
+  f32 view_yaw = 0;
+  bool has_view_yaw = false;
+  f32 view_pitch = 0;                  // degrees, positive looks down (soldier aim)
+  // soldier
+  bool fire = false, aim = false, reload = false, crouch = false, interact = false;
+  f32 look_stick_x = 0, look_stick_y = 0;  // gamepad right stick (-1..1), turned into look by the camera
+  bool gamepad = false;                // the input came from a pad (aim assist, response curves)
+  f32 rewind = 0;                      // server: seconds the shooter saw the world in the past (lag compensation)
+}; }
+namespace game { enum class KERN_BLUEPRINT_TYPE SimMode : u8 { none, simulate, play, replica }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE GameStatus : u8 { inactive, playing, won, lost }; }
+namespace game { struct KERN_BLUEPRINT_TYPE ShotEvent {
+  Vec3 from, to;
+  ActorId shooter = 0, hit = 0;
+  bool impact = false, head = false;
+  Vec3 normal{0, 0, 1};           // surface normal at `to` (impacts)
+  u8 surface = 0;                 // 0 nothing, 1 static world, 2 moving body, 3 flesh (no decal)
+}; }
+struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitWriter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitReader : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WriteStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ReadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeasureStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Endpoint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Connection : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace net { struct KERN_BLUEPRINT_TYPE Address {
+  u64 id = 0;  // 0 = none
+  
+  bool operator==(const Address&) const = default;
+}; }
+struct Transport : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Simulator : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LoopbackNetwork : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HostTransport : public Transport {
+  using Transport::Transport;
+};
+namespace net { enum class KERN_BLUEPRINT_TYPE ClientState : i8 {
+  denied = -3,          // server full
+  timed_out = -2,
+  error = -1,           // connection error (desync, bad packets)
+  disconnected = 0,
+  connecting = 1,       // sending requests
+  challenged = 2,       // sending responses
+  connected = 3,
+}; }
+struct Client : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Server : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  int max_clients() const;
+  bool client_connected(const int& index) const;
+  bool send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
+};
+namespace net { enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect }; }
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_values { struct Int {}; } }
+namespace logic { namespace engine_values { struct Float {}; } }
+namespace logic { namespace scan { using Kind = :: kern :: logic :: scan :: Kind; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace scan { struct Plan {
+  std::size_t count = 0;
+  Kind kinds[kMostSlots] = {};
+}; } }
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameWorld;
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Self = ::kern::logic::ActorRef; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+struct ShaderExtension;
+struct Renderer;
 namespace fc { constexpr uint16_t kEscMinUs = 1000; }
 namespace fc { constexpr uint16_t kEscIdleUs = 1050; }
 namespace fc { constexpr uint16_t kEscMaxUs = 2000; }
@@ -2365,13 +2727,6 @@ struct GpsLive {
   f32 x_ = 0, y_ = 0, vx_ = 0, vy_ = 0, speed_ = 0, speed_avg_ = 0, heading_ = 0, distance_ = 0, accuracy_ = 0, compass_ = 0;
   Vec2 shown_;
 };
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
-namespace audio { using ClipId = u32; }
-namespace audio { using VoiceId = u64; }
-struct Mixer : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 enum class Opt : u8 {
   // mouse_settings.mjs
   mouse_sensitivity, mouse_invert_y,
@@ -2775,88 +3130,6 @@ namespace lamps { struct Field {
   converted::wide::Map<i64, u8> broken_;
   converted::wide::Map<i64, std::vector<i32>> grid_;
 }; }
-namespace game { using ActorId = u32; }
-namespace game { enum class Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh }; }
-namespace game { enum class JointKind : u8 { hinge, slider, ball, fixed, distance, wheel, motor, parallel, no_collision }; }
-namespace game { enum class ControlMode : u8 { hovercar, rolling, character, flyer, vehicle, soldier, walker }; }
-namespace game { enum class CameraMode : u8 { chase, first_person, top_down }; }
-namespace game { struct ControllerComponent {
-  ControlMode mode = ControlMode::hovercar;
-  f32 max_speed = 36;           // m/s
-  f32 acceleration = 24;        // m/s^2
-  f32 turn_rate = 130;          // degrees per second
-  f32 jump_speed = 6;           // m/s, 0 = no jump
-  bool boost = true;
-  f32 boost_speed = 60;         // m/s with boost
-  f32 hover_height = 0.6;      // hovercar
-  CameraMode camera = CameraMode::chase;
-  f32 camera_distance = 12, camera_height = 4, camera_fov = 62;
-  // sounds ("auto" = the movement mode's default, "" = silent)
-  std::string engine_sound = "auto";  // loop, pitch and volume follow speed and throttle
-  std::string jump_sound = "builtin:jump";
-  std::string boost_sound = "builtin:boost";
-  // soldier
-  f32 crouch_speed = 2.6;      // m/s while crouching
-  f32 eye_height = 1.62;       // m above the feet standing (crouching: 60 %)
-  f32 look_sensitivity = 1;     // mouse / touch / gamepad look scale
-  bool head_bob = true;
-  // walker
-  bool autonomous = true;       // roams on its own (camera, ToF) whenever nobody drives it
-  std::string gait = "velstand";  // walking network: "velstand" (walks and stands) or "alpha" (alpha_walking + alpha_stand)
-  bool rollers = false;         // wears the roller skates (roller.onnx and the crouch drive it)
-  // How network outputs become servo goals: "training" (scale 1, no filter, as the networks were
-  // trained) or "robot" (the robot's daemon: scale 0.9, low-pass head 0.5 / legs 0.7).
-  std::string actions = "training";
-  // Kern's own additions on top of Pollen's software, off by default (then only Pollen's runtime
-  // and brain run): ball play, sock fetching, the beak opening and biting during a ground pick.
-  bool kern_extras = false;
-  // Its servos' command latency (real seconds; the device profile, game/servo.h).
-  f32 servo_delay = 0.02;
-}; }
-namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
-namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
-namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
-struct Particles : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct LightPool : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct NightWindows : public ShaderExtension {
-  using ShaderExtension::ShaderExtension;
-};
-namespace game { struct PlayInput {
-  f32 move_x = 0, move_y = 0, up = 0;  // -1..1 (right, forward, up)
-  bool jump = false, boost = false;
-  bool camera = false;                 // held: switches the vehicle view (chase / low interior) on press
-  bool handbrake = false;              // vehicles: rear handbrake (drift)
-  u32 robot = 0;                       // robot moves held (walker): 1 sit/stand, 2 pick, 4 kick left, 8 kick right, 16 roulade, 32 beak, 64 chirp, 128 wheee, 256 jump (Kern)
-  f32 look_x = 0, look_y = 0;          // camera orbit in degrees since the last frame
-  f32 turn_deg = 0;                    // heading change as it is (no sensitivity, no zoom): VR room turn, snap turn (CCW +)
-  f32 speed_scale = 1;                 // soldier: the walk speed times this (VR arm-swing running: the arms' power; the gun stays usable)
-  f32 zoom = 0;                        // camera distance change (wheel)
-  // Remote players: the direction their camera looks (degrees) for camera-relative movement.
-  f32 view_yaw = 0;
-  bool has_view_yaw = false;
-  f32 view_pitch = 0;                  // degrees, positive looks down (soldier aim)
-  // soldier
-  bool fire = false, aim = false, reload = false, crouch = false, interact = false;
-  f32 look_stick_x = 0, look_stick_y = 0;  // gamepad right stick (-1..1), turned into look by the camera
-  bool gamepad = false;                // the input came from a pad (aim assist, response curves)
-  f32 rewind = 0;                      // server: seconds the shooter saw the world in the past (lag compensation)
-}; }
-namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
-namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
-namespace game { struct ShotEvent {
-  Vec3 from, to;
-  ActorId shooter = 0, hit = 0;
-  bool impact = false, head = false;
-  Vec3 normal{0, 0, 1};           // surface normal at `to` (impacts)
-  u8 surface = 0;                 // 0 nothing, 1 static world, 2 moving body, 3 flesh (no decal)
-}; }
-struct GameWorld : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct GapsState {
   // police_sirens.mjs: one voice for the nearest cruiser, one for the nearest police drone; each is
   // a bright and a dull (air-absorbed) loop cross-faded by distance.
@@ -3524,7 +3797,6 @@ namespace mp { struct NavTimeline {
   struct Snap { Vec3 p; f32 heading; u8 mode; f64 at; };
   std::vector<Snap> snaps_;
 }; }
-namespace mp { enum class Zone : u8 { torso, head, legs }; }
 namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
 namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
 namespace mp { struct Score { u8 slot = 0; u16 kills = 0, deaths = 0; }; }
@@ -3600,65 +3872,6 @@ namespace mp { struct PingBoard {
  private:
   std::vector<Ping> pings_;
 }; }
-struct BitWriter : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct BitReader : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct WriteStream : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct ReadStream : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct MeasureStream : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Endpoint : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Connection : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace net { struct Address {
-  u64 id = 0;  // 0 = none
-  
-  bool operator==(const Address&) const = default;
-}; }
-struct Transport : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Simulator : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct LoopbackNetwork : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct HostTransport : public Transport {
-  using Transport::Transport;
-};
-namespace net { enum class ClientState : i8 {
-  denied = -3,          // server full
-  timed_out = -2,
-  error = -1,           // connection error (desync, bad packets)
-  disconnected = 0,
-  connecting = 1,       // sending requests
-  challenged = 2,       // sending responses
-  connected = 3,
-}; }
-struct Client : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-  bool connected() const;
-  bool send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
-};
-struct Server : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-  int max_clients() const;
-  bool client_connected(const int& index) const;
-  bool send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
-};
-namespace net { enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect }; }
 namespace seats { constexpr u8 kNone = 253; }
 namespace seats { enum class Seat : u8 { pilot = 0, passenger = 1 }; }
 namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
@@ -3759,7 +3972,7 @@ namespace net { struct Session {
   
   
   
-  bool active() const { return role_ != Role::none; }
+  
   bool hosting() const { return role_ == Role::host; }
   
   /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
@@ -3818,10 +4031,10 @@ namespace net { struct Session {
   
   /// Destruction sync: client -> host, host -> all / one; incoming with the sender's slot.
   struct Blob { u8 from = 0; std::vector<u8> data; };
-  void destroy_to_host(const std::vector<u8>& blob);
+  
   void destroy_to_all(const std::vector<u8>& blob, bool reliable);
   void destroy_to(u8 slot, const std::vector<u8>& blob);
-  std::vector<Blob> take_destroy() { return std::move(destroy_); }
+  
   /// The town's state and what is done to it (game_townsync.cpp, town_sync.h), reliable: a client's
   /// hits on the host's cars and passers-by and his changes to the host; the host's state to all / one.
   
@@ -3839,10 +4052,10 @@ namespace net { struct Session {
   /// A spawn anchor from the host for this (joining) player.
   
 
-  std::vector<Remote>& remotes() { return remotes_; }
+  
   
   /// The place of the player in `slot` among remotes(), -1: no such player here.
-  i32 remote_index(u8 slot) const;
+  
   /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
   
   
@@ -4255,29 +4468,6 @@ struct Jet {
   i32 contacts_ = 0;
   f32 gear_impact_ = 0;
   JetTelemetry tele_;
-};
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Engine : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct App : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
-struct SoundBank : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
 };
 namespace game { enum class InputDevice : u8 { touch, mouse_keyboard }; }
 struct InputArbiter : converted::EngineObject {
@@ -4913,13 +5103,10 @@ struct Game {
   
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
   
-  /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
-  // the original's facades and lit windows (facades.h)
-  // the original's water shader (water_look.h)
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
-  
+     // the game's fixed step in its world (game.cpp: FixedStepper)
   
   
   
@@ -4968,7 +5155,7 @@ struct Game {
   
   
   // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
-  void dsync_update(f32 dt);
+  
   void dsync_send_full(i32 to);
   void dsync_reset_epoch();
   std::string dsync_json();
@@ -5397,8 +5584,6 @@ struct Game {
   /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
   /// draw distances follow it, so a zoomed view shows what an unzoomed one shows nearer.
     // the page runs a WebXR session ("vr 1")
-  Facades windows_;
-  WaterLook water_look_;
   std::unique_ptr<GameWorld> world_;
   CityStream city_;
   VehicleArt art_;
@@ -5433,7 +5618,6 @@ struct Game {
   f32 sensitivity_ = 1;
   f32 dpr_ = 1;
   // input devices
-  game::ControllerComponent soldier_controller_;
   TouchPlay pad_touch_;   // every mode's touch controls (touch_play.h)
   ControlsState ctl_;     // game_controls.h
   bool touch_mode_ = false;
@@ -5486,7 +5670,6 @@ struct Game {
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
-  i32 substeps_ = 1;  // Box3D sub-steps per 240 Hz step (game.cpp: 240 solver passes a second)
   std::vector<Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;
@@ -5559,104 +5742,6 @@ namespace wire { inline void put_f32(std::vector<u8>& b, f32 v) {
   const std::array<u8, 4> x = f32_bytes(v);
   b.insert(b.end(), x.begin(), x.end());
 } }
-namespace wire { struct Reader {
-  std::size_t at = 0;
-  bool ok = true;
-
-  u8 get_u8(const std::vector<u8>& b) {
-    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
-    const u8 v = converted::at(b, at);
-    converted::plus_to(at, 1);
-    return v;
-  }
-  
-
-
-
-
-
-
-  u16 get_u16(const std::vector<u8>& b) {
-    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
-    U16 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 2);
-    return x.v;
-  }
-  
-
-
-
-
-
-
-  u32 get_u32(const std::vector<u8>& b) {
-    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
-    U32 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 4);
-    return x.v;
-  }
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  f32 get_f32(const std::vector<u8>& b) {
-    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
-    F32 x;
-    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.v, p_ + 0); });
-    converted::plus_to(at, 4);
-    return x.v;
-  }
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  /// A list of bytes (put_bytes): empty where it is not all there.
-  
-
-
-
-
-
-
-  /// Every number was there, and the message has no more.
-  
-}; }
 void Terrain::crater_list(std::vector<CraterRec>& out) const {
   out.clear();
   for (const Crater& c : craters_) out.push_back({c.c.x, c.c.y, c.r, c.depth});
@@ -5668,239 +5753,12 @@ void CityStream::damage_list(std::vector<DamageRec>& out) const {
   for (const auto& [seed, d] : damage_) out.push_back({seed, d.height, d.leveled});
   std::stable_sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
 }
-bool CityStream::damage_of(u32 seed, DamageRec& out) const {
-  auto it = damage_.find(seed);
-  if (it == damage_.end()) return false;
-  out = {seed, it->second.height, it->second.leveled};
-  return true;
-}
-namespace terrain_cpp_local { constexpr f32 kTile = 160; }
-namespace terrain_cpp_local { constexpr f32 kBlock = 640; }
-namespace terrain_cpp_local { constexpr f32 kWaterChunk = 320; }
-namespace terrain_cpp_local { i32 sx28(u64 v) { return static_cast<i32>(static_cast<u32>(converted::shl_bits(v, 4))) >> 4; } }
-namespace terrain_cpp_local { void unkey3(u64 k, i32& level, i32& i, i32& j) {
-  level = static_cast<i32>(converted::shr_bits(k, 56));
-  i = sx28((converted::shr_bits(k, 28)) & 0xFFFFFFF);
-  j = sx28(k & 0xFFFFFFF);
-} }
-void Terrain::add_crater(Vec2 at, f32 radius, f32 depth) {
-  if (!(radius > 0.5)) return;
-  // Rim height in the same proportion as SpawnCity's (7 m on a 22 m deep bowl).
-  craters_.push_back({at, radius, depth, depth * 7.0 / 22.0});
-  while (craters_.size() > 32) {
-    const Crater old = converted::front(craters_);
-    converted::erase(craters_, craters_.begin());
-    dirty(old.c.x - old.r, old.c.y - old.r, old.c.x + old.r, old.c.y + old.r);
-  }
-  stats_.craters = static_cast<u32>(craters_.size());
-  dirty(at.x - radius, at.y - radius, at.x + radius, at.y + radius);
-}
-void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify) {
-  const f32 m = kStep * 2;
-  x0 -= m; y0 -= m; x1 += m; y1 += m;
-  for (auto& [k, t] : render_) {
-    i32 level, i, j;
-    terrain_cpp_local::unkey3(k, level, i, j);
-    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
-    if (i * size <= x1 && (converted::plus(i, 1)) * size >= x0 && j * size <= y1 && (converted::plus(j, 1)) * size >= y0) dirty_render_.insert(k);
-  }
-  for (auto& [k, c] : collision_) {
-    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
-    if (i * terrain_cpp_local::kTile - kStep <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kTile + kStep >= x0 && j * terrain_cpp_local::kTile - kStep <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kTile + kStep >= y0) dirty_collision_.insert(k);
-  }
-  for (auto& [k, m2] : water_meshes_) {
-    (void)m2;
-    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
-    if (i * terrain_cpp_local::kWaterChunk <= x1 && (converted::plus(i, 1)) * terrain_cpp_local::kWaterChunk >= x0 && j * terrain_cpp_local::kWaterChunk <= y1 && (converted::plus(j, 1)) * terrain_cpp_local::kWaterChunk >= y0) dirty_water_.insert(k);
-  }
-  if (notify) changes_.push_back({x0, y0, x1, y1});
-  replan_ = true;
-}
-namespace city_stream_cpp_local { f64 signed_area(const std::vector<Vec2>& r) {
-  f64 a = 0;
-  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += static_cast<f64>(converted::at(r, j).x) * converted::at(r, i).y - static_cast<f64>(converted::at(r, i).x) * converted::at(r, j).y;
-  return a * 0.5;
-} }
-namespace city_stream_cpp_local { constexpr f32 kChunk = 160; }
-namespace city_stream_cpp_local { u64 cell_key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-namespace city_stream_cpp_local { u64 cell_of(Vec2 c) { return cell_key(static_cast<i32>(converted::fits<int>(std::floor(c.x / kChunk))), static_cast<i32>(converted::fits<int>(std::floor(c.y / kChunk)))); } }
-physics::Shape CityStream::building_shape(physics::Body body, const MapFeatures::Building& b) {
-  Earcut earcut;
-  std::vector<f64> xy;
-  std::vector<u32> holes, tris, idx;
-  std::vector<Vec3> pts;
-  xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
-  std::vector<std::vector<Vec2>> rings = b.rings;
-  // MAX_VERTICES 64 per ring
-  for (auto& ring : rings)
-    if (ring.size() > 64) { const std::size_t step = converted::quot((converted::plus(ring.size(), 63)), 64); std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); converted::plus_to(k, step)) thin.push_back(converted::at(ring, k)); ring = std::move(thin); }
-  for (std::size_t r = 0; r < rings.size(); converted::pre_inc(r)) {
-    auto& ring = converted::at(rings, r);
-    if (ring.size() < 3) continue;
-    const f64 a = city_stream_cpp_local::signed_area(ring);
-    if (std::fabs(a) < 0.5) continue;
-    if ((r == 0) != (a > 0)) std::reverse(ring.begin(), ring.end());  // outer CCW, courtyards CW
-    if (r) holes.push_back(static_cast<u32>(converted::quot(xy.size(), 2)));
-    for (Vec2 p : ring) xy.insert(xy.end(), {p.x, p.y});
-    // Walls: quads per edge, outward = right of the edge for CCW outer / CW holes.
-    for (std::size_t i = 0; i < ring.size(); converted::pre_inc(i)) {
-      const Vec2 p0 = converted::at(ring, i), p1 = converted::at(ring, converted::rem((converted::plus(i, 1)), ring.size()));
-      const u32 base = static_cast<u32>(pts.size());
-      pts.push_back({p0.x, p0.y, b.base});
-      pts.push_back({p1.x, p1.y, b.base});
-      pts.push_back({p1.x, p1.y, b.top});
-      pts.push_back({p0.x, p0.y, b.top});
-      idx.insert(idx.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
-    }
-  }
-  if (xy.size() >= 6) {
-    earcut.triangulate(xy.data(), static_cast<u32>(converted::quot(xy.size(), 2)), holes.data(), static_cast<u32>(holes.size()), tris);
-    const u32 base = static_cast<u32>(pts.size());
-    for (std::size_t i = 0; i < converted::quot(xy.size(), 2); converted::pre_inc(i)) pts.push_back({static_cast<f32>(converted::at(xy, converted::times(i, 2))), static_cast<f32>(converted::at(xy, converted::plus(converted::times(i, 2), 1))), b.top});
-    for (std::size_t i = 0; converted::plus(i, 2) < tris.size(); converted::plus_to(i, 3)) {
-      u32 a = base + converted::at(tris, i), c = base + converted::at(tris, converted::plus(i, 1)), d = base + converted::at(tris, converted::plus(i, 2));
-      if (converted::wide::cross(converted::at(pts, c) - converted::at(pts, a), converted::at(pts, d) - converted::at(pts, a)).z < 0) std::swap(c, d);
-      idx.insert(idx.end(), {a, c, d});
-    }
-  }
-  if (!idx.empty()) {
-    physics::ShapeSettings ss;
-    ss.kind = physics::ShapeKind::mesh;
-    ss.points = Span<const Vec3>(pts.data(), pts.size());
-    ss.indices = Span<const u32>(idx.data(), idx.size());
-    ss.material.friction = 0.7;
-    ss.material.category_bits = kCatWorld;
-    return world_->create_shape(body, ss);
-  }
-  return {};
-}
-bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled) {
-  auto it = tiles_.find(tile);
-  if (it == tiles_.end() || !converted::present(it->second)->prepared || index >= converted::present(it->second)->features.buildings.size()) return false;
-  Tile& t = *converted::present(it->second);
-  MapFeatures::Building& b = converted::at(t.features.buildings, index);
-  if (!(new_top < b.top - 0.01)) return false;
-  b.top = std::fmax(b.base + 0.3, new_top);
-  b.leveled = b.leveled || leveled;
-  ++damage_serial_;
-  Damage& d = damage_[b.seed];
-  d.height = b.top - b.base;
-  d.leveled = b.leveled;
-  if (!damage_quiet_) damage_log_.push_back(b.seed);
-  // the drawing: its chunk alone (when the building is drawn at all)
-  if (index < t.cent.size() && t.cell_ids.count(city_stream_cpp_local::cell_of(converted::at(t.cent, index)))) t.dirty_cells.insert(city_stream_cpp_local::cell_of(converted::at(t.cent, index)));
-  // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
-  // destroyed and created on a static body; no teleport, no filter change, no rebuild of the set)
-  NearCollision& n = near_;
-  if (n.building) { n.dirty = true; return true; }  // the set being built: built again after it
-  for (std::size_t k = 0; k < n.list.size(); converted::pre_inc(k)) {
-    if (converted::at(n.list, k).first != tile || converted::at(n.list, k).second != index) continue;
-    if (k < n.shapes.size()) {
-      if (converted::at(n.shapes, k).valid()) { world_->destroy_shape(converted::at(n.shapes, k)); --n.colliders; }
-      converted::at(n.shapes, k) = building_shape(n.body, b);
-      if (converted::at(n.shapes, k).valid()) ++n.colliders;
-    }
-    break;
-  }
-  return true;
-}
-bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
-  if (list.empty()) return false;
-  converted::wide::Map<u32, u32> want;  // seed -> the place of its record in list (the last one of the seed)
-  bool changed = false;
-  for (u32 i = 0; i < list.size(); ++i) {
-    const DamageRec& r = converted::at(list, i);
-    if (!(r.height >= 0) || !std::isfinite(r.height)) continue;
-    auto it = damage_.find(r.seed);
-    if (it != damage_.end() && it->second.height <= r.height + 0.01 && (it->second.leveled || !r.leveled)) continue;  // ours is as low already
-    want[r.seed] = i;
-  }
-  if (want.empty()) return false;
-  damage_quiet_ = !log;
-  // the loaded ones: lowered now (the same path as a blast: its chunk, its collider)
-  for (auto& [k, tp] : tiles_) {
-    Tile& t = *converted::present(tp);
-    if (!t.prepared) continue;
-    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
-      auto w = want.find(converted::at(t.features.buildings, i).seed);
-      if (w == want.end()) continue;
-      const MapFeatures::Building& b = converted::at(t.features.buildings, i);
-      const DamageRec& r = converted::at(list, w->second);
-      if (damage_building(k, i, b.base + r.height, r.leveled)) changed = true;
-    }
-  }
-  // the rest (not loaded here): kept for when the tile comes (prepare applies damage_)
-  for (const auto& [seed, at] : want) {
-    const DamageRec& r = converted::at(list, at);
-    auto it = damage_.find(seed);
-    if (it == damage_.end()) {
-      damage_[seed] = Damage{r.height, r.leveled};
-    } else if (r.height < it->second.height - 0.01 || (r.leveled && !it->second.leveled)) {
-      it->second.height = std::fmin(it->second.height, r.height);
-      it->second.leveled = it->second.leveled || r.leveled;
-    } else {
-      continue;
-    }
-    changed = true;
-    if (log) damage_log_.push_back(seed);
-  }
-  damage_quiet_ = false;
-  if (changed) ++damage_serial_;
-  return changed;
-}
-bool Destruction::merge_points(const std::vector<std::pair<u32, f32>>& list, bool log) {
-  bool changed = false;
-  for (const auto& [seed, hp] : list) {
-    if (!std::isfinite(hp) || hp < 0) continue;
-    auto [it, fresh] = points_.try_emplace(seed, hp);
-    if (!fresh) { if (hp >= it->second - 0.01) continue; it->second = hp; }
-    changed = true;
-    if (log) points_log_.emplace_back(seed, hp);
-  }
-  return changed;
-}
 namespace net { namespace net_session_cpp_local { enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
   kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31, kTownMsg = 32,
 }; } }
 namespace net { namespace net_session_cpp_local { enum : int { kReliable = 0, kUnreliable = 1 }; } }
-namespace net { void Session::destroy_to_host(const std::vector<u8>& blob) {
-  if (role_ == Role::client && client_ && converted::present(client_)->connected()) converted::present(client_)->send(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kDestroyMsg, blob);
-} }
-void CityStream::clear_damage() {
-  damage_.clear();
-  damage_log_.clear();
-  for (auto& [k, tp] : tiles_) {
-    Tile& t = *converted::present(tp);
-    if (!t.prepared) continue;
-    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
-      MapFeatures::Building& b = converted::at(t.features.buildings, i);
-      if (b.top >= b.full_top - 0.01 && !b.leveled) continue;
-      b.top = b.full_top;
-      b.leveled = false;
-      if (i < t.cent.size() && t.cell_ids.count(city_stream_cpp_local::cell_of(converted::at(t.cent, i)))) t.dirty_cells.insert(city_stream_cpp_local::cell_of(converted::at(t.cent, i)));
-    }
-  }
-  near_.dirty = true;
-}
-void Destruction::free_torn(Torn& t) {
-  if (t.mesh && r_) r_->remove(t.mesh);
-  t.mesh = 0;
-}
-void Destruction::reset(CityStream& city) {
-  for (Torn& t : torn_) free_torn(t);
-  torn_.clear();
-  pieces_.clear();
-  points_.clear();
-  points_log_.clear();
-  city.clear_damage();
-  stats_ = {};
-}
-namespace net { i32 Session::remote_index(u8 slot) const {
-  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
-  return -1;
-} }
 namespace net { void Session::refused(u16 type, std::size_t bytes) {
   ++send_refused_;
   if (refused_said_ < 8) { ++refused_said_; std::fprintf(stderr, "[spawncity net] message type %u (%zu bytes) was not sent\n", static_cast<unsigned>(type), bytes); }
@@ -5914,19 +5772,6 @@ namespace net { void Session::to_all(int ch, u16 type, const std::vector<u8>& da
 namespace net { void Session::destroy_to_all(const std::vector<u8>& blob, bool reliable) {
   if (role_ == Role::host) to_all(reliable ? net::net_session_cpp_local::kReliable : net::net_session_cpp_local::kUnreliable, net::net_session_cpp_local::kDestroyMsg, blob, kHost);
 } }
-void Terrain::set_craters(const std::vector<CraterRec>& list) {
-  std::vector<CraterRec> mine;
-  crater_list(mine);
-  if (mine == list) return;
-  auto has = [](const std::vector<CraterRec>& v, const CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); };
-  // the ground changes only where a crater came or went (a reorder alone changes nothing: the
-  // height adds every bowl up)
-  for (const CraterRec& c : mine) if (!has(list, c)) dirty(c.x - c.r, c.y - c.r, c.x + c.r, c.y + c.r);
-  for (const CraterRec& c : list) if (!has(mine, c)) dirty(c.x - c.r, c.y - c.r, c.x + c.r, c.y + c.r);
-  craters_.clear();
-  for (const CraterRec& c : list) if (c.r > 0.5 && std::isfinite(c.x) && std::isfinite(c.y) && std::isfinite(c.depth)) craters_.push_back({{c.x, c.y}, c.r, c.depth, c.depth * 7.0 / 22.0});
-  stats_.craters = static_cast<u32>(craters_.size());
-}
 namespace net { void Session::to_client(u8 slot, int ch, u16 type, const std::vector<u8>& data) {
   if (role_ == Role::host && server_ && slot < converted::present(server_)->max_clients() && converted::present(server_)->client_connected(slot))
     if (!converted::present(server_)->send(slot, ch, type, data)) refused(type, data.size());
@@ -5962,8 +5807,7 @@ void Car::detach() {
   rig_chassis_ = {};
   has_last_ = false;
 }
-constexpr u8 kEdit = 1, kState = 2, kDigest = 3, kAsk = 4;
-constexpr f32 kDeltaEvery = 0.15, kDigestEvery = 2.0;
+constexpr u8 kEdit = 1, kState = 2;
 constexpr std::size_t kPerMessage = 400;
 using Craters = DestroySync::Craters;
 using DamageList = DestroySync::DamageList;
@@ -5972,31 +5816,13 @@ void put_craters(std::vector<u8>& o, const Craters& c) {
   wire::put_u8(o, static_cast<u8>(std::min<std::size_t>(c.size(), 255)));
   for (std::size_t i = 0; i < c.size() && i < 255; converted::pre_inc(i)) { wire::put_f32(o, converted::at(c, i).x); wire::put_f32(o, converted::at(c, i).y); wire::put_f32(o, converted::at(c, i).r); wire::put_f32(o, converted::at(c, i).depth); }
 }
-bool get_craters(wire::Reader& in, const std::vector<u8>& b, Craters& c) {
-  const u8 n = in.get_u8(b);
-  c.clear();
-  for (u8 i = 0; i < n && in.ok; ++i) { Terrain::CraterRec r; r.x = in.get_f32(b); r.y = in.get_f32(b); r.r = in.get_f32(b); r.depth = in.get_f32(b); c.push_back(r); }
-  return in.ok;
-}
 void put_damage(std::vector<u8>& o, const DamageList& d, std::size_t from, std::size_t n) {
   wire::put_u16(o, static_cast<u16>(n));
   for (std::size_t i = from; i < converted::plus(from, n); converted::pre_inc(i)) { wire::put_u32(o, converted::at(d, i).seed); wire::put_f32(o, converted::at(d, i).height); wire::put_u8(o, static_cast<u8>(converted::at(d, i).leveled)); }
 }
-bool get_damage(wire::Reader& in, const std::vector<u8>& b, DamageList& d) {
-  const u16 n = in.get_u16(b);
-  d.clear();
-  for (u16 i = 0; i < n && in.ok; ++i) { CityStream::DamageRec r; r.seed = in.get_u32(b); r.height = in.get_f32(b); r.leveled = in.get_u8(b) != 0; d.push_back(r); }
-  return in.ok;
-}
 void put_points(std::vector<u8>& o, const Points& p, std::size_t from, std::size_t n) {
   wire::put_u16(o, static_cast<u16>(n));
   for (std::size_t i = from; i < converted::plus(from, n); converted::pre_inc(i)) { wire::put_u32(o, converted::at(p, i).first); wire::put_f32(o, converted::at(p, i).second); }
-}
-bool get_points(wire::Reader& in, const std::vector<u8>& b, Points& p) {
-  const u16 n = in.get_u16(b);
-  p.clear();
-  for (u16 i = 0; i < n && in.ok; ++i) { const u32 s = in.get_u32(b); const f32 hp = in.get_f32(b); p.emplace_back(s, hp); }
-  return in.ok;
 }
 void fnv_byte(u32& h, u32 byte) {
   h ^= byte;
@@ -6021,7 +5847,6 @@ u32 digest_of(const Craters& c, const DamageList& d) {
   }
   return h;
 }
-bool has(const Craters& v, const Terrain::CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); }
 void Game::dsync_ready() {
   if (!dsync_) dsync_ = std::make_unique<DestroySync>();
 }
@@ -6055,177 +5880,6 @@ void Game::dsync_send_full(i32 to) {
     ++d.sent_states;
   }
   if (to < 0) d.sent = c;
-}
-void Game::dsync_update(f32 dt) {
-  dsync_ready();
-  DestroySync& d = *converted::present(dsync_);
-  Terrain& terrain = city_.terrain();
-  const bool active = net_.active();
-  if (!active) {
-    if (d.was_active) { d.mine.clear(); d.sent.clear(); d.known.clear(); d.dmg_out.clear(); d.pts_out.clear(); d.mismatches = 0; }
-    d.was_active = false;
-    (void)city_.take_damage_log();
-    (void)destruction_.take_points_log();
-    return;
-  }
-  const bool host = net_.hosting();
-  if (!d.was_active || host != d.hosting) { d.mine.clear(); d.sent.clear(); d.known.clear(); d.mismatches = 0; if (!host) d.epoch = 0; }
-  d.was_active = true;
-  d.hosting = host;
-  const f32 now = static_cast<f32>(time_);
-
-  // what changed here since the last frame (a blast, a merge with log on: the host's relays)
-  for (u32 seed : city_.take_damage_log()) {
-    CityStream::DamageRec r;
-    if (!city_.damage_of(seed, r)) continue;
-    auto it = std::find_if(d.dmg_out.begin(), d.dmg_out.end(), [&](const CityStream::DamageRec& q) { return q.seed == seed; });
-    if (it != d.dmg_out.end()) *it = r; else d.dmg_out.push_back(r);
-  }
-  for (const auto& [seed, hp] : destruction_.take_points_log()) {
-    auto it = std::find_if(d.pts_out.begin(), d.pts_out.end(), [&](const std::pair<u32, f32>& q) { return q.first == seed; });
-    if (it != d.pts_out.end()) it->second = std::fmin(it->second, hp); else d.pts_out.emplace_back(seed, hp);
-  }
-
-  for (const net::Session::Blob& m : net_.take_destroy()) {
-    wire::Reader in;
-    const u8 kind = in.get_u8(m.data);
-    const u32 epoch = in.get_u32(m.data);
-    if (!in.ok) continue;
-    if (host) {
-      if (kind == kAsk || epoch != d.epoch) { ++d.asks; dsync_send_full(m.from); continue; }  // a client behind: the whole state
-      if (kind != kEdit) continue;
-      Craters c;
-      DamageList dm;
-      Points pt;
-      if (!get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
-      // his craters join the list (in the order they reach the authority), his damage the city
-      for (const Terrain::CraterRec& r : c) {
-        Craters cur;
-        terrain.crater_list(cur);
-        if (!has(cur, r) && r.r > 0.5 && r.r < 40 && std::isfinite(r.x) && std::isfinite(r.y)) terrain.add_crater({r.x, r.y}, r.r, r.depth);
-      }
-      city_.merge_damage(dm, true);
-      destruction_.merge_points(pt, true);
-      continue;
-    }
-    // client
-    if (kind == kDigest) {
-      const u32 theirs = in.get_u32(m.data);
-      if (!in.ok) continue;
-      Craters c;
-      terrain.crater_list(c);
-      DamageList dm;
-      city_.damage_list(dm);
-      // the check, not a repair: the protocol keeps the cities equal by construction (one
-      // authority, reliable ordered deltas, merges that only ever lower, the whole state for a
-      // joiner and with every epoch) - a differing digest while nothing of ours is in flight is a
-      // defect, counted and logged so it is seen (`destroy sync`), never papered over
-      if (epoch == d.epoch && d.mine.empty() && d.dmg_out.empty() && d.pts_out.empty() && now - d.told_at > 1.0 && digest_of(c, dm) != theirs) {
-        if (++d.mismatches == 1 || d.mismatches % 30 == 0) std::fprintf(stderr, "[spawncity] destruction digest differs from the host's (%u)\n", d.mismatches);
-      }
-      continue;
-    }
-    if (kind != kState) continue;
-    const u8 full = in.get_u8(m.data);
-    Craters c;
-    DamageList dm;
-    Points pt;
-    if (!in.ok || !get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
-    ++d.got_states;
-    if (epoch != d.epoch) {
-      if (!full && d.epoch != 0) {  // missed the start of it
-        std::vector<u8> o;
-        wire::put_u8(o, kAsk);
-        wire::put_u32(o, d.epoch);
-        net_.destroy_to_host(o);
-        continue;
-      }
-      // the host's new epoch (a RESET there, or our first state): our city as his from scratch
-      if (d.epoch != 0) { destruction_.reset(city_); d.mine.clear(); d.dmg_out.clear(); d.pts_out.clear(); }
-      d.epoch = epoch;
-    }
-    d.sent = c;
-    city_.merge_damage(dm, false);
-    destruction_.merge_points(pt, false);
-    (void)city_.take_damage_log();      // (merged quietly - nothing of ours to tell)
-    (void)destruction_.take_points_log();
-  }
-
-  if (host) {
-    // a mate who joined gets the whole state once
-    for (const net::Remote& r : net_.remotes())
-      if (std::find(d.known.begin(), d.known.end(), r.state.slot) == d.known.end()) { dsync_send_full(r.state.slot); d.known.push_back(r.state.slot); }
-    converted::erase(d.known, std::remove_if(d.known.begin(), d.known.end(), [&](u8 s) { return net_.remote_index(s) < 0; }), d.known.end());
-    d.delta_clock += dt;
-    if (d.delta_clock >= kDeltaEvery) {
-      d.delta_clock = 0;
-      Craters c;
-      terrain.crater_list(c);
-      if (c != d.sent || !d.dmg_out.empty() || !d.pts_out.empty()) {
-        for (std::size_t a = 0; a == 0 || a < std::max(d.dmg_out.size(), d.pts_out.size()); converted::plus_to(a, kPerMessage)) {
-          std::vector<u8> o;
-          wire::put_u8(o, kState);
-          wire::put_u32(o, d.epoch);
-          wire::put_u8(o, static_cast<u8>(0));
-          put_craters(o, c);
-          const std::size_t da = std::min(d.dmg_out.size(), a), pa = std::min(d.pts_out.size(), a);
-          put_damage(o, d.dmg_out, da, std::min(kPerMessage, converted::minus(d.dmg_out.size(), da)));
-          put_points(o, d.pts_out, pa, std::min(kPerMessage, converted::minus(d.pts_out.size(), pa)));
-          net_.destroy_to_all(o, true);
-          ++d.sent_states;
-        }
-        d.sent = c;
-        d.dmg_out.clear();
-        d.pts_out.clear();
-      }
-    }
-    d.digest_clock += dt;
-    if (d.digest_clock >= kDigestEvery) {
-      d.digest_clock = 0;
-      Craters c;
-      terrain.crater_list(c);
-      DamageList dm;
-      city_.damage_list(dm);
-      std::vector<u8> o;
-      wire::put_u8(o, kDigest);
-      wire::put_u32(o, d.epoch);
-      wire::put_u32(o, digest_of(c, dm));
-      net_.destroy_to_all(o, false);
-    }
-    return;
-  }
-
-  // client: the craters - the host's list, our own fresh ones kept on top until his list has them
-  // (a crater dug here shows at once; after 3 s without the host taking it, it goes)
-  Craters local;
-  terrain.crater_list(local);
-  for (const Terrain::CraterRec& r : local)
-    if (!has(d.sent, r) && std::none_of(d.mine.begin(), d.mine.end(), [&](const DestroySync::Mine& q) { return q.r == r; })) d.mine.push_back({r, now, false});
-  converted::erase(d.mine, std::remove_if(d.mine.begin(), d.mine.end(), [&](const DestroySync::Mine& q) { return has(d.sent, q.r) || now - q.at > 3.0; }), d.mine.end());
-  if (d.epoch != 0) {
-    Craters want = d.sent;
-    for (const DestroySync::Mine& q : d.mine) want.push_back(q.r);
-    while (want.size() > 32) converted::erase(want, want.begin());
-    terrain.set_craters(want);
-  }
-  // our own changes to the host (in one message per 150 ms)
-  d.delta_clock += dt;
-  std::vector<Terrain::CraterRec> tell;
-  for (const DestroySync::Mine& q : d.mine) if (!q.told) tell.push_back(q.r);
-  if (d.epoch == 0 || d.delta_clock < kDeltaEvery || (tell.empty() && d.dmg_out.empty() && d.pts_out.empty())) return;  // (the host's state first)
-  d.delta_clock = 0;
-  std::vector<u8> o;
-  wire::put_u8(o, kEdit);
-  wire::put_u32(o, d.epoch);
-  put_craters(o, tell);
-  const std::size_t nd = std::min(d.dmg_out.size(), kPerMessage), np = std::min(d.pts_out.size(), kPerMessage);
-  put_damage(o, d.dmg_out, 0, nd);
-  put_points(o, d.pts_out, 0, np);
-  net_.destroy_to_host(o);
-  d.told_at = now;
-  for (DestroySync::Mine& q : d.mine) q.told = true;
-  converted::erase(d.dmg_out, d.dmg_out.begin(), d.dmg_out.begin() + static_cast<std::ptrdiff_t>(nd));
-  converted::erase(d.pts_out, d.pts_out.begin(), d.pts_out.begin() + static_cast<std::ptrdiff_t>(np));
 }
 std::string Game::dsync_json() {
   dsync_ready();
@@ -7544,30 +7198,7 @@ namespace game { using converted::arg; using converted::same; using converted::d
 [[maybe_unused]] static bool defined(const Game::VrHand& s) { return defined(s.valid) && defined(s.had) && defined(s.world_ok) && defined(s.grab_was) && defined(s.swish) && defined(s.p) && defined(s.prev) && defined(s.prev_strike) && defined(s.world_prev) && defined(s.grab_local) && defined(s.throw_v) && defined(s.q) && defined(s.swing) && defined(s.strike_at) && defined(s.grab_t) && defined(s.grab) && defined(s.grab_person) && defined(s.grab_slot) && defined(s.bird) && defined(s.grab_mate_at); }
 [[maybe_unused]] static std::string text(const Game::VrHand& s) { return std::string("{") + text(s.valid) + ", " + text(s.had) + ", " + text(s.world_ok) + ", " + text(s.grab_was) + ", " + text(s.swish) + ", " + text(s.p) + ", " + text(s.prev) + ", " + text(s.prev_strike) + ", " + text(s.world_prev) + ", " + text(s.grab_local) + ", " + text(s.throw_v) + ", " + text(s.q) + ", " + text(s.swing) + ", " + text(s.strike_at) + ", " + text(s.grab_t) + ", " + text(s.grab) + ", " + text(s.grab_person) + ", " + text(s.grab_slot) + ", " + text(s.bird) + ", " + text(s.grab_mate_at) + "}"; }
 [[maybe_unused]] static void take(Game::VrHand& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 20) return; converted::take_as<bool>(s.valid, (*v.rows)[0]); converted::take_as<bool>(s.had, (*v.rows)[1]); converted::take_as<bool>(s.world_ok, (*v.rows)[2]); converted::take_as<bool>(s.grab_was, (*v.rows)[3]); converted::take_as<bool>(s.swish, (*v.rows)[4]); converted::take_as<Vec3>(s.p, (*v.rows)[5]); converted::take_as<Vec3>(s.prev, (*v.rows)[6]); converted::take_as<Vec3>(s.prev_strike, (*v.rows)[7]); converted::take_as<Vec3>(s.world_prev, (*v.rows)[8]); converted::take_as<Vec3>(s.grab_local, (*v.rows)[9]); converted::take_as<Vec3>(s.throw_v, (*v.rows)[10]); converted::take_as<Quat>(s.q, (*v.rows)[11]); converted::take_as<double>(s.swing, (*v.rows)[12]); converted::take_as<double>(s.strike_at, (*v.rows)[13]); converted::take_as<double>(s.grab_t, (*v.rows)[14]); converted::take_as<physics::Body>(s.grab, (*v.rows)[15]); converted::take_as<int>(s.grab_person, (*v.rows)[16]); converted::take_as<int>(s.grab_slot, (*v.rows)[17]); converted::take_as<int>(s.bird, (*v.rows)[18]); converted::take_as<double>(s.grab_mate_at, (*v.rows)[19]); }
-[[maybe_unused]] static Facades draw_Facades(converted::Draw& draw) {
-  Facades s{};
-  s.night = draw.number();
-  s.u_night_ = static_cast<unsigned int>(draw.below(40));
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Facades& s) { return converted::Value::structure({arg(s.night), arg(s.u_night_)}); }
-[[maybe_unused]] static bool same(const Facades& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.night, (*got.rows)[0]), ".night") && converted::at_place(same(want.u_night_, (*got.rows)[1]), ".u_night_"); }
-[[maybe_unused]] static bool defined(const Facades& s) { return defined(s.night) && defined(s.u_night_); }
-[[maybe_unused]] static std::string text(const Facades& s) { return std::string("{") + text(s.night) + ", " + text(s.u_night_) + "}"; }
-[[maybe_unused]] static void take(Facades& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.night, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_night_, (*v.rows)[1]); }
-[[maybe_unused]] static WaterLook draw_WaterLook(converted::Draw& draw) {
-  WaterLook s{};
-  s.time = draw.number();
-  s.u_time_ = static_cast<unsigned int>(draw.below(40));
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const WaterLook& s) { return converted::Value::structure({arg(s.time), arg(s.u_time_)}); }
-[[maybe_unused]] static bool same(const WaterLook& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.time, (*got.rows)[0]), ".time") && converted::at_place(same(want.u_time_, (*got.rows)[1]), ".u_time_"); }
-[[maybe_unused]] static bool defined(const WaterLook& s) { return defined(s.time) && defined(s.u_time_); }
-[[maybe_unused]] static std::string text(const WaterLook& s) { return std::string("{") + text(s.time) + ", " + text(s.u_time_) + "}"; }
-[[maybe_unused]] static void take(WaterLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_time_, (*v.rows)[1]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
-  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
   s.x = draw.number();
   s.y = draw.number();
@@ -8758,42 +8389,6 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 [[maybe_unused]] static bool defined(const Camera& s) { return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
 [[maybe_unused]] static std::string text(const Camera& s) { return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
 [[maybe_unused]] static void take(Camera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.up, (*v.rows)[2]); converted::take_as<double>(s.fov, (*v.rows)[3]); converted::take_as<double>(s.near, (*v.rows)[4]); converted::take_as<double>(s.far, (*v.rows)[5]); converted::take_as<bool>(s.orthographic, (*v.rows)[6]); converted::take_as<double>(s.ortho_height, (*v.rows)[7]); converted::take_as<bool>(s.has_projection, (*v.rows)[8]); converted::take_as<Mat4>(s.projection, (*v.rows)[9]); }
-[[maybe_unused]] static game::ControllerComponent draw_kern__game__ControllerComponent(converted::Draw& draw) {
-  game::ControllerComponent s{};
-  s.mode = converted::enum_value<game::ControlMode>(draw.below(7));
-  s.max_speed = draw.number();
-  s.acceleration = draw.number();
-  s.turn_rate = draw.number();
-  s.jump_speed = draw.number();
-  s.boost = draw.flag();
-  s.boost_speed = draw.number();
-  s.hover_height = draw.number();
-  s.camera = converted::enum_value<game::CameraMode>(draw.below(3));
-  s.camera_distance = draw.number();
-  s.camera_height = draw.number();
-  s.camera_fov = draw.number();
-  s.engine_sound = draw.word();
-  s.jump_sound = draw.word();
-  s.boost_sound = draw.word();
-  s.crouch_speed = draw.number();
-  s.eye_height = draw.number();
-  s.look_sensitivity = draw.number();
-  s.head_bob = draw.flag();
-  s.autonomous = draw.flag();
-  s.gait = draw.word();
-  s.rollers = draw.flag();
-  s.actions = draw.word();
-  s.kern_extras = draw.flag();
-  s.servo_delay = draw.number();
-  return s;
-}
-namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const game::ControllerComponent& s) { return converted::Value::structure({arg(s.mode), arg(s.max_speed), arg(s.acceleration), arg(s.turn_rate), arg(s.jump_speed), arg(s.boost), arg(s.boost_speed), arg(s.hover_height), arg(s.camera), arg(s.camera_distance), arg(s.camera_height), arg(s.camera_fov), arg(s.engine_sound), arg(s.jump_sound), arg(s.boost_sound), arg(s.crouch_speed), arg(s.eye_height), arg(s.look_sensitivity), arg(s.head_bob), arg(s.autonomous), arg(s.gait), arg(s.rollers), arg(s.actions), arg(s.kern_extras), arg(s.servo_delay)}); }
-[[maybe_unused]] static bool same(const game::ControllerComponent& want, const converted::Value& got) { return converted::rows_of(got, 25) && converted::at_place(same(want.mode, (*got.rows)[0]), ".mode") && converted::at_place(same(want.max_speed, (*got.rows)[1]), ".max_speed") && converted::at_place(same(want.acceleration, (*got.rows)[2]), ".acceleration") && converted::at_place(same(want.turn_rate, (*got.rows)[3]), ".turn_rate") && converted::at_place(same(want.jump_speed, (*got.rows)[4]), ".jump_speed") && converted::at_place(same(want.boost, (*got.rows)[5]), ".boost") && converted::at_place(same(want.boost_speed, (*got.rows)[6]), ".boost_speed") && converted::at_place(same(want.hover_height, (*got.rows)[7]), ".hover_height") && converted::at_place(same(want.camera, (*got.rows)[8]), ".camera") && converted::at_place(same(want.camera_distance, (*got.rows)[9]), ".camera_distance") && converted::at_place(same(want.camera_height, (*got.rows)[10]), ".camera_height") && converted::at_place(same(want.camera_fov, (*got.rows)[11]), ".camera_fov") && converted::at_place(same(want.engine_sound, (*got.rows)[12]), ".engine_sound") && converted::at_place(same(want.jump_sound, (*got.rows)[13]), ".jump_sound") && converted::at_place(same(want.boost_sound, (*got.rows)[14]), ".boost_sound") && converted::at_place(same(want.crouch_speed, (*got.rows)[15]), ".crouch_speed") && converted::at_place(same(want.eye_height, (*got.rows)[16]), ".eye_height") && converted::at_place(same(want.look_sensitivity, (*got.rows)[17]), ".look_sensitivity") && converted::at_place(same(want.head_bob, (*got.rows)[18]), ".head_bob") && converted::at_place(same(want.autonomous, (*got.rows)[19]), ".autonomous") && converted::at_place(same(want.gait, (*got.rows)[20]), ".gait") && converted::at_place(same(want.rollers, (*got.rows)[21]), ".rollers") && converted::at_place(same(want.actions, (*got.rows)[22]), ".actions") && converted::at_place(same(want.kern_extras, (*got.rows)[23]), ".kern_extras") && converted::at_place(same(want.servo_delay, (*got.rows)[24]), ".servo_delay"); }
-[[maybe_unused]] static bool defined(const game::ControllerComponent& s) { return defined(s.mode) && defined(s.max_speed) && defined(s.acceleration) && defined(s.turn_rate) && defined(s.jump_speed) && defined(s.boost) && defined(s.boost_speed) && defined(s.hover_height) && defined(s.camera) && defined(s.camera_distance) && defined(s.camera_height) && defined(s.camera_fov) && defined(s.engine_sound) && defined(s.jump_sound) && defined(s.boost_sound) && defined(s.crouch_speed) && defined(s.eye_height) && defined(s.look_sensitivity) && defined(s.head_bob) && defined(s.autonomous) && defined(s.gait) && defined(s.rollers) && defined(s.actions) && defined(s.kern_extras) && defined(s.servo_delay); }
-[[maybe_unused]] static std::string text(const game::ControllerComponent& s) { return std::string("{") + text(s.mode) + ", " + text(s.max_speed) + ", " + text(s.acceleration) + ", " + text(s.turn_rate) + ", " + text(s.jump_speed) + ", " + text(s.boost) + ", " + text(s.boost_speed) + ", " + text(s.hover_height) + ", " + text(s.camera) + ", " + text(s.camera_distance) + ", " + text(s.camera_height) + ", " + text(s.camera_fov) + ", " + text(s.engine_sound) + ", " + text(s.jump_sound) + ", " + text(s.boost_sound) + ", " + text(s.crouch_speed) + ", " + text(s.eye_height) + ", " + text(s.look_sensitivity) + ", " + text(s.head_bob) + ", " + text(s.autonomous) + ", " + text(s.gait) + ", " + text(s.rollers) + ", " + text(s.actions) + ", " + text(s.kern_extras) + ", " + text(s.servo_delay) + "}"; }
-[[maybe_unused]] static void take(game::ControllerComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<game::ControlMode>(s.mode, (*v.rows)[0]); converted::take_as<double>(s.max_speed, (*v.rows)[1]); converted::take_as<double>(s.acceleration, (*v.rows)[2]); converted::take_as<double>(s.turn_rate, (*v.rows)[3]); converted::take_as<double>(s.jump_speed, (*v.rows)[4]); converted::take_as<bool>(s.boost, (*v.rows)[5]); converted::take_as<double>(s.boost_speed, (*v.rows)[6]); converted::take_as<double>(s.hover_height, (*v.rows)[7]); converted::take_as<game::CameraMode>(s.camera, (*v.rows)[8]); converted::take_as<double>(s.camera_distance, (*v.rows)[9]); converted::take_as<double>(s.camera_height, (*v.rows)[10]); converted::take_as<double>(s.camera_fov, (*v.rows)[11]); converted::take_as<std::string>(s.engine_sound, (*v.rows)[12]); converted::take_as<std::string>(s.jump_sound, (*v.rows)[13]); converted::take_as<std::string>(s.boost_sound, (*v.rows)[14]); converted::take_as<double>(s.crouch_speed, (*v.rows)[15]); converted::take_as<double>(s.eye_height, (*v.rows)[16]); converted::take_as<double>(s.look_sensitivity, (*v.rows)[17]); converted::take_as<bool>(s.head_bob, (*v.rows)[18]); converted::take_as<bool>(s.autonomous, (*v.rows)[19]); converted::take_as<std::string>(s.gait, (*v.rows)[20]); converted::take_as<bool>(s.rollers, (*v.rows)[21]); converted::take_as<std::string>(s.actions, (*v.rows)[22]); converted::take_as<bool>(s.kern_extras, (*v.rows)[23]); converted::take_as<double>(s.servo_delay, (*v.rows)[24]); }
-}
 [[maybe_unused]] static TouchLayout draw_TouchLayout(converted::Draw& draw) {
   TouchLayout s{};
   s.mode = converted::enum_value<TouchMode>(draw.below(6));
@@ -11887,8 +11482,6 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->vr_scope_mesh_ = static_cast<unsigned int>(draw.below(40));
   s->vr_hud_tex_ = static_cast<unsigned int>(draw.below(40));
   s->vr_hud_mesh_ = static_cast<unsigned int>(draw.below(40));
-  s->windows_ = draw_Facades(draw);
-  s->water_look_ = draw_WaterLook(draw);
   s->world_ = std::make_unique<GameWorld>(converted::owned(*converted::engine_object<GameWorld>(1 + draw.below(6))));
   s->city_ = draw_CityStream(draw);
   s->art_ = draw_VehicleArt(draw);
@@ -11933,7 +11526,6 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->head_pitch_ = draw.number();
   s->sensitivity_ = draw.number();
   s->dpr_ = draw.number();
-  s->soldier_controller_ = draw_kern__game__ControllerComponent(draw);
   s->pad_touch_ = draw_TouchPlay(draw);
   s->ctl_ = draw_ControlsState(draw);
   s->touch_mode_ = draw.flag();
@@ -11996,7 +11588,6 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->rebased_ = draw.flag();
   s->mp_ = converted::draw_maybe<std::unique_ptr<MpLocal>>(draw, [&]() -> MpLocal { return draw_MpLocal(draw); });
   s->lamps_ = draw_list(draw, [&]() -> Game::Lamp { return draw_Game__Lamp(draw); });
-  s->substeps_ = static_cast<int>(draw.whole());
   s->ground_changes_ = draw_list(draw, [&]() -> Vec4 { return draw_kern__Vec4(draw); });
   s->night_ = draw.number();
   s->show_lamps_ = draw.flag();
@@ -12039,69 +11630,14 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->glife_ = converted::draw_maybe<std::unique_ptr<GameLife>>(draw, [&]() -> GameLife { return draw_GameLife(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Variables variables_Game(const Game& s) { return {{"pad", arg(s.pad)}, {"dsync_", arg(s.dsync_)}, {"toss_test_", arg(s.toss_test_)}, {"toss_", arg(s.toss_)}, {"projsync_", arg(s.projsync_)}, {"proj_serial_", arg(s.proj_serial_)}, {"townsync_", arg(s.townsync_)}, {"puppet_world_", arg(s.puppet_world_)}, {"world_send_clock_", arg(s.world_send_clock_)}, {"people_send_clock_", arg(s.people_send_clock_)}, {"world_send_real_", arg(s.world_send_real_)}, {"world_tick_", arg(s.world_tick_)}, {"world_sent_", arg(s.world_sent_)}, {"world_got_", arg(s.world_got_)}, {"world_heard_at_", arg(s.world_heard_at_)}, {"car_seen_", arg(s.car_seen_)}, {"people_acc_", arg(s.people_acc_)}, {"car_net_", arg(s.car_net_)}, {"car_line_", arg(s.car_line_)}, {"car_rest_q_", arg(s.car_rest_q_)}, {"world_parts_", arg(s.world_parts_)}, {"cows_acc_", arg(s.cows_acc_)}, {"pets_acc_", arg(s.pets_acc_)}, {"flocks_acc_", arg(s.flocks_acc_)}, {"host_epoch_off_", arg(s.host_epoch_off_)}, {"host_epoch_ok_", arg(s.host_epoch_ok_)}, {"world_clock_", arg(s.world_clock_)}, {"world_clock_ok_", arg(s.world_clock_ok_)}, {"car_lent_", arg(s.car_lent_)}, {"car_lent_at_", arg(s.car_lent_at_)}, {"swarms_", arg(s.swarms_)}, {"swarm_clock_", arg(s.swarm_clock_)}, {"swarm_serial_", arg(s.swarm_serial_)}, {"swarm_sent_", arg(s.swarm_sent_)}, {"swarm_fallen_", arg(s.swarm_fallen_)}, {"swarm_cruiser_", arg(s.swarm_cruiser_)}, {"life_", arg(s.life_)}, {"laser_finger_", arg(s.laser_finger_)}, {"laser_pinned_", arg(s.laser_pinned_)}, {"laser_valid_", arg(s.laser_valid_)}, {"laser_fx_", arg(s.laser_fx_)}, {"laser_fy_", arg(s.laser_fy_)}, {"laser_pin_", arg(s.laser_pin_)}, {"laser_dot_", arg(s.laser_dot_)}, {"visual_blasts_", arg(s.visual_blasts_)}, {"bounce_fx_", arg(converted::array_list(s.bounce_fx_))}, {"bounce_fx_next_", arg(s.bounce_fx_next_)}, {"gaps_", arg(s.gaps_)}, {"engine_", arg(s.engine_)}, {"vr_", arg(s.vr_)}, {"vr_hands_", arg(converted::array_list(s.vr_hands_))}, {"vr_snap_armed_", arg(s.vr_snap_armed_)}, {"vr_arms_", arg(s.vr_arms_)}, {"vr_both_clicks_", arg(s.vr_both_clicks_)}, {"vr_wpn_armed_", arg(s.vr_wpn_armed_)}, {"vr_fire_was_", arg(s.vr_fire_was_)}, {"vr_pulse_", arg(converted::array_list(s.vr_pulse_))}, {"vr_tunnel_mesh_", arg(s.vr_tunnel_mesh_)}, {"vr_tunnel_tex_", arg(s.vr_tunnel_tex_)}, {"vr_tunnel_", arg(s.vr_tunnel_)}, {"vr_prev_f_", arg(s.vr_prev_f_)}, {"vr_prev_up_", arg(s.vr_prev_up_)}, {"vr_prev_eye_", arg(s.vr_prev_eye_)}, {"vr_prev_v_", arg(s.vr_prev_v_)}, {"vr_prev_ok_", arg(s.vr_prev_ok_)}, {"vr_menu_open_", arg(s.vr_menu_open_)}, {"vr_menu_trigger_", arg(s.vr_menu_trigger_)}, {"vr_menu_valid_", arg(s.vr_menu_valid_)}, {"vr_menu_hover_", arg(s.vr_menu_hover_)}, {"vr_menu_hover_was_", arg(s.vr_menu_hover_was_)}, {"vr_menu_page_", arg(s.vr_menu_page_)}, {"vr_menu_sel_", arg(s.vr_menu_sel_)}, {"vr_menu_stick_used_", arg(s.vr_menu_stick_used_)}, {"vr_menu_stick_armed_", arg(s.vr_menu_stick_armed_)}, {"vr_y_fired_", arg(s.vr_y_fired_)}, {"vr_near_vehicle_", arg(s.vr_near_vehicle_)}, {"vr_y_held_", arg(s.vr_y_held_)}, {"vr_cam_request_", arg(s.vr_cam_request_)}, {"vr_scoped_", arg(s.vr_scoped_)}, {"vr_menu_c_", arg(s.vr_menu_c_)}, {"vr_menu_r_", arg(s.vr_menu_r_)}, {"vr_menu_u_", arg(s.vr_menu_u_)}, {"vr_menu_n_", arg(s.vr_menu_n_)}, {"vr_menu_w_", arg(s.vr_menu_w_)}, {"vr_menu_h_", arg(s.vr_menu_h_)}, {"vr_action_", arg(s.vr_action_)}, {"vr_scope_tex_", arg(s.vr_scope_tex_)}, {"vr_scope_mesh_", arg(s.vr_scope_mesh_)}, {"vr_hud_tex_", arg(s.vr_hud_tex_)}, {"vr_hud_mesh_", arg(s.vr_hud_mesh_)}, {"windows_", arg(s.windows_)}, {"water_look_", arg(s.water_look_)}, {"world_", arg(s.world_)}, {"city_", arg(s.city_)}, {"art_", arg(s.art_)}, {"soldier_", arg(s.soldier_)}, {"drone_actor_", arg(s.drone_actor_)}, {"jet_actor_", arg(s.jet_actor_)}, {"chute_actor_", arg(s.chute_actor_)}, {"drone_", arg(s.drone_)}, {"jet_", arg(s.jet_)}, {"cars_", arg(s.cars_)}, {"mode_", arg(s.mode_)}, {"car_index_", arg(s.car_index_)}, {"focus_prev_", arg(s.focus_prev_)}, {"focus_prev_valid_", arg(s.focus_prev_valid_)}, {"jet_flown_", arg(s.jet_flown_)}, {"jet_v_valid_", arg(s.jet_v_valid_)}, {"jet_v_ctrl_", arg(s.jet_v_ctrl_)}, {"drone_out_", arg(s.drone_out_)}, {"jet_placed_", arg(s.jet_placed_)}, {"world_placed_", arg(s.world_placed_)}, {"chute_open_", arg(s.chute_open_)}, {"chute_time_", arg(s.chute_time_)}, {"chute_steer_", arg(s.chute_steer_)}, {"sticks_", arg(s.sticks_)}, {"jet_in_", arg(s.jet_in_)}, {"landing_", arg(s.landing_)}, {"landing_still_", arg(s.landing_still_)}, {"height_held_", arg(s.height_held_)}, {"drone_cam_", arg(s.drone_cam_)}, {"car_cockpit_", arg(s.car_cockpit_)}, {"jet_cockpit_", arg(s.jet_cockpit_)}, {"fpv_tilt_deg_", arg(s.fpv_tilt_deg_)}, {"fpv_fov_deg_", arg(s.fpv_fov_deg_)}, {"spawn_", arg(s.spawn_)}, {"cam_", arg(s.cam_)}, {"cam_valid_", arg(s.cam_valid_)}, {"cam_anchor_", arg(s.cam_anchor_)}, {"cam_vel_", arg(s.cam_vel_)}, {"cam_heading_", arg(s.cam_heading_)}, {"rig_init_", arg(s.rig_init_)}, {"head_yaw_", arg(s.head_yaw_)}, {"head_pitch_", arg(s.head_pitch_)}, {"sensitivity_", arg(s.sensitivity_)}, {"dpr_", arg(s.dpr_)}, {"soldier_controller_", arg(s.soldier_controller_)}, {"pad_touch_", arg(s.pad_touch_)}, {"ctl_", arg(s.ctl_)}, {"touch_mode_", arg(s.touch_mode_)}, {"frame_w_", arg(s.frame_w_)}, {"frame_h_", arg(s.frame_h_)}, {"play_in_", arg(s.play_in_)}, {"people_", arg(s.people_)}, {"people_art_", arg(s.people_art_)}, {"combat_art_", arg(s.combat_art_)}, {"destruction_", arg(s.destruction_)}, {"combat_", arg(s.combat_)}, {"guided_", arg(s.guided_)}, {"guided_last_", arg(s.guided_last_)}, {"guided_lock_", arg(s.guided_lock_)}, {"guided_mark_", arg(s.guided_mark_)}, {"guided_mark_at_", arg(s.guided_mark_at_)}, {"guided_mark_time_", arg(s.guided_mark_time_)}, {"guided_marked_", arg(s.guided_marked_)}, {"car_last_hp_", arg(s.car_last_hp_)}, {"car_burn_seen_", arg(s.car_burn_seen_)}, {"pd_crit_", arg(converted::array_list(s.pd_crit_))}, {"drone_crit_", arg(s.drone_crit_)}, {"ballot_", arg(s.ballot_)}, {"ballot_serial_", arg(s.ballot_serial_)}, {"bullet_pushes_", arg(s.bullet_pushes_)}, {"crit_blasts_", arg(s.crit_blasts_)}, {"sfx_cursor_", arg(converted::array_list(s.sfx_cursor_))}, {"combat_audio_ready_", arg(s.combat_audio_ready_)}, {"roads_", arg(s.roads_)}, {"units_", arg(s.units_)}, {"pdrones_", arg(converted::array_list(s.pdrones_))}, {"last_known_", arg(s.last_known_)}, {"last_contact_", arg(s.last_contact_)}, {"next_drone_wave_", arg(s.next_drone_wave_)}, {"emp_ready_at_", arg(s.emp_ready_at_)}, {"last_drone_shot_", arg(s.last_drone_shot_)}, {"last_player_hit_", arg(s.last_player_hit_)}, {"drone_serial_", arg(s.drone_serial_)}, {"drone_wave_live_", arg(s.drone_wave_live_)}, {"projectiles_", arg(s.projectiles_)}, {"foot_weapon_", arg(s.foot_weapon_)}, {"ammo_mag_", arg(converted::array_list(s.ammo_mag_))}, {"ammo_reserve_", arg(converted::array_list(s.ammo_reserve_))}, {"grenades_", arg(s.grenades_)}, {"drone_weapon_", arg(s.drone_weapon_)}, {"jet_rocket_side_", arg(s.jet_rocket_side_)}, {"jacked_at_", arg(s.jacked_at_)}, {"jet_cam_off_", arg(s.jet_cam_off_)}, {"next_attack_", arg(s.next_attack_)}, {"next_grenade_", arg(s.next_grenade_)}, {"next_drone_fire_", arg(s.next_drone_fire_)}, {"next_jet_gun_", arg(s.next_jet_gun_)}, {"next_jet_missile_", arg(s.next_jet_missile_)}, {"next_jet_bomb_", arg(s.next_jet_bomb_)}, {"trigger_was_", arg(s.trigger_was_)}, {"explosions_", arg(s.explosions_)}, {"net_", arg(s.net_)}, {"remote_car_", arg(s.remote_car_)}, {"remote_bus_", arg(s.remote_bus_)}, {"rebased_", arg(s.rebased_)}, {"mp_", arg(s.mp_)}, {"lamps_", arg(s.lamps_)}, {"substeps_", arg(s.substeps_)}, {"ground_changes_", arg(s.ground_changes_)}, {"night_", arg(s.night_)}, {"show_lamps_", arg(s.show_lamps_)}, {"star_since_", arg(s.star_since_)}, {"last_wave_", arg(s.last_wave_)}, {"last_cop_shot_", arg(s.last_cop_shot_)}, {"drone_hp_", arg(s.drone_hp_)}, {"jet_hp_", arg(s.jet_hp_)}, {"last_stars_", arg(s.last_stars_)}, {"player_dead_", arg(s.player_dead_)}, {"died_at_", arg(s.died_at_)}, {"died_feet_", arg(s.died_feet_)}, {"respawn_rule_", arg(s.respawn_rule_)}, {"reset_revive_", arg(s.reset_revive_)}, {"spawn_guard_", arg(s.spawn_guard_)}, {"spawn_guard_until_", arg(s.spawn_guard_until_)}, {"spawn_guard_ready_at_", arg(s.spawn_guard_ready_at_)}, {"hint_", arg(s.hint_)}, {"toast_", arg(s.toast_)}, {"toast_age_", arg(s.toast_age_)}, {"time_", arg(s.time_)}, {"fps_", arg(s.fps_)}, {"steps_", arg(converted::shaped<converted::Whole>(s.steps_))}, {"rng_", arg(s.rng_)}, {"spawn_checked_", arg(s.spawn_checked_)}, {"mixer_", arg(s.mixer_)}, {"bank_", arg(s.bank_)}, {"game_audio_", arg(s.game_audio_)}, {"fx_", arg(s.fx_)}, {"audio_out_", arg(s.audio_out_)}, {"web_audio_", arg(s.web_audio_)}, {"osfx_", arg(s.osfx_)}, {"shot_flesh_", arg(s.shot_flesh_)}, {"lon_", arg(s.lon_)}, {"lat_", arg(s.lat_)}, {"start_mode_", arg(s.start_mode_)}, {"mobile_", arg(s.mobile_)}, {"ui_", arg(s.ui_)}, {"look_", arg(s.look_)}, {"glife_", arg(s.glife_)}}; }
+[[maybe_unused]] static converted::Variables variables_Game(const Game& s) { return {{"pad", arg(s.pad)}, {"dsync_", arg(s.dsync_)}, {"toss_test_", arg(s.toss_test_)}, {"toss_", arg(s.toss_)}, {"projsync_", arg(s.projsync_)}, {"proj_serial_", arg(s.proj_serial_)}, {"townsync_", arg(s.townsync_)}, {"puppet_world_", arg(s.puppet_world_)}, {"world_send_clock_", arg(s.world_send_clock_)}, {"people_send_clock_", arg(s.people_send_clock_)}, {"world_send_real_", arg(s.world_send_real_)}, {"world_tick_", arg(s.world_tick_)}, {"world_sent_", arg(s.world_sent_)}, {"world_got_", arg(s.world_got_)}, {"world_heard_at_", arg(s.world_heard_at_)}, {"car_seen_", arg(s.car_seen_)}, {"people_acc_", arg(s.people_acc_)}, {"car_net_", arg(s.car_net_)}, {"car_line_", arg(s.car_line_)}, {"car_rest_q_", arg(s.car_rest_q_)}, {"world_parts_", arg(s.world_parts_)}, {"cows_acc_", arg(s.cows_acc_)}, {"pets_acc_", arg(s.pets_acc_)}, {"flocks_acc_", arg(s.flocks_acc_)}, {"host_epoch_off_", arg(s.host_epoch_off_)}, {"host_epoch_ok_", arg(s.host_epoch_ok_)}, {"world_clock_", arg(s.world_clock_)}, {"world_clock_ok_", arg(s.world_clock_ok_)}, {"car_lent_", arg(s.car_lent_)}, {"car_lent_at_", arg(s.car_lent_at_)}, {"swarms_", arg(s.swarms_)}, {"swarm_clock_", arg(s.swarm_clock_)}, {"swarm_serial_", arg(s.swarm_serial_)}, {"swarm_sent_", arg(s.swarm_sent_)}, {"swarm_fallen_", arg(s.swarm_fallen_)}, {"swarm_cruiser_", arg(s.swarm_cruiser_)}, {"life_", arg(s.life_)}, {"laser_finger_", arg(s.laser_finger_)}, {"laser_pinned_", arg(s.laser_pinned_)}, {"laser_valid_", arg(s.laser_valid_)}, {"laser_fx_", arg(s.laser_fx_)}, {"laser_fy_", arg(s.laser_fy_)}, {"laser_pin_", arg(s.laser_pin_)}, {"laser_dot_", arg(s.laser_dot_)}, {"visual_blasts_", arg(s.visual_blasts_)}, {"bounce_fx_", arg(converted::array_list(s.bounce_fx_))}, {"bounce_fx_next_", arg(s.bounce_fx_next_)}, {"gaps_", arg(s.gaps_)}, {"engine_", arg(s.engine_)}, {"vr_", arg(s.vr_)}, {"vr_hands_", arg(converted::array_list(s.vr_hands_))}, {"vr_snap_armed_", arg(s.vr_snap_armed_)}, {"vr_arms_", arg(s.vr_arms_)}, {"vr_both_clicks_", arg(s.vr_both_clicks_)}, {"vr_wpn_armed_", arg(s.vr_wpn_armed_)}, {"vr_fire_was_", arg(s.vr_fire_was_)}, {"vr_pulse_", arg(converted::array_list(s.vr_pulse_))}, {"vr_tunnel_mesh_", arg(s.vr_tunnel_mesh_)}, {"vr_tunnel_tex_", arg(s.vr_tunnel_tex_)}, {"vr_tunnel_", arg(s.vr_tunnel_)}, {"vr_prev_f_", arg(s.vr_prev_f_)}, {"vr_prev_up_", arg(s.vr_prev_up_)}, {"vr_prev_eye_", arg(s.vr_prev_eye_)}, {"vr_prev_v_", arg(s.vr_prev_v_)}, {"vr_prev_ok_", arg(s.vr_prev_ok_)}, {"vr_menu_open_", arg(s.vr_menu_open_)}, {"vr_menu_trigger_", arg(s.vr_menu_trigger_)}, {"vr_menu_valid_", arg(s.vr_menu_valid_)}, {"vr_menu_hover_", arg(s.vr_menu_hover_)}, {"vr_menu_hover_was_", arg(s.vr_menu_hover_was_)}, {"vr_menu_page_", arg(s.vr_menu_page_)}, {"vr_menu_sel_", arg(s.vr_menu_sel_)}, {"vr_menu_stick_used_", arg(s.vr_menu_stick_used_)}, {"vr_menu_stick_armed_", arg(s.vr_menu_stick_armed_)}, {"vr_y_fired_", arg(s.vr_y_fired_)}, {"vr_near_vehicle_", arg(s.vr_near_vehicle_)}, {"vr_y_held_", arg(s.vr_y_held_)}, {"vr_cam_request_", arg(s.vr_cam_request_)}, {"vr_scoped_", arg(s.vr_scoped_)}, {"vr_menu_c_", arg(s.vr_menu_c_)}, {"vr_menu_r_", arg(s.vr_menu_r_)}, {"vr_menu_u_", arg(s.vr_menu_u_)}, {"vr_menu_n_", arg(s.vr_menu_n_)}, {"vr_menu_w_", arg(s.vr_menu_w_)}, {"vr_menu_h_", arg(s.vr_menu_h_)}, {"vr_action_", arg(s.vr_action_)}, {"vr_scope_tex_", arg(s.vr_scope_tex_)}, {"vr_scope_mesh_", arg(s.vr_scope_mesh_)}, {"vr_hud_tex_", arg(s.vr_hud_tex_)}, {"vr_hud_mesh_", arg(s.vr_hud_mesh_)}, {"world_", arg(s.world_)}, {"city_", arg(s.city_)}, {"art_", arg(s.art_)}, {"soldier_", arg(s.soldier_)}, {"drone_actor_", arg(s.drone_actor_)}, {"jet_actor_", arg(s.jet_actor_)}, {"chute_actor_", arg(s.chute_actor_)}, {"drone_", arg(s.drone_)}, {"jet_", arg(s.jet_)}, {"cars_", arg(s.cars_)}, {"mode_", arg(s.mode_)}, {"car_index_", arg(s.car_index_)}, {"focus_prev_", arg(s.focus_prev_)}, {"focus_prev_valid_", arg(s.focus_prev_valid_)}, {"jet_flown_", arg(s.jet_flown_)}, {"jet_v_valid_", arg(s.jet_v_valid_)}, {"jet_v_ctrl_", arg(s.jet_v_ctrl_)}, {"drone_out_", arg(s.drone_out_)}, {"jet_placed_", arg(s.jet_placed_)}, {"world_placed_", arg(s.world_placed_)}, {"chute_open_", arg(s.chute_open_)}, {"chute_time_", arg(s.chute_time_)}, {"chute_steer_", arg(s.chute_steer_)}, {"sticks_", arg(s.sticks_)}, {"jet_in_", arg(s.jet_in_)}, {"landing_", arg(s.landing_)}, {"landing_still_", arg(s.landing_still_)}, {"height_held_", arg(s.height_held_)}, {"drone_cam_", arg(s.drone_cam_)}, {"car_cockpit_", arg(s.car_cockpit_)}, {"jet_cockpit_", arg(s.jet_cockpit_)}, {"fpv_tilt_deg_", arg(s.fpv_tilt_deg_)}, {"fpv_fov_deg_", arg(s.fpv_fov_deg_)}, {"spawn_", arg(s.spawn_)}, {"cam_", arg(s.cam_)}, {"cam_valid_", arg(s.cam_valid_)}, {"cam_anchor_", arg(s.cam_anchor_)}, {"cam_vel_", arg(s.cam_vel_)}, {"cam_heading_", arg(s.cam_heading_)}, {"rig_init_", arg(s.rig_init_)}, {"head_yaw_", arg(s.head_yaw_)}, {"head_pitch_", arg(s.head_pitch_)}, {"sensitivity_", arg(s.sensitivity_)}, {"dpr_", arg(s.dpr_)}, {"pad_touch_", arg(s.pad_touch_)}, {"ctl_", arg(s.ctl_)}, {"touch_mode_", arg(s.touch_mode_)}, {"frame_w_", arg(s.frame_w_)}, {"frame_h_", arg(s.frame_h_)}, {"play_in_", arg(s.play_in_)}, {"people_", arg(s.people_)}, {"people_art_", arg(s.people_art_)}, {"combat_art_", arg(s.combat_art_)}, {"destruction_", arg(s.destruction_)}, {"combat_", arg(s.combat_)}, {"guided_", arg(s.guided_)}, {"guided_last_", arg(s.guided_last_)}, {"guided_lock_", arg(s.guided_lock_)}, {"guided_mark_", arg(s.guided_mark_)}, {"guided_mark_at_", arg(s.guided_mark_at_)}, {"guided_mark_time_", arg(s.guided_mark_time_)}, {"guided_marked_", arg(s.guided_marked_)}, {"car_last_hp_", arg(s.car_last_hp_)}, {"car_burn_seen_", arg(s.car_burn_seen_)}, {"pd_crit_", arg(converted::array_list(s.pd_crit_))}, {"drone_crit_", arg(s.drone_crit_)}, {"ballot_", arg(s.ballot_)}, {"ballot_serial_", arg(s.ballot_serial_)}, {"bullet_pushes_", arg(s.bullet_pushes_)}, {"crit_blasts_", arg(s.crit_blasts_)}, {"sfx_cursor_", arg(converted::array_list(s.sfx_cursor_))}, {"combat_audio_ready_", arg(s.combat_audio_ready_)}, {"roads_", arg(s.roads_)}, {"units_", arg(s.units_)}, {"pdrones_", arg(converted::array_list(s.pdrones_))}, {"last_known_", arg(s.last_known_)}, {"last_contact_", arg(s.last_contact_)}, {"next_drone_wave_", arg(s.next_drone_wave_)}, {"emp_ready_at_", arg(s.emp_ready_at_)}, {"last_drone_shot_", arg(s.last_drone_shot_)}, {"last_player_hit_", arg(s.last_player_hit_)}, {"drone_serial_", arg(s.drone_serial_)}, {"drone_wave_live_", arg(s.drone_wave_live_)}, {"projectiles_", arg(s.projectiles_)}, {"foot_weapon_", arg(s.foot_weapon_)}, {"ammo_mag_", arg(converted::array_list(s.ammo_mag_))}, {"ammo_reserve_", arg(converted::array_list(s.ammo_reserve_))}, {"grenades_", arg(s.grenades_)}, {"drone_weapon_", arg(s.drone_weapon_)}, {"jet_rocket_side_", arg(s.jet_rocket_side_)}, {"jacked_at_", arg(s.jacked_at_)}, {"jet_cam_off_", arg(s.jet_cam_off_)}, {"next_attack_", arg(s.next_attack_)}, {"next_grenade_", arg(s.next_grenade_)}, {"next_drone_fire_", arg(s.next_drone_fire_)}, {"next_jet_gun_", arg(s.next_jet_gun_)}, {"next_jet_missile_", arg(s.next_jet_missile_)}, {"next_jet_bomb_", arg(s.next_jet_bomb_)}, {"trigger_was_", arg(s.trigger_was_)}, {"explosions_", arg(s.explosions_)}, {"net_", arg(s.net_)}, {"remote_car_", arg(s.remote_car_)}, {"remote_bus_", arg(s.remote_bus_)}, {"rebased_", arg(s.rebased_)}, {"mp_", arg(s.mp_)}, {"lamps_", arg(s.lamps_)}, {"ground_changes_", arg(s.ground_changes_)}, {"night_", arg(s.night_)}, {"show_lamps_", arg(s.show_lamps_)}, {"star_since_", arg(s.star_since_)}, {"last_wave_", arg(s.last_wave_)}, {"last_cop_shot_", arg(s.last_cop_shot_)}, {"drone_hp_", arg(s.drone_hp_)}, {"jet_hp_", arg(s.jet_hp_)}, {"last_stars_", arg(s.last_stars_)}, {"player_dead_", arg(s.player_dead_)}, {"died_at_", arg(s.died_at_)}, {"died_feet_", arg(s.died_feet_)}, {"respawn_rule_", arg(s.respawn_rule_)}, {"reset_revive_", arg(s.reset_revive_)}, {"spawn_guard_", arg(s.spawn_guard_)}, {"spawn_guard_until_", arg(s.spawn_guard_until_)}, {"spawn_guard_ready_at_", arg(s.spawn_guard_ready_at_)}, {"hint_", arg(s.hint_)}, {"toast_", arg(s.toast_)}, {"toast_age_", arg(s.toast_age_)}, {"time_", arg(s.time_)}, {"fps_", arg(s.fps_)}, {"steps_", arg(converted::shaped<converted::Whole>(s.steps_))}, {"rng_", arg(s.rng_)}, {"spawn_checked_", arg(s.spawn_checked_)}, {"mixer_", arg(s.mixer_)}, {"bank_", arg(s.bank_)}, {"game_audio_", arg(s.game_audio_)}, {"fx_", arg(s.fx_)}, {"audio_out_", arg(s.audio_out_)}, {"web_audio_", arg(s.web_audio_)}, {"osfx_", arg(s.osfx_)}, {"shot_flesh_", arg(s.shot_flesh_)}, {"lon_", arg(s.lon_)}, {"lat_", arg(s.lat_)}, {"start_mode_", arg(s.start_mode_)}, {"mobile_", arg(s.mobile_)}, {"ui_", arg(s.ui_)}, {"look_", arg(s.look_)}, {"glife_", arg(s.glife_)}}; }
 struct State_Game { const Game* s; };
-[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return converted::rows_of(got, 240) && converted::at_place(same(w.s->pad, (*got.rows)[0]), ".pad") && converted::at_place(same(w.s->dsync_, (*got.rows)[1]), ".dsync_") && converted::at_place(same(w.s->toss_test_, (*got.rows)[2]), ".toss_test_") && converted::at_place(same(w.s->toss_, (*got.rows)[3]), ".toss_") && converted::at_place(same(w.s->projsync_, (*got.rows)[4]), ".projsync_") && converted::at_place(same(w.s->proj_serial_, (*got.rows)[5]), ".proj_serial_") && converted::at_place(same(w.s->townsync_, (*got.rows)[6]), ".townsync_") && converted::at_place(same(w.s->puppet_world_, (*got.rows)[7]), ".puppet_world_") && converted::at_place(same(w.s->world_send_clock_, (*got.rows)[8]), ".world_send_clock_") && converted::at_place(same(w.s->people_send_clock_, (*got.rows)[9]), ".people_send_clock_") && converted::at_place(same(w.s->world_send_real_, (*got.rows)[10]), ".world_send_real_") && converted::at_place(same(w.s->world_tick_, (*got.rows)[11]), ".world_tick_") && converted::at_place(same(w.s->world_sent_, (*got.rows)[12]), ".world_sent_") && converted::at_place(same(w.s->world_got_, (*got.rows)[13]), ".world_got_") && converted::at_place(same(w.s->world_heard_at_, (*got.rows)[14]), ".world_heard_at_") && converted::at_place(same(w.s->car_seen_, (*got.rows)[15]), ".car_seen_") && converted::at_place(same(w.s->people_acc_, (*got.rows)[16]), ".people_acc_") && converted::at_place(same(w.s->car_net_, (*got.rows)[17]), ".car_net_") && converted::at_place(same(w.s->car_line_, (*got.rows)[18]), ".car_line_") && converted::at_place(same(w.s->car_rest_q_, (*got.rows)[19]), ".car_rest_q_") && converted::at_place(same(w.s->world_parts_, (*got.rows)[20]), ".world_parts_") && converted::at_place(same(w.s->cows_acc_, (*got.rows)[21]), ".cows_acc_") && converted::at_place(same(w.s->pets_acc_, (*got.rows)[22]), ".pets_acc_") && converted::at_place(same(w.s->flocks_acc_, (*got.rows)[23]), ".flocks_acc_") && converted::at_place(same(w.s->host_epoch_off_, (*got.rows)[24]), ".host_epoch_off_") && converted::at_place(same(w.s->host_epoch_ok_, (*got.rows)[25]), ".host_epoch_ok_") && converted::at_place(same(w.s->world_clock_, (*got.rows)[26]), ".world_clock_") && converted::at_place(same(w.s->world_clock_ok_, (*got.rows)[27]), ".world_clock_ok_") && converted::at_place(same(w.s->car_lent_, (*got.rows)[28]), ".car_lent_") && converted::at_place(same(w.s->car_lent_at_, (*got.rows)[29]), ".car_lent_at_") && converted::at_place(same(w.s->swarms_, (*got.rows)[30]), ".swarms_") && converted::at_place(same(w.s->swarm_clock_, (*got.rows)[31]), ".swarm_clock_") && converted::at_place(same(w.s->swarm_serial_, (*got.rows)[32]), ".swarm_serial_") && converted::at_place(same(w.s->swarm_sent_, (*got.rows)[33]), ".swarm_sent_") && converted::at_place(same(w.s->swarm_fallen_, (*got.rows)[34]), ".swarm_fallen_") && converted::at_place(same(w.s->swarm_cruiser_, (*got.rows)[35]), ".swarm_cruiser_") && converted::at_place(same(w.s->life_, (*got.rows)[36]), ".life_") && converted::at_place(same(w.s->laser_finger_, (*got.rows)[37]), ".laser_finger_") && converted::at_place(same(w.s->laser_pinned_, (*got.rows)[38]), ".laser_pinned_") && converted::at_place(same(w.s->laser_valid_, (*got.rows)[39]), ".laser_valid_") && converted::at_place(same(w.s->laser_fx_, (*got.rows)[40]), ".laser_fx_") && converted::at_place(same(w.s->laser_fy_, (*got.rows)[41]), ".laser_fy_") && converted::at_place(same(w.s->laser_pin_, (*got.rows)[42]), ".laser_pin_") && converted::at_place(same(w.s->laser_dot_, (*got.rows)[43]), ".laser_dot_") && converted::at_place(same(w.s->visual_blasts_, (*got.rows)[44]), ".visual_blasts_") && converted::at_place(same(converted::array_list(w.s->bounce_fx_), (*got.rows)[45]), ".bounce_fx_") && converted::at_place(same(w.s->bounce_fx_next_, (*got.rows)[46]), ".bounce_fx_next_") && converted::at_place(same(w.s->gaps_, (*got.rows)[47]), ".gaps_") && converted::at_place(same(w.s->engine_, (*got.rows)[48]), ".engine_") && converted::at_place(same(w.s->vr_, (*got.rows)[49]), ".vr_") && converted::at_place(same(converted::array_list(w.s->vr_hands_), (*got.rows)[50]), ".vr_hands_") && converted::at_place(same(w.s->vr_snap_armed_, (*got.rows)[51]), ".vr_snap_armed_") && converted::at_place(same(w.s->vr_arms_, (*got.rows)[52]), ".vr_arms_") && converted::at_place(same(w.s->vr_both_clicks_, (*got.rows)[53]), ".vr_both_clicks_") && converted::at_place(same(w.s->vr_wpn_armed_, (*got.rows)[54]), ".vr_wpn_armed_") && converted::at_place(same(w.s->vr_fire_was_, (*got.rows)[55]), ".vr_fire_was_") && converted::at_place(same(converted::array_list(w.s->vr_pulse_), (*got.rows)[56]), ".vr_pulse_") && converted::at_place(same(w.s->vr_tunnel_mesh_, (*got.rows)[57]), ".vr_tunnel_mesh_") && converted::at_place(same(w.s->vr_tunnel_tex_, (*got.rows)[58]), ".vr_tunnel_tex_") && converted::at_place(same(w.s->vr_tunnel_, (*got.rows)[59]), ".vr_tunnel_") && converted::at_place(same(w.s->vr_prev_f_, (*got.rows)[60]), ".vr_prev_f_") && converted::at_place(same(w.s->vr_prev_up_, (*got.rows)[61]), ".vr_prev_up_") && converted::at_place(same(w.s->vr_prev_eye_, (*got.rows)[62]), ".vr_prev_eye_") && converted::at_place(same(w.s->vr_prev_v_, (*got.rows)[63]), ".vr_prev_v_") && converted::at_place(same(w.s->vr_prev_ok_, (*got.rows)[64]), ".vr_prev_ok_") && converted::at_place(same(w.s->vr_menu_open_, (*got.rows)[65]), ".vr_menu_open_") && converted::at_place(same(w.s->vr_menu_trigger_, (*got.rows)[66]), ".vr_menu_trigger_") && converted::at_place(same(w.s->vr_menu_valid_, (*got.rows)[67]), ".vr_menu_valid_") && converted::at_place(same(w.s->vr_menu_hover_, (*got.rows)[68]), ".vr_menu_hover_") && converted::at_place(same(w.s->vr_menu_hover_was_, (*got.rows)[69]), ".vr_menu_hover_was_") && converted::at_place(same(w.s->vr_menu_page_, (*got.rows)[70]), ".vr_menu_page_") && converted::at_place(same(w.s->vr_menu_sel_, (*got.rows)[71]), ".vr_menu_sel_") && converted::at_place(same(w.s->vr_menu_stick_used_, (*got.rows)[72]), ".vr_menu_stick_used_") && converted::at_place(same(w.s->vr_menu_stick_armed_, (*got.rows)[73]), ".vr_menu_stick_armed_") && converted::at_place(same(w.s->vr_y_fired_, (*got.rows)[74]), ".vr_y_fired_") && converted::at_place(same(w.s->vr_near_vehicle_, (*got.rows)[75]), ".vr_near_vehicle_") && converted::at_place(same(w.s->vr_y_held_, (*got.rows)[76]), ".vr_y_held_") && converted::at_place(same(w.s->vr_cam_request_, (*got.rows)[77]), ".vr_cam_request_") && converted::at_place(same(w.s->vr_scoped_, (*got.rows)[78]), ".vr_scoped_") && converted::at_place(same(w.s->vr_menu_c_, (*got.rows)[79]), ".vr_menu_c_") && converted::at_place(same(w.s->vr_menu_r_, (*got.rows)[80]), ".vr_menu_r_") && converted::at_place(same(w.s->vr_menu_u_, (*got.rows)[81]), ".vr_menu_u_") && converted::at_place(same(w.s->vr_menu_n_, (*got.rows)[82]), ".vr_menu_n_") && converted::at_place(same(w.s->vr_menu_w_, (*got.rows)[83]), ".vr_menu_w_") && converted::at_place(same(w.s->vr_menu_h_, (*got.rows)[84]), ".vr_menu_h_") && converted::at_place(same(w.s->vr_action_, (*got.rows)[85]), ".vr_action_") && converted::at_place(same(w.s->vr_scope_tex_, (*got.rows)[86]), ".vr_scope_tex_") && converted::at_place(same(w.s->vr_scope_mesh_, (*got.rows)[87]), ".vr_scope_mesh_") && converted::at_place(same(w.s->vr_hud_tex_, (*got.rows)[88]), ".vr_hud_tex_") && converted::at_place(same(w.s->vr_hud_mesh_, (*got.rows)[89]), ".vr_hud_mesh_") && converted::at_place(same(w.s->windows_, (*got.rows)[90]), ".windows_") && converted::at_place(same(w.s->water_look_, (*got.rows)[91]), ".water_look_") && converted::at_place(same(w.s->world_, (*got.rows)[92]), ".world_") && converted::at_place(same(w.s->city_, (*got.rows)[93]), ".city_") && converted::at_place(same(w.s->art_, (*got.rows)[94]), ".art_") && converted::at_place(same(w.s->soldier_, (*got.rows)[95]), ".soldier_") && converted::at_place(same(w.s->drone_actor_, (*got.rows)[96]), ".drone_actor_") && converted::at_place(same(w.s->jet_actor_, (*got.rows)[97]), ".jet_actor_") && converted::at_place(same(w.s->chute_actor_, (*got.rows)[98]), ".chute_actor_") && converted::at_place(same(w.s->drone_, (*got.rows)[99]), ".drone_") && converted::at_place(same(w.s->jet_, (*got.rows)[100]), ".jet_") && converted::at_place(same(w.s->cars_, (*got.rows)[101]), ".cars_") && converted::at_place(same(w.s->mode_, (*got.rows)[102]), ".mode_") && converted::at_place(same(w.s->car_index_, (*got.rows)[103]), ".car_index_") && converted::at_place(same(w.s->focus_prev_, (*got.rows)[104]), ".focus_prev_") && converted::at_place(same(w.s->focus_prev_valid_, (*got.rows)[105]), ".focus_prev_valid_") && converted::at_place(same(w.s->jet_flown_, (*got.rows)[106]), ".jet_flown_") && converted::at_place(same(w.s->jet_v_valid_, (*got.rows)[107]), ".jet_v_valid_") && converted::at_place(same(w.s->jet_v_ctrl_, (*got.rows)[108]), ".jet_v_ctrl_") && converted::at_place(same(w.s->drone_out_, (*got.rows)[109]), ".drone_out_") && converted::at_place(same(w.s->jet_placed_, (*got.rows)[110]), ".jet_placed_") && converted::at_place(same(w.s->world_placed_, (*got.rows)[111]), ".world_placed_") && converted::at_place(same(w.s->chute_open_, (*got.rows)[112]), ".chute_open_") && converted::at_place(same(w.s->chute_time_, (*got.rows)[113]), ".chute_time_") && converted::at_place(same(w.s->chute_steer_, (*got.rows)[114]), ".chute_steer_") && converted::at_place(same(w.s->sticks_, (*got.rows)[115]), ".sticks_") && converted::at_place(same(w.s->jet_in_, (*got.rows)[116]), ".jet_in_") && converted::at_place(same(w.s->landing_, (*got.rows)[117]), ".landing_") && converted::at_place(same(w.s->landing_still_, (*got.rows)[118]), ".landing_still_") && converted::at_place(same(w.s->height_held_, (*got.rows)[119]), ".height_held_") && converted::at_place(same(w.s->drone_cam_, (*got.rows)[120]), ".drone_cam_") && converted::at_place(same(w.s->car_cockpit_, (*got.rows)[121]), ".car_cockpit_") && converted::at_place(same(w.s->jet_cockpit_, (*got.rows)[122]), ".jet_cockpit_") && converted::at_place(same(w.s->fpv_tilt_deg_, (*got.rows)[123]), ".fpv_tilt_deg_") && converted::at_place(same(w.s->fpv_fov_deg_, (*got.rows)[124]), ".fpv_fov_deg_") && converted::at_place(same(w.s->spawn_, (*got.rows)[125]), ".spawn_") && converted::at_place(same(w.s->cam_, (*got.rows)[126]), ".cam_") && converted::at_place(same(w.s->cam_valid_, (*got.rows)[127]), ".cam_valid_") && converted::at_place(same(w.s->cam_anchor_, (*got.rows)[128]), ".cam_anchor_") && converted::at_place(same(w.s->cam_vel_, (*got.rows)[129]), ".cam_vel_") && converted::at_place(same(w.s->cam_heading_, (*got.rows)[130]), ".cam_heading_") && converted::at_place(same(w.s->rig_init_, (*got.rows)[131]), ".rig_init_") && converted::at_place(same(w.s->head_yaw_, (*got.rows)[132]), ".head_yaw_") && converted::at_place(same(w.s->head_pitch_, (*got.rows)[133]), ".head_pitch_") && converted::at_place(same(w.s->sensitivity_, (*got.rows)[134]), ".sensitivity_") && converted::at_place(same(w.s->dpr_, (*got.rows)[135]), ".dpr_") && converted::at_place(same(w.s->soldier_controller_, (*got.rows)[136]), ".soldier_controller_") && converted::at_place(same(w.s->pad_touch_, (*got.rows)[137]), ".pad_touch_") && converted::at_place(same(w.s->ctl_, (*got.rows)[138]), ".ctl_") && converted::at_place(same(w.s->touch_mode_, (*got.rows)[139]), ".touch_mode_") && converted::at_place(same(w.s->frame_w_, (*got.rows)[140]), ".frame_w_") && converted::at_place(same(w.s->frame_h_, (*got.rows)[141]), ".frame_h_") && converted::at_place(same(w.s->play_in_, (*got.rows)[142]), ".play_in_") && converted::at_place(same(w.s->people_, (*got.rows)[143]), ".people_") && converted::at_place(same(w.s->people_art_, (*got.rows)[144]), ".people_art_") && converted::at_place(same(w.s->combat_art_, (*got.rows)[145]), ".combat_art_") && converted::at_place(same(w.s->destruction_, (*got.rows)[146]), ".destruction_") && converted::at_place(same(w.s->combat_, (*got.rows)[147]), ".combat_") && converted::at_place(same(w.s->guided_, (*got.rows)[148]), ".guided_") && converted::at_place(same(w.s->guided_last_, (*got.rows)[149]), ".guided_last_") && converted::at_place(same(w.s->guided_lock_, (*got.rows)[150]), ".guided_lock_") && converted::at_place(same(w.s->guided_mark_, (*got.rows)[151]), ".guided_mark_") && converted::at_place(same(w.s->guided_mark_at_, (*got.rows)[152]), ".guided_mark_at_") && converted::at_place(same(w.s->guided_mark_time_, (*got.rows)[153]), ".guided_mark_time_") && converted::at_place(same(w.s->guided_marked_, (*got.rows)[154]), ".guided_marked_") && converted::at_place(same(w.s->car_last_hp_, (*got.rows)[155]), ".car_last_hp_") && converted::at_place(same(w.s->car_burn_seen_, (*got.rows)[156]), ".car_burn_seen_") && converted::at_place(same(converted::array_list(w.s->pd_crit_), (*got.rows)[157]), ".pd_crit_") && converted::at_place(same(w.s->drone_crit_, (*got.rows)[158]), ".drone_crit_") && converted::at_place(same(w.s->ballot_, (*got.rows)[159]), ".ballot_") && converted::at_place(same(w.s->ballot_serial_, (*got.rows)[160]), ".ballot_serial_") && converted::at_place(same(w.s->bullet_pushes_, (*got.rows)[161]), ".bullet_pushes_") && converted::at_place(same(w.s->crit_blasts_, (*got.rows)[162]), ".crit_blasts_") && converted::at_place(same(converted::array_list(w.s->sfx_cursor_), (*got.rows)[163]), ".sfx_cursor_") && converted::at_place(same(w.s->combat_audio_ready_, (*got.rows)[164]), ".combat_audio_ready_") && converted::at_place(same(w.s->roads_, (*got.rows)[165]), ".roads_") && converted::at_place(same(w.s->units_, (*got.rows)[166]), ".units_") && converted::at_place(same(converted::array_list(w.s->pdrones_), (*got.rows)[167]), ".pdrones_") && converted::at_place(same(w.s->last_known_, (*got.rows)[168]), ".last_known_") && converted::at_place(same(w.s->last_contact_, (*got.rows)[169]), ".last_contact_") && converted::at_place(same(w.s->next_drone_wave_, (*got.rows)[170]), ".next_drone_wave_") && converted::at_place(same(w.s->emp_ready_at_, (*got.rows)[171]), ".emp_ready_at_") && converted::at_place(same(w.s->last_drone_shot_, (*got.rows)[172]), ".last_drone_shot_") && converted::at_place(same(w.s->last_player_hit_, (*got.rows)[173]), ".last_player_hit_") && converted::at_place(same(w.s->drone_serial_, (*got.rows)[174]), ".drone_serial_") && converted::at_place(same(w.s->drone_wave_live_, (*got.rows)[175]), ".drone_wave_live_") && converted::at_place(same(w.s->projectiles_, (*got.rows)[176]), ".projectiles_") && converted::at_place(same(w.s->foot_weapon_, (*got.rows)[177]), ".foot_weapon_") && converted::at_place(same(converted::array_list(w.s->ammo_mag_), (*got.rows)[178]), ".ammo_mag_") && converted::at_place(same(converted::array_list(w.s->ammo_reserve_), (*got.rows)[179]), ".ammo_reserve_") && converted::at_place(same(w.s->grenades_, (*got.rows)[180]), ".grenades_") && converted::at_place(same(w.s->drone_weapon_, (*got.rows)[181]), ".drone_weapon_") && converted::at_place(same(w.s->jet_rocket_side_, (*got.rows)[182]), ".jet_rocket_side_") && converted::at_place(same(w.s->jacked_at_, (*got.rows)[183]), ".jacked_at_") && converted::at_place(same(w.s->jet_cam_off_, (*got.rows)[184]), ".jet_cam_off_") && converted::at_place(same(w.s->next_attack_, (*got.rows)[185]), ".next_attack_") && converted::at_place(same(w.s->next_grenade_, (*got.rows)[186]), ".next_grenade_") && converted::at_place(same(w.s->next_drone_fire_, (*got.rows)[187]), ".next_drone_fire_") && converted::at_place(same(w.s->next_jet_gun_, (*got.rows)[188]), ".next_jet_gun_") && converted::at_place(same(w.s->next_jet_missile_, (*got.rows)[189]), ".next_jet_missile_") && converted::at_place(same(w.s->next_jet_bomb_, (*got.rows)[190]), ".next_jet_bomb_") && converted::at_place(same(w.s->trigger_was_, (*got.rows)[191]), ".trigger_was_") && converted::at_place(same(w.s->explosions_, (*got.rows)[192]), ".explosions_") && converted::at_place(same(w.s->net_, (*got.rows)[193]), ".net_") && converted::at_place(same(w.s->remote_car_, (*got.rows)[194]), ".remote_car_") && converted::at_place(same(w.s->remote_bus_, (*got.rows)[195]), ".remote_bus_") && converted::at_place(same(w.s->rebased_, (*got.rows)[196]), ".rebased_") && converted::at_place(same(w.s->mp_, (*got.rows)[197]), ".mp_") && converted::at_place(same(w.s->lamps_, (*got.rows)[198]), ".lamps_") && converted::at_place(same(w.s->substeps_, (*got.rows)[199]), ".substeps_") && converted::at_place(same(w.s->ground_changes_, (*got.rows)[200]), ".ground_changes_") && converted::at_place(same(w.s->night_, (*got.rows)[201]), ".night_") && converted::at_place(same(w.s->show_lamps_, (*got.rows)[202]), ".show_lamps_") && converted::at_place(same(w.s->star_since_, (*got.rows)[203]), ".star_since_") && converted::at_place(same(w.s->last_wave_, (*got.rows)[204]), ".last_wave_") && converted::at_place(same(w.s->last_cop_shot_, (*got.rows)[205]), ".last_cop_shot_") && converted::at_place(same(w.s->drone_hp_, (*got.rows)[206]), ".drone_hp_") && converted::at_place(same(w.s->jet_hp_, (*got.rows)[207]), ".jet_hp_") && converted::at_place(same(w.s->last_stars_, (*got.rows)[208]), ".last_stars_") && converted::at_place(same(w.s->player_dead_, (*got.rows)[209]), ".player_dead_") && converted::at_place(same(w.s->died_at_, (*got.rows)[210]), ".died_at_") && converted::at_place(same(w.s->died_feet_, (*got.rows)[211]), ".died_feet_") && converted::at_place(same(w.s->respawn_rule_, (*got.rows)[212]), ".respawn_rule_") && converted::at_place(same(w.s->reset_revive_, (*got.rows)[213]), ".reset_revive_") && converted::at_place(same(w.s->spawn_guard_, (*got.rows)[214]), ".spawn_guard_") && converted::at_place(same(w.s->spawn_guard_until_, (*got.rows)[215]), ".spawn_guard_until_") && converted::at_place(same(w.s->spawn_guard_ready_at_, (*got.rows)[216]), ".spawn_guard_ready_at_") && converted::at_place(same(w.s->hint_, (*got.rows)[217]), ".hint_") && converted::at_place(same(w.s->toast_, (*got.rows)[218]), ".toast_") && converted::at_place(same(w.s->toast_age_, (*got.rows)[219]), ".toast_age_") && converted::at_place(same(w.s->time_, (*got.rows)[220]), ".time_") && converted::at_place(same(w.s->fps_, (*got.rows)[221]), ".fps_") && converted::at_place(same(converted::shaped<converted::Whole>(w.s->steps_), (*got.rows)[222]), ".steps_") && converted::at_place(same(w.s->rng_, (*got.rows)[223]), ".rng_") && converted::at_place(same(w.s->spawn_checked_, (*got.rows)[224]), ".spawn_checked_") && converted::at_place(same(w.s->mixer_, (*got.rows)[225]), ".mixer_") && converted::at_place(same(w.s->bank_, (*got.rows)[226]), ".bank_") && converted::at_place(same(w.s->game_audio_, (*got.rows)[227]), ".game_audio_") && converted::at_place(same(w.s->fx_, (*got.rows)[228]), ".fx_") && converted::at_place(same(w.s->audio_out_, (*got.rows)[229]), ".audio_out_") && converted::at_place(same(w.s->web_audio_, (*got.rows)[230]), ".web_audio_") && converted::at_place(same(w.s->osfx_, (*got.rows)[231]), ".osfx_") && converted::at_place(same(w.s->shot_flesh_, (*got.rows)[232]), ".shot_flesh_") && converted::at_place(same(w.s->lon_, (*got.rows)[233]), ".lon_") && converted::at_place(same(w.s->lat_, (*got.rows)[234]), ".lat_") && converted::at_place(same(w.s->start_mode_, (*got.rows)[235]), ".start_mode_") && converted::at_place(same(w.s->mobile_, (*got.rows)[236]), ".mobile_") && converted::at_place(same(w.s->ui_, (*got.rows)[237]), ".ui_") && converted::at_place(same(w.s->look_, (*got.rows)[238]), ".look_") && converted::at_place(same(w.s->glife_, (*got.rows)[239]), ".glife_"); }
-[[maybe_unused]] static bool defined(const State_Game& w) { return defined(w.s->pad) && defined(w.s->dsync_) && defined(w.s->toss_test_) && defined(w.s->toss_) && defined(w.s->projsync_) && defined(w.s->proj_serial_) && defined(w.s->townsync_) && defined(w.s->puppet_world_) && defined(w.s->world_send_clock_) && defined(w.s->people_send_clock_) && defined(w.s->world_send_real_) && defined(w.s->world_tick_) && defined(w.s->world_sent_) && defined(w.s->world_got_) && defined(w.s->world_heard_at_) && defined(w.s->car_seen_) && defined(w.s->people_acc_) && defined(w.s->car_net_) && defined(w.s->car_line_) && defined(w.s->car_rest_q_) && defined(w.s->world_parts_) && defined(w.s->cows_acc_) && defined(w.s->pets_acc_) && defined(w.s->flocks_acc_) && defined(w.s->host_epoch_off_) && defined(w.s->host_epoch_ok_) && defined(w.s->world_clock_) && defined(w.s->world_clock_ok_) && defined(w.s->car_lent_) && defined(w.s->car_lent_at_) && defined(w.s->swarms_) && defined(w.s->swarm_clock_) && defined(w.s->swarm_serial_) && defined(w.s->swarm_sent_) && defined(w.s->swarm_fallen_) && defined(w.s->swarm_cruiser_) && defined(w.s->life_) && defined(w.s->laser_finger_) && defined(w.s->laser_pinned_) && defined(w.s->laser_valid_) && defined(w.s->laser_fx_) && defined(w.s->laser_fy_) && defined(w.s->laser_pin_) && defined(w.s->laser_dot_) && defined(w.s->visual_blasts_) && defined(converted::array_list(w.s->bounce_fx_)) && defined(w.s->bounce_fx_next_) && defined(w.s->gaps_) && defined(w.s->engine_) && defined(w.s->vr_) && defined(converted::array_list(w.s->vr_hands_)) && defined(w.s->vr_snap_armed_) && defined(w.s->vr_arms_) && defined(w.s->vr_both_clicks_) && defined(w.s->vr_wpn_armed_) && defined(w.s->vr_fire_was_) && defined(converted::array_list(w.s->vr_pulse_)) && defined(w.s->vr_tunnel_mesh_) && defined(w.s->vr_tunnel_tex_) && defined(w.s->vr_tunnel_) && defined(w.s->vr_prev_f_) && defined(w.s->vr_prev_up_) && defined(w.s->vr_prev_eye_) && defined(w.s->vr_prev_v_) && defined(w.s->vr_prev_ok_) && defined(w.s->vr_menu_open_) && defined(w.s->vr_menu_trigger_) && defined(w.s->vr_menu_valid_) && defined(w.s->vr_menu_hover_) && defined(w.s->vr_menu_hover_was_) && defined(w.s->vr_menu_page_) && defined(w.s->vr_menu_sel_) && defined(w.s->vr_menu_stick_used_) && defined(w.s->vr_menu_stick_armed_) && defined(w.s->vr_y_fired_) && defined(w.s->vr_near_vehicle_) && defined(w.s->vr_y_held_) && defined(w.s->vr_cam_request_) && defined(w.s->vr_scoped_) && defined(w.s->vr_menu_c_) && defined(w.s->vr_menu_r_) && defined(w.s->vr_menu_u_) && defined(w.s->vr_menu_n_) && defined(w.s->vr_menu_w_) && defined(w.s->vr_menu_h_) && defined(w.s->vr_action_) && defined(w.s->vr_scope_tex_) && defined(w.s->vr_scope_mesh_) && defined(w.s->vr_hud_tex_) && defined(w.s->vr_hud_mesh_) && defined(w.s->windows_) && defined(w.s->water_look_) && defined(w.s->world_) && defined(w.s->city_) && defined(w.s->art_) && defined(w.s->soldier_) && defined(w.s->drone_actor_) && defined(w.s->jet_actor_) && defined(w.s->chute_actor_) && defined(w.s->drone_) && defined(w.s->jet_) && defined(w.s->cars_) && defined(w.s->mode_) && defined(w.s->car_index_) && defined(w.s->focus_prev_) && defined(w.s->focus_prev_valid_) && defined(w.s->jet_flown_) && defined(w.s->jet_v_valid_) && defined(w.s->jet_v_ctrl_) && defined(w.s->drone_out_) && defined(w.s->jet_placed_) && defined(w.s->world_placed_) && defined(w.s->chute_open_) && defined(w.s->chute_time_) && defined(w.s->chute_steer_) && defined(w.s->sticks_) && defined(w.s->jet_in_) && defined(w.s->landing_) && defined(w.s->landing_still_) && defined(w.s->height_held_) && defined(w.s->drone_cam_) && defined(w.s->car_cockpit_) && defined(w.s->jet_cockpit_) && defined(w.s->fpv_tilt_deg_) && defined(w.s->fpv_fov_deg_) && defined(w.s->spawn_) && defined(w.s->cam_) && defined(w.s->cam_valid_) && defined(w.s->cam_anchor_) && defined(w.s->cam_vel_) && defined(w.s->cam_heading_) && defined(w.s->rig_init_) && defined(w.s->head_yaw_) && defined(w.s->head_pitch_) && defined(w.s->sensitivity_) && defined(w.s->dpr_) && defined(w.s->soldier_controller_) && defined(w.s->pad_touch_) && defined(w.s->ctl_) && defined(w.s->touch_mode_) && defined(w.s->frame_w_) && defined(w.s->frame_h_) && defined(w.s->play_in_) && defined(w.s->people_) && defined(w.s->people_art_) && defined(w.s->combat_art_) && defined(w.s->destruction_) && defined(w.s->combat_) && defined(w.s->guided_) && defined(w.s->guided_last_) && defined(w.s->guided_lock_) && defined(w.s->guided_mark_) && defined(w.s->guided_mark_at_) && defined(w.s->guided_mark_time_) && defined(w.s->guided_marked_) && defined(w.s->car_last_hp_) && defined(w.s->car_burn_seen_) && defined(converted::array_list(w.s->pd_crit_)) && defined(w.s->drone_crit_) && defined(w.s->ballot_) && defined(w.s->ballot_serial_) && defined(w.s->bullet_pushes_) && defined(w.s->crit_blasts_) && defined(converted::array_list(w.s->sfx_cursor_)) && defined(w.s->combat_audio_ready_) && defined(w.s->roads_) && defined(w.s->units_) && defined(converted::array_list(w.s->pdrones_)) && defined(w.s->last_known_) && defined(w.s->last_contact_) && defined(w.s->next_drone_wave_) && defined(w.s->emp_ready_at_) && defined(w.s->last_drone_shot_) && defined(w.s->last_player_hit_) && defined(w.s->drone_serial_) && defined(w.s->drone_wave_live_) && defined(w.s->projectiles_) && defined(w.s->foot_weapon_) && defined(converted::array_list(w.s->ammo_mag_)) && defined(converted::array_list(w.s->ammo_reserve_)) && defined(w.s->grenades_) && defined(w.s->drone_weapon_) && defined(w.s->jet_rocket_side_) && defined(w.s->jacked_at_) && defined(w.s->jet_cam_off_) && defined(w.s->next_attack_) && defined(w.s->next_grenade_) && defined(w.s->next_drone_fire_) && defined(w.s->next_jet_gun_) && defined(w.s->next_jet_missile_) && defined(w.s->next_jet_bomb_) && defined(w.s->trigger_was_) && defined(w.s->explosions_) && defined(w.s->net_) && defined(w.s->remote_car_) && defined(w.s->remote_bus_) && defined(w.s->rebased_) && defined(w.s->mp_) && defined(w.s->lamps_) && defined(w.s->substeps_) && defined(w.s->ground_changes_) && defined(w.s->night_) && defined(w.s->show_lamps_) && defined(w.s->star_since_) && defined(w.s->last_wave_) && defined(w.s->last_cop_shot_) && defined(w.s->drone_hp_) && defined(w.s->jet_hp_) && defined(w.s->last_stars_) && defined(w.s->player_dead_) && defined(w.s->died_at_) && defined(w.s->died_feet_) && defined(w.s->respawn_rule_) && defined(w.s->reset_revive_) && defined(w.s->spawn_guard_) && defined(w.s->spawn_guard_until_) && defined(w.s->spawn_guard_ready_at_) && defined(w.s->hint_) && defined(w.s->toast_) && defined(w.s->toast_age_) && defined(w.s->time_) && defined(w.s->fps_) && defined(converted::shaped<converted::Whole>(w.s->steps_)) && defined(w.s->rng_) && defined(w.s->spawn_checked_) && defined(w.s->mixer_) && defined(w.s->bank_) && defined(w.s->game_audio_) && defined(w.s->fx_) && defined(w.s->audio_out_) && defined(w.s->web_audio_) && defined(w.s->osfx_) && defined(w.s->shot_flesh_) && defined(w.s->lon_) && defined(w.s->lat_) && defined(w.s->start_mode_) && defined(w.s->mobile_) && defined(w.s->ui_) && defined(w.s->look_) && defined(w.s->glife_); }
-[[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "pad = " + text(w.s->pad) + ", " + "dsync_ = " + text(w.s->dsync_) + ", " + "toss_test_ = " + text(w.s->toss_test_) + ", " + "toss_ = " + text(w.s->toss_) + ", " + "projsync_ = " + text(w.s->projsync_) + ", " + "proj_serial_ = " + text(w.s->proj_serial_) + ", " + "townsync_ = " + text(w.s->townsync_) + ", " + "puppet_world_ = " + text(w.s->puppet_world_) + ", " + "world_send_clock_ = " + text(w.s->world_send_clock_) + ", " + "people_send_clock_ = " + text(w.s->people_send_clock_) + ", " + "world_send_real_ = " + text(w.s->world_send_real_) + ", " + "world_tick_ = " + text(w.s->world_tick_) + ", " + "world_sent_ = " + text(w.s->world_sent_) + ", " + "world_got_ = " + text(w.s->world_got_) + ", " + "world_heard_at_ = " + text(w.s->world_heard_at_) + ", " + "car_seen_ = " + text(w.s->car_seen_) + ", " + "people_acc_ = " + text(w.s->people_acc_) + ", " + "car_net_ = " + text(w.s->car_net_) + ", " + "car_line_ = " + text(w.s->car_line_) + ", " + "car_rest_q_ = " + text(w.s->car_rest_q_) + ", " + "world_parts_ = " + text(w.s->world_parts_) + ", " + "cows_acc_ = " + text(w.s->cows_acc_) + ", " + "pets_acc_ = " + text(w.s->pets_acc_) + ", " + "flocks_acc_ = " + text(w.s->flocks_acc_) + ", " + "host_epoch_off_ = " + text(w.s->host_epoch_off_) + ", " + "host_epoch_ok_ = " + text(w.s->host_epoch_ok_) + ", " + "world_clock_ = " + text(w.s->world_clock_) + ", " + "world_clock_ok_ = " + text(w.s->world_clock_ok_) + ", " + "car_lent_ = " + text(w.s->car_lent_) + ", " + "car_lent_at_ = " + text(w.s->car_lent_at_) + ", " + "swarms_ = " + text(w.s->swarms_) + ", " + "swarm_clock_ = " + text(w.s->swarm_clock_) + ", " + "swarm_serial_ = " + text(w.s->swarm_serial_) + ", " + "swarm_sent_ = " + text(w.s->swarm_sent_) + ", " + "swarm_fallen_ = " + text(w.s->swarm_fallen_) + ", " + "swarm_cruiser_ = " + text(w.s->swarm_cruiser_) + ", " + "life_ = " + text(w.s->life_) + ", " + "laser_finger_ = " + text(w.s->laser_finger_) + ", " + "laser_pinned_ = " + text(w.s->laser_pinned_) + ", " + "laser_valid_ = " + text(w.s->laser_valid_) + ", " + "laser_fx_ = " + text(w.s->laser_fx_) + ", " + "laser_fy_ = " + text(w.s->laser_fy_) + ", " + "laser_pin_ = " + text(w.s->laser_pin_) + ", " + "laser_dot_ = " + text(w.s->laser_dot_) + ", " + "visual_blasts_ = " + text(w.s->visual_blasts_) + ", " + "bounce_fx_ = " + text(converted::array_list(w.s->bounce_fx_)) + ", " + "bounce_fx_next_ = " + text(w.s->bounce_fx_next_) + ", " + "gaps_ = " + text(w.s->gaps_) + ", " + "engine_ = " + text(w.s->engine_) + ", " + "vr_ = " + text(w.s->vr_) + ", " + "vr_hands_ = " + text(converted::array_list(w.s->vr_hands_)) + ", " + "vr_snap_armed_ = " + text(w.s->vr_snap_armed_) + ", " + "vr_arms_ = " + text(w.s->vr_arms_) + ", " + "vr_both_clicks_ = " + text(w.s->vr_both_clicks_) + ", " + "vr_wpn_armed_ = " + text(w.s->vr_wpn_armed_) + ", " + "vr_fire_was_ = " + text(w.s->vr_fire_was_) + ", " + "vr_pulse_ = " + text(converted::array_list(w.s->vr_pulse_)) + ", " + "vr_tunnel_mesh_ = " + text(w.s->vr_tunnel_mesh_) + ", " + "vr_tunnel_tex_ = " + text(w.s->vr_tunnel_tex_) + ", " + "vr_tunnel_ = " + text(w.s->vr_tunnel_) + ", " + "vr_prev_f_ = " + text(w.s->vr_prev_f_) + ", " + "vr_prev_up_ = " + text(w.s->vr_prev_up_) + ", " + "vr_prev_eye_ = " + text(w.s->vr_prev_eye_) + ", " + "vr_prev_v_ = " + text(w.s->vr_prev_v_) + ", " + "vr_prev_ok_ = " + text(w.s->vr_prev_ok_) + ", " + "vr_menu_open_ = " + text(w.s->vr_menu_open_) + ", " + "vr_menu_trigger_ = " + text(w.s->vr_menu_trigger_) + ", " + "vr_menu_valid_ = " + text(w.s->vr_menu_valid_) + ", " + "vr_menu_hover_ = " + text(w.s->vr_menu_hover_) + ", " + "vr_menu_hover_was_ = " + text(w.s->vr_menu_hover_was_) + ", " + "vr_menu_page_ = " + text(w.s->vr_menu_page_) + ", " + "vr_menu_sel_ = " + text(w.s->vr_menu_sel_) + ", " + "vr_menu_stick_used_ = " + text(w.s->vr_menu_stick_used_) + ", " + "vr_menu_stick_armed_ = " + text(w.s->vr_menu_stick_armed_) + ", " + "vr_y_fired_ = " + text(w.s->vr_y_fired_) + ", " + "vr_near_vehicle_ = " + text(w.s->vr_near_vehicle_) + ", " + "vr_y_held_ = " + text(w.s->vr_y_held_) + ", " + "vr_cam_request_ = " + text(w.s->vr_cam_request_) + ", " + "vr_scoped_ = " + text(w.s->vr_scoped_) + ", " + "vr_menu_c_ = " + text(w.s->vr_menu_c_) + ", " + "vr_menu_r_ = " + text(w.s->vr_menu_r_) + ", " + "vr_menu_u_ = " + text(w.s->vr_menu_u_) + ", " + "vr_menu_n_ = " + text(w.s->vr_menu_n_) + ", " + "vr_menu_w_ = " + text(w.s->vr_menu_w_) + ", " + "vr_menu_h_ = " + text(w.s->vr_menu_h_) + ", " + "vr_action_ = " + text(w.s->vr_action_) + ", " + "vr_scope_tex_ = " + text(w.s->vr_scope_tex_) + ", " + "vr_scope_mesh_ = " + text(w.s->vr_scope_mesh_) + ", " + "vr_hud_tex_ = " + text(w.s->vr_hud_tex_) + ", " + "vr_hud_mesh_ = " + text(w.s->vr_hud_mesh_) + ", " + "windows_ = " + text(w.s->windows_) + ", " + "water_look_ = " + text(w.s->water_look_) + ", " + "world_ = " + text(w.s->world_) + ", " + "city_ = " + text(w.s->city_) + ", " + "art_ = " + text(w.s->art_) + ", " + "soldier_ = " + text(w.s->soldier_) + ", " + "drone_actor_ = " + text(w.s->drone_actor_) + ", " + "jet_actor_ = " + text(w.s->jet_actor_) + ", " + "chute_actor_ = " + text(w.s->chute_actor_) + ", " + "drone_ = " + text(w.s->drone_) + ", " + "jet_ = " + text(w.s->jet_) + ", " + "cars_ = " + text(w.s->cars_) + ", " + "mode_ = " + text(w.s->mode_) + ", " + "car_index_ = " + text(w.s->car_index_) + ", " + "focus_prev_ = " + text(w.s->focus_prev_) + ", " + "focus_prev_valid_ = " + text(w.s->focus_prev_valid_) + ", " + "jet_flown_ = " + text(w.s->jet_flown_) + ", " + "jet_v_valid_ = " + text(w.s->jet_v_valid_) + ", " + "jet_v_ctrl_ = " + text(w.s->jet_v_ctrl_) + ", " + "drone_out_ = " + text(w.s->drone_out_) + ", " + "jet_placed_ = " + text(w.s->jet_placed_) + ", " + "world_placed_ = " + text(w.s->world_placed_) + ", " + "chute_open_ = " + text(w.s->chute_open_) + ", " + "chute_time_ = " + text(w.s->chute_time_) + ", " + "chute_steer_ = " + text(w.s->chute_steer_) + ", " + "sticks_ = " + text(w.s->sticks_) + ", " + "jet_in_ = " + text(w.s->jet_in_) + ", " + "landing_ = " + text(w.s->landing_) + ", " + "landing_still_ = " + text(w.s->landing_still_) + ", " + "height_held_ = " + text(w.s->height_held_) + ", " + "drone_cam_ = " + text(w.s->drone_cam_) + ", " + "car_cockpit_ = " + text(w.s->car_cockpit_) + ", " + "jet_cockpit_ = " + text(w.s->jet_cockpit_) + ", " + "fpv_tilt_deg_ = " + text(w.s->fpv_tilt_deg_) + ", " + "fpv_fov_deg_ = " + text(w.s->fpv_fov_deg_) + ", " + "spawn_ = " + text(w.s->spawn_) + ", " + "cam_ = " + text(w.s->cam_) + ", " + "cam_valid_ = " + text(w.s->cam_valid_) + ", " + "cam_anchor_ = " + text(w.s->cam_anchor_) + ", " + "cam_vel_ = " + text(w.s->cam_vel_) + ", " + "cam_heading_ = " + text(w.s->cam_heading_) + ", " + "rig_init_ = " + text(w.s->rig_init_) + ", " + "head_yaw_ = " + text(w.s->head_yaw_) + ", " + "head_pitch_ = " + text(w.s->head_pitch_) + ", " + "sensitivity_ = " + text(w.s->sensitivity_) + ", " + "dpr_ = " + text(w.s->dpr_) + ", " + "soldier_controller_ = " + text(w.s->soldier_controller_) + ", " + "pad_touch_ = " + text(w.s->pad_touch_) + ", " + "ctl_ = " + text(w.s->ctl_) + ", " + "touch_mode_ = " + text(w.s->touch_mode_) + ", " + "frame_w_ = " + text(w.s->frame_w_) + ", " + "frame_h_ = " + text(w.s->frame_h_) + ", " + "play_in_ = " + text(w.s->play_in_) + ", " + "people_ = " + text(w.s->people_) + ", " + "people_art_ = " + text(w.s->people_art_) + ", " + "combat_art_ = " + text(w.s->combat_art_) + ", " + "destruction_ = " + text(w.s->destruction_) + ", " + "combat_ = " + text(w.s->combat_) + ", " + "guided_ = " + text(w.s->guided_) + ", " + "guided_last_ = " + text(w.s->guided_last_) + ", " + "guided_lock_ = " + text(w.s->guided_lock_) + ", " + "guided_mark_ = " + text(w.s->guided_mark_) + ", " + "guided_mark_at_ = " + text(w.s->guided_mark_at_) + ", " + "guided_mark_time_ = " + text(w.s->guided_mark_time_) + ", " + "guided_marked_ = " + text(w.s->guided_marked_) + ", " + "car_last_hp_ = " + text(w.s->car_last_hp_) + ", " + "car_burn_seen_ = " + text(w.s->car_burn_seen_) + ", " + "pd_crit_ = " + text(converted::array_list(w.s->pd_crit_)) + ", " + "drone_crit_ = " + text(w.s->drone_crit_) + ", " + "ballot_ = " + text(w.s->ballot_) + ", " + "ballot_serial_ = " + text(w.s->ballot_serial_) + ", " + "bullet_pushes_ = " + text(w.s->bullet_pushes_) + ", " + "crit_blasts_ = " + text(w.s->crit_blasts_) + ", " + "sfx_cursor_ = " + text(converted::array_list(w.s->sfx_cursor_)) + ", " + "combat_audio_ready_ = " + text(w.s->combat_audio_ready_) + ", " + "roads_ = " + text(w.s->roads_) + ", " + "units_ = " + text(w.s->units_) + ", " + "pdrones_ = " + text(converted::array_list(w.s->pdrones_)) + ", " + "last_known_ = " + text(w.s->last_known_) + ", " + "last_contact_ = " + text(w.s->last_contact_) + ", " + "next_drone_wave_ = " + text(w.s->next_drone_wave_) + ", " + "emp_ready_at_ = " + text(w.s->emp_ready_at_) + ", " + "last_drone_shot_ = " + text(w.s->last_drone_shot_) + ", " + "last_player_hit_ = " + text(w.s->last_player_hit_) + ", " + "drone_serial_ = " + text(w.s->drone_serial_) + ", " + "drone_wave_live_ = " + text(w.s->drone_wave_live_) + ", " + "projectiles_ = " + text(w.s->projectiles_) + ", " + "foot_weapon_ = " + text(w.s->foot_weapon_) + ", " + "ammo_mag_ = " + text(converted::array_list(w.s->ammo_mag_)) + ", " + "ammo_reserve_ = " + text(converted::array_list(w.s->ammo_reserve_)) + ", " + "grenades_ = " + text(w.s->grenades_) + ", " + "drone_weapon_ = " + text(w.s->drone_weapon_) + ", " + "jet_rocket_side_ = " + text(w.s->jet_rocket_side_) + ", " + "jacked_at_ = " + text(w.s->jacked_at_) + ", " + "jet_cam_off_ = " + text(w.s->jet_cam_off_) + ", " + "next_attack_ = " + text(w.s->next_attack_) + ", " + "next_grenade_ = " + text(w.s->next_grenade_) + ", " + "next_drone_fire_ = " + text(w.s->next_drone_fire_) + ", " + "next_jet_gun_ = " + text(w.s->next_jet_gun_) + ", " + "next_jet_missile_ = " + text(w.s->next_jet_missile_) + ", " + "next_jet_bomb_ = " + text(w.s->next_jet_bomb_) + ", " + "trigger_was_ = " + text(w.s->trigger_was_) + ", " + "explosions_ = " + text(w.s->explosions_) + ", " + "net_ = " + text(w.s->net_) + ", " + "remote_car_ = " + text(w.s->remote_car_) + ", " + "remote_bus_ = " + text(w.s->remote_bus_) + ", " + "rebased_ = " + text(w.s->rebased_) + ", " + "mp_ = " + text(w.s->mp_) + ", " + "lamps_ = " + text(w.s->lamps_) + ", " + "substeps_ = " + text(w.s->substeps_) + ", " + "ground_changes_ = " + text(w.s->ground_changes_) + ", " + "night_ = " + text(w.s->night_) + ", " + "show_lamps_ = " + text(w.s->show_lamps_) + ", " + "star_since_ = " + text(w.s->star_since_) + ", " + "last_wave_ = " + text(w.s->last_wave_) + ", " + "last_cop_shot_ = " + text(w.s->last_cop_shot_) + ", " + "drone_hp_ = " + text(w.s->drone_hp_) + ", " + "jet_hp_ = " + text(w.s->jet_hp_) + ", " + "last_stars_ = " + text(w.s->last_stars_) + ", " + "player_dead_ = " + text(w.s->player_dead_) + ", " + "died_at_ = " + text(w.s->died_at_) + ", " + "died_feet_ = " + text(w.s->died_feet_) + ", " + "respawn_rule_ = " + text(w.s->respawn_rule_) + ", " + "reset_revive_ = " + text(w.s->reset_revive_) + ", " + "spawn_guard_ = " + text(w.s->spawn_guard_) + ", " + "spawn_guard_until_ = " + text(w.s->spawn_guard_until_) + ", " + "spawn_guard_ready_at_ = " + text(w.s->spawn_guard_ready_at_) + ", " + "hint_ = " + text(w.s->hint_) + ", " + "toast_ = " + text(w.s->toast_) + ", " + "toast_age_ = " + text(w.s->toast_age_) + ", " + "time_ = " + text(w.s->time_) + ", " + "fps_ = " + text(w.s->fps_) + ", " + "steps_ = " + text(converted::shaped<converted::Whole>(w.s->steps_)) + ", " + "rng_ = " + text(w.s->rng_) + ", " + "spawn_checked_ = " + text(w.s->spawn_checked_) + ", " + "mixer_ = " + text(w.s->mixer_) + ", " + "bank_ = " + text(w.s->bank_) + ", " + "game_audio_ = " + text(w.s->game_audio_) + ", " + "fx_ = " + text(w.s->fx_) + ", " + "audio_out_ = " + text(w.s->audio_out_) + ", " + "web_audio_ = " + text(w.s->web_audio_) + ", " + "osfx_ = " + text(w.s->osfx_) + ", " + "shot_flesh_ = " + text(w.s->shot_flesh_) + ", " + "lon_ = " + text(w.s->lon_) + ", " + "lat_ = " + text(w.s->lat_) + ", " + "start_mode_ = " + text(w.s->start_mode_) + ", " + "mobile_ = " + text(w.s->mobile_) + ", " + "ui_ = " + text(w.s->ui_) + ", " + "look_ = " + text(w.s->look_) + ", " + "glife_ = " + text(w.s->glife_) + "}"; }
-[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
-  physics::ShapeMaterial s{};
-  s.density = draw.number();
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  s.rolling_resistance = draw.number();
-  s.sensor = draw.flag();
-  s.category_bits = static_cast<u64>(draw.bits());
-  s.mask_bits = static_cast<u64>(draw.bits());
-  s.group_index = static_cast<int>(draw.whole());
-  s.contact_events = draw.flag();
-  s.sensor_events = draw.flag();
-  s.hit_events = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  s.surface = converted::enum_value<physics::Surface>(draw.below(4));
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
-[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.density, (*got.rows)[0]), ".density") && converted::at_place(same(want.friction, (*got.rows)[1]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[2]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[3]), ".rolling_resistance") && converted::at_place(same(want.sensor, (*got.rows)[4]), ".sensor") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]), ".category_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]), ".mask_bits") && converted::at_place(same(want.group_index, (*got.rows)[7]), ".group_index") && converted::at_place(same(want.contact_events, (*got.rows)[8]), ".contact_events") && converted::at_place(same(want.sensor_events, (*got.rows)[9]), ".sensor_events") && converted::at_place(same(want.hit_events, (*got.rows)[10]), ".hit_events") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]), ".user") && converted::at_place(same(want.surface, (*got.rows)[12]), ".surface"); }
-[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
-[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
-  physics::ShapeSettings s{};
-  s.kind = converted::enum_value<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  static std::deque<std::vector<Vec3>> kept_points;
-  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
-  s.points = {kept_points.back().data(), kept_points.back().size()};
-  static std::deque<std::vector<unsigned int>> kept_indices;
-  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
-  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
-  s.material = draw_kern__physics__ShapeMaterial(draw);
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
-[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]), ".points") && converted::at_place(same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]), ".indices") && converted::at_place(same(want.material, (*got.rows)[8]), ".material"); }
-[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
-[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
-}
-inline Earcut::Earcut() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.make", {}); converted::take_made(*this, kern_out[0]); }
-inline void Earcut::triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.triangulate", {converted::value_of(*this), converted::value_of(std::vector<double>(xy, xy + converted::room(xy, 2 * static_cast<std::size_t>(vertex_count)))), converted::value_of(vertex_count), converted::value_of(std::vector<unsigned int>(hole_starts, hole_starts + converted::room(hole_starts, 1 * static_cast<std::size_t>(hole_count)))), converted::value_of(hole_count), converted::value_of(out)}); converted::take_as<std::vector<unsigned int>>(out, kern_out[0]); }
-inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool Client::send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send", {converted::value_of(*this), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return converted::rows_of(got, 236) && converted::at_place(same(w.s->pad, (*got.rows)[0]), ".pad") && converted::at_place(same(w.s->dsync_, (*got.rows)[1]), ".dsync_") && converted::at_place(same(w.s->toss_test_, (*got.rows)[2]), ".toss_test_") && converted::at_place(same(w.s->toss_, (*got.rows)[3]), ".toss_") && converted::at_place(same(w.s->projsync_, (*got.rows)[4]), ".projsync_") && converted::at_place(same(w.s->proj_serial_, (*got.rows)[5]), ".proj_serial_") && converted::at_place(same(w.s->townsync_, (*got.rows)[6]), ".townsync_") && converted::at_place(same(w.s->puppet_world_, (*got.rows)[7]), ".puppet_world_") && converted::at_place(same(w.s->world_send_clock_, (*got.rows)[8]), ".world_send_clock_") && converted::at_place(same(w.s->people_send_clock_, (*got.rows)[9]), ".people_send_clock_") && converted::at_place(same(w.s->world_send_real_, (*got.rows)[10]), ".world_send_real_") && converted::at_place(same(w.s->world_tick_, (*got.rows)[11]), ".world_tick_") && converted::at_place(same(w.s->world_sent_, (*got.rows)[12]), ".world_sent_") && converted::at_place(same(w.s->world_got_, (*got.rows)[13]), ".world_got_") && converted::at_place(same(w.s->world_heard_at_, (*got.rows)[14]), ".world_heard_at_") && converted::at_place(same(w.s->car_seen_, (*got.rows)[15]), ".car_seen_") && converted::at_place(same(w.s->people_acc_, (*got.rows)[16]), ".people_acc_") && converted::at_place(same(w.s->car_net_, (*got.rows)[17]), ".car_net_") && converted::at_place(same(w.s->car_line_, (*got.rows)[18]), ".car_line_") && converted::at_place(same(w.s->car_rest_q_, (*got.rows)[19]), ".car_rest_q_") && converted::at_place(same(w.s->world_parts_, (*got.rows)[20]), ".world_parts_") && converted::at_place(same(w.s->cows_acc_, (*got.rows)[21]), ".cows_acc_") && converted::at_place(same(w.s->pets_acc_, (*got.rows)[22]), ".pets_acc_") && converted::at_place(same(w.s->flocks_acc_, (*got.rows)[23]), ".flocks_acc_") && converted::at_place(same(w.s->host_epoch_off_, (*got.rows)[24]), ".host_epoch_off_") && converted::at_place(same(w.s->host_epoch_ok_, (*got.rows)[25]), ".host_epoch_ok_") && converted::at_place(same(w.s->world_clock_, (*got.rows)[26]), ".world_clock_") && converted::at_place(same(w.s->world_clock_ok_, (*got.rows)[27]), ".world_clock_ok_") && converted::at_place(same(w.s->car_lent_, (*got.rows)[28]), ".car_lent_") && converted::at_place(same(w.s->car_lent_at_, (*got.rows)[29]), ".car_lent_at_") && converted::at_place(same(w.s->swarms_, (*got.rows)[30]), ".swarms_") && converted::at_place(same(w.s->swarm_clock_, (*got.rows)[31]), ".swarm_clock_") && converted::at_place(same(w.s->swarm_serial_, (*got.rows)[32]), ".swarm_serial_") && converted::at_place(same(w.s->swarm_sent_, (*got.rows)[33]), ".swarm_sent_") && converted::at_place(same(w.s->swarm_fallen_, (*got.rows)[34]), ".swarm_fallen_") && converted::at_place(same(w.s->swarm_cruiser_, (*got.rows)[35]), ".swarm_cruiser_") && converted::at_place(same(w.s->life_, (*got.rows)[36]), ".life_") && converted::at_place(same(w.s->laser_finger_, (*got.rows)[37]), ".laser_finger_") && converted::at_place(same(w.s->laser_pinned_, (*got.rows)[38]), ".laser_pinned_") && converted::at_place(same(w.s->laser_valid_, (*got.rows)[39]), ".laser_valid_") && converted::at_place(same(w.s->laser_fx_, (*got.rows)[40]), ".laser_fx_") && converted::at_place(same(w.s->laser_fy_, (*got.rows)[41]), ".laser_fy_") && converted::at_place(same(w.s->laser_pin_, (*got.rows)[42]), ".laser_pin_") && converted::at_place(same(w.s->laser_dot_, (*got.rows)[43]), ".laser_dot_") && converted::at_place(same(w.s->visual_blasts_, (*got.rows)[44]), ".visual_blasts_") && converted::at_place(same(converted::array_list(w.s->bounce_fx_), (*got.rows)[45]), ".bounce_fx_") && converted::at_place(same(w.s->bounce_fx_next_, (*got.rows)[46]), ".bounce_fx_next_") && converted::at_place(same(w.s->gaps_, (*got.rows)[47]), ".gaps_") && converted::at_place(same(w.s->engine_, (*got.rows)[48]), ".engine_") && converted::at_place(same(w.s->vr_, (*got.rows)[49]), ".vr_") && converted::at_place(same(converted::array_list(w.s->vr_hands_), (*got.rows)[50]), ".vr_hands_") && converted::at_place(same(w.s->vr_snap_armed_, (*got.rows)[51]), ".vr_snap_armed_") && converted::at_place(same(w.s->vr_arms_, (*got.rows)[52]), ".vr_arms_") && converted::at_place(same(w.s->vr_both_clicks_, (*got.rows)[53]), ".vr_both_clicks_") && converted::at_place(same(w.s->vr_wpn_armed_, (*got.rows)[54]), ".vr_wpn_armed_") && converted::at_place(same(w.s->vr_fire_was_, (*got.rows)[55]), ".vr_fire_was_") && converted::at_place(same(converted::array_list(w.s->vr_pulse_), (*got.rows)[56]), ".vr_pulse_") && converted::at_place(same(w.s->vr_tunnel_mesh_, (*got.rows)[57]), ".vr_tunnel_mesh_") && converted::at_place(same(w.s->vr_tunnel_tex_, (*got.rows)[58]), ".vr_tunnel_tex_") && converted::at_place(same(w.s->vr_tunnel_, (*got.rows)[59]), ".vr_tunnel_") && converted::at_place(same(w.s->vr_prev_f_, (*got.rows)[60]), ".vr_prev_f_") && converted::at_place(same(w.s->vr_prev_up_, (*got.rows)[61]), ".vr_prev_up_") && converted::at_place(same(w.s->vr_prev_eye_, (*got.rows)[62]), ".vr_prev_eye_") && converted::at_place(same(w.s->vr_prev_v_, (*got.rows)[63]), ".vr_prev_v_") && converted::at_place(same(w.s->vr_prev_ok_, (*got.rows)[64]), ".vr_prev_ok_") && converted::at_place(same(w.s->vr_menu_open_, (*got.rows)[65]), ".vr_menu_open_") && converted::at_place(same(w.s->vr_menu_trigger_, (*got.rows)[66]), ".vr_menu_trigger_") && converted::at_place(same(w.s->vr_menu_valid_, (*got.rows)[67]), ".vr_menu_valid_") && converted::at_place(same(w.s->vr_menu_hover_, (*got.rows)[68]), ".vr_menu_hover_") && converted::at_place(same(w.s->vr_menu_hover_was_, (*got.rows)[69]), ".vr_menu_hover_was_") && converted::at_place(same(w.s->vr_menu_page_, (*got.rows)[70]), ".vr_menu_page_") && converted::at_place(same(w.s->vr_menu_sel_, (*got.rows)[71]), ".vr_menu_sel_") && converted::at_place(same(w.s->vr_menu_stick_used_, (*got.rows)[72]), ".vr_menu_stick_used_") && converted::at_place(same(w.s->vr_menu_stick_armed_, (*got.rows)[73]), ".vr_menu_stick_armed_") && converted::at_place(same(w.s->vr_y_fired_, (*got.rows)[74]), ".vr_y_fired_") && converted::at_place(same(w.s->vr_near_vehicle_, (*got.rows)[75]), ".vr_near_vehicle_") && converted::at_place(same(w.s->vr_y_held_, (*got.rows)[76]), ".vr_y_held_") && converted::at_place(same(w.s->vr_cam_request_, (*got.rows)[77]), ".vr_cam_request_") && converted::at_place(same(w.s->vr_scoped_, (*got.rows)[78]), ".vr_scoped_") && converted::at_place(same(w.s->vr_menu_c_, (*got.rows)[79]), ".vr_menu_c_") && converted::at_place(same(w.s->vr_menu_r_, (*got.rows)[80]), ".vr_menu_r_") && converted::at_place(same(w.s->vr_menu_u_, (*got.rows)[81]), ".vr_menu_u_") && converted::at_place(same(w.s->vr_menu_n_, (*got.rows)[82]), ".vr_menu_n_") && converted::at_place(same(w.s->vr_menu_w_, (*got.rows)[83]), ".vr_menu_w_") && converted::at_place(same(w.s->vr_menu_h_, (*got.rows)[84]), ".vr_menu_h_") && converted::at_place(same(w.s->vr_action_, (*got.rows)[85]), ".vr_action_") && converted::at_place(same(w.s->vr_scope_tex_, (*got.rows)[86]), ".vr_scope_tex_") && converted::at_place(same(w.s->vr_scope_mesh_, (*got.rows)[87]), ".vr_scope_mesh_") && converted::at_place(same(w.s->vr_hud_tex_, (*got.rows)[88]), ".vr_hud_tex_") && converted::at_place(same(w.s->vr_hud_mesh_, (*got.rows)[89]), ".vr_hud_mesh_") && converted::at_place(same(w.s->world_, (*got.rows)[90]), ".world_") && converted::at_place(same(w.s->city_, (*got.rows)[91]), ".city_") && converted::at_place(same(w.s->art_, (*got.rows)[92]), ".art_") && converted::at_place(same(w.s->soldier_, (*got.rows)[93]), ".soldier_") && converted::at_place(same(w.s->drone_actor_, (*got.rows)[94]), ".drone_actor_") && converted::at_place(same(w.s->jet_actor_, (*got.rows)[95]), ".jet_actor_") && converted::at_place(same(w.s->chute_actor_, (*got.rows)[96]), ".chute_actor_") && converted::at_place(same(w.s->drone_, (*got.rows)[97]), ".drone_") && converted::at_place(same(w.s->jet_, (*got.rows)[98]), ".jet_") && converted::at_place(same(w.s->cars_, (*got.rows)[99]), ".cars_") && converted::at_place(same(w.s->mode_, (*got.rows)[100]), ".mode_") && converted::at_place(same(w.s->car_index_, (*got.rows)[101]), ".car_index_") && converted::at_place(same(w.s->focus_prev_, (*got.rows)[102]), ".focus_prev_") && converted::at_place(same(w.s->focus_prev_valid_, (*got.rows)[103]), ".focus_prev_valid_") && converted::at_place(same(w.s->jet_flown_, (*got.rows)[104]), ".jet_flown_") && converted::at_place(same(w.s->jet_v_valid_, (*got.rows)[105]), ".jet_v_valid_") && converted::at_place(same(w.s->jet_v_ctrl_, (*got.rows)[106]), ".jet_v_ctrl_") && converted::at_place(same(w.s->drone_out_, (*got.rows)[107]), ".drone_out_") && converted::at_place(same(w.s->jet_placed_, (*got.rows)[108]), ".jet_placed_") && converted::at_place(same(w.s->world_placed_, (*got.rows)[109]), ".world_placed_") && converted::at_place(same(w.s->chute_open_, (*got.rows)[110]), ".chute_open_") && converted::at_place(same(w.s->chute_time_, (*got.rows)[111]), ".chute_time_") && converted::at_place(same(w.s->chute_steer_, (*got.rows)[112]), ".chute_steer_") && converted::at_place(same(w.s->sticks_, (*got.rows)[113]), ".sticks_") && converted::at_place(same(w.s->jet_in_, (*got.rows)[114]), ".jet_in_") && converted::at_place(same(w.s->landing_, (*got.rows)[115]), ".landing_") && converted::at_place(same(w.s->landing_still_, (*got.rows)[116]), ".landing_still_") && converted::at_place(same(w.s->height_held_, (*got.rows)[117]), ".height_held_") && converted::at_place(same(w.s->drone_cam_, (*got.rows)[118]), ".drone_cam_") && converted::at_place(same(w.s->car_cockpit_, (*got.rows)[119]), ".car_cockpit_") && converted::at_place(same(w.s->jet_cockpit_, (*got.rows)[120]), ".jet_cockpit_") && converted::at_place(same(w.s->fpv_tilt_deg_, (*got.rows)[121]), ".fpv_tilt_deg_") && converted::at_place(same(w.s->fpv_fov_deg_, (*got.rows)[122]), ".fpv_fov_deg_") && converted::at_place(same(w.s->spawn_, (*got.rows)[123]), ".spawn_") && converted::at_place(same(w.s->cam_, (*got.rows)[124]), ".cam_") && converted::at_place(same(w.s->cam_valid_, (*got.rows)[125]), ".cam_valid_") && converted::at_place(same(w.s->cam_anchor_, (*got.rows)[126]), ".cam_anchor_") && converted::at_place(same(w.s->cam_vel_, (*got.rows)[127]), ".cam_vel_") && converted::at_place(same(w.s->cam_heading_, (*got.rows)[128]), ".cam_heading_") && converted::at_place(same(w.s->rig_init_, (*got.rows)[129]), ".rig_init_") && converted::at_place(same(w.s->head_yaw_, (*got.rows)[130]), ".head_yaw_") && converted::at_place(same(w.s->head_pitch_, (*got.rows)[131]), ".head_pitch_") && converted::at_place(same(w.s->sensitivity_, (*got.rows)[132]), ".sensitivity_") && converted::at_place(same(w.s->dpr_, (*got.rows)[133]), ".dpr_") && converted::at_place(same(w.s->pad_touch_, (*got.rows)[134]), ".pad_touch_") && converted::at_place(same(w.s->ctl_, (*got.rows)[135]), ".ctl_") && converted::at_place(same(w.s->touch_mode_, (*got.rows)[136]), ".touch_mode_") && converted::at_place(same(w.s->frame_w_, (*got.rows)[137]), ".frame_w_") && converted::at_place(same(w.s->frame_h_, (*got.rows)[138]), ".frame_h_") && converted::at_place(same(w.s->play_in_, (*got.rows)[139]), ".play_in_") && converted::at_place(same(w.s->people_, (*got.rows)[140]), ".people_") && converted::at_place(same(w.s->people_art_, (*got.rows)[141]), ".people_art_") && converted::at_place(same(w.s->combat_art_, (*got.rows)[142]), ".combat_art_") && converted::at_place(same(w.s->destruction_, (*got.rows)[143]), ".destruction_") && converted::at_place(same(w.s->combat_, (*got.rows)[144]), ".combat_") && converted::at_place(same(w.s->guided_, (*got.rows)[145]), ".guided_") && converted::at_place(same(w.s->guided_last_, (*got.rows)[146]), ".guided_last_") && converted::at_place(same(w.s->guided_lock_, (*got.rows)[147]), ".guided_lock_") && converted::at_place(same(w.s->guided_mark_, (*got.rows)[148]), ".guided_mark_") && converted::at_place(same(w.s->guided_mark_at_, (*got.rows)[149]), ".guided_mark_at_") && converted::at_place(same(w.s->guided_mark_time_, (*got.rows)[150]), ".guided_mark_time_") && converted::at_place(same(w.s->guided_marked_, (*got.rows)[151]), ".guided_marked_") && converted::at_place(same(w.s->car_last_hp_, (*got.rows)[152]), ".car_last_hp_") && converted::at_place(same(w.s->car_burn_seen_, (*got.rows)[153]), ".car_burn_seen_") && converted::at_place(same(converted::array_list(w.s->pd_crit_), (*got.rows)[154]), ".pd_crit_") && converted::at_place(same(w.s->drone_crit_, (*got.rows)[155]), ".drone_crit_") && converted::at_place(same(w.s->ballot_, (*got.rows)[156]), ".ballot_") && converted::at_place(same(w.s->ballot_serial_, (*got.rows)[157]), ".ballot_serial_") && converted::at_place(same(w.s->bullet_pushes_, (*got.rows)[158]), ".bullet_pushes_") && converted::at_place(same(w.s->crit_blasts_, (*got.rows)[159]), ".crit_blasts_") && converted::at_place(same(converted::array_list(w.s->sfx_cursor_), (*got.rows)[160]), ".sfx_cursor_") && converted::at_place(same(w.s->combat_audio_ready_, (*got.rows)[161]), ".combat_audio_ready_") && converted::at_place(same(w.s->roads_, (*got.rows)[162]), ".roads_") && converted::at_place(same(w.s->units_, (*got.rows)[163]), ".units_") && converted::at_place(same(converted::array_list(w.s->pdrones_), (*got.rows)[164]), ".pdrones_") && converted::at_place(same(w.s->last_known_, (*got.rows)[165]), ".last_known_") && converted::at_place(same(w.s->last_contact_, (*got.rows)[166]), ".last_contact_") && converted::at_place(same(w.s->next_drone_wave_, (*got.rows)[167]), ".next_drone_wave_") && converted::at_place(same(w.s->emp_ready_at_, (*got.rows)[168]), ".emp_ready_at_") && converted::at_place(same(w.s->last_drone_shot_, (*got.rows)[169]), ".last_drone_shot_") && converted::at_place(same(w.s->last_player_hit_, (*got.rows)[170]), ".last_player_hit_") && converted::at_place(same(w.s->drone_serial_, (*got.rows)[171]), ".drone_serial_") && converted::at_place(same(w.s->drone_wave_live_, (*got.rows)[172]), ".drone_wave_live_") && converted::at_place(same(w.s->projectiles_, (*got.rows)[173]), ".projectiles_") && converted::at_place(same(w.s->foot_weapon_, (*got.rows)[174]), ".foot_weapon_") && converted::at_place(same(converted::array_list(w.s->ammo_mag_), (*got.rows)[175]), ".ammo_mag_") && converted::at_place(same(converted::array_list(w.s->ammo_reserve_), (*got.rows)[176]), ".ammo_reserve_") && converted::at_place(same(w.s->grenades_, (*got.rows)[177]), ".grenades_") && converted::at_place(same(w.s->drone_weapon_, (*got.rows)[178]), ".drone_weapon_") && converted::at_place(same(w.s->jet_rocket_side_, (*got.rows)[179]), ".jet_rocket_side_") && converted::at_place(same(w.s->jacked_at_, (*got.rows)[180]), ".jacked_at_") && converted::at_place(same(w.s->jet_cam_off_, (*got.rows)[181]), ".jet_cam_off_") && converted::at_place(same(w.s->next_attack_, (*got.rows)[182]), ".next_attack_") && converted::at_place(same(w.s->next_grenade_, (*got.rows)[183]), ".next_grenade_") && converted::at_place(same(w.s->next_drone_fire_, (*got.rows)[184]), ".next_drone_fire_") && converted::at_place(same(w.s->next_jet_gun_, (*got.rows)[185]), ".next_jet_gun_") && converted::at_place(same(w.s->next_jet_missile_, (*got.rows)[186]), ".next_jet_missile_") && converted::at_place(same(w.s->next_jet_bomb_, (*got.rows)[187]), ".next_jet_bomb_") && converted::at_place(same(w.s->trigger_was_, (*got.rows)[188]), ".trigger_was_") && converted::at_place(same(w.s->explosions_, (*got.rows)[189]), ".explosions_") && converted::at_place(same(w.s->net_, (*got.rows)[190]), ".net_") && converted::at_place(same(w.s->remote_car_, (*got.rows)[191]), ".remote_car_") && converted::at_place(same(w.s->remote_bus_, (*got.rows)[192]), ".remote_bus_") && converted::at_place(same(w.s->rebased_, (*got.rows)[193]), ".rebased_") && converted::at_place(same(w.s->mp_, (*got.rows)[194]), ".mp_") && converted::at_place(same(w.s->lamps_, (*got.rows)[195]), ".lamps_") && converted::at_place(same(w.s->ground_changes_, (*got.rows)[196]), ".ground_changes_") && converted::at_place(same(w.s->night_, (*got.rows)[197]), ".night_") && converted::at_place(same(w.s->show_lamps_, (*got.rows)[198]), ".show_lamps_") && converted::at_place(same(w.s->star_since_, (*got.rows)[199]), ".star_since_") && converted::at_place(same(w.s->last_wave_, (*got.rows)[200]), ".last_wave_") && converted::at_place(same(w.s->last_cop_shot_, (*got.rows)[201]), ".last_cop_shot_") && converted::at_place(same(w.s->drone_hp_, (*got.rows)[202]), ".drone_hp_") && converted::at_place(same(w.s->jet_hp_, (*got.rows)[203]), ".jet_hp_") && converted::at_place(same(w.s->last_stars_, (*got.rows)[204]), ".last_stars_") && converted::at_place(same(w.s->player_dead_, (*got.rows)[205]), ".player_dead_") && converted::at_place(same(w.s->died_at_, (*got.rows)[206]), ".died_at_") && converted::at_place(same(w.s->died_feet_, (*got.rows)[207]), ".died_feet_") && converted::at_place(same(w.s->respawn_rule_, (*got.rows)[208]), ".respawn_rule_") && converted::at_place(same(w.s->reset_revive_, (*got.rows)[209]), ".reset_revive_") && converted::at_place(same(w.s->spawn_guard_, (*got.rows)[210]), ".spawn_guard_") && converted::at_place(same(w.s->spawn_guard_until_, (*got.rows)[211]), ".spawn_guard_until_") && converted::at_place(same(w.s->spawn_guard_ready_at_, (*got.rows)[212]), ".spawn_guard_ready_at_") && converted::at_place(same(w.s->hint_, (*got.rows)[213]), ".hint_") && converted::at_place(same(w.s->toast_, (*got.rows)[214]), ".toast_") && converted::at_place(same(w.s->toast_age_, (*got.rows)[215]), ".toast_age_") && converted::at_place(same(w.s->time_, (*got.rows)[216]), ".time_") && converted::at_place(same(w.s->fps_, (*got.rows)[217]), ".fps_") && converted::at_place(same(converted::shaped<converted::Whole>(w.s->steps_), (*got.rows)[218]), ".steps_") && converted::at_place(same(w.s->rng_, (*got.rows)[219]), ".rng_") && converted::at_place(same(w.s->spawn_checked_, (*got.rows)[220]), ".spawn_checked_") && converted::at_place(same(w.s->mixer_, (*got.rows)[221]), ".mixer_") && converted::at_place(same(w.s->bank_, (*got.rows)[222]), ".bank_") && converted::at_place(same(w.s->game_audio_, (*got.rows)[223]), ".game_audio_") && converted::at_place(same(w.s->fx_, (*got.rows)[224]), ".fx_") && converted::at_place(same(w.s->audio_out_, (*got.rows)[225]), ".audio_out_") && converted::at_place(same(w.s->web_audio_, (*got.rows)[226]), ".web_audio_") && converted::at_place(same(w.s->osfx_, (*got.rows)[227]), ".osfx_") && converted::at_place(same(w.s->shot_flesh_, (*got.rows)[228]), ".shot_flesh_") && converted::at_place(same(w.s->lon_, (*got.rows)[229]), ".lon_") && converted::at_place(same(w.s->lat_, (*got.rows)[230]), ".lat_") && converted::at_place(same(w.s->start_mode_, (*got.rows)[231]), ".start_mode_") && converted::at_place(same(w.s->mobile_, (*got.rows)[232]), ".mobile_") && converted::at_place(same(w.s->ui_, (*got.rows)[233]), ".ui_") && converted::at_place(same(w.s->look_, (*got.rows)[234]), ".look_") && converted::at_place(same(w.s->glife_, (*got.rows)[235]), ".glife_"); }
+[[maybe_unused]] static bool defined(const State_Game& w) { return defined(w.s->pad) && defined(w.s->dsync_) && defined(w.s->toss_test_) && defined(w.s->toss_) && defined(w.s->projsync_) && defined(w.s->proj_serial_) && defined(w.s->townsync_) && defined(w.s->puppet_world_) && defined(w.s->world_send_clock_) && defined(w.s->people_send_clock_) && defined(w.s->world_send_real_) && defined(w.s->world_tick_) && defined(w.s->world_sent_) && defined(w.s->world_got_) && defined(w.s->world_heard_at_) && defined(w.s->car_seen_) && defined(w.s->people_acc_) && defined(w.s->car_net_) && defined(w.s->car_line_) && defined(w.s->car_rest_q_) && defined(w.s->world_parts_) && defined(w.s->cows_acc_) && defined(w.s->pets_acc_) && defined(w.s->flocks_acc_) && defined(w.s->host_epoch_off_) && defined(w.s->host_epoch_ok_) && defined(w.s->world_clock_) && defined(w.s->world_clock_ok_) && defined(w.s->car_lent_) && defined(w.s->car_lent_at_) && defined(w.s->swarms_) && defined(w.s->swarm_clock_) && defined(w.s->swarm_serial_) && defined(w.s->swarm_sent_) && defined(w.s->swarm_fallen_) && defined(w.s->swarm_cruiser_) && defined(w.s->life_) && defined(w.s->laser_finger_) && defined(w.s->laser_pinned_) && defined(w.s->laser_valid_) && defined(w.s->laser_fx_) && defined(w.s->laser_fy_) && defined(w.s->laser_pin_) && defined(w.s->laser_dot_) && defined(w.s->visual_blasts_) && defined(converted::array_list(w.s->bounce_fx_)) && defined(w.s->bounce_fx_next_) && defined(w.s->gaps_) && defined(w.s->engine_) && defined(w.s->vr_) && defined(converted::array_list(w.s->vr_hands_)) && defined(w.s->vr_snap_armed_) && defined(w.s->vr_arms_) && defined(w.s->vr_both_clicks_) && defined(w.s->vr_wpn_armed_) && defined(w.s->vr_fire_was_) && defined(converted::array_list(w.s->vr_pulse_)) && defined(w.s->vr_tunnel_mesh_) && defined(w.s->vr_tunnel_tex_) && defined(w.s->vr_tunnel_) && defined(w.s->vr_prev_f_) && defined(w.s->vr_prev_up_) && defined(w.s->vr_prev_eye_) && defined(w.s->vr_prev_v_) && defined(w.s->vr_prev_ok_) && defined(w.s->vr_menu_open_) && defined(w.s->vr_menu_trigger_) && defined(w.s->vr_menu_valid_) && defined(w.s->vr_menu_hover_) && defined(w.s->vr_menu_hover_was_) && defined(w.s->vr_menu_page_) && defined(w.s->vr_menu_sel_) && defined(w.s->vr_menu_stick_used_) && defined(w.s->vr_menu_stick_armed_) && defined(w.s->vr_y_fired_) && defined(w.s->vr_near_vehicle_) && defined(w.s->vr_y_held_) && defined(w.s->vr_cam_request_) && defined(w.s->vr_scoped_) && defined(w.s->vr_menu_c_) && defined(w.s->vr_menu_r_) && defined(w.s->vr_menu_u_) && defined(w.s->vr_menu_n_) && defined(w.s->vr_menu_w_) && defined(w.s->vr_menu_h_) && defined(w.s->vr_action_) && defined(w.s->vr_scope_tex_) && defined(w.s->vr_scope_mesh_) && defined(w.s->vr_hud_tex_) && defined(w.s->vr_hud_mesh_) && defined(w.s->world_) && defined(w.s->city_) && defined(w.s->art_) && defined(w.s->soldier_) && defined(w.s->drone_actor_) && defined(w.s->jet_actor_) && defined(w.s->chute_actor_) && defined(w.s->drone_) && defined(w.s->jet_) && defined(w.s->cars_) && defined(w.s->mode_) && defined(w.s->car_index_) && defined(w.s->focus_prev_) && defined(w.s->focus_prev_valid_) && defined(w.s->jet_flown_) && defined(w.s->jet_v_valid_) && defined(w.s->jet_v_ctrl_) && defined(w.s->drone_out_) && defined(w.s->jet_placed_) && defined(w.s->world_placed_) && defined(w.s->chute_open_) && defined(w.s->chute_time_) && defined(w.s->chute_steer_) && defined(w.s->sticks_) && defined(w.s->jet_in_) && defined(w.s->landing_) && defined(w.s->landing_still_) && defined(w.s->height_held_) && defined(w.s->drone_cam_) && defined(w.s->car_cockpit_) && defined(w.s->jet_cockpit_) && defined(w.s->fpv_tilt_deg_) && defined(w.s->fpv_fov_deg_) && defined(w.s->spawn_) && defined(w.s->cam_) && defined(w.s->cam_valid_) && defined(w.s->cam_anchor_) && defined(w.s->cam_vel_) && defined(w.s->cam_heading_) && defined(w.s->rig_init_) && defined(w.s->head_yaw_) && defined(w.s->head_pitch_) && defined(w.s->sensitivity_) && defined(w.s->dpr_) && defined(w.s->pad_touch_) && defined(w.s->ctl_) && defined(w.s->touch_mode_) && defined(w.s->frame_w_) && defined(w.s->frame_h_) && defined(w.s->play_in_) && defined(w.s->people_) && defined(w.s->people_art_) && defined(w.s->combat_art_) && defined(w.s->destruction_) && defined(w.s->combat_) && defined(w.s->guided_) && defined(w.s->guided_last_) && defined(w.s->guided_lock_) && defined(w.s->guided_mark_) && defined(w.s->guided_mark_at_) && defined(w.s->guided_mark_time_) && defined(w.s->guided_marked_) && defined(w.s->car_last_hp_) && defined(w.s->car_burn_seen_) && defined(converted::array_list(w.s->pd_crit_)) && defined(w.s->drone_crit_) && defined(w.s->ballot_) && defined(w.s->ballot_serial_) && defined(w.s->bullet_pushes_) && defined(w.s->crit_blasts_) && defined(converted::array_list(w.s->sfx_cursor_)) && defined(w.s->combat_audio_ready_) && defined(w.s->roads_) && defined(w.s->units_) && defined(converted::array_list(w.s->pdrones_)) && defined(w.s->last_known_) && defined(w.s->last_contact_) && defined(w.s->next_drone_wave_) && defined(w.s->emp_ready_at_) && defined(w.s->last_drone_shot_) && defined(w.s->last_player_hit_) && defined(w.s->drone_serial_) && defined(w.s->drone_wave_live_) && defined(w.s->projectiles_) && defined(w.s->foot_weapon_) && defined(converted::array_list(w.s->ammo_mag_)) && defined(converted::array_list(w.s->ammo_reserve_)) && defined(w.s->grenades_) && defined(w.s->drone_weapon_) && defined(w.s->jet_rocket_side_) && defined(w.s->jacked_at_) && defined(w.s->jet_cam_off_) && defined(w.s->next_attack_) && defined(w.s->next_grenade_) && defined(w.s->next_drone_fire_) && defined(w.s->next_jet_gun_) && defined(w.s->next_jet_missile_) && defined(w.s->next_jet_bomb_) && defined(w.s->trigger_was_) && defined(w.s->explosions_) && defined(w.s->net_) && defined(w.s->remote_car_) && defined(w.s->remote_bus_) && defined(w.s->rebased_) && defined(w.s->mp_) && defined(w.s->lamps_) && defined(w.s->ground_changes_) && defined(w.s->night_) && defined(w.s->show_lamps_) && defined(w.s->star_since_) && defined(w.s->last_wave_) && defined(w.s->last_cop_shot_) && defined(w.s->drone_hp_) && defined(w.s->jet_hp_) && defined(w.s->last_stars_) && defined(w.s->player_dead_) && defined(w.s->died_at_) && defined(w.s->died_feet_) && defined(w.s->respawn_rule_) && defined(w.s->reset_revive_) && defined(w.s->spawn_guard_) && defined(w.s->spawn_guard_until_) && defined(w.s->spawn_guard_ready_at_) && defined(w.s->hint_) && defined(w.s->toast_) && defined(w.s->toast_age_) && defined(w.s->time_) && defined(w.s->fps_) && defined(converted::shaped<converted::Whole>(w.s->steps_)) && defined(w.s->rng_) && defined(w.s->spawn_checked_) && defined(w.s->mixer_) && defined(w.s->bank_) && defined(w.s->game_audio_) && defined(w.s->fx_) && defined(w.s->audio_out_) && defined(w.s->web_audio_) && defined(w.s->osfx_) && defined(w.s->shot_flesh_) && defined(w.s->lon_) && defined(w.s->lat_) && defined(w.s->start_mode_) && defined(w.s->mobile_) && defined(w.s->ui_) && defined(w.s->look_) && defined(w.s->glife_); }
+[[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "pad = " + text(w.s->pad) + ", " + "dsync_ = " + text(w.s->dsync_) + ", " + "toss_test_ = " + text(w.s->toss_test_) + ", " + "toss_ = " + text(w.s->toss_) + ", " + "projsync_ = " + text(w.s->projsync_) + ", " + "proj_serial_ = " + text(w.s->proj_serial_) + ", " + "townsync_ = " + text(w.s->townsync_) + ", " + "puppet_world_ = " + text(w.s->puppet_world_) + ", " + "world_send_clock_ = " + text(w.s->world_send_clock_) + ", " + "people_send_clock_ = " + text(w.s->people_send_clock_) + ", " + "world_send_real_ = " + text(w.s->world_send_real_) + ", " + "world_tick_ = " + text(w.s->world_tick_) + ", " + "world_sent_ = " + text(w.s->world_sent_) + ", " + "world_got_ = " + text(w.s->world_got_) + ", " + "world_heard_at_ = " + text(w.s->world_heard_at_) + ", " + "car_seen_ = " + text(w.s->car_seen_) + ", " + "people_acc_ = " + text(w.s->people_acc_) + ", " + "car_net_ = " + text(w.s->car_net_) + ", " + "car_line_ = " + text(w.s->car_line_) + ", " + "car_rest_q_ = " + text(w.s->car_rest_q_) + ", " + "world_parts_ = " + text(w.s->world_parts_) + ", " + "cows_acc_ = " + text(w.s->cows_acc_) + ", " + "pets_acc_ = " + text(w.s->pets_acc_) + ", " + "flocks_acc_ = " + text(w.s->flocks_acc_) + ", " + "host_epoch_off_ = " + text(w.s->host_epoch_off_) + ", " + "host_epoch_ok_ = " + text(w.s->host_epoch_ok_) + ", " + "world_clock_ = " + text(w.s->world_clock_) + ", " + "world_clock_ok_ = " + text(w.s->world_clock_ok_) + ", " + "car_lent_ = " + text(w.s->car_lent_) + ", " + "car_lent_at_ = " + text(w.s->car_lent_at_) + ", " + "swarms_ = " + text(w.s->swarms_) + ", " + "swarm_clock_ = " + text(w.s->swarm_clock_) + ", " + "swarm_serial_ = " + text(w.s->swarm_serial_) + ", " + "swarm_sent_ = " + text(w.s->swarm_sent_) + ", " + "swarm_fallen_ = " + text(w.s->swarm_fallen_) + ", " + "swarm_cruiser_ = " + text(w.s->swarm_cruiser_) + ", " + "life_ = " + text(w.s->life_) + ", " + "laser_finger_ = " + text(w.s->laser_finger_) + ", " + "laser_pinned_ = " + text(w.s->laser_pinned_) + ", " + "laser_valid_ = " + text(w.s->laser_valid_) + ", " + "laser_fx_ = " + text(w.s->laser_fx_) + ", " + "laser_fy_ = " + text(w.s->laser_fy_) + ", " + "laser_pin_ = " + text(w.s->laser_pin_) + ", " + "laser_dot_ = " + text(w.s->laser_dot_) + ", " + "visual_blasts_ = " + text(w.s->visual_blasts_) + ", " + "bounce_fx_ = " + text(converted::array_list(w.s->bounce_fx_)) + ", " + "bounce_fx_next_ = " + text(w.s->bounce_fx_next_) + ", " + "gaps_ = " + text(w.s->gaps_) + ", " + "engine_ = " + text(w.s->engine_) + ", " + "vr_ = " + text(w.s->vr_) + ", " + "vr_hands_ = " + text(converted::array_list(w.s->vr_hands_)) + ", " + "vr_snap_armed_ = " + text(w.s->vr_snap_armed_) + ", " + "vr_arms_ = " + text(w.s->vr_arms_) + ", " + "vr_both_clicks_ = " + text(w.s->vr_both_clicks_) + ", " + "vr_wpn_armed_ = " + text(w.s->vr_wpn_armed_) + ", " + "vr_fire_was_ = " + text(w.s->vr_fire_was_) + ", " + "vr_pulse_ = " + text(converted::array_list(w.s->vr_pulse_)) + ", " + "vr_tunnel_mesh_ = " + text(w.s->vr_tunnel_mesh_) + ", " + "vr_tunnel_tex_ = " + text(w.s->vr_tunnel_tex_) + ", " + "vr_tunnel_ = " + text(w.s->vr_tunnel_) + ", " + "vr_prev_f_ = " + text(w.s->vr_prev_f_) + ", " + "vr_prev_up_ = " + text(w.s->vr_prev_up_) + ", " + "vr_prev_eye_ = " + text(w.s->vr_prev_eye_) + ", " + "vr_prev_v_ = " + text(w.s->vr_prev_v_) + ", " + "vr_prev_ok_ = " + text(w.s->vr_prev_ok_) + ", " + "vr_menu_open_ = " + text(w.s->vr_menu_open_) + ", " + "vr_menu_trigger_ = " + text(w.s->vr_menu_trigger_) + ", " + "vr_menu_valid_ = " + text(w.s->vr_menu_valid_) + ", " + "vr_menu_hover_ = " + text(w.s->vr_menu_hover_) + ", " + "vr_menu_hover_was_ = " + text(w.s->vr_menu_hover_was_) + ", " + "vr_menu_page_ = " + text(w.s->vr_menu_page_) + ", " + "vr_menu_sel_ = " + text(w.s->vr_menu_sel_) + ", " + "vr_menu_stick_used_ = " + text(w.s->vr_menu_stick_used_) + ", " + "vr_menu_stick_armed_ = " + text(w.s->vr_menu_stick_armed_) + ", " + "vr_y_fired_ = " + text(w.s->vr_y_fired_) + ", " + "vr_near_vehicle_ = " + text(w.s->vr_near_vehicle_) + ", " + "vr_y_held_ = " + text(w.s->vr_y_held_) + ", " + "vr_cam_request_ = " + text(w.s->vr_cam_request_) + ", " + "vr_scoped_ = " + text(w.s->vr_scoped_) + ", " + "vr_menu_c_ = " + text(w.s->vr_menu_c_) + ", " + "vr_menu_r_ = " + text(w.s->vr_menu_r_) + ", " + "vr_menu_u_ = " + text(w.s->vr_menu_u_) + ", " + "vr_menu_n_ = " + text(w.s->vr_menu_n_) + ", " + "vr_menu_w_ = " + text(w.s->vr_menu_w_) + ", " + "vr_menu_h_ = " + text(w.s->vr_menu_h_) + ", " + "vr_action_ = " + text(w.s->vr_action_) + ", " + "vr_scope_tex_ = " + text(w.s->vr_scope_tex_) + ", " + "vr_scope_mesh_ = " + text(w.s->vr_scope_mesh_) + ", " + "vr_hud_tex_ = " + text(w.s->vr_hud_tex_) + ", " + "vr_hud_mesh_ = " + text(w.s->vr_hud_mesh_) + ", " + "world_ = " + text(w.s->world_) + ", " + "city_ = " + text(w.s->city_) + ", " + "art_ = " + text(w.s->art_) + ", " + "soldier_ = " + text(w.s->soldier_) + ", " + "drone_actor_ = " + text(w.s->drone_actor_) + ", " + "jet_actor_ = " + text(w.s->jet_actor_) + ", " + "chute_actor_ = " + text(w.s->chute_actor_) + ", " + "drone_ = " + text(w.s->drone_) + ", " + "jet_ = " + text(w.s->jet_) + ", " + "cars_ = " + text(w.s->cars_) + ", " + "mode_ = " + text(w.s->mode_) + ", " + "car_index_ = " + text(w.s->car_index_) + ", " + "focus_prev_ = " + text(w.s->focus_prev_) + ", " + "focus_prev_valid_ = " + text(w.s->focus_prev_valid_) + ", " + "jet_flown_ = " + text(w.s->jet_flown_) + ", " + "jet_v_valid_ = " + text(w.s->jet_v_valid_) + ", " + "jet_v_ctrl_ = " + text(w.s->jet_v_ctrl_) + ", " + "drone_out_ = " + text(w.s->drone_out_) + ", " + "jet_placed_ = " + text(w.s->jet_placed_) + ", " + "world_placed_ = " + text(w.s->world_placed_) + ", " + "chute_open_ = " + text(w.s->chute_open_) + ", " + "chute_time_ = " + text(w.s->chute_time_) + ", " + "chute_steer_ = " + text(w.s->chute_steer_) + ", " + "sticks_ = " + text(w.s->sticks_) + ", " + "jet_in_ = " + text(w.s->jet_in_) + ", " + "landing_ = " + text(w.s->landing_) + ", " + "landing_still_ = " + text(w.s->landing_still_) + ", " + "height_held_ = " + text(w.s->height_held_) + ", " + "drone_cam_ = " + text(w.s->drone_cam_) + ", " + "car_cockpit_ = " + text(w.s->car_cockpit_) + ", " + "jet_cockpit_ = " + text(w.s->jet_cockpit_) + ", " + "fpv_tilt_deg_ = " + text(w.s->fpv_tilt_deg_) + ", " + "fpv_fov_deg_ = " + text(w.s->fpv_fov_deg_) + ", " + "spawn_ = " + text(w.s->spawn_) + ", " + "cam_ = " + text(w.s->cam_) + ", " + "cam_valid_ = " + text(w.s->cam_valid_) + ", " + "cam_anchor_ = " + text(w.s->cam_anchor_) + ", " + "cam_vel_ = " + text(w.s->cam_vel_) + ", " + "cam_heading_ = " + text(w.s->cam_heading_) + ", " + "rig_init_ = " + text(w.s->rig_init_) + ", " + "head_yaw_ = " + text(w.s->head_yaw_) + ", " + "head_pitch_ = " + text(w.s->head_pitch_) + ", " + "sensitivity_ = " + text(w.s->sensitivity_) + ", " + "dpr_ = " + text(w.s->dpr_) + ", " + "pad_touch_ = " + text(w.s->pad_touch_) + ", " + "ctl_ = " + text(w.s->ctl_) + ", " + "touch_mode_ = " + text(w.s->touch_mode_) + ", " + "frame_w_ = " + text(w.s->frame_w_) + ", " + "frame_h_ = " + text(w.s->frame_h_) + ", " + "play_in_ = " + text(w.s->play_in_) + ", " + "people_ = " + text(w.s->people_) + ", " + "people_art_ = " + text(w.s->people_art_) + ", " + "combat_art_ = " + text(w.s->combat_art_) + ", " + "destruction_ = " + text(w.s->destruction_) + ", " + "combat_ = " + text(w.s->combat_) + ", " + "guided_ = " + text(w.s->guided_) + ", " + "guided_last_ = " + text(w.s->guided_last_) + ", " + "guided_lock_ = " + text(w.s->guided_lock_) + ", " + "guided_mark_ = " + text(w.s->guided_mark_) + ", " + "guided_mark_at_ = " + text(w.s->guided_mark_at_) + ", " + "guided_mark_time_ = " + text(w.s->guided_mark_time_) + ", " + "guided_marked_ = " + text(w.s->guided_marked_) + ", " + "car_last_hp_ = " + text(w.s->car_last_hp_) + ", " + "car_burn_seen_ = " + text(w.s->car_burn_seen_) + ", " + "pd_crit_ = " + text(converted::array_list(w.s->pd_crit_)) + ", " + "drone_crit_ = " + text(w.s->drone_crit_) + ", " + "ballot_ = " + text(w.s->ballot_) + ", " + "ballot_serial_ = " + text(w.s->ballot_serial_) + ", " + "bullet_pushes_ = " + text(w.s->bullet_pushes_) + ", " + "crit_blasts_ = " + text(w.s->crit_blasts_) + ", " + "sfx_cursor_ = " + text(converted::array_list(w.s->sfx_cursor_)) + ", " + "combat_audio_ready_ = " + text(w.s->combat_audio_ready_) + ", " + "roads_ = " + text(w.s->roads_) + ", " + "units_ = " + text(w.s->units_) + ", " + "pdrones_ = " + text(converted::array_list(w.s->pdrones_)) + ", " + "last_known_ = " + text(w.s->last_known_) + ", " + "last_contact_ = " + text(w.s->last_contact_) + ", " + "next_drone_wave_ = " + text(w.s->next_drone_wave_) + ", " + "emp_ready_at_ = " + text(w.s->emp_ready_at_) + ", " + "last_drone_shot_ = " + text(w.s->last_drone_shot_) + ", " + "last_player_hit_ = " + text(w.s->last_player_hit_) + ", " + "drone_serial_ = " + text(w.s->drone_serial_) + ", " + "drone_wave_live_ = " + text(w.s->drone_wave_live_) + ", " + "projectiles_ = " + text(w.s->projectiles_) + ", " + "foot_weapon_ = " + text(w.s->foot_weapon_) + ", " + "ammo_mag_ = " + text(converted::array_list(w.s->ammo_mag_)) + ", " + "ammo_reserve_ = " + text(converted::array_list(w.s->ammo_reserve_)) + ", " + "grenades_ = " + text(w.s->grenades_) + ", " + "drone_weapon_ = " + text(w.s->drone_weapon_) + ", " + "jet_rocket_side_ = " + text(w.s->jet_rocket_side_) + ", " + "jacked_at_ = " + text(w.s->jacked_at_) + ", " + "jet_cam_off_ = " + text(w.s->jet_cam_off_) + ", " + "next_attack_ = " + text(w.s->next_attack_) + ", " + "next_grenade_ = " + text(w.s->next_grenade_) + ", " + "next_drone_fire_ = " + text(w.s->next_drone_fire_) + ", " + "next_jet_gun_ = " + text(w.s->next_jet_gun_) + ", " + "next_jet_missile_ = " + text(w.s->next_jet_missile_) + ", " + "next_jet_bomb_ = " + text(w.s->next_jet_bomb_) + ", " + "trigger_was_ = " + text(w.s->trigger_was_) + ", " + "explosions_ = " + text(w.s->explosions_) + ", " + "net_ = " + text(w.s->net_) + ", " + "remote_car_ = " + text(w.s->remote_car_) + ", " + "remote_bus_ = " + text(w.s->remote_bus_) + ", " + "rebased_ = " + text(w.s->rebased_) + ", " + "mp_ = " + text(w.s->mp_) + ", " + "lamps_ = " + text(w.s->lamps_) + ", " + "ground_changes_ = " + text(w.s->ground_changes_) + ", " + "night_ = " + text(w.s->night_) + ", " + "show_lamps_ = " + text(w.s->show_lamps_) + ", " + "star_since_ = " + text(w.s->star_since_) + ", " + "last_wave_ = " + text(w.s->last_wave_) + ", " + "last_cop_shot_ = " + text(w.s->last_cop_shot_) + ", " + "drone_hp_ = " + text(w.s->drone_hp_) + ", " + "jet_hp_ = " + text(w.s->jet_hp_) + ", " + "last_stars_ = " + text(w.s->last_stars_) + ", " + "player_dead_ = " + text(w.s->player_dead_) + ", " + "died_at_ = " + text(w.s->died_at_) + ", " + "died_feet_ = " + text(w.s->died_feet_) + ", " + "respawn_rule_ = " + text(w.s->respawn_rule_) + ", " + "reset_revive_ = " + text(w.s->reset_revive_) + ", " + "spawn_guard_ = " + text(w.s->spawn_guard_) + ", " + "spawn_guard_until_ = " + text(w.s->spawn_guard_until_) + ", " + "spawn_guard_ready_at_ = " + text(w.s->spawn_guard_ready_at_) + ", " + "hint_ = " + text(w.s->hint_) + ", " + "toast_ = " + text(w.s->toast_) + ", " + "toast_age_ = " + text(w.s->toast_age_) + ", " + "time_ = " + text(w.s->time_) + ", " + "fps_ = " + text(w.s->fps_) + ", " + "steps_ = " + text(converted::shaped<converted::Whole>(w.s->steps_)) + ", " + "rng_ = " + text(w.s->rng_) + ", " + "spawn_checked_ = " + text(w.s->spawn_checked_) + ", " + "mixer_ = " + text(w.s->mixer_) + ", " + "bank_ = " + text(w.s->bank_) + ", " + "game_audio_ = " + text(w.s->game_audio_) + ", " + "fx_ = " + text(w.s->fx_) + ", " + "audio_out_ = " + text(w.s->audio_out_) + ", " + "web_audio_ = " + text(w.s->web_audio_) + ", " + "osfx_ = " + text(w.s->osfx_) + ", " + "shot_flesh_ = " + text(w.s->shot_flesh_) + ", " + "lon_ = " + text(w.s->lon_) + ", " + "lat_ = " + text(w.s->lat_) + ", " + "start_mode_ = " + text(w.s->start_mode_) + ", " + "mobile_ = " + text(w.s->mobile_) + ", " + "ui_ = " + text(w.s->ui_) + ", " + "look_ = " + text(w.s->look_) + ", " + "glife_ = " + text(w.s->glife_) + "}"; }
 inline int Server::max_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.max_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
 inline bool Server::client_connected(const int& index) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.client_connected", {converted::value_of(*this), converted::value_of(index)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Server::send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline void World::destroy_shape(const physics::Shape& shape) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_shape", {converted::value_of(*this), converted::value_of(shape)}); }
-inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
 inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
@@ -12176,30 +11712,6 @@ KERN_TEST(converted_Game__game_destruction_sync_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::dsync_update
-    converted::Tally tally("dsync_update");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->dsync_update(std::move(a0)); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      double a0 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

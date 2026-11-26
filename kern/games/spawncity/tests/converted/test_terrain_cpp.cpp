@@ -18,6 +18,7 @@
 
 namespace converted_terrain_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -94,7 +95,7 @@ bool fail(const char* text, ...) __attribute__((format(printf, 1, 2)));
 double now_ms();
 template <class T>
 constexpr T max_of(T a, T b) { return a < b ? b : a; }
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -102,7 +103,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
 
@@ -122,8 +123,8 @@ struct Quat {
 struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct KERN_BLUEPRINT_TYPE Material {
   Vec4 color{1, 1, 1, 1};
   AlphaMode alpha = AlphaMode::opaque;
   f32 alpha_cutoff = 0.5;
@@ -145,7 +146,7 @@ struct Material {
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -170,7 +171,7 @@ struct MeshData {
   
 };
 struct Renderer;
-struct MeshLook {
+struct KERN_BLUEPRINT_TYPE MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
   u32 texture = 0;      // GPU texture handle (0 = none)
@@ -184,13 +185,13 @@ struct HeightSampler {
   void* user = nullptr;
   
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct BodySettings {
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE BodySettings {
   BodyType type = BodyType::dynamic;
   Vec3 position;
   Quat rotation;
@@ -199,7 +200,7 @@ namespace physics { struct BodySettings {
   bool enable_sleep = true, awake = true, enabled = true, bullet = false;
   u64 user = 0;  // returned by World::body_user
 }; }
-namespace physics { struct ShapeMaterial {
+namespace physics { struct KERN_BLUEPRINT_TYPE ShapeMaterial {
   f32 density = 1;            // kg/m^3
   f32 friction = 0.6;
   f32 restitution = 0;        // 0..1
@@ -211,7 +212,7 @@ namespace physics { struct ShapeMaterial {
   u64 user = 0;               // returned by World::shape_user
   Surface surface = Surface::none;
 }; }
-namespace physics { struct ShapeSettings {
+namespace physics { struct KERN_BLUEPRINT_TYPE ShapeSettings {
   ShapeKind kind = ShapeKind::box;
   Vec3 center;               // body-local placement of the shape
   Quat rotation;
@@ -252,7 +253,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -277,11 +278,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -828,7 +829,7 @@ void Terrain::plan_windows(Vec3 focus) {
 }
 bool Terrain::plan_dem(Vec2 centre, f32 half, bool side) {
   if (!dem_ || job_) return false;
-  const f64 now = now_ms();
+  const f64 now = ::converted_terrain_cpp::now_ms();
   if (now < retry_at_) return false;
   const f32 cx = std::round(centre.x / 50) * 50, cy = std::round(centre.y / 50) * 50;
   f64 lon_a, lat_a, lon_b, lat_b;
@@ -908,7 +909,7 @@ bool Terrain::run_job(f64 deadline) {
   std::vector<u8> out;
   if (!jobs::take(j.id, out)) return false;
   j.id = 0;
-  if (out.size() != converted::times(converted::times(static_cast<std::size_t>(g.n), g.n), 4)) { job_.reset(); retry_at_ = now_ms() + 1500; return true; }
+  if (out.size() != converted::times(converted::times(static_cast<std::size_t>(g.n), g.n), 4)) { job_.reset(); retry_at_ = ::converted_terrain_cpp::now_ms() + 1500; return true; }
   converted::layout::copy_bytes<true, false>(g.h.data(), out.data(), out.size());
   if (j.side) {
     // a far mate's window: kept beside the player's; the ground there is built again from it
@@ -1556,7 +1557,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
   look.material.cast_shadow = false;
   look.material.double_sided = true;
   const u32 id = r_->allocate_id();
-  if (!upsert(*r_, id, m, look)) { r_->release_id(id); return; }
+  if (!::converted_terrain_cpp::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   RenderTile& t = render_[key3(level, ti, tj)];
   if (t.mesh) r_->remove(t.mesh);
   t.mesh = id;
@@ -1709,7 +1710,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
   look.material.alpha = AlphaMode::blend;
   look.extra_slot = 1;  // the second extension's stream (main.cpp: facades, water)
   const u32 id = r_->allocate_id();
-  if (!upsert(*r_, id, m, look)) { r_->release_id(id); return; }
+  if (!::converted_terrain_cpp::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   if (slot) r_->remove(slot);
   slot = id;
 }
@@ -1727,7 +1728,7 @@ bool Terrain::ready_at(Vec3 p) const {
 }
 void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   if (!r_ || !world_) return;
-  const f64 deadline = now_ms() + budget_ms;
+  const f64 deadline = ::converted_terrain_cpp::now_ms() + budget_ms;
   plan_windows(focus);
   plan_images(focus);
   if (job_) run_job(deadline);
@@ -1756,14 +1757,14 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   // 1. collision (what stands on it must not fall), 2. render, 3. water
   for (u64 k : want_collision_) {
     if (collision_.count(k) && !dirty_collision_.count(k)) continue;
-    if (now_ms() > deadline) { missing = true; break; }
+    if (::converted_terrain_cpp::now_ms() > deadline) { missing = true; break; }
     build_collision_tile(static_cast<i32>(converted::shr_bits(k, 32)), static_cast<i32>(k & 0xffffffffu));
     dirty_collision_.erase(k);
     ++stats_.rebuilds;
   }
   for (u64 k : want_render_) {
     if (render_.count(k) && !dirty_render_.count(k)) continue;
-    if (now_ms() > deadline) { missing = true; break; }
+    if (::converted_terrain_cpp::now_ms() > deadline) { missing = true; break; }
     i32 level, i, j;
     unkey3(k, level, i, j);
     build_render_tile(level, i, j);
@@ -1774,7 +1775,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
     const i32 wi = static_cast<i32>(converted::shr_bits(k, 32)), wj = static_cast<i32>(k & 0xffffffffu);
     const bool detail = rect_distance(focus.x, focus.y, wi * kWaterChunk, wj * kWaterChunk, (converted::plus(wi, 1)) * kWaterChunk, (converted::plus(wj, 1)) * kWaterChunk) < 1000;
     if (water_meshes_.count(k) && !dirty_water_.count(k) && water_detail_[k] == detail) continue;
-    if (now_ms() > deadline) { missing = true; break; }
+    if (::converted_terrain_cpp::now_ms() > deadline) { missing = true; break; }
     build_water_chunk(wi, wj, detail);
     dirty_water_.erase(k);
   }
@@ -2737,7 +2738,7 @@ KERN_TEST(converted_terrain_cpp) {
       converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
