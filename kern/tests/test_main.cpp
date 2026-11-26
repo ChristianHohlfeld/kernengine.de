@@ -8616,7 +8616,7 @@ TEST(program_beside_an_app_of_cpp) {
   } cpp;
   std::string error;
   logic::Graph lib, app;
-  CHECK(logic::from_cpp("struct Codes : kern::Library {\n"
+  CHECK(logic::from_cpp("struct Codes : virtual kern::Library {\n"
                         "  struct twiceResult { Int Result = 0; };\n"
                         "  KERN_PURE twiceResult twice(Int x = 0) {\n"
                         "    return {kern::formula([](Float x) -> Float { return (x * 2.0); }, kern::to<Float>(x))};\n"
@@ -8639,9 +8639,9 @@ TEST(program_beside_an_app_of_cpp) {
   CHECK(program.start(empty, cpp, &error) && program.app() == &cpp && program.runtime()->instances().empty());
   program.end();
   // one App: a Blueprint of the project that implements App too - refused, named
-  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8651,7 +8651,7 @@ TEST(program_beside_an_app_of_cpp) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(error.empty());
