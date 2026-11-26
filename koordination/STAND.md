@@ -121,3 +121,9 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - zahlen7 (work-zahlen fcbcc0ef, CI 45863021396 läuft): Konverter-Ausdrücke, Murmel bitgenau.
 - editor (work-zahlen-editor, noch nicht gepusht): Beleg-Zweig work-beleg-editor-<commit> erlaubt (nur cp spawncity.html ausgelassen, nie mischen).
 - konverter7: work-konverter 058aa524, CI 45865013913 läuft.
+
+## Nachtrag 26.11. 18:50 (Kontrolle)
+- work-projekt 0a7bba61 Gate 45867270705: native, build, determinism, input, converter-cases, murmel, murmel-web, native-build GRÜN; e2e läuft; rot erwartet: native-spawncity-build, e2e-spawncity. Fall hyperbolic dort ohne f32-Funktion (kommt auf work-zahlen zurück, an zahlen7).
+- work-spiel c12c930c: Probe 1 (64de83ea) 548/577, Bibliotheken 0 wartend. Probe 2 rc=1: Konverter-Fehler bind(Runtime&) + Engine-Lücke „Regel-Akteure vom Programm aus C++" → konverter7: ActorBlueprint::bind(ActorHandle)/Call on Actor; danach 3 App-Lücken (Export auf App-Zustand, Zustand mit Basis/extensions, WorldSettings). Fassaden-/Wasser-Shader vorerst heraus. Laufzeit-Abfrage step_hz heraus (Test hält 240).
+- work-zahlen-editor 57a5765e: Punkte 1–5 gebaut; Beleg-Zweig darf SpawnCity-Teil von „Assemble the site" auslassen.
+- work-konverter 02c1ca55 (CI wartet).
