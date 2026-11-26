@@ -205,6 +205,7 @@ class WasmGen {
       op(kSelect);
       f64c(-9223372036854775808.0); op(kF64Max);
       f64c(9223372036854775808.0); op(kF64Min);
+      f64c(0); op(kF64Add);  // (an Int has no -0: -0 + 0 is 0)
     }
     else if (t == PinType::boolean) { bool_of_f64(); to_f64_from_bool(); }
   }
@@ -263,34 +264,18 @@ class WasmGen {
     if (t == "math.add") { value(node, "a", depth); value(node, "b", depth); op(kF64Add); return; }
     if (t == "math.sub") { value(node, "a", depth); value(node, "b", depth); op(kF64Sub); return; }
     if (t == "math.mul") { value(node, "a", depth); value(node, "b", depth); op(kF64Mul); return; }
-    if (t == "math.min") { value(node, "a", depth); value(node, "b", depth); op(kF64Min); return; }
-    if (t == "math.max") { value(node, "a", depth); value(node, "b", depth); op(kF64Max); return; }
     if (t == "math.abs") { value(node, "a", depth); op(kF64Abs); return; }
     if (t == "math.copysign") { value(node, "a", depth); value(node, "b", depth); op(kF64Copysign); return; }  // (WebAssembly's f64.copysign: the same bit operation)
     if (t == "math.negate") { value(node, "a", depth); op(kF64Neg); return; }
-    if (t == "math.sqrt") { value(node, "a", depth); f64c(0); op(kF64Max); op(kF64Sqrt); return; }
     if (t == "math.floor") { value(node, "a", depth); op(kF64Floor); return; }
-    if (t == "math.round") {  // llround: half away from zero
-      value(node, "a", depth);
-      lset(kF0);
-      lget(kF0); op(kF64Abs); f64c(0.5); op(kF64Add); op(kF64Floor); lget(kF0); op(kF64Copysign);
-      return;
-    }
-    if (t == "math.div" || t == "math.mod") {
+    // (Modulo, Round, Min, Max, Clamp, Square Root: never inline - Instance::inline_pure - WebAssembly's f64.min/max,
+    // a - trunc(a / b) * b and floor(|a| + 0.5) give otherwise than the node at a NaN, at -0 and at the edges of rounding)
+    if (t == "math.div") {
       two("a", "b");
-      if (t == "math.div") { lget(kF0); lget(kF1); op(kF64Div); }
-      else { lget(kF0); lget(kF1); lget(kF0); lget(kF1); op(kF64Div); op(kF64Trunc); op(kF64Mul); op(kF64Sub); }
+      lget(kF0); lget(kF1); op(kF64Div);
       f64c(0);
       lget(kF1); f64c(0); op(kF64Ne);
       op(kSelect);
-      return;
-    }
-    if (t == "math.clamp") {
-      value(node, "value", depth); value(node, "min", depth); value(node, "max", depth);
-      lset(kF2); lset(kF1); lset(kF0);
-      lget(kF1); lget(kF2); op(kF64Min);
-      lget(kF0); lget(kF1); lget(kF2); op(kF64Max); op(kF64Min);
-      op(kF64Max);
       return;
     }
     if (t == "math.lerp") {
