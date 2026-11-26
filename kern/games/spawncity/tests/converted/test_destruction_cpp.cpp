@@ -14,6 +14,7 @@
 
 namespace converted_destruction_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -40,14 +41,8 @@ struct KeyIndex : converted::EngineObject {
 };
 struct Earcut : converted::EngineObject {
   Earcut();
-  void triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const;
-  ~Earcut();
-  Earcut(const Earcut&) = default;
-  Earcut(Earcut&&) = default;
-  Earcut& operator=(const Earcut&) = default;
-  Earcut& operator=(Earcut&& o) noexcept;
 };
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -55,7 +50,7 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -72,7 +67,7 @@ struct Quat {
 
 
 };
-struct Mat4 {
+struct KERN_BLUEPRINT_TYPE Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
   
@@ -165,65 +160,11 @@ struct Mat4 {
 
 };
 struct Bvh;
-constexpr u32 kMaxExtensionAttributes = 2;
-constexpr u32 kMaxMaterialParams = 8;
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
-  Vec4 color{1, 1, 1, 1};
-  AlphaMode alpha = AlphaMode::opaque;
-  f32 alpha_cutoff = 0.5;
-  f32 roughness = 1.0;
-  f32 metalness = 0.0;
-  Vec3 emissive{0, 0, 0};      // linear HDR colour added after lighting (feeds bloom)
-  bool unlit = false;
-  bool double_sided = false;
-  bool cast_shadow = true;
-  bool frustum_culled = true;
-  bool viewmodel = false;      // first-person layer: drawn last after a depth clear
-  bool linear_colors = false;  // vertex colours are linear (skip the sRGB decode)
-  bool lines = false;          // line list (pairs of vertices), always unlit, never casts shadows or is picked
-  /// Parameters owned by shader extensions (see ShaderExtension::material_keys).
-  i32 params[kMaxMaterialParams] = {};
-
-  
-};
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
-  std::vector<f32> positions, normals, colors, uvs;
-  std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
-  u32 extra_size = 0;
-  std::vector<u32> indices;
-
-  
-  
-  
-
-
-  void push(Vec3 p, Vec3 n, Vec3 c, Vec2 uv) {
-    positions.insert(positions.end(), {p.x, p.y, p.z});
-    normals.insert(normals.end(), {n.x, n.y, n.z});
-    colors.insert(colors.end(), {c.x, c.y, c.z});
-    uvs.insert(uvs.end(), {uv.x, uv.y});
-  }
-  
-  
-
-
-  /// Borrowed MeshInput view (geometry only; material etc. stay default).
-  
-};
 struct Renderer;
-struct MeshLook {
-  Material material;
-  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
-  u32 texture = 0;      // GPU texture handle (0 = none)
-  bool visible = true;
-  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
-  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
-};
-struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -236,7 +177,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -261,11 +202,11 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -278,44 +219,17 @@ struct Bvh : converted::EngineObject {
 };
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  unsigned int allocate_id() const;
-  void release_id(const unsigned int& id) const;
   bool remove(const unsigned int& id) const;
   bool update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed = nullptr) const;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
-namespace physics { struct ShapeMaterial {
-  f32 density = 1;            // kg/m^3
-  f32 friction = 0.6;
-  f32 restitution = 0;        // 0..1
-  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
-  bool sensor = false;
-  u64 category_bits = 1, mask_bits = ~0ull;
-  i32 group_index = 0;
-  bool contact_events = true, sensor_events = true, hit_events = false;
-  u64 user = 0;               // returned by World::shape_user
-  Surface surface = Surface::none;
-}; }
-namespace physics { struct ShapeSettings {
-  ShapeKind kind = ShapeKind::box;
-  Vec3 center;               // body-local placement of the shape
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5;         // sphere, capsule
-  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
-  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
-  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
-  ShapeMaterial material;
-}; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  void destroy_shape(const physics::Shape& shape) const;
-  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -323,7 +237,6 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 struct Rng {
   // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
@@ -347,7 +260,38 @@ struct Rng {
 
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
-namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+namespace mvt { struct Value {
+  enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
+  std::string s;
+  f64 n = 0;
+  bool b = false;
+}; }
+namespace mvt { struct Feature {
+  u64 id = 0;
+  GeomType type = GeomType::unknown;
+  std::vector<std::pair<u32, u32>> tags;  // key index, value index into the layer
+  /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
+  std::vector<std::vector<Vec2>> parts;
+}; }
+namespace mvt { struct Layer {
+  std::string name;
+  u32 extent = 4096;
+  std::vector<std::string> keys;
+  std::vector<Value> values;
+  std::vector<Feature> features;
+  /// The value of a tag on a feature: its index in `values` (-1 when absent).
+  
+  
+  
+}; }
+namespace mvt { struct Tile {
+  std::vector<Layer> layers;
+  /// The layer of that name: its index in `layers` (-1 when the tile has none).
+  
+}; }
+namespace mvt { struct Piece {
+  std::size_t at = 0, end = 0;
+}; }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -680,12 +624,12 @@ struct CityStream {
   struct BuildingRef { u64 tile = 0; u32 index = 0; };
   struct AreaRef { u64 key = 0; u64 tile = 0; u32 index = 0; };
   /// The map features of a tile (of a tile that is not loaded: none).
-  const MapFeatures& features(u64 tile) const;
+  
   /// What a reference names, while its tile is loaded.
-  const MapFeatures::Building& building(const BuildingRef& ref) const { return converted::at(features(ref.tile).buildings, ref.index); }
+  
   
   /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
-  void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
+  
   /// Every built tile (their map features: the minimap, web/view.mjs).
   
   /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
@@ -702,7 +646,7 @@ struct CityStream {
   /// its map feature. Its 160 m mesh chunk is rebuilt as a job and swapped in one step, its
   /// collider replaced alone. The damage outlives the tile (a re-streamed tile keeps it) until
   /// clear_damage().
-  bool damage_building(u64 tile, u32 index, f32 new_top, bool leveled);
+  
   /// Every building back to its full height (RESET).
   void clear_damage();
   
@@ -768,7 +712,7 @@ struct CityStream {
   
   
   
-  physics::Shape building_shape(physics::Body body, const MapFeatures::Building& b);
+  
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
   converted::wide::Map<u32, Damage> damage_;
@@ -874,7 +818,7 @@ struct Destruction {
   
   /// A weapon's blast at `at` (radius m, the blast's damage); `missile`: the guided missile (x 2.2).
   /// Returns how many buildings lost height.
-  u32 blast(Vec3 at, f32 radius, f32 damage, bool missile, CityStream& city, Rng& rng);
+  
   void update(f32 dt, const CityStream& city, Rng& rng);
   void draw(CombatArt& art) const;
   /// RESET / a new city: every building whole, no debris, no points lost.
@@ -906,8 +850,8 @@ struct Destruction {
     Vec3 center, dir, axis, pivot, offset;
     f32 tilt = 0, speed = 0, lift = 0, break_at = 1, age = 0;
   };
-  void collapse(const Broken& b, Vec3 center, CityStream& city, Rng& rng);
-  bool tear(const Broken& b, Vec3 center, Rng& rng);
+  
+  
   void fracture(const Broken& b, Vec3 center, Vec3 offset, f32 boost, Rng& rng);
   void spawn(Vec3 at, Vec3 v, Vec3 size, f32 yaw, Vec3 tint, Rng& rng);
   void free_torn(Torn& t);
@@ -1048,109 +992,6 @@ bool Terrain::water_at(f32 x, f32 y) const {
   if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
   return bridges_.empty() || !on_bridge(x, y);
 }
-void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const {
-  for (const auto& [k, t] : tiles_) {
-    if (converted::present(t)->state != Tile::State::ready && converted::present(t)->state != Tile::State::collision) continue;
-    for (std::size_t i = 0; i < converted::present(t)->features.buildings.size(); converted::pre_inc(i)) {
-      const MapFeatures::Building& b = converted::at(converted::present(t)->features.buildings, i);
-      if (b.rings.empty() || converted::at(b.rings, 0).size() < 3) continue;
-      f32 x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-      for (Vec2 q : converted::at(b.rings, 0)) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
-      if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k, static_cast<u32>(i)});
-    }
-  }
-}
-namespace city_stream_cpp_local { f64 signed_area(const std::vector<Vec2>& r) {
-  f64 a = 0;
-  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += static_cast<f64>(converted::at(r, j).x) * converted::at(r, i).y - static_cast<f64>(converted::at(r, i).x) * converted::at(r, j).y;
-  return a * 0.5;
-} }
-physics::Shape CityStream::building_shape(physics::Body body, const MapFeatures::Building& b) {
-  Earcut earcut;
-  std::vector<f64> xy;
-  std::vector<u32> holes, tris, idx;
-  std::vector<Vec3> pts;
-  xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
-  std::vector<std::vector<Vec2>> rings = b.rings;
-  // MAX_VERTICES 64 per ring
-  for (auto& ring : rings)
-    if (ring.size() > 64) { const std::size_t step = converted::quot((converted::plus(ring.size(), 63)), 64); std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); converted::plus_to(k, step)) thin.push_back(converted::at(ring, k)); ring = std::move(thin); }
-  for (std::size_t r = 0; r < rings.size(); converted::pre_inc(r)) {
-    auto& ring = converted::at(rings, r);
-    if (ring.size() < 3) continue;
-    const f64 a = city_stream_cpp_local::signed_area(ring);
-    if (std::fabs(a) < 0.5) continue;
-    if ((r == 0) != (a > 0)) std::reverse(ring.begin(), ring.end());  // outer CCW, courtyards CW
-    if (r) holes.push_back(static_cast<u32>(converted::quot(xy.size(), 2)));
-    for (Vec2 p : ring) xy.insert(xy.end(), {p.x, p.y});
-    // Walls: quads per edge, outward = right of the edge for CCW outer / CW holes.
-    for (std::size_t i = 0; i < ring.size(); converted::pre_inc(i)) {
-      const Vec2 p0 = converted::at(ring, i), p1 = converted::at(ring, converted::rem((converted::plus(i, 1)), ring.size()));
-      const u32 base = static_cast<u32>(pts.size());
-      pts.push_back({p0.x, p0.y, b.base});
-      pts.push_back({p1.x, p1.y, b.base});
-      pts.push_back({p1.x, p1.y, b.top});
-      pts.push_back({p0.x, p0.y, b.top});
-      idx.insert(idx.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
-    }
-  }
-  if (xy.size() >= 6) {
-    earcut.triangulate(xy.data(), static_cast<u32>(converted::quot(xy.size(), 2)), holes.data(), static_cast<u32>(holes.size()), tris);
-    const u32 base = static_cast<u32>(pts.size());
-    for (std::size_t i = 0; i < converted::quot(xy.size(), 2); converted::pre_inc(i)) pts.push_back({static_cast<f32>(converted::at(xy, converted::times(i, 2))), static_cast<f32>(converted::at(xy, converted::plus(converted::times(i, 2), 1))), b.top});
-    for (std::size_t i = 0; converted::plus(i, 2) < tris.size(); converted::plus_to(i, 3)) {
-      u32 a = base + converted::at(tris, i), c = base + converted::at(tris, converted::plus(i, 1)), d = base + converted::at(tris, converted::plus(i, 2));
-      if (converted::wide::cross(converted::at(pts, c) - converted::at(pts, a), converted::at(pts, d) - converted::at(pts, a)).z < 0) std::swap(c, d);
-      idx.insert(idx.end(), {a, c, d});
-    }
-  }
-  if (!idx.empty()) {
-    physics::ShapeSettings ss;
-    ss.kind = physics::ShapeKind::mesh;
-    ss.points = Span<const Vec3>(pts.data(), pts.size());
-    ss.indices = Span<const u32>(idx.data(), idx.size());
-    ss.material.friction = 0.7;
-    ss.material.category_bits = kCatWorld;
-    return world_->create_shape(body, ss);
-  }
-  return {};
-}
-bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled) {
-  auto it = tiles_.find(tile);
-  if (it == tiles_.end() || !converted::present(it->second)->prepared || index >= converted::present(it->second)->features.buildings.size()) return false;
-  Tile& t = *converted::present(it->second);
-  MapFeatures::Building& b = converted::at(t.features.buildings, index);
-  if (!(new_top < b.top - 0.01)) return false;
-  b.top = std::fmax(b.base + 0.3, new_top);
-  b.leveled = b.leveled || leveled;
-  ++damage_serial_;
-  Damage& d = damage_[b.seed];
-  d.height = b.top - b.base;
-  d.leveled = b.leveled;
-  if (!damage_quiet_) damage_log_.push_back(b.seed);
-  // the drawing: its chunk alone (when the building is drawn at all)
-  if (index < t.cent.size() && t.cell_ids.count(city_stream_cpp_local::cell_of(converted::at(t.cent, index)))) t.dirty_cells.insert(city_stream_cpp_local::cell_of(converted::at(t.cent, index)));
-  // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
-  // destroyed and created on a static body; no teleport, no filter change, no rebuild of the set)
-  NearCollision& n = near_;
-  if (n.building) { n.dirty = true; return true; }  // the set being built: built again after it
-  for (std::size_t k = 0; k < n.list.size(); converted::pre_inc(k)) {
-    if (converted::at(n.list, k).first != tile || converted::at(n.list, k).second != index) continue;
-    if (k < n.shapes.size()) {
-      if (converted::at(n.shapes, k).valid()) { world_->destroy_shape(converted::at(n.shapes, k)); --n.colliders; }
-      converted::at(n.shapes, k) = building_shape(n.body, b);
-      if (converted::at(n.shapes, k).valid()) ++n.colliders;
-    }
-    break;
-  }
-  return true;
-}
-namespace city_stream_cpp_local { const MapFeatures kNoFeatures{}; }
-const MapFeatures& CityStream::features(u64 tile) const {
-  const auto it = tiles_.find(tile);
-  return it != tiles_.end() ? converted::present(it->second)->features : city_stream_cpp_local::kNoFeatures;
-}
 constexpr f32 kGravity = 9.81;
 constexpr f32 kPanelMax = 7;
 constexpr u32 kMaxPieces = 40;
@@ -1169,124 +1010,6 @@ bool Destruction::merge_points(const std::vector<std::pair<u32, f32>>& list, boo
     if (log) points_log_.emplace_back(seed, hp);
   }
   return changed;
-}
-u32 Destruction::blast(Vec3 at, f32 radius, f32 damage, bool missile, CityStream& city, Rng& rng) {
-  const f32 r = std::clamp(radius, 2.0, 40.0);
-  const f32 power = std::clamp(damage, 10.0, 400.0) * (missile ? 2.2 : 1.0);
-  std::vector<CityStream::BuildingRef> near;
-  city.buildings_near({at.x, at.y}, r, near);
-  u32 touched = 0;
-  for (const CityStream::BuildingRef& ref : near) {
-    const MapFeatures::Building& b = city.building(ref);
-    if (b.rings.empty() || converted::at(b.rings, 0).size() < 3 || b.leveled) continue;
-    Vec2 lo{1e30, 1e30}, hi{-1e30, -1e30};
-    for (Vec2 p : converted::at(b.rings, 0)) { lo = {std::fmin(lo.x, p.x), std::fmin(lo.y, p.y)}; hi = {std::fmax(hi.x, p.x), std::fmax(hi.y, p.y)}; }
-    const f32 dx = std::fmax(std::fmax(lo.x - at.x, 0.0), at.x - hi.x), dy = std::fmax(std::fmax(lo.y - at.y, 0.0), at.y - hi.y);
-    const f32 d = kern::math::sqrt(dx * dx + dy * dy + kern::math::pow(std::fmax(0.0, at.z - b.top), 2.0));
-    if (d > r) continue;
-    // the points belong to the whole building (its undamaged volume)
-    const f32 height = std::fmax(1.0, b.full_top - b.base);
-    const f32 full = std::fmax(220.0, (hi.x - lo.x) * (hi.y - lo.y) * height * 0.22);
-    auto [it, fresh] = points_.try_emplace(b.seed, full);
-    (void)fresh;
-    const f32 hp = std::fmax(0.0, it->second - power * kern::math::pow(1 - d / r, 1.5) * 2.6);
-    it->second = hp;
-    points_log_.emplace_back(b.seed, hp);
-    const f32 keep = hp / full;
-    const f32 target = hp <= 0 ? b.base + std::fmin(kRubble, height) : b.base + std::fmax(kRubble, std::ceil(height * keep / kFloor) * kFloor);
-    if (target >= b.top - 0.4) continue;
-    Broken br;
-    br.rings = b.rings;
-    br.lo = lo;
-    br.hi = hi;
-    br.top = b.top;
-    br.new_top = target;
-    br.intensity = 0.35 + 0.6 * (1 - d / r);
-    Vec2 c{};
-    u32 n = 0;
-    for (const auto& ring : b.rings) for (Vec2 p : ring) { c = c + p; ++n; }
-    br.c = n ? c * (1.0 / static_cast<f32>(n)) : Vec2{at.x, at.y};
-    if (!city.damage_building(ref.tile, ref.index, target, hp <= 0)) continue;
-    ++touched;
-    stats_.collapsed += hp <= 0;
-    collapse(br, {at.x, at.y, 0}, city, rng);
-  }
-  stats_.hits += touched;
-  return touched;
-}
-void Destruction::collapse(const Broken& b, Vec3 center, CityStream& city, Rng& rng) {
-  (void)city;
-  const f32 removed = b.top - b.new_top;
-  if (removed < 0.5) return;
-  // a big part comes off as one piece first (it covers the frames until the chunk is swapped)
-  if (removed > 2 && b.intensity < 2.4 && torn_.size() < kTorn && tear(b, center, rng)) return;
-  fracture(b, center, {}, 1, rng);
-}
-bool Destruction::tear(const Broken& b, Vec3 center, Rng& rng) {
-  if (!r_) return false;
-  // the largest ring is the piece's outline
-  i32 largest = -1;  // (its place in b.rings)
-  f32 best = -1;
-  for (std::size_t k = 0; k < b.rings.size(); converted::pre_inc(k)) {
-    const std::vector<Vec2>& rr = converted::at(b.rings, k);
-    f32 a = 0;
-    for (std::size_t i = 0; i < rr.size(); converted::pre_inc(i)) { const Vec2 p = converted::at(rr, i), q = converted::at(rr, converted::rem((converted::plus(i, 1)), rr.size())); a += p.x * q.y - q.x * p.y; }
-    if (std::fabs(a) > best) { best = std::fabs(a); largest = static_cast<i32>(k); }
-  }
-  if (largest < 0 || converted::at(b.rings, static_cast<std::size_t>(largest)).size() < 3) return false;
-  const std::vector<Vec2>& ring = converted::at(b.rings, static_cast<std::size_t>(largest));
-  const Vec2 dir = norm2(b.c - Vec2{center.x, center.y}, {1, 0});
-  // it pivots on its leeward edge: the outline's farthest point along the blast direction
-  f32 reach = -1e30;
-  for (Vec2 p : ring) reach = std::fmax(reach, (p.x - b.c.x) * dir.x + (p.y - b.c.y) * dir.y);
-  const Vec3 pivot{b.c.x + dir.x * reach, b.c.y + dir.y * reach, b.new_top};
-  const f32 h = b.top - b.new_top;
-  std::vector<Vec2> pts;
-  for (Vec2 p : ring) pts.push_back({p.x - pivot.x, p.y - pivot.y});
-  if (pts.size() > 3 && hypot_bp(converted::front(pts).x - converted::back(pts).x, converted::front(pts).y - converted::back(pts).y) < 1e-4) converted::pop_back(pts);
-  if (pts.size() < 3) return false;
-  f32 area = 0;
-  for (std::size_t i = 0; i < pts.size(); converted::pre_inc(i)) { const Vec2 p = converted::at(pts, i), q = converted::at(pts, converted::rem((converted::plus(i, 1)), pts.size())); area += p.x * q.y - q.x * p.y; }
-  if (area < 0) std::reverse(pts.begin(), pts.end());  // counter-clockwise from above
-  std::vector<f64> xy;
-  for (Vec2 p : pts) xy.insert(xy.end(), {p.x, p.y});
-  std::vector<u32> tris;
-  Earcut earcut;
-  earcut.triangulate(xy.data(), static_cast<u32>(pts.size()), nullptr, 0, tris);
-  if (tris.empty()) return false;
-  const Vec3 col = converted::wide::hex_color(0xcdb99a);
-  MeshData m;
-  for (std::size_t i = 0; converted::plus(i, 2) < tris.size(); converted::plus_to(i, 3)) {
-    const Vec2 a = converted::at(pts, converted::at(tris, i)), c = converted::at(pts, converted::at(tris, converted::plus(i, 1))), d = converted::at(pts, converted::at(tris, converted::plus(i, 2)));
-    for (Vec2 q : {a, c, d}) m.push({q.x, q.y, h}, {0, 0, 1}, col, {q.x * 0.1, q.y * 0.1});
-    for (Vec2 q : {a, d, c}) m.push({q.x, q.y, 0}, {0, 0, -1}, col, {q.x * 0.1, q.y * 0.1});
-  }
-  for (std::size_t i = 0; i < pts.size(); converted::pre_inc(i)) {
-    const Vec2 a = converted::at(pts, i), c = converted::at(pts, converted::rem((converted::plus(i, 1)), pts.size()));
-    const Vec2 e = norm2(c - a, {1, 0});
-    const Vec3 nrm{e.y, -e.x, 0};  // outward of a counter-clockwise outline
-    for (Vec3 q : {Vec3{a.x, a.y, 0}, Vec3{c.x, c.y, 0}, Vec3{c.x, c.y, h}, Vec3{a.x, a.y, 0}, Vec3{c.x, c.y, h}, Vec3{a.x, a.y, h}})
-      m.push(q, nrm, col, {q.x * 0.1 + q.y * 0.1, q.z * 0.1});
-  }
-  Torn t;
-  t.mesh = r_->allocate_id();
-  MeshLook look;
-  look.material.roughness = 0.9;
-  look.material.double_sided = true;
-  const Mat4 at = Mat4::translate(pivot);
-  if (!upsert(*r_, t.mesh, m, look, Span<const f32>(at.m, 16))) { r_->release_id(t.mesh); return false; }
-  const f32 I = std::fmin(b.intensity, 2.4);
-  t.b = b;
-  t.center = center;
-  t.dir = {dir.x, dir.y, 0};
-  t.axis = {-dir.y, dir.x, 0};
-  t.pivot = pivot;
-  t.tilt = std::fmin(1.45, 0.35 + 0.55 * I + 0.25 * std::fmin(1.0, h / 30)) * rng.range(0.8, 1.1);
-  t.speed = (6 + 22 * I) * rng.range(0.75, 1.15);
-  t.lift = rng.range(1, 4) + 3 * I;
-  t.break_at = std::fmax(0.28, 1.15 - 0.38 * I) * rng.range(0.85, 1.2);
-  torn_.push_back(std::move(t));
-  return true;
 }
 void Destruction::fracture(const Broken& b, Vec3 center, Vec3 offset, f32 boost, Rng& rng) {
   const f32 removed = b.top - b.new_top;
@@ -2062,140 +1785,13 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const CombatArt& s) { return defined(s.r_) && defined(converted::array_list(s.parts_)); }
 [[maybe_unused]] static std::string text(const CombatArt& s) { return std::string("{") + text(s.r_) + ", " + text(converted::array_list(s.parts_)) + "}"; }
 [[maybe_unused]] static void take(CombatArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); { std::vector<CombatArt::Part> items; converted::take_as<std::vector<CombatArt::Part>>(items, (*v.rows)[1]); converted::array_from(s.parts_, items); } }
-[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
-  Quat s{};
-  s.x = draw.number();
-  s.y = draw.number();
-  s.z = draw.number();
-  s.w = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
-[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
-[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
-[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
-[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
-  physics::ShapeMaterial s{};
-  s.density = draw.number();
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  s.rolling_resistance = draw.number();
-  s.sensor = draw.flag();
-  s.category_bits = static_cast<u64>(draw.bits());
-  s.mask_bits = static_cast<u64>(draw.bits());
-  s.group_index = static_cast<int>(draw.whole());
-  s.contact_events = draw.flag();
-  s.sensor_events = draw.flag();
-  s.hit_events = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  s.surface = converted::enum_value<physics::Surface>(draw.below(4));
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
-[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.density, (*got.rows)[0]), ".density") && converted::at_place(same(want.friction, (*got.rows)[1]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[2]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[3]), ".rolling_resistance") && converted::at_place(same(want.sensor, (*got.rows)[4]), ".sensor") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]), ".category_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]), ".mask_bits") && converted::at_place(same(want.group_index, (*got.rows)[7]), ".group_index") && converted::at_place(same(want.contact_events, (*got.rows)[8]), ".contact_events") && converted::at_place(same(want.sensor_events, (*got.rows)[9]), ".sensor_events") && converted::at_place(same(want.hit_events, (*got.rows)[10]), ".hit_events") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]), ".user") && converted::at_place(same(want.surface, (*got.rows)[12]), ".surface"); }
-[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
-[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
-  physics::ShapeSettings s{};
-  s.kind = converted::enum_value<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  static std::deque<std::vector<Vec3>> kept_points;
-  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
-  s.points = {kept_points.back().data(), kept_points.back().size()};
-  static std::deque<std::vector<unsigned int>> kept_indices;
-  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
-  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
-  s.material = draw_kern__physics__ShapeMaterial(draw);
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
-[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]), ".points") && converted::at_place(same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]), ".indices") && converted::at_place(same(want.material, (*got.rows)[8]), ".material"); }
-[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
-[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
-}
-[[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
-  MeshData s{};
-  s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.normals = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.colors = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.uvs = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.extra = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.extra_size = static_cast<unsigned int>(draw.below(40));
-  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
-[[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
-[[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
-[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
-[[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
-  Material s{};
-  s.color = draw_kern__Vec4(draw);
-  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
-  s.alpha_cutoff = draw.number();
-  s.roughness = draw.number();
-  s.metalness = draw.number();
-  s.emissive = draw.vector();
-  s.unlit = draw.flag();
-  s.double_sided = draw.flag();
-  s.cast_shadow = draw.flag();
-  s.frustum_culled = draw.flag();
-  s.viewmodel = draw.flag();
-  s.linear_colors = draw.flag();
-  s.lines = draw.flag();
-  converted::fill_array(s.params, [&]() -> int { return static_cast<int>(draw.whole()); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
-[[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
-[[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
-[[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
-[[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
-  MeshLook s{};
-  s.material = draw_kern__Material(draw);
-  s.extra_slot = static_cast<unsigned int>(draw.below(40));
-  s.texture = static_cast<unsigned int>(draw.below(40));
-  s.visible = draw.flag();
-  s.layers = static_cast<unsigned int>(draw.below(40));
-  s.pick_bvh = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
-[[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
-[[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
-[[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
 inline Earcut::Earcut() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.make", {}); converted::take_made(*this, kern_out[0]); }
-inline void Earcut::triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.triangulate", {converted::value_of(*this), converted::value_of(std::vector<double>(xy, xy + converted::room(xy, 2 * static_cast<std::size_t>(vertex_count)))), converted::value_of(vertex_count), converted::value_of(std::vector<unsigned int>(hole_starts, hole_starts + converted::room(hole_starts, 1 * static_cast<std::size_t>(hole_count)))), converted::value_of(hole_count), converted::value_of(out)}); converted::take_as<std::vector<unsigned int>>(out, kern_out[0]); }
-inline Earcut::~Earcut() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {converted::value_of(*this)}); }
-inline Earcut& Earcut::operator=(Earcut&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
-inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
-inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
 inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
-inline void World::destroy_shape(const physics::Shape& shape) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_shape", {converted::value_of(*this), converted::value_of(shape)}); }
-inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
-inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 struct Out_Destruction_merge_points { Destruction Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_Destruction_merge_points& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Destruction_merge_points& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Destruction_merge_points& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_Destruction_tear { Destruction Self; bool Result; Rng rng; };
-[[maybe_unused]] static bool same(const Out_Destruction_tear& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.rng, (*got.rows)[2]), ".rng"); }
-[[maybe_unused]] static bool defined(const Out_Destruction_tear& s) { return defined(s.Self) && defined(s.Result) && defined(s.rng); }
-[[maybe_unused]] static std::string text(const Out_Destruction_tear& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.rng) + "}"; }
 struct Out_Destruction_spawn { Destruction Self; Rng rng; };
 [[maybe_unused]] static bool same(const Out_Destruction_spawn& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.rng, (*got.rows)[1]), ".rng"); }
 [[maybe_unused]] static bool defined(const Out_Destruction_spawn& s) { return defined(s.Self) && defined(s.rng); }
@@ -2204,14 +1800,6 @@ struct Out_Destruction_fracture { Destruction Self; Rng rng; };
 [[maybe_unused]] static bool same(const Out_Destruction_fracture& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.rng, (*got.rows)[1]), ".rng"); }
 [[maybe_unused]] static bool defined(const Out_Destruction_fracture& s) { return defined(s.Self) && defined(s.rng); }
 [[maybe_unused]] static std::string text(const Out_Destruction_fracture& s) { return std::string("{") + text(s.Self) + ", " + text(s.rng) + "}"; }
-struct Out_Destruction_collapse { Destruction Self; CityStream city; Rng rng; };
-[[maybe_unused]] static bool same(const Out_Destruction_collapse& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.city, (*got.rows)[1]), ".city") && converted::at_place(same(want.rng, (*got.rows)[2]), ".rng"); }
-[[maybe_unused]] static bool defined(const Out_Destruction_collapse& s) { return defined(s.Self) && defined(s.city) && defined(s.rng); }
-[[maybe_unused]] static std::string text(const Out_Destruction_collapse& s) { return std::string("{") + text(s.Self) + ", " + text(s.city) + ", " + text(s.rng) + "}"; }
-struct Out_Destruction_blast { Destruction Self; unsigned int Result; CityStream city; Rng rng; };
-[[maybe_unused]] static bool same(const Out_Destruction_blast& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.city, (*got.rows)[2]), ".city") && converted::at_place(same(want.rng, (*got.rows)[3]), ".rng"); }
-[[maybe_unused]] static bool defined(const Out_Destruction_blast& s) { return defined(s.Self) && defined(s.Result) && defined(s.city) && defined(s.rng); }
-[[maybe_unused]] static std::string text(const Out_Destruction_blast& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.city) + ", " + text(s.rng) + "}"; }
 struct Out_Destruction_free_torn { Destruction Self; Destruction::Torn t; };
 [[maybe_unused]] static bool same(const Out_Destruction_free_torn& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t"); }
 [[maybe_unused]] static bool defined(const Out_Destruction_free_torn& s) { return defined(s.Self) && defined(s.t); }
@@ -2272,30 +1860,6 @@ KERN_TEST(converted_destruction_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
-  {  // Destruction::tear
-    converted::Tally tally("Destruction_tear");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction& a0, [[maybe_unused]] Destruction::Broken& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] Rng& a3) { auto r = converted::counted([&] { return a0.tear(a1, std::move(a2), a3); }); return Out_Destruction_tear{std::move(a0), std::move(r), std::move(a3)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Destruction a0 = draw_Destruction(draw);
-      Destruction::Broken a1 = draw_Destruction__Broken(draw);
-      Vec3 a2 = draw.vector();
-      Rng a3 = draw_Rng(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
-    }
-  }
   {  // Destruction::spawn
     converted::Tally tally("Destruction_spawn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -2347,58 +1911,6 @@ KERN_TEST(converted_destruction_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
-    }
-  }
-  {  // Destruction::collapse
-    converted::Tally tally("Destruction_collapse");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction& a0, [[maybe_unused]] Destruction::Broken& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] CityStream& a3, [[maybe_unused]] Rng& a4) { converted::counted([&] { return a0.collapse(a1, std::move(a2), a3, a4); }); return Out_Destruction_collapse{std::move(a0), std::move(a3), std::move(a4)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Destruction a0 = draw_Destruction(draw);
-      Destruction::Broken a1 = draw_Destruction__Broken(draw);
-      Vec3 a2 = draw.vector();
-      CityStream a3 = draw_CityStream(draw);
-      Rng a4 = draw_Rng(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a4), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
-    }
-  }
-  {  // Destruction::blast
-    converted::Tally tally("Destruction_blast");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] CityStream& a5, [[maybe_unused]] Rng& a6) { auto r = converted::counted([&] { return a0.blast(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, a6); }); return Out_Destruction_blast{std::move(a0), std::move(r), std::move(a5), std::move(a6)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Destruction a0 = draw_Destruction(draw);
-      Vec3 a1 = draw.vector();
-      double a2 = draw.number();
-      double a3 = draw.number();
-      bool a4 = draw.flag();
-      CityStream a5 = draw_CityStream(draw);
-      Rng a6 = draw_Rng(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a5), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2, 3});
     }
   }
   {  // Destruction::free_torn

@@ -15,6 +15,7 @@
 
 namespace converted_game_destruction_sync_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -39,25 +40,25 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 namespace Terrain { struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } }; }
 namespace CityStream { struct DamageRec { u32 seed = 0; f32 height = 0; bool leveled = false; }; }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-namespace DestroySync { using Craters = std::vector<Terrain::CraterRec>; }
-namespace DestroySync { using DamageList = std::vector<CityStream::DamageRec>; }
-namespace DestroySync { using Points = std::vector<std::pair<u32, f32>>; }
-namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
-namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
-enum class Key : u8 {
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+namespace BlueprintCore { using U16 = ::kern::logic::Sized<u16>; }
+namespace BlueprintCore { using U32 = ::kern::logic::Sized<u32>; }
+namespace BlueprintCore { using I8 = ::kern::logic::Sized<i8>; }
+namespace BlueprintCore { using I16 = ::kern::logic::Sized<i16>; }
+namespace BlueprintCore { using I32 = ::kern::logic::Sized<i32>; }
+namespace DestroySync { using Craters = std::vector<Terrain::CraterRec>; }
+namespace DestroySync { using DamageList = std::vector<CityStream::DamageRec>; }
+namespace DestroySync { using Points = std::vector<std::pair<u32, f32>>; }
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
 namespace wire { struct F32 { f32 v = 0; }; }

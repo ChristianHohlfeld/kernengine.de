@@ -23,6 +23,7 @@
 
 namespace converted_Arondight45_HardwareSensors {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -455,7 +456,7 @@ KERN_TEST(converted_Arondight45_HardwareSensors) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1, [[maybe_unused]] unsigned long& a2) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::crc16_ccitt((a1 < 0 ? nullptr : a0.data() + a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      std::vector<unsigned char> a0(20); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }); a0.push_back(static_cast<unsigned char>(draw.below(40)));
       long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
       unsigned long a2 = static_cast<unsigned long>(draw.below(40));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
@@ -479,7 +480,7 @@ KERN_TEST(converted_Arondight45_HardwareSensors) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::read_be_i16((a1 < 0 ? nullptr : a0.data() + a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      std::vector<unsigned char> a0(14); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }); a0.push_back(static_cast<unsigned char>(draw.below(40)));
       long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
@@ -523,11 +524,12 @@ KERN_TEST(converted_Arondight45_HardwareSensors) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1, [[maybe_unused]] fc::Imu& a2) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_icm42688_registers((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_icm42688_registers{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
-      std::vector<unsigned char> a0(14); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }); a0.push_back(static_cast<unsigned char>(draw.below(40)));
+      while (a0.size() < 14) a0.push_back(static_cast<unsigned char>(draw.below(40)));
       long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size() - 14) + 1));
       fc::Imu a2 = draw_fc__Imu(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a2), arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;

@@ -14,6 +14,7 @@
 
 namespace converted_game_events_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -42,20 +43,25 @@ inline f32 wrap_pi(f32 a) {
   while (a < -kPi) a += 2 * kPi;
   return a;
 }
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
-namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
-namespace WorldLife { namespace TowTruck { enum class State : u8 { to_job, hook, tow, depot }; } }
-enum class Key : u8 {
+namespace logic { struct State {
+  u32 id = 0;
+  std::string name;
+  f32 x = 0, y = 0;
+  bool initial = false;
+}; }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
-namespace game { namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } } }
+namespace logic { namespace scan { using Kind = :: kern :: logic :: scan :: Kind; } }
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
+namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
 namespace People { enum class Kind : u8 { citizen, officer, soldier, zombie, enemy }; }
 namespace People { enum class State : u8 { walk, wait, flee, down, gone, officer, fight }; }
 namespace People { struct Person {
@@ -96,7 +102,6 @@ namespace People { struct Person {
     f32 net_at = 0;                 // ... when (on our clock): he walks on from there at his pace
   }; }
 namespace People { enum class HurtBy : u8 { round, blow, vehicle, kLast = vehicle }; }
-namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
 namespace Game { enum class BlastBy : u8 { other, weapon, missile }; }
 namespace combat { } using namespace ::converted_game_events_cpp::combat;
 using P = People::Person;

@@ -15,6 +15,7 @@
 
 namespace converted_mvt_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -156,7 +157,7 @@ namespace mvt { struct Writer {
   void begin_layer(const std::string& name, u32 extent = 4096);
   /// Adds a feature: geometry parts in tile units, tags as key/value strings or numbers.
   void feature(GeomType type, const std::vector<std::vector<Vec2>>& parts, const std::vector<std::pair<std::string, Value>>& tags, u64 id = 0);
-  
+  void end_layer();
   
 
  private:
@@ -361,7 +362,7 @@ namespace mvt { void Decoder::begin(Span<const u8> bytes, std::size_t at, const 
 } }
 namespace mvt { bool Decoder::step(Span<const u8> bytes, f64 budget_ms) {
   if (done_) return true;
-  const f64 start = now_ms();
+  const f64 start = ::converted_mvt_cpp::now_ms();
   u32 work = 0;
   while (layer_ < layers_.size()) {
     if (!layer_open_) {
@@ -381,7 +382,7 @@ namespace mvt { bool Decoder::step(Span<const u8> bytes, f64 budget_ms) {
       if (!read_feature(bytes, Reader{converted::at(features_, feature_).at, converted::at(features_, feature_).end}, f)) { failed_ = done_ = true; return true; }
       layer.features.push_back(std::move(f));
       converted::pre_inc(feature_);
-      if ((++work & 63) == 0 && budget_ms > 0 && now_ms() - start > budget_ms) return false;
+      if ((++work & 63) == 0 && budget_ms > 0 && ::converted_mvt_cpp::now_ms() - start > budget_ms) return false;
     }
     layer_open_ = false;
     converted::pre_inc(layer_);
@@ -405,6 +406,11 @@ namespace mvt { void put_bytes(std::vector<u8>& o, u32 field, const std::vector<
   put_key(o, field, 2);
   put_varint(o, data.size());
   o.insert(o.end(), data.begin(), data.end());
+} }
+namespace mvt { void put_bytes(std::vector<u8>& o, u32 field, std::string_view text) {
+  put_key(o, field, 2);
+  put_varint(o, text.size());
+  o.insert(o.end(), text.begin(), text.end());
 } }
 namespace mvt { u64 zz(i64 v) { return (converted::shl_bits(static_cast<u64>(v), 1)) ^ static_cast<u64>(converted::shr_bits(v, 63)); } }
 namespace mvt { void Writer::begin_layer(const std::string& name, u32 extent) {
@@ -453,6 +459,27 @@ namespace mvt { void Writer::feature(GeomType type, const std::vector<std::vecto
   }
   put_bytes(f, 4, g);
   layer_.features.push_back(std::move(f));
+} }
+namespace mvt { void Writer::end_layer() {
+  std::vector<u8> l;
+  put_key(l, 15, 0);
+  put_varint(l, 2);
+  put_bytes(l, 1, layer_.name);
+  for (const auto& f : layer_.features) put_bytes(l, 2, f);
+  for (const auto& k : layer_.keys) put_bytes(l, 3, k);
+  for (const Value& v : layer_.values) {
+    std::vector<u8> e;
+    switch (v.kind) {
+      case Value::Kind::string: put_bytes(e, 1, v.s); break;
+      case Value::Kind::number: { put_key(e, 3, 1); const u8* p = reinterpret_cast<const u8*>(&v.n); e.insert(e.end(), p, p + 8); break; }
+      case Value::Kind::boolean: put_key(e, 7, 0); put_varint(e, v.b ? 1 : 0); break;
+      default: break;
+    }
+    put_bytes(l, 4, e);
+  }
+  put_key(l, 5, 0);
+  put_varint(l, layer_.extent);
+  put_bytes(out_, 3, l);
 } }
 #undef private
 #undef protected
@@ -868,7 +895,7 @@ KERN_TEST(converted_mvt_cpp) {
       mvt::GeomType a2 = converted::enum_value<mvt::GeomType>(draw.below(4));
       std::vector<std::vector<Vec2>> a3 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1028,7 +1055,7 @@ KERN_TEST(converted_mvt_cpp) {
       mvt::Layer a2 = draw_mvt__Layer(draw);
       std::vector<mvt::Piece> a3 = draw_list(draw, [&]() -> mvt::Piece { return draw_mvt__Piece(draw); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a2), arg(a3), arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1052,7 +1079,7 @@ KERN_TEST(converted_mvt_cpp) {
       mvt::Reader a1 = draw_mvt__Reader(draw);
       mvt::Feature a2 = draw_mvt__Feature(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a2), arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1077,7 +1104,7 @@ KERN_TEST(converted_mvt_cpp) {
       unsigned long a2 = static_cast<unsigned long>(draw.below(40));
       std::vector<std::string> a3 = draw_list(draw, [&]() -> std::string { return draw.word(); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1125,7 +1152,7 @@ KERN_TEST(converted_mvt_cpp) {
       mvt::Tile a1 = draw_mvt__Tile(draw);
       std::vector<std::string> a2 = draw_list(draw, [&]() -> std::string { return draw.word(); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a1), arg(a2), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1208,6 +1235,29 @@ KERN_TEST(converted_mvt_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // put_bytes
+    converted::Tally tally("put_bytes_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] std::string_view& a2) { converted::counted([&] { return converted_mvt_cpp::mvt::put_bytes(a0, std::move(a1), std::move(a2)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      std::string_view a2 = std::string_view(draw.c_word());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // zz
     converted::Tally tally("zz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1270,6 +1320,27 @@ KERN_TEST(converted_mvt_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Writer::end_layer
+    converted::Tally tally("Writer_end_layer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] mvt::Writer& a0) { converted::counted([&] { return a0.end_layer(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      mvt::Writer a0 = draw_mvt__Writer(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

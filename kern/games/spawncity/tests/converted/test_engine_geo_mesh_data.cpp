@@ -13,6 +13,7 @@
 
 namespace converted_engine_geo_mesh_data {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -85,7 +86,7 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -226,7 +227,7 @@ KERN_TEST(converted_engine_geo_mesh_data) {
     const auto run = [&]([[maybe_unused]] MeshData& a0, [[maybe_unused]] const std::vector<double>& a1, [[maybe_unused]] long long& a2) { converted::counted([&] { return a0.push_extra((a2 < 0 ? nullptr : a1.data() + a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MeshData a0 = draw_kern__MeshData(draw);
-      std::vector<double> a1(3); for (auto& e : a1) e = draw.number();
+      std::vector<double> a1 = draw_list(draw, [&]() -> double { return draw.number(); }); a1.push_back(draw.number());
       long long a2 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a1.size()) + 1));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data()), reinterpret_cast<const unsigned char*>(a1.data() + a1.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
