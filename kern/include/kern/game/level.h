@@ -462,6 +462,10 @@ json::Value actor_to_json(const Actor& a);
 bool actor_from_json(const json::Value& v, Actor& out, std::string* error = nullptr);
 json::Value world_to_json(const WorldSettings& w);
 bool world_from_json(const json::Value& v, WorldSettings& out, std::string* error = nullptr);
+/// Lays `keys` (an object with keys of a level's "world", as a device profile holds them: kern/app/project.h) on `w`.
+/// False - `error` says which key and why - for a key WorldSettings does not have (the names it has are given) or a
+/// value the level's reader does not take; `w` is then unchanged.
+bool overlay_world(const json::Value& keys, WorldSettings& w, std::string* error = nullptr);
 
 struct Issue {
   bool error = true;  // false: a warning, the level still plays

@@ -58,6 +58,12 @@ typisierte Verweis `{WorldId, ActorRef}` kommt (project.md 7., engine_object.md)
   abbricht); ein Wert der falschen Art (eine Zahl für ein Feld mit Zahl – Text nur, wenn er ganz eine Zahl ist –, wahr/
   falsch für ein Feld mit Wahrheitswert; eine Zahl für einen Vektor setzt alle drei).
 
+## Was vom Gerät abhängt
+
+Welt-Einstellungen, die vom Gerät abhängen (Schattenweite am Telefon …), stehen nicht im Code eines Spiels, sondern als
+`world` im Geräteprofil des Projekts (project.md 2., „Welt-Einstellungen je Gerät“). So startet ein Spiel sein Level mit
+`start_level` und hält keinen Level-Wert.
+
 ## Klänge einer Welt
 
 `SoundBank::request_world(const GameWorld&)`: fordert jeden Klang an, den die Welt braucht – ihre Akteure **und ihre

@@ -25,7 +25,7 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   "name": "Mein Spiel",
   "settings": {
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
-    "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } } } ],
+    "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } }, "world": { "shadowDistance": 70 } } ],
     "heapReserveMb": 0,
     "loopBudget": 200000
   },
@@ -45,6 +45,15 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   im Log mit den vorhandenen Namen) und `heapReserveMb` (0–4095). Die Engine wendet sie vor dem Start des Renderers an;
   `kern::run` übergibt sie (4.). Das feste Telefon-Feld `"mobile"` früherer Dateien, ein Profil ohne Namen oder mit
   doppeltem Namen: Fehler mit Stelle. Ein Level hat keinen Abschnitt `"project"`.
+- **Welt-Einstellungen je Gerät:** ein Profil kann `world` tragen – Schlüssel des Abschnitts `"world"` eines Levels
+  (`WorldSettings`, etwa `shadowDistance`, `substeps`). Startet eine Welt des Projekts ein Level (`GameWorld::start`,
+  `start_level`), gilt diese **Reihenfolge**: die Welt-Einstellungen des Levels, darüber die Schlüssel des gewählten
+  Profils. Gewählt ist es bei einer Welt des Programms durch den Startparameter `profile=<name>` (`GameWorld(Engine&)`),
+  sonst mit `GameWorld::set_profile` (Editor, Test); kein Profil: nur die des Levels. Ein Schlüssel, den `WorldSettings`
+  nicht hat, oder ein Wert, den der Level-Leser nicht nimmt, ist beim Lesen des Projekts ein Fehler mit Stelle und den
+  erlaubten Namen (`settings: profiles[0] "mobile".world: unknown key "shadowDistanz" - one of …`); ein gewähltes Profil,
+  das das Projekt nicht hat, hält die Welt vom Start ab (mit den vorhandenen Namen). Im Editor stehen die Profile mit
+  ihrem `world` in den Projekt-Einstellungen (Settings, dieselbe Prüfung). Geprüft: `world_takes_its_device_profile`.
 - `levels` nennt die Levels des Projekts (Pfade relativ zur Projekt-Datei), `startLevel` das erste davon. Welches Level
   wann läuft, entscheidet das Programm (siehe 4.); `startLevel` ist nur die Vorgabe, die der Editor bei Play öffnet und
   die ein Programm ohne eigene Wahl nimmt.

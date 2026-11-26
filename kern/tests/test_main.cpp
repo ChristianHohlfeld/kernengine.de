@@ -8930,6 +8930,51 @@ TEST(program_from_the_project) {
 // starts level A, ends it, starts level B - what it keeps (here: points) is its own and stays. The project holds the
 // texts of its levels (Project::level_texts; embedded_project() fills them); errors say why: no project, a path that is
 // none of its levels (named), a level not loaded, a text that is no level.
+// A device profile's world settings (kern/app/project.h DeviceProfile::world): laid on the level's when a world of
+// the project starts it - the level's first, then the profile's keys; unknown keys are errors with the names.
+TEST(world_takes_its_device_profile) {
+  game::Level a = game::basic_level();
+  a.world.shadow_distance = 110;
+  a.world.step_hz = 240;
+  game::Project pr;
+  pr.name = "Geraete";
+  pr.levels = {"a.klevel"};
+  pr.level_texts = {{"a.klevel", game::to_text(a)}};
+  std::string error;
+  // In the file: a profile with "world".
+  const char* text = R"({"format":"kern-project","version":1,"name":"Geraete","levels":["a.klevel"],"settings":{"profiles":[
+    {"name":"mobile","renderer":{},"world":{"shadowDistance":70,"substeps":2}},{"name":"laptop"}]}})";
+  game::Project read;
+  CHECK(game::from_text(text, read, &error));
+  CHECK(read.settings.profile("mobile") && read.settings.profile("mobile")->world["shadowDistance"].as_number() == 70);
+  CHECK(read.settings.profile("laptop") && read.settings.profile("laptop")->world.size() == 0);
+  // It is written as it is read.
+  game::Project again;
+  CHECK(game::from_text(game::to_text(read), again, &error) && again.settings.profile("mobile")->world["substeps"].as_number() == 2);
+  // A key WorldSettings does not have: where, and the names it has.
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"shadowDistanz":70}}]}})", read, &error));
+  CHECK(error.find("settings: profiles[0] \"mobile\".world: unknown key \"shadowDistanz\" - one of ") != std::string::npos && error.find("shadowDistance") != std::string::npos);
+  // A value the level's reader does not take; a world that is no object.
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"stepHz":1}}]}})", read, &error) && error.find("stepHz") != std::string::npos);
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":7}]}})", read, &error) && error.find("profiles[0].world: must be an object") != std::string::npos);
+  // A world of the project with the profile: the level's settings, the profile's keys on top.
+  CHECK(game::from_text(text, read, &error));
+  read.level_texts = pr.level_texts;
+  Renderer renderer;
+  game::GameWorld world(renderer);
+  world.set_project(&read);
+  CHECK(world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(world.level().world.shadow_distance == 110 && world.level().world.substeps == a.world.substeps);   // (no profile: the level's)
+  world.stop();
+  world.set_profile("mobile");
+  CHECK(world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(world.level().world.shadow_distance == 70 && world.level().world.substeps == 2 && world.level().world.step_hz == 240);
+  world.stop();
+  world.set_profile("tablet");
+  CHECK(!world.start_level("a.klevel", game::SimMode::simulate));
+  CHECK(std::string(last_error()) == "start: the device profile \"tablet\" is none of the project's (it has: mobile, laptop)");
+}
+
 TEST(world_starts_a_level_of_its_project) {
   game::Level a = game::basic_level(), b = game::basic_level();
   a.name = "Erstes";

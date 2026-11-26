@@ -24,10 +24,14 @@
 namespace kern {
 
 /// A device profile: the renderer on a kind of device (a phone, a weak laptop), chosen at start by the launch
-/// argument profile=<name>. Its renderer is the project's with the keys the profile names on top.
+/// argument profile=<name>. Its renderer is the project's with the keys the profile names on top. Its `world`: the
+/// world settings on that device - keys of a level's "world" (kern/game/level.h WorldSettings, e.g. "shadowDistance"),
+/// laid on the level's own when a world of the program starts it (kern/game/runtime.h GameWorld::start; the project's
+/// reader checks the keys - kern/game/project.h).
 struct DeviceProfile {
   std::string name;
   RendererOptions renderer;
+  json::Value world = json::Value::object();
 };
 
 struct ProjectSettings {
@@ -137,6 +141,7 @@ inline json::Value project_to_json(const ProjectSettings& p) {
     json::Value x = json::Value::object();
     x.set("name", d.name);
     x.set("renderer", renderer_to(d.renderer));
+    if (d.world.size() > 0) x.set("world", d.world);
     profiles.push(std::move(x));
   }
   o.set("profiles", std::move(profiles));
@@ -170,6 +175,10 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
       if (out.profile(d.name)) return fail(at + ": the profile " + d.name + " stands twice");
       d.renderer = out.renderer;
       renderer_from(x["renderer"], d.renderer);
+      if (const json::Value* w = x.find("world")) {
+        if (!w->is_object()) return fail(at + ".world: must be an object (keys of a level's \"world\", e.g. {\"shadowDistance\": 70})");
+        d.world = *w;
+      }
       out.profiles.push_back(std::move(d));
     }
   }

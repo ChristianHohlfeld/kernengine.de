@@ -1036,6 +1036,25 @@ json::Value world_to_json(const WorldSettings& w) {
   return o;
 }
 
+bool overlay_world(const json::Value& keys, WorldSettings& w, std::string* error) {
+  if (!keys.is_object()) { if (error) *error = "must be an object (keys of a level's \"world\")"; return false; }
+  json::Value doc = world_to_json(w);
+  for (const auto& [k, v] : keys.members()) {
+    if (!doc.find(k)) {
+      std::string names;
+      for (const auto& [n, x] : doc.members()) names += (names.empty() ? "" : ", ") + n;
+      if (error) *error = "unknown key \"" + k + "\" - one of " + names;
+      return false;
+    }
+    doc.set(k, v);
+  }
+  WorldSettings out;
+  std::string why;
+  if (!world_from_json(doc, out, &why)) { if (error) *error = why; return false; }
+  w = out;
+  return true;
+}
+
 bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error) {
   if (!v.is_object()) return true;
   Reader r{v, error, "world"};

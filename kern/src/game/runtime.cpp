@@ -429,7 +429,10 @@ struct GameWorld::Traffic {
 
 GameWorld::GameWorld(Renderer& renderer, NightWindows* windows) : r_(renderer), windows_(windows) { (void)logic_nodes_registered(); }
 
-GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) { project_ = engine.project(); }
+GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) {
+  project_ = engine.project();
+  profile_ = engine.arg("profile", "");   // (the device profile the program runs with: kern/app/project.h)
+}
 
 GameWorld::~GameWorld() {
   stop();
@@ -1245,9 +1248,24 @@ bool GameWorld::start_level(std::string_view path, SimMode mode) {
   return start(level, mode);
 }
 
-bool GameWorld::start(const Level& level, SimMode mode) {
+bool GameWorld::start(const Level& given, SimMode mode) {
   ++session_;
   if (mode == SimMode::none) return fail("choose Simulate or Play");
+  // The device profile's world settings on the level's (kern/docs/project.md 2.: the level's, then the profile's keys).
+  Level profiled;
+  const bool overlay = project_ && !profile_.empty();
+  if (overlay) {
+    const DeviceProfile* d = project_->settings.profile(profile_);
+    if (!d) {
+      std::string names;
+      for (const DeviceProfile& p : project_->settings.profiles) names += (names.empty() ? "" : ", ") + p.name;
+      return fail("start: the device profile \"%s\" is none of the project's (it has: %s)", profile_.c_str(), names.empty() ? "none" : names.c_str());
+    }
+    profiled = given;
+    std::string why;
+    if (!overlay_world(d->world, profiled.world, &why)) return fail("start: the device profile \"%s\".world: %s", profile_.c_str(), why.c_str());
+  }
+  const Level& level = overlay ? profiled : given;
   if (running()) stop();
   for (const Issue& i : validate(level))
     if (i.error) return fail("%s", i.text.c_str());

@@ -224,7 +224,8 @@ class GameWorld {
 
   // ---- simulation ----
   /// Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that
-  /// stands in the level and in the project (library_conflicts) keeps it from starting.
+  /// stands in the level and in the project (library_conflicts) keeps it from starting; with a device profile too
+  /// (set_profile), its world settings lie on the level's (the level's, then the profile's keys).
   bool start(const Level& level, SimMode mode);
   /// Starts the level of its project at `path` (as the project's "levels" name it: Project::level_text) - how a
   /// program starts a world and changes to the next one (stop, then start_level of the next; what the program keeps -
@@ -239,6 +240,12 @@ class GameWorld {
   void set_fixed_step(FixedStep* step) { fixed_step_ = step; }
   FixedStep* fixed_step_handler() const { return fixed_step_; }
   const Project* project() const { return project_; }
+  /// The project's device profile this world runs on (kern/app/project.h DeviceProfile; "": none): a start (start,
+  /// start_level) lays its world settings on the level's - the level's first, then the profile's keys. A world of the
+  /// program has the launch argument profile=<name> (GameWorld(Engine&)); a host without a program sets it here. A name
+  /// the project has no profile of keeps the world from starting (the names it has are said).
+  void set_profile(std::string name) { profile_ = std::move(name); }
+  const std::string& profile() const { return profile_; }
   void stop();
   bool running() const { return mode_ != SimMode::none; }
   /// Counts start() calls (restart included): listeners notice a fresh run.
@@ -612,6 +619,7 @@ class GameWorld {
   // presentation
   Level level_;                  // edited level (sync) or the running copy (start)
   const Project* project_ = nullptr;  // where the libraries the level does not have are found (set_project)
+  std::string profile_;               // the project's device profile whose world settings a start lays on the level's
   FixedStep* fixed_step_ = nullptr;   // the program's fixed step (set_fixed_step)
   Level edit_level_;             // what sync() last saw (restored by stop())
   std::unordered_map<ActorId, std::unique_ptr<Visual>> visuals_;
