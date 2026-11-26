@@ -205,18 +205,26 @@ Namen oder Ordner:
 - **ins Level** (Welt): jeder andere.
 
 Das Protokoll nennt je Blueprint Ort und Grund („where the Blueprints stand“, z. B. `CasesApp: the project - it
-implements App …`, `door_cpp: the level - a world's …`). Ein Blueprint des Programms, der aus einem früheren Stand im
-Level steht (auch einer eines anderen Ordners, eine eigene Quelle), zieht unverändert ins Projekt um – mit eigener
-Zeile im Protokoll. Ein Lauf ohne `--project`, der Programm-Blueprints hat, bricht mit ihren Namen und Gründen ab.
+implements App …`, `door_cpp: the level - a world's …`). Ein Blueprint, der schon im Projekt steht und den der Lauf
+nicht schreibt (eine Datei des Programms, die jetzt ein Blueprint ist: ihr C++ ist weg, das C++ des Programms ruft
+ihn als seine Klasse), ist des Programms – was er benutzt, steht darum auch im Projekt. Ein Blueprint des eigenen
+Ordners, der aus einem früheren Lauf im Level steht und nun des Programms ist, zieht ins Projekt; einer eines
+anderen Ordners (eine eigene Quelle) wird nie verschoben: steht er im Level und benutzt ihn das Programm, bricht der
+Lauf mit Name, Ordner und Grund ab, und beide Dateien bleiben, wie sie sind. Ein Lauf ohne `--project`, der
+Programm-Blueprints hat, bricht mit ihren Namen und Gründen ab.
 Projekt-Blueprints tragen wie Akteure einen Ordner (`"folder"`, Ordnung im Editor); der Konverter kennt daran seine
 eigenen – `--folder` ist darum anzugeben (keine Vorgabe). Nur mit `--whole-program` (ein Lauf über das ganze
 Programm, ausdrücklich, nie aus der Zahl der Dateien geschlossen) fällt aus seinem Ordner, was er nicht mehr schreibt.
-Klassen, die das C++ des Programms direkt ruft, nennt `--classes <header.h>=<ordner>` (keine Vorgabe). Das eine Objekt
+Welche Blueprints das C++ des Programms direkt als Klassen ruft, sagt das Projekt (seine Blueprints, die der Lauf
+nicht schreibt – nie ein Ordnername); `--classes <header.h>` nennt nur den Header, in den der Bau ihre Klassen
+schreibt (keine Vorgabe; braucht `--project`). Ebenso `tools/blueprint_cpp.sh --project <p> <level> <out.cpp> <out.h>`:
+der Header hält die Klassen der Blueprints des Projekts und der Bibliotheken, die sie benutzen. Das eine Objekt
 der App findet er auch im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }`. Beide Dateien werden vom Leser der Engine gelesen (`tools/blueprint_cpp.sh --apply <datei> [--with <projekt>]`;
 ein Level weist dabei einen Export ab, `game::world_export`) und nur geschrieben, wenn alle Blueprints gelesen sind.
 Die Klassen schreibt `tools/blueprint_cpp.sh --project <spiel.kproject> <level> …` aus beiden. Geprüft:
 `tools/converter_cases/run.sh` (Fall `program` + `door`: App, Export und deren Bibliothek im Projekt, die Tür im
-Level, beide gelesen, ein Export im Level abgewiesen).
+Level, beide gelesen, ein Export im Level abgewiesen; `placement.py`: was ein Blueprint des Projekts benutzt, steht im
+Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf an; `--classes` ohne Ordner).
 
 ## 8. Ein zweites Spiel anlegen – Schritt für Schritt
 

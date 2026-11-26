@@ -7,8 +7,8 @@ build.sh leaves out "Source", the Blueprints tools/cpp_to_blueprint.py writes fr
 until a file switches, its C++ is what runs and its Blueprint stands beside it, bound to it by the tests; the built
 game would only load and carry them (most of the text). They stand in the level (a world's) and in the project (the
 program's: kern/docs/project.md) - each file loses them alike. What the Blueprints that stay use as their libraries
-(`uses` of their Blueprints, and what those use) stays with them, wherever it stands: a Blueprint of the folder
-"Program" (a file of the game that is a Blueprint now) calls libraries of "Source" (BLUEPRINTS.md, "5 - Umschalten").
+(`uses` of their Blueprints, and what those use) stays with them, wherever it stands: a Blueprint of the program (a
+file of the game that is a Blueprint now, in the project) calls libraries of "Source" (BLUEPRINTS.md, "5 - Umschalten").
 The engine's kern/tools/embed_project.py then embeds this project with this level (--level), and tools/blueprint_cpp.sh
 reads them. The outputs are only rewritten when they change. The tests embed the whole level and project.
 """

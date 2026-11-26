@@ -8,7 +8,7 @@ in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--project <name.kproject>] --folder <name>
       [--whole-program] [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
-      [--classes <header.h>=<folder>] <include flags...> -- <file.cpp>...
+      [--classes <header.h>] <include flags...> -- <file.cpp>...
 
   - the program is the folders of the sources, in the namespace given - and the further folders named
     with --program, each with the namespaces its files declare (vendored code the program includes:
@@ -45,10 +45,11 @@ in the notation, function by function:
     which drops of its folder what it does not write any more): a file that is a Blueprint now - its C++ is gone, the Blueprint in the
     level is its one source (BLUEPRINTS.md, "5 - Umschalten") - stands in a folder of its own. A run
     neither rewrites nor drops such a Blueprint (a run over the whole program drops, of its own folder,
-    what it does not write any more). The program's C++ calls it as its class: --classes names the
-    header the build writes their classes into (tools/blueprint_cpp, the same tool, from the same
-    level) and their folder (no default: without it the program calls no Blueprint as its class). Where the
-    level has Blueprints in that folder, the run writes the header from the level into a folder of its
+    what it does not write any more). The program's C++ calls it as its class: it is the program's, so it stands
+    in the project (kern/docs/project.md) - every Blueprint of the project the run does not write is one the program
+    calls as its class (never a folder's name says it). --classes names the header the build writes their classes
+    into (tools/blueprint_cpp, the same tool, from the same project; no default: without it the program calls no
+    Blueprint as its class). Where the project has such Blueprints, the run writes the header into a folder of its
     own before it reads the sources, and that folder comes first on the include path; a test includes it
     by its name (TestWriter: a header that is not in the sources' folder is the build's);
 
@@ -1447,9 +1448,10 @@ def is_nothing(n):
     return b.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or re.sub(r"^const\s+", "", (b.get("type") or {}).get("qualType", "")) in ("std::nullopt_t", "std::nullptr_t", "nullptr_t")
 
 
-# The header of the Blueprints the program calls as their classes, and their folder in the level, as the build
-# writes it (build.sh: tools/blueprint_cpp.sh <level> <out.cpp> <out.h> <folder>; --classes says other ones).
-CLASSES = [None, None]   # (none unless --classes names them: no game's build is the default)
+# The header of the Blueprints the program calls as their classes - the project's that the run does not write
+# (class_libraries) -, as the build writes it (tools/blueprint_cpp.sh --project <p> <level> <out.cpp> <out.h>).
+CLASSES = [None]   # (none unless --classes names it: no game's build is the default)
+RUN_FOLDER = [None]   # the folder of the Blueprints this run writes (--folder): it knows its own by it
 # A type of such a Blueprint's class, as the compiler names it: the class itself (kern_blueprint_<hash>::qr_code_cpp, which
 # blueprints::qr_code_cpp names) or a type it declares (kern_blueprint_<hash>::qr_code::qr_Code) - tools/blueprint_cpp
 # writes each class into a namespace of its graph's hash.
@@ -2287,7 +2289,7 @@ class Unit:
         raise Wait(f"{struct_name} has no field {cpp_field}")
 
     # ---- the Blueprints the program calls as their classes (BLUEPRINTS.md, "5 - Umschalten") ----
-    # A file of the program that is a Blueprint now (its C++ gone; the level's folder CLASSES[1]) is called by the
+    # A file of the program that is a Blueprint now (its C++ gone; a Blueprint of the project: class_libraries) is called by the
     # program's C++ as its class - typed, with the types the Blueprint declares (kern/logic/blueprint_class.h):
     # `blueprints::qr_code::qr_Code c; kern::logic::blueprint<blueprints::qr_code_cpp>().encode(text, c).Result`.
     # The compiler sees the classes (the run writes their header from the level), but no declaration of them is
@@ -2296,8 +2298,8 @@ class Unit:
     def class_library(self, lib):
         """The Blueprint `lib` of the level, which the program calls as its class: what the level says of it. Else Wait."""
         info = self.world.actors.get(lib)
-        if info is None or CLASSES[1] is None or info.get("folder") != CLASSES[1]:
-            raise Wait(f"a type of the Blueprint {lib}'s class, which is not one the program calls as its class (the level's folder {CLASSES[1]})")
+        if info is None or lib not in class_libraries(self.world):
+            raise Wait(f"a type of the Blueprint {lib}'s class, which is not one the program calls as its class (the project's Blueprints this run does not write)")
         if not info["library"]:
             raise Wait(f"the Blueprint {lib}, which keeps something, called as its class (only a library's class is called directly)")
         return info
@@ -2342,7 +2344,7 @@ class Unit:
             raise Wait(f"the type {name} of the Blueprint {lib}, which the level does not have")
         home = d.get("from") or lib
         if home != lib:
-            if CLASSES[1] is None or (self.world.actors.get(home) or {}).get("folder") != CLASSES[1]:
+            if home not in class_libraries(self.world):
                 raise Wait(f"the type {name} of {home}, which the Blueprint {lib} uses: a type of a Blueprint of this run, as a class has it (not read yet)")
             return self.class_named(home, name)
         if name in self.type_line:
@@ -16402,14 +16404,16 @@ def blueprints_of(level, project=None):
 APP_INTERFACE = "App"
 
 
-def place_blueprints(written, uses, implements, texts, known):
+def place_blueprints(written, uses, implements, texts, known, in_project=()):
     """Where each Blueprint of a run stands (kern/docs/project.md 1., 4., 5.): {name: ("project" | "level", why)}. The
     program's - in the project - are its App (a state that implements the engine's App: kern::run starts the program
     with its object), every Blueprint with an export (exports belong to the program: a level refuses one), and every
     Blueprint a Blueprint of the program uses (a Blueprint of the program finds its libraries only in the project).
     Every other one is a world's - in the level. Where a Blueprint stands follows from what it is and who uses it, not
     from its name or its folder. `uses`: {name: the Blueprints it uses}, of this run's and of those it knows of the
-    level and the project (`known`: {name: their uses}); `texts`: the Blueprints' texts (an export: KERN_EXPORT_AS)."""
+    level and the project (`known`: {name: their uses}); `texts`: the Blueprints' texts (an export: KERN_EXPORT_AS).
+    `in_project`: the Blueprints that stand in the project and that this run does not write - the program's already
+    (what the program's C++ calls as their classes): what they use is the program's too."""
     why = {}
     for u in sorted(written):
         if implements.get(u) == APP_INTERFACE:
@@ -16418,7 +16422,7 @@ def place_blueprints(written, uses, implements, texts, known):
             exports = re.findall(r'KERN_EXPORT_AS\("([^"]+)"', texts.get(u, ""))
             if exports:
                 why[u] = f"it exports {', '.join(exports[:4])}{f' and {len(exports) - 4} more' if len(exports) > 4 else ''} - exports belong to the program"
-    todo = sorted(why)
+    todo = sorted(why) + sorted(set(in_project) - set(why))
     while todo:   # (what a Blueprint of the program uses, and what that uses: the program's too)
         u = todo.pop(0)
         for x in sorted(uses.get(u, ()) if u in uses else known.get(u, ())):
@@ -16436,10 +16440,11 @@ def apply_to_level(level, folder, blueprints, prune=False, project=None, placed=
     ({name: ("project" | "level", why)} - place_blueprints; without it all into the level), read from its text by the
     engine's own reader - in the order given: a library before the Blueprints that use it. In the level a Blueprint
     is the Blueprint of the actor of its name (made when the level has none), in the project one of its Blueprints -
-    both in the folder of this run. A Blueprint of the program that stands in the level from before (`known`: the
-    Blueprints the run did not write - its own folder's of a former run, or another folder's, a source of its own)
-    moves into the project unchanged; one of this run's folder that is a world's now moves into the level. All of
-    them, or nothing: the files are written when every Blueprint was read."""
+    both in the folder of this run. A Blueprint of this run's folder that the program uses and that stands in the level
+    from a former run moves into the project; one of this run's folder that is a world's now moves into the level. A
+    Blueprint of another folder - a source of its own - is never moved: one the program uses that stands in the level
+    stops the run (its place is the project; the files stay as they are). All of them, or nothing: the files are
+    written when every Blueprint was read."""
     if not ENGINE_RUN[0]:
         # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
         # engine has, written by tools/engine_api.py --libraries; neither a level nor a project holds one)
@@ -16463,10 +16468,9 @@ def apply_to_level(level, folder, blueprints, prune=False, project=None, placed=
         a = actors.get(name)
         if a is None:
             continue
-        if name not in {n for n, _ in blueprints} and a.get("folder") != folder:
-            print(f"  {name} (folder {a.get('folder')}, a source of its own): moved into the project unchanged - {placed[name][1]}")
-        elif a.get("folder") != folder:
-            raise SystemExit(f"{level}: the actor {name} is not one of the folder {folder}")
+        if a.get("folder") != folder:
+            raise SystemExit(f"{level}: the Blueprint {name} (actor {a.get('id')}, folder {a.get('folder')}: a source of its own, not this run's) stands in the level, "
+                             f"but it is the program's - {placed[name][1]}: its place is the project (kern/docs/project.md 7a.; this run moves no source of its own)")
         if name in entries:
             raise SystemExit(f"the Blueprint {name} stands in the level (actor {a.get('id')}) and in the project - rename one")
         e = {"name": name, **({"folder": a["folder"]} if a.get("folder") else {}), "logic": (a.get("components") or {}).get("logic") or {}}
@@ -16545,7 +16549,7 @@ def class_facts(actors, level_actors):
         g = graphs.get(a.get("name"))
         if g is None or a["name"] not in actors:
             continue
-        actors[a["name"]].update({"folder": a.get("folder"), "engine": engine(a["name"], set()),
+        actors[a["name"]].update({"folder": a.get("folder"), "in": a.get("in"), "engine": engine(a["name"], set()),
                                   "struct_defs": {s["name"]: s for s in g.get("structs", []) if s.get("name")},
                                   "enum_defs": {e["name"]: e for e in g.get("enums", []) if e.get("name")},
                                   "function_defs": {f["name"]: f for f in g.get("functions", []) if f.get("name") and "::" not in f["name"]},
@@ -16553,9 +16557,10 @@ def class_facts(actors, level_actors):
 
 
 def class_libraries(world):
-    """The Blueprints the program calls as their classes (the level's folder CLASSES[1]): a run reads them - their types
-    and functions -, it writes none of them (main: no Blueprint text of theirs, no declaration of their types)."""
-    return {name for name, a in world.actors.items() if CLASSES[1] is not None and a.get("folder") == CLASSES[1]}
+    """The Blueprints the program calls as their classes: the project's (the program's) that this run does not write -
+    not of its folder (RUN_FOLDER). A run reads them - their types and functions -, it writes none of them (main: no
+    Blueprint text of theirs, no declaration of their types). Without --classes the program calls none."""
+    return {name for name, a in world.actors.items() if CLASSES[0] is not None and a.get("in") == "project" and a.get("folder") != RUN_FOLDER[0]}
 
 
 def kept_by_others(level, folder, project=None):
@@ -16659,11 +16664,10 @@ def main(argv):
             if opts[i] == "--level": level = v
             elif opts[i] == "--project": project = v
             elif opts[i] == "--classes":
-                # the header of the Blueprints the program calls as their classes, and the folder they stand in
-                header, _, of = v.partition("=")
-                if not header or not of:
-                    raise SystemExit(f"--classes {v}: give the header and the folder, <header.h>=<folder>")
-                classes = (header, of)
+                # the header of the Blueprints the program calls as their classes (the project's: class_libraries)
+                if "=" in v or not v.endswith(".h"):
+                    raise SystemExit(f"--classes {v}: give the header the build writes their classes into (<header.h>) - which Blueprints the program calls as their classes says the project (its Blueprints this run does not write), no folder")
+                classes = (v,)
             elif opts[i] == "--folder": folder = v
             elif opts[i] == "--test": test = v
             elif opts[i] == "--program":
@@ -16689,11 +16693,12 @@ def main(argv):
     if whole and not level:
         raise SystemExit("--whole-program: a run over the whole program drops, of its folder, what it does not write any more - give the level (--level)")
     CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
-    if classes[1] is not None and classes[1] == folder:
-        raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
+    RUN_FOLDER[0] = folder
+    if classes[0] is not None and not project:
+        raise SystemExit(f"--classes {classes[0]}: the Blueprints the program calls as their classes stand in the project - give it (--project <name.kproject>)")
     if project and not level:
         raise SystemExit("--project: the run writes the program's Blueprints into the project and the worlds' into a level - give the level too (--level)")
-    if level and classes[1] is not None and any(a.get("folder") == classes[1] for a in blueprints_of(level, project)):
+    if level and classes[0] is not None and any(a.get("in") == "project" and a.get("folder") != folder for a in blueprints_of(level, project)):
         # The Blueprints the program calls as their classes: their header, as the build writes it (from the level,
         # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it. It
         # is written for this run, into a folder of its own that comes first on the include path (nothing is kept
@@ -16701,7 +16706,27 @@ def main(argv):
         # beside the file first): it has to be the same.
         made = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-classes-", dir=os.environ.get("TMPDIR") or None)
         header = os.path.join(made, os.path.basename(classes[0]))
-        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), *(["--project", project] if project else []), level, os.path.join(made, "classes.cpp"), header, classes[1]], capture_output=True, text=True)
+        # (from a copy of the project with the Blueprints the program calls as their classes - those of the project
+        # this run does not write - and the libraries they use, wherever they stand: what the game's build has of it)
+        known = {a["name"]: a for a in blueprints_of(level, project) if a.get("name")}
+        need, todo = set(), [n for n, a in known.items() if a["in"] == "project" and a.get("folder") != folder]
+        while todo:
+            n = todo.pop()
+            if n in need or n not in known:
+                continue
+            need.add(n)
+            todo += ((known[n].get("components") or {}).get("logic") or {}).get("uses", [])
+        proj_doc = json.load(open(project, encoding="utf-8"))
+        proj_doc["blueprints"] = [b for b in proj_doc.get("blueprints", []) if b.get("name") in need]
+        lvl_doc = json.load(open(level, encoding="utf-8"))
+        lvl_doc["actors"] = [a for a in lvl_doc.get("actors", []) if a.get("name") in need or not (a.get("components") or {}).get("logic")]
+        lvl_doc.pop("logic", None)
+        with open(os.path.join(made, "classes.kproject"), "w", encoding="utf-8") as f:
+            json.dump(proj_doc, f)
+        with open(os.path.join(made, os.path.basename(level)), "w", encoding="utf-8") as f:
+            json.dump(lvl_doc, f)
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), "--project", os.path.join(made, "classes.kproject"), os.path.join(made, os.path.basename(level)),
+                            os.path.join(made, "classes.cpp"), header], capture_output=True, text=True)
         if r.returncode != 0:
             raise SystemExit(f"the header {classes[0]} of the Blueprints the program calls as their classes is not to be had (tools/blueprint_cpp.sh): " + (r.stderr or r.stdout).strip()[:2000])
         for d in sorted({os.path.dirname(os.path.abspath(f)) for f in files}):
@@ -17281,7 +17306,8 @@ def main(argv):
                 raise SystemExit(f"{', '.join(sorted(kept['users']))} use {', '.join(missing)} of the Blueprint {lib}, which this run does not write: the level is as it was")
         # Where each stands - the program's in the project, a world's in the level -, and why (place_blueprints).
         known = {a["name"]: list(((a.get("components") or {}).get("logic") or {}).get("uses", [])) for a in blueprints_of(level, project) if a.get("name")}
-        placed = place_blueprints(set(order), {u: uses[u] for u in order}, {u: (blueprint_implements[u] or [None])[0] for u in order}, blueprints, known)
+        in_project = {a["name"] for a in blueprints_of(level, project) if a.get("name") and a["in"] == "project" and a["name"] not in order}
+        placed = place_blueprints(set(order), {u: uses[u] for u in order}, {u: (blueprint_implements[u] or [None])[0] for u in order}, blueprints, known, in_project)
         print("\nwhere the Blueprints stand (kern/docs/project.md):")
         for u in order:
             print(f"  {u}: {'the project' if placed[u][0] == 'project' else 'the level'} - {placed[u][1]}")

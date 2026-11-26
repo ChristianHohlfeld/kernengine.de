@@ -1,6 +1,6 @@
 // Host tool: the Blueprints of a Kern level as C++ classes a game links.
 //
-//   tools/blueprint_cpp.sh [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]
+//   tools/blueprint_cpp.sh [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> [<name> ...]]
 //                                                        (builds this file once, then runs it; with --project the
 //                                                        project's Blueprints - the program's - too, a folder of theirs
 //                                                        as an actor's)
@@ -34,7 +34,7 @@
 // libraries is registered under the hash of the one graph it is with them (logic::link): when a
 // library changes, the Blueprints that use it change with it.
 //
-// With <out.h> and <folder>: the Blueprints of the level's folder <folder> are those the program's
+// With <out.h>: the project's Blueprints - the program's (kern/docs/project.md 1.) - are those the program's
 // own C++ calls directly, as their classes (kern/logic/blueprint_class.h). Their classes - and those
 // of the libraries they use - are reached through <out.h> instead (not written into <out.cpp>),
 // each once, and named there by their class names in the namespace `blueprints`
@@ -42,9 +42,10 @@
 // runtime runs it as. Each of these classes stands in a header of its own (<out.h without .h>/<namespace>.h, with how
 // its structs are held as values), its glue in a source of its own (<out.cpp without .cpp>_<namespace>.cpp): every
 // file compiles by itself, with what its class needs. The program calls their functions on that object, typed and directly, with
-// the types they declare - no value is packed, nothing is looked up by name. Actors named after the
-// folder are called as their classes too, wherever they stand (a program's tests call Blueprints of other
-// folders the same way: what they prove binds those Blueprints, before the program does).
+// the types they declare - no value is packed, nothing is looked up by name. Blueprints named after
+// <out.h> are called as their classes too, wherever they stand (a program's tests call Blueprints of a
+// world the same way: what they prove binds those Blueprints, before the program does). Which Blueprints the
+// program calls follows from where they stand - the project is the program's -, never from a folder's name.
 //
 // <out.cpp> and <out.h> are only rewritten when they change, so nothing recompiles for an unchanged level.
 #include <algorithm>
@@ -280,13 +281,12 @@ int main(int argc, char** argv) {
     for (int k = 4; k < argc; ++k) only.insert(argv[k]);
     argv += 1, argc -= 1;
   }
-  if (argc < 3 || (!classes_only && argc != 3 && argc < 5) || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]\n       blueprint_cpp [--project <name.kproject>] --classes <level.klevel> <out.h> <name> [<name> ...]\n       blueprint_cpp --apply <level.klevel | name.kproject> [--with <name.kproject>] [--folder <name>] [--level-graph <text.cpp>] [<name> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+  if (argc < 3 || std::string(argv[1]) == "--apply") {
+    std::fprintf(stderr, "usage: blueprint_cpp [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> [<name> ...]]\n       blueprint_cpp [--project <name.kproject>] --classes <level.klevel> <out.h> <name> [<name> ...]\n       blueprint_cpp --apply <level.klevel | name.kproject> [--with <name.kproject>] [--folder <name>] [--level-graph <text.cpp>] [<name> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
-  // (the header of the Blueprints the program calls by their classes, and the folder they stand in)
-  const char* header_path = !classes_only && argc >= 5 ? argv[3] : nullptr;
-  const std::string called_folder = header_path ? argv[4] : "";
+  // (the header of the Blueprints the program calls by their classes: the project's, and those named after it)
+  const char* header_path = !classes_only && argc >= 4 ? argv[3] : nullptr;
   std::string text, why;
   json::Value doc;
   if (!read_file(argv[1], text) || !json::parse(text, doc, &why)) {
@@ -308,13 +308,13 @@ int main(int argc, char** argv) {
     const json::Value* graph;
   };
   std::vector<Found> found;
-  std::set<std::string> called;  // (the Blueprints of the folder whose classes the program calls)
-  std::set<std::string> named_too;  // (and those named after the folder, wherever they stand)
+  std::set<std::string> called;  // (the Blueprints whose classes the program calls: the project's)
+  std::set<std::string> named_too;  // (and those named after the header, wherever they stand)
   if (header_path)
-    for (int k = 5; k < argc; ++k) named_too.insert(argv[k]), called.insert(argv[k]);
+    for (int k = 4; k < argc; ++k) named_too.insert(argv[k]), called.insert(argv[k]);
   if (const json::Value* g = doc.find("logic"); g && g->is_object()) found.push_back({"the level", "Level", g});
   std::map<std::string, std::string> where;  // (a name: where it stands - a name stands once, in the level or in the project)
-  auto take = [&](const json::Value& a, const json::Value* g, const std::string& owner) {
+  auto take = [&](const json::Value& a, const json::Value* g, const std::string& owner, bool program) {
     const std::string n = a["name"].as_string();
     if (!g || !g->is_object()) return true;
     if (where.count(n)) {
@@ -323,15 +323,19 @@ int main(int argc, char** argv) {
     }
     where[n] = owner;
     found.push_back({owner, n, g});
-    if (header_path && a["folder"].as_string() == called_folder) called.insert(n);
+    if (header_path && program) called.insert(n);
     named_too.erase(n);
     return true;
   };
   for (const json::Value& a : doc["actors"].items())
-    if (!take(a, a["components"].find("logic"), "actor \"" + a["name"].as_string() + "\"")) return 1;
+    if (!take(a, a["components"].find("logic"), "actor \"" + a["name"].as_string() + "\"", false)) return 1;
   if (project_path)
     for (const json::Value& b : project_doc["blueprints"].items())
-      if (!take(b, b.find("logic"), "the project's Blueprint \"" + b["name"].as_string() + "\"")) return 1;
+      if (!take(b, b.find("logic"), "the project's Blueprint \"" + b["name"].as_string() + "\"", true)) return 1;
+  if (header_path && called.empty()) {
+    std::fprintf(stderr, "%s: no Blueprint the program calls as its class - its classes are the project's Blueprints (--project <name.kproject>), and those named after %s\n", argv[1], header_path);
+    return 1;
+  }
 
   std::string name = argv[1];
   if (const std::size_t slash = name.find_last_of("/\\"); slash != std::string::npos) name.erase(0, slash + 1);
@@ -354,8 +358,8 @@ int main(int argc, char** argv) {
     pieces_dir = std::string(header_path).substr(0, std::string(header_path).size() - included.size()) + pieces_include;
     glue_stem = argv[2];
     if (glue_stem.ends_with(".cpp")) glue_stem.resize(glue_stem.size() - 4);
-    header = "// Generated from " + name + " by tools/blueprint_cpp - do not edit: the Blueprints of the level's folder\n"
-             "// \"" + called_folder + "\" - those the program's own C++ calls directly, as their classes - and the libraries\n"
+    header = "// Generated from " + name + " by tools/blueprint_cpp - do not edit: the program's Blueprints (the project's)\n"
+             "// - those the program's own C++ calls directly, as their classes - and the libraries\n"
              "// they use (kern/logic/blueprint_class.h, kern/docs/blueprint_cpp.md). Change the Blueprint in the level;\n"
              "// the build writes this file again.\n"
              "#pragma once\n\n"
@@ -572,7 +576,7 @@ int main(int argc, char** argv) {
     }
     for (const std::string& c : called)
       if (std::none_of(held.begin(), held.end(), [&](const Held& h) { return h.owner != "the level" && h.name == c; })) {
-        std::fprintf(stderr, "%s: the Blueprint %s of the folder %s is empty\n", argv[1], c.c_str(), called_folder.c_str());
+        std::fprintf(stderr, "%s: the Blueprint %s the program calls as its class is empty\n", argv[1], c.c_str());
         return 1;
       }
     // The classes by their names, and how the program binds them (each to the object the runtime runs it as).
@@ -632,7 +636,7 @@ int main(int argc, char** argv) {
   }
   if (!write(argv[2], out)) return 1;
   std::printf("%s: %d of %zu Blueprint(s) as C++ classes", argv[2], classes, found.size());
-  if (header_path) std::printf(" - %zu of them in %s, which the program calls (folder %s) and the libraries they use", named.size(), header_path, called_folder.c_str());
+  if (header_path) std::printf(" - %zu of them in %s, which the program calls (the project's) and the libraries they use", named.size(), header_path);
   std::printf("\n");
   return 0;
 }

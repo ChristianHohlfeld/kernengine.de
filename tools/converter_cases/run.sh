@@ -22,6 +22,9 @@
 #             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of game.cpp).
 #   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece ("too many errors"
 #             in the test of game.cpp: the piece before it went for it).
+#   placement.py where the Blueprints stand (place_blueprints, apply_to_level): what a Blueprint of the project uses is
+#             the program's; a source of its own (another folder) the program uses that stands in the level stops the run;
+#             --classes takes the header only (the project says which Blueprints the program calls as their classes).
 #   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
 #             (Murmel's welt_.get(), B8) - written and compared.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as the game's are:
@@ -121,6 +124,7 @@ elif echo "$out" | grep -q 'is an export (sc_case_score) - exports belong to the
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
 
 python3 "$here/compiles.py" || fail=1
+python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
   for c in pad getter nodekind ownget bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done

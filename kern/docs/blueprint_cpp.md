@@ -2134,8 +2134,9 @@ C++, aus dem der Blueprint stammt.) Ohne Zuhörer ist es ein Vergleich mit null.
 **Aus C++ direkt.** Ein Programm, dessen eigenes C++ einen Blueprint des Levels ruft (eine Datei
 des Programms, die zu einem Blueprint geworden ist), ruft ihn als seine Klasse – typisiert, ohne
 Nachschlagen beim Namen, ohne verpackte Werte (`kern/logic/blueprint_class.h`):
-`tools/blueprint_cpp.sh level.klevel out.cpp out.h <Ordner>` schreibt die Klassen der Blueprints
-dieses Ordners des Levels und der Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
+`tools/blueprint_cpp.sh --project spiel.kproject level.klevel out.cpp out.h` schreibt die Klassen der Blueprints
+des Projekts (des Programms – welche es sind, sagt der Ort, nie ein Ordnername; `kern/docs/project.md` 1.) und der
+Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
 unter ihren Namen im Namensraum `blueprints`). Jede dieser Klassen steht in einem Header für sich
 (`out/<Namensraum>.h`, er bindet die Header der Bibliotheken ein, die sie benutzt), mit dem, wie ihre
 Strukturen als Werte gehalten werden (`kern::logic::detail::Held`): jede Datei des Programms, die die

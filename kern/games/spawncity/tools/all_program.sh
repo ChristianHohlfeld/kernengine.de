@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The whole game as classes (BLUEPRINTS.md, "5 - Umschalten": the one step at the end): every Blueprint of the folder
-# "Source" taken as one of "Program" - in a copy of the level, the level stays as it is - written by tools/blueprint_cpp.sh
+# "Source" taken as one of the program - moved into a copy of the project, the level stays as it is - written by tools/blueprint_cpp.sh
 # into a header per class and a source per class's glue, and every one of these files compiled by itself, as the
 # game's build compiles them. Says per file whether it compiles and how much memory its compiler took, and counts the
 # errors by their message.
@@ -23,16 +23,20 @@ cp "$here/level/spawncity.klevel" "$out/all.klevel"
 cp "$here/level/spawncity.kproject" "$out/all.kproject"   # (the program's Blueprints stand in the project: kern/docs/project.md)
 if [ -n "${REFRESH:-}" ]; then
   (cd "$here" && mkdir -p "$out/refresh/converted" "$out/refresh/texts" && cp tests/*.h "$out/refresh/" &&
-   CLANGXX="${CLANGXX:-clang++}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --program firmware=fc,hwcontract --folder Source --classes level_blueprints.h=Program \
+   CLANGXX="${CLANGXX:-clang++}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --program firmware=fc,hwcontract --folder Source --classes level_blueprints.h \
      -I../../include -I../../third_party/box3d/include -Isrc --level "$out/all.klevel" --project "$out/all.kproject" --test "$out/refresh/converted" --texts "$out/refresh/texts" \
      -- $REFRESH > "$out/refresh.log" 2>&1)
   echo "refresh ($REFRESH): rc=$? - $(tail -n 3 "$out/refresh.log" | tr '\n' ' ')"
 fi
 python3 - "$out/all.klevel" "$out/all.kproject" <<'PY'
-import sys
-for path in sys.argv[1:]:
-    s = open(path).read()
-    open(path, "w").write(s.replace('"folder": "Source"', '"folder": "Program"'))
+import json, sys
+# (the program's Blueprints stand in the project - kern/docs/project.md: the copy holds every one of "Source" there)
+level, project = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+moved = [a for a in level["actors"] if a.get("folder") == "Source" and (a.get("components") or {}).get("logic")]
+level["actors"] = [a for a in level["actors"] if a not in moved]
+project.setdefault("blueprints", []).extend({"name": a["name"], "folder": "Source", "logic": a["components"]["logic"]} for a in moved)
+json.dump(level, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)
+json.dump(project, open(sys.argv[2], "w"), indent=2, ensure_ascii=False)
 PY
 # The structs of the engine as the Blueprints of the engine's headers hold them (and every Blueprint that holds a copy of
 # them, "from" that library): a field the engine has since got (kern/logic/engine_nodes.gen.h, S_<struct>)
@@ -63,7 +67,7 @@ json.dump(level, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)
 print(f"structs of the engine brought up to its headers: {added} fields added" + (f"; not sayable: {', '.join(sorted(missing))}" if missing else ""))
 PY
 mkdir -p "$out/gen"
-"$root/tools/blueprint_cpp.sh" --project "$out/all.kproject" "$out/all.klevel" "$out/gen/level_blueprints.cpp" "$out/gen/level_blueprints.h" Program || exit 1
+"$root/tools/blueprint_cpp.sh" --project "$out/all.kproject" "$out/all.klevel" "$out/gen/level_blueprints.cpp" "$out/gen/level_blueprints.h" || exit 1
 export cxx root out
 compile() {
   local f="$1" log="$out/logs/$(basename "$1" .cpp).log"
