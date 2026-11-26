@@ -341,8 +341,19 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.mesh_data.bytes: kern::MeshData::bytes
+// engine.mesh_data.push_extra: kern::MeshData::push_extra
 bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::MeshData>();
+  ev::take<ev::Struct<S_MeshData>>(o, in, 0, self);
+  std::vector<float> a0;
+  ev::take<ev::List<ev::Num<::kern::f32>>>(o, in, 1, a0);
+  self.push_extra(kern::Span<float const>(a0.data(), a0.size()));
+  ev::give<ev::Struct<S_MeshData>>(o, out, 0, self);
+  return true;
+}
+
+// engine.mesh_data.bytes: kern::MeshData::bytes
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto self = ev::blank<kern::MeshData>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, self);
   decltype(auto) r = self.bytes();
@@ -351,7 +362,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mesh_data.as_input: kern::MeshData::as_input
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto self = ev::blank<kern::MeshData>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, self);
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -362,7 +373,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.upsert: kern::upsert
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -381,7 +392,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.weld: kern::weld
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::MeshData&>>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -393,7 +404,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.content_hash: kern::content_hash
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::MeshData const&>>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, a0);
   decltype(auto) r = kern::content_hash(a0);
@@ -402,7 +413,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.stream_count: kern::stream_count
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Num<::kern::f64>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
@@ -416,7 +427,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.stream_u32: kern::stream_u32
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Num<::kern::f64>>(o, in, 0, a0);
   decltype(auto) r = kern::stream_u32(std::move(a0));
@@ -425,7 +436,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.box: kern::primitives::box
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -436,7 +447,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.box_on_ground: kern::primitives::box_on_ground
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -447,7 +458,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.sphere: kern::primitives::sphere
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -462,7 +473,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.capsule: kern::primitives::capsule
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -479,7 +490,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.torus: kern::primitives::torus
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -496,7 +507,7 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.cylinder: kern::primitives::cylinder
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -511,7 +522,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.cone: kern::primitives::cone
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -526,7 +537,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.plane: kern::primitives::plane
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -541,7 +552,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.primitives.append: kern::primitives::append
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::MeshData&>>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::MeshData const&>>();
@@ -554,7 +565,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.begin: kern::RoadBuilder::begin
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   std::vector<double> a0;
@@ -572,7 +583,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.step: kern::RoadBuilder::step
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -583,7 +594,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.done: kern::RoadBuilder::done
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   decltype(auto) r = self->done();
@@ -592,7 +603,7 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.failed: kern::RoadBuilder::failed
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   decltype(auto) r = self->failed();
@@ -601,7 +612,7 @@ bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.chunks: kern::RoadBuilder::chunks
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   decltype(auto) r = self->chunks();
@@ -610,7 +621,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.chunks@set: what stands at the place kern::RoadBuilder::chunks gives
-bool c44_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c45_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   ev::take<ev::List<ev::Struct<S_GeoChunk>>>(o, in, 1, self->chunks());
@@ -618,7 +629,7 @@ bool c44_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.road_builder.roads: kern::RoadBuilder::roads
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   decltype(auto) r = self->roads();
@@ -627,7 +638,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_builder.triangles: kern::RoadBuilder::triangles
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
   if (!self) return false;
   decltype(auto) r = self->triangles();
@@ -636,7 +647,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_stream.road: kern::RoadStream::road
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadStream>(o, in, 0, "road_stream");
   if (!self) return false;
   std::vector<kern::Vec2> a0;
@@ -657,7 +668,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_stream.data: kern::RoadStream::data
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadStream>(o, in, 0, "road_stream");
   if (!self) return false;
   decltype(auto) r = self->data();
@@ -666,7 +677,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.road_stream.size: kern::RoadStream::size
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadStream>(o, in, 0, "road_stream");
   if (!self) return false;
   decltype(auto) r = self->size();
@@ -675,7 +686,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.build_terrain_tile: kern::build_terrain_tile
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Num<::kern::f64>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
@@ -701,7 +712,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.geo_projector.init: kern::GeoProjector::init
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto self = ev::blank<kern::GeoProjector>();
   ev::take<ev::Struct<S_GeoProjector>>(o, in, 0, self);
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -715,7 +726,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.geo_projector.project: kern::GeoProjector::project
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto self = ev::blank<kern::GeoProjector>();
   ev::take<ev::Struct<S_GeoProjector>>(o, in, 0, self);
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -733,65 +744,65 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.building_builder.make: kern::BuildingBuilder::BuildingBuilder
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::BuildingBuilder>(std::unique_ptr<kern::BuildingBuilder>(new kern::BuildingBuilder()))));
   return true;
 }
 
 // engine.building_builder.release: kern::BuildingBuilder::~BuildingBuilder
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "building_builder", r)) return false;
   return ev::release_of<kern::BuildingBuilder>(o, r, "building_builder", "BuildingBuilder");
 }
 
 // engine.earcut.make: kern::Earcut::Earcut
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Earcut>(std::unique_ptr<kern::Earcut>(new kern::Earcut()))));
   return true;
 }
 
 // engine.earcut.release: kern::Earcut::~Earcut
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "earcut", r)) return false;
   return ev::release_of<kern::Earcut>(o, r, "earcut", "Earcut");
 }
 
 // engine.footprint_stream.make: kern::FootprintStream::FootprintStream
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::FootprintStream>(std::unique_ptr<kern::FootprintStream>(new kern::FootprintStream()))));
   return true;
 }
 
 // engine.footprint_stream.release: kern::FootprintStream::~FootprintStream
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "footprint_stream", r)) return false;
   return ev::release_of<kern::FootprintStream>(o, r, "footprint_stream", "FootprintStream");
 }
 
 // engine.road_builder.make: kern::RoadBuilder::RoadBuilder
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::RoadBuilder>(std::unique_ptr<kern::RoadBuilder>(new kern::RoadBuilder()))));
   return true;
 }
 
 // engine.road_builder.release: kern::RoadBuilder::~RoadBuilder
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "road_builder", r)) return false;
   return ev::release_of<kern::RoadBuilder>(o, r, "road_builder", "RoadBuilder");
 }
 
 // engine.road_stream.make: kern::RoadStream::RoadStream
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::RoadStream>(std::unique_ptr<kern::RoadStream>(new kern::RoadStream()))));
   return true;
 }
 
 // engine.road_stream.release: kern::RoadStream::~RoadStream
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "road_stream", r)) return false;
   return ev::release_of<kern::RoadStream>(o, r, "road_stream", "RoadStream");
@@ -822,49 +833,50 @@ const EngineCall kCalls[] = {
     {"engine.mesh_data.triangle_count", &c21},
     {"engine.mesh_data.clear", &c22},
     {"engine.mesh_data.push", &c23},
-    {"engine.mesh_data.bytes", &c24},
-    {"engine.mesh_data.as_input", &c25},
-    {"engine.upsert", &c26},
-    {"engine.weld", &c27},
-    {"engine.content_hash", &c28},
-    {"engine.stream_count", &c29},
-    {"engine.stream_u32", &c30},
-    {"engine.primitives.box", &c31},
-    {"engine.primitives.box_on_ground", &c32},
-    {"engine.primitives.sphere", &c33},
-    {"engine.primitives.capsule", &c34},
-    {"engine.primitives.torus", &c35},
-    {"engine.primitives.cylinder", &c36},
-    {"engine.primitives.cone", &c37},
-    {"engine.primitives.plane", &c38},
-    {"engine.primitives.append", &c39},
-    {"engine.road_builder.begin", &c40},
-    {"engine.road_builder.step", &c41},
-    {"engine.road_builder.done", &c42},
-    {"engine.road_builder.failed", &c43},
-    {"engine.road_builder.chunks", &c44},
-    {"engine.road_builder.roads", &c45},
-    {"engine.road_builder.triangles", &c46},
-    {"engine.road_stream.road", &c47},
-    {"engine.road_stream.data", &c48},
-    {"engine.road_stream.size", &c49},
-    {"engine.build_terrain_tile", &c50},
-    {"engine.geo_projector.init", &c51},
-    {"engine.geo_projector.project", &c52},
-    {"engine.building_builder.make", &c53},
-    {"engine.building_builder.release", &c54},
-    {"engine.earcut.make", &c55},
-    {"engine.earcut.release", &c56},
-    {"engine.footprint_stream.make", &c57},
-    {"engine.footprint_stream.release", &c58},
-    {"engine.road_builder.make", &c59},
-    {"engine.road_builder.release", &c60},
-    {"engine.road_stream.make", &c61},
-    {"engine.road_stream.release", &c62},
+    {"engine.mesh_data.push_extra", &c24},
+    {"engine.mesh_data.bytes", &c25},
+    {"engine.mesh_data.as_input", &c26},
+    {"engine.upsert", &c27},
+    {"engine.weld", &c28},
+    {"engine.content_hash", &c29},
+    {"engine.stream_count", &c30},
+    {"engine.stream_u32", &c31},
+    {"engine.primitives.box", &c32},
+    {"engine.primitives.box_on_ground", &c33},
+    {"engine.primitives.sphere", &c34},
+    {"engine.primitives.capsule", &c35},
+    {"engine.primitives.torus", &c36},
+    {"engine.primitives.cylinder", &c37},
+    {"engine.primitives.cone", &c38},
+    {"engine.primitives.plane", &c39},
+    {"engine.primitives.append", &c40},
+    {"engine.road_builder.begin", &c41},
+    {"engine.road_builder.step", &c42},
+    {"engine.road_builder.done", &c43},
+    {"engine.road_builder.failed", &c44},
+    {"engine.road_builder.chunks", &c45},
+    {"engine.road_builder.roads", &c46},
+    {"engine.road_builder.triangles", &c47},
+    {"engine.road_stream.road", &c48},
+    {"engine.road_stream.data", &c49},
+    {"engine.road_stream.size", &c50},
+    {"engine.build_terrain_tile", &c51},
+    {"engine.geo_projector.init", &c52},
+    {"engine.geo_projector.project", &c53},
+    {"engine.building_builder.make", &c54},
+    {"engine.building_builder.release", &c55},
+    {"engine.earcut.make", &c56},
+    {"engine.earcut.release", &c57},
+    {"engine.footprint_stream.make", &c58},
+    {"engine.footprint_stream.release", &c59},
+    {"engine.road_builder.make", &c60},
+    {"engine.road_builder.release", &c61},
+    {"engine.road_stream.make", &c62},
+    {"engine.road_stream.release", &c63},
     {"engine.building_builder.chunks@get", &c4},
     {"engine.building_builder.chunks@set", &c4_set},
-    {"engine.road_builder.chunks@get", &c44},
-    {"engine.road_builder.chunks@set", &c44_set},
+    {"engine.road_builder.chunks@get", &c45},
+    {"engine.road_builder.chunks@set", &c45_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

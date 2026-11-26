@@ -1357,6 +1357,15 @@ __attribute__((format(printf, 1, 0))) inline std::string formatted(const char* f
   va_end(again);
   return out;
 }
+/// The same of values handed one by one (a stand-in of a free function of the engine that formats a text is a variadic
+/// template: the source's unqualified call - `log(LogLevel::warn, ...)` - finds it before the engine's own, which it
+/// finds too by its enum; a C ellipsis is the worse match).
+template <class... A> std::string formatted_of(const char* format, A... values) {
+  const int n = std::snprintf(nullptr, 0, format, values...);
+  std::string out(n > 0 ? static_cast<std::size_t>(n) : 0, '\0');
+  if (n > 0) std::snprintf(out.data(), out.size() + 1, format, values...);
+  return out;
+}
 
 /// A place of the engine the source holds (`std::vector<ShotEvent>& shots() { return shots_; }`: kern/docs/blueprint_cpp.md,
 /// "Plätze der Engine"). The stand-in of the source's engine object gives a reference to a copy the test keeps: read

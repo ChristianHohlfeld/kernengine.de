@@ -156,6 +156,23 @@ MeshData grid_mesh(u32 n, f32 size) {
   return m;
 }
 
+TEST(mesh_push_extra_takes_its_record_counted) {
+  // (MeshData::push_extra: a record of extra_size numbers, from an array or a list; a shorter view appends nothing and
+  // says why - nothing is read past its end)
+  MeshData m;
+  m.extra_size = 3;
+  const f32 rec[3] = {1.5f, -2.0f, 0.25f};
+  m.push_extra(rec);
+  const std::vector<f32> list = {4.0f, 5.0f, 6.0f, 7.0f};
+  m.push_extra(list);
+  CHECK(m.extra == (std::vector<f32>{1.5f, -2.0f, 0.25f, 4.0f, 5.0f, 6.0f}));
+  clear_error();
+  const f32 short_rec[2] = {8.0f, 9.0f};
+  m.push_extra(short_rec);
+  CHECK(m.extra.size() == 6 && std::string(last_error()).find("a record of 2 numbers") != std::string::npos);
+  clear_error();
+}
+
 TEST(bvh_matches_brute_force) {
   const MeshData g = grid_mesh(60, 2);
   Bvh bvh;

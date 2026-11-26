@@ -13839,8 +13839,14 @@ class TestWriter:
                     f'inline {ret} {cls + "::" if cls else ""}{d["name"]}({", ".join(a for a, _ in params)}){const} {{ return converted::engine_place<{held}, {shape(held)}>("{f["type"]}", {{{", ".join(values)}}}); }}')
         # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
-        said = ""
-        if formats is not None:
+        said, variadic = "", ""
+        if formats is not None and not cls:
+            # (a free function of the engine: a variadic template - the source's unqualified call takes it before the engine's own
+            # one, which it finds too where an argument is a type of the engine (an enum); a C ellipsis is the worse match)
+            params[-1] = ("KernA... kern_a", "")
+            variadic = "template <class... KernA> "
+            body.insert(0, f"const std::string kern_text = converted::formatted_of({formats}, kern_a...);")
+        elif formats is not None:
             # (what the format makes of the values: as the engine's function writes it - vsnprintf)
             body.insert(0, f"std::va_list kern_va; va_start(kern_va, {formats}); const std::string kern_text = converted::formatted({formats}, kern_va); va_end(kern_va);")
             at = len(params) - 1 + (1 if cls else 0)   # (its place among the parameters, counted from 1 - a method's object first)
@@ -13870,8 +13876,8 @@ class TestWriter:
         if ret != "void":
             body.append("return kern_result;")
         const = " const" if cls and (not plain or qtype(d).rstrip().endswith("const")) else ""
-        return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const}{said};",
-                f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
+        return (f"{variadic}{ret} {d['name']}({', '.join(a + b for a, b in params)}){const}{said};",
+                f"{variadic}inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
     def overridden(self, q):
         """The virtual functions of the class `q` of the engine that a function of a class of the program the test holds

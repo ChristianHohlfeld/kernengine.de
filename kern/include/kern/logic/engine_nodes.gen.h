@@ -9272,6 +9272,32 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.mesh_data.push", {to_value(::kern::logic::engine_values::input_value(self)), to_value(p), to_value(n), to_value(c), to_value(uv)}, {PinType::structure});
     kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[0]);
   }
+  /// One record of the extra stream: extra_size numbers of `values` (an array of that length, a list). A shorter view appends nothing and says why (fail) - nothing is read past its end.
+  template <class T1> void engine_mesh_data_push_extra(const T1& self, const List<f32>& values) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_self = ::kern::logic::engine_values::blank<kern::MeshData>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Num<::kern::f32>>, std::vector<float>>(*kern_o, values);
+      kern_self.push_extra(kern::Span<float const>(kern_a0.data(), kern_a0.size()));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::pass(*kern_o, kern_self);
+      return;
+    }
+    this->kern_engine("engine.mesh_data.push_extra", {to_value(::kern::logic::engine_values::input_value(self)), to_value(values)}, {PinType::structure});
+  }
+  template <class KernNode, class T1> void engine_mesh_data_push_extra(KernNode& kern_n, const T1& self, const List<f32>& values) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_self = ::kern::logic::engine_values::blank<kern::MeshData>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Num<::kern::f32>>, std::vector<float>>(*kern_o, values);
+      kern_self.push_extra(kern::Span<float const>(kern_a0.data(), kern_a0.size()));
+      kern_n.self = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::template make<std::remove_cvref_t<decltype(kern_n.self)>>(*kern_o, kern_self);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.mesh_data.push_extra", {to_value(::kern::logic::engine_values::input_value(self)), to_value(values)}, {PinType::structure});
+    kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[0]);
+  }
   template <class T1> u64 engine_mesh_data_bytes(const T1& self) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
