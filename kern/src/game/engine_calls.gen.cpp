@@ -450,7 +450,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->fixed_step_handler();
-  out[0] = Value::integer(ev::handle_of<kern::game::FixedStep>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::game::FixedStep>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -797,7 +797,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->physics();
-  out[0] = Value::integer(ev::handle_of<kern::physics::World>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::physics::World>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1048,7 +1048,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->logic_runtime();
-  out[0] = Value::integer(ev::handle_of<kern::logic::Runtime>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::logic::Runtime>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1069,11 +1069,12 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
   ev::take<ev::List<ev::Struct<S_game_GameWorld_SpawnChange>>>(o, in, 2, a1);
+  if (!o.error.empty()) return false;
   self->take_replicated_changes(a0, a1);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a0);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, a0);
   ev::give<ev::List<ev::Struct<S_game_GameWorld_SpawnChange>>>(o, out, 1, a1);
   return true;
 }
@@ -1083,11 +1084,12 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
   ev::take<ev::List<ev::Struct<S_game_GameWorld_SpawnChange>>>(o, in, 2, a1);
+  if (!o.error.empty()) return false;
   self->replicated_state(a0, a1);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a0);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, a0);
   ev::give<ev::List<ev::Struct<S_game_GameWorld_SpawnChange>>>(o, out, 1, a1);
   return true;
 }
@@ -1876,7 +1878,7 @@ bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   decltype(auto) r = self->mixer();
-  out[0] = Value::integer(ev::handle_of<kern::audio::Mixer>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::audio::Mixer>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -2100,17 +2102,15 @@ bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   if (!a0) return false;
   kern::game::SoundBank* a1 = ev::object<kern::game::SoundBank>(o, in, 1, "bank");
   if (!a1) return false;
-  out[0] = Value::integer(o.own<kern::game::GameAudio>(std::unique_ptr<kern::game::GameAudio>(new kern::game::GameAudio(*a0, *a1))));
+  out[0] = Value::object(o.ref(o.own<kern::game::GameAudio>(std::unique_ptr<kern::game::GameAudio>(new kern::game::GameAudio(*a0, *a1)))));
   return true;
 }
 
 // engine.game_audio.release: kern::game::GameAudio::~GameAudio
 bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::game::GameAudio>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no GameAudio that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "game_audio", r)) return false;
+  return ev::release_of<kern::game::GameAudio>(o, r, "game_audio", "GameAudio");
 }
 
 // engine.game_world.make: kern::game::GameWorld::GameWorld
@@ -2119,7 +2119,7 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   if (!a0) return false;
   kern::game::NightWindows* a1 = ev::maybe<kern::game::NightWindows>(o, in, 1, "windows");
   if (!o.error.empty()) return false;
-  out[0] = Value::integer(o.own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*a0, a1))));
+  out[0] = Value::object(o.ref(o.own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*a0, a1)))));
   return true;
 }
 
@@ -2127,17 +2127,15 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Engine* a0 = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!a0) return false;
-  out[0] = Value::integer(o.own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*a0))));
+  out[0] = Value::object(o.ref(o.own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*a0)))));
   return true;
 }
 
 // engine.game_world.release: kern::game::GameWorld::~GameWorld
 bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::game::GameWorld>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no GameWorld that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "game_world", r)) return false;
+  return ev::release_of<kern::game::GameWorld>(o, r, "game_world", "GameWorld");
 }
 
 // engine.game_world.logic_native: kern::game::GameWorld::logic_native
@@ -2158,17 +2156,15 @@ bool c177_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 
 // engine.property_change.make: kern::game::GameWorld::PropertyChange::PropertyChange
 bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::game::GameWorld::PropertyChange>(std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange())));
+  out[0] = Value::object(o.ref(o.own<kern::game::GameWorld::PropertyChange>(std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange()))));
   return true;
 }
 
 // engine.property_change.release: kern::game::GameWorld::PropertyChange::~PropertyChange
 bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::game::GameWorld::PropertyChange>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no PropertyChange that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "property_change", r)) return false;
+  return ev::release_of<kern::game::GameWorld::PropertyChange>(o, r, "property_change", "PropertyChange");
 }
 
 // engine.property_change.actor: kern::game::GameWorld::PropertyChange::actor
@@ -2205,17 +2201,15 @@ bool c181_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 
 // engine.night_windows.make: kern::game::NightWindows::NightWindows
 bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::game::NightWindows, kern::ShaderExtension>(std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows())));
+  out[0] = Value::object(o.ref(o.own<kern::game::NightWindows, kern::ShaderExtension>(std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows()))));
   return true;
 }
 
 // engine.night_windows.release: kern::game::NightWindows::~NightWindows
 bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::game::NightWindows>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no NightWindows that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "night_windows", r)) return false;
+  return ev::release_of<kern::game::NightWindows>(o, r, "night_windows", "NightWindows");
 }
 
 // engine.night_windows.night: kern::game::NightWindows::night
@@ -2238,17 +2232,15 @@ bool c184_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::audio::Mixer* a0 = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!a0) return false;
-  out[0] = Value::integer(o.own<kern::game::SoundBank>(std::unique_ptr<kern::game::SoundBank>(new kern::game::SoundBank(*a0))));
+  out[0] = Value::object(o.ref(o.own<kern::game::SoundBank>(std::unique_ptr<kern::game::SoundBank>(new kern::game::SoundBank(*a0)))));
   return true;
 }
 
 // engine.sound_bank.release: kern::game::SoundBank::~SoundBank
 bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::game::SoundBank>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no SoundBank that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "sound_bank", r)) return false;
+  return ev::release_of<kern::game::SoundBank>(o, r, "sound_bank", "SoundBank");
 }
 
 // kern::game::FixedStep: the object of the engine a Blueprint is (Graph::implements "game_FixedStep")

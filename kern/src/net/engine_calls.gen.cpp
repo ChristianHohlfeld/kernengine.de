@@ -166,7 +166,7 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   decltype(auto) r = self->connection();
-  out[0] = Value::integer(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -175,7 +175,7 @@ bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   decltype(auto) r = self->connection();
-  out[0] = Value::integer(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -328,7 +328,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Int>(o, in, 1, a0);
   decltype(auto) r = self->connection(std::move(a0));
-  out[0] = Value::integer(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -449,7 +449,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   decltype(auto) r = self->endpoint();
-  out[0] = Value::integer(ev::handle_of<kern::net::Endpoint>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Endpoint>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1156,7 +1156,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->create();
-  out[0] = Value::integer(ev::handle_of<kern::net::Transport>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Transport>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1165,7 +1165,7 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->simulator();
-  out[0] = Value::integer(ev::handle_of<kern::net::Simulator>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Simulator>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1294,7 +1294,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   decltype(auto) r = self->simulator();
-  out[0] = Value::integer(ev::handle_of<kern::net::Simulator>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::net::Simulator>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1306,17 +1306,15 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int64>(o, in, 2, a2);
-  out[0] = Value::integer(o.own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*a0, a1, std::move(a2)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*a0, a1, std::move(a2))))));
   return true;
 }
 
 // engine.client.release: kern::net::Client::~Client
 bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::Client>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Client that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "client", r)) return false;
+  return ev::release_of<kern::net::Client>(o, r, "client", "Client");
 }
 
 // engine.connection.make: kern::net::Connection::Connection
@@ -1325,66 +1323,58 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_ConnectionConfig>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Float>(o, in, 1, a1);
-  out[0] = Value::integer(o.own<kern::net::Connection>(std::unique_ptr<kern::net::Connection>(new kern::net::Connection(a0, std::move(a1)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::Connection>(std::unique_ptr<kern::net::Connection>(new kern::net::Connection(a0, std::move(a1))))));
   return true;
 }
 
 // engine.connection.release: kern::net::Connection::~Connection
 bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::Connection>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Connection that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "connection", r)) return false;
+  return ev::release_of<kern::net::Connection>(o, r, "connection", "Connection");
 }
 
 // engine.host_transport.make: kern::net::HostTransport::HostTransport
 bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 0, a0);
-  out[0] = Value::integer(o.own<kern::net::HostTransport, kern::net::Transport>(std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport(std::move(a0)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::HostTransport, kern::net::Transport>(std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport(std::move(a0))))));
   return true;
 }
 
 // engine.host_transport.release: kern::net::HostTransport::~HostTransport
 bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::HostTransport>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no HostTransport that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "host_transport", r)) return false;
+  return ev::release_of<kern::net::HostTransport>(o, r, "host_transport", "HostTransport");
 }
 
 // engine.loopback_network.make: kern::net::LoopbackNetwork::LoopbackNetwork
 bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
-  out[0] = Value::integer(o.own<kern::net::LoopbackNetwork>(std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork(std::move(a0)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::LoopbackNetwork>(std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork(std::move(a0))))));
   return true;
 }
 
 // engine.loopback_network.release: kern::net::LoopbackNetwork::~LoopbackNetwork
 bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::LoopbackNetwork>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no LoopbackNetwork that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "loopback_network", r)) return false;
+  return ev::release_of<kern::net::LoopbackNetwork>(o, r, "loopback_network", "LoopbackNetwork");
 }
 
 // engine.measure_stream.make: kern::net::MeasureStream::MeasureStream
 bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::net::MeasureStream>(std::unique_ptr<kern::net::MeasureStream>(new kern::net::MeasureStream())));
+  out[0] = Value::object(o.ref(o.own<kern::net::MeasureStream>(std::unique_ptr<kern::net::MeasureStream>(new kern::net::MeasureStream()))));
   return true;
 }
 
 // engine.measure_stream.release: kern::net::MeasureStream::~MeasureStream
 bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::MeasureStream>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no MeasureStream that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "measure_stream", r)) return false;
+  return ev::release_of<kern::net::MeasureStream>(o, r, "measure_stream", "MeasureStream");
 }
 
 // engine.server.make: kern::net::Server::Server
@@ -1395,34 +1385,30 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int64>(o, in, 2, a2);
-  out[0] = Value::integer(o.own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*a0, a1, std::move(a2)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*a0, a1, std::move(a2))))));
   return true;
 }
 
 // engine.server.release: kern::net::Server::~Server
 bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::Server>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Server that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "server", r)) return false;
+  return ev::release_of<kern::net::Server>(o, r, "server", "Server");
 }
 
 // engine.simulator.make: kern::net::Simulator::Simulator
 bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
-  out[0] = Value::integer(o.own<kern::net::Simulator>(std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator(std::move(a0)))));
+  out[0] = Value::object(o.ref(o.own<kern::net::Simulator>(std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator(std::move(a0))))));
   return true;
 }
 
 // engine.simulator.release: kern::net::Simulator::~Simulator
 bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::net::Simulator>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Simulator that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "simulator", r)) return false;
+  return ev::release_of<kern::net::Simulator>(o, r, "simulator", "Simulator");
 }
 
 // engine.simulator.settings: kern::net::Simulator::settings

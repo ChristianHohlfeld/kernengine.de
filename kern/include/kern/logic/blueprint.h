@@ -232,6 +232,7 @@ struct BlueprintCore : logic::PureNodes {
   /// Is Valid Object, Handle of Object (kern/docs/engine_object.md).
   template <class I> static Bool object_valid(Object<I> object) { return object.valid(); }
   template <class I> static Int object_handle(Object<I> object) { return object.ref.handle; }
+  template <class I> static Bool object_equal(Object<I> a, Object<I> b) { return a == b; }
 
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's

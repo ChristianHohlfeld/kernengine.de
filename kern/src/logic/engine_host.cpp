@@ -226,7 +226,8 @@ bool call_engine(EngineObjects& objects, std::string_view function, const std::v
   }
   objects.begin_call();
   const bool done = f(objects, in, out);
-  if (!in.empty() && in[0].type == PinType::integer) objects.kept_by(in[0].as_int(), function);  // (what a method of an object was handed stays with it)
+  // (what a method of an object was handed stays with it - an object of these objects' world)
+  if (!in.empty() && in[0].type == PinType::object && in[0].world == objects.world()) objects.kept_by(in[0].i, function);
   return done;
 }
 
