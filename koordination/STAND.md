@@ -127,3 +127,10 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - work-spiel c12c930c: Probe 1 (64de83ea) 548/577, Bibliotheken 0 wartend. Probe 2 rc=1: Konverter-Fehler bind(Runtime&) + Engine-Lücke „Regel-Akteure vom Programm aus C++" → konverter7: ActorBlueprint::bind(ActorHandle)/Call on Actor; danach 3 App-Lücken (Export auf App-Zustand, Zustand mit Basis/extensions, WorldSettings). Fassaden-/Wasser-Shader vorerst heraus. Laufzeit-Abfrage step_hz heraus (Test hält 240).
 - work-zahlen-editor 57a5765e: Punkte 1–5 gebaut; Beleg-Zweig darf SpawnCity-Teil von „Assemble the site" auslassen.
 - work-konverter 02c1ca55 (CI wartet).
+
+## Nachtrag 26.11. 19:17 (Kontrolle)
+- work-projekt 0a7bba61: Gate 45867270705 GANZ GRÜN (rot nur erwartet: native-spawncity-build, e2e-spawncity). gate2 beendet.
+- work-konverter 02c1ca55 (bind-Abbruch behoben): Gate 45870839112 ganz grün (gleiche erwartete Rote) → MISCHBEREIT. konverter7 beendet; Nachfolger konverter8 (a474e916…): bind an Akteur einer Welt (ActorHandle, Call on Actor), App-Lücken a–c, Fall pieces Link, K2 (Text::view, embedded_level, Listen-Sicht).
+- kleinspiel beendet (03a6c1c4); Nachfolger kleinspiel2 (a4e55eb3…), work-spiel 336e4157, Läufe 45873837774/45873952731.
+- zahlen7: work-zahlen a5730d18; Konverter-Ausdrücke getypt lokal; cmath ohne Umrechnung; 8 Funktionen fehlen der Engine → Auftrag mathe (a320b739…, work-projekt): log2, cbrt, ldexp, acosh, atanh, exp2, log1p, remainder.
+- editor: work-zahlen-editor f712aa51, Beleg-Lauf 45870721699.
