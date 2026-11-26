@@ -2083,7 +2083,7 @@ inline std::string value_source(const Value& v) {
     case PinType::number: return L + "number(" + cpp_value(v) + ")";
     case PinType::vector: return L + "vector(" + cpp_value(v) + ")";
     case PinType::text: return L + "text(" + cpp_value(v) + ")";
-    case PinType::actor: return L + "actor(" + std::to_string(v.a) + "u)";
+    case PinType::actor: return L + "actor(kern::logic::ActorHandle{" + std::to_string(v.a) + "u, " + std::to_string(v.world) + "u})";   // (its id and its world, as they are)
     case PinType::object: return L + "object(kern::logic::ObjectRef{" + std::to_string(v.i) + "LL, " + std::to_string(v.world) + "u})";
     case PinType::object_list: {
       std::string r = L + "of(std::vector<kern::logic::ObjectRef>{";
