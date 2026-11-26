@@ -50,6 +50,11 @@ class Program {
   /// start with the project of a project file's text (kern/game/project.h); a text that is no project: false.
   bool start(std::string_view project_text, std::string* error = nullptr);
   bool running() const;
+  /// The device profile it runs on (kern/app/project.h DeviceProfile; the launch argument profile=<name> - Engine::profile,
+  /// which kern::run hands it before App::start): a world it makes (a GameWorld of its host) is given it when it is made,
+  /// as the project (GameWorld::set_profile). "" (the start's): none. Not running: nothing to set, "".
+  void set_profile(std::string name);
+  const std::string& profile() const;
   /// The App: the engine's object of the program Blueprint that implements App, or the App of C++ it was started with
   /// (null: not running).
   App* app() const;
@@ -87,6 +92,7 @@ class ProgramApp final : public App {
   bool start(Engine& engine) override {
     App* a = app();
     engine.set_project(program.project());   // (a world the App makes from its Engine is the project's: GameWorld(Engine&))
+    program.set_profile(engine.profile());   // (and a world a program Blueprint makes runs on the same device profile)
     return a && a->start(engine);
   }
   void update(Engine& engine, const Frame& frame) override { if (App* a = program.app()) a->update(engine, frame); }

@@ -48,7 +48,9 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
 - **Welt-Einstellungen je Gerät:** ein Profil kann `world` tragen – Schlüssel des Abschnitts `"world"` eines Levels
   (`WorldSettings`, etwa `shadowDistance`, `substeps`). Startet eine Welt des Projekts ein Level (`GameWorld::start`,
   `start_level`), gilt diese **Reihenfolge**: die Welt-Einstellungen des Levels, darüber die Schlüssel des gewählten
-  Profils. Gewählt ist es bei einer Welt des Programms durch den Startparameter `profile=<name>` (`Engine::profile()`, `GameWorld(Engine&)`),
+  Profils. Gewählt ist es bei einer Welt des Programms durch den Startparameter `profile=<name>` (`Engine::profile()`): eine Welt, die
+  eine App in C++ aus ihrer Engine macht (`GameWorld(Engine&)`), und eine, die ein Programm-Blueprint macht (der Host des Programms
+  gibt sie ihr beim Machen, `Program::set_profile` – `kern::run` setzt es vor `App::start`; Test `program_world_has_the_project`),
   sonst mit `GameWorld::set_profile` (Editor, Test); kein Profil: nur die des Levels. Ein Schlüssel, den `WorldSettings`
   nicht hat, oder ein Wert, den der Level-Leser nicht nimmt, ist beim Lesen des Projekts ein Fehler mit Stelle und den
   erlaubten Namen (`settings: profiles[0] "mobile".world: unknown key "shadowDistanz" - one of …`); ein gewähltes Profil,

@@ -9134,12 +9134,20 @@ TEST(program_world_has_the_project) {
   CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* world = objects->get<game::GameWorld>(out[0].as_object());
   CHECK(world && world->project() == program.project() && world->project()->name == "Welten");
+  CHECK(world && world->profile().empty());   // (no device profile: the start's)
+  // the program's device profile (kern::run hands it Engine::profile): a world it makes from now on runs on it
+  program.set_profile("mobile");
+  CHECK(program.profile() == "mobile");
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out));
+  game::GameWorld* profiled = objects->get<game::GameWorld>(out[0].as_object());
+  CHECK(profiled && profiled->project() == program.project() && profiled->profile() == "mobile");
   // (made elsewhere: no project)
   logic::EngineObjects other;
   CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::object(other.ref(other.adopt<Renderer>(renderer))), logic::Value::object({})}, out));
   game::GameWorld* alone = other.get<game::GameWorld>(out[0].as_object());
-  CHECK(alone && alone->project() == nullptr);
+  CHECK(alone && alone->project() == nullptr && alone->profile().empty());
   program.end();
+  CHECK(program.profile().empty());
 }
 
 // A world a program makes from its Engine is a world of its project (kern/docs/project.md 3.): an App of C++ run with
