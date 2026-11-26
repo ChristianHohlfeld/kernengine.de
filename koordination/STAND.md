@@ -113,3 +113,11 @@ Besitzer 17:57: „Du brauchst nichts von mir, do it." Damit entschieden (Koordi
 
 **MEILENSTEIN Zahl-Typen:** Engine-Suite auf work-zahlen ganz grün, CI 45858436873 (2e13c032): kern_tests 63.340/0, blueprint_native_test 84 Blueprints/46.217 Aufrufe, game_native_test, ASan+UBSan ohne Meldung. Offen dort: Konverter-Ausdrücke (Stufe 5), Engine-Konstanten/Mathe-Knoten, Murmel neu erzeugen, Editor, JIT getypt inline, SpawnCity.
 Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an sinh/tanh/asinh); Suite: noch 21 Compilerfehler statt 3262. Mathe-Test auf dem GCC-Bau rot → behoben (Compiler an Makros erkennen, pow(x,2) nicht als x*x; 4eb11583).
+
+## Nachtrag 26.11. 18:25 (Kontrolle)
+- Richtung seit 18:07 (Besitzer): SpawnCity massiv verkleinern, Engine 100 % heute, Spiel lauffähig. Kandidat 10 = verkleinertes Spiel (work-spiel), NICHT mehr work-projekt mit vollem Spiel.
+- kleinspiel (a7c43ec7…, work-spiel): Weg B freigegeben (sc::SpawnCity : kern::App auf behaltenen Bibliotheken); Basis 0a8f32cb + 058aa524. Wartet auf Probe rc=0/wartend 0.
+- gate2: work-projekt 0a8f32cb (eigene sinh/cosh/tanh/asinh), Lauf 45865235947 läuft. musl-Frage erledigt (Besitzer: „schreibst sie selber").
+- zahlen7 (work-zahlen fcbcc0ef, CI 45863021396 läuft): Konverter-Ausdrücke, Murmel bitgenau.
+- editor (work-zahlen-editor, noch nicht gepusht): Beleg-Zweig work-beleg-editor-<commit> erlaubt (nur cp spawncity.html ausgelassen, nie mischen).
+- konverter7: work-konverter 058aa524, CI 45865013913 läuft.
