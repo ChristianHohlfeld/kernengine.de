@@ -448,7 +448,10 @@ bool read_literal(const json::Value& in, const logic::TypeRef& t, const logic::G
   if (text.empty()) text = "0";
   if (logic::is_floating(t.type)) {
     std::string body = text;
-    if (t.type == logic::PinType::f32 && (body.back() == 'f' || body.back() == 'F') && body.size() > 1 && body.find_first_of("xX") == std::string::npos) body.pop_back();
+    // (0.5f: an f32 literal as C++ writes it - the f after a digit or a point, not the f of "inf")
+    if (t.type == logic::PinType::f32 && body.size() > 1 && (body.back() == 'f' || body.back() == 'F') && (std::isdigit(static_cast<unsigned char>(body[body.size() - 2])) || body[body.size() - 2] == '.') &&
+        body.find_first_of("xX") == std::string::npos)
+      body.pop_back();
     const logic::scan::Real r = logic::scan::real(body, t.type == logic::PinType::f32);
     if (r.end != body.size() || body.find('(') != std::string::npos) {
       why = "\"" + text + "\" is no " + name + ": a number such as 0.5, -3, 1e-3, inf or nan";
@@ -488,7 +491,7 @@ struct Conversion {
 Conversion conversion_for(const logic::TypeRef& from, const logic::TypeRef& to) {
   using logic::PinType;
   Conversion c;
-  const std::string a = logic::type_label(from), b = logic::type_label(to);
+  const std::string a = logic::type_text(from), b = logic::type_text(to);
   if (logic::is_number(from.type) && logic::is_number(to.type)) {
     c.type = "num.cast";
     c.params = {{"from", logic::pin_type_name(from.type)}, {"to", logic::pin_type_name(to.type)}};

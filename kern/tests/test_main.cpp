@@ -16293,7 +16293,7 @@ TEST(studio_logic_structs) {
     for (const json::Value& s : st["logic"]["structs"].items()) if (s["name"].as_string() == name) return s;
     return json::Value();
   };
-  /// The fields of a struct as text: "Name:text,Damage:f64".
+  /// The fields of a struct as text: "Name:text,Damage:f32".
   auto fields = [&](const char* name) {
     std::string all;
     const json::Value declared = structure(name);
@@ -16316,7 +16316,7 @@ TEST(studio_logic_structs) {
     return f.s->command(c);
   };
   const json::Value made = cmd({{"cmd", "logicStruct"}, {"op", "add"}, {"name", "Weapon"}});
-  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Weapon" && fields("Weapon") == "Field:f64" && structure("Weapon")["fields"][0]["value"].as_number() == 0);
+  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Weapon" && fields("Weapon") == "Field:f32" && structure("Weapon")["fields"][0]["value"].as_number() == 0);
   // its name is a type's name in C++: not a word of the notation, not a list's name, not taken twice
   CHECK(!edit("add", "f32")["ok"].as_bool() && !edit("add", "Items_list")["ok"].as_bool() && !edit("add", "Weapon")["ok"].as_bool() && !edit("add", "math_add")["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicStruct"}, {"op", "add"}})["name"].as_string() == "NewStruct" && order() == "Weapon,NewStruct");
@@ -16327,7 +16327,7 @@ TEST(studio_logic_structs) {
   CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Damage"}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Damage"}, {"value", 10}})["ok"].as_bool());
   CHECK(edit("addField", "Weapon", {{"field", "Label"}, {"type", "text"}})["ok"].as_bool() && edit("addField", "Weapon", {{"field", "Type"}, {"type", "Kind"}})["ok"].as_bool());
   CHECK(edit("addField", "Weapon", {{"type", "f64_list"}})["field"].as_string() == "Field" && edit("addField", "Weapon")["field"].as_string() == "Field2");
-  CHECK(fields("Weapon") == "Damage:f64,Label:text,Type:Kind,Field:f64_list,Field2:f32" && structure("Weapon")["fields"][0]["value"].as_number() == 10);
+  CHECK(fields("Weapon") == "Damage:f32,Label:text,Type:Kind,Field:f64_list,Field2:f32" && structure("Weapon")["fields"][0]["value"].as_number() == 10);
   json::Value r = edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "Label"}});
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon has a field Label already");
   CHECK(!edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "my field"}})["ok"].as_bool() && !edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "class"}})["ok"].as_bool());
@@ -16339,16 +16339,16 @@ TEST(studio_logic_structs) {
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "\"Label\" is a field of the struct Weapon" && !edit("rename", "Aim", {{"to", "Damage"}})["ok"].as_bool());
   CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Falloff"}})["ok"].as_bool() && edit("removeField", "Weapon", {{"field", "Field2"}})["ok"].as_bool());
   CHECK(edit("fieldValue", "Weapon", {{"field", "Type"}, {"value", 1}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Falloff"}, {"value", parsed("[1, 0.5]")}})["ok"].as_bool());
-  CHECK(edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}})["ok"].as_bool() && fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list");
+  CHECK(edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}})["ok"].as_bool() && fields("Weapon") == "Label:text,Damage:f32,Type:Kind,Falloff:f64_list");
   // (the first one does not move up, the last one not down)
   edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}});
   edit("moveField", "Weapon", {{"field", "Falloff"}, {"by", 1}});
-  CHECK(fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list" && edit("help", "Weapon", {{"text", "What a weapon does."}})["ok"].as_bool());
+  CHECK(fields("Weapon") == "Label:text,Damage:f32,Type:Kind,Falloff:f64_list" && edit("help", "Weapon", {{"text", "What a weapon does."}})["ok"].as_bool());
   // A field of another struct: the struct it is of stands above (Aim moves up) - and no struct
   // holds itself, directly or through another one.
   CHECK(edit("renameField", "Aim", {{"field", "Field"}, {"to", "Tries"}})["ok"].as_bool() && edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "i64"}})["ok"].as_bool());
   CHECK(edit("fieldValue", "Aim", {{"field", "Tries"}, {"value", 3}})["ok"].as_bool() && order() == "Weapon,Aim");
-  CHECK(edit("addField", "Weapon", {{"field", "Sight"}, {"type", "Aim"}})["ok"].as_bool() && order() == "Aim,Weapon" && fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list,Sight:Aim");
+  CHECK(edit("addField", "Weapon", {{"field", "Sight"}, {"type", "Aim"}})["ok"].as_bool() && order() == "Aim,Weapon" && fields("Weapon") == "Label:text,Damage:f32,Type:Kind,Falloff:f64_list,Sight:Aim");
   CHECK(structure("Weapon")["fields"][4]["value"]["Tries"].as_number() == 3 && edit("addField", "Weapon", {{"field", "Marks"}, {"type", "Aim_list"}})["ok"].as_bool() && fields("Weapon").find("Marks:Aim[]") != std::string::npos);
   r = edit("addField", "Aim", {{"field", "Of"}, {"type", "Weapon"}});
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon holds Aim: a struct cannot contain itself" && !edit("addField", "Aim", {{"field", "Me"}, {"type", "Aim_list"}})["ok"].as_bool());
@@ -16441,12 +16441,12 @@ TEST(studio_logic_structs) {
   // Make has an input for each field - of the field's type, with its default -, Break an output; Set Field names a variable and a field.
   const u32 begin = added("event.begin"), make = added("struct.make", R"({"struct":"Weapon"})"), brk = added("struct.break", R"({"struct":"Weapon"})"), set = added("var.set", R"({"variable":"Held"})");
   const u32 tune = added("var.set", R"({"variable":"Held","path":".Damage"})"), number = added("math.add"), text = added("text.append"), print = added("debug.print");
-  CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "f64");
+  CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "f32");
   CHECK(pin(make, "Damage", false)["value"].as_number() == 10 && pin(make, "Type", false)["type"].as_string() == "enum" && pin(make, "Type", false)["of"].as_string() == "Kind" && pin(make, "Type", false)["value"].as_number() == 1);
   CHECK(pin(make, "Sight", false)["type"].as_string() == "struct" && pin(make, "Sight", false)["of"].as_string() == "Aim" && pin(make, "Sight", false)["value"]["Tries"].as_number() == 3);
   CHECK(pin(make, "Marks", false)["type"].as_string() == "struct_list" && pin(make, "value", true)["type"].as_string() == "struct" && pin(make, "value", true)["of"].as_string() == "Weapon");
   CHECK(node(brk)["title"].as_string() == "Break Weapon" && node(brk)["outputs"].size() == 6 && pin(brk, "Label", true)["type"].as_string() == "text" && pin(brk, "value", false)["value"]["Damage"].as_number() == 10);
-  CHECK(node(tune)["title"].as_string() == "Set Held.Damage" && pin(tune, "value", false)["type"].as_string() == "f64" && pin(tune, "value", false)["value"].as_number() == 10);
+  CHECK(node(tune)["title"].as_string() == "Set Held.Damage" && pin(tune, "value", false)["type"].as_string() == "f32" && pin(tune, "value", false)["value"].as_number() == 10);
   // (its settings: the variable, and the path from it to the place - a text on the node)
   std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
@@ -16484,7 +16484,7 @@ TEST(studio_logic_structs) {
   CHECK(f.s->level().logic.find(length)->param("type") == "Weapon" && pin(length, "list", false)["type"].as_string() == "struct_list" && no_errors(logic::check(f.s->level().logic)));
 
   // A field's new name: its values and its wires stay with it - on Make, on Break, in every path that leads through it, in every default.
-  CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:f64") != std::string::npos);
+  CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:f32") != std::string::npos);
   CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && !wired(number, "result", make, "Damage") && node(tune)["title"].as_string() == "Set Held.Power");
   CHECK(variable("Held")["value"]["Power"].as_number() == 25 && !variable("Held")["value"].has("Damage") && variable("Rack")["value"][1]["Power"].as_number() == 10 && no_errors(logic::check(f.s->level().logic)));
   CHECK(cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Label"}, {"value", "typed"}})["ok"].as_bool() && edit("renameField", "Weapon", {{"field", "Label"}, {"to", "Title"}})["ok"].as_bool());
@@ -16494,7 +16494,7 @@ TEST(studio_logic_structs) {
   CHECK(edit("renameField", "Aim", {{"field", "Tries"}, {"to", "Shots"}})["ok"].as_bool() && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7 && pin(make, "Sight", false)["value"]["Shots"].as_number() == 9);
   CHECK(structure("Weapon")["fields"][4]["value"]["Shots"].as_number() == 3 && variable("Last")["value"]["Shots"].as_number() == 3 && no_errors(logic::check(f.s->level().logic)));
   // A field moves: nothing but its place changes.
-  CHECK(edit("moveField", "Weapon", {{"field", "Power"}, {"by", 1}})["ok"].as_bool() && fields("Weapon") == "Title:text,Type:Kind,Power:f64,Falloff:f64_list,Sight:Aim,Marks:Aim[]");
+  CHECK(edit("moveField", "Weapon", {{"field", "Power"}, {"by", 1}})["ok"].as_bool() && fields("Weapon") == "Title:text,Type:Kind,Power:f32,Falloff:f64_list,Sight:Aim,Marks:Aim[]");
   CHECK(variable("Held")["value"]["Power"].as_number() == 25 && variable("Held")["value"]["Type"].as_number() == 1 && wired(number, "result", make, "Power") && node(make)["inputs"][2]["id"].as_string() == "Power");
   // An enum's values move: what a struct holds of them follows.
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Kind"}, {"index", 1}, {"by", -1}})["ok"].as_bool() && variable("Held")["value"]["Type"].as_number() == 0 && structure("Weapon")["fields"][1]["value"].as_number() == 0);
@@ -16503,7 +16503,7 @@ TEST(studio_logic_structs) {
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Kind is in use: the field Type of the struct Weapon");
   // A field's new type: what it holds is kept where the types convert; wires that no longer fit go.
   CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "i64"}})["ok"].as_bool() && fields("Weapon").find("Power:i64") != std::string::npos && variable("Held")["value"]["Power"].as_number() == 25);
-  // (the Number node is an f64: its wire into the i64 field no longer fits - no wire converts)
+  // (the Add node is an f32 (a new struct's field is a Float, f32): its wire into the i64 field no longer fits - no wire converts)
   CHECK(!wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && pin(tune, "value", false)["type"].as_string() == "i64" && no_errors(logic::check(f.s->level().logic)));
   CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "Kind"}})["ok"].as_bool() && variable("Held")["value"]["Power"].as_number() == 0 && !wired(number, "result", make, "Power"));
   CHECK(wired(brk, "Power", tune, "value") && pin(tune, "value", false)["of"].as_string() == "Kind" && no_errors(logic::check(f.s->level().logic)));
