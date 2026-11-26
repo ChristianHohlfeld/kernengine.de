@@ -2623,15 +2623,16 @@ struct Host : kern::Blueprint {
   std::string glue;
   CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5, kern::u32* out_len) {") != std::string::npos &&
         glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
-  // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
+  // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0; what comes in is
+  // the list of the input's own type (List<Int> here, List<U8> for one with its width)
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
-        glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+        glue.find("(kern::logic::export_bytes_in<kern::List<kern::logic::Whole>>(a0, a2), ") != std::string::npos);
   // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
   // when the list is empty); bytes go out the same way, as u8
   CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
         glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3, kern::u32* out_len) {") != std::string::npos &&
-        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out<&game_audio>(object->") != std::string::npos);
+        glue.find("(kern::logic::export_floats_in<kern::List<kern::f64>>(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out<&game_audio>(object->") != std::string::npos);
   CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take(kern::u32* out_len) {") != std::string::npos && glue.find("return kern::logic::export_bytes_out<&game_take>(object->") != std::string::npos);
   // (a text, bytes, floats go out as a piece: the pointer returned, the length written to out_len - the export's own)
   CHECK(glue.find("return kern::logic::export_text_out<&game_hud>(object->") != std::string::npos && glue.find(", out_len);") != std::string::npos);
