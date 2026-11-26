@@ -23,6 +23,9 @@
 #             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of a program's node types).
 #   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece (the piece
 #             before it went for it).
+#   libraries.py every header of the engine that marks a type for Blueprints has its library; one that has none stops the
+#             converter before it converts anything, with the header; a text that names what the libraries do not have is
+#             found with who and the line (the one check, tools/engine_api.py --check runs it on texts too).
 #   placement.py where the Blueprints stand (place_blueprints, apply_to_level): what a Blueprint of the project uses is
 #             the program's; a source of its own (another folder) the program uses that stands in the level stops the run;
 #             --classes takes the header only (the project says which Blueprints the program calls as their classes).
@@ -237,6 +240,7 @@ elif echo "$out" | grep -q 'is an export (case_score) - exports belong to the pr
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
 
 python3 "$here/compiles.py" || fail=1
+python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then

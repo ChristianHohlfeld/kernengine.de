@@ -162,6 +162,84 @@ NODE_SHAPE = re.compile(r"^(n|go|on|it|machine)\d+$")
 ENGINE_RUN = [False]
 ENGINE_HEADERS = set()
 ENGINE_HEADERS_DIR = os.path.join(ROOT, "kern", "include", "kern")   # (the engine's headers: their types are Blueprints' only where marked)
+# A header of the engine that marks a type for Blueprints (KERN_BLUEPRINT_TYPE) is one library of the engine, named by its
+# path (kern/input/actions.h: engine_input_actions) - tools/engine_api.py --libraries writes them all into
+# kern/src/logic/engine_libraries.gen.cpp. What a Blueprint names of them is checked where it is written (engine_names_missing).
+MARKED = re.compile(r"\b(?:struct|class|union|enum(?:\s+class|\s+struct)?)\s+KERN_BLUEPRINT_TYPE\b")
+ENGINE_LIBRARIES_GEN = os.path.join(ROOT, "kern", "src", "logic", "engine_libraries.gen.cpp")
+
+
+def strings_of(x):
+    """Every text in a value of lists, tuples and dicts (what a conversion gives: the pieces of a Blueprint's text)."""
+    if isinstance(x, str):
+        return [x]
+    if isinstance(x, dict):
+        return [t for v in x.values() for t in strings_of(v)]
+    if isinstance(x, (list, tuple, set)):
+        return [t for v in x for t in strings_of(v)]
+    return []
+
+
+def marked_headers():
+    """The engine's headers (kern/include/kern, without the generated ones and the test's) that mark a type for
+    Blueprints: each one library of the engine (relative paths, sorted)."""
+    out = []
+    for d, _, names in os.walk(ENGINE_HEADERS_DIR):
+        for n in names:
+            rel = os.path.relpath(os.path.join(d, n), ENGINE_HEADERS_DIR).replace(os.sep, "/")
+            if n.endswith(".h") and not n.endswith(".gen.h") and not rel.startswith("test/") and MARKED.search(open(os.path.join(d, n), encoding="utf-8").read()):
+                out.append(rel)
+    return sorted(out)
+
+
+def library_of_header(rel):
+    """The name of the library of the engine's header `rel` (input/actions.h: engine_input_actions)."""
+    return "engine_" + re.sub(r"\W", "_", rel[:-2] if rel.endswith(".h") else rel)
+
+
+_BUILT = []
+
+
+def built_engine_libraries():
+    """The engine's libraries as the build has them (engine_libraries.gen.cpp): name -> {"types", "functions"} (their own)."""
+    if not _BUILT:
+        text = open(ENGINE_LIBRARIES_GEN, encoding="utf-8").read() if os.path.exists(ENGINE_LIBRARIES_GEN) else ""
+        have = {}
+        for m in re.finditer(r'\{"(engine_\w+)", "\w*", R"kl\((.*?)\)kl"\}', text, re.S):
+            g = json.loads(m.group(2))
+            have[m.group(1)] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
+                                "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
+        _BUILT.append(have)
+    return _BUILT[0]
+
+
+def engine_libraries_missing():
+    """The headers of the engine that mark types and have no library in the build: ["kern/<h>: ..."] (empty: all there)."""
+    have = built_engine_libraries()
+    return [f"kern/{h} marks types for Blueprints, but the engine has no library {library_of_header(h)} "
+            f"(tools/engine_api.py --libraries writes it into {os.path.relpath(ENGINE_LIBRARIES_GEN, ROOT)})"
+            for h in marked_headers() if library_of_header(h) not in have]
+
+
+def engine_names_missing(texts):
+    """What Blueprint texts ({who: text}) name of the engine's libraries that the build does not have - a library, or a
+    type or function of one: [(who, line, what is missing)] (empty: all there). The one check of it: the converter runs it
+    on every text it writes, tools/engine_api.py --check on a folder of texts."""
+    have = built_engine_libraries()
+    out = []
+    for who, text in sorted(texts.items()):
+        for at, line in enumerate(text.split("\n"), 1):
+            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", line):
+                if lib not in have:
+                    out.append((who, at, f"{lib}: no library of the engine"))
+                elif fn not in have[lib]["types"] and fn not in have[lib]["functions"] and not fn.endswith("Result"):
+                    out.append((who, at, f"{lib}: the type or function {fn} - the engine does not write it"))
+            for lib in re.findall(r"virtual (engine_\w+)\b", line):
+                if lib not in have:
+                    out.append((who, at, f"{lib}: no library of the engine"))
+    return out
+
+
 
 
 def engine_only(field):
@@ -16937,6 +17015,12 @@ def main(argv):
         raise SystemExit("--folder <name>: the folder (in the level and the project) of the Blueprints this run writes - it knows its own by it")
     if whole and not level:
         raise SystemExit("--whole-program: a run over the whole program drops, of its folder, what it does not write any more - give the level (--level)")
+    # (the engine's libraries this run's Blueprints may name - one for each header that marks types: all of them there before
+    # anything is converted, or the run stops now, not when the level reads the texts at the end)
+    if not ENGINE_RUN[0]:
+        lacking = engine_libraries_missing()
+        if lacking:
+            raise SystemExit("the engine's libraries are not whole - nothing is converted:\n  " + "\n  ".join(lacking))
     CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
     RUN_FOLDER[0] = folder
     if classes[0] is not None and not project:
@@ -17386,6 +17470,16 @@ def main(argv):
         got = {}
         for u in now:
             took[u], got[u] = futures[u].result()
+        for u in now:
+            # (what a text names of the engine's libraries is there - the check tools/engine_api.py --check makes of the texts:
+            # here as each is written, so that a run stops at once, with the Blueprint, the line and what is missing)
+            if not ENGINE_RUN[0]:
+                written = "\n".join(strings_of(got[u]["parts"]) + strings_of(got[u]["types"]))
+                lacking = engine_names_missing({u: written})
+                if lacking:
+                    lines_ = written.split("\n")
+                    raise SystemExit(f"{u} names what the engine's libraries do not have (tools/engine_api.py --libraries):\n  "
+                                     + "\n  ".join(f"{what} - in `{lines_[line - 1].strip()[:160]}`" for _, line, what in lacking[:12]))
         for u in now:
             r = got[u]
             # (what is given only grows - more of the others written - and with it what is written: a function

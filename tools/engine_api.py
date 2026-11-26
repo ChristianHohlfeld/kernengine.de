@@ -1326,10 +1326,10 @@ def read_engine(flags=()):
 
 
 # The headers whose types and functions are the engine's libraries (kern/logic/engine_libraries.h): each one library,
-# named by its path (kern/physics/physics.h: engine_physics_physics).
-LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "core/base.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
-                   "gfx/mesh.h", "gfx/passes.h", "gfx/renderer.h", "gfx/shader.h", "logic/logic.h", "math/math.h", "net/client_server.h",
-                   "net/connection.h", "net/reliable.h", "net/transport.h", "physics/physics.h"]
+# named by its path (kern/physics/physics.h: engine_physics_physics). They are the headers that mark a type for Blueprints
+# (KERN_BLUEPRINT_TYPE), found in the engine's headers - not listed by hand (cpp_to_blueprint.marked_headers): a header that
+# marks a type has its library, one that marks none has none.
+LIBRARY_HEADERS = c2b.marked_headers()
 
 
 def libraries_text(level):
@@ -1410,18 +1410,13 @@ def check_level(path):
         have[name] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
                       "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
     named = collections.defaultdict(set)   # (library, kind, name) -> who names it
-    if os.path.isdir(path):
-        for f in sorted(os.listdir(path)):
-            if not f.endswith(".cpp") or f.startswith("engine_"):
-                continue
-            text = open(os.path.join(path, f), encoding="utf-8").read()
-            who = f[:-4]
-            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", text):
-                if lib in have and fn not in have[lib]["types"] and not fn.endswith("Result"):
-                    named[(lib, "function", fn)].add(who)
-            for lib in re.findall(r"virtual (engine_\w+)\b", text):
-                if lib not in have:
-                    named[(lib, "library", lib)].add(who)
+    missing = list(c2b.engine_libraries_missing())   # (a header that marks types and has no library: the build is not whole)
+    if os.path.isdir(path):   # (the one check of what texts name - cpp_to_blueprint.engine_names_missing, as the converter runs it)
+        texts = {f[:-4]: open(os.path.join(path, f), encoding="utf-8").read() for f in sorted(os.listdir(path)) if f.endswith(".cpp") and not f.startswith("engine_")}
+        found = c2b.engine_names_missing(texts)
+        for who, line, what in found:
+            missing.append(f"{what} (named by {who}, line {line})")
+        named.update({k: set() for t in texts.values() for k in re.findall(r"\b(engine_\w+?)::(\w+)", t)})
     else:
         for a in json.load(open(path, encoding="utf-8")).get("actors", []):
             g = (a.get("components") or {}).get("logic") or {}
@@ -1436,8 +1431,8 @@ def check_level(path):
                     if lib.startswith("engine_"):
                         n = x["name"].split("::")[-1]
                         named[(lib, kind, n)].add(a["name"])
-    missing = []
-    for (lib, kind, n), who in sorted(named.items()):
+    for key, who in sorted(named.items()) if not os.path.isdir(path) else ():
+        lib, kind, n = key
         if lib not in have:
             missing.append(f"{lib}: no library of the engine (named by {', '.join(sorted(who)[:5])})")
         elif kind != "library" and n not in have[lib]["types" if kind == "type" else "functions"]:

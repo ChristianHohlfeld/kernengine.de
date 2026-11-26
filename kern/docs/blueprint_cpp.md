@@ -1256,6 +1256,12 @@ enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
 - **Erzeugt beim Bau der Engine:** `tools/engine_api.py --libraries` übersetzt die Header (`tools/cpp_to_blueprint.py
   --engine <header>`) und schreibt `kern/src/logic/engine_libraries.gen.cpp`. Die Datei steht wie die anderen `*.gen.*`
   im Repo, deshalb braucht der Bau kein clang. Jede Bibliothek hat eine **Marke** (Hash ihres Textes).
+- **Welche Header Bibliotheken sind**, steht in keiner Liste: Jeder Header unter `kern/include/kern` (ohne `*.gen.h` und
+  `test/`), der einen Typ mit `KERN_BLUEPRINT_TYPE` kennzeichnet, ist genau eine Bibliothek, benannt nach seinem Pfad
+  (`kern/input/actions.h`: `engine_input_actions`; `cpp_to_blueprint.marked_headers`). Fehlt einer im Bau, bricht der
+  Konverter ab, bevor er etwas wandelt, mit Header und Grund. Was ein Text nennt (Bibliothek, Typ, Funktion), prüft er
+  bei jedem Text, den er schreibt – dieselbe Prüfung wie `tools/engine_api.py --check <texte>` (`engine_names_missing`).
+  Fall: `tools/converter_cases/libraries.py`.
 - **Da in jeder Laufzeit, in jedem Leser und im Editor**, ohne dass ein Level sie enthält (`kern/logic/engine_libraries.h`).
   `with_engine(blueprints)` ist der eine Weg, auf dem jeder Leser eine Bibliothek findet: Ein Name der Engine ist immer
   die Bibliothek der Engine. libraries_of, take_libraries, link, from_cpp und apply_cpp gehen ihn selbst.
