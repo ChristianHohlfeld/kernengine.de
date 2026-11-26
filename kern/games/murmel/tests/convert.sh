@@ -56,7 +56,10 @@ python3 "$kern/tools/embed_project.py" "$work/murmel.kproject" "$work/projekt.cp
 "$root/tools/blueprint_cpp.sh" --project "$work/murmel.kproject" "$work/levels/programm.klevel" "$work/klassen.cpp"
 "$cxx" "${flags[@]}" -I"$work" -I"$kern/tests" "$work"/pt/converted/*.cpp "$kern/tools/test_main.cpp" "$kern/tools/test_memory.cpp" \
   "$work/projekt.cpp" "$work/klassen.cpp" "${engine[@]}" "$out"/box3d/*.o "$out"/musl/*.o -lm -o "$work/vergleich"
+# (beide Durchgänge, was der erste auch gab; die Meldungen der Welt - [status] - nicht ins Protokoll)
+rc=0
 echo "== Vergleich gegen den Stellvertreter der Engine"
-"$work/vergleich"
+"$work/vergleich" | grep -v '^\[status\]' || rc=1
 echo "== Vergleich gegen die Engine selbst"
-KERN_TEST_ENGINE=real "$work/vergleich"
+KERN_TEST_ENGINE=real "$work/vergleich" | grep -v '^\[status\]' || rc=1
+exit $rc
