@@ -84,6 +84,42 @@ struct Register {
 
 }  // namespace
 #include "number_tests.h"
+#include "kern/test/converted.h"
+
+TEST(converted_compares_a_nan_at_its_place) {
+  // The converter's tests (kern/test/converted.h) compare what a Blueprint gives with what its source gives, and the
+  // interpreter's value with the class's, bit for bit as the language sees a number (numbers.h, seen): entry for entry the
+  // same bits, a NaN the one NaN - at the same place. A NaN at one place excuses no other entry.
+  using kern::converted::same;
+  using kern::converted::same_value;
+  using logic::Value;
+  const f64 nan = std::numeric_limits<f64>::quiet_NaN(), other = std::copysign(nan, -1.0);   // (two NaNs of other bits)
+  const f32 nanf = std::numeric_limits<f32>::quiet_NaN();
+  CHECK(std::bit_cast<u64>(nan) != std::bit_cast<u64>(other));
+  auto list = [](std::vector<f64> v) { return Value::of(std::move(v)); };
+  auto list32 = [](std::vector<f32> v) { return Value::of(std::move(v)); };
+  // the interpreter's value against the class's (take: same_value)
+  CHECK(same_value(Value::number(nan), Value::number(other)) && !same_value(Value::number(nan), Value::number(0.0)));
+  CHECK(same_value(list({1.0, nan, 3.0}), list({1.0, other, 3.0})));
+  CHECK(!same_value(list({1.0, nan, 3.0}), list({1.0, nan, 4.0})));   // a NaN at [1] and another number at [2]: a difference
+  CHECK(!same_value(list({4.0, nan, 3.0}), list({1.0, other, 3.0})));
+  CHECK(!same_value(list({nan, 2.0}), list({2.0, nan})));             // the NaN at another place
+  CHECK(!same_value(list({nan, 1.0}), list({nan})) && !same_value(list({nan}), list({1.0})));
+  CHECK(!same_value(list({0.0, nan}), list({-0.0, nan})));            // 0 and -0 are two
+  CHECK(same_value(list32({nanf, 1.5f}), list32({-nanf, 1.5f})) && !same_value(list32({nanf, 1.5f}), list32({nanf, 1.25f})));
+  CHECK(!same_value(list({nan}), list32({nanf})));                    // of another type
+  CHECK(same_value(Value::structure({Value::number(nan), Value::integer(1)}), Value::structure({Value::number(other), Value::integer(1)})));
+  CHECK(!same_value(Value::structure({Value::number(nan), Value::integer(1)}), Value::structure({Value::number(nan), Value::integer(2)})));
+  CHECK(same_value(Value::vector({nanf, 1, 2}), Value::vector({-nanf, 1, 2})) && !same_value(Value::vector({nanf, 1, 2}), Value::vector({nanf, 1, 3})));
+  // the source's value against the Blueprint's (same)
+  CHECK(same(nan, Value::number(other)) && !same(nan, Value::number(1.0)) && !same(1.0, Value::number(nan)));
+  CHECK(same(std::vector<f64>{1.0, nan, 3.0}, list({1.0, other, 3.0})));
+  CHECK(!same(std::vector<f64>{1.0, nan, 3.0}, list({1.0, nan, 4.0})));
+  CHECK(!same(std::vector<f64>{nan, 2.0}, list({2.0, nan})));
+  CHECK(!same(std::vector<f64>{0.0, nan}, list({-0.0, nan})));
+  CHECK(same(std::vector<f32>{nanf, 1.5f}, list32({-nanf, 1.5f})) && !same(std::vector<f32>{nanf, 1.5f}, list32({nanf, 1.25f})));
+  CHECK(same(Vec3{nanf, 1, 2}, Value::vector({-nanf, 1, 2})) && !same(Vec3{nanf, 1, 2}, Value::vector({nanf, 1, 3})));
+}
 namespace {
 
 bool mat_near(const Mat4& a, const Mat4& b, f32 eps = 1e-5f) {
