@@ -15854,6 +15854,180 @@ TEST(studio_logic_lists) {
   CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
 }
 
+TEST(studio_logic_number_types) {
+  // The number types in the editor (kern/docs/studio.md "Zahl-Typen im Editor"): the defaults Float = f32 and
+  // Int = i64, the types a node of numbers offers, literals read exactly in the pin's type, a wire between two types
+  // that gets its conversion node in the open (one undo step, what it can lose said), a wire refused with its reason,
+  // a node of numbers that takes the type of its first wire - and never silently another while wires hang on it.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> kv) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : kv) c.set(k, v);
+    return f.s->command(c);
+  };
+  auto added = [&](const char* type, std::initializer_list<std::pair<const char*, json::Value>> params = {}) {
+    json::Value p = json::Value::object();
+    for (const auto& [k, v] : params) p.set(k, v);
+    return static_cast<u32>(cmd({{"cmd", "logicAdd"}, {"type", type}, {"x", 0}, {"y", 0}, {"params", p}})["id"].as_number());
+  };
+  auto node = [&](u32 id) {
+    const json::Value st = f.s->state();
+    for (const json::Value& n : st["logic"]["nodes"].items()) if (static_cast<u32>(n["id"].as_number()) == id) return n;
+    return json::Value();
+  };
+  auto pin = [&](u32 id, const char* p, bool output) {
+    const json::Value n = node(id);
+    for (const json::Value& x : n[output ? "outputs" : "inputs"].items()) if (x["id"].as_string() == p) return x;
+    return json::Value();
+  };
+  auto wire = [&](u32 a, const char* out, u32 b, const char* in) { return cmd({{"cmd", "logicConnect"}, {"from", a}, {"out", out}, {"to", b}, {"in", in}}); };
+  auto wired = [&](u32 a, const char* out, u32 b, const char* in) {
+    for (const logic::Link& l : f.s->level().logic.links) if (l.from == a && l.out == out && l.to == b && l.in == in) return true;
+    return false;
+  };
+  const logic::Graph& g = f.s->level().logic;
+  auto var = [&](const char* name) { return f.s->level().logic.variable(name); };
+  auto has = [](const std::string& text, const char* part) { return text.find(part) != std::string::npos; };
+
+  // ---- defaults: a new variable, pin, field or node is a Float (f32); "Int" is i64 ----
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Pace"}})["ok"].as_bool() && var("Pace")->type == logic::PinType::f32);
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Hits"}, {"type", "i64"}})["ok"].as_bool() && var("Hits")->type == logic::PinType::i64);
+  for (const char* t : {"u8", "i8", "u16", "i16", "u32", "i32", "u64", "f64", "bool"}) {
+    const std::string name = std::string("V_") + t;
+    CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", name}, {"type", t}})["ok"].as_bool() && std::string(logic::pin_type_name(var(name.c_str())->type)) == t);
+  }
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "add"}, {"name", "Shot"}})["ok"].as_bool() && f.s->level().logic.structure("Shot")->fields[0].type.type == logic::PinType::f32);
+  const u32 add = added("math.add");
+  CHECK(node(add)["numberType"].as_string() == "f32" && pin(add, "a", false)["type"].as_string() == "f32" && pin(add, "result", true)["type"].as_string() == "f32");
+  // (its setting Type offers what an Add takes - the numbers, the defaults first by their names -, not a Vector or a Text)
+  {
+    const json::Value n = node(add), shared = f.s->state()["logic"]["choices"];
+    std::vector<std::pair<std::string, std::string>> offered;
+    for (const json::Value& p : n["params"].items())
+      if (p["key"].as_string() == "type")
+        for (const json::Value& ch : (p["choices"].is_null() ? shared[p["list"].as_string()] : p["choices"]).items()) offered.push_back({ch[0].as_string(), ch[1].as_string()});
+    CHECK(offered.size() == 10);
+    CHECK(offered.size() >= 2 && offered[0] == std::make_pair(std::string("f32"), std::string("Float (f32)")) && offered[1] == std::make_pair(std::string("i64"), std::string("Int (i64)")));
+    bool other = false, all = true;
+    for (const auto& [t, label] : offered) other |= t == "vector" || t == "text" || t == "bool";
+    for (const char* t : {"f64", "i8", "i16", "i32", "u8", "u16", "u32", "u64"}) all &= std::find_if(offered.begin(), offered.end(), [&](const auto& o) { return o.first == t && o.second == t; }) != offered.end();
+    CHECK(!other && all);
+  }
+
+  // ---- literals: read in the type of the pin, exactly; a value the type does not hold is refused at the field, with the reason ----
+  auto value_of = [&](const char* name, json::Value v) { return cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", name}, {"value", v}}); };
+  json::Value r = value_of("V_u8", "256");
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "V_u8") && has(r["error"].as_string(), "0 to 255"));
+  CHECK(!value_of("V_u8", "-1")["ok"].as_bool() && !value_of("V_u8", "1.5")["ok"].as_bool() && !value_of("V_u8", "abc")["ok"].as_bool() && !value_of("V_u8", true)["ok"].as_bool());
+  CHECK(value_of("V_u8", "255")["ok"].as_bool() && var("V_u8")->value.as_number() == 255);
+  CHECK(!value_of("V_i8", "-129")["ok"].as_bool() && value_of("V_i8", "-128")["ok"].as_bool() && var("V_i8")->value.as_number() == -128 && !value_of("V_i8", "128")["ok"].as_bool());
+  CHECK(!value_of("V_u16", "65536")["ok"].as_bool() && value_of("V_u16", "65535")["ok"].as_bool() && !value_of("V_i16", "-32769")["ok"].as_bool() && value_of("V_i16", "32767")["ok"].as_bool());
+  CHECK(!value_of("V_u32", "4294967296")["ok"].as_bool() && value_of("V_u32", "4294967295")["ok"].as_bool() && var("V_u32")->value.as_number() == 4294967295.0);
+  CHECK(!value_of("V_i32", "2147483648")["ok"].as_bool() && value_of("V_i32", "-2147483648")["ok"].as_bool());
+  r = value_of("V_i32", 2.5);
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "whole number"));
+  // (64 bits beyond 2^53: as their digits - never by way of a double)
+  CHECK(value_of("Hits", "9223372036854775807")["ok"].as_bool() && var("Hits")->value.is_string() && var("Hits")->value.as_string() == "9223372036854775807");
+  CHECK(value_of("Hits", "-9223372036854775808")["ok"].as_bool() && var("Hits")->value.as_string() == "-9223372036854775808");
+  CHECK(!value_of("Hits", "9223372036854775808")["ok"].as_bool() && !value_of("Hits", 1e300)["ok"].as_bool());
+  CHECK(value_of("Hits", "9007199254740993")["ok"].as_bool() && var("Hits")->value.as_string() == "9007199254740993");   // (2^53 + 1: no double holds it)
+  CHECK(value_of("V_u64", "18446744073709551615")["ok"].as_bool() && var("V_u64")->value.as_string() == "18446744073709551615" && !value_of("V_u64", "18446744073709551616")["ok"].as_bool() && !value_of("V_u64", "-1")["ok"].as_bool());
+  // (a floating number: the nearest value of its type - of an f32 strtof's, as 0.1f in C++ -, inf and nan too)
+  CHECK(value_of("Pace", "0.1")["ok"].as_bool() && var("Pace")->value.as_number() == static_cast<f64>(0.1f) && var("Pace")->value.as_number() != 0.1);
+  CHECK(value_of("Pace", "0.1f")["ok"].as_bool() && var("Pace")->value.as_number() == static_cast<f64>(0.1f));
+  CHECK(value_of("Pace", "16777217")["ok"].as_bool() && var("Pace")->value.as_number() == 16777216.0);   // (2^24 + 1: f32 holds its neighbour)
+  CHECK(value_of("Pace", "3.4028235e38")["ok"].as_bool() && var("Pace")->value.as_number() == static_cast<f64>(std::numeric_limits<f32>::max()));
+  CHECK(value_of("Pace", "1.4e-45")["ok"].as_bool() && var("Pace")->value.as_number() == static_cast<f64>(std::numeric_limits<f32>::denorm_min()));
+  CHECK(value_of("Pace", "-inf")["ok"].as_bool() && var("Pace")->value.is_string() && var("Pace")->value.as_string() == "-inf");
+  CHECK(value_of("Pace", "nan")["ok"].as_bool() && var("Pace")->value.as_string() == "nan");
+  r = value_of("Pace", "1.5.2");
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "is no f32"));
+  CHECK(value_of("V_f64", "0.1")["ok"].as_bool() && var("V_f64")->value.as_number() == 0.1 && !value_of("V_f64", "0.1f")["ok"].as_bool());
+  CHECK(value_of("Pace", "2.5")["ok"].as_bool());
+  // (into a pin: the same, the pin named)
+  const u32 small = added("math.add", {{"type", "u8"}});
+  r = cmd({{"cmd", "logicValue"}, {"node", small}, {"pin", "a"}, {"value", "300"}});
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "A: ") && has(r["error"].as_string(), "u8"));
+  CHECK(cmd({{"cmd", "logicValue"}, {"node", small}, {"pin", "a"}, {"value", "200"}})["ok"].as_bool() && pin(small, "a", false)["value"].as_number() == 200);
+
+  // ---- a node of numbers takes the type of its first wire, and says it ----
+  const u32 hits = added("var.get", {{"variable", "Hits"}}), pace = added("var.get", {{"variable", "Pace"}});
+  CHECK(wire(hits, "value", add, "a")["ok"].as_bool() && g.find(add)->param("type") == "i64" && node(add)["numberType"].as_string() == "i64" && pin(add, "b", false)["type"].as_string() == "i64");
+
+  // ---- a wire between two types: its Cast in the open, one step of the history ----
+  const std::size_t nodes = g.nodes.size(), links = g.links.size(), steps = f.s->history().size();
+  r = wire(pace, "value", add, "b");
+  CHECK(r["ok"].as_bool() && r["inserted"].is_number() && has(r["title"].as_string(), "f32 → i64"));
+  const u32 cast = static_cast<u32>(r["inserted"].as_number());
+  CHECK(g.nodes.size() == nodes + 1 && g.find(cast)->type == "num.cast" && g.find(cast)->param("from") == "f32" && g.find(cast)->param("to") == "i64");
+  CHECK(wired(pace, "value", cast, "a") && wired(cast, "result", add, "b") && !wired(pace, "value", add, "b") && g.find(add)->param("type") == "i64");
+  CHECK(has(node(cast)["title"].as_string(), "f32 → i64") && has(node(cast)["loss"].as_string(), "toward zero") && has(r["loss"].as_string(), "fraction"));
+  CHECK(f.s->history().size() == steps + 1);
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && g.nodes.size() == nodes && g.links.size() == links && !g.find(cast));
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool() && g.nodes.size() == nodes + 1 && wired(cast, "result", add, "b"));
+  CHECK(no_errors(logic::check(g)));
+  // (what each conversion can lose is said - and nothing where nothing is lost)
+  {
+    auto loss_of = [&](const char* a, const char* b) {
+      const u32 c = added("num.cast", {{"from", a}, {"to", b}});
+      const std::string l = node(c)["loss"].is_string() ? node(c)["loss"].as_string() : std::string();
+      json::Value ids = json::Value::array();
+      ids.push(c);
+      cmd({{"cmd", "logicDelete"}, {"ids", ids}});
+      return l;
+    };
+    CHECK(loss_of("f32", "f64").empty() && loss_of("i32", "i64").empty() && loss_of("u8", "i16").empty() && loss_of("u32", "u64").empty() && loss_of("bool", "u8").empty());
+    CHECK(loss_of("i16", "f32").empty() && loss_of("i32", "f64").empty());
+    CHECK(has(loss_of("f64", "f32"), "nearest f32") && has(loss_of("i64", "i32"), "low 32 bits") && has(loss_of("u16", "u8"), "0 ... 255"));
+    CHECK(has(loss_of("i32", "u32"), "-1 becomes 4294967295") && has(loss_of("u32", "i32"), "-2147483648 ... 2147483647") && has(loss_of("i32", "f32"), "2^24"));
+    CHECK(has(loss_of("i64", "f64"), "2^53") && has(loss_of("f32", "u8"), "toward zero") && has(loss_of("i32", "bool"), "true"));
+  }
+  // (a number into a Text: To Text of its type; into a Vector: Make Vector with it in X, Y, Z - after a Cast to f32 where it is none)
+  const u32 print = added("debug.print");
+  r = wire(add, "result", print, "text");
+  CHECK(r["ok"].as_bool() && g.find(static_cast<u32>(r["inserted"].as_number()))->type == "num.text" && g.find(static_cast<u32>(r["inserted"].as_number()))->param("type") == "i64");
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Where"}, {"type", "vector"}})["ok"].as_bool());
+  const u32 place = added("var.set", {{"variable", "Where"}});
+  r = wire(hits, "value", place, "value");
+  CHECK(r["ok"].as_bool());
+  const u32 make = static_cast<u32>(r["inserted"].as_number());
+  CHECK(g.find(make)->type == "vector.make" && wired(make, "result", place, "value"));
+  u32 to_f32 = 0;
+  for (const logic::Link& l : g.links) if (l.to == make && l.in == "x") to_f32 = l.from;
+  CHECK(to_f32 && g.find(to_f32)->type == "num.cast" && g.find(to_f32)->param("from") == "i64" && g.find(to_f32)->param("to") == "f32" && wired(to_f32, "result", make, "y") && wired(to_f32, "result", make, "z"));
+  // (a bool into a number: Cast too)
+  const u32 flag = added("var.get", {{"variable", "V_bool"}}), wide = added("math.add", {{"type", "f64"}});
+  CHECK(wire(hits, "value", wide, "a")["ok"].as_bool() && g.find(wide)->param("type") == "i64");   // (still free: it takes the wire's type)
+  r = wire(flag, "value", wide, "b");
+  CHECK(r["ok"].as_bool() && g.find(static_cast<u32>(r["inserted"].as_number()))->param("from") == "bool" && !r["loss"].is_string());
+  // ---- where no node converts, the wire is refused, with the reason ----
+  const u32 where = added("var.get", {{"variable", "Where"}});
+  r = wire(where, "value", add, "a");
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "Vector") && has(r["error"].as_string(), "Break Vector") && wired(hits, "value", add, "a"));
+  const u32 word = added("value.text");
+  r = wire(word, "result", add, "a");
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "Scan Text"));
+
+  // ---- another Type while wires of another type hang on the node: refused, the wire named ----
+  r = cmd({{"cmd", "logicParam"}, {"node", add}, {"key", "type"}, {"value", "f32"}});
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "brings an i64") && has(r["error"].as_string(), "Cast") && g.find(add)->param("type") == "i64");
+  // (free of wires, it changes)
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", small}, {"key", "type"}, {"value", "i16"}})["ok"].as_bool() && pin(small, "a", false)["type"].as_string() == "i16");
+
+  // ---- a formula: its inputs typed (Float for a new name, a name keeps its type), its error at its place ----
+  const u32 formula = added("math.formula");
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", formula}, {"key", "formula"}, {"value", "x * 2.0f + y"}})["ok"].as_bool() && g.find(formula)->param("types") == "f32 f32");
+  CHECK(pin(formula, "x", false)["type"].as_string() == "f32" && pin(formula, "result", true)["type"].as_string() == "f32" && !node(formula)["formulaError"].is_string());
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", formula}, {"key", "types"}, {"value", "f32 i64"}})["ok"].as_bool());
+  const json::Value bad = node(formula);
+  CHECK(bad["formulaError"].is_string() && has(bad["formulaError"].as_string(), "f32 and an i64") && bad["formulaAt"].as_number() >= 1 && bad["formulaAt"].as_number() <= 13);
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", formula}, {"key", "formula"}, {"value", "y + num_cast<i64, f32>(x) * z"}})["ok"].as_bool() && g.find(formula)->param("types") == "i64 f32 f32");
+  CHECK(!node(formula)["formulaError"].is_string() || has(node(formula)["formulaError"].as_string(), "i64"));   // (z is a new f32: it meets an i64)
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", formula}, {"key", "types"}, {"value", "i64 f32 i64"}})["ok"].as_bool() && !node(formula)["formulaError"].is_string() && pin(formula, "result", true)["type"].as_string() == "i64");
+}
+
 TEST(studio_logic_enums) {
   // Enums in the editor: an enum and its values; variables, pins and nodes of its type; and what
   // follows when a value is renamed, moved or removed - a value is its place among the values,

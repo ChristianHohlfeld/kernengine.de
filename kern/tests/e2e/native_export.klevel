@@ -217,7 +217,7 @@
     "variables": [
       {
         "name": "Ticks",
-        "type": "int",
+        "type": "i64",
         "value": 0
       }
     ],
