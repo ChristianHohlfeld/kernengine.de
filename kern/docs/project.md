@@ -185,6 +185,9 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
 
 ## 7. Akteure einer Welt aus dem Programm erreichen: der Eingang „World“
 
+**Entwurf, nicht gebaut** (siehe Stand). Der Verweis wird ein eigener Typ `{WorldId, ActorRef}` (wie `Object<I>`,
+docs/engine_object.md: die Welt im Wert, nie aus einem Int), nicht der Int-Handle, den der Text unten noch nennt.
+
 Die Knoten, die einen anderen Blueprint ansprechen (Call on Actor, Get Variable on Actor, Has Blueprint), haben einen
 Eingang **World** (Int, der Handle einer GameWorld):
 
@@ -242,26 +245,26 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
    `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
 5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::game::embedded_project())` (kern/game/embedded.h, siehe 4.).
 
-## Stand (25.11.2026, Zweig work-projekt)
+## Stand (26.11.2026, Zweig work-projekt)
 
-- Gebaut (Teil 1): die Projekt-Datei (`kern/game/project.h`: `Project`, Leser/Schreiber mit Stelle und Grund,
-  `program_blueprints`, `world_blueprints`, `library_conflicts`), die Programm-Laufzeit aus dem Projekt
-  (`kern/game/program.h`: `kern::game::Program`), die Suche der Bibliotheken einer Welt (`GameWorld::set_project`),
-  das Einbetten (`kern/tools/embed_project.py`, `kern/game/embedded.h`). Ein Level hat keinen Abschnitt `"project"`
-  mehr (Fehler beim Lesen); `ProjectSettings::program`, `kern/game/level_app.h` und `embed_level.py --split-program`
-  sind entfernt.
-- Gebaut (Teil 1b): der Editor „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen,
-  speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
-  `studio_project`, e2e im Modul-Bau.
-- Gebaut (Teil 3): der eine Einstieg `kern_main()` mit `kern::run(App&, settings)` / `kern::run(Project)`; die
-  schwachen Symbole `kern_create_app`, `kern_project_app`, `kern_project_text` und `kern_game_extensions` sind
-  ersatzlos entfernt (Test `run_the_program_of_a_project`). Einstellungen: ein Weg – `App::configure()` ist entfernt,
-  Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`). Welten, die
-  das Programm macht, bekommen das Projekt (`program_world_has_the_project`). Exporte: die Programm-Laufzeit bindet
-  und löst sie; ein Export in einer Welt wird abgewiesen (`program_binds_the_exports`).
-  SpawnCity startet mit `kern::run(sc::app(), embedded_project())`; `Game::start` bindet keine Programm-Klassen mehr
-  an die Logik der Welt – die Programm-Laufzeit bindet sie. Sie stehen nach dem nächsten vollen Lauf des Konverters im
-  Projekt (7a); bis dahin stehen die Klassen des Ordners „Program“ noch im Level und sind ungebunden (Spiel rot bis
-  zum vollen Lauf).
-- Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
-  (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.
+- Gebaut: die Projekt-Datei (`kern/game/project.h`: `Project`, Leser/Schreiber mit Stelle und Grund,
+  `program_blueprints`, `world_blueprints`, `library_conflicts`; ein Level hat keinen Abschnitt `"project"`), die
+  Programm-Laufzeit (`kern/game/program.h`: `kern::game::Program`, bindet jede Klasse und die Exporte), das Einbetten
+  (`kern/tools/embed_project.py`, `kern/game/embedded.h`), der eine Einstieg `kern_main()` mit `kern::run` (4.; keine
+  schwachen Symbole), die Einstellungen als ein Weg (`profiles`, kein `App::configure`), der feste Schritt (6.1),
+  Levels starten und wechseln (`GameWorld::start_level`), das Projekt einer Welt des Programms von selbst (3.:
+  `EngineObjects::on_made`, `GameWorld(Engine&)`), der Konverter mit Projekt (7a.). Tests: `game_project_round_trip`,
+  `game_project_errors`, `program_from_the_project`, `run_the_program_of_a_project`, `program_world_has_the_project`,
+  `world_of_an_app_of_cpp_has_the_project`, `program_binds_the_exports`, `program_beside_an_app_of_cpp`,
+  `world_starts_a_level_of_its_project`, `game_world_fixed_step`, `tools/converter_cases/run.sh`.
+- Gebaut im Editor: „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen mit seinen
+  Levels (das Start-Level ist das offene Level), speichern, Levels, Start-Level, Einstellungen, Programm-Blueprints im
+  Blueprint-Editor; Play spielt das offene Level mit den Bibliotheken des Projekts. Test `studio_project`, e2e.
+- Zweites Spiel: `kern/games/murmel` (App in C++, zwei Levels, Wechsel, Punkte über die Levels) – nativ und im
+  Browser belegt (CI-Jobs `murmel`, `murmel-web`); seine App als Blueprint wartet noch am Testrahmen der Vergleichstests
+  (er gehört heute SpawnCity: Namensraum `sc`).
+- Offen: „Play Project“ im Editor (die Programm-Laufzeit mit der App im Viewport; braucht die Engine – `Engine`,
+  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit), der Eingang „World“ als typisierter
+  Verweis (7.), Feld-Anfangswerte, die keine Konstante sind, im Vergleichstest.
+- SpawnCity: `kern::run(sc::app(), embedded_project())`; seine Programm-Klassen stehen im Projekt.
+
