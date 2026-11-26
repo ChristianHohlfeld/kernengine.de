@@ -7117,6 +7117,53 @@ TEST(engine_calls_mixer_is_the_mixer) {
 
 // A test's host makes what a handle names where it has nothing yet - the same object on every side it
 // compares (engine_make_default: as C++ makes it without arguments, at that handle).
+// An object of the engine is an Object<I> of its class at every node of the engine - never a number (kern/docs/
+// engine_object.md): every pin of the form of an object (o, h - or a list of them) is an object pin, every object pin names
+// a class of the engine and no Int pin does; what makes an object gives one of its class, what ends one takes one. (The
+// generator stops on a pin of an object that is no Object - tools/engine_api.py, table_text.) Handle of Object is the one
+// way to an Int; no Int becomes an Object.
+TEST(engine_objects_are_never_ints) {
+  const auto item = [](std::string_view shape) {   // (the form of an entry: [3o], [?h], [o] -> o)
+    while (!shape.empty() && (shape[0] == '[' || shape[0] == '?' || (shape[0] >= '0' && shape[0] <= '9'))) shape.remove_prefix(1);
+    return shape.empty() ? '\0' : shape[0];
+  };
+  int objects = 0, wrong = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    for (const std::vector<logic::EnginePin>* pins : {&f.inputs, &f.outputs})
+      for (const logic::EnginePin& p : *pins) {
+        const bool object = p.type == logic::PinType::object || p.type == logic::PinType::object_list;
+        const char c = item(p.shape);
+        const bool shaped = (c == 'o' || c == 'h') && (p.shape[0] == '[') == (p.type == logic::PinType::object_list);
+        const bool integer = p.type == logic::PinType::integer || p.type == logic::PinType::integer_list;
+        const bool ok = object ? shaped && logic::engine_class(p.of) != nullptr : !(c == 'o' || c == 'h') && !(integer && logic::engine_class(p.of));
+        if (!ok) {
+          std::printf("%s: the pin %s (%s, of %s, form %s) - an object of the engine is an Object of its class\n", f.type, p.id, logic::pin_type_name(p.type), p.of, p.shape);
+          ++wrong;
+        }
+        objects += object;
+      }
+    const std::string type = f.type;
+    if (type.ends_with(".release"))
+      CHECK(f.inputs.size() == 1 && f.inputs[0].type == logic::PinType::object && std::string(f.cpp).starts_with(logic::engine_class_cpp(f.inputs[0].of) + "::~"));
+    if (type.ends_with(".make") || type.find(".make_") != std::string::npos)
+      CHECK(f.outputs.size() == 1 && f.outputs[0].type == logic::PinType::object && std::string(f.outputs[0].shape) == "h");
+  }
+  CHECK(wrong == 0 && objects > 300);
+  // (the one way to an Int: Handle of Object; an Int at an object's input of the engine is no handle - the call fails, saying so)
+  const logic::NodeDef* handle = logic::library().find("object.handle");
+  CHECK(handle && handle->outputs.size() == 1 && handle->outputs[0].type == logic::PinType::integer && handle->inputs[0].type == logic::PinType::object);
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::integer)};
+  CHECK(!logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(1)}, out) && o.error == "the input mixer is no Object of the engine (it is int)" && o.size() == 0);
+  // (... and one of another world names nothing here, not the object of the same handle)
+  logic::EngineObjects there;
+  there.on_missing(logic::engine_make_default);
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::object(o.ref(1))}, out) && o.size() == 1);
+  CHECK(!logic::call_engine(there, "engine.mixer.sample_rate", {logic::Value::object(o.ref(1))}, out) && there.size() == 0 &&
+        there.error.find("an object of world " + std::to_string(o.world()) + " used in world " + std::to_string(there.world())) != std::string::npos);
+}
+
 TEST(engine_calls_default_objects) {
   logic::EngineObjects a, b;
   a.on_missing(logic::engine_make_default);

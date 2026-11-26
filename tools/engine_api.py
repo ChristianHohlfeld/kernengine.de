@@ -81,7 +81,11 @@ def table_text(api, functions, interfaces=(), classes=()):
     for f in functions:
         def pins(ps):
             out = []
-            for name, bt, _ in ps:
+            for name, bt, h in ps:
+                # (an object of the engine is an Object<I> of its class at every pin - never a number: kern/docs/engine_object.md)
+                if h is not None and c2b.object_class(bt) != h:
+                    raise SystemExit(f"engine_api.py: {f['type']} has the pin {name} of an object of the engine ({h}) as {bt}, not Object<{h}> - "
+                                     "an object of the engine is never a number (kern/docs/engine_object.md)")
                 t, of = api.pin(bt)
                 count = f.get("counts", {}).get(name) if ps is f["outs"] else None   # (an output list the engine writes through a pointer: its count)
                 per = f.get("per", {}).get(name, 1) if count else 1                  # (... and how many numbers each it counts is)

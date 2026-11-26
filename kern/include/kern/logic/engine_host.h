@@ -473,7 +473,7 @@ template <class A, class B> struct Conv<Pair<A, B>> {
 /// fails - EngineObjects::error says why (call_engine, and the class's own call, ask before they call the engine).
 template <class T> T* object_in(EngineObjects& o, const Value& v) {
   if (v.type != PinType::object) {
-    o.error = std::string("an object of the engine given as a ") + pin_type_name(v.type) + " - an Object<I> is no number";
+    o.error = std::string("an object of the engine in a value is no Object (it is ") + pin_type_name(v.type) + ")";
     return nullptr;
   }
   const ObjectRef r = v.as_object();
@@ -666,7 +666,7 @@ inline bool object_ref(EngineObjects& o, const std::vector<Value>& in, std::size
   r = {};
   if (k >= in.size()) return true;
   if (in[k].type != PinType::object) {
-    o.error = std::string("the input ") + pin + " is a " + pin_type_name(in[k].type) + ", no Object of the engine";
+    o.error = std::string("the input ") + pin + " is no Object of the engine (it is " + pin_type_name(in[k].type) + ")";
     return false;
   }
   r = in[k].as_object();
