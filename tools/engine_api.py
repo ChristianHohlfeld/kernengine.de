@@ -189,8 +189,9 @@ def case_text(api, functions):
             continue
         node += 1
         maker, name, mk = life["make"]["type"].replace(".", "_"), f["type"].replace(".", "_"), node
-        variables.append(f"  Int H{k} = 0;")
-        members.append(f"  struct {{ Int result = 0; }} n{mk};")
+        ot = life["make"]["outs"][0][1]   # (what the maker gives: an Object of the class)
+        variables.append(f"  {ot} H{k} = {ot}{{}};")
+        members.append(f"  struct {{ {ot} result = {ot}{{}}; }} n{mk};")
         node += 1
         members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
         lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"] + [value(bt) for _, bt, _ in f["ins"][1:]], f"P{k}", node)]

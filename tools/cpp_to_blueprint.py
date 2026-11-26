@@ -3536,6 +3536,11 @@ class Const:
         inlined = self.inlined(n)
         if inlined is not None:
             return self.literal(inlined, t)
+        if object_class(t):
+            # (an object of the engine as a constant: only none - nullptr, or nothing written; no number is one)
+            if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr", "CXXDefaultInitExpr", "ImplicitValueInitExpr") or k == "InitListExpr" and not kids(n):
+                return u.zero(t)
+            raise Wait(f"an object of the engine as a constant ({k}): only none (nullptr) is one")
         if t == "Int64" and k not in ("InitListExpr", "CXXConstructExpr"):
             v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its bits)
             return f"Int64{{{v:#x}}}"
@@ -3710,7 +3715,7 @@ class Emit:
         if t is not None:
             return wire(self.u.rows.get(t, t))   # (a list inside a list is held as a struct of that list: here, the list)
         if self.u.object_of(qtype(n)):
-            return "Int"   # (an object of the engine: its handle)
+            return object_type(self.u.object_of(qtype(n)))   # (an object of the engine: an Object of its class)
         b = bare(n)
         d = None
         if b.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
@@ -4922,18 +4927,18 @@ class Emit:
             if isinstance(q, tuple):
                 out += self.ended_parts(q[1], name) if q[0] == "value" else self.ended_box(q[1], name)
             else:
-                out += self.release(q, name) + [f"{name} = 0;"]
+                out += self.release(q, name) + [f"{name} = {object_type(q)}{{}};"]
         return out
 
     def release(self, q, handle):
-        """The release of an object of the engine (its destructor), if the handle is one: the node <class>.release."""
+        """The release of an object of the engine (its destructor), if the Object is one: the node <class>.release."""
         u = self.u
         f = u.api().releaser(q)
         if u.engine_table().get(f["type"]) != (False, [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], []):
             raise Wait(f"the release of a {q.split('::')[-1]} (its node is another one in the engine)")
         u.engine_calls[f["decl"]["id"] + ":release"] = f
         self.f.effect(f"it releases a {q.split('::')[-1]} of the engine")
-        return [f'if (math_compare<"!=">({self.cast("Float", handle)}, 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
+        return [f"if (object_valid<{q}>({handle})) {{", f'  {f["type"].replace(".", "_")}({handle});', "}"]
 
     # ---- the objects of the engine a value holds: made with it, ended with it (Unit.held_life) ----
     def made_parts(self, q, place, inits=None, own=False):
@@ -6869,18 +6874,19 @@ class Emit:
                 # an object of the engine held as a value gets one its constructor makes for it: the new one first,
                 # then the old one ends (move assignment: what the place held is replaced)
                 q = self.u.held_life(qtype(ops[0]))[1]
-                old = self.temp("old", "Int")
-                lines = [f"{old} = {self.ex(ops[0], 'Int')};"]
-                text = self.ex(ops[1], "Int")
+                old = self.temp("old", object_type(q))
+                lines = [f"{old} = {self.ex(ops[0], object_type(q))};"]
+                text = self.ex(ops[1], object_type(q))
                 lines += self.take_pre()
                 return lines + self.store(ops[0], lambda t: text) + self.release(q, old)
             if name == "operator=" and self.owned_object(ops[0]):
                 # an owned object of the engine (std::unique_ptr) gets another: the new one first, then the
                 # old one is released (unique_ptr::operator=: reset - the pointer stored, then the old deleted)
                 q = self.owned_object(ops[0])
-                old = self.temp("old", "Int")
-                lines = [f"{old} = {self.ex(ops[0], 'Int')};"]
-                text = "0" if self.nothing(ops[1]) else self.ex(ops[1], "Int")
+                t = object_type(q)
+                old = self.temp("old", t)
+                lines = [f"{old} = {self.ex(ops[0], t)};"]
+                text = t + "{}" if self.nothing(ops[1]) else self.ex(ops[1], t)
                 lines += self.take_pre()
                 return lines + self.store(ops[0], lambda t: text) + self.release(q, old)
             if name == "operator=" and self.owner_box(ops[0]) is not None:
@@ -7019,8 +7025,8 @@ class Emit:
             if (base is not None and not self.is_this(base) and self.owned_object(base) and name == "reset"
                     and all(x.get("kind") == "CXXDefaultArgExpr" or self.nothing(x) for x in kids(n)[1:])):   # (reset(), reset(nullptr))
                 q = self.owned_object(base)
-                old = self.temp("old", "Int")
-                return [f"{old} = {self.ex(base, 'Int')};"] + self.store(base, lambda t: "0") + self.release(q, old)
+                old = self.temp("old", object_type(q))
+                return [f"{old} = {self.ex(base, object_type(q))};"] + self.store(base, lambda t: object_type(q) + "{}") + self.release(q, old)
             if base is not None and not self.is_this(base) and self.is_box(base):
                 if name == "reset" and all(x.get("kind") == "CXXDefaultArgExpr" or self.nothing(x) for x in kids(n)[1:]):   # (reset(), reset(nullptr))
                     if self.owner_box(base) is not None:
@@ -10351,6 +10357,25 @@ class Emit:
             if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
                 at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
                 return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "Bool"
+            if op in ("==", "!=") and (object_class(self.tp(x)) or object_class(self.tp(y))):
+                # objects of the engine (kern/docs/engine_object.md): against null, whether there is one (Is Valid Object);
+                # two of them, whether they are the same one (Same Object) - of the class both are one of
+                if self.nothing(x) or self.nothing(y):
+                    o = y if self.nothing(x) else x
+                    t = self.tp(o)
+                    if not object_class(t):
+                        raise Wait(f"{t} compared with null")
+                    valid = f"object_valid<{object_class(t)}>({self.ex(o, t)})"
+                    return (f"logic_not({valid})" if op == "==" else valid), "Bool"
+                tx, ty = self.tp(x), self.tp(y)
+                cx, cy = object_class(tx), object_class(ty)
+                if not cx or not cy:
+                    raise Wait(f"{tx} {op} {ty}")
+                c = cy if u.engine_class_is(cx, cy) else cx if u.engine_class_is(cy, cx) else None
+                if c is None:
+                    raise Wait(f"two objects of the engine of unrelated classes compared ({tx} {op} {ty})")
+                same = f"object_equal<{c}>({self.ex(x, object_type(c))}, {self.ex(y, object_type(c))})"
+                return (same if op == "==" else f"logic_not({same})"), "Bool"
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
                 if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
@@ -11104,7 +11129,7 @@ class Emit:
                         fit.append(d)
                 if len(fit) != 1:
                     raise Wait(f"std::make_unique of a {q.split('::')[-1]}: " + ("no constructor of it is a node" if not fit else "which of its constructors"))
-                return self.made(fit[0], a), "Int"
+                return self.made(fit[0], a), object_type(q)
             if name == "make_unique" and self.is_box(b):
                 lt = self.tp(b)
                 if lt[5:-1] not in u.struct_fields:
@@ -16508,6 +16533,8 @@ def shape_line(name, struct):
         word = {"int": "Int", "float": "Float", "bool": "Bool", "vector": "Vector", "text": "Text", "int64": "Int64", "actor": "Actor"}.get(base)
         if word is None and base == "struct":
             word = f.get("of")
+        if word is None and base == "object" and f.get("of"):
+            word = object_type("kern::" + f["of"].replace("_", "::"))   # (engine_class_name, back: physics_World is kern::physics::World)
         if not word:
             return None
         return f"List<{word}>" if t.endswith("_list") else word

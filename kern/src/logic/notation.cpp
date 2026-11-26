@@ -3444,8 +3444,12 @@ struct Reader {
       const ParamDef& pd = def->params[k];
       if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
       bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type || pd.engine_class);
-      if (fits && pd.engine_class && !engine_interface(given[at])) {
+      if (fits && pd.engine_class && pd.key == "interface" && !engine_interface(given[at])) {
         fail(tok, node_name(def->type) + ": the engine has no interface " + engine_class_cpp(given[at]) + " (" + interface_names() + ")");
+        return -1;
+      }
+      if (fits && pd.engine_class && pd.key != "interface" && !engine_class(given[at])) {   // (any class of the engine: object_valid<kern::audio::Mixer>)
+        fail(tok, node_name(def->type) + ": the engine has no class " + engine_class_cpp(given[at]) + " (one with objects in a Blueprint: kern/docs/engine_object.md)");
         return -1;
       }
       if (fits && pd.kind == ParamDef::Kind::type) {

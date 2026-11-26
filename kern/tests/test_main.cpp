@@ -8095,7 +8095,7 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
   const std::vector<logic::Issue> issues = logic::check(wrong);
   const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
-  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is int, not float"));
+  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is object<Program>, not float"));
   wrong.implements = "Nothing";
   CHECK(!no_errors(logic::check(wrong)));
   // the Blueprint ends: the engine's object stays, and gets nothing from it - the zero of what it asks for
@@ -8452,16 +8452,16 @@ TEST(program_from_the_project) {
                      "\n"
                      "  // ---- functions ----\n"
                      "  struct startResult { Bool result = false; };\n"
-                     "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                      "    debug_print(\"start\", false);\n"
                      "    return {true};\n"
                      "  }\n"
                      "\n"
-                     "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                      "    debug_print(\"update\", false);\n"
                      "  }\n"
                      "\n"
-                     "  KERN_OVERRIDE void stop(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE void stop(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                      "    debug_print(\"stop\", false);\n"
                      "  }\n"
                      "\n"
@@ -8540,7 +8540,7 @@ TEST(program_world_has_the_project) {
   std::string error;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8550,7 +8550,7 @@ TEST(program_world_has_the_project) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   game::Project pr;
@@ -8593,7 +8593,7 @@ TEST(program_binds_the_exports) {
   logic::Graph app, hud;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8603,7 +8603,7 @@ TEST(program_binds_the_exports) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
@@ -8657,7 +8657,7 @@ TEST(run_the_program_of_a_project) {
   std::string error;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8667,7 +8667,7 @@ TEST(run_the_program_of_a_project) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   CHECK(error.empty() && main.implements == "App");
@@ -13309,7 +13309,8 @@ TEST(studio_logic_places_of_the_engine) {
     for (const auto& [k, v] : fields) c.set(k, v);
     return f.s->command(c);
   };
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Int Count = 0;\n\n  void Note() {\n    engine_game_world_events(n2, 1);\n    list_add(n2.result, \"x\");\n"
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Object<kern::game::GameWorld> World = Object<kern::game::GameWorld>{};\n  Int Count = 0;\n\n"
+                                                "  void Note() {\n    engine_game_world_events(n2, World);\n    list_add(n2.result, \"x\");\n"
                                                 "    Count = list_length<Text>(n2.result);\n  }\n\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;\n};\n"}})["ok"].as_bool());
   const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "n2"}});
   bool get = false, set = false, entry = false, add = false;

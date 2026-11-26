@@ -18,6 +18,9 @@
 #             in the test of game.cpp: the piece before it went for it).
 #   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
 #             (Murmel's welt_.get(), B8) - written and compared.
+#   objects.cpp objects of the engine are Object<I> (kern/docs/engine_object.md), never a number: as an input, what a
+#             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
+#             compared, a function of the engine called on one - written and compared, and no Handle of Object.
 # Each case is a program of its own, its Blueprints read into a level of their own, as the game's are: the engine's
 # reader refuses what is wrong (a function read as a value that changes something).
 set -euo pipefail
@@ -74,6 +77,19 @@ convert ownget
 logged ownget "Holder::world (unique_ptr::get()) is written" '^ +Holder::world \([0-9]+\): written$'
 logged ownget "both are compared" '^2 functions of the Blueprints are compared'
 
+convert objects
+check objects "an Object as an input" yes 'void add\(Object<kern::audio::Mixer> m = Object<kern::audio::Mixer>\{\}\)'
+check objects "if (p): Is Valid Object" yes 'if \(object_valid<kern::audio::Mixer>\(m\)\)'
+check objects "a list of pointers: a List of Objects" yes 'List<Object<kern::audio::Mixer>> mixers_ = List<Object<kern::audio::Mixer>>\{\}'
+check objects "what a function gives, nullptr: none" yes 'Object<kern::audio::Mixer>\{\}, mixers_\[0\]'
+check objects "unique_ptr<...>::get(): the Object it owns" yes 'return \{own_\};'
+check objects "against nullptr: Is Valid Object" yes 'return \{object_valid<kern::audio::Mixer>\(own_\)\};'
+check objects "two compared: Same Object" yes 'object_equal<kern::audio::Mixer>\(first\(\)\.Result, own\(\)\.Result\)'
+check objects "a field of a struct" yes 'KERN_STRUCT\(Rig\) \{ Object<kern::audio::Mixer> mixer = Object<kern::audio::Mixer>\{\};'
+check objects "a function of the engine on an Object" yes 'engine_mixer_sample_rate\(m\)'
+check objects "no Object becomes a number (Handle of Object)" no 'object_handle'
+logged objects "all nine are written and compared" '^9 functions of the Blueprints are compared'
+
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
@@ -83,6 +99,6 @@ check table "width_and_glock is written, the table as weapons' Specs" yes 'weapo
 python3 "$here/compiles.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget objects bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
