@@ -187,7 +187,7 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
       const json::Value& x = (*list)[i];
       const std::string at = "profiles[" + std::to_string(i) + "]";
       if (!x.is_object() || !x["name"].is_string() || x["name"].as_string().empty()) return fail(at + ": a profile has a name");
-      if (std::string e = keys_of(x, at.c_str(), {"name", "renderer"}); !e.empty()) return fail(e);
+      if (std::string e = keys_of(x, at.c_str(), {"name", "renderer", "world"}); !e.empty()) return fail(e);
       DeviceProfile d;
       d.name = x["name"].as_string();
       if (out.profile(d.name)) return fail(at + ": the profile " + d.name + " stands twice");

@@ -431,7 +431,7 @@ GameWorld::GameWorld(Renderer& renderer, NightWindows* windows) : r_(renderer), 
 
 GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) {
   project_ = engine.project();
-  profile_ = engine.arg("profile", "");   // (the device profile the program runs with: kern/app/project.h)
+  profile_ = engine.profile();   // (the device profile the program runs with: kern/app/project.h)
 }
 
 GameWorld::~GameWorld() {

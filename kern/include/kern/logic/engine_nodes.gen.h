@@ -2615,6 +2615,29 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<::kern::logic::Object<::kern::Input>>(this->kern_engine("engine.engine.input_2", {to_value(engine)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::Input>>()));
   }
+  /// The device profile the program runs with (the launch argument profile=<name>, kern/app/project.h; "": none) - its renderer started the renderer, its world settings lie on a level a world of the program starts (GameWorld(Engine&)).
+  Text engine_engine_profile(::kern::logic::Object<::kern::Engine> engine) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.profile"); return Text{}; }
+      decltype(auto) kern_r = kern_self->profile();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.engine.profile", {to_value(engine)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  void engine_engine_set_profile(::kern::logic::Object<::kern::Engine> engine, const Text& name) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.set_profile"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a0);
+      kern_self->set_profile(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.engine.set_profile", {to_value(engine), to_value(name)}, {});
+  }
   /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
   void engine_engine_mixer(::kern::logic::Object<::kern::Engine> engine) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
