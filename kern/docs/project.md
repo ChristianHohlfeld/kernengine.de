@@ -249,8 +249,12 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
   Ausdrücklich, mit Grund, wenn nichts erreicht wird: läuft die Welt nicht mehr („… - its world does not run any more
   (the GameWorld was stopped)“), ist sie neu gestartet (eine neue Welt: „… - no world of this program runs as world 7
   (it ended and started again as a new world, or the program did not make it)“). Eine Welt, die eine App in C++ macht
-  (`GameWorld(Engine&)`), ist kein Objekt des Programm-Hosts – ihre Akteure erreicht die App in C++ selbst
-  (`ActorBlueprint`). **In die andere Richtung**, von einer Welt zum Programm oder zu einer anderen Welt, gibt es
+  (`GameWorld(Engine&)`), ist kein Objekt des Programm-Hosts – ihre Akteure erreicht die App in C++ selbst:
+  `kern::logic::ActorBlueprint rules{"Controls"}; rules.bind(world);` nimmt den Akteur des Namens als Actor dieser Welt
+  (`actor_named`) und ruft danach dessen Blueprint dort – mit denselben Gründen, wenn die Welt gestoppt oder neu
+  gestartet ist (blueprint_cpp.md „An einen Actor einer Welt gebunden“; Test `cpp_reaches_actors_of_its_worlds`). Als
+  Blueprint geschrieben (Konverter) ist das eine Variable Actor des Programm-Blueprints, gesetzt mit „GameWorld actor
+  named“ – derselbe Weg wie oben. **In die andere Richtung**, von einer Welt zum Programm oder zu einer anderen Welt, gibt es
   **kein** stilles Durchfallen: der Host einer Welt erreicht nur ihre eigenen Akteure; der Weg führt über Objekte der
   Engine, die das Programm der Welt gibt (den festen Schritt, 6.1, oder eine Schnittstelle).
   Geprüft: `program_reaches_actors_of_its_worlds` (ein Programm, zwei Welten desselben Levels mit Akteuren gleicher Id:
