@@ -13699,8 +13699,30 @@ TEST(studio_project) {
   // a project whose Blueprint has the name of one in the open level: refused, with both places
   CHECK(cmd({{"cmd", "projectOpen"}, {"text", "{\"format\":\"kern-project\",\"blueprints\":[{\"name\":\"Kiste\",\"logic\":{}}]}"}})["error"].as_string() ==
         "the Blueprint Kiste stands in the level (actor " + std::to_string(cube) + ") and in the project (blueprints[0]) - rename one");
-  CHECK(cmd({{"cmd", "projectOpen"}, {"text", saved["text"]}})["ok"].as_bool());
+  // opened again with its levels (every one it names): the same project, its start level open, the levels' texts held
+  const std::string start_text = f.s->level_text();
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", saved["text"]}})["error"].as_string() == "the project Spiel opens with its levels - not given: levels/start.klevel, levels/wald.klevel");
+  json::Value given = json::Value::object();
+  given.set("levels/start.klevel", start_text);
+  given.set("levels/other.klevel", start_text);
+  json::Value with = json::Value::object();
+  with.set("cmd", "projectOpen");
+  with.set("text", saved["text"]);
+  with.set("levels", given);
+  CHECK(f.s->command(with)["error"].as_string() == "the level levels/other.klevel is none of the project Spiel's levels");
+  given = json::Value::object();
+  given.set("levels/start.klevel", "{\"format\":\"kern-level\",\"version\":1,\"world\":{\"goal\":\"collect_all\"}}");
+  given.set("levels/wald.klevel", start_text);
+  with.set("levels", given);
+  CHECK(f.s->command(with)["error"].as_string().starts_with("levels/start.klevel: world.goal: unknown value"));
+  CHECK(f.s->project().name == "Spiel" && f.s->project().level_texts.empty());  // (nothing changed)
+  given = json::Value::object();
+  given.set("levels/start.klevel", start_text);
+  given.set("levels/wald.klevel", start_text);
+  with.set("levels", given);
+  CHECK(f.s->command(with)["ok"].as_bool());
   CHECK(game::to_text(f.s->project()) == saved["text"].as_string() && !f.s->state()["project"]["dirty"].as_bool());
+  CHECK(f.s->project().level_texts.size() == 2 && f.s->project().first_level() == "levels/wald.klevel" && f.s->level_text() == start_text);
   CHECK(!f.s->can_undo());  // opening starts a new history
 }
 

@@ -57,11 +57,15 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   const cmd = c => page.evaluate(c => window.KernStudio.command(c), c);
   const state = () => page.evaluate(() => window.KernStudio.state);
   const status = () => page.evaluate(() => window.KernStudio.status);
-  await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")});
-  check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject");
-  const start = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")).startLevel;
-  await cmd({cmd: "open", text: fs.readFileSync(path.join(game, start), "utf8"), name: "wiese"});
-  check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "it opens the start level " + start);
+  // (a project opens with its levels: each one it names; its start level is the open level)
+  const project = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"));
+  const without = await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")});
+  check(without?.ok === false && /not given: levels\/wiese\.klevel, levels\/bruecke\.klevel/.test(without.error ?? ""), "a project without its levels is refused, the levels named (" + (without?.error ?? "-") + ")");
+  const levels = Object.fromEntries(project.levels.map(l => [l, fs.readFileSync(path.join(game, l), "utf8")]));
+  await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"), levels});
+  check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject with its levels");
+  const start = project.startLevel;
+  check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "opening the project opens its start level " + start);
   await cmd({cmd: "play", mode: "play"});
   check(await until(async () => /Level 1/.test((await status()).hud?.message ?? "")), "Play runs the level's Blueprint (its message: " + ((await status()).hud?.message ?? "-") + ")");
   const box = await page.locator(".vp canvas, #gl").first().boundingBox();

@@ -123,7 +123,10 @@ Fehler wie verwaiste Referenzen oder ungültige Werte verhindern Play; Warnungen
 Ein Level gehört zu einem **Projekt** (`.kproject`, siehe [`project.md`](project.md)): Name, Einstellungen, die Liste
 der Levels mit dem Start-Level und die **Programm-Blueprints** (die App, der Spielstand, Menüs, Bibliotheken des
 Programms). Der Editor zeigt es oben im Outliner unter „Project“ und im Menü File (New Project, Open Project…,
-Save Project); eine `.kproject`-Datei kann auch auf die Seite gezogen werden.
+Save Project). Ein Projekt öffnet mit seinen Levels: in „Open Project…“ die `.kproject`-Datei und ihre `.klevel`-Dateien
+zusammen wählen oder auf die Seite ziehen (ein Level `levels/a.klevel` ist die Datei `a.klevel`). Fehlt eines, nennt
+der Editor die fehlenden und öffnet nichts; sonst hält das Projekt die Texte seiner Levels (was „Start Level“ beim Play
+startet) und sein Start-Level ist das offene Level.
 
 - **Levels**: ein Pfad je Level (relativ zur Projekt-Datei); der angehakte ist das Start-Level. Ein Pfad steht einmal.
 - **Program Blueprints**: hinzufügen (Name, optional als Bibliothek), umbenennen, entfernen; ein Klick öffnet ihn im
@@ -137,7 +140,7 @@ Save Project); eine `.kproject`-Datei kann auch auf die Seite gezogen werden.
 Jede Änderung am Projekt ist ein Schritt im Verlauf (Undo/Redo zusammen mit dem Level); Öffnen beginnt einen neuen
 Verlauf. Projekt und Level werden getrennt gespeichert; „*“ hinter dem Namen heißt: ungespeicherte Änderungen. Was
 die Seite schickt, prüft der Editor wie den Leser der Datei (dieselben Meldungen mit Stelle und Grund). Kommandos:
-`projectNew`, `projectOpen {text}`, `projectSave`, `projectSaved`, `projectSet {name, levels, startLevel, settings}`,
+`projectNew`, `projectOpen {text, levels: {pfad: text}}` (jedes Level des Projekts), `projectSave`, `projectSaved`, `projectSet {name, levels, startLevel, settings}`,
 `projectBlueprint {op: add|remove|rename, name, to, library}`, `logicOpen {program}` (`kern/src/studio/project.cpp`).
 
 ## Place Actors

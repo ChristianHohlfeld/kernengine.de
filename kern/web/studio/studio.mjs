@@ -946,7 +946,7 @@ class StudioPage {
       const f = e.dataTransfer.files?.[0];
       if (!f) return;
       e.preventDefault();
-      if (/\.kproject$/i.test(f.name)) this.projectCommand({cmd: "projectOpen", text: await f.text()});
+      if (/\.kproject$/i.test(f.name)) this.openProject(e.dataTransfer.files);
       else if (/\.(klevel|json)$/i.test(f.name)) this.engine.command({cmd: "open", text: await f.text(), name: f.name});
       else if (f.type.startsWith("image/")) this.importTexture(f);
       else if (f.type.startsWith("audio/") || /\.(wav|mp3|ogg|oga|m4a|aac|flac|opus|webm)$/i.test(f.name)) for (const file of e.dataTransfer.files) await this.importSound(file);
@@ -999,11 +999,28 @@ class StudioPage {
     if (r && r.ok === false && r.error) this.toast(r.error);
     return r;
   }
+  /** Opens a project with its levels (projectOpen {text, levels}): the .kproject among `files` and, for each level it
+   *  names, the file of that name (a level's path "levels/a.klevel" is the file a.klevel). One not given: the engine
+   *  says which. */
+  async openProject(files) {
+    files = [...files];
+    const proj = files.find(f => /\.kproject$/i.test(f.name));
+    if (!proj) return this.toast("Open Project: choose the .kproject and its .klevel files together");
+    const text = await proj.text();
+    let names = [];
+    try { names = JSON.parse(text).levels || []; } catch { /* the engine says why */ }
+    const levels = {};
+    for (const path of names) {
+      const f = files.find(x => x.name === String(path).split("/").pop());
+      if (f) levels[path] = await f.text();
+    }
+    return this.projectCommand({cmd: "projectOpen", text, levels});
+  }
   initProject() {
     $("#fileProject").onchange = async e => {
-      const f = e.target.files[0];
+      const files = [...e.target.files];
       e.target.value = "";
-      if (f) this.projectCommand({cmd: "projectOpen", text: await f.text()});
+      if (files.length) this.openProject(files);
     };
     const body = $("#projectBody");
     body.addEventListener("click", e => {
