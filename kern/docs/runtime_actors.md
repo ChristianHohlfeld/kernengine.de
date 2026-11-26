@@ -31,7 +31,7 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
   geben dieselben Ids. `id` setzt die Id der Wurzel (ein Replikat spiegelt, was sein Server gesetzt hat); sonst 0.
 - Die Kopie trägt den Namen der Vorlage. Ein Pickup in ihr zählt zu `Hud::pickups_total`.
 - Repliziert: jeder Mitspieler bekommt den Namen der Vorlage, die Id und `at` (`GameWorld::SpawnChange`).
-- **Fehler** (Rückgabe 0, `last_error()` sagt den Grund): die Welt läuft nicht; keine Vorlage dieses Namens – die
+- **Fehler** (Rückgabe keiner, `ActorHandle{}`; `last_error()` sagt den Grund): die Welt läuft nicht; keine Vorlage dieses Namens – die
   Meldung nennt die Vorlagen des Levels („spawn: no template "Crate" - the level's templates: Coin, Car“, oder dass es
   keine hat); die Ids sind belegt.
 - Entfernen: `GameWorld::destroy_actor(id)` (Knoten „Destroy Actor“) – der Akteur ist aus der Welt, sein Blueprint endet.
@@ -43,9 +43,9 @@ den Eingängen Location, Rotation, Scale; Ausgang *Spawned* (der Akteur). C++-Te
 Vorlage: Fehler an den Host beim Lauf, mit derselben Meldung (welche Vorlagen ein Level hat, weiß erst die laufende Welt; zur
 Bearbeitungszeit ist jeder Knoten mit seinen Vorgaben gültig). Dazu der Knoten der Engine `GameWorld spawn` (aus dem Header).
 
-**Rückgabe – die eine Stelle für den Akteur-Verweis:** heute `ActorId` (C++) bzw. der Pin-Typ `actor` (Knoten). Wenn der
-typisierte Verweis `{WorldId, ActorRef}` kommt (project.md 7., engine_object.md), ändert sich nur der Rückgabetyp von
-`GameWorld::spawn` und der Ausgang von `nodes::actor_spawn` (kern/include/kern/game/blueprint_nodes.h).
+**Rückgabe – der Akteur-Verweis:** `GameWorld::spawn` gibt `logic::ActorHandle` (die Id der Wurzel und die Welt,
+`GameWorld::world_id()`; project.md 7.), der Knoten „Spawn Actor“ und der Knoten der Engine `GameWorld spawn` den Pin
+`actor` – nie eine Zahl. Wer in C++ die Id braucht, liest `.id`.
 
 ## Eigenschaften setzen: typisiert, oder der Pfad mit Prüfung
 

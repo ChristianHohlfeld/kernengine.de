@@ -189,7 +189,7 @@ struct GameWorld::WalkerBrain::Play {
 
 class GameWorld::LogicHost : public logic::Host {
  public:
-  explicit LogicHost(GameWorld& w) : w_(w) {}
+  explicit LogicHost(GameWorld& w) : w_(w), objects_(w.world_id_) {}   // (its objects and the actors: one world)
   f64 time() const override { return w_.sim_time_; }
   void print(const std::string& text, bool screen) override {
     w_.events_.push_back("Logic: " + text);

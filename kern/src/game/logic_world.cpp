@@ -21,11 +21,12 @@ namespace {
 logic::Value act(logic::WorldId world, ActorId id) { return logic::Value::actor(id ? logic::ActorHandle{static_cast<logic::ActorRef>(id), world} : logic::ActorHandle{}); }
 }  // namespace
 
-logic::WorldId GameWorld::world_id() const { return logic_host_ ? logic_host_->world() : 0; }
+logic::WorldId GameWorld::world_id() const { return world_id_; }
 
 void GameWorld::start_logic() {
   logic_.reset();
   logic_host_.reset();
+  world_id_ = logic::new_world();   // (a new world at every start: an actor of the level before names nothing in this one)
   prop_changes_.clear();
   prop_log_.clear();
   spawn_changes_.clear();
@@ -263,9 +264,9 @@ bool GameWorld::set_material_color(ActorId id, Vec3 color) {
   return set_property(id, "components.mesh.material.color", json::Value(hex_color(color)));
 }
 
-ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
+logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
   const std::string name(template_name);
-  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return 0; }
+  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return {}; }
   const Actor* src = nullptr;
   std::string known;
   for (const Actor& a : templates_.actors) {
@@ -276,11 +277,11 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
   if (!src) {
     if (known.empty()) fail("no template \"%s\" - the level has no templates (an actor with \"template\": true)", name.c_str());
     else fail("no template \"%s\" - the level's templates: %s", name.c_str(), known.c_str());
-    return 0;
+    return {};
   }
-  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return 0; }
+  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return {}; }
   for (int i = 0; i < 3; ++i)
-    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return 0; }
+    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return {}; }
   // The template's subtree in the level's order (root first).
   std::vector<const Actor*> subtree{src};
   for (std::size_t i = 0; i < subtree.size(); ++i)
@@ -296,7 +297,7 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
   for (std::size_t i = 0; i < subtree.size(); ++i)
     if (level_.find(root + static_cast<ActorId>(i)) || templates_.find(root + static_cast<ActorId>(i))) {
       fail("spawn \"%s\": the ids %u..%u are taken", name.c_str(), root, root + static_cast<ActorId>(subtree.size() - 1));
-      return 0;
+      return {};
     }
   std::unordered_map<ActorId, ActorId> remap;
   for (std::size_t i = 0; i < subtree.size(); ++i) remap[subtree[i]->id] = root + static_cast<ActorId>(i);
@@ -353,7 +354,7 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
       logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
     }
   }
-  return root;
+  return {root, world_id_};   // (the root, an Actor of this world: kern/docs/project.md 7)
 }
 
 void GameWorld::destroy_actor(ActorId id) {

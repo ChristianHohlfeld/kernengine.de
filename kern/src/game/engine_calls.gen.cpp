@@ -1187,7 +1187,7 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 3, a2);
   decltype(auto) r = self->spawn(a0, a1, std::move(a2));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Actor>(o, out, 0, r);
   return true;
 }
 

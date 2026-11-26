@@ -2222,6 +2222,7 @@ template <class Core> struct EngineNodesOf : Core {
   using Vector = Vec3;
   using Text = logic::Text;
   using Int64 = logic::Int64;
+  using Actor = logic::ActorHandle;
   template <class T> using List = logic::List<T>;
 
   /// One call of the engine through the host's door: the inputs as values to the host, what it gives as values back (zeros where it has no such function).
@@ -5775,7 +5776,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.logic_runtime", {to_value(game_world)}, {PinType::object});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  /// The world of this world's actors and its objects of the engine while it runs (0: it does not run): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of the level before names nothing in the next.
+  /// The world of this world's actors and its objects of the engine (0: it never ran): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of the level before names nothing in the next.
   Int engine_game_world_world_id(::kern::logic::Object<::kern::game::GameWorld> game_world) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -6048,10 +6049,10 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a2);
       decltype(auto) kern_r = kern_self->spawn(kern_a0, kern_a1, std::move(kern_a2));
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Actor>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::integer});
+    this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::actor});
   }
   template <class KernNode, class T1> void engine_game_world_spawn(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, const T1& at, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6063,10 +6064,10 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a2);
       decltype(auto) kern_r = kern_self->spawn(kern_a0, kern_a1, std::move(kern_a2));
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Actor>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::actor});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_game_world_teleport(::kern::logic::Object<::kern::game::GameWorld> game_world, Int id, Vector position, const List<Vector>& rotation_deg) {

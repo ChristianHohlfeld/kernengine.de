@@ -3690,7 +3690,9 @@ TEST(world_templates_spawn) {
   CHECK(f.world->hud().pickups_total == 0);
   // spawn: the copy with its child, its body and collider, its Blueprint (Begin Play ran).
   const game::Transform at{{3, 4, 5}, {0, 0, 90}, {1, 1, 1}};
-  const game::ActorId a = f.world->spawn("Crate", at);
+  const logic::ActorHandle made = f.world->spawn("Crate", at);
+  CHECK(made.world != 0 && made.world == f.world->world_id());   // (an Actor of this world: kern/docs/project.md 7)
+  const game::ActorId a = made.id;
   CHECK(a == last + 1);   // (past every actor of the level and every template)
   const game::Actor* copy = f.world->level().find(a);
   CHECK(copy && copy->name == "Crate" && !copy->is_template && copy->parent == 0 && copy->transform.position == at.position && copy->transform.rotation == at.rotation);
@@ -3702,7 +3704,7 @@ TEST(world_templates_spawn) {
   logic::Instance* inst = f.world->logic_runtime() ? f.world->logic_runtime()->find(a) : nullptr;
   CHECK(inst && inst->get("Began").as_int() == 1);
   // A second copy: the next ids; the template itself is unchanged.
-  const game::ActorId b = f.world->spawn("Crate", game::Transform{{-3, 4, 5}, {}, {2, 2, 2}});
+  const game::ActorId b = f.world->spawn("Crate", game::Transform{{-3, 4, 5}, {}, {2, 2, 2}}).id;
   CHECK(b == a + 2 && f.world->level().find(b)->transform.scale == Vec3(2, 2, 2));
   CHECK(f.world->templates().find(tpl)->transform.position == Vec3(50, 50, 50));
   // Its body falls (a dynamic body of the template).
@@ -3711,7 +3713,7 @@ TEST(world_templates_spawn) {
   f.run(0.5f);
   CHECK(f.world->actor_matrix(a, m1) && m1.translation().z < m0.translation().z - 0.5f);
   // A pickup of a template counts once it is spawned (collect all).
-  const game::ActorId c = f.world->spawn("Coin", game::Transform{{0, 8, 0.5f}, {}, {1, 1, 1}});
+  const game::ActorId c = f.world->spawn("Coin", game::Transform{{0, 8, 0.5f}, {}, {1, 1, 1}}).id;
   CHECK(c == b + 2 && f.world->hud().pickups_total == 1);
   // Replicated: the template's name, the id and the transform.
   std::vector<game::GameWorld::PropertyChange> props;
@@ -3724,9 +3726,9 @@ TEST(world_templates_spawn) {
   // Deterministic: the same level and the same calls give the same ids in another world.
   GameFixture g;
   CHECK(g.world->start(l, game::SimMode::simulate));
-  CHECK(g.world->spawn("Crate", at) == a && g.world->spawn("Crate", at) == b && g.world->spawn("Coin", at) == c);
+  CHECK(g.world->spawn("Crate", at).id == a && g.world->spawn("Crate", at).id == b && g.world->spawn("Coin", at).id == c);
   // A replica's spawn takes the server's id.
-  CHECK(g.world->spawn("Coin", at, 500) == 500 && g.world->level().find(500));
+  CHECK(g.world->spawn("Coin", at, 500).id == 500 && g.world->level().find(500));
   // After the run, the level is the level again (the editor sees the template).
   f.world->stop();
   CHECK(f.world->level().find(tpl) && f.world->level().find(tpl)->is_template && !f.world->level().find(a));
@@ -3736,23 +3738,23 @@ TEST(world_spawn_errors) {
   GameFixture f;
   const game::Level l = template_level();
   // The world does not run.
-  CHECK(f.world->spawn("Crate", {}) == 0 && std::string(last_error()) == "spawn \"Crate\": the world does not run");
+  CHECK(f.world->spawn("Crate", {}).id == 0 && std::string(last_error()) == "spawn \"Crate\": the world does not run");
   CHECK(f.world->start(l, game::SimMode::simulate));
   // No template of that name: the level's templates are named.
-  CHECK(f.world->spawn("Barrel", {}) == 0);
+  CHECK(f.world->spawn("Barrel", {}).id == 0);
   CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
   // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
-  CHECK(f.world->spawn("", {}) == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
+  CHECK(f.world->spawn("", {}).id == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
   // An actor of the world is no template.
-  CHECK(f.world->spawn("Cube", {}) == 0 && std::string(last_error()).find("no template \"Cube\"") == 0);
+  CHECK(f.world->spawn("Cube", {}).id == 0 && std::string(last_error()).find("no template \"Cube\"") == 0);
   // A transform that is no place.
-  CHECK(f.world->spawn("Crate", game::Transform{{0, 0, 0}, {}, {0, 1, 1}}) == 0 && std::string(last_error()) == "spawn \"Crate\": the scale must not be zero");
+  CHECK(f.world->spawn("Crate", game::Transform{{0, 0, 0}, {}, {0, 1, 1}}).id == 0 && std::string(last_error()) == "spawn \"Crate\": the scale must not be zero");
   // An id that is taken (a replica told a wrong one).
-  CHECK(f.world->spawn("Crate", {}, 1) == 0 && std::string(last_error()).find("are taken") != std::string::npos);
+  CHECK(f.world->spawn("Crate", {}, 1).id == 0 && std::string(last_error()).find("are taken") != std::string::npos);
   f.world->stop();
   // A level without templates says so.
   CHECK(f.world->start(game::basic_level(), game::SimMode::simulate));
-  CHECK(f.world->spawn("Crate", {}) == 0 && std::string(last_error()) == "no template \"Crate\" - the level has no templates (an actor with \"template\": true)");
+  CHECK(f.world->spawn("Crate", {}).id == 0 && std::string(last_error()) == "no template \"Crate\" - the level has no templates (an actor with \"template\": true)");
   f.world->stop();
   // What a level must not do with templates (validate: errors with the actor and the reason, start refuses).
   auto first_error = [](const game::Level& x) {

@@ -196,6 +196,9 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
 | kein Akteur | `Actor{}` (Id 0, Welt 0): die Vorgabe jeder Variablen dieses Typs, das einzige Literal |
 | Welt | `logic::Host::world()`: die Welt der Objekte der Engine des Hosts (`EngineObjects::world`) – die Akteure einer `GameWorld` und ihre Objekte sind **eine** Welt (`GameWorld::world_id()`); ein Host ohne Objekte hat eine eigene Nummer (`logic::new_world`). Jeder Start einer Welt gibt eine neue Nummer: ein Akteur des Levels davor nennt im nächsten nichts. |
 
+- **Die Engine gibt ihn so:** `GameWorld::spawn` (Vorlagen, docs/runtime_actors.md) gibt `logic::ActorHandle`; ein
+  Pin `Actor` an einem Knoten der Engine (tools/engine_api.py: Tür `Conv<Actor>`, Klasse `Direct<Actor>`, Stellvertreter
+  Form `a`) trägt ihn, wie er ist – welche Welt er haben muss, sagt die Funktion, die ihn nimmt.
 - **Woher ein Akteur kommt:** nur aus seiner Welt – Self, Find Actor by Name, Find Actor with Tag, Spawn Actor,
   Get Player, ein Ereignis (Overlap, Hit …), For Each Actor with Tag, Line Trace. Jede dieser Stellen gibt den Akteur
   mit der Welt, in der der Knoten läuft (`Context::actor`, in der Klasse `kern_actor`).
@@ -224,8 +227,7 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
   nichts und sagt warum, der eigene schon; die Klasse fragt ebenso; kein Int wird ein Akteur), die Fälle der Stufen
   (blueprint_native: Akteure als Werte mit Welt), `tools/converter_cases/run.sh` (actors).
 - **Offen:** Akteure einer Welt vom Programm aus erreichen (der Host des Programms schlägt die Laufzeit der Welt des
-  Verweises nach, statt abzuweisen) und `GameWorld::spawn` der Vorlagen mit `ActorHandle` als Rückgabe (Zweig
-  work-vorlagen; die Knoten geben schon den typisierten Verweis). In die andere Richtung, von der Welt zum Programm,
+  Verweises nach, statt abzuweisen). In die andere Richtung, von der Welt zum Programm,
   gibt es **kein** stilles Durchfallen: der Weg führt nur über Objekte der Engine, die das Programm der Welt gibt (den
   festen Schritt, 6.1, oder eine Schnittstelle).
 

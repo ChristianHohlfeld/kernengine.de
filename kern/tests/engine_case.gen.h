@@ -341,7 +341,7 @@ struct Engine : kern::Blueprint {
   Bool R232_0 = false;
   Bool R233_0 = false;
   Bool R234_0 = false;
-  Int R235_0 = 0;
+  Actor R235_0 = Actor{};
   Bool R236_0 = false;
   Vector R237 = Vector{0.0, 0.0, 0.0};
   Bool R238_0 = false;
@@ -2878,7 +2878,7 @@ struct Engine : kern::Blueprint {
   struct { Bool result = false; } n63;
   struct { Bool result = false; } n64;
   struct { Bool result = false; } n65;
-  struct { Int result = 0; } n66;
+  struct { Actor result = Actor{}; } n66;
   struct { Bool result = false; } n67;
   struct { Bool result = false; } n68;
   struct { Bool result = false; } n69;

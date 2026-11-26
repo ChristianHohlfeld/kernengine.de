@@ -160,6 +160,10 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       return Value::object(h ? ObjectRef{h, kStandInWorld} : ObjectRef{});
     }
     case 'h': return Value::object({1 + static_cast<i64>(next(state) % 7), kStandInWorld});
+    case 'a': {  // (an actor, of the stand-in's own world, or none)
+      const ActorRef id = static_cast<ActorRef>(next(state) % 7);
+      return Value::actor(id ? ActorHandle{id, kStandInWorld} : ActorHandle{});
+    }
     case 'v': {
       Vec3 v;
       v.x = static_cast<f32>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0f;
