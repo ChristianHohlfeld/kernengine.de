@@ -1981,7 +1981,10 @@ struct Tally {
     }
     // (a callback the source gives, called to compare it, that went where C++ says nothing: not compared - probe_source)
     g_probe_open = false;
-    const bool equal = ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0]);
+    // (the interpreter's and the class's value are one value: equal as C++ compares them - or, where a NaN stands in them,
+    // which equals nothing and not itself, each the same as the source's the way the language sees a number: same)
+    const bool one = ia && ib && a.size() == 1 && b.size() == 1 && (a[0] == b[0] || (!(a[0] == a[0]) && !(b[0] == b[0])));
+    const bool equal = one && same(want, a[0]) && same(want, b[0]);
     if (g_probe_open) {
       g_probe_open = false;
       ++outside;
