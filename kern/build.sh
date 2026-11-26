@@ -2,7 +2,7 @@
 # Builds a Kern WebAssembly module: the engine plus the optional components and
 # game sources given.
 #
-#   kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] <out.wasm> [compiler flags / game sources...]
+#   kern/build.sh [--app] [--physics] [--game] [--studio] [--lehrer] [--project <game.kproject> [--classes]] <out.wasm> [compiler flags / game sources...]
 #
 # Components (the core renderer, geometry and JSON are always linked):
 #   --app      application runtime (kern/src/app) for games written entirely in
@@ -16,6 +16,8 @@
 #   --commercial  leaves out the assets that may not be used commercially: Pollen Robotics'
 #              Micro Duck 3D models (CC BY-NC-SA 4.0). Everything else in the module is
 #              Apache 2.0 or permissive (kern/LICENSES.md).
+#   --project  the game's project with its levels embedded (kern/game/embedded.h, kern/docs/app.md 7.); with
+#              --classes the Blueprints of its levels compiled in as C++ classes (kern/tools/project_sources.sh).
 #   --lehrer   the headless Lehrer (kern/src/lehrer: environments, PPO, ONNX
 #              export) and its C ABI for the browser's Web Workers; implies --game.
 #
@@ -32,7 +34,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-with_app=0 with_physics=0 with_game=0 with_studio=0 with_lehrer=0 commercial=0
+with_app=0 with_physics=0 with_game=0 with_studio=0 with_lehrer=0 commercial=0 project="" classes=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) with_app=1 ;;
@@ -41,6 +43,8 @@ while [ $# -gt 0 ]; do
     --studio) with_studio=1; with_game=1; with_physics=1 ;;
     --lehrer) with_lehrer=1; with_game=1; with_physics=1 ;;
     --commercial) commercial=1 ;;
+    --project) project="${2:?--project needs a project file}"; shift ;;
+    --classes) classes=--classes ;;
     *) break ;;
   esac
   shift
@@ -114,7 +118,13 @@ for p in "${pids[@]}"; do wait "$p"; done
 includes=(-I"$here/include")
 [ "$with_physics" = 1 ] && includes+=(-I"$here/third_party/box3d/include")
 
-# Game sources (*.cpp) compile like the engine's; other arguments are compiler flags.
+# Game sources (*.cpp) compile like the engine's; other arguments are compiler flags. A project brings its own
+# (kern/tools/project_sources.sh: the project embedded, with --classes its levels' Blueprints as classes).
+[ -z "$classes" ] || [ -n "$project" ] || { echo "kern/build.sh: --classes compiles the Blueprints of a project's levels - it needs --project" >&2; exit 1; }
+if [ -n "$project" ]; then
+  gen="$cache_root/project-$(echo "$(cd "$(dirname "$project")" && pwd)/$(basename "$project") $classes" | sha256sum | cut -c1-12)"
+  while IFS= read -r f; do set -- "$@" "$f"; done < <("$here/tools/project_sources.sh" "$project" "$gen" $classes)
+fi
 extra_flags=()
 [ "$commercial" = 1 ] && extra_flags+=(-DKERN_NO_NONCOMMERCIAL_ASSETS)
 for a in "$@"; do

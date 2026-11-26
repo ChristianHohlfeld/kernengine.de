@@ -134,3 +134,20 @@ Berührungen kommen als Ereignisse zurück.
 
 Geprüft: `app_ui_widgets` (Liste, Ereignisse, Fehler, Status), Murmel: Punkte/Level als Text, Münzen als Balken, am Ende
 ein Menü „Noch einmal / Nur Level 2“; das e2e liest die Widgets der Seite und wählt im Menü.
+
+## 7. Bauen: natives Spiel, Spieltest, Export (B7)
+
+Ein Spiel nennt seine Quellen und sein Projekt – welche Teile der Engine dazugehören, wie sie gebaut und
+zwischengespeichert werden, weiß die Engine.
+
+| | |
+|---|---|
+| nativ | `kern/tools/build_native.sh [--project <p.kproject>] [--classes] [--sanitize] -o <programm> [Compiler-Schalter / Quellen …]` – die Engine (ohne Editor und Lehrer, mit der kopflosen Grafik `kern/tests/gl_stub.cpp`) als Objekte, zwischengespeichert unter dem Hash von Quelle, Schaltern und allen Headern (`$KERN_NATIVE_CACHE`, Vorgabe `$TMPDIR/kern-native`); `--project` bettet das Projekt samt Levels ein (`embed_project.py`), `--classes` kompiliert die Blueprints jedes Levels des Projekts als C++-Klassen (`tools/blueprint_cpp.sh`); `--sanitize` mit ASan/UBSan wie die Engine-Tests. |
+| Web | `kern/build.sh --app --game --project <p.kproject> [--classes] <out.wasm> [Quellen …]` – dasselbe für WebAssembly. |
+| Spieltest | ein Spieltest ist ein natives Programm des Spiels: `build_native.sh --project … -o test test.cpp quellen.cpp`, dann laufen lassen. Murmel: `tests/run.sh` ruft nur noch das. |
+| Export | `tools/export_game.sh <level.klevel \| spiel.kproject> <out.html> [titel] [Quellen der App …]`: ein Level wie bisher; ein Projekt mit den Quellen seiner App wird eine Seite für sich (Modul, `kern.mjs`, `audio.mjs`, `app.mjs` eingebettet, Titel aus dem Projekt) – kein Spielname, kein fester Pfad zur Engine. |
+| Fehler | fehlende Quelle, Projekt, das nicht liest, Level, dessen Blueprints nicht C++ werden: der Bau bricht mit Ort und Grund ab. |
+| bewusst nicht | ein Bausystem (make/cmake), Bibliotheken der Engine als .a/.so, Bau aus dem Editor heraus. |
+
+Geprüft: CI-Job `murmel` (Spieltest über `build_native.sh`, Interpreter und Klassen), `murmel-web` (`kern/build.sh
+--project`), der Export eines Projekts im Job `murmel-web` (die Seite für sich startet das Spiel).

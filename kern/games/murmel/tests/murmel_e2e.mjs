@@ -88,6 +88,18 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(errors.length === 0, "no page errors in the editor" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await page.close();
 }
+// (3) the export of the project (tools/export_game.sh murmel.kproject): a page for itself starts the game
+{
+  const page = await browser.newPage({viewport: {width: 640, height: 400}});
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(base + "/generated/murmel.html");
+  const stand = () => page.evaluate(() => document.querySelector('.kern-ui [data-id="stand"]')?.textContent ?? "");
+  check(await until(async () => /Level 1\/2/.test(await stand()), 90000), "the exported page starts level 1 (" + (await stand()) + ")");
+  check(await page.title() === "Murmel", "it has the project's name as its title (" + (await page.title()) + ")");
+  check(errors.length === 0 && !(await page.evaluate(() => window.__kernError)), "no errors on the exported page" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
+  await page.close();
+}
 await browser.close();
 console.log(`murmel e2e: ${checks - failures}/${checks}`);
 process.exit(failures ? 1 : 0);

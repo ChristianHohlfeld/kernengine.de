@@ -497,6 +497,8 @@ jobs:
           export WASI_SDK=/home/runner/wasi-sdk
           kern/games/murmel/build.sh
           tools/build_studio.sh
+          # the export of a project with its App: one page for itself (kern/docs/app.md 7.)
+          tools/export_game.sh kern/games/murmel/murmel.kproject generated/murmel.html -Ikern/games/murmel/src kern/games/murmel/src/murmel.cpp kern/games/murmel/src/main.cpp
       - name: Playwright (cached)
         uses: actions/cache@v4
         with:
