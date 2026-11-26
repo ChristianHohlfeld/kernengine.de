@@ -6,6 +6,7 @@
 # Steps:
 #   1. kern/build.sh --studio generated/kern_studio.wasm   (C++ engine, Box3D, game runtime, studio)
 #   2. inline kern/web/studio/studio.css, the module sources kern/web/kern.mjs, kern/web/audio.mjs,
+#      kern/web/app.mjs (the widgets of an App: Play Project draws them, mountUi),
 #      kern/web/studio/game.mjs, logic.mjs, trainer.mjs and studio.mjs and the
 #      wasm (base64) into the markup of kern/web/studio/index.html.
 #
@@ -34,6 +35,7 @@ css = (web / "studio/studio.css").read_text()
 sources = {
     "kern": (web / "kern.mjs").read_text(),
     "audio": (web / "audio.mjs").read_text(),
+    "app": (web / "app.mjs").read_text(),
     "game": (web / "studio/game.mjs").read_text(),
     "logic": (web / "studio/logic.mjs").read_text(),
     "trainer": (web / "studio/trainer.mjs").read_text(),
@@ -55,7 +57,7 @@ blocks += f'<script type="text/plain" id="kern-wasm">{b64}</script>\n'
 def strip(text):
     text = re.sub(r'^import \{[^}]*\} from "[^"]+";\n', "", text, flags=re.M)
     return re.sub(r"^export (?=(const|let|function|async function|class) )", "", text, flags=re.M)
-bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "audio", "game", "logic", "trainer", "studio"))
+bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "audio", "app", "game", "logic", "trainer", "studio"))
 boot = """<script type="module">
 """ + bundle + """
 // ---- single-file boot ----
