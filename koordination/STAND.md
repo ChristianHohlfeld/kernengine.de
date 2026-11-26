@@ -134,3 +134,9 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - kleinspiel beendet (03a6c1c4); Nachfolger kleinspiel2 (a4e55eb3…), work-spiel 336e4157, Läufe 45873837774/45873952731.
 - zahlen7: work-zahlen a5730d18; Konverter-Ausdrücke getypt lokal; cmath ohne Umrechnung; 8 Funktionen fehlen der Engine → Auftrag mathe (a320b739…, work-projekt): log2, cbrt, ldexp, acosh, atanh, exp2, log1p, remainder.
 - editor: work-zahlen-editor f712aa51, Beleg-Lauf 45870721699.
+
+## Nachtrag 26.11. 19:50 (Kontrolle)
+- work-spiel 336e4157 (mit 02c1ca55): CI 45873952731 build GRÜN; rot: native-spawncity-build + e2e-spawncity (alte engine_*-Kopien im Level; small_level.py-Fix lokal), input (Maus-Fang/Stick im Kleinspiel — wird untersucht). Probe 4 rc=1 aus gleicher Ursache.
+- konverter8: bind(GameWorld&) entworfen und im Bau (Fall worldrules/worldmix), noch nicht gepusht. C++-Form: `g_rules.bind(w)`.
+- work-zahlen af3fb833 (Glue-Fix Exporte); CI 45875999709 (47aa67f5) rot — Jobs offen. Editor c836e0f5 eingemischt, CI 45877234547 läuft; e2e-Beleg 45874580610 grün.
+- mathe (acht Funktionen): läuft, noch kein Push.
