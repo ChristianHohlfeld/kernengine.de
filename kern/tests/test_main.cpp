@@ -6690,6 +6690,50 @@ TEST(logic_libraries) {
   if (logic::cpp_problem(linked).find("while Lists::grow holds it") == std::string::npos) std::printf("Grows: %s | %s\n", error.c_str(), logic::cpp_problem(linked).c_str());
 }
 
+TEST(logic_library_place) {
+  // A function of a library that names a place of the engine (setting "bound": the node of the engine that binds it -
+  // GameWorld::events, KERN_PLACE), called by another Blueprint: in the one graph link() makes, the library's nodes
+  // have ids of the caller's, and the nodes that name the place name the binding node by its id there (before: the
+  // library's id stayed - "bound" named no node that binds a place, or one of the caller's own).
+  const char* places =
+      "struct Places : virtual kern::Library {\n  // ---- functions ----\n  struct take_eventsResult { Int Result = 0; };\n"
+      "  take_eventsResult take_events(Object<kern::game::GameWorld> w = Object<kern::game::GameWorld>{}) {\n"
+      "    Int n = 0;\n    engine_game_world_events(n10, w);\n    n = list_length<Text>(n10.result);\n    list_clear(n10.result);\n    return {n};\n  }\n\n"
+      "  // ---- what nodes give and keep ----\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n10;\n};\n";
+  const char* taker =
+      "struct Taker : virtual kern::Library, virtual Places {\n  // ---- functions ----\n  struct twiceResult { Int Result = 0; };\n"
+      "  twiceResult twice(Object<kern::game::GameWorld> w = Object<kern::game::GameWorld>{}) {\n"
+      "    n10 = Places::take_events(w);\n    n11 = Places::take_events(w);\n    return {kern::to<Int>(kern::formula([](Float a, Float b) -> Float { return a + b; }, kern::to<Float>(n10.Result), kern::to<Float>(n11.Result)))};\n  }\n\n"
+      "  // ---- what nodes give and keep ----\n  Places::take_eventsResult n10;\n  Places::take_eventsResult n11;\n};\n";
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  for (const auto& [name, text] : {std::pair<const char*, const char*>{"Places", places}, {"Taker", taker}}) {
+    std::string error;
+    logic::Graph g;
+    CHECK(logic::from_cpp(text, g, nullptr, &error, logic::library(), all));
+    for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    CHECK(error.empty());
+    if (!error.empty()) std::printf("%s: %s", name, error.c_str());
+    project[name] = std::move(g);
+  }
+  logic::Graph linked;
+  std::string error;
+  CHECK(logic::link(project["Taker"], all, linked, &error) && error.empty());
+  int named = 0;
+  for (const logic::Node& n : linked.nodes) {
+    if (n.param("bound").empty()) continue;
+    ++named;
+    const logic::Node* binder = linked.find(static_cast<u32>(std::stoul(n.param("bound"))));
+    CHECK(binder && binder->type == "engine.game_world.events");
+  }
+  CHECK(named == 2);   // (the length read and the list cleared)
+  CHECK(no_errors(logic::check(linked)) && logic::cpp_problem(linked).empty());
+  for (const logic::Issue& i : logic::check(linked)) if (i.error) std::printf("linked: %s\n", i.text.c_str());
+}
+
 TEST(logic_constants) {
   // A constant is read like a variable and never changed. A library may have it - it keeps
   // nothing -, and in the one graph a Blueprint is with its libraries the library's constants
