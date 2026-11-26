@@ -109,8 +109,35 @@ bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   return true;
 }
 
-// engine.physics.frame_from_axis: kern::physics::frame_from_axis
+// engine.body.valid: kern::physics::Body::valid
 bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::physics::Body>();
+  ev::take<ev::Struct<S_physics_Body>>(o, in, 0, self);
+  decltype(auto) r = self.valid();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.shape.valid: kern::physics::Shape::valid
+bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::physics::Shape>();
+  ev::take<ev::Struct<S_physics_Shape>>(o, in, 0, self);
+  decltype(auto) r = self.valid();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.joint.valid: kern::physics::Joint::valid
+bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::physics::Joint>();
+  ev::take<ev::Struct<S_physics_Joint>>(o, in, 0, self);
+  decltype(auto) r = self.valid();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.physics.frame_from_axis: kern::physics::frame_from_axis
+bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -123,14 +150,14 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.physics.version: kern::physics::version
-bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::physics::version();
   ev::give<ev::Struct<S_physics_Version>>(o, out, 0, r);
   return true;
 }
 
 // engine.world.create: kern::physics::World::create
-bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::WorldSettings const&>>();
@@ -141,7 +168,7 @@ bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.world.destroy: kern::physics::World::destroy
-bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   self->destroy();
@@ -149,7 +176,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.world.valid: kern::physics::World::valid
-bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->valid();
@@ -158,7 +185,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.world.create_body: kern::physics::World::create_body
-bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::BodySettings const&>>();
@@ -169,7 +196,7 @@ bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.world.destroy_body: kern::physics::World::destroy_body
-bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -179,7 +206,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.world.body_valid: kern::physics::World::body_valid
-bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -190,7 +217,7 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.create_shape: kern::physics::World::create_shape
-bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -203,7 +230,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.destroy_shape: kern::physics::World::destroy_shape
-bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Shape>>();
@@ -213,7 +240,7 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.mesh_count: kern::physics::World::mesh_count
-bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->mesh_count();
@@ -222,7 +249,7 @@ bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.create_joint: kern::physics::World::create_joint
-bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::JointSettings const&>>();
@@ -233,7 +260,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.destroy_joint: kern::physics::World::destroy_joint
-bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -245,7 +272,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_valid: kern::physics::World::joint_valid
-bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -256,7 +283,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.step: kern::physics::World::step
-bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -268,7 +295,7 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.pose: kern::physics::World::pose
-bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -279,7 +306,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_pose: kern::physics::World::set_pose
-bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -291,7 +318,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_target_pose: kern::physics::World::set_target_pose
-bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -305,7 +332,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.linear_velocity: kern::physics::World::linear_velocity
-bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -316,7 +343,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.angular_velocity: kern::physics::World::angular_velocity
-bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -327,7 +354,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_linear_velocity: kern::physics::World::set_linear_velocity
-bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -339,7 +366,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_angular_velocity: kern::physics::World::set_angular_velocity
-bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -351,7 +378,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_force: kern::physics::World::apply_force
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -365,7 +392,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_force_to_center: kern::physics::World::apply_force_to_center
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -377,7 +404,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_torque: kern::physics::World::apply_torque
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -389,7 +416,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_linear_impulse: kern::physics::World::apply_linear_impulse
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -403,7 +430,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_linear_impulse_to_center: kern::physics::World::apply_linear_impulse_to_center
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -415,7 +442,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.apply_angular_impulse: kern::physics::World::apply_angular_impulse
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -427,7 +454,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_awake: kern::physics::World::set_awake
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -439,7 +466,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.awake: kern::physics::World::awake
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -450,7 +477,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.mass: kern::physics::World::mass
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -461,7 +488,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.body_type: kern::physics::World::body_type
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -472,7 +499,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_body_type: kern::physics::World::set_body_type
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -484,7 +511,7 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.body_masks: kern::physics::World::body_masks
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -497,7 +524,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_body_masks: kern::physics::World::set_body_masks
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -509,7 +536,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.local_point: kern::physics::World::local_point
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -522,7 +549,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.world_point: kern::physics::World::world_point
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -535,7 +562,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.world_vector: kern::physics::World::world_vector
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -548,7 +575,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.body_user: kern::physics::World::body_user
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -559,7 +586,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.shape_user: kern::physics::World::shape_user
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Shape>>();
@@ -570,7 +597,7 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.shape_body: kern::physics::World::shape_body
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Shape>>();
@@ -581,7 +608,7 @@ bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_motion_locks: kern::physics::World::set_motion_locks
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -593,7 +620,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_mass: kern::physics::World::set_mass
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -605,7 +632,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_mass_data: kern::physics::World::set_mass_data
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -622,7 +649,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_joint_thresholds: kern::physics::World::set_joint_thresholds
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -636,7 +663,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_force: kern::physics::World::joint_force
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -647,7 +674,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_joint_motor: kern::physics::World::set_joint_motor
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -663,7 +690,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_wheel_steering: kern::physics::World::set_wheel_steering
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -675,7 +702,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.wheel_steering: kern::physics::World::wheel_steering
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -686,7 +713,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_angle: kern::physics::World::joint_angle
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -697,7 +724,7 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_speed: kern::physics::World::joint_speed
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -708,7 +735,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.set_joint_spring: kern::physics::World::set_joint_spring
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -724,7 +751,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.hinge_lever: kern::physics::World::hinge_lever
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -737,7 +764,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_torque: kern::physics::World::joint_torque
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
@@ -748,7 +775,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.contact_points: kern::physics::World::contact_points
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -761,7 +788,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.touching: kern::physics::World::touching
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -774,7 +801,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.cast_ray: kern::physics::World::cast_ray
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -791,7 +818,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.cast_ray_ignoring: kern::physics::World::cast_ray_ignoring
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -808,7 +835,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.cast_sphere: kern::physics::World::cast_sphere
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -827,7 +854,7 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.cast_mover: kern::physics::World::cast_mover
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -846,7 +873,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.collide_mover: kern::physics::World::collide_mover
-bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -865,7 +892,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.explode: kern::physics::World::explode
-bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -883,7 +910,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.push_body: kern::physics::World::push_body
-bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
@@ -899,7 +926,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.contact_begin: kern::physics::World::contact_begin
-bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->contact_begin();
@@ -908,7 +935,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.contact_end: kern::physics::World::contact_end
-bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->contact_end();
@@ -917,7 +944,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.sensor_begin: kern::physics::World::sensor_begin
-bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->sensor_begin();
@@ -926,7 +953,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.sensor_end: kern::physics::World::sensor_end
-bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->sensor_end();
@@ -935,7 +962,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.hits: kern::physics::World::hits
-bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->hits();
@@ -944,7 +971,7 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.joint_events: kern::physics::World::joint_events
-bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->joint_events();
@@ -953,7 +980,7 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.body_count: kern::physics::World::body_count
-bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->body_count();
@@ -962,7 +989,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.awake_body_count: kern::physics::World::awake_body_count
-bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->awake_body_count();
@@ -971,7 +998,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.step_count: kern::physics::World::step_count
-bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->step_count();
@@ -980,7 +1007,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.gravity: kern::physics::World::gravity
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->gravity();
@@ -989,7 +1016,7 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.begin: kern::physics::MouseGrab::begin
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   kern::physics::World* a0 = ev::object<kern::physics::World>(o, in, 1, "world");
@@ -1008,7 +1035,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.set_target: kern::physics::MouseGrab::set_target
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1018,7 +1045,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.target: kern::physics::MouseGrab::target
-bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->target();
@@ -1027,7 +1054,7 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.update: kern::physics::MouseGrab::update
-bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1037,7 +1064,7 @@ bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.end: kern::physics::MouseGrab::end
-bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   self->end();
@@ -1045,7 +1072,7 @@ bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.active: kern::physics::MouseGrab::active
-bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->active();
@@ -1054,7 +1081,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.body: kern::physics::MouseGrab::body
-bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->body();
@@ -1063,7 +1090,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.anchor: kern::physics::MouseGrab::anchor
-bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->anchor();
@@ -1072,7 +1099,7 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mouse_grab.max_force: kern::physics::MouseGrab::max_force
-bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->max_force();
@@ -1081,7 +1108,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.reset: kern::physics::CharacterMover::reset
-bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1091,7 +1118,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.step: kern::physics::CharacterMover::step
-bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   kern::physics::World* a0 = ev::object<kern::physics::World>(o, in, 1, "world");
@@ -1112,7 +1139,7 @@ bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.position: kern::physics::CharacterMover::position
-bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   decltype(auto) r = self->position();
@@ -1121,7 +1148,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.velocity: kern::physics::CharacterMover::velocity
-bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   decltype(auto) r = self->velocity();
@@ -1130,7 +1157,7 @@ bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.set_velocity: kern::physics::CharacterMover::set_velocity
-bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1140,7 +1167,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.jump: kern::physics::CharacterMover::jump
-bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1150,7 +1177,7 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.on_ground: kern::physics::CharacterMover::on_ground
-bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   decltype(auto) r = self->on_ground();
@@ -1159,7 +1186,7 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.planes: kern::physics::CharacterMover::planes
-bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   decltype(auto) r = self->planes();
@@ -1168,7 +1195,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.capsule: kern::physics::CharacterMover::capsule
-bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   decltype(auto) r = self->capsule();
@@ -1177,7 +1204,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.physics.hull_mesh: kern::physics::hull_mesh
-bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<kern::Vec3> a0;
   ev::take<ev::List<ev::Vector>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::MeshData&>>();
@@ -1191,20 +1218,20 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.make: kern::physics::CharacterMover::CharacterMover
-bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::physics::CharacterMover>(std::unique_ptr<kern::physics::CharacterMover>(new kern::physics::CharacterMover()))));
   return true;
 }
 
 // engine.character_mover.release: kern::physics::CharacterMover::~CharacterMover
-bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "character_mover", r)) return false;
   return ev::release_of<kern::physics::CharacterMover>(o, r, "character_mover", "CharacterMover");
 }
 
 // engine.character_mover.settings: kern::physics::CharacterMover::settings
-bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   ev::give<ev::Struct<S_physics_CharacterMover_Settings>>(o, out, 0, self->settings);
@@ -1212,7 +1239,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.character_mover.settings@set: what stands at the place kern::physics::CharacterMover::settings gives
-bool c97_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c100_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   ev::take<ev::Struct<S_physics_CharacterMover_Settings>>(o, in, 1, self->settings);
@@ -1220,26 +1247,26 @@ bool c97_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.mouse_grab.make: kern::physics::MouseGrab::MouseGrab
-bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::physics::MouseGrab>(std::unique_ptr<kern::physics::MouseGrab>(new kern::physics::MouseGrab()))));
   return true;
 }
 
 // engine.mouse_grab.release: kern::physics::MouseGrab::~MouseGrab
-bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "mouse_grab", r)) return false;
   return ev::release_of<kern::physics::MouseGrab>(o, r, "mouse_grab", "MouseGrab");
 }
 
 // engine.world.make: kern::physics::World::World
-bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::physics::World>(std::unique_ptr<kern::physics::World>(new kern::physics::World()))));
   return true;
 }
 
 // engine.world.release: kern::physics::World::~World
-bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "world", r)) return false;
   return ev::release_of<kern::physics::World>(o, r, "world", "World");
@@ -1249,107 +1276,110 @@ const EngineCall kCalls[] = {
     {"engine.physics.surface_name", &c0},
     {"engine.physics.parse_surface", &c1},
     {"engine.physics.surface_friction", &c2},
-    {"engine.physics.frame_from_axis", &c3},
-    {"engine.physics.version", &c4},
-    {"engine.world.create", &c5},
-    {"engine.world.destroy", &c6},
-    {"engine.world.valid", &c7},
-    {"engine.world.create_body", &c8},
-    {"engine.world.destroy_body", &c9},
-    {"engine.world.body_valid", &c10},
-    {"engine.world.create_shape", &c11},
-    {"engine.world.destroy_shape", &c12},
-    {"engine.world.mesh_count", &c13},
-    {"engine.world.create_joint", &c14},
-    {"engine.world.destroy_joint", &c15},
-    {"engine.world.joint_valid", &c16},
-    {"engine.world.step", &c17},
-    {"engine.world.pose", &c18},
-    {"engine.world.set_pose", &c19},
-    {"engine.world.set_target_pose", &c20},
-    {"engine.world.linear_velocity", &c21},
-    {"engine.world.angular_velocity", &c22},
-    {"engine.world.set_linear_velocity", &c23},
-    {"engine.world.set_angular_velocity", &c24},
-    {"engine.world.apply_force", &c25},
-    {"engine.world.apply_force_to_center", &c26},
-    {"engine.world.apply_torque", &c27},
-    {"engine.world.apply_linear_impulse", &c28},
-    {"engine.world.apply_linear_impulse_to_center", &c29},
-    {"engine.world.apply_angular_impulse", &c30},
-    {"engine.world.set_awake", &c31},
-    {"engine.world.awake", &c32},
-    {"engine.world.mass", &c33},
-    {"engine.world.body_type", &c34},
-    {"engine.world.set_body_type", &c35},
-    {"engine.world.body_masks", &c36},
-    {"engine.world.set_body_masks", &c37},
-    {"engine.world.local_point", &c38},
-    {"engine.world.world_point", &c39},
-    {"engine.world.world_vector", &c40},
-    {"engine.world.body_user", &c41},
-    {"engine.world.shape_user", &c42},
-    {"engine.world.shape_body", &c43},
-    {"engine.world.set_motion_locks", &c44},
-    {"engine.world.set_mass", &c45},
-    {"engine.world.set_mass_data", &c46},
-    {"engine.world.set_joint_thresholds", &c47},
-    {"engine.world.joint_force", &c48},
-    {"engine.world.set_joint_motor", &c49},
-    {"engine.world.set_wheel_steering", &c50},
-    {"engine.world.wheel_steering", &c51},
-    {"engine.world.joint_angle", &c52},
-    {"engine.world.joint_speed", &c53},
-    {"engine.world.set_joint_spring", &c54},
-    {"engine.world.hinge_lever", &c55},
-    {"engine.world.joint_torque", &c56},
-    {"engine.world.contact_points", &c57},
-    {"engine.world.touching", &c58},
-    {"engine.world.cast_ray", &c59},
-    {"engine.world.cast_ray_ignoring", &c60},
-    {"engine.world.cast_sphere", &c61},
-    {"engine.world.cast_mover", &c62},
-    {"engine.world.collide_mover", &c63},
-    {"engine.world.explode", &c64},
-    {"engine.world.push_body", &c65},
-    {"engine.world.contact_begin", &c66},
-    {"engine.world.contact_end", &c67},
-    {"engine.world.sensor_begin", &c68},
-    {"engine.world.sensor_end", &c69},
-    {"engine.world.hits", &c70},
-    {"engine.world.joint_events", &c71},
-    {"engine.world.body_count", &c72},
-    {"engine.world.awake_body_count", &c73},
-    {"engine.world.step_count", &c74},
-    {"engine.world.gravity", &c75},
-    {"engine.mouse_grab.begin", &c76},
-    {"engine.mouse_grab.set_target", &c77},
-    {"engine.mouse_grab.target", &c78},
-    {"engine.mouse_grab.update", &c79},
-    {"engine.mouse_grab.end", &c80},
-    {"engine.mouse_grab.active", &c81},
-    {"engine.mouse_grab.body", &c82},
-    {"engine.mouse_grab.anchor", &c83},
-    {"engine.mouse_grab.max_force", &c84},
-    {"engine.character_mover.reset", &c85},
-    {"engine.character_mover.step", &c86},
-    {"engine.character_mover.position", &c87},
-    {"engine.character_mover.velocity", &c88},
-    {"engine.character_mover.set_velocity", &c89},
-    {"engine.character_mover.jump", &c90},
-    {"engine.character_mover.on_ground", &c91},
-    {"engine.character_mover.planes", &c92},
-    {"engine.character_mover.capsule", &c93},
-    {"engine.physics.hull_mesh", &c94},
-    {"engine.character_mover.make", &c95},
-    {"engine.character_mover.release", &c96},
-    {"engine.character_mover.settings", &c97},
-    {"engine.mouse_grab.make", &c98},
-    {"engine.mouse_grab.release", &c99},
-    {"engine.world.make", &c100},
-    {"engine.world.release", &c101},
-    {"engine.character_mover.settings@get", &c97},
-    {"engine.character_mover.settings@set", &c97_set},
+    {"engine.body.valid", &c3},
+    {"engine.shape.valid", &c4},
+    {"engine.joint.valid", &c5},
+    {"engine.physics.frame_from_axis", &c6},
+    {"engine.physics.version", &c7},
+    {"engine.world.create", &c8},
+    {"engine.world.destroy", &c9},
+    {"engine.world.valid", &c10},
+    {"engine.world.create_body", &c11},
+    {"engine.world.destroy_body", &c12},
+    {"engine.world.body_valid", &c13},
+    {"engine.world.create_shape", &c14},
+    {"engine.world.destroy_shape", &c15},
+    {"engine.world.mesh_count", &c16},
+    {"engine.world.create_joint", &c17},
+    {"engine.world.destroy_joint", &c18},
+    {"engine.world.joint_valid", &c19},
+    {"engine.world.step", &c20},
+    {"engine.world.pose", &c21},
+    {"engine.world.set_pose", &c22},
+    {"engine.world.set_target_pose", &c23},
+    {"engine.world.linear_velocity", &c24},
+    {"engine.world.angular_velocity", &c25},
+    {"engine.world.set_linear_velocity", &c26},
+    {"engine.world.set_angular_velocity", &c27},
+    {"engine.world.apply_force", &c28},
+    {"engine.world.apply_force_to_center", &c29},
+    {"engine.world.apply_torque", &c30},
+    {"engine.world.apply_linear_impulse", &c31},
+    {"engine.world.apply_linear_impulse_to_center", &c32},
+    {"engine.world.apply_angular_impulse", &c33},
+    {"engine.world.set_awake", &c34},
+    {"engine.world.awake", &c35},
+    {"engine.world.mass", &c36},
+    {"engine.world.body_type", &c37},
+    {"engine.world.set_body_type", &c38},
+    {"engine.world.body_masks", &c39},
+    {"engine.world.set_body_masks", &c40},
+    {"engine.world.local_point", &c41},
+    {"engine.world.world_point", &c42},
+    {"engine.world.world_vector", &c43},
+    {"engine.world.body_user", &c44},
+    {"engine.world.shape_user", &c45},
+    {"engine.world.shape_body", &c46},
+    {"engine.world.set_motion_locks", &c47},
+    {"engine.world.set_mass", &c48},
+    {"engine.world.set_mass_data", &c49},
+    {"engine.world.set_joint_thresholds", &c50},
+    {"engine.world.joint_force", &c51},
+    {"engine.world.set_joint_motor", &c52},
+    {"engine.world.set_wheel_steering", &c53},
+    {"engine.world.wheel_steering", &c54},
+    {"engine.world.joint_angle", &c55},
+    {"engine.world.joint_speed", &c56},
+    {"engine.world.set_joint_spring", &c57},
+    {"engine.world.hinge_lever", &c58},
+    {"engine.world.joint_torque", &c59},
+    {"engine.world.contact_points", &c60},
+    {"engine.world.touching", &c61},
+    {"engine.world.cast_ray", &c62},
+    {"engine.world.cast_ray_ignoring", &c63},
+    {"engine.world.cast_sphere", &c64},
+    {"engine.world.cast_mover", &c65},
+    {"engine.world.collide_mover", &c66},
+    {"engine.world.explode", &c67},
+    {"engine.world.push_body", &c68},
+    {"engine.world.contact_begin", &c69},
+    {"engine.world.contact_end", &c70},
+    {"engine.world.sensor_begin", &c71},
+    {"engine.world.sensor_end", &c72},
+    {"engine.world.hits", &c73},
+    {"engine.world.joint_events", &c74},
+    {"engine.world.body_count", &c75},
+    {"engine.world.awake_body_count", &c76},
+    {"engine.world.step_count", &c77},
+    {"engine.world.gravity", &c78},
+    {"engine.mouse_grab.begin", &c79},
+    {"engine.mouse_grab.set_target", &c80},
+    {"engine.mouse_grab.target", &c81},
+    {"engine.mouse_grab.update", &c82},
+    {"engine.mouse_grab.end", &c83},
+    {"engine.mouse_grab.active", &c84},
+    {"engine.mouse_grab.body", &c85},
+    {"engine.mouse_grab.anchor", &c86},
+    {"engine.mouse_grab.max_force", &c87},
+    {"engine.character_mover.reset", &c88},
+    {"engine.character_mover.step", &c89},
+    {"engine.character_mover.position", &c90},
+    {"engine.character_mover.velocity", &c91},
+    {"engine.character_mover.set_velocity", &c92},
+    {"engine.character_mover.jump", &c93},
+    {"engine.character_mover.on_ground", &c94},
+    {"engine.character_mover.planes", &c95},
+    {"engine.character_mover.capsule", &c96},
+    {"engine.physics.hull_mesh", &c97},
+    {"engine.character_mover.make", &c98},
+    {"engine.character_mover.release", &c99},
+    {"engine.character_mover.settings", &c100},
+    {"engine.mouse_grab.make", &c101},
+    {"engine.mouse_grab.release", &c102},
+    {"engine.world.make", &c103},
+    {"engine.world.release", &c104},
+    {"engine.character_mover.settings@get", &c100},
+    {"engine.character_mover.settings@set", &c100_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

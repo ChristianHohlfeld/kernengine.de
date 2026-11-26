@@ -571,8 +571,19 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.bit_writer.write_bits: kern::net::BitWriter::write_bits
+// engine.net.bits_required: kern::net::bits_required
 bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  ev::take<ev::Num<u32>>(o, in, 1, a1);
+  decltype(auto) r = kern::net::bits_required(std::move(a0), std::move(a1));
+  ev::give<ev::Num<i32>>(o, out, 0, r);
+  return true;
+}
+
+// engine.bit_writer.write_bits: kern::net::BitWriter::write_bits
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -584,7 +595,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.write_align: kern::net::BitWriter::write_align
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   self->write_align();
@@ -592,7 +603,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.write_bytes: kern::net::BitWriter::write_bytes
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   std::vector<unsigned char> a0;
@@ -605,7 +616,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.flush: kern::net::BitWriter::flush
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   self->flush();
@@ -613,7 +624,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.align_bits: kern::net::BitWriter::align_bits
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
@@ -622,7 +633,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.bits_written: kern::net::BitWriter::bits_written
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bits_written();
@@ -631,7 +642,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.bits_available: kern::net::BitWriter::bits_available
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bits_available();
@@ -640,7 +651,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.bytes_written: kern::net::BitWriter::bytes_written
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bytes_written();
@@ -649,7 +660,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_writer.overflow: kern::net::BitWriter::overflow
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->overflow();
@@ -658,7 +669,7 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.would_overflow: kern::net::BitReader::would_overflow
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -669,7 +680,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.read_bits: kern::net::BitReader::read_bits
-bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -680,7 +691,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.read_align: kern::net::BitReader::read_align
-bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->read_align();
@@ -689,7 +700,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.read_bytes: kern::net::BitReader::read_bytes
-bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
@@ -702,7 +713,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.align_bits: kern::net::BitReader::align_bits
-bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
@@ -711,7 +722,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.bits_read: kern::net::BitReader::bits_read
-bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bits_read();
@@ -720,7 +731,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.bits_remaining: kern::net::BitReader::bits_remaining
-bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bits_remaining();
@@ -729,7 +740,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bit_reader.bytes_read: kern::net::BitReader::bytes_read
-bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bytes_read();
@@ -738,7 +749,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.serialize_integer: kern::net::WriteStream::serialize_integer
-bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -753,7 +764,7 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.serialize_bits: kern::net::WriteStream::serialize_bits
-bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -766,7 +777,7 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.serialize_bytes: kern::net::WriteStream::serialize_bytes
-bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   std::vector<unsigned char> a0;
@@ -780,7 +791,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.serialize_align: kern::net::WriteStream::serialize_align
-bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->serialize_align();
@@ -789,7 +800,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.serialize_check: kern::net::WriteStream::serialize_check
-bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -800,7 +811,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.flush: kern::net::WriteStream::flush
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   self->flush();
@@ -808,7 +819,7 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.bits_processed: kern::net::WriteStream::bits_processed
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
@@ -817,7 +828,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.bytes_processed: kern::net::WriteStream::bytes_processed
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
@@ -826,7 +837,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.align_bits: kern::net::WriteStream::align_bits
-bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
@@ -835,7 +846,7 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.write_stream.overflow: kern::net::WriteStream::overflow
-bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->overflow();
@@ -844,7 +855,7 @@ bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.serialize_integer: kern::net::ReadStream::serialize_integer
-bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int&>>();
@@ -860,7 +871,7 @@ bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.serialize_bits: kern::net::ReadStream::serialize_bits
-bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int&>>();
@@ -874,7 +885,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.serialize_bytes: kern::net::ReadStream::serialize_bytes
-bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
@@ -888,7 +899,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.serialize_align: kern::net::ReadStream::serialize_align
-bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->serialize_align();
@@ -897,7 +908,7 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.serialize_check: kern::net::ReadStream::serialize_check
-bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -908,7 +919,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.bits_processed: kern::net::ReadStream::bits_processed
-bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
@@ -917,7 +928,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.bytes_processed: kern::net::ReadStream::bytes_processed
-bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
@@ -926,7 +937,7 @@ bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.bits_remaining: kern::net::ReadStream::bits_remaining
-bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_remaining();
@@ -935,7 +946,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.read_stream.align_bits: kern::net::ReadStream::align_bits
-bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
@@ -944,7 +955,7 @@ bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.serialize_integer: kern::net::MeasureStream::serialize_integer
-bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -959,7 +970,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.serialize_bits: kern::net::MeasureStream::serialize_bits
-bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -972,7 +983,7 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.serialize_bytes: kern::net::MeasureStream::serialize_bytes
-bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   std::vector<unsigned char> a0;
@@ -986,7 +997,7 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.serialize_align: kern::net::MeasureStream::serialize_align
-bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->serialize_align();
@@ -995,7 +1006,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.serialize_check: kern::net::MeasureStream::serialize_check
-bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1006,7 +1017,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.bits_processed: kern::net::MeasureStream::bits_processed
-bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
@@ -1015,7 +1026,7 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.bytes_processed: kern::net::MeasureStream::bytes_processed
-bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
@@ -1024,7 +1035,7 @@ bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.measure_stream.align_bits: kern::net::MeasureStream::align_bits
-bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
@@ -1032,8 +1043,39 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// engine.net.sequence_greater: kern::net::sequence_greater
+bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<unsigned short>>();
+  ev::take<ev::Num<u16>>(o, in, 0, a0);
+  auto a1 = ev::blank<std::remove_cvref_t<unsigned short>>();
+  ev::take<ev::Num<u16>>(o, in, 1, a1);
+  decltype(auto) r = kern::net::sequence_greater(std::move(a0), std::move(a1));
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.net.sequence_less: kern::net::sequence_less
+bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<unsigned short>>();
+  ev::take<ev::Num<u16>>(o, in, 0, a0);
+  auto a1 = ev::blank<std::remove_cvref_t<unsigned short>>();
+  ev::take<ev::Num<u16>>(o, in, 1, a1);
+  decltype(auto) r = kern::net::sequence_less(std::move(a0), std::move(a1));
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.address.valid: kern::net::Address::valid
+bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::net::Address>();
+  ev::take<ev::Struct<S_net_Address>>(o, in, 0, self);
+  decltype(auto) r = self.valid();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
 // engine.transport.address: kern::net::Transport::address
-bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!self) return false;
   decltype(auto) r = self->address();
@@ -1042,7 +1084,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.transport.send: kern::net::Transport::send
-bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
@@ -1058,7 +1100,7 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.transport.receive: kern::net::Transport::receive
-bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
@@ -1075,7 +1117,7 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.transport.advance_time: kern::net::Transport::advance_time
-bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -1084,8 +1126,17 @@ bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.simulator_settings.active: kern::net::SimulatorSettings::active
+bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::net::SimulatorSettings>();
+  ev::take<ev::Struct<S_net_SimulatorSettings>>(o, in, 0, self);
+  decltype(auto) r = self.active();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
 // engine.simulator.send: kern::net::Simulator::send
-bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
@@ -1104,7 +1155,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.take_due: kern::net::Simulator::take_due
-bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -1117,7 +1168,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.clear: kern::net::Simulator::clear
-bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   self->clear();
@@ -1125,7 +1176,7 @@ bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.in_flight: kern::net::Simulator::in_flight
-bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->in_flight();
@@ -1134,7 +1185,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.dropped: kern::net::Simulator::dropped
-bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->dropped();
@@ -1143,7 +1194,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.duplicated: kern::net::Simulator::duplicated
-bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->duplicated();
@@ -1152,7 +1203,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.create: kern::net::LoopbackNetwork::create
-bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->create();
@@ -1161,7 +1212,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.simulator: kern::net::LoopbackNetwork::simulator
-bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->simulator();
@@ -1170,7 +1221,7 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.advance_time: kern::net::LoopbackNetwork::advance_time
-bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -1180,7 +1231,7 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.time: kern::net::LoopbackNetwork::time
-bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->time();
@@ -1189,7 +1240,7 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.delivered: kern::net::LoopbackNetwork::delivered
-bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->delivered();
@@ -1198,7 +1249,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.address: kern::net::HostTransport::address
-bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   decltype(auto) r = self->address();
@@ -1207,7 +1258,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.set_address: kern::net::HostTransport::set_address
-bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
@@ -1217,7 +1268,7 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.send: kern::net::HostTransport::send
-bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
@@ -1233,7 +1284,7 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.receive: kern::net::HostTransport::receive
-bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
@@ -1250,7 +1301,7 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.advance_time: kern::net::HostTransport::advance_time
-bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -1260,7 +1311,7 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.push_incoming: kern::net::HostTransport::push_incoming
-bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
@@ -1275,7 +1326,7 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.take_outgoing: kern::net::HostTransport::take_outgoing
-bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
@@ -1290,7 +1341,7 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.simulator: kern::net::HostTransport::simulator
-bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   decltype(auto) r = self->simulator();
@@ -1299,7 +1350,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.client.make: kern::net::Client::Client
-bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::net::Transport* a0 = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
@@ -1311,14 +1362,14 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.client.release: kern::net::Client::~Client
-bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "client", r)) return false;
   return ev::release_of<kern::net::Client>(o, r, "client", "Client");
 }
 
 // engine.connection.make: kern::net::Connection::Connection
-bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::ConnectionConfig const&>>();
   ev::take<ev::Struct<S_net_ConnectionConfig>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
@@ -1328,14 +1379,14 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.connection.release: kern::net::Connection::~Connection
-bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "connection", r)) return false;
   return ev::release_of<kern::net::Connection>(o, r, "connection", "Connection");
 }
 
 // engine.host_transport.make: kern::net::HostTransport::HostTransport
-bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 0, a0);
   out[0] = Value::object(o.ref(o.own<kern::net::HostTransport, kern::net::Transport>(std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport(std::move(a0))))));
@@ -1343,14 +1394,14 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.host_transport.release: kern::net::HostTransport::~HostTransport
-bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "host_transport", r)) return false;
   return ev::release_of<kern::net::HostTransport>(o, r, "host_transport", "HostTransport");
 }
 
 // engine.loopback_network.make: kern::net::LoopbackNetwork::LoopbackNetwork
-bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Num<u32>>(o, in, 0, a0);
   out[0] = Value::object(o.ref(o.own<kern::net::LoopbackNetwork>(std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork(std::move(a0))))));
@@ -1358,27 +1409,27 @@ bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.loopback_network.release: kern::net::LoopbackNetwork::~LoopbackNetwork
-bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "loopback_network", r)) return false;
   return ev::release_of<kern::net::LoopbackNetwork>(o, r, "loopback_network", "LoopbackNetwork");
 }
 
 // engine.measure_stream.make: kern::net::MeasureStream::MeasureStream
-bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::net::MeasureStream>(std::unique_ptr<kern::net::MeasureStream>(new kern::net::MeasureStream()))));
   return true;
 }
 
 // engine.measure_stream.release: kern::net::MeasureStream::~MeasureStream
-bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "measure_stream", r)) return false;
   return ev::release_of<kern::net::MeasureStream>(o, r, "measure_stream", "MeasureStream");
 }
 
 // engine.server.make: kern::net::Server::Server
-bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::net::Transport* a0 = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
@@ -1390,14 +1441,14 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.server.release: kern::net::Server::~Server
-bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "server", r)) return false;
   return ev::release_of<kern::net::Server>(o, r, "server", "Server");
 }
 
 // engine.simulator.make: kern::net::Simulator::Simulator
-bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Num<u32>>(o, in, 0, a0);
   out[0] = Value::object(o.ref(o.own<kern::net::Simulator>(std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator(std::move(a0))))));
@@ -1405,14 +1456,14 @@ bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.release: kern::net::Simulator::~Simulator
-bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "simulator", r)) return false;
   return ev::release_of<kern::net::Simulator>(o, r, "simulator", "Simulator");
 }
 
 // engine.simulator.settings: kern::net::Simulator::settings
-bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   ev::give<ev::Struct<S_net_SimulatorSettings>>(o, out, 0, self->settings);
@@ -1420,7 +1471,7 @@ bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.simulator.settings@set: what stands at the place kern::net::Simulator::settings gives
-bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   ev::take<ev::Struct<S_net_SimulatorSettings>>(o, in, 1, self->settings);
@@ -1530,90 +1581,95 @@ const EngineCall kCalls[] = {
     {"engine.endpoint.time", &c50},
     {"engine.endpoint.stats", &c51},
     {"engine.endpoint.config", &c52},
-    {"engine.bit_writer.write_bits", &c53},
-    {"engine.bit_writer.write_align", &c54},
-    {"engine.bit_writer.write_bytes", &c55},
-    {"engine.bit_writer.flush", &c56},
-    {"engine.bit_writer.align_bits", &c57},
-    {"engine.bit_writer.bits_written", &c58},
-    {"engine.bit_writer.bits_available", &c59},
-    {"engine.bit_writer.bytes_written", &c60},
-    {"engine.bit_writer.overflow", &c61},
-    {"engine.bit_reader.would_overflow", &c62},
-    {"engine.bit_reader.read_bits", &c63},
-    {"engine.bit_reader.read_align", &c64},
-    {"engine.bit_reader.read_bytes", &c65},
-    {"engine.bit_reader.align_bits", &c66},
-    {"engine.bit_reader.bits_read", &c67},
-    {"engine.bit_reader.bits_remaining", &c68},
-    {"engine.bit_reader.bytes_read", &c69},
-    {"engine.write_stream.serialize_integer", &c70},
-    {"engine.write_stream.serialize_bits", &c71},
-    {"engine.write_stream.serialize_bytes", &c72},
-    {"engine.write_stream.serialize_align", &c73},
-    {"engine.write_stream.serialize_check", &c74},
-    {"engine.write_stream.flush", &c75},
-    {"engine.write_stream.bits_processed", &c76},
-    {"engine.write_stream.bytes_processed", &c77},
-    {"engine.write_stream.align_bits", &c78},
-    {"engine.write_stream.overflow", &c79},
-    {"engine.read_stream.serialize_integer", &c80},
-    {"engine.read_stream.serialize_bits", &c81},
-    {"engine.read_stream.serialize_bytes", &c82},
-    {"engine.read_stream.serialize_align", &c83},
-    {"engine.read_stream.serialize_check", &c84},
-    {"engine.read_stream.bits_processed", &c85},
-    {"engine.read_stream.bytes_processed", &c86},
-    {"engine.read_stream.bits_remaining", &c87},
-    {"engine.read_stream.align_bits", &c88},
-    {"engine.measure_stream.serialize_integer", &c89},
-    {"engine.measure_stream.serialize_bits", &c90},
-    {"engine.measure_stream.serialize_bytes", &c91},
-    {"engine.measure_stream.serialize_align", &c92},
-    {"engine.measure_stream.serialize_check", &c93},
-    {"engine.measure_stream.bits_processed", &c94},
-    {"engine.measure_stream.bytes_processed", &c95},
-    {"engine.measure_stream.align_bits", &c96},
-    {"engine.transport.address", &c97},
-    {"engine.transport.send", &c98},
-    {"engine.transport.receive", &c99},
-    {"engine.transport.advance_time", &c100},
-    {"engine.simulator.send", &c101},
-    {"engine.simulator.take_due", &c102},
-    {"engine.simulator.clear", &c103},
-    {"engine.simulator.in_flight", &c104},
-    {"engine.simulator.dropped", &c105},
-    {"engine.simulator.duplicated", &c106},
-    {"engine.loopback_network.create", &c107},
-    {"engine.loopback_network.simulator", &c108},
-    {"engine.loopback_network.advance_time", &c109},
-    {"engine.loopback_network.time", &c110},
-    {"engine.loopback_network.delivered", &c111},
-    {"engine.host_transport.address", &c112},
-    {"engine.host_transport.set_address", &c113},
-    {"engine.host_transport.send", &c114},
-    {"engine.host_transport.receive", &c115},
-    {"engine.host_transport.advance_time", &c116},
-    {"engine.host_transport.push_incoming", &c117},
-    {"engine.host_transport.take_outgoing", &c118},
-    {"engine.host_transport.simulator", &c119},
-    {"engine.client.make", &c120},
-    {"engine.client.release", &c121},
-    {"engine.connection.make", &c122},
-    {"engine.connection.release", &c123},
-    {"engine.host_transport.make", &c124},
-    {"engine.host_transport.release", &c125},
-    {"engine.loopback_network.make", &c126},
-    {"engine.loopback_network.release", &c127},
-    {"engine.measure_stream.make", &c128},
-    {"engine.measure_stream.release", &c129},
-    {"engine.server.make", &c130},
-    {"engine.server.release", &c131},
-    {"engine.simulator.make", &c132},
-    {"engine.simulator.release", &c133},
-    {"engine.simulator.settings", &c134},
-    {"engine.simulator.settings@get", &c134},
-    {"engine.simulator.settings@set", &c134_set},
+    {"engine.net.bits_required", &c53},
+    {"engine.bit_writer.write_bits", &c54},
+    {"engine.bit_writer.write_align", &c55},
+    {"engine.bit_writer.write_bytes", &c56},
+    {"engine.bit_writer.flush", &c57},
+    {"engine.bit_writer.align_bits", &c58},
+    {"engine.bit_writer.bits_written", &c59},
+    {"engine.bit_writer.bits_available", &c60},
+    {"engine.bit_writer.bytes_written", &c61},
+    {"engine.bit_writer.overflow", &c62},
+    {"engine.bit_reader.would_overflow", &c63},
+    {"engine.bit_reader.read_bits", &c64},
+    {"engine.bit_reader.read_align", &c65},
+    {"engine.bit_reader.read_bytes", &c66},
+    {"engine.bit_reader.align_bits", &c67},
+    {"engine.bit_reader.bits_read", &c68},
+    {"engine.bit_reader.bits_remaining", &c69},
+    {"engine.bit_reader.bytes_read", &c70},
+    {"engine.write_stream.serialize_integer", &c71},
+    {"engine.write_stream.serialize_bits", &c72},
+    {"engine.write_stream.serialize_bytes", &c73},
+    {"engine.write_stream.serialize_align", &c74},
+    {"engine.write_stream.serialize_check", &c75},
+    {"engine.write_stream.flush", &c76},
+    {"engine.write_stream.bits_processed", &c77},
+    {"engine.write_stream.bytes_processed", &c78},
+    {"engine.write_stream.align_bits", &c79},
+    {"engine.write_stream.overflow", &c80},
+    {"engine.read_stream.serialize_integer", &c81},
+    {"engine.read_stream.serialize_bits", &c82},
+    {"engine.read_stream.serialize_bytes", &c83},
+    {"engine.read_stream.serialize_align", &c84},
+    {"engine.read_stream.serialize_check", &c85},
+    {"engine.read_stream.bits_processed", &c86},
+    {"engine.read_stream.bytes_processed", &c87},
+    {"engine.read_stream.bits_remaining", &c88},
+    {"engine.read_stream.align_bits", &c89},
+    {"engine.measure_stream.serialize_integer", &c90},
+    {"engine.measure_stream.serialize_bits", &c91},
+    {"engine.measure_stream.serialize_bytes", &c92},
+    {"engine.measure_stream.serialize_align", &c93},
+    {"engine.measure_stream.serialize_check", &c94},
+    {"engine.measure_stream.bits_processed", &c95},
+    {"engine.measure_stream.bytes_processed", &c96},
+    {"engine.measure_stream.align_bits", &c97},
+    {"engine.net.sequence_greater", &c98},
+    {"engine.net.sequence_less", &c99},
+    {"engine.address.valid", &c100},
+    {"engine.transport.address", &c101},
+    {"engine.transport.send", &c102},
+    {"engine.transport.receive", &c103},
+    {"engine.transport.advance_time", &c104},
+    {"engine.simulator_settings.active", &c105},
+    {"engine.simulator.send", &c106},
+    {"engine.simulator.take_due", &c107},
+    {"engine.simulator.clear", &c108},
+    {"engine.simulator.in_flight", &c109},
+    {"engine.simulator.dropped", &c110},
+    {"engine.simulator.duplicated", &c111},
+    {"engine.loopback_network.create", &c112},
+    {"engine.loopback_network.simulator", &c113},
+    {"engine.loopback_network.advance_time", &c114},
+    {"engine.loopback_network.time", &c115},
+    {"engine.loopback_network.delivered", &c116},
+    {"engine.host_transport.address", &c117},
+    {"engine.host_transport.set_address", &c118},
+    {"engine.host_transport.send", &c119},
+    {"engine.host_transport.receive", &c120},
+    {"engine.host_transport.advance_time", &c121},
+    {"engine.host_transport.push_incoming", &c122},
+    {"engine.host_transport.take_outgoing", &c123},
+    {"engine.host_transport.simulator", &c124},
+    {"engine.client.make", &c125},
+    {"engine.client.release", &c126},
+    {"engine.connection.make", &c127},
+    {"engine.connection.release", &c128},
+    {"engine.host_transport.make", &c129},
+    {"engine.host_transport.release", &c130},
+    {"engine.loopback_network.make", &c131},
+    {"engine.loopback_network.release", &c132},
+    {"engine.measure_stream.make", &c133},
+    {"engine.measure_stream.release", &c134},
+    {"engine.server.make", &c135},
+    {"engine.server.release", &c136},
+    {"engine.simulator.make", &c137},
+    {"engine.simulator.release", &c138},
+    {"engine.simulator.settings", &c139},
+    {"engine.simulator.settings@get", &c139},
+    {"engine.simulator.settings@set", &c139_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

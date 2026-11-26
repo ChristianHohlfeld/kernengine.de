@@ -1156,8 +1156,106 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
-// engine.storage_host.read: kern::StorageHost::read
+// engine.project_json.num: kern::project_json::num
 bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<float>>();
+  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  decltype(auto) r = kern::project_json::num(std::move(a0));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::json::Value>(o, std::forward<decltype(r)>(r))));
+  return true;
+}
+
+// engine.project_json.quality_name: kern::project_json::quality_name
+bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<kern::AoQuality>>();
+  ev::take<ev::Enum<E_AoQuality>>(o, in, 0, a0);
+  decltype(auto) r = kern::project_json::quality_name(std::move(a0));
+  ev::give<ev::Text>(o, out, 0, r);
+  return true;
+}
+
+// engine.project_json.quality_of: kern::project_json::quality_of
+bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
+  ev::take<ev::Text>(o, in, 0, a0);
+  auto a1 = ev::blank<std::remove_cvref_t<kern::AoQuality>>();
+  ev::take<ev::Enum<E_AoQuality>>(o, in, 1, a1);
+  decltype(auto) r = kern::project_json::quality_of(a0, std::move(a1));
+  ev::give<ev::Enum<E_AoQuality>>(o, out, 0, r);
+  return true;
+}
+
+// engine.project_json.shadow_to: kern::project_json::shadow_to
+bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<kern::ShadowOptions const&>>();
+  ev::take<ev::Struct<S_ShadowOptions>>(o, in, 0, a0);
+  decltype(auto) r = kern::project_json::shadow_to(a0);
+  out[0] = Value::object(o.ref(ev::handle_of<kern::json::Value>(o, std::forward<decltype(r)>(r))));
+  return true;
+}
+
+// engine.project_json.shadow_from: kern::project_json::shadow_from
+bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  kern::json::Value* a0 = ev::object<kern::json::Value>(o, in, 0, "v");
+  if (!a0) return false;
+  auto a1 = ev::blank<std::remove_cvref_t<kern::ShadowOptions&>>();
+  ev::take<ev::Struct<S_ShadowOptions>>(o, in, 1, a1);
+  auto a2 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
+  ev::take<ev::Text>(o, in, 2, a2);
+  decltype(auto) r = kern::project_json::shadow_from(*a0, a1, a2);
+  ev::give<ev::Text>(o, out, 0, r);
+  ev::give<ev::Struct<S_ShadowOptions>>(o, out, 1, a1);
+  return true;
+}
+
+// engine.project_json.ao_to: kern::project_json::ao_to
+bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<kern::AoOptions const&>>();
+  ev::take<ev::Struct<S_AoOptions>>(o, in, 0, a0);
+  decltype(auto) r = kern::project_json::ao_to(a0);
+  out[0] = Value::object(o.ref(ev::handle_of<kern::json::Value>(o, std::forward<decltype(r)>(r))));
+  return true;
+}
+
+// engine.project_json.ao_from: kern::project_json::ao_from
+bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  kern::json::Value* a0 = ev::object<kern::json::Value>(o, in, 0, "v");
+  if (!a0) return false;
+  auto a1 = ev::blank<std::remove_cvref_t<kern::AoOptions&>>();
+  ev::take<ev::Struct<S_AoOptions>>(o, in, 1, a1);
+  auto a2 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
+  ev::take<ev::Text>(o, in, 2, a2);
+  decltype(auto) r = kern::project_json::ao_from(*a0, a1, a2);
+  ev::give<ev::Text>(o, out, 0, r);
+  ev::give<ev::Struct<S_AoOptions>>(o, out, 1, a1);
+  return true;
+}
+
+// engine.project_json.renderer_to: kern::project_json::renderer_to
+bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<kern::RendererOptions const&>>();
+  ev::take<ev::Struct<S_RendererOptions>>(o, in, 0, a0);
+  decltype(auto) r = kern::project_json::renderer_to(a0);
+  out[0] = Value::object(o.ref(ev::handle_of<kern::json::Value>(o, std::forward<decltype(r)>(r))));
+  return true;
+}
+
+// engine.project_json.renderer_from: kern::project_json::renderer_from
+bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  kern::json::Value* a0 = ev::object<kern::json::Value>(o, in, 0, "r");
+  if (!a0) return false;
+  auto a1 = ev::blank<std::remove_cvref_t<kern::RendererOptions&>>();
+  ev::take<ev::Struct<S_RendererOptions>>(o, in, 1, a1);
+  auto a2 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
+  ev::take<ev::Text>(o, in, 2, a2);
+  decltype(auto) r = kern::project_json::renderer_from(*a0, a1, a2);
+  ev::give<ev::Text>(o, out, 0, r);
+  ev::give<ev::Struct<S_RendererOptions>>(o, out, 1, a1);
+  return true;
+}
+
+// engine.storage_host.read: kern::StorageHost::read
+bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::StorageHost>(o, in, 0, "storage_host");
   if (!self) return false;
   std::string a0;
@@ -1177,7 +1275,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.storage_host.write: kern::StorageHost::write
-bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::StorageHost>(o, in, 0, "storage_host");
   if (!self) return false;
   std::string a0;
@@ -1193,7 +1291,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.storage_host.remove: kern::StorageHost::remove
-bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::StorageHost>(o, in, 0, "storage_host");
   if (!self) return false;
   std::string a0;
@@ -1207,7 +1305,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.platform_storage: kern::platform_storage
-bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
   ev::take<ev::Text>(o, in, 0, a0);
   decltype(auto) r = kern::platform_storage(std::move(a0));
@@ -1216,7 +1314,7 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.storage_name_ok: kern::storage_name_ok
-bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::string a0;
   ev::take<ev::Text>(o, in, 0, a0);
   decltype(auto) r = kern::storage_name_ok(a0);
@@ -1225,20 +1323,20 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.device_profile.make: kern::DeviceProfile::DeviceProfile
-bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::DeviceProfile>(std::unique_ptr<kern::DeviceProfile>(new kern::DeviceProfile()))));
   return true;
 }
 
 // engine.device_profile.release: kern::DeviceProfile::~DeviceProfile
-bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "device_profile", r)) return false;
   return ev::release_of<kern::DeviceProfile>(o, r, "device_profile", "DeviceProfile");
 }
 
 // engine.device_profile.name: kern::DeviceProfile::name
-bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
   if (!self) return false;
   ev::give<ev::Text>(o, out, 0, self->name);
@@ -1246,7 +1344,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.device_profile.name@set: what stands at the place kern::DeviceProfile::name gives
-bool c112_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c121_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
   if (!self) return false;
   ev::take<ev::Text>(o, in, 1, self->name);
@@ -1254,7 +1352,7 @@ bool c112_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.device_profile.renderer: kern::DeviceProfile::renderer
-bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
   if (!self) return false;
   ev::give<ev::Struct<S_RendererOptions>>(o, out, 0, self->renderer);
@@ -1262,7 +1360,7 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.device_profile.renderer@set: what stands at the place kern::DeviceProfile::renderer gives
-bool c113_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c122_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::DeviceProfile>(o, in, 0, "device_profile");
   if (!self) return false;
   ev::take<ev::Struct<S_RendererOptions>>(o, in, 1, self->renderer);
@@ -1270,7 +1368,7 @@ bool c113_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.engine.make: kern::Engine::Engine
-bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   out[0] = Value::object(o.ref(o.own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*a0)))));
@@ -1278,7 +1376,7 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.engine.make_2: kern::Engine::Engine
-bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   kern::AppHost* a1 = ev::object<kern::AppHost>(o, in, 1, "host");
@@ -1288,20 +1386,20 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.engine.release: kern::Engine::~Engine
-bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "engine", r)) return false;
   return ev::release_of<kern::Engine>(o, r, "engine", "Engine");
 }
 
 // engine.input.make: kern::Input::Input
-bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Input>(std::unique_ptr<kern::Input>(new kern::Input()))));
   return true;
 }
 
 // engine.input.release: kern::Input::~Input
-bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "input", r)) return false;
   return ev::release_of<kern::Input>(o, r, "input", "Input");
@@ -1526,24 +1624,33 @@ const EngineCall kCalls[] = {
     {"engine.app.update", &c102},
     {"engine.app.resized", &c103},
     {"engine.app.stop", &c104},
-    {"engine.storage_host.read", &c105},
-    {"engine.storage_host.write", &c106},
-    {"engine.storage_host.remove", &c107},
-    {"engine.platform_storage", &c108},
-    {"engine.storage_name_ok", &c109},
-    {"engine.device_profile.make", &c110},
-    {"engine.device_profile.release", &c111},
-    {"engine.device_profile.name", &c112},
-    {"engine.device_profile.renderer", &c113},
-    {"engine.engine.make", &c114},
-    {"engine.engine.make_2", &c115},
-    {"engine.engine.release", &c116},
-    {"engine.input.make", &c117},
-    {"engine.input.release", &c118},
-    {"engine.device_profile.name@get", &c112},
-    {"engine.device_profile.name@set", &c112_set},
-    {"engine.device_profile.renderer@get", &c113},
-    {"engine.device_profile.renderer@set", &c113_set},
+    {"engine.project_json.num", &c105},
+    {"engine.project_json.quality_name", &c106},
+    {"engine.project_json.quality_of", &c107},
+    {"engine.project_json.shadow_to", &c108},
+    {"engine.project_json.shadow_from", &c109},
+    {"engine.project_json.ao_to", &c110},
+    {"engine.project_json.ao_from", &c111},
+    {"engine.project_json.renderer_to", &c112},
+    {"engine.project_json.renderer_from", &c113},
+    {"engine.storage_host.read", &c114},
+    {"engine.storage_host.write", &c115},
+    {"engine.storage_host.remove", &c116},
+    {"engine.platform_storage", &c117},
+    {"engine.storage_name_ok", &c118},
+    {"engine.device_profile.make", &c119},
+    {"engine.device_profile.release", &c120},
+    {"engine.device_profile.name", &c121},
+    {"engine.device_profile.renderer", &c122},
+    {"engine.engine.make", &c123},
+    {"engine.engine.make_2", &c124},
+    {"engine.engine.release", &c125},
+    {"engine.input.make", &c126},
+    {"engine.input.release", &c127},
+    {"engine.device_profile.name@get", &c121},
+    {"engine.device_profile.name@set", &c121_set},
+    {"engine.device_profile.renderer@get", &c122},
+    {"engine.device_profile.renderer@set", &c122_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

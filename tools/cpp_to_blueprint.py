@@ -11985,9 +11985,6 @@ ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (the pin types of the engine's door until its pins have the types of their signatures - stage 6 of the number types:
 # Int an i64, Float an f64, Int64 a u64; an entry of a fixed width - of a List<U8> - its own type, u8)
 ENGINE_PIN = {"bool": "boolean", "Int": "i64", "Float": "f64", "Vector": "vector", "Text": "text", "Int64": "u64", "Actor": "actor"}
-# (Stufe 6, in Arbeit: a function a header defines as a node of its own - KERN_ENGINE_INLINE_NODES=1; off until the door
-# handles every type such a function takes - std::initializer_list, ... - and the native cases cover them)
-ENGINE_INLINE_NODES = os.environ.get("KERN_ENGINE_INLINE_NODES") == "1"
 # (the form of a number of each type - EnginePin::shape, kern/logic/engine_api.h: a letter each)
 NUM_SHAPE = {"bool": "b", "f64": "n", "f32": "f", "i64": "i", "u64": "l", "i32": "w", "u32": "u", "i16": "s", "u16": "r", "i8": "k", "u8": "y"}
 
@@ -12141,7 +12138,7 @@ class Api:
         defined? What such an object holds is the engine's: a Blueprint reaches it through its node only."""
         if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d.get("isImplicit") or d.get("explicitlyDeleted"):
             return False
-        if d["id"] in self.tree.body and not self.of_object(d) and not (ENGINE_INLINE_NODES and self.engine_inline(d)):
+        if d["id"] in self.tree.body and not self.of_object(d) and not self.engine_inline(d):
             return False
         scope = self.tree.scope_of.get(d["id"], "")
         if not scope.startswith(ENGINE + "::") or engine_skipped(scope) and engine_skipped(scope.rstrip(":") + "::" + (d.get("name") or "")):
@@ -12387,6 +12384,17 @@ class Api:
         per = {}      # ... -> how many numbers each one it counts is (kern::Count<Per>; else 1)
         all_params = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
         for i, p in enumerate(all_params):
+            if re.match(r"(const\s+)?std::initializer_list<", u.clean(qtype(p))):
+                # (C++ makes a std::initializer_list only of entries written out in braces - never of a list a Blueprint holds:
+                # no node can hand one over)
+                raise Wait(f"a list written in braces (std::initializer_list, parameter {p.get('name') or i + 1}): C++ makes none of a list the program holds")
+            pt = u.clean(qtype(p))
+            if d["id"] in tree.body and self.engine_inline(d) and re.fullmatch(r"(const\s+)?(f32|f64|float|double|u8|i8|u16|i16|u32|i32|u64|i64|int|unsigned)\s*(const\s*)?\*(\s*const)?", pt):
+                nxt = all_params[i + 1] if i + 1 < len(all_params) else None
+                if nxt is None or not re.search(r"\b(size_t|int|unsigned|u32|i32|u64|i64|std::size_t)\b", u.clean(qtype(nxt))):
+                    # (a function the header defines reads through the pointer as many numbers as its body says - Vec3::load reads
+                    # three: the door does not know how many, a list of the program may have fewer)
+                    raise Wait(f"a pointer to numbers without their count (parameter {p.get('name') or i + 1}): how many the function reads, says only its body")
             optional = self.optional_out(p)
             if optional is not None:
                 name = name_of(p.get("name") or f"value{i + 1}")

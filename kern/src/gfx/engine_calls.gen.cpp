@@ -1,6 +1,7 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
 #include <algorithm>
+#include "kern/gfx/gl.h"
 #include "kern/gfx/mesh.h"
 #include "kern/gfx/particles.h"
 #include "kern/gfx/passes.h"
@@ -87,8 +88,26 @@ void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const V
 Value S_Viewport::to(EngineObjects& o, const kern::Viewport& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.x), ev::Conv<ev::Num<i32>>::to(o, x.y), ev::Conv<ev::Num<i32>>::to(o, x.width), ev::Conv<ev::Num<i32>>::to(o, x.height)}); }
 void S_Viewport::from(EngineObjects& o, const Value& v, kern::Viewport& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<i32>>::from(o, *f, x.width); if (const Value* f = v.field(3)) ev::Conv<ev::Num<i32>>::from(o, *f, x.height); }
 
-// engine.mesh.skinned: kern::Mesh::skinned
+// engine.gl.has_extension: kern::gl::has_extension
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  std::string a0;
+  ev::take<ev::Text>(o, in, 0, a0);
+  decltype(auto) r = kern::gl::has_extension(a0.c_str());
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.material.casts_shadow: kern::Material::casts_shadow
+bool c1(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto self = ev::blank<kern::Material>();
+  ev::take<ev::Struct<S_Material>>(o, in, 0, self);
+  decltype(auto) r = self.casts_shadow();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.mesh.skinned: kern::Mesh::skinned
+bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   decltype(auto) r = self->skinned();
@@ -97,7 +116,7 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mesh.cull_mode: kern::Mesh::cull_mode
-bool c1(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   decltype(auto) r = self->cull_mode();
@@ -106,7 +125,7 @@ bool c1(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mesh.vertex_count: kern::Mesh::vertex_count
-bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   decltype(auto) r = self->vertex_count();
@@ -115,7 +134,7 @@ bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mesh.element_count: kern::Mesh::element_count
-bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   decltype(auto) r = self->element_count();
@@ -124,7 +143,7 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mesh.triangle_count: kern::Mesh::triangle_count
-bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   decltype(auto) r = self->triangle_count();
@@ -133,7 +152,7 @@ bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mesh.posed_vertex: kern::Mesh::posed_vertex
-bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -144,7 +163,7 @@ bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.bounding_sphere: kern::bounding_sphere
-bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<float> a0;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<3u>>>();
@@ -156,7 +175,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mirror_state: kern::mirror_state
-bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<float> a0;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<16u>>>();
@@ -168,7 +187,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.apply_cull_mode: kern::apply_cull_mode
-bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Num<i32>>(o, in, 0, a0);
   kern::apply_cull_mode(std::move(a0));
@@ -176,7 +195,7 @@ bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.instanced_bounds: kern::instanced_bounds
-bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::Sphere const&>>();
   ev::take<ev::Struct<S_Sphere>>(o, in, 0, a0);
   std::vector<float> a1;
@@ -190,7 +209,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.particles.init: kern::Particles::init
-bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 1, "renderer");
@@ -205,7 +224,7 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.emit: kern::Particles::emit
-bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::ParticleSpec const&>>();
@@ -216,7 +235,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.tick: kern::Particles::tick
-bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -229,7 +248,7 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.clear: kern::Particles::clear
-bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   self->clear();
@@ -237,7 +256,7 @@ bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.mesh_id: kern::Particles::mesh_id
-bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   decltype(auto) r = self->mesh_id();
@@ -246,7 +265,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.active: kern::Particles::active
-bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   decltype(auto) r = self->active();
@@ -255,7 +274,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.particles.stats: kern::Particles::stats
-bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Particles>(o, in, 0, "particles");
   if (!self) return false;
   decltype(auto) r = self->stats();
@@ -264,7 +283,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.light_pool.request: kern::LightPool::request
-bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::LightPool>(o, in, 0, "light_pool");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -281,7 +300,7 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.light_pool.resolve: kern::LightPool::resolve
-bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::LightPool>(o, in, 0, "light_pool");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -292,7 +311,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.light_pool.clear: kern::LightPool::clear
-bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::LightPool>(o, in, 0, "light_pool");
   if (!self) return false;
   self->clear();
@@ -300,7 +319,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.init: kern::SunShadowMap::init
-bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::ShadowOptions const&>>();
@@ -311,7 +330,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.destroy: kern::SunShadowMap::destroy
-bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -321,7 +340,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.valid: kern::SunShadowMap::valid
-bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   decltype(auto) r = self->valid();
@@ -330,7 +349,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.focus_key: kern::SunShadowMap::focus_key
-bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -345,7 +364,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.draw: kern::SunShadowMap::draw
-bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   std::vector<kern::Mesh*> a0;
@@ -365,7 +384,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.matrix: kern::SunShadowMap::matrix
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   decltype(auto) r = self->matrix();
@@ -374,7 +393,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.depth_texture: kern::SunShadowMap::depth_texture
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   decltype(auto) r = self->depth_texture();
@@ -383,7 +402,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.options: kern::SunShadowMap::options
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   decltype(auto) r = self->options();
@@ -392,7 +411,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.set_filter: kern::SunShadowMap::set_filter
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -402,7 +421,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sun_shadow_map.extent: kern::SunShadowMap::extent
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   decltype(auto) r = self->extent();
@@ -411,7 +430,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sky_pass.init: kern::SkyPass::init
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SkyPass>(o, in, 0, "sky_pass");
   if (!self) return false;
   decltype(auto) r = self->init();
@@ -420,7 +439,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sky_pass.destroy: kern::SkyPass::destroy
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SkyPass>(o, in, 0, "sky_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -430,7 +449,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.sky_pass.draw: kern::SkyPass::draw
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::SkyPass>(o, in, 0, "sky_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
@@ -450,7 +469,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.configure: kern::BloomPass::configure
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::BloomOptions const&>>();
@@ -460,7 +479,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.begin: kern::BloomPass::begin
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -477,7 +496,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.end: kern::BloomPass::end
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -489,7 +508,7 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.destroy: kern::BloomPass::destroy
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -499,7 +518,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.state: kern::BloomPass::state
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   decltype(auto) r = self->state();
@@ -508,7 +527,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.depth_texture: kern::BloomPass::depth_texture
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   decltype(auto) r = self->depth_texture();
@@ -517,7 +536,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.bloom_pass.bind_scene: kern::BloomPass::bind_scene
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BloomPass>(o, in, 0, "bloom_pass");
   if (!self) return false;
   self->bind_scene();
@@ -525,7 +544,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.configure: kern::AmbientOcclusionPass::configure
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::AoOptions const&>>();
@@ -535,7 +554,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.set_radius: kern::AmbientOcclusionPass::set_radius
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -545,7 +564,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.options: kern::AmbientOcclusionPass::options
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->options();
@@ -554,7 +573,7 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.compute: kern::AmbientOcclusionPass::compute
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -573,7 +592,7 @@ bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.texture: kern::AmbientOcclusionPass::texture
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->texture();
@@ -582,7 +601,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.width: kern::AmbientOcclusionPass::width
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->width();
@@ -591,7 +610,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.height: kern::AmbientOcclusionPass::height
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->height();
@@ -600,7 +619,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.destroy: kern::AmbientOcclusionPass::destroy
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -610,7 +629,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.quality: kern::AmbientOcclusionPass::quality
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->quality();
@@ -619,7 +638,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.ambient_occlusion_pass.half_resolution: kern::AmbientOcclusionPass::half_resolution
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::AmbientOcclusionPass>(o, in, 0, "ambient_occlusion_pass");
   if (!self) return false;
   decltype(auto) r = self->half_resolution();
@@ -628,7 +647,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.build: kern::Program::build
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   std::string a0;
@@ -643,7 +662,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.destroy: kern::Program::destroy
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -653,7 +672,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.handle: kern::Program::handle
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   decltype(auto) r = self->handle();
@@ -662,7 +681,7 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.valid: kern::Program::valid
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   decltype(auto) r = self->valid();
@@ -671,7 +690,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.location: kern::Program::location
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   std::string a0;
@@ -682,7 +701,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.program.use: kern::Program::use
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Program>(o, in, 0, "program");
   if (!self) return false;
   self->use();
@@ -690,7 +709,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.reset: kern::UniformCache::reset
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   self->reset();
@@ -698,7 +717,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_int: kern::UniformCache::set_int
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -710,7 +729,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_float: kern::UniformCache::set_float
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -722,7 +741,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_vec2: kern::UniformCache::set_vec2
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -736,7 +755,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_vec3: kern::UniformCache::set_vec3
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -748,7 +767,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_vec4: kern::UniformCache::set_vec4
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -760,7 +779,7 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_vec4_array: kern::UniformCache::set_vec4_array
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -775,7 +794,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_vec3_array: kern::UniformCache::set_vec3_array
-bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -790,7 +809,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.uniform_cache.set_mat4: kern::UniformCache::set_mat4
-bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::UniformCache>(o, in, 0, "uniform_cache");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -801,21 +820,8 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.uniform_cache.set_mat4_array: kern::UniformCache::set_mat4_array
-bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
-  std::vector<float> a1;
-  ev::take<ev::List<ev::Num<f32>>>(o, in, 1, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<16u>>>();
-  ev::take<ev::Num<u32>>(o, in, 2, a2);
-  if (ev::numbers(a2) > a1.size()) { o.error = "the list values has fewer entries than n says"; return false; }
-  kern::UniformCache::set_mat4_array(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
-  return true;
-}
-
 // engine.renderer.init: kern::Renderer::init
-bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::RendererOptions const&>>();
@@ -829,7 +835,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.shutdown: kern::Renderer::shutdown
-bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   self->shutdown();
@@ -837,7 +843,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.resize: kern::Renderer::resize
-bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -850,7 +856,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.width: kern::Renderer::width
-bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->width();
@@ -859,7 +865,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.height: kern::Renderer::height
-bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->height();
@@ -868,7 +874,7 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.allocate_id: kern::Renderer::allocate_id
-bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->allocate_id();
@@ -877,7 +883,7 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.release_id: kern::Renderer::release_id
-bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -887,7 +893,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.id_allocated: kern::Renderer::id_allocated
-bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -898,7 +904,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.upsert: kern::Renderer::upsert
-bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -911,7 +917,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.update_instances: kern::Renderer::update_instances
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -928,7 +934,7 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.update_bones: kern::Renderer::update_bones
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -941,7 +947,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_visible: kern::Renderer::set_visible
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -954,7 +960,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.remove: kern::Renderer::remove
-bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -965,7 +971,7 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_material: kern::Renderer::set_material
-bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -978,7 +984,7 @@ bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_layers: kern::Renderer::set_layers
-bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -991,7 +997,7 @@ bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.mesh: kern::Renderer::mesh
-bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1002,7 +1008,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.meshes: kern::Renderer::meshes
-bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->meshes();
@@ -1011,7 +1017,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.mesh_count: kern::Renderer::mesh_count
-bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->mesh_count();
@@ -1020,7 +1026,7 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.create_texture: kern::Renderer::create_texture
-bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   kern::TextureDesc* a0 = ev::object<kern::TextureDesc>(o, in, 1, "desc");
@@ -1031,7 +1037,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.register_external_texture: kern::Renderer::register_external_texture
-bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1042,7 +1048,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.create_render_target: kern::Renderer::create_render_target
-bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -1056,7 +1062,7 @@ bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.delete_texture: kern::Renderer::delete_texture
-bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1067,7 +1073,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.camera: kern::Renderer::camera
-bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->camera();
@@ -1076,7 +1082,7 @@ bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_camera: kern::Renderer::set_camera
-bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
@@ -1086,7 +1092,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.lighting: kern::Renderer::lighting
-bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->lighting();
@@ -1095,7 +1101,7 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_lighting: kern::Renderer::set_lighting
-bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Lighting const&>>();
@@ -1105,7 +1111,7 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.sky: kern::Renderer::sky
-bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->sky();
@@ -1114,7 +1120,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_sky: kern::Renderer::set_sky
-bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::SkyState const&>>();
@@ -1124,7 +1130,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_point_lights: kern::Renderer::set_point_lights
-bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::PointLights const&>>();
@@ -1135,7 +1141,7 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.point_lights: kern::Renderer::point_lights
-bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->point_lights();
@@ -1144,7 +1150,7 @@ bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_shadows: kern::Renderer::set_shadows
-bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   std::vector<kern::ShadowOptions> a0;
@@ -1155,7 +1161,7 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_shadow_distance: kern::Renderer::set_shadow_distance
-bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1165,7 +1171,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_shadow_filter: kern::Renderer::set_shadow_filter
-bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -1175,7 +1181,7 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_ambient_occlusion: kern::Renderer::set_ambient_occlusion
-bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::AoOptions const&>>();
@@ -1185,7 +1191,7 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.renderer.set_ambient_occlusion_radius: kern::Renderer::set_ambient_occlusion_radius
-bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1195,7 +1201,7 @@ bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.ambient_occlusion: kern::Renderer::ambient_occlusion
-bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->ambient_occlusion();
@@ -1204,7 +1210,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.shadow: kern::Renderer::shadow
-bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->shadow();
@@ -1213,7 +1219,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.invalidate: kern::Renderer::invalidate
-bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -1223,7 +1229,7 @@ bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.scene_revision: kern::Renderer::scene_revision
-bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->scene_revision();
@@ -1232,7 +1238,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.render: kern::Renderer::render
-bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::RenderParams const&>>();
@@ -1246,7 +1252,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.last_stats: kern::Renderer::last_stats
-bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->last_stats();
@@ -1255,7 +1261,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.screen_ray: kern::Renderer::screen_ray
-bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1271,7 +1277,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.context_lost: kern::Renderer::context_lost
-bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   self->context_lost();
@@ -1279,7 +1285,7 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.context_restored: kern::Renderer::context_restored
-bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->context_restored();
@@ -1288,7 +1294,7 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.lost: kern::Renderer::lost
-bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->lost();
@@ -1297,7 +1303,7 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.set_headless: kern::Renderer::set_headless
-bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   self->set_headless();
@@ -1305,7 +1311,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.extensions: kern::Renderer::extensions
-bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->extensions();
@@ -1314,7 +1320,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.name: kern::ShaderExtension::name
-bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->name();
@@ -1323,7 +1329,7 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.attributes: kern::ShaderExtension::attributes
-bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->attributes();
@@ -1332,7 +1338,7 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.vertex_declarations: kern::ShaderExtension::vertex_declarations
-bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->vertex_declarations();
@@ -1341,7 +1347,7 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.vertex: kern::ShaderExtension::vertex
-bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->vertex();
@@ -1350,7 +1356,7 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_declarations: kern::ShaderExtension::fragment_declarations
-bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_declarations();
@@ -1359,7 +1365,7 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_discard: kern::ShaderExtension::fragment_discard
-bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_discard();
@@ -1368,7 +1374,7 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_input: kern::ShaderExtension::fragment_input
-bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_input();
@@ -1377,7 +1383,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_surface: kern::ShaderExtension::fragment_surface
-bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_surface();
@@ -1386,7 +1392,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.bind: kern::ShaderExtension::bind
-bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::Program* a0 = ev::object<kern::Program>(o, in, 1, "program");
@@ -1396,7 +1402,7 @@ bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.frame_uniforms: kern::ShaderExtension::frame_uniforms
-bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::UniformCache* a0 = ev::object<kern::UniformCache>(o, in, 1, "cache");
@@ -1408,7 +1414,7 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.material_uniforms: kern::ShaderExtension::material_uniforms
-bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::UniformCache* a0 = ev::object<kern::UniformCache>(o, in, 1, "cache");
@@ -1422,7 +1428,7 @@ bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.build_standard_shader: kern::build_standard_shader
-bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<kern::ShaderExtension*> a0;
   ev::take<ev::List<ev::Handle>>(o, in, 0, a0);
   if (!o.error.empty()) return false;
@@ -1432,33 +1438,33 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.ambient_occlusion_pass.make: kern::AmbientOcclusionPass::AmbientOcclusionPass
-bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::AmbientOcclusionPass>(std::unique_ptr<kern::AmbientOcclusionPass>(new kern::AmbientOcclusionPass()))));
   return true;
 }
 
 // engine.ambient_occlusion_pass.release: kern::AmbientOcclusionPass::~AmbientOcclusionPass
-bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "ambient_occlusion_pass", r)) return false;
   return ev::release_of<kern::AmbientOcclusionPass>(o, r, "ambient_occlusion_pass", "AmbientOcclusionPass");
 }
 
 // engine.bloom_pass.make: kern::BloomPass::BloomPass
-bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::BloomPass>(std::unique_ptr<kern::BloomPass>(new kern::BloomPass()))));
   return true;
 }
 
 // engine.bloom_pass.release: kern::BloomPass::~BloomPass
-bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "bloom_pass", r)) return false;
   return ev::release_of<kern::BloomPass>(o, r, "bloom_pass", "BloomPass");
 }
 
 // engine.light_pool.make: kern::LightPool::LightPool
-bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Num<u32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1468,27 +1474,27 @@ bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.light_pool.release: kern::LightPool::~LightPool
-bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "light_pool", r)) return false;
   return ev::release_of<kern::LightPool>(o, r, "light_pool", "LightPool");
 }
 
 // engine.mesh.make: kern::Mesh::Mesh
-bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Mesh>(std::unique_ptr<kern::Mesh>(new kern::Mesh()))));
   return true;
 }
 
 // engine.mesh.release: kern::Mesh::~Mesh
-bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "mesh", r)) return false;
   return ev::release_of<kern::Mesh>(o, r, "mesh", "Mesh");
 }
 
 // engine.mesh.id: kern::Mesh::id
-bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->id);
@@ -1496,7 +1502,7 @@ bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.id@set: what stands at the place kern::Mesh::id gives
-bool c133_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->id);
@@ -1504,7 +1510,7 @@ bool c133_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.visible: kern::Mesh::visible
-bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->visible);
@@ -1512,7 +1518,7 @@ bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.visible@set: what stands at the place kern::Mesh::visible gives
-bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->visible);
@@ -1520,7 +1526,7 @@ bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.layers: kern::Mesh::layers
-bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->layers);
@@ -1528,7 +1534,7 @@ bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.layers@set: what stands at the place kern::Mesh::layers gives
-bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->layers);
@@ -1536,7 +1542,7 @@ bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.pick_bvh: kern::Mesh::pick_bvh
-bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->pick_bvh);
@@ -1544,7 +1550,7 @@ bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.pick_bvh@set: what stands at the place kern::Mesh::pick_bvh gives
-bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->pick_bvh);
@@ -1552,7 +1558,7 @@ bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.linear_colors: kern::Mesh::linear_colors
-bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->linear_colors);
@@ -1560,7 +1566,7 @@ bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.linear_colors@set: what stands at the place kern::Mesh::linear_colors gives
-bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->linear_colors);
@@ -1568,7 +1574,7 @@ bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.material: kern::Mesh::material
-bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Material>>(o, out, 0, self->material);
@@ -1576,7 +1582,7 @@ bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.material@set: what stands at the place kern::Mesh::material gives
-bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Material>>(o, in, 1, self->material);
@@ -1584,7 +1590,7 @@ bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.texture: kern::Mesh::texture
-bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->texture);
@@ -1592,7 +1598,7 @@ bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.texture@set: what stands at the place kern::Mesh::texture gives
-bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->texture);
@@ -1600,7 +1606,7 @@ bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.positions: kern::Mesh::positions
-bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->positions);
@@ -1608,7 +1614,7 @@ bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.positions@set: what stands at the place kern::Mesh::positions gives
-bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->positions);
@@ -1616,7 +1622,7 @@ bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.normals: kern::Mesh::normals
-bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->normals);
@@ -1624,7 +1630,7 @@ bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.normals@set: what stands at the place kern::Mesh::normals gives
-bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->normals);
@@ -1632,7 +1638,7 @@ bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.colors: kern::Mesh::colors
-bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->colors);
@@ -1640,7 +1646,7 @@ bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.colors@set: what stands at the place kern::Mesh::colors gives
-bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->colors);
@@ -1648,7 +1654,7 @@ bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.uvs: kern::Mesh::uvs
-bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->uvs);
@@ -1656,7 +1662,7 @@ bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.uvs@set: what stands at the place kern::Mesh::uvs gives
-bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->uvs);
@@ -1664,7 +1670,7 @@ bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.indices: kern::Mesh::indices
-bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<u32>>>(o, out, 0, self->indices);
@@ -1672,7 +1678,7 @@ bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.indices@set: what stands at the place kern::Mesh::indices gives
-bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<u32>>>(o, in, 1, self->indices);
@@ -1680,7 +1686,7 @@ bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.joints: kern::Mesh::joints
-bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->joints);
@@ -1688,7 +1694,7 @@ bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.joints@set: what stands at the place kern::Mesh::joints gives
-bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->joints);
@@ -1696,7 +1702,7 @@ bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.weights: kern::Mesh::weights
-bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->weights);
@@ -1704,7 +1710,7 @@ bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.weights@set: what stands at the place kern::Mesh::weights gives
-bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->weights);
@@ -1712,7 +1718,7 @@ bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.bones: kern::Mesh::bones
-bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->bones);
@@ -1720,7 +1726,7 @@ bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.bones@set: what stands at the place kern::Mesh::bones gives
-bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->bones);
@@ -1728,7 +1734,7 @@ bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.transforms: kern::Mesh::transforms
-bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->transforms);
@@ -1736,7 +1742,7 @@ bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.transforms@set: what stands at the place kern::Mesh::transforms gives
-bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->transforms);
@@ -1744,7 +1750,7 @@ bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.tints: kern::Mesh::tints
-bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->tints);
@@ -1752,7 +1758,7 @@ bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.tints@set: what stands at the place kern::Mesh::tints gives
-bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->tints);
@@ -1760,7 +1766,7 @@ bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.instance_normals: kern::Mesh::instance_normals
-bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Num<f32>>>(o, out, 0, self->instance_normals);
@@ -1768,7 +1774,7 @@ bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.instance_normals@set: what stands at the place kern::Mesh::instance_normals gives
-bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Num<f32>>>(o, in, 1, self->instance_normals);
@@ -1776,7 +1782,7 @@ bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.instance_count: kern::Mesh::instance_count
-bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->instance_count);
@@ -1784,7 +1790,7 @@ bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.instance_count@set: what stands at the place kern::Mesh::instance_count gives
-bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->instance_count);
@@ -1792,7 +1798,7 @@ bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.mirror: kern::Mesh::mirror
-bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u8>>(o, out, 0, self->mirror);
@@ -1800,7 +1806,7 @@ bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.mirror@set: what stands at the place kern::Mesh::mirror gives
-bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u8>>(o, in, 1, self->mirror);
@@ -1808,7 +1814,7 @@ bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.local_bounds: kern::Mesh::local_bounds
-bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, self->local_bounds);
@@ -1816,7 +1822,7 @@ bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.local_bounds@set: what stands at the place kern::Mesh::local_bounds gives
-bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Sphere>>(o, in, 1, self->local_bounds);
@@ -1824,7 +1830,7 @@ bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.world_bounds: kern::Mesh::world_bounds
-bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, self->world_bounds);
@@ -1832,7 +1838,7 @@ bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.world_bounds@set: what stands at the place kern::Mesh::world_bounds gives
-bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Sphere>>(o, in, 1, self->world_bounds);
@@ -1840,7 +1846,7 @@ bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.sort_distance: kern::Mesh::sort_distance
-bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<f32>>(o, out, 0, self->sort_distance);
@@ -1848,7 +1854,7 @@ bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.sort_distance@set: what stands at the place kern::Mesh::sort_distance gives
-bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<f32>>(o, in, 1, self->sort_distance);
@@ -1856,7 +1862,7 @@ bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.live_index: kern::Mesh::live_index
-bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->live_index);
@@ -1864,7 +1870,7 @@ bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.live_index@set: what stands at the place kern::Mesh::live_index gives
-bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c157_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->live_index);
@@ -1872,46 +1878,46 @@ bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.particles.make: kern::Particles::Particles
-bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Particles>(std::unique_ptr<kern::Particles>(new kern::Particles()))));
   return true;
 }
 
 // engine.particles.release: kern::Particles::~Particles
-bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "particles", r)) return false;
   return ev::release_of<kern::Particles>(o, r, "particles", "Particles");
 }
 
 // engine.program.make: kern::Program::Program
-bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Program>(std::unique_ptr<kern::Program>(new kern::Program()))));
   return true;
 }
 
 // engine.program.release: kern::Program::~Program
-bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "program", r)) return false;
   return ev::release_of<kern::Program>(o, r, "program", "Program");
 }
 
 // engine.renderer.make: kern::Renderer::Renderer
-bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::Renderer>(std::unique_ptr<kern::Renderer>(new kern::Renderer()))));
   return true;
 }
 
 // engine.renderer.release: kern::Renderer::~Renderer
-bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "renderer", r)) return false;
   return ev::release_of<kern::Renderer>(o, r, "renderer", "Renderer");
 }
 
 // engine.shader_extension.material_base: kern::ShaderExtension::material_base
-bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->material_base);
@@ -1919,7 +1925,7 @@ bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.material_base@set: what stands at the place kern::ShaderExtension::material_base gives
-bool c163_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c164_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->material_base);
@@ -1927,7 +1933,7 @@ bool c163_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.shader_extension.attribute_base: kern::ShaderExtension::attribute_base
-bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::give<ev::Num<u32>>(o, out, 0, self->attribute_base);
@@ -1935,7 +1941,7 @@ bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.attribute_base@set: what stands at the place kern::ShaderExtension::attribute_base gives
-bool c164_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c165_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::take<ev::Num<u32>>(o, in, 1, self->attribute_base);
@@ -1943,46 +1949,46 @@ bool c164_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.sky_pass.make: kern::SkyPass::SkyPass
-bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::SkyPass>(std::unique_ptr<kern::SkyPass>(new kern::SkyPass()))));
   return true;
 }
 
 // engine.sky_pass.release: kern::SkyPass::~SkyPass
-bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "sky_pass", r)) return false;
   return ev::release_of<kern::SkyPass>(o, r, "sky_pass", "SkyPass");
 }
 
 // engine.sun_shadow_map.make: kern::SunShadowMap::SunShadowMap
-bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::SunShadowMap>(std::unique_ptr<kern::SunShadowMap>(new kern::SunShadowMap()))));
   return true;
 }
 
 // engine.sun_shadow_map.release: kern::SunShadowMap::~SunShadowMap
-bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "sun_shadow_map", r)) return false;
   return ev::release_of<kern::SunShadowMap>(o, r, "sun_shadow_map", "SunShadowMap");
 }
 
 // engine.texture_desc.make: kern::TextureDesc::TextureDesc
-bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::TextureDesc>(std::unique_ptr<kern::TextureDesc>(new kern::TextureDesc()))));
   return true;
 }
 
 // engine.texture_desc.release: kern::TextureDesc::~TextureDesc
-bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "texture_desc", r)) return false;
   return ev::release_of<kern::TextureDesc>(o, r, "texture_desc", "TextureDesc");
 }
 
 // engine.texture_desc.width: kern::TextureDesc::width
-bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Num<i32>>(o, out, 0, self->width);
@@ -1990,7 +1996,7 @@ bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.width@set: what stands at the place kern::TextureDesc::width gives
-bool c171_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c172_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Num<i32>>(o, in, 1, self->width);
@@ -1998,7 +2004,7 @@ bool c171_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.height: kern::TextureDesc::height
-bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Num<i32>>(o, out, 0, self->height);
@@ -2006,7 +2012,7 @@ bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.height@set: what stands at the place kern::TextureDesc::height gives
-bool c172_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c173_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Num<i32>>(o, in, 1, self->height);
@@ -2014,7 +2020,7 @@ bool c172_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.mipmaps: kern::TextureDesc::mipmaps
-bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->mipmaps);
@@ -2022,7 +2028,7 @@ bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.mipmaps@set: what stands at the place kern::TextureDesc::mipmaps gives
-bool c173_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->mipmaps);
@@ -2030,7 +2036,7 @@ bool c173_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.repeat: kern::TextureDesc::repeat
-bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->repeat);
@@ -2038,7 +2044,7 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.repeat@set: what stands at the place kern::TextureDesc::repeat gives
-bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->repeat);
@@ -2046,7 +2052,7 @@ bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.nearest: kern::TextureDesc::nearest
-bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->nearest);
@@ -2054,7 +2060,7 @@ bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.nearest@set: what stands at the place kern::TextureDesc::nearest gives
-bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c176_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->nearest);
@@ -2062,13 +2068,13 @@ bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.uniform_cache.make: kern::UniformCache::UniformCache
-bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::UniformCache>(std::unique_ptr<kern::UniformCache>(new kern::UniformCache()))));
   return true;
 }
 
 // engine.uniform_cache.release: kern::UniformCache::~UniformCache
-bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "uniform_cache", r)) return false;
   return ev::release_of<kern::UniformCache>(o, r, "uniform_cache", "UniformCache");
@@ -2172,246 +2178,247 @@ i64 implements_ShaderExtension(EngineObjects& o, std::shared_ptr<Implementer> by
 }
 
 const EngineCall kCalls[] = {
-    {"engine.mesh.skinned", &c0},
-    {"engine.mesh.cull_mode", &c1},
-    {"engine.mesh.vertex_count", &c2},
-    {"engine.mesh.element_count", &c3},
-    {"engine.mesh.triangle_count", &c4},
-    {"engine.mesh.posed_vertex", &c5},
-    {"engine.bounding_sphere", &c6},
-    {"engine.mirror_state", &c7},
-    {"engine.apply_cull_mode", &c8},
-    {"engine.instanced_bounds", &c9},
-    {"engine.particles.init", &c10},
-    {"engine.particles.emit", &c11},
-    {"engine.particles.tick", &c12},
-    {"engine.particles.clear", &c13},
-    {"engine.particles.mesh_id", &c14},
-    {"engine.particles.active", &c15},
-    {"engine.particles.stats", &c16},
-    {"engine.light_pool.request", &c17},
-    {"engine.light_pool.resolve", &c18},
-    {"engine.light_pool.clear", &c19},
-    {"engine.sun_shadow_map.init", &c20},
-    {"engine.sun_shadow_map.destroy", &c21},
-    {"engine.sun_shadow_map.valid", &c22},
-    {"engine.sun_shadow_map.focus_key", &c23},
-    {"engine.sun_shadow_map.draw", &c24},
-    {"engine.sun_shadow_map.matrix", &c25},
-    {"engine.sun_shadow_map.depth_texture", &c26},
-    {"engine.sun_shadow_map.options", &c27},
-    {"engine.sun_shadow_map.set_filter", &c28},
-    {"engine.sun_shadow_map.extent", &c29},
-    {"engine.sky_pass.init", &c30},
-    {"engine.sky_pass.destroy", &c31},
-    {"engine.sky_pass.draw", &c32},
-    {"engine.bloom_pass.configure", &c33},
-    {"engine.bloom_pass.begin", &c34},
-    {"engine.bloom_pass.end", &c35},
-    {"engine.bloom_pass.destroy", &c36},
-    {"engine.bloom_pass.state", &c37},
-    {"engine.bloom_pass.depth_texture", &c38},
-    {"engine.bloom_pass.bind_scene", &c39},
-    {"engine.ambient_occlusion_pass.configure", &c40},
-    {"engine.ambient_occlusion_pass.set_radius", &c41},
-    {"engine.ambient_occlusion_pass.options", &c42},
-    {"engine.ambient_occlusion_pass.compute", &c43},
-    {"engine.ambient_occlusion_pass.texture", &c44},
-    {"engine.ambient_occlusion_pass.width", &c45},
-    {"engine.ambient_occlusion_pass.height", &c46},
-    {"engine.ambient_occlusion_pass.destroy", &c47},
-    {"engine.ambient_occlusion_pass.quality", &c48},
-    {"engine.ambient_occlusion_pass.half_resolution", &c49},
-    {"engine.program.build", &c50},
-    {"engine.program.destroy", &c51},
-    {"engine.program.handle", &c52},
-    {"engine.program.valid", &c53},
-    {"engine.program.location", &c54},
-    {"engine.program.use", &c55},
-    {"engine.uniform_cache.reset", &c56},
-    {"engine.uniform_cache.set_int", &c57},
-    {"engine.uniform_cache.set_float", &c58},
-    {"engine.uniform_cache.set_vec2", &c59},
-    {"engine.uniform_cache.set_vec3", &c60},
-    {"engine.uniform_cache.set_vec4", &c61},
-    {"engine.uniform_cache.set_vec4_array", &c62},
-    {"engine.uniform_cache.set_vec3_array", &c63},
-    {"engine.uniform_cache.set_mat4", &c64},
-    {"engine.uniform_cache.set_mat4_array", &c65},
-    {"engine.renderer.init", &c66},
-    {"engine.renderer.shutdown", &c67},
-    {"engine.renderer.resize", &c68},
-    {"engine.renderer.width", &c69},
-    {"engine.renderer.height", &c70},
-    {"engine.renderer.allocate_id", &c71},
-    {"engine.renderer.release_id", &c72},
-    {"engine.renderer.id_allocated", &c73},
-    {"engine.renderer.upsert", &c74},
-    {"engine.renderer.update_instances", &c75},
-    {"engine.renderer.update_bones", &c76},
-    {"engine.renderer.set_visible", &c77},
-    {"engine.renderer.remove", &c78},
-    {"engine.renderer.set_material", &c79},
-    {"engine.renderer.set_layers", &c80},
-    {"engine.renderer.mesh", &c81},
-    {"engine.renderer.meshes", &c82},
-    {"engine.renderer.mesh_count", &c83},
-    {"engine.renderer.create_texture", &c84},
-    {"engine.renderer.register_external_texture", &c85},
-    {"engine.renderer.create_render_target", &c86},
-    {"engine.renderer.delete_texture", &c87},
-    {"engine.renderer.camera", &c88},
-    {"engine.renderer.set_camera", &c89},
-    {"engine.renderer.lighting", &c90},
-    {"engine.renderer.set_lighting", &c91},
-    {"engine.renderer.sky", &c92},
-    {"engine.renderer.set_sky", &c93},
-    {"engine.renderer.set_point_lights", &c94},
-    {"engine.renderer.point_lights", &c95},
-    {"engine.renderer.set_shadows", &c96},
-    {"engine.renderer.set_shadow_distance", &c97},
-    {"engine.renderer.set_shadow_filter", &c98},
-    {"engine.renderer.set_ambient_occlusion", &c99},
-    {"engine.renderer.set_ambient_occlusion_radius", &c100},
-    {"engine.renderer.ambient_occlusion", &c101},
-    {"engine.renderer.shadow", &c102},
-    {"engine.renderer.invalidate", &c103},
-    {"engine.renderer.scene_revision", &c104},
-    {"engine.renderer.render", &c105},
-    {"engine.renderer.last_stats", &c106},
-    {"engine.renderer.screen_ray", &c107},
-    {"engine.renderer.context_lost", &c108},
-    {"engine.renderer.context_restored", &c109},
-    {"engine.renderer.lost", &c110},
-    {"engine.renderer.set_headless", &c111},
-    {"engine.renderer.extensions", &c112},
-    {"engine.shader_extension.name", &c113},
-    {"engine.shader_extension.attributes", &c114},
-    {"engine.shader_extension.vertex_declarations", &c115},
-    {"engine.shader_extension.vertex", &c116},
-    {"engine.shader_extension.fragment_declarations", &c117},
-    {"engine.shader_extension.fragment_discard", &c118},
-    {"engine.shader_extension.fragment_input", &c119},
-    {"engine.shader_extension.fragment_surface", &c120},
-    {"engine.shader_extension.bind", &c121},
-    {"engine.shader_extension.frame_uniforms", &c122},
-    {"engine.shader_extension.material_uniforms", &c123},
-    {"engine.build_standard_shader", &c124},
-    {"engine.ambient_occlusion_pass.make", &c125},
-    {"engine.ambient_occlusion_pass.release", &c126},
-    {"engine.bloom_pass.make", &c127},
-    {"engine.bloom_pass.release", &c128},
-    {"engine.light_pool.make", &c129},
-    {"engine.light_pool.release", &c130},
-    {"engine.mesh.make", &c131},
-    {"engine.mesh.release", &c132},
-    {"engine.mesh.id", &c133},
-    {"engine.mesh.visible", &c134},
-    {"engine.mesh.layers", &c135},
-    {"engine.mesh.pick_bvh", &c136},
-    {"engine.mesh.linear_colors", &c137},
-    {"engine.mesh.material", &c138},
-    {"engine.mesh.texture", &c139},
-    {"engine.mesh.positions", &c140},
-    {"engine.mesh.normals", &c141},
-    {"engine.mesh.colors", &c142},
-    {"engine.mesh.uvs", &c143},
-    {"engine.mesh.indices", &c144},
-    {"engine.mesh.joints", &c145},
-    {"engine.mesh.weights", &c146},
-    {"engine.mesh.bones", &c147},
-    {"engine.mesh.transforms", &c148},
-    {"engine.mesh.tints", &c149},
-    {"engine.mesh.instance_normals", &c150},
-    {"engine.mesh.instance_count", &c151},
-    {"engine.mesh.mirror", &c152},
-    {"engine.mesh.local_bounds", &c153},
-    {"engine.mesh.world_bounds", &c154},
-    {"engine.mesh.sort_distance", &c155},
-    {"engine.mesh.live_index", &c156},
-    {"engine.particles.make", &c157},
-    {"engine.particles.release", &c158},
-    {"engine.program.make", &c159},
-    {"engine.program.release", &c160},
-    {"engine.renderer.make", &c161},
-    {"engine.renderer.release", &c162},
-    {"engine.shader_extension.material_base", &c163},
-    {"engine.shader_extension.attribute_base", &c164},
-    {"engine.sky_pass.make", &c165},
-    {"engine.sky_pass.release", &c166},
-    {"engine.sun_shadow_map.make", &c167},
-    {"engine.sun_shadow_map.release", &c168},
-    {"engine.texture_desc.make", &c169},
-    {"engine.texture_desc.release", &c170},
-    {"engine.texture_desc.width", &c171},
-    {"engine.texture_desc.height", &c172},
-    {"engine.texture_desc.mipmaps", &c173},
-    {"engine.texture_desc.repeat", &c174},
-    {"engine.texture_desc.nearest", &c175},
-    {"engine.uniform_cache.make", &c176},
-    {"engine.uniform_cache.release", &c177},
-    {"engine.mesh.id@get", &c133},
-    {"engine.mesh.id@set", &c133_set},
-    {"engine.mesh.visible@get", &c134},
-    {"engine.mesh.visible@set", &c134_set},
-    {"engine.mesh.layers@get", &c135},
-    {"engine.mesh.layers@set", &c135_set},
-    {"engine.mesh.pick_bvh@get", &c136},
-    {"engine.mesh.pick_bvh@set", &c136_set},
-    {"engine.mesh.linear_colors@get", &c137},
-    {"engine.mesh.linear_colors@set", &c137_set},
-    {"engine.mesh.material@get", &c138},
-    {"engine.mesh.material@set", &c138_set},
-    {"engine.mesh.texture@get", &c139},
-    {"engine.mesh.texture@set", &c139_set},
-    {"engine.mesh.positions@get", &c140},
-    {"engine.mesh.positions@set", &c140_set},
-    {"engine.mesh.normals@get", &c141},
-    {"engine.mesh.normals@set", &c141_set},
-    {"engine.mesh.colors@get", &c142},
-    {"engine.mesh.colors@set", &c142_set},
-    {"engine.mesh.uvs@get", &c143},
-    {"engine.mesh.uvs@set", &c143_set},
-    {"engine.mesh.indices@get", &c144},
-    {"engine.mesh.indices@set", &c144_set},
-    {"engine.mesh.joints@get", &c145},
-    {"engine.mesh.joints@set", &c145_set},
-    {"engine.mesh.weights@get", &c146},
-    {"engine.mesh.weights@set", &c146_set},
-    {"engine.mesh.bones@get", &c147},
-    {"engine.mesh.bones@set", &c147_set},
-    {"engine.mesh.transforms@get", &c148},
-    {"engine.mesh.transforms@set", &c148_set},
-    {"engine.mesh.tints@get", &c149},
-    {"engine.mesh.tints@set", &c149_set},
-    {"engine.mesh.instance_normals@get", &c150},
-    {"engine.mesh.instance_normals@set", &c150_set},
-    {"engine.mesh.instance_count@get", &c151},
-    {"engine.mesh.instance_count@set", &c151_set},
-    {"engine.mesh.mirror@get", &c152},
-    {"engine.mesh.mirror@set", &c152_set},
-    {"engine.mesh.local_bounds@get", &c153},
-    {"engine.mesh.local_bounds@set", &c153_set},
-    {"engine.mesh.world_bounds@get", &c154},
-    {"engine.mesh.world_bounds@set", &c154_set},
-    {"engine.mesh.sort_distance@get", &c155},
-    {"engine.mesh.sort_distance@set", &c155_set},
-    {"engine.mesh.live_index@get", &c156},
-    {"engine.mesh.live_index@set", &c156_set},
-    {"engine.shader_extension.material_base@get", &c163},
-    {"engine.shader_extension.material_base@set", &c163_set},
-    {"engine.shader_extension.attribute_base@get", &c164},
-    {"engine.shader_extension.attribute_base@set", &c164_set},
-    {"engine.texture_desc.width@get", &c171},
-    {"engine.texture_desc.width@set", &c171_set},
-    {"engine.texture_desc.height@get", &c172},
-    {"engine.texture_desc.height@set", &c172_set},
-    {"engine.texture_desc.mipmaps@get", &c173},
-    {"engine.texture_desc.mipmaps@set", &c173_set},
-    {"engine.texture_desc.repeat@get", &c174},
-    {"engine.texture_desc.repeat@set", &c174_set},
-    {"engine.texture_desc.nearest@get", &c175},
-    {"engine.texture_desc.nearest@set", &c175_set},
+    {"engine.gl.has_extension", &c0},
+    {"engine.material.casts_shadow", &c1},
+    {"engine.mesh.skinned", &c2},
+    {"engine.mesh.cull_mode", &c3},
+    {"engine.mesh.vertex_count", &c4},
+    {"engine.mesh.element_count", &c5},
+    {"engine.mesh.triangle_count", &c6},
+    {"engine.mesh.posed_vertex", &c7},
+    {"engine.bounding_sphere", &c8},
+    {"engine.mirror_state", &c9},
+    {"engine.apply_cull_mode", &c10},
+    {"engine.instanced_bounds", &c11},
+    {"engine.particles.init", &c12},
+    {"engine.particles.emit", &c13},
+    {"engine.particles.tick", &c14},
+    {"engine.particles.clear", &c15},
+    {"engine.particles.mesh_id", &c16},
+    {"engine.particles.active", &c17},
+    {"engine.particles.stats", &c18},
+    {"engine.light_pool.request", &c19},
+    {"engine.light_pool.resolve", &c20},
+    {"engine.light_pool.clear", &c21},
+    {"engine.sun_shadow_map.init", &c22},
+    {"engine.sun_shadow_map.destroy", &c23},
+    {"engine.sun_shadow_map.valid", &c24},
+    {"engine.sun_shadow_map.focus_key", &c25},
+    {"engine.sun_shadow_map.draw", &c26},
+    {"engine.sun_shadow_map.matrix", &c27},
+    {"engine.sun_shadow_map.depth_texture", &c28},
+    {"engine.sun_shadow_map.options", &c29},
+    {"engine.sun_shadow_map.set_filter", &c30},
+    {"engine.sun_shadow_map.extent", &c31},
+    {"engine.sky_pass.init", &c32},
+    {"engine.sky_pass.destroy", &c33},
+    {"engine.sky_pass.draw", &c34},
+    {"engine.bloom_pass.configure", &c35},
+    {"engine.bloom_pass.begin", &c36},
+    {"engine.bloom_pass.end", &c37},
+    {"engine.bloom_pass.destroy", &c38},
+    {"engine.bloom_pass.state", &c39},
+    {"engine.bloom_pass.depth_texture", &c40},
+    {"engine.bloom_pass.bind_scene", &c41},
+    {"engine.ambient_occlusion_pass.configure", &c42},
+    {"engine.ambient_occlusion_pass.set_radius", &c43},
+    {"engine.ambient_occlusion_pass.options", &c44},
+    {"engine.ambient_occlusion_pass.compute", &c45},
+    {"engine.ambient_occlusion_pass.texture", &c46},
+    {"engine.ambient_occlusion_pass.width", &c47},
+    {"engine.ambient_occlusion_pass.height", &c48},
+    {"engine.ambient_occlusion_pass.destroy", &c49},
+    {"engine.ambient_occlusion_pass.quality", &c50},
+    {"engine.ambient_occlusion_pass.half_resolution", &c51},
+    {"engine.program.build", &c52},
+    {"engine.program.destroy", &c53},
+    {"engine.program.handle", &c54},
+    {"engine.program.valid", &c55},
+    {"engine.program.location", &c56},
+    {"engine.program.use", &c57},
+    {"engine.uniform_cache.reset", &c58},
+    {"engine.uniform_cache.set_int", &c59},
+    {"engine.uniform_cache.set_float", &c60},
+    {"engine.uniform_cache.set_vec2", &c61},
+    {"engine.uniform_cache.set_vec3", &c62},
+    {"engine.uniform_cache.set_vec4", &c63},
+    {"engine.uniform_cache.set_vec4_array", &c64},
+    {"engine.uniform_cache.set_vec3_array", &c65},
+    {"engine.uniform_cache.set_mat4", &c66},
+    {"engine.renderer.init", &c67},
+    {"engine.renderer.shutdown", &c68},
+    {"engine.renderer.resize", &c69},
+    {"engine.renderer.width", &c70},
+    {"engine.renderer.height", &c71},
+    {"engine.renderer.allocate_id", &c72},
+    {"engine.renderer.release_id", &c73},
+    {"engine.renderer.id_allocated", &c74},
+    {"engine.renderer.upsert", &c75},
+    {"engine.renderer.update_instances", &c76},
+    {"engine.renderer.update_bones", &c77},
+    {"engine.renderer.set_visible", &c78},
+    {"engine.renderer.remove", &c79},
+    {"engine.renderer.set_material", &c80},
+    {"engine.renderer.set_layers", &c81},
+    {"engine.renderer.mesh", &c82},
+    {"engine.renderer.meshes", &c83},
+    {"engine.renderer.mesh_count", &c84},
+    {"engine.renderer.create_texture", &c85},
+    {"engine.renderer.register_external_texture", &c86},
+    {"engine.renderer.create_render_target", &c87},
+    {"engine.renderer.delete_texture", &c88},
+    {"engine.renderer.camera", &c89},
+    {"engine.renderer.set_camera", &c90},
+    {"engine.renderer.lighting", &c91},
+    {"engine.renderer.set_lighting", &c92},
+    {"engine.renderer.sky", &c93},
+    {"engine.renderer.set_sky", &c94},
+    {"engine.renderer.set_point_lights", &c95},
+    {"engine.renderer.point_lights", &c96},
+    {"engine.renderer.set_shadows", &c97},
+    {"engine.renderer.set_shadow_distance", &c98},
+    {"engine.renderer.set_shadow_filter", &c99},
+    {"engine.renderer.set_ambient_occlusion", &c100},
+    {"engine.renderer.set_ambient_occlusion_radius", &c101},
+    {"engine.renderer.ambient_occlusion", &c102},
+    {"engine.renderer.shadow", &c103},
+    {"engine.renderer.invalidate", &c104},
+    {"engine.renderer.scene_revision", &c105},
+    {"engine.renderer.render", &c106},
+    {"engine.renderer.last_stats", &c107},
+    {"engine.renderer.screen_ray", &c108},
+    {"engine.renderer.context_lost", &c109},
+    {"engine.renderer.context_restored", &c110},
+    {"engine.renderer.lost", &c111},
+    {"engine.renderer.set_headless", &c112},
+    {"engine.renderer.extensions", &c113},
+    {"engine.shader_extension.name", &c114},
+    {"engine.shader_extension.attributes", &c115},
+    {"engine.shader_extension.vertex_declarations", &c116},
+    {"engine.shader_extension.vertex", &c117},
+    {"engine.shader_extension.fragment_declarations", &c118},
+    {"engine.shader_extension.fragment_discard", &c119},
+    {"engine.shader_extension.fragment_input", &c120},
+    {"engine.shader_extension.fragment_surface", &c121},
+    {"engine.shader_extension.bind", &c122},
+    {"engine.shader_extension.frame_uniforms", &c123},
+    {"engine.shader_extension.material_uniforms", &c124},
+    {"engine.build_standard_shader", &c125},
+    {"engine.ambient_occlusion_pass.make", &c126},
+    {"engine.ambient_occlusion_pass.release", &c127},
+    {"engine.bloom_pass.make", &c128},
+    {"engine.bloom_pass.release", &c129},
+    {"engine.light_pool.make", &c130},
+    {"engine.light_pool.release", &c131},
+    {"engine.mesh.make", &c132},
+    {"engine.mesh.release", &c133},
+    {"engine.mesh.id", &c134},
+    {"engine.mesh.visible", &c135},
+    {"engine.mesh.layers", &c136},
+    {"engine.mesh.pick_bvh", &c137},
+    {"engine.mesh.linear_colors", &c138},
+    {"engine.mesh.material", &c139},
+    {"engine.mesh.texture", &c140},
+    {"engine.mesh.positions", &c141},
+    {"engine.mesh.normals", &c142},
+    {"engine.mesh.colors", &c143},
+    {"engine.mesh.uvs", &c144},
+    {"engine.mesh.indices", &c145},
+    {"engine.mesh.joints", &c146},
+    {"engine.mesh.weights", &c147},
+    {"engine.mesh.bones", &c148},
+    {"engine.mesh.transforms", &c149},
+    {"engine.mesh.tints", &c150},
+    {"engine.mesh.instance_normals", &c151},
+    {"engine.mesh.instance_count", &c152},
+    {"engine.mesh.mirror", &c153},
+    {"engine.mesh.local_bounds", &c154},
+    {"engine.mesh.world_bounds", &c155},
+    {"engine.mesh.sort_distance", &c156},
+    {"engine.mesh.live_index", &c157},
+    {"engine.particles.make", &c158},
+    {"engine.particles.release", &c159},
+    {"engine.program.make", &c160},
+    {"engine.program.release", &c161},
+    {"engine.renderer.make", &c162},
+    {"engine.renderer.release", &c163},
+    {"engine.shader_extension.material_base", &c164},
+    {"engine.shader_extension.attribute_base", &c165},
+    {"engine.sky_pass.make", &c166},
+    {"engine.sky_pass.release", &c167},
+    {"engine.sun_shadow_map.make", &c168},
+    {"engine.sun_shadow_map.release", &c169},
+    {"engine.texture_desc.make", &c170},
+    {"engine.texture_desc.release", &c171},
+    {"engine.texture_desc.width", &c172},
+    {"engine.texture_desc.height", &c173},
+    {"engine.texture_desc.mipmaps", &c174},
+    {"engine.texture_desc.repeat", &c175},
+    {"engine.texture_desc.nearest", &c176},
+    {"engine.uniform_cache.make", &c177},
+    {"engine.uniform_cache.release", &c178},
+    {"engine.mesh.id@get", &c134},
+    {"engine.mesh.id@set", &c134_set},
+    {"engine.mesh.visible@get", &c135},
+    {"engine.mesh.visible@set", &c135_set},
+    {"engine.mesh.layers@get", &c136},
+    {"engine.mesh.layers@set", &c136_set},
+    {"engine.mesh.pick_bvh@get", &c137},
+    {"engine.mesh.pick_bvh@set", &c137_set},
+    {"engine.mesh.linear_colors@get", &c138},
+    {"engine.mesh.linear_colors@set", &c138_set},
+    {"engine.mesh.material@get", &c139},
+    {"engine.mesh.material@set", &c139_set},
+    {"engine.mesh.texture@get", &c140},
+    {"engine.mesh.texture@set", &c140_set},
+    {"engine.mesh.positions@get", &c141},
+    {"engine.mesh.positions@set", &c141_set},
+    {"engine.mesh.normals@get", &c142},
+    {"engine.mesh.normals@set", &c142_set},
+    {"engine.mesh.colors@get", &c143},
+    {"engine.mesh.colors@set", &c143_set},
+    {"engine.mesh.uvs@get", &c144},
+    {"engine.mesh.uvs@set", &c144_set},
+    {"engine.mesh.indices@get", &c145},
+    {"engine.mesh.indices@set", &c145_set},
+    {"engine.mesh.joints@get", &c146},
+    {"engine.mesh.joints@set", &c146_set},
+    {"engine.mesh.weights@get", &c147},
+    {"engine.mesh.weights@set", &c147_set},
+    {"engine.mesh.bones@get", &c148},
+    {"engine.mesh.bones@set", &c148_set},
+    {"engine.mesh.transforms@get", &c149},
+    {"engine.mesh.transforms@set", &c149_set},
+    {"engine.mesh.tints@get", &c150},
+    {"engine.mesh.tints@set", &c150_set},
+    {"engine.mesh.instance_normals@get", &c151},
+    {"engine.mesh.instance_normals@set", &c151_set},
+    {"engine.mesh.instance_count@get", &c152},
+    {"engine.mesh.instance_count@set", &c152_set},
+    {"engine.mesh.mirror@get", &c153},
+    {"engine.mesh.mirror@set", &c153_set},
+    {"engine.mesh.local_bounds@get", &c154},
+    {"engine.mesh.local_bounds@set", &c154_set},
+    {"engine.mesh.world_bounds@get", &c155},
+    {"engine.mesh.world_bounds@set", &c155_set},
+    {"engine.mesh.sort_distance@get", &c156},
+    {"engine.mesh.sort_distance@set", &c156_set},
+    {"engine.mesh.live_index@get", &c157},
+    {"engine.mesh.live_index@set", &c157_set},
+    {"engine.shader_extension.material_base@get", &c164},
+    {"engine.shader_extension.material_base@set", &c164_set},
+    {"engine.shader_extension.attribute_base@get", &c165},
+    {"engine.shader_extension.attribute_base@set", &c165_set},
+    {"engine.texture_desc.width@get", &c172},
+    {"engine.texture_desc.width@set", &c172_set},
+    {"engine.texture_desc.height@get", &c173},
+    {"engine.texture_desc.height@set", &c173_set},
+    {"engine.texture_desc.mipmaps@get", &c174},
+    {"engine.texture_desc.mipmaps@set", &c174_set},
+    {"engine.texture_desc.repeat@get", &c175},
+    {"engine.texture_desc.repeat@set", &c175_set},
+    {"engine.texture_desc.nearest@get", &c176},
+    {"engine.texture_desc.nearest@set", &c176_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

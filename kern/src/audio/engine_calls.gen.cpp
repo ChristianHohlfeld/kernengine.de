@@ -80,8 +80,26 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   return true;
 }
 
-// engine.mixer.init: kern::audio::Mixer::init
+// engine.audio.db_to_gain: kern::audio::db_to_gain
 bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<float>>();
+  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  decltype(auto) r = kern::audio::db_to_gain(std::move(a0));
+  ev::give<ev::Num<f32>>(o, out, 0, r);
+  return true;
+}
+
+// engine.audio.gain_to_db: kern::audio::gain_to_db
+bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<float>>();
+  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  decltype(auto) r = kern::audio::gain_to_db(std::move(a0));
+  ev::give<ev::Num<f32>>(o, out, 0, r);
+  return true;
+}
+
+// engine.mixer.init: kern::audio::Mixer::init
+bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -94,7 +112,7 @@ bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.sample_rate: kern::audio::Mixer::sample_rate
-bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   decltype(auto) r = self->sample_rate();
@@ -103,7 +121,7 @@ bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.ready: kern::audio::Mixer::ready
-bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   decltype(auto) r = self->ready();
@@ -112,7 +130,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.create_clip: kern::audio::Mixer::create_clip
-bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   std::vector<float> a0;
@@ -132,7 +150,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.adopt_clip: kern::audio::Mixer::adopt_clip
-bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >>>();
@@ -149,7 +167,7 @@ bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.destroy_clip: kern::audio::Mixer::destroy_clip
-bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -160,7 +178,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 }
 
 // engine.mixer.clip_info: kern::audio::Mixer::clip_info
-bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -171,7 +189,7 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.clip_samples: kern::audio::Mixer::clip_samples
-bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -182,7 +200,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.clip_count: kern::audio::Mixer::clip_count
-bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   decltype(auto) r = self->clip_count();
@@ -191,7 +209,7 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.play: kern::audio::Mixer::play
-bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -204,7 +222,7 @@ bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.stop: kern::audio::Mixer::stop
-bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -216,7 +234,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.stop_all: kern::audio::Mixer::stop_all
-bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
@@ -228,7 +246,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.playing: kern::audio::Mixer::playing
-bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -239,7 +257,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_volume: kern::audio::Mixer::set_volume
-bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -253,7 +271,7 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_pitch: kern::audio::Mixer::set_pitch
-bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -265,7 +283,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_pan: kern::audio::Mixer::set_pan
-bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -277,7 +295,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_position: kern::audio::Mixer::set_position
-bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -291,7 +309,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_paused: kern::audio::Mixer::set_paused
-bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -303,7 +321,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_all_paused: kern::audio::Mixer::set_all_paused
-bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -313,7 +331,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.position_of: kern::audio::Mixer::position_of
-bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
@@ -324,7 +342,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_listener: kern::audio::Mixer::set_listener
-bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Listener const&>>();
@@ -334,7 +352,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.listener: kern::audio::Mixer::listener
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   decltype(auto) r = self->listener();
@@ -343,7 +361,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.bus: kern::audio::Mixer::bus
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
@@ -355,7 +373,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.bus@set: what stands at the place kern::audio::Mixer::bus gives
-bool c26_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c28_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
@@ -366,7 +384,7 @@ bool c26_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.mixer.bus_2: kern::audio::Mixer::bus
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
@@ -377,7 +395,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.set_reverb: kern::audio::Mixer::set_reverb
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -391,7 +409,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.render: kern::audio::Mixer::render
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<2u>>>();
@@ -404,7 +422,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.stats: kern::audio::Mixer::stats
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   decltype(auto) r = self->stats();
@@ -413,7 +431,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.synthesize: kern::audio::synthesize
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::SynthPatch const&>>();
   ev::take<ev::Struct<S_audio_SynthPatch>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -424,7 +442,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.mix_into: kern::audio::mix_into
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >&>>();
   ev::take<ev::List<ev::Num<f32>>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> > const&>>();
@@ -441,7 +459,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.make_seamless: kern::audio::make_seamless
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >&>>();
   ev::take<ev::List<ev::Num<f32>>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -454,7 +472,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.normalize: kern::audio::normalize
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >&>>();
   ev::take<ev::List<ev::Num<f32>>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
@@ -465,14 +483,14 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.builtin_sounds: kern::audio::builtin_sounds
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::audio::builtin_sounds();
   ev::give<ev::List<ev::Struct<S_audio_BuiltinSound>>>(o, out, 0, r);
   return true;
 }
 
 // engine.audio.find_builtin: kern::audio::find_builtin
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::string a0;
   ev::take<ev::Text>(o, in, 0, a0);
   decltype(auto) r = kern::audio::find_builtin(a0);
@@ -481,7 +499,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.audio.render_builtin: kern::audio::render_builtin
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::string a0;
   ev::take<ev::Text>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -498,7 +516,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.start: kern::audio::BuiltinJob::start
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::BuiltinJob>(o, in, 0, "builtin_job");
   if (!self) return false;
   std::string a0;
@@ -511,7 +529,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.step: kern::audio::BuiltinJob::step
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::BuiltinJob>(o, in, 0, "builtin_job");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -522,7 +540,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.done: kern::audio::BuiltinJob::done
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::BuiltinJob>(o, in, 0, "builtin_job");
   if (!self) return false;
   decltype(auto) r = self->done();
@@ -531,7 +549,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.name: kern::audio::BuiltinJob::name
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::BuiltinJob>(o, in, 0, "builtin_job");
   if (!self) return false;
   decltype(auto) r = self->name();
@@ -540,7 +558,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.take: kern::audio::BuiltinJob::take
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::BuiltinJob>(o, in, 0, "builtin_job");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int&>>();
@@ -552,33 +570,33 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.builtin_job.make: kern::audio::BuiltinJob::BuiltinJob
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::audio::BuiltinJob>(std::unique_ptr<kern::audio::BuiltinJob>(new kern::audio::BuiltinJob()))));
   return true;
 }
 
 // engine.builtin_job.release: kern::audio::BuiltinJob::~BuiltinJob
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "builtin_job", r)) return false;
   return ev::release_of<kern::audio::BuiltinJob>(o, r, "builtin_job", "BuiltinJob");
 }
 
 // engine.mixer.make: kern::audio::Mixer::Mixer
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::object(o.ref(o.own<kern::audio::Mixer>(std::unique_ptr<kern::audio::Mixer>(new kern::audio::Mixer()))));
   return true;
 }
 
 // engine.mixer.release: kern::audio::Mixer::~Mixer
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   ObjectRef r;
   if (!ev::object_ref(o, in, 0, "mixer", r)) return false;
   return ev::release_of<kern::audio::Mixer>(o, r, "mixer", "Mixer");
 }
 
 // engine.mixer.speed_of_sound: kern::audio::Mixer::speed_of_sound
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   ev::give<ev::Num<f32>>(o, out, 0, self->speed_of_sound);
@@ -586,7 +604,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.speed_of_sound@set: what stands at the place kern::audio::Mixer::speed_of_sound gives
-bool c47_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c49_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   ev::take<ev::Num<f32>>(o, in, 1, self->speed_of_sound);
@@ -594,7 +612,7 @@ bool c47_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.mixer.doppler_factor: kern::audio::Mixer::doppler_factor
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   ev::give<ev::Num<f32>>(o, out, 0, self->doppler_factor);
@@ -602,7 +620,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.mixer.doppler_factor@set: what stands at the place kern::audio::Mixer::doppler_factor gives
-bool c48_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c50_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   ev::take<ev::Num<f32>>(o, in, 1, self->doppler_factor);
@@ -614,57 +632,59 @@ const EngineCall kCalls[] = {
     {"engine.audio.parse_bus", &c1},
     {"engine.audio.rolloff_name", &c2},
     {"engine.audio.parse_rolloff", &c3},
-    {"engine.mixer.init", &c4},
-    {"engine.mixer.sample_rate", &c5},
-    {"engine.mixer.ready", &c6},
-    {"engine.mixer.create_clip", &c7},
-    {"engine.mixer.adopt_clip", &c8},
-    {"engine.mixer.destroy_clip", &c9},
-    {"engine.mixer.clip_info", &c10},
-    {"engine.mixer.clip_samples", &c11},
-    {"engine.mixer.clip_count", &c12},
-    {"engine.mixer.play", &c13},
-    {"engine.mixer.stop", &c14},
-    {"engine.mixer.stop_all", &c15},
-    {"engine.mixer.playing", &c16},
-    {"engine.mixer.set_volume", &c17},
-    {"engine.mixer.set_pitch", &c18},
-    {"engine.mixer.set_pan", &c19},
-    {"engine.mixer.set_position", &c20},
-    {"engine.mixer.set_paused", &c21},
-    {"engine.mixer.set_all_paused", &c22},
-    {"engine.mixer.position_of", &c23},
-    {"engine.mixer.set_listener", &c24},
-    {"engine.mixer.listener", &c25},
-    {"engine.mixer.bus", &c26},
-    {"engine.mixer.bus_2", &c27},
-    {"engine.mixer.set_reverb", &c28},
-    {"engine.mixer.render", &c29},
-    {"engine.mixer.stats", &c30},
-    {"engine.audio.synthesize", &c31},
-    {"engine.audio.mix_into", &c32},
-    {"engine.audio.make_seamless", &c33},
-    {"engine.audio.normalize", &c34},
-    {"engine.audio.builtin_sounds", &c35},
-    {"engine.audio.find_builtin", &c36},
-    {"engine.audio.render_builtin", &c37},
-    {"engine.builtin_job.start", &c38},
-    {"engine.builtin_job.step", &c39},
-    {"engine.builtin_job.done", &c40},
-    {"engine.builtin_job.name", &c41},
-    {"engine.builtin_job.take", &c42},
-    {"engine.builtin_job.make", &c43},
-    {"engine.builtin_job.release", &c44},
-    {"engine.mixer.make", &c45},
-    {"engine.mixer.release", &c46},
-    {"engine.mixer.speed_of_sound", &c47},
-    {"engine.mixer.doppler_factor", &c48},
-    {"engine.mixer.bus@get", &c26},
-    {"engine.mixer.bus@set", &c26_set},
-    {"engine.mixer.speed_of_sound@get", &c47},
-    {"engine.mixer.speed_of_sound@set", &c47_set},
-    {"engine.mixer.doppler_factor@get", &c48},
-    {"engine.mixer.doppler_factor@set", &c48_set},
+    {"engine.audio.db_to_gain", &c4},
+    {"engine.audio.gain_to_db", &c5},
+    {"engine.mixer.init", &c6},
+    {"engine.mixer.sample_rate", &c7},
+    {"engine.mixer.ready", &c8},
+    {"engine.mixer.create_clip", &c9},
+    {"engine.mixer.adopt_clip", &c10},
+    {"engine.mixer.destroy_clip", &c11},
+    {"engine.mixer.clip_info", &c12},
+    {"engine.mixer.clip_samples", &c13},
+    {"engine.mixer.clip_count", &c14},
+    {"engine.mixer.play", &c15},
+    {"engine.mixer.stop", &c16},
+    {"engine.mixer.stop_all", &c17},
+    {"engine.mixer.playing", &c18},
+    {"engine.mixer.set_volume", &c19},
+    {"engine.mixer.set_pitch", &c20},
+    {"engine.mixer.set_pan", &c21},
+    {"engine.mixer.set_position", &c22},
+    {"engine.mixer.set_paused", &c23},
+    {"engine.mixer.set_all_paused", &c24},
+    {"engine.mixer.position_of", &c25},
+    {"engine.mixer.set_listener", &c26},
+    {"engine.mixer.listener", &c27},
+    {"engine.mixer.bus", &c28},
+    {"engine.mixer.bus_2", &c29},
+    {"engine.mixer.set_reverb", &c30},
+    {"engine.mixer.render", &c31},
+    {"engine.mixer.stats", &c32},
+    {"engine.audio.synthesize", &c33},
+    {"engine.audio.mix_into", &c34},
+    {"engine.audio.make_seamless", &c35},
+    {"engine.audio.normalize", &c36},
+    {"engine.audio.builtin_sounds", &c37},
+    {"engine.audio.find_builtin", &c38},
+    {"engine.audio.render_builtin", &c39},
+    {"engine.builtin_job.start", &c40},
+    {"engine.builtin_job.step", &c41},
+    {"engine.builtin_job.done", &c42},
+    {"engine.builtin_job.name", &c43},
+    {"engine.builtin_job.take", &c44},
+    {"engine.builtin_job.make", &c45},
+    {"engine.builtin_job.release", &c46},
+    {"engine.mixer.make", &c47},
+    {"engine.mixer.release", &c48},
+    {"engine.mixer.speed_of_sound", &c49},
+    {"engine.mixer.doppler_factor", &c50},
+    {"engine.mixer.bus@get", &c28},
+    {"engine.mixer.bus@set", &c28_set},
+    {"engine.mixer.speed_of_sound@get", &c49},
+    {"engine.mixer.speed_of_sound@set", &c49_set},
+    {"engine.mixer.doppler_factor@get", &c50},
+    {"engine.mixer.doppler_factor@set", &c50_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
