@@ -8513,7 +8513,7 @@ TEST(program_world_has_the_project) {
   std::string error;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8523,7 +8523,7 @@ TEST(program_world_has_the_project) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   game::Project pr;
