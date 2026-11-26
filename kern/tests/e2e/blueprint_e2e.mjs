@@ -625,13 +625,18 @@ const varName = page.locator('.lg-dbody [data-vk="name"]');
 await until(async () => await varName.count() === 1);
 await varName.fill("Pace");
 await varName.press("Enter");
+// (Details is drawn anew for the renamed variable: a field is typed into once that is done - the editor draws with its next frames)
+const drawn = async () => { const f = await page.evaluate(() => window.KernStudio.frames()); await page.waitForFunction(f => window.KernStudio.frames() >= f + 3, f); };
+await until(async () => (await vars())[0].name === "Pace" && await page.locator('.lg-dbody [data-vk="name"]').inputValue() === "Pace");
+await drawn();
 check(await until(async () => (await vars())[0].name === "Pace" && await page.locator('.lg-dbody [data-vk="type"] option:checked').count() === 1) &&
       (await page.locator('.lg-dbody [data-vk="type"] option:checked').textContent()) === "Float (f32)", "Details says its type: Float (f32)");
 const paceValue = page.locator('.lg-dbody [data-vk="value"]');
 await paceValue.fill("0.1");
 await paceValue.press("Enter");
-check(await until(async () => (await vars())[0].value === Math.fround(0.1)), "0.1 typed in is the f32 nearest to it (0.1f in C++), not the double");
-check(await until(async () => await page.locator('.lg-dbody [data-vk="value"]').inputValue() === "0.1"), "and is shown in the shortest form that gives that f32");
+check(await until(async () => (await vars())[0].value === Math.fround(0.1)), `0.1 typed in is the f32 nearest to it (0.1f in C++), not the double (${(await vars())[0].value})`);
+await drawn();
+check(await until(async () => await page.locator('.lg-dbody [data-vk="value"]').inputValue() === "0.1"), `and is shown in the shortest form that gives that f32 (${await page.locator('.lg-dbody [data-vk="value"]').inputValue()})`);
 await paceValue.fill("abc");
 await paceValue.press("Enter");
 check(await until(async () => await page.locator('.lg-dbody [data-vk="value"].lg-bad').count() === 1) && /is no f32/.test(await paceValue.getAttribute("title")) && (await vars())[0].value === Math.fround(0.1),
