@@ -281,7 +281,7 @@ check worldrules "bind(world): the Actor of the world's actor of its name (GameW
 check worldrules "... of that world" yes 'actor_named = engine_game_world_actor_named\(world[_0-9]*, "Lamps"\);'
 check worldrules "... and what it gives: Has Blueprint of it" yes 'return \{func_has_blueprint\(worldrules_g_lamps\)\};'
 check worldrules "a call goes to that Actor (Call on Actor)" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, '
-check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", Float>\(worldrules_g_lamps\)'
+check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", f64>\(worldrules_g_lamps\)'
 check worldrules "no call names the actor by its name in the program's logic" no 'actor_find\("Lamps"\)'
 logged worldrules "bind, radius, twice, Runner::start, Runner::pole and Runner::lit are written" '^Runner/worldrules_cpp +6 / +6 functions'
 logged worldrules "one bound to a world and to a logic waits, with the reason" '^ +radius \([0-9]+\): the Blueprint of an actor \(g_both\) bound to a world and to a logic'

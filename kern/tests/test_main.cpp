@@ -9535,12 +9535,12 @@ TEST(cpp_reaches_actors_of_its_worlds) {
   door.logic = logic::Graph{};
   std::string error;
   CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
-                        "  Int Hits = 0;\n"
-                        "  Float Speed = 2.5;\n"
+                        "  i64 Hits = 0;\n"
+                        "  f64 Speed = 2.5;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct HitResult { Int hits = 0; };\n"
-                        "  HitResult Hit(Int by = 0) {\n"
+                        "  struct HitResult { i64 hits = 0; };\n"
+                        "  HitResult Hit(i64 by = 0) {\n"
                         "    Hits += by;\n"
                         "    return {Hits};\n"
                         "  }\n"
