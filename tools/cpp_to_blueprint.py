@@ -2177,6 +2177,9 @@ class Unit:
                                                    "or in the entry kern_main())")
             raise Wait(f"the class {q.split('::')[-1]} has a base class, and it is no state: {why}")
         self.structs[q] = None
+        # (the types of its fields are named as C++ looks them up there: from inside the struct - `std::vector<Tile>` in
+        # CityStream is CityStream::Tile, from whatever Blueprint the struct is first met in)
+        looked, self.lookup_scope = self.lookup_scope, q + "::"
         try:
             fields, taken, declared = [], set(), {}
             for c in kids(o):
@@ -2215,6 +2218,8 @@ class Unit:
         except Wait:
             del self.structs[q]
             raise
+        finally:
+            self.lookup_scope = looked
         name = self.type_name(q)
         if name in self.type_line:
             del self.structs[q]

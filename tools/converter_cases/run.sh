@@ -31,6 +31,8 @@
 #             class ("Frame not KERN_BLUEPRINT_TYPE") - written and compared.
 #   makeworld.cpp std::make_unique of an object of the engine with several constructors of that count: the one whose
 #             parameters take the arguments (GameWorld(Engine&) for an Engine, GameWorld(Renderer&, ...) for a Renderer).
+#   nested.cpp a struct with a struct of its own (Stream::Tile) beside another Tile (mvt::Tile), named first from mvt: its
+#             field `kern::Map<u64, std::unique_ptr<Tile>>` (Tile declared before it) holds Stream::Tile - a field's type is looked up inside its struct.
 #   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
 #             - written and compared.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
@@ -116,6 +118,11 @@ check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'li
 convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
 
+convert nested
+check nested "Stream's field holds Stream::Tile, named from inside the struct (not mvt::Tile)" yes 'List<Stream_Tile>'
+check nested "... and nowhere a list of mvt::Tile" no 'List<mvt_Tile>'
+logged nested "both are compared" '^2 functions of the Blueprints are compared'
+
 convert program door
 logged program "the log says the App stands in the project, and why" '^  CasesApp: the project - it implements App - the program.s App'
 logged program "the log says the export's Blueprint stands in the project, and why" '^  program_cpp: the project - it exports case_score - exports belong to the program'
@@ -141,6 +148,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld bytes table nested program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
