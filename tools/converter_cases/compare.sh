@@ -48,6 +48,7 @@ python3 "$kern/tools/embed_project.py" "$project" "$o/project.cpp" > /dev/null
 # classes; else without it, and the header empty: a source of the program that includes it compiles, and what it would call of
 # such a class is not there - said by the link below)
 if ! "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1; then
+  echo "the header of the classes the program calls is empty: $(grep -v '^\s*$' "$o/classes.log" | tail -3 | tr '\n' ' ' | cut -c1-400)"
   "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" > /dev/null
   printf '#pragma once\n// (no Blueprint the program calls as its class in this project - tools/converter_cases/compare.sh)\n' > "$o/level_blueprints.h"
 fi

@@ -14592,11 +14592,14 @@ class TestWriter:
         outer = q.rsplit("::", 1)[0] if "::" in q else ""
         return bool(outer) and (self.top_of(q) != q or outer in records) and outer in self.tree.records and self.inside(self.tree.records[q], [self.tree.records[outer]]) is None
 
-    def engine_record(self, q):
-        """Is this class one of the engine's own types - defined in a header of the engine, in namespaces only (not in a class)? In the second
-        pass of the comparison (HONEST) the test holds it as the engine has it, not as a copy."""
-        d = self.tree.records.get(q)
+    def engine_record(self, q, kinds=("records",)):
+        """Is this one of the engine's own types for Blueprints - marked KERN_BLUEPRINT_TYPE in a header of the engine, in namespaces
+        only (not in a class)? In the second pass of the comparison (HONEST) the test holds it as the engine has it, not as a copy.
+        (kinds: ("enums",) for an enum.)"""
+        d = next((getattr(self.tree, k).get(q) for k in kinds if getattr(self.tree, k).get(q) is not None), None)
         if d is None or "::" not in q or not os.path.abspath(d.get("_file", "") or "").startswith(ENGINE_HEADERS_DIR + os.sep):
+            return False
+        if not any(isinstance(c, dict) and c.get("kind") == "AnnotateAttr" for c in d.get("inner", ())):
             return False
         parts = q.split("::")
         return not any("::".join(parts[:i]) in self.tree.records for i in range(1, len(parts)))
@@ -15042,7 +15045,7 @@ class TestWriter:
         return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else []) + [d["name"]])
 
     def enum_text(self, q, local=None):
-        if q.startswith(ENGINE + "::logic::"):
+        if q.startswith(ENGINE + "::logic::") or (HONEST[0] and self.engine_record(q, ("enums",))):   # (and in the second pass every enum of the engine for Blueprints: the engine's own)
             # (an enum of the engine's logic - logic::NodeKind of a NodeDef the source fills -: the real one, which the
             # logic of the test is; a copy of it would be another type than the field of the real struct. Written with
             # spaces, `:: kern :: logic :: NodeKind`: the renamer, which makes a held name the test's, leaves it as it is)
@@ -15391,7 +15394,7 @@ class TestWriter:
             put(d, {"kind": "record", "q": q, "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
         for q in sorted(G.enums):
-            put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
+            put(tree.enums[q], {"kind": "enum", "q": q, "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
             # (the definition of a variable of the program a header declares - `i32 kGates = 0;` to `extern i32 kGates;` -
             # stands where the header puts it, not among this file's own: one variable. A test that takes it and has it already
@@ -15852,7 +15855,8 @@ class TestWriter:
         # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
         # the real engine in the test)
         # (in the second pass a type of the engine is the engine's own - engine_record: the source names it as it is)
-        own_types = "".join("|" + re.escape(q[len(ENGINE) + 2:]) + r"\b" for q in sorted(tree.records, key=len, reverse=True) if HONEST[0] and q.startswith(ENGINE + "::") and self.engine_record(q))
+        own_types = "".join("|" + re.escape(q[len(ENGINE) + 2:]) + r"\b" for q in sorted([*tree.records, *tree.enums], key=len, reverse=True)
+                            if HONEST[0] and q.startswith(ENGINE + "::") and (self.engine_record(q) or self.engine_record(q, ("enums",))))
         foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + own_types + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
@@ -15912,6 +15916,9 @@ class TestWriter:
                         add(key, wide(piece["stand_in"][0]))
                         continue
                     directives = "".join(t + " " for t in (self.directive_text(scope, q, ns) for scope, q in piece.get("directives", ())) if t)
+                    if piece["kind"] == "enum" and HONEST[0] and piece.get("q") and self.engine_record(piece["q"], ("enums",)):   # (the second pass: the engine's own enum)
+                        add(key, directives + self.enum_text(piece["q"]))
+                        continue
                     if piece["kind"] != "record":
                         add(key, directives + self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
