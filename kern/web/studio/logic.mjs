@@ -24,7 +24,9 @@
 import {wheelPixels} from "../kern.mjs";
 
 // (the number types of C++ - kern/logic/numbers.h: a whole number green-blue, a floating one green; the name is the
-// type's own. Stage 7 of the number types brings the type menu and the conversion nodes on connecting.)
+// type's own, and a pin of a number says it beside its circle - "f32", "u8". The editor's defaults: "Float" is f32,
+// "Int" is i64 - first in every menu of types, the other widths below them. A wire between two types gets the node
+// that converts it, in the open: the engine puts it there (logic_edit.cpp connect) and says what it can lose.)
 const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5"};
 const LG_TYPE_NAMES = {exec: "Exec", bool: "bool", vector: "Vector", text: "Text", actor: "Actor"};
 const LG_NUMBER_TYPES = ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"];
@@ -33,9 +35,33 @@ for (const t of LG_NUMBER_TYPES) { LG_TYPE_COLORS[t] = t[0] === "f" ? "#9be36b" 
 // (An Int64 is its 64 bits: in the document the text of their u64 - more than a number of JSON
 // holds -, so here a text too: "18446744073709551615", "0x1f".)
 const LG_VALUE_TYPES = ["bool", ...LG_NUMBER_TYPES, "vector", "text", "actor"];
-// Ints of a fixed width (U8 ... I32): a place holds the low bits of the Int it is given; a pin is an Int.
-const LG_WIDTHS = ["u8", "u16", "u32", "i8", "i16", "i32"];
-for (const w of LG_WIDTHS) { LG_TYPE_COLORS[w] = LG_TYPE_COLORS.int; LG_TYPE_NAMES[w] = w.toUpperCase(); }
+const lgIsNumber = t => LG_NUMBER_TYPES.includes(t);
+/** The family of a number type, for its colour and its chip: "f" floating, "i" whole, "b" bool. */
+const lgFamily = t => t === "bool" ? "b" : t[0] === "f" ? "f" : "i";
+/** How a menu names a type: the two defaults by what they are for, every other number by its C++ name. */
+const lgTypeLabel = t => t === "f32" ? "Float (f32)" : t === "i64" ? "Int (i64)" : t === "f32_list" ? "Float List (f32)" : t === "i64_list" ? "Int List (i64)" : lgTypeName(t);
+/** The menus' order: the defaults, then the other widths. */
+const LG_DEFAULT_NUMBERS = ["f32", "i64"], LG_OTHER_NUMBERS = ["f64", "i32", "u32", "u64", "i16", "u16", "i8", "u8"];
+/** The chip of a number's type beside its pin ("f32", a list "f32[]"); "" for other types. */
+const lgTypeChip = t => {
+  const item = lgIsList(t) ? lgItemType(t) : t;
+  if (!lgIsNumber(item) && item !== "bool") return "";
+  return `<span class="lg-pt ${lgFamily(item)}">${item}${lgIsList(t) ? "[]" : ""}</span>`;
+};
+/** A number as its type writes it: an f32 the shortest decimal that is that f32 again (Math.fround), an f64 the
+ *  shortest that is that double; a whole number of 64 bits beyond 2^53 comes as its digits - a text, never a double. */
+const lgNumText = (v, type) => {
+  if (typeof v === "string") return v;
+  if (typeof v !== "number") return String(v ?? "");
+  if (type === "f32" && Number.isFinite(v))
+    for (let p = 1; p <= 9; ++p) { const t = String(+v.toPrecision(p)); if (Math.fround(+t) === v) return t; }
+  return String(v);
+};
+/** What is sent for a value typed in: a number as the text typed (the engine reads it in the pin's type, exactly,
+ *  and says why where it is none - logic_edit.cpp read_literal); a text as it is. */
+/** A field whose value was refused: marked, the reason on it (until a value is taken). */
+const lgMark = (f, r) => { if (!f) return; const bad = r?.ok === false; f.classList.toggle("lg-bad", bad); if (bad) f.title = r.error || "refused"; };
+const lgLiteral = (type, text) => lgIsNumber(type) ? String(text).trim() : type === "text" ? text : (+text || 0);
 for (const t of LG_VALUE_TYPES) { LG_TYPE_COLORS[t + "_list"] = LG_TYPE_COLORS[t]; LG_TYPE_NAMES[t + "_list"] = LG_TYPE_NAMES[t] + " List"; }
 const LG_DATA_TYPES = [...LG_VALUE_TYPES, ...LG_VALUE_TYPES.map(t => t + "_list")];
 const lgIsList = t => typeof t === "string" && t.endsWith("_list");
@@ -55,18 +81,17 @@ const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
 const lgColor = t => LG_TYPE_COLORS[t] || (lgIsObject(lgIsList(t) ? lgItemType(t) : t) ? LG_OBJECT_COLOR : lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
 const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsObject(t) ? (lgObjectOf(t) ? lgObjectOf(t) + " Object" : "Object") : lgIsList(t) && lgIsObject(lgItemType(t)) ? lgObjectOf(lgItemType(t)) + " Object List" : lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
 const lgTyped = x => {
-  if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
+  if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "i64") + ">"; return; }  // (a map, a set: "map<i64>f32>", as the engine names it)
   if (x && x.type === "callback") { x.type = "callback<" + (x.of || "()") + ">"; return; }  // (a Callback: "callback<float(float,float)>" - only its own signature fits it)
   if (x && (x.type === "object" || x.type === "object_list")) { x.type = "object<" + (x.of || "") + ">" + (x.type === "object_list" ? "_list" : ""); return; }  // (an object of the engine: "object<App>" - kern/docs/engine_object.md)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
-  if (x?.of && (x.type === "int" || x.type === "int_list") && LG_WIDTHS.includes(x.of)) x.type = x.type === "int" ? x.of : x.of + "_list";  // (an Int of a fixed width: "u32", "u8_list")
 };
 // A map of values under keys, a set of keys - in the order the keys came: a type by the engine's
 // name for it, "map<int>float>", "map<enum:Kind>struct_list:Cell>", "set<text>". Its keys and
 // values are named here as every other type is ("Kind", "Cell_list") - lgKeyed takes one apart,
 // lgKeyedType puts one together.
 const LG_MAP_COLOR = "#c77d2a";
-const LG_KEY_TYPES = ["int", "int64", "text", "bool"];  // (and the Blueprint's enums)
+const LG_KEY_TYPES = ["i64", ...LG_OTHER_NUMBERS.filter(t => t[0] !== "f"), "text", "bool"];  // (and the Blueprint's enums)
 const lgIsKeyed = t => typeof t === "string" && /^(map|set)<.*>$/.test(t);
 /** A Callback: a function of a library the engine calls - "callback<float(float,float)>" (Make Callback). */
 const LG_CALLBACK_COLOR = "#8f6bd8";
@@ -81,18 +106,13 @@ const lgKeyed = t => {
   return {kind: t.slice(0, 3), key: lgFromNamed(at < 0 ? inner : inner.slice(0, at)), value: at < 0 ? null : lgFromNamed(inner.slice(at + 1))};
 };
 const lgToNamed = (t, enums) => {
-  // (an Int of a fixed width as a map's value: "int:u8", "int_list:u8" - as the engine names it)
-  const width = lgIsList(t) ? lgItemType(t) : t;
-  if (LG_WIDTHS.includes(width)) return (lgIsList(t) ? "int_list:" : "int:") + width;
   if (lgBuiltin(t)) return t;
   const list = lgIsList(t), name = list ? lgItemType(t) : t;
   const kind = lgStructNames.has(name) ? "struct" : (enums || []).some(e => e.name === name) ? "enum" : null;
   return kind ? kind + (list ? "_list" : "") + ":" + name : t;
 };
-const lgKeyedType = (kind, key, value, enums) => kind + "<" + lgToNamed(key, enums) + (kind === "map" ? ">" + lgToNamed(value || "float", enums) : "") + ">";
+const lgKeyedType = (kind, key, value, enums) => kind + "<" + lgToNamed(key, enums) + (kind === "map" ? ">" + lgToNamed(value || "f32", enums) : "") + ">";
 const lgKeyedName = t => { const k = lgKeyed(t); return k.kind === "map" ? "Map of " + lgTypeName(k.key) + " to " + lgTypeName(k.value) : "Set of " + lgTypeName(k.key); };
-/** A value typed in for a type: an Int64 as the text of its bits, a number, a text. */
-const lgTyped64 = (type, text) => type === "int64" ? (String(text).trim() || "0") : type === "text" ? text : (+text || 0);
 const lgEnumOf = (enums, type) => lgBuiltin(type) ? null : (enums || []).find(e => e.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
 const lgStructOf = (structs, type) => lgBuiltin(type) ? null : (structs || []).find(s => s.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
 /** Every pin, variable, function pin and struct field of the editor's data with its type as one name. */
@@ -128,8 +148,8 @@ const lgValueText = (v, type, data) => {
     const one = x => "{" + s.fields.map(f => f.name + ": " + (f.type === "text" ? JSON.stringify(x?.[f.name] ?? "") : lgValueText(x?.[f.name], f.type, data))).join(", ") + "}";
     return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(one).join(", ") + "]" : one(v);
   }
-  return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x) + ")" : lgValueText(x)).join(", ") + "]"
-    : Array.isArray(v) ? v.map(lgNum).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgNum(v);
+  return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => lgItemType(type) === "vector" ? "(" + lgValueText(x, "vector") + ")" : lgValueText(x, lgItemType(type))).join(", ") + "]"
+    : Array.isArray(v) ? v.map(x => lgNumText(x, "f32")).join(", ") : typeof v === "boolean" ? (v ? "true" : "false") : lgIsNumber(type) ? lgNumText(v, type) : lgNum(v);
 };
 /** A struct's value in short, as a node shows it: its first fields, the rest in the tooltip. */
 const lgStructSummary = (v, type, data) => {
@@ -138,7 +158,7 @@ const lgStructSummary = (v, type, data) => {
   const parts = s.fields.slice(0, 2).map(f => lgStructOf(data?.structs, f.type) || lgIsList(f.type) ? f.name : lgValueText(v?.[f.name], f.type, data));
   return "{" + parts.join(", ") + (s.fields.length > 2 ? ", …" : "") + "}";
 };
-const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : item === "int64" ? "0" : lgIsKeyed(item) ? [] : lgStructNames.has(item) ? {} : 0;
+const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : lgIsKeyed(item) ? [] : lgStructNames.has(item) ? {} : 0;
 const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
 
 /** The editor of a list's items (the default of a variable or a function input, a list typed
@@ -149,14 +169,14 @@ function lgListEditor(type, value, data) {
   const of = lgEnumOf(data?.enums, type);
   const field = (v, i) => of ? `<select data-li="${i}">${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
     : item === "bool" ? `<input type="checkbox" data-li="${i}"${v ? " checked" : ""}>`
-    : `<input data-li="${i}" value="${lgEsc(item === "vector" ? (Array.isArray(v) ? v : [0, 0, 0]).map(lgNum).join(", ") : item === "text" ? (v ?? "") : lgNum(v))}" spellcheck="false"${item === "text" ? "" : ' inputmode="decimal"'}>`;
+    : `<input data-li="${i}" value="${lgEsc(item === "vector" ? (Array.isArray(v) ? v : [0, 0, 0]).map(lgNum).join(", ") : item === "text" ? (v ?? "") : lgNumText(v, item))}" spellcheck="false"${item === "text" ? "" : ` inputmode="decimal" title="${lgEsc(lgTypeLabel(item))}"`}>`;
   return `<div class="lg-list" data-list="${lgEsc(type)}">${items.map((v, i) => `<div class="lg-li"><em>${i}</em>${field(v, i)}<button data-lx="${i}" title="Remove this item">×</button></div>`).join("")}
     <button class="lg-ladd" data-ladd title="Add an item at the end">+ Item</button></div>`;
 }
 /** The items a list editor shows now. */
 function lgListValue(box) {
   const item = lgItemType(box.dataset.list);
-  return [...box.querySelectorAll("[data-li]")].map(f => item === "bool" ? f.checked : item === "vector" ? lgVector(f.value) : lgTyped64(item, f.value));
+  return [...box.querySelectorAll("[data-li]")].map(f => item === "bool" ? f.checked : item === "vector" ? lgVector(f.value) : lgLiteral(item, f.value));
 }
 /** Every change of a list editor gives `send` the whole list. */
 function lgListBind(box, send) {
@@ -202,7 +222,7 @@ function lgValueEditor(type, value, data, path = []) {
   if (en) return `<select data-vp="${at(path)}" data-vt="enum">${en.values.map((name, k) => `<option value="${k}"${k === value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
   if (type === "bool") return `<input type="checkbox" data-vp="${at(path)}" data-vt="bool"${value ? " checked" : ""}>`;
   if (type === "actor") return `<span class="lg-dim">none (set it while playing)</span>`;
-  return `<input data-vp="${at(path)}" data-vt="${lgEsc(type)}" value="${lgEsc(type === "vector" ? (Array.isArray(value) ? value : [0, 0, 0]).map(lgNum).join(", ") : type === "text" || type === "int64" ? (value ?? "") : lgNum(value))}" spellcheck="false"${type === "text" || type === "int64" ? "" : ' inputmode="decimal"'}>`;
+  return `<input data-vp="${at(path)}" data-vt="${lgEsc(type)}" value="${lgEsc(type === "vector" ? (Array.isArray(value) ? value : [0, 0, 0]).map(lgNum).join(", ") : type === "text" ? (value ?? "") : lgNumText(value, type))}" spellcheck="false"${type === "text" ? "" : ` inputmode="decimal" title="${lgEsc(lgTypeLabel(type))}"`}>`;
 }
 /** A key a map or a set does not have yet (its entries: `entries`), of the keys' type. */
 function lgFreshKey(type, entries, data) {
@@ -211,7 +231,7 @@ function lgFreshKey(type, entries, data) {
   if (en) { const free = en.values.findIndex((_, i) => !keys.includes(i)); return free < 0 ? null : free; }
   if (k.key === "bool") return !keys.includes(false) ? false : !keys.includes(true) ? true : null;
   for (let n = keys.length; ; ++n) {
-    const key = k.key === "text" ? "key" + n : k.key === "int64" ? String(n) : n;
+    const key = k.key === "text" ? "key" + n : n;
     if (!keys.some(x => String(x) === String(key))) return key;
   }
 }
@@ -231,7 +251,7 @@ function lgValueBind(box, current, send) {
   const part = path => path.reduce((o, k) => o?.[k], current());
   for (const f of box.querySelectorAll("[data-vp]")) {
     const t = f.dataset.vt;
-    f.onchange = () => send(put(JSON.parse(f.dataset.vp), t === "bool" ? f.checked : t === "enum" ? +f.value : t === "vector" ? lgVector(f.value) : lgTyped64(t, f.value)));
+    f.onchange = () => send(put(JSON.parse(f.dataset.vp), t === "bool" ? f.checked : t === "enum" ? +f.value : t === "vector" ? lgVector(f.value) : lgLiteral(t, f.value)));
   }
   for (const add of box.querySelectorAll("[data-vkadd]")) {
     // (a new entry of a map or a set: a key it does not have, a map's value at its zero)
@@ -734,11 +754,12 @@ export class LogicEditor {
     const vars = (data.variables || []).filter(v => match(v.name)).map(v => `
         <div class="lg-item lg-var${this.selVar === v.name ? " on" : ""}" draggable="true" data-var="${lgEsc(v.name)}" title="Drag into the graph: Ctrl = Get, Alt = Set">
           <i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
-          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data))}</span>` : `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
+          ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data))}</span>` : lgTypeChip(v.type) || `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
           <span class="lg-acts"><button data-get title="Add a Get node">Get</button>${v.const ? "" : `<button data-set title="Add a Set node">Set</button>`}</span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
     // a function's signature in short: (x, y) -> result
-    const sig = f => `(${f.inputs.map(p => p.name).join(", ")})${f.outputs.length ? " → " + f.outputs.map(p => p.name).join(", ") : ""}`;
+    const named = p => p.name + (lgIsNumber(p.type) || lgIsNumber(lgIsList(p.type) ? lgItemType(p.type) : "") ? ": " + (lgIsList(p.type) ? lgItemType(p.type) + "[]" : p.type) : "");
+    const sig = f => `(${f.inputs.map(named).join(", ")})${f.outputs.length ? " → " + f.outputs.map(named).join(", ") : ""}`;
     const fns = (data.functions || []).filter(f => match(f.name)).map(f => `
         <div class="lg-item lg-fn${this.selFn === f.name ? " on" : ""}" draggable="true" data-fn="${lgEsc(f.name)}" title="${lgEsc(f.help || "Drag into the graph: a call of the function")}">
           <i class="lg-fni"${f.external ? ' title="A function of another Blueprint: called on an actor"' : f.from ? ` title="A function of the library ${lgEsc(f.from)}: called directly, changed there"` : ""}>${f.external ? "↗" : f.from ? "L" : "ƒ"}</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
@@ -961,15 +982,20 @@ export class LogicEditor {
   /** The types a variable, a function's pin or a struct's field can have: the value types, this
    *  Blueprint's enums and structs (`without`: the structs that are none of them), and a list of each. */
   typeOptions(current, without = [], keyed = true) {
-    const values = [...LG_VALUE_TYPES, ...LG_WIDTHS, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
-    const all = [...values, ...values.map(t => t + "_list")];  // (a list of Ints of a fixed width too: List<U8>)
-    // (a map or a set: the one it is, else one of Integer keys - its keys and values are chosen beside it, keyOptions)
-    if (keyed) all.push(lgIsKeyed(current) && current.startsWith("map") ? current : "map<int>float>", lgIsKeyed(current) && current.startsWith("set") ? current : "set<int>");
-    return all.map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgIsKeyed(t) ? (t.startsWith("map") ? "Map…" : "Set…") : lgTypeName(t))}</option>`).join("");
+    // (the defaults Float (f32) and Int (i64) first, the other widths below them; then the other values, the
+    // Blueprint's enums and structs; a list of each; a map or a set - its keys and values are chosen beside it)
+    const declared = [...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
+    const others = ["bool", "vector", "text", "actor", ...declared];
+    const groups = [["Numbers", LG_DEFAULT_NUMBERS], ["Other number types", LG_OTHER_NUMBERS], ["Values", others],
+      ["Lists", [...LG_DEFAULT_NUMBERS, ...LG_OTHER_NUMBERS, ...others].map(t => t + "_list")]];
+    if (keyed) groups.push(["Maps and sets", [lgIsKeyed(current) && current.startsWith("map") ? current : "map<i64>f32>", lgIsKeyed(current) && current.startsWith("set") ? current : "set<i64>"]]);
+    if (current && !groups.some(([, ts]) => ts.includes(current))) groups[2][1] = [current, ...others];   // (an object of the engine, a callback: the one it is)
+    const option = t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgIsKeyed(t) ? (t.startsWith("map") ? "Map…" : "Set…") : lgTypeLabel(t))}</option>`;
+    return groups.map(([label, ts]) => `<optgroup label="${lgEsc(label)}">${ts.map(option).join("")}</optgroup>`).join("");
   }
   /** The types a map's or a set's keys can be: Integer, Int64, Text, Boolean and the Blueprint's enums. */
   keyOptions(current) {
-    return [...LG_KEY_TYPES, ...(this.data?.enums || []).map(e => e.name)].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeName(t))}</option>`).join("");
+    return [...LG_KEY_TYPES, ...(this.data?.enums || []).map(e => e.name)].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeLabel(t))}</option>`).join("");
   }
   /** Beside the type of a map or a set: what its keys and (of a map) its values are. `attr`: the data attribute of the selects ("vk", "pf", "sf"). */
   keyedChoices(type, attr, without = []) {
@@ -1101,11 +1127,13 @@ export class LogicEditor {
       let lit = "";
       if (dir === "in" && p.type !== "exec" && !p.linked) lit = this.literalHtml(n, p, actors);
       const label = p.label && !compact ? `<span class="lg-pl">${lgEsc(p.label)}</span>` : "";
-      const tip = `${lgTypeName(p.type)}${p.label ? " · " + p.label : ""}`;
-      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${lgEsc(p.type)}"${p.generic ? ` data-generic="${lgEsc(p.generic)}"` : ""} title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + label + lit : label + lgPinIcon(p.type, p.linked)}</div>`;
+      const tip = `${lgTypeLabel(p.type)}${p.label ? " · " + p.label : ""}`;
+      // (a number's pin says its type beside it: "f32", "u8", a list "f32[]")
+      const chip = lgTypeChip(p.type);
+      return `<div class="lg-row ${dir}" data-pin="${lgEsc(p.id)}" data-dir="${dir}" data-type="${lgEsc(p.type)}"${p.generic ? ` data-generic="${lgEsc(p.generic)}"` : ""} title="${lgEsc(tip)}">${dir === "in" ? lgPinIcon(p.type, p.linked) + chip + label + lit : label + chip + lgPinIcon(p.type, p.linked)}</div>`;
     };
     const cls = `lg-node k-${n.kind}${n.error ? " error" : n.issues ? " warn" : ""}${n.breakpoint ? " bp" : ""}${n.hit ? " hit" : ""}`;
-    const tip = lgEsc((n.issues ? n.issues.join("\n") + "\n\n" : "") + (n.help || ""));
+    const tip = lgEsc((n.issues ? n.issues.join("\n") + "\n\n" : "") + (n.loss ? "Can change a value: " + n.loss + "\n\n" : "") + (n.help || ""));
     const bubble = (n.comment ? `<div class="lg-bubble">${lgEsc(n.comment)}</div>` : "") + (n.breakpoint ? `<i class="lg-bpdot" title="Breakpoint (F9)"></i>` : "");
     const badge = n.error ? `<div class="lg-badge err">ERROR</div>` : n.issues ? `<div class="lg-badge warn">WARNING</div>` : "";
     const pos = `left:${n.x}px;top:${n.y}px`;
@@ -1125,7 +1153,7 @@ export class LogicEditor {
       const sym = n.compact;
       return `<div class="${cls} compact op" data-id="${n.id}" style="${pos}" title="${lgEsc(n.title)}\n${tip}">${bubble}
         <div class="lg-col in">${n.inputs.map(p => pinRow(p, "in", true)).join("")}</div>
-        <div class="lg-sym${sym.length > 2 ? " word" : ""}">${lgEsc(sym)}</div>
+        <div class="lg-sym${sym.length > 2 ? " word" : ""}">${lgEsc(sym)}${n.numberType ? `<small class="lg-symt ${lgFamily(n.numberType)}" title="Type: ${lgEsc(lgTypeLabel(n.numberType))} - changed in Details">${lgEsc(n.numberType)}</small>` : ""}</div>
         <div class="lg-col out">${n.outputs.map(p => pinRow(p, "out", true)).join("")}</div>${badge}</div>`;
     }
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
@@ -1136,6 +1164,7 @@ export class LogicEditor {
     return `<div class="${cls}" data-id="${n.id}" style="${pos};--h:${head}" title="${tip}">${bubble}
       <div class="lg-nh">${lgIco(icon, "lg-ki")}<span class="lg-title">${lgEsc(n.title)}</span>${n.latent ? `<span class="lg-clock" title="Latent: waits">${lgIco("latent")}</span>` : ""}</div>
       ${params ? `<div class="lg-params">${params}</div>` : ""}
+      ${n.loss ? `<div class="lg-loss" title="${lgEsc(n.loss)}">${lgIco("warn")}<span>can change a value</span></div>` : ""}
       <div class="lg-pins"><div class="lg-col in">${ins}</div><div class="lg-col out">${outs}</div></div>${badge}
     </div>`;
   }
@@ -1148,13 +1177,14 @@ export class LogicEditor {
     if (of && !lgIsList(p.type)) return `<select class="lg-lit enm" ${attr}>${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
     switch (p.type) {
       case "bool": return `<input type="checkbox" class="lg-lit chk" ${attr}${v ? " checked" : ""}>`;
-      case "i8": case "i16": case "i32": case "u8": case "u16": case "u32": case "f32": case "f64":
-        return `<input class="lg-lit num" ${attr} value="${lgEsc(lgNum(v))}" spellcheck="false" inputmode="decimal">`;
-      case "i64": case "u64":   // (64 bits: more than a number of JavaScript holds - a text, as the document has one beyond 2^53)
-        return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="a whole number of 64 bits">`;
+      // a number: in its type, as the engine read it (an f32 the shortest text that gives it, 64 bits beyond 2^53
+      // as their digits); what is typed goes as text, and a value the type does not hold is marked here, with the reason
+      case "i8": case "i16": case "i32": case "i64": case "u8": case "u16": case "u32": case "u64": case "f32": case "f64": {
+        const bad = this.fieldErrors?.get(n.id + ":" + p.id);
+        return `<input class="lg-lit num${bad ? " lg-bad" : ""}" ${attr} value="${lgEsc(bad ? bad.text : lgNumText(v, p.type))}" spellcheck="false" inputmode="decimal" title="${lgEsc(bad ? bad.error : lgTypeLabel(p.type))}">`;
+      }
       case "text": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v)}" spellcheck="false">`;
-      case "int64": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="64 bits: a whole number up to 18446744073709551615, or 0x... in hexadecimal">`;
-      case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
+      case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNumText(Array.isArray(v) ? v[i] : 0, "f32"))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
       // an actor comes from its world (Self, Find Actor by Name, Spawn Actor, an event) - never typed in as a number
       // (kern/docs/project.md 7): unwired, the input means what the node says of an empty one
       case "actor": return `<span class="lg-dim" title="Wire an actor in: Self, Find Actor by Name, Spawn Actor, an event">${p.id === "target" || p.id === "a" || p.id === "this" ? "Self" : "None"}</span>`;
@@ -1206,7 +1236,13 @@ export class LogicEditor {
       const node = +el.dataset.node, pin = el.dataset.lit;
       if (el.type === "checkbox") el.onchange = () => send(node, pin, el.checked);
       else if (el.tagName === "SELECT") el.onchange = () => send(node, pin, +el.value);
-      else el.onchange = () => send(node, pin, lgTyped64(el.dataset.t, el.value));
+      else el.onchange = () => {
+        // (a value its type does not hold stays in the field, marked, with the reason - after the node is drawn again too)
+        const text = el.value, r = send(node, pin, lgLiteral(el.dataset.t, text)), key = node + ":" + pin;
+        this.fieldErrors ??= new Map();
+        if (r?.ok === false) this.fieldErrors.set(key, {text, error: r.error}); else this.fieldErrors.delete(key);
+        lgMark(el, r);
+      };
     }
     for (const el of root.querySelectorAll(".lg-par")) {
       // (a long shared list is written into its box when the box is first opened: paramHtml)
@@ -1220,7 +1256,13 @@ export class LogicEditor {
       el.addEventListener("pointerdown", e => { e.stopPropagation(); fill(); });
       el.addEventListener("focus", fill);
       el.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") el.blur(); });
-      el.onchange = () => this.cmd({cmd: "logicParam", node: +el.dataset.node, key: el.dataset.param, value: el.value});
+      el.onchange = () => {
+        // (refused - another Type while wires of another type hang on the node: the setting goes back, marked with the reason)
+        const was = (this.data?.nodes || []).find(x => x.id === +el.dataset.node)?.params?.find(q => q.key === el.dataset.param)?.value;
+        const r = this.cmd({cmd: "logicParam", node: +el.dataset.node, key: el.dataset.param, value: el.value});
+        if (r?.ok === false && was !== undefined && el.tagName === "SELECT") el.value = was;
+        lgMark(el, r);
+      };
     }
   }
   bindNodeInputs() { this.bindInputs(this.el.nodes); }
@@ -1421,7 +1463,7 @@ export class LogicEditor {
     const actors = this.studio.state()?.actors || [];
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
     const inputs = n.inputs.filter(p => p.type !== "exec");
-    const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
+    const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgTypeChip(p.type)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
       (p.linked ? "" : this.structOf(p.type) || lgIsKeyed(p.type) ? `<div class="lg-lsub lg-vsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${this.partsEditor(p.type, p.value)}</div>`
         : lgIsList(p.type) ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("");
     const params = (n.params || []).map(p => `<div class="lg-drow"><label>${lgEsc(p.label)}</label><div>${this.paramHtml(n, p)}</div></div>`).join("");
@@ -1431,9 +1473,26 @@ export class LogicEditor {
       ${issues}
       ${n.help ? `<div class="lg-dtxt">${lgEsc(n.help)}</div>` : ""}
       ${params ? `<div class="lg-dsec"><div class="lg-dst">Settings</div>${params}</div>` : ""}
+      ${n.type === "math.formula" ? this.formulaDetails(n) : ""}
+      ${n.loss ? `<div class="lg-dissue warn">${lgIco("warn")}Can change a value: ${lgEsc(n.loss)}</div>` : ""}
       ${rows ? `<div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows}</div>` : ""}
       <div class="lg-dsec"><div class="lg-dst">Comment</div><textarea class="lg-dcomment" rows="2" placeholder="A note shown above the node">${lgEsc(n.comment || "")}</textarea></div>
       <div class="lg-dacts"><button data-act="duplicate">Duplicate</button><button data-act="break">Break Links</button><button data-act="delete" class="danger">Delete</button></div>`;
+  }
+
+  /** A formula's inputs with their types (the setting Types, one for each name in the order they first appear) and
+   *  what it gives; its error marked at its place in the text (the engine says where: formulaAt). */
+  formulaDetails(n) {
+    const text = (n.params || []).find(p => p.key === "formula")?.value || "";
+    const at = n.formulaAt || 0;
+    const err = n.formulaError ? `<div class="lg-ferr" data-ferr>${at ? lgEsc(text.slice(0, at - 1)) + `<mark>${lgEsc(text[at - 1] || " ")}</mark>` + lgEsc(text.slice(at)) + "\n" : ""}${lgEsc(n.formulaError)}${at ? ` (at ${at})` : ""}</div>` : "";
+    const options = t => [...LG_DEFAULT_NUMBERS, ...LG_OTHER_NUMBERS, "bool"].map(x => `<option value="${x}"${x === t ? " selected" : ""}>${lgEsc(lgTypeLabel(x))}</option>`).join("");
+    const ins = n.inputs.filter(p => p.type !== "exec");
+    const rows = ins.map((p, i) => `<div class="lg-drow"><label>${lgTypeChip(p.type)}${lgEsc(p.id)}</label><div><select data-ftype="${i}" title="The type of ${lgEsc(p.id)}">${options(p.type)}</select></div></div>`).join("");
+    const out = n.outputs[0]?.type;
+    return `<div class="lg-dsec"><div class="lg-dst">Formula</div>${err}${rows}
+      ${out && !n.formulaError ? `<div class="lg-drow"><label>Gives</label><div>${lgTypeChip(out) || lgEsc(lgTypeLabel(out))}</div></div>` : ""}
+      <div class="lg-dtxt">Each name is an input of its type; values of two types never meet - num_cast&lt;To, From&gt;(x) converts. 0.5f is an f32, 0.5 an f64.</div></div>`;
   }
 
   commentDetails(c) {
@@ -1454,7 +1513,7 @@ export class LogicEditor {
       : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
-      : `<input data-vk="value" value="${lgEsc(lgNum(v.value))}">`;
+      : `<input data-vk="value" value="${lgEsc(lgNumText(v.value, v.type))}" title="${lgEsc(lgTypeLabel(v.type))}" spellcheck="false">`;
     const refs = this.data.counts?.variables?.[v.name] || 0;
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${lgColor(v.type)}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
@@ -1477,7 +1536,7 @@ export class LogicEditor {
       : this.structOf(p.type) ? `<span class="lg-dim lg-fval" title="Default: ${lgEsc(lgValueText(p.value, p.type, this.data))}">fields</span>`
       : p.type === "bool" ? `<input type="checkbox" data-pf="value"${p.value ? " checked" : ""} title="Default">`
       : p.type === "actor" ? `<span class="lg-dim">none</span>`
-      : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
+      : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNumText(p.value, p.type))}" title="Default (${lgEsc(lgTypeLabel(p.type))})" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
         <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${this.keyedChoices(p.type, "pf")}${lgIsList(p.type) ? `<input data-pf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${p.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
@@ -1534,7 +1593,7 @@ export class LogicEditor {
       : this.structOf(f.type) ? `<span class="lg-dim lg-fval" title="Default: ${lgEsc(lgValueText(f.value, f.type, this.data))}">fields</span>`
       : f.type === "bool" ? `<input type="checkbox" data-sf="value"${f.value ? " checked" : ""} title="Default">`
       : f.type === "actor" ? `<span class="lg-dim">none</span>`
-      : `<input data-sf="value" class="lg-fval" value="${lgEsc(f.type === "vector" ? (f.value || [0, 0, 0]).join(", ") : f.type === "text" ? (f.value ?? "") : lgNum(f.value))}" title="Default" spellcheck="false">`;
+      : `<input data-sf="value" class="lg-fval" value="${lgEsc(f.type === "vector" ? (f.value || [0, 0, 0]).join(", ") : f.type === "text" ? (f.value ?? "") : lgNumText(f.value, f.type))}" title="Default (${lgEsc(lgTypeLabel(f.type))})" spellcheck="false">`;
     const rows = s.fields.map((f, i) => `<div class="lg-frow lg-srow" data-field="${lgEsc(f.name)}">
         <i class="lg-pill" style="--c:${lgColor(f.type)}"></i><input data-sf="name" class="lg-fname" value="${lgEsc(f.name)}" spellcheck="false" title="The field's name">
         <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${this.keyedChoices(f.type, "sf", without)}${lgIsList(f.type) ? `<input data-sf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${f.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${value(f)}
@@ -1606,6 +1665,11 @@ export class LogicEditor {
       this.deleteSelection();
     });
     act("duplicate", () => this.duplicate());
+    // (a formula's input types: the setting Types, written again from the menus)
+    for (const f of b.querySelectorAll("[data-ftype]")) f.onchange = () => {
+      const types = [...b.querySelectorAll("[data-ftype]")].map(x => x.value).join(" ");
+      lgMark(f, this.cmd({cmd: "logicParam", node: node.id, key: "types", value: types}));
+    };
     act("break", () => this.breakAll(node));
     act("comment", () => this.commentSelection());
     act("straighten", () => this.straighten());
@@ -1662,7 +1726,7 @@ export class LogicEditor {
             else if (k === "mapkey" || k === "mapvalue") edit({op: "pinType", side, pin, type: this.keyedWith(def.type, k, f.value)});
             else if (k === "count") edit({op: "pinType", side, pin, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))});
             else if (k === "ref") edit({op: "pinRef", side, pin, ref: f.value});
-            else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : lgTyped64(def.type, f.value)});
+            else lgMark(f, edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : lgLiteral(def.type, f.value)}));
           };
         }
       }
@@ -1718,7 +1782,7 @@ export class LogicEditor {
             else if (k === "type") { if (edit({op: "fieldType", field, type: f.value})?.ok === false) f.value = def.type; }
             else if (k === "mapkey" || k === "mapvalue") edit({op: "fieldType", field, type: this.keyedWith(def.type, k, f.value)});
             else if (k === "count") { if (edit({op: "fieldType", field, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))})?.ok === false) f.value = def.count || 0; }
-            else edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : lgTyped64(def.type, f.value)});
+            else lgMark(f, edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : lgLiteral(def.type, f.value)}));
           };
         }
       }
@@ -1740,8 +1804,8 @@ export class LogicEditor {
         else if (k === "count") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: variable.type, count: Math.max(0, Math.floor(+f.value || 0))});
         else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
-          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : lgTyped64(variable.type, f.value);
-          this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value});
+          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : lgLiteral(variable.type, f.value);
+          lgMark(f, this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value}));
         }
       };
     }
@@ -2237,17 +2301,26 @@ export class LogicEditor {
     const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
     if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;
     if (!lgBuiltin(from) || !lgBuiltin(to)) return false;  // an enum's value goes where its own enum is wanted, nowhere else (a map, a set: where its own keys and values are)
-    // (no wire converts: a value goes where its own type is wanted - a conversion is a node, num.cast / num.text)
+    // (no wire converts: a value goes where its own type is wanted. Where a node converts it - Cast, To Text, List to
+    // Text, Make Vector -, the pin lights in its own way: dropped there, the engine puts that node on the wire)
+    const number = t => lgIsNumber(t) || t === "bool";
+    if ((number(from) && number(to)) || (number(from) && to === "text") || (lgIsList(from) && to === "text") || (lgIsNumber(from) && to === "vector")) return "convert";
     return false;
+  }
+
+  /** What a wire did, said: the node the engine put on it to convert ("f32 → i64"), and what that can change. */
+  saidConnect(r) {
+    if (r?.ok === false && r.error) this.studio.toast(r.error);
+    else if (r?.inserted) this.studio.toast("On the wire: " + r.title + (r.loss ? " - can change a value: " + r.loss : ""));
   }
 
   highlightTargets(d) {
     this.el.nodes.classList.add("wiring");
-    for (const row of this.el.nodes.querySelectorAll(".lg-row")) row.classList.toggle("can", this.fits(d, row));
+    for (const row of this.el.nodes.querySelectorAll(".lg-row")) { const f = this.fits(d, row); row.classList.toggle("can", !!f); row.classList.toggle("conv", f === "convert"); }
   }
   clearTargets() {
     this.el.nodes.classList.remove("wiring");
-    for (const row of this.el.nodes.querySelectorAll(".lg-row.can, .lg-row.hover")) row.classList.remove("can", "hover");
+    for (const row of this.el.nodes.querySelectorAll(".lg-row.can, .lg-row.hover, .lg-row.conv")) row.classList.remove("can", "hover", "conv");
   }
 
   onUp(e, cancelled = false) {
@@ -2289,13 +2362,19 @@ export class LogicEditor {
       if (row && row.closest(".lg-node") && this.fits(d, row)) {
         const other = +row.closest(".lg-node").dataset.id;
         for (const s of starts) {
-          if (s.out) this.engine.command({cmd: "logicConnect", from: s.node, out: s.pin, to: other, in: row.dataset.pin, transaction: d.transaction});
-          else this.engine.command({cmd: "logicConnect", from: other, out: row.dataset.pin, to: s.node, in: s.pin, transaction: d.transaction});
+          const r = s.out ? this.engine.command({cmd: "logicConnect", from: s.node, out: s.pin, to: other, in: row.dataset.pin, transaction: d.transaction})
+            : this.engine.command({cmd: "logicConnect", from: other, out: row.dataset.pin, to: s.node, in: s.pin, transaction: d.transaction});
+          this.saidConnect(r);
         }
         this.studio.flushUi();
         return;
       }
-      if (row && row.closest(".lg-node") && +row.closest(".lg-node").dataset.id !== d.node && d.moved) { this.studio.toast(`A ${lgTypeName(d.type)} pin does not fit a ${lgTypeName(row.dataset.type)} pin`); return; }
+      // (a pin it does not fit: the engine says why - no node converts the one into the other)
+      if (row && row.closest(".lg-node") && +row.closest(".lg-node").dataset.id !== d.node && d.moved && row.dataset.dir !== (d.out ? "out" : "in")) {
+        const other = +row.closest(".lg-node").dataset.id;
+        this.cmd(d.out ? {cmd: "logicConnect", from: d.node, out: d.pin, to: other, in: row.dataset.pin} : {cmd: "logicConnect", from: other, out: row.dataset.pin, to: d.node, in: d.pin});
+        return;
+      }
       if (d.ends) return;  // picked-up wires dropped in empty space: they stay broken (Blueprint)
       // A wire dropped into empty space (or a tap on a pin): the nodes that fit.
       if (d.moved || d.touch) this.openPalette(e.clientX, e.clientY, {node: d.node, pin: d.pin, output: d.out});
@@ -2444,7 +2523,7 @@ export class LogicEditor {
     }
     entries.push({label: "Add Nodes That Fit…", run: () => this.openPalette(x, y, {node, pin, output: out})});
     if (p && p.type !== "exec") entries.push({label: "Promote to Variable", run: () => { const r = this.cmd({cmd: "logicPromote", node, pin, output: out}); if (r?.variable) this.studio.toast(`New variable ${r.variable}`); }});
-    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: lgIsList(p.type) || lgIsKeyed(p.type) ? [] : p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "int64" ? "0" : p.type === "bool" ? false : 0})});
+    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: lgIsList(p.type) || lgIsKeyed(p.type) ? [] : p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "bool" ? false : 0})});
     this.studio.openMenu(entries, x, y);
   }
 
@@ -2804,8 +2883,16 @@ export const LOGIC_STYLE = `
 .lg-pin{width:15px;height:15px;flex:none;display:block}
 .lg-pin.exec{width:16px;height:16px}
 .lg-pl{font-size:12px}
+.lg-pt{font:600 9.5px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;margin:0 3px;background:#1d3b33;color:#7ff0d2}
+.lg-pt.f{background:#2a3d1f;color:#b9f08f}.lg-pt.b{background:#3d1f1f;color:#f09a9a}
+.lg-symt{display:block;font:600 10px/1.1 ui-monospace,Menlo,Consolas,monospace;color:#7ff0d2;letter-spacing:0}.lg-symt.f{color:#b9f08f}.lg-symt.b{color:#f09a9a}
+.lg-loss{display:flex;align-items:center;gap:4px;padding:2px 8px;font-size:11px;color:#e0b45a;background:rgba(224,165,38,.1)}.lg-loss .lg-i{width:12px;height:12px}
+.lg-bad,.lg-lit.lg-bad,input.lg-bad{border-color:#e04848!important;background:#2a0f0f!important;color:#ffb3b3!important}
+.lg-ferr{margin:4px 0;padding:4px 6px;border-radius:3px;background:#2a0f0f;color:#ffb3b3;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.lg-ferr mark{background:#e04848;color:#fff;border-radius:2px}
 .wiring .lg-row:not(.can){opacity:.35}
 .wiring .lg-row.can .lg-pin{filter:drop-shadow(0 0 4px #fff)}
+.wiring .lg-row.conv .lg-pin{filter:drop-shadow(0 0 4px #e0b45a)}
 .lg-row.hover{background:rgba(255,255,255,.12)}
 .lg-lit,.lg-par{height:20px;background:#0a0a0a;border:1px solid #3c3c3c;border-radius:3px;color:#f0f0f0;font:11.5px/1 inherit;padding:0 5px;min-width:0;outline:none}
 .lg-lit:focus,.lg-par:focus{border-color:var(--lg-acc)}
