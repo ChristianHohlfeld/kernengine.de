@@ -1853,7 +1853,7 @@ bool export_ok(const Function& f, std::string* why) {
     return false;
   };
   for (std::size_t k = 0; k < words.size(); ++k) {
-    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; floats: a List of Float; len, at: an Int)");
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number of that type by value; text: a Text; bytes: a List<u8>; floats: a List<f32>; len, at: a u32)");
     const std::size_t before = k >= 2 && words[k - 1] == "at" ? k - 2 : k - 1;
     const auto many = [](const std::string& x) { return x == "bytes" || x == "floats"; };
     if (words[k] == "len" && (k == 0 || (words[before] != "text" && !many(words[before])))) return no("len is the length of the text, the bytes or the floats before it (after their at)");
@@ -1861,7 +1861,7 @@ bool export_ok(const Function& f, std::string* why) {
     const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
     if (many(words[k]) && (after >= words.size() || words[after] != "len")) return no(words[k] + " are followed by their length: " + words[k] + " len (or " + words[k] + " at len)");
   }
-  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64, text, bytes: a List of Int, floats: a List of Float)");
+  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64: a number of that type; text: a Text; bytes: a List<u8>; floats: a List<f32>)");
   return true;
 }
 

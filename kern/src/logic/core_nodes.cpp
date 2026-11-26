@@ -666,6 +666,20 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // (no wire makes a text of a list: this node does - each item as To Text writes it, between [ and ])
+    NodeDef d = make("list.text", "List to Text", "Text", NodeKind::pure, "The items of the list as a text: [1, 2.5, 3] - each as its To Text writes it.",
+                     "string print show convert");
+    d.params = {type_param(false)};
+    d.inputs = {data("list", "List", PinType::f64_list)};
+    d.outputs = {data("result", "", PinType::text)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::text(c.in(std::size_t{0}).as_text()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("list.get", "Get Item", "Lists", NodeKind::pure, "The item at the index (the first is 0). Beyond the list: the zero of its type.", "element at index array");
     d.params = {type_param(false)};
     d.inputs = {data("list", "List", PinType::f64_list), data("index", "Index", PinType::i64, 0)};

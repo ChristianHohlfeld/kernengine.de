@@ -394,6 +394,8 @@ struct BlueprintCore : logic::PureNodes {
   // (the values read the entries where they stand - of a List or of a Fixed: logic::Items)
   template <class T> static Int list_length(logic::Items<T> list) { return static_cast<i64>(list.size()); }
   template <class T> static const T& list_get(logic::Items<T> list, Int index) { return list[index]; }
+  /// List to Text: the items as the interpreter writes a list ([1, 2.5, 3]).
+  template <class T> static Text list_text(logic::Items<T> list) { return Text(logic::to_value(std::vector<T>(list.begin(), list.end())).as_text()); }
   // (an item is sought as C++ compares it: of a list of U8 the number, an Int - logic::Sought)
   template <class T> static Int list_find(logic::Items<T> list, const logic::Sought<T>& item) {
     for (std::size_t k = 0; k < list.size(); ++k)

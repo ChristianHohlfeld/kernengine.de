@@ -144,12 +144,12 @@ struct Places : kern::Blueprint {
       case 4: { list_clear(Cars[car].Wheels); } break;
       case 5: { Cars[car].Wheels[wheel] = Mine.Spare; } break;
       case 6: {
-        list_add(Cars[car].Tags, kern::to<Text>(value));
+        list_add(Cars[car].Tags, num_text<f64>(value));
         list_add(Mine.Tags, "m");
         list_insert(Mine.Spare.Marks, 0, value);
       } break;
     }
-    return {n41.index, n44.removed, list_length<f64>(Cars[car].Wheels[wheel].Marks), list_length<Text>(Cars[car].Tags), kern::to<Text>(Cars[car].Wheels[wheel].Marks)};
+    return {n41.index, n44.removed, list_length<f64>(Cars[car].Wheels[wheel].Marks), list_length<Text>(Cars[car].Tags), num_text<f64>(list_get<f64>(Cars[car].Wheels[wheel].Marks, 0))};
   }
 
   struct LocalResult { f64 slip = 0.0; i64 wheels = 0; Text name = ""; };
@@ -159,7 +159,7 @@ struct Places : kern::Blueprint {
     list_add(Work.Wheels, struct_make<Wheel>(slip, Side::Rear, List<f64>{}));
     Work.Wheels[at].Slip += slip;
     Work.Spare.Marks[0] = slip;
-    Work.Name = text_append(Work.Name, kern::to<Text>(Work.Wheels[at].Slip), "");
+    Work.Name = text_append(Work.Name, num_text<f64>(Work.Wheels[at].Slip), "");
     return {Work.Wheels[at].Slip, list_length<Wheel>(Work.Wheels), Work.Name};
   }
 
@@ -429,9 +429,9 @@ struct References : kern::Blueprint {
     Toggle(Flags[at]);
     Flags[0] = logic_and(Flags[at], add);
     for (auto it50 = flow_for_each<bool>(n50, Flags); it50.next();) {
-      On += num_cast<i64, f64>(n50.item);
+      On += num_cast<i64, bool>(n50.item);
     }
-    return {On, list_find<bool>(Flags, add), Flags[0], kern::to<Text>(Flags[at])};
+    return {On, list_find<bool>(Flags, add), Flags[0], num_text<bool>(Flags[at])};
   }
 
   struct RunResult { f64 speed = 0.0; i64 wheels = 0; f64 slip = 0.0; i64 marks = 0; Text name = ""; f64 total = 0.0; i64 scores = 0; f64 mine = 0.0; i64 count = 0; f64 sum = 0.0; f64 mixed = 0.0; bool flag = false; };
@@ -488,7 +488,7 @@ struct Flow : kern::Blueprint {
     } else if (math_compare<"<", f64>(points, 0.0)) {
       return {};
     }
-    return {3, text_append("fail ", kern::to<Text>(points), "")};
+    return {3, text_append("fail ", num_text<f64>(points), "")};
   }
 
   struct FirstAboveResult { i64 sum = 0; i64 last = -1; };
@@ -507,7 +507,7 @@ struct Flow : kern::Blueprint {
     Count = 0;
     for (auto it20 = flow_for(n20, 1, rows); it20.next();) {
       for (auto it21 = flow_for(n21, 1, columns); it21.next();) {
-        Count += math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n20.index), num_cast<f64, i64>(n21.index)));
+        Count += num_cast<i64, f64>(math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n20.index), num_cast<f64, i64>(n21.index))));
         Heat += 0.25;
       }
     }
@@ -544,8 +544,8 @@ struct Flow : kern::Blueprint {
       case 4: { go32("toggle"); } break;
       case 5: {
         switch (flow_flip_flop(n33)) {
-          case 0: { Log = text_append(Log, "A", kern::to<Text>(n33.is_a)); } break;
-          case 1: { Log = text_append(Log, "B", kern::to<Text>(n33.is_a)); } break;
+          case 0: { Log = text_append(Log, "A", num_text<bool>(n33.is_a)); } break;
+          case 1: { Log = text_append(Log, "B", num_text<bool>(n33.is_a)); } break;
         }
       } break;
       case 6: { Log = "?"; } break;
@@ -572,7 +572,7 @@ struct Flow : kern::Blueprint {
 
   void go31(Text entry) {
     if (flow_do_n(n31, entry, 2)) {
-      Log = text_append(Log, "n", kern::to<Text>(n31.counter));
+      Log = text_append(Log, "n", num_text<i64>(n31.counter));
     }
   }
 
@@ -613,8 +613,8 @@ struct Calls : kern::Blueprint {
   AddUpResult AddUp(f64 amount = 1.0, i64 times = 1) {
     for (auto it42 = flow_for(n42, 1, times); it42.next();) {
       n43.value = (Total += Scale(amount, 1.5).out);
-      n44.value = (Steps = math_floor<f64>(n43.value));
-      Trace = text_append(Trace, kern::to<Text>(n44.value), ",");
+      n44.value = (Steps = num_cast<i64, f64>(math_floor<f64>(n43.value)));
+      Trace = text_append(Trace, num_text<i64>(n44.value), ",");
     }
     return {Total, Steps};
   }
@@ -639,12 +639,12 @@ struct Calls : kern::Blueprint {
     n62 = AddUp(b, 1);
     Flag = math_compare<">", f64>(n61.total, n62.total);
     Mark(n62.total, Flag);
-    return {math_add<f64>(n61.total, n62.total), text_append(kern::to<Text>(n61.steps), "/", kern::to<Text>(n62.steps))};
+    return {math_add<f64>(n61.total, n62.total), text_append(num_text<i64>(n61.steps), "/", num_text<i64>(n62.steps))};
   }
 
   void go52() {
     n52.value = (Total += n50.amount);
-    Trace = text_append(Trace, kern::to<Text>(n52.value), kern::to<Text>(n50.twice));
+    Trace = text_append(Trace, num_text<f64>(n52.value), num_text<bool>(n50.twice));
   }
 
   struct : kern::Node<42> { i64 index = 0; } n42;
@@ -737,39 +737,39 @@ struct Casts : kern::Blueprint {
   Text T = "";
   Actor A = Actor{};
 
-  /// Every wire between pins of different types.
+  /// Every conversion between types: a node of its own (no wire converts) - Cast, To Text, Make Vector, Id of Actor.
   void FromFloat(f64 x = 0.0) {
-    B = kern::to<bool>(x);
+    B = num_cast<bool, f64>(x);
     I = num_cast<i64, f64>(x);
     F = x;
-    V = kern::to<Vector>(x);
-    T = kern::to<Text>(x);
+    V = vector_make(num_cast<f32, f64>(x), num_cast<f32, f64>(x), num_cast<f32, f64>(x));
+    T = num_text<f64>(x);
   }
 
   void FromInt(i64 x = 0) {
-    B = kern::to<bool>(x);
+    B = num_cast<bool, i64>(x);
     I = x;
     F = num_cast<f64, i64>(x);
-    V = kern::to<Vector>(x);
-    T = kern::to<Text>(x);
+    V = vector_make(num_cast<f32, i64>(x), num_cast<f32, i64>(x), num_cast<f32, i64>(x));
+    T = num_text<i64>(x);
   }
 
   void FromBool(bool x = false) {
     B = x;
-    I = num_cast<i64, f64>(x);
-    F = num_cast<f64, i64>(x);
-    T = kern::to<Text>(x);
+    I = num_cast<i64, bool>(x);
+    F = num_cast<f64, bool>(x);
+    T = num_text<bool>(x);
   }
 
   void FromVector(Vector x = Vector{0.0, 0.0, 0.0}) {
     V = x;
-    T = kern::to<Text>(x);
+    T = text_append(num_text<f32>(vector_break(x).x), ", ", text_append(num_text<f32>(vector_break(x).y), ", ", num_text<f32>(vector_break(x).z)));
   }
 
   void FromActor(Actor x = Actor{}) {
     A = x;
-    B = kern::to<bool>(x);
-    T = kern::to<Text>(x);
+    B = logic_not(actor_equal(x, Actor{}));
+    T = num_text<i64>(actor_id(x));
   }
 
   struct PickResult { f64 number = 0.0; i64 whole = 0; bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{}; };
@@ -799,7 +799,7 @@ struct Lists : kern::Blueprint {
   /// Add gives the index; a list prints its items.
   PushResult Push(f64 value = 0.0) {
     list_add(n3, Scores, value);
-    return {n3.index, list_length<f64>(Scores), kern::to<Text>(Scores)};
+    return {n3.index, list_length<f64>(Scores), num_text<f64>(list_get<f64>(Scores, 0))};
   }
 
   struct EditResult { bool removed = false; i64 length = 0; Text shown = ""; };
@@ -812,7 +812,7 @@ struct Lists : kern::Blueprint {
       case 3: { list_remove(n14, Scores, value); } break;
       case 4: { list_clear(Scores); } break;
     }
-    return {n14.removed, list_length<f64>(Scores), kern::to<Text>(Scores)};
+    return {n14.removed, list_length<f64>(Scores), num_text<f64>(list_get<f64>(Scores, 0))};
   }
 
   struct SumResult { f64 total = 0.0; i64 passes = 0; i64 last = 0; };
@@ -822,7 +822,7 @@ struct Lists : kern::Blueprint {
     for (auto it20 = flow_for_each<f64>(n20, Scores); it20.next();) {
       Total += n20.item;
       for (auto it22 = flow_for_each<Text>(n22, Names); it22.next();) {
-        Shown = text_append(Shown, n22.item, kern::to<Text>(n22.index));
+        Shown = text_append(Shown, n22.item, num_text<i64>(n22.index));
       }
     }
     return {Total, list_length<Text>(Names), n20.index};
@@ -844,9 +844,9 @@ struct Lists : kern::Blueprint {
     list_clear(Points);
     list_clear(Team);
     for (auto it40 = flow_for(n40, 1, n); it40.next();) {
-      list_add(Counts, math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n40.index), num_cast<f64, i64>(big))));
+      list_add(Counts, num_cast<i64, f64>(math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n40.index), num_cast<f64, i64>(big)))));
       list_add(Flags, math_compare<"==", f64>(math_rem<f64>(num_cast<f64, i64>(n40.index), 2.0), 0.0));
-      list_insert(Points, 0, vector_make(num_cast<f64, i64>(n40.index), 0.5, -1.0));
+      list_insert(Points, 0, vector_make(num_cast<f32, i64>(n40.index), 0.5f, -1.0f));
       list_add(Team, who);
     }
     Counts[0] = -7;
@@ -945,7 +945,7 @@ struct Enums : kern::Blueprint {
   WalkResult Walk() {
     Log = "";
     for (auto it40 = flow_for_each<Mode>(n40, enum_values<Mode>()); it40.next();) {
-      Log = text_append(Log, enum_name<Mode>(n40.item), kern::to<Text>(enum_index<Mode>(n40.item)));
+      Log = text_append(Log, enum_name<Mode>(n40.item), num_text<i64>(enum_index<Mode>(n40.item)));
     }
     switch (flow_switch_enum<One>(Single)) {
       case One::Only: {
@@ -999,7 +999,7 @@ struct Structs : kern::Blueprint {
   KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, f64 damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{}) {
     return {struct_make<Weapon>(name, kind, damage, list_make<f64, "2">(damage, math_div<f64>(damage, 2.0)), struct_make<Aim>(at, num_cast<i64, f64>(damage)), list_make<Aim, "2">(struct_make<Aim>(at, 1), Last), false, who,
                                 list_make<Kind, "1">(kind)),
-            struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
+            struct_make<Aim>(vector_scale(at, num_cast<f32, f64>(damage)), 2), struct_make<Solo>(damage)};
   }
 
   struct TakeResult { Text name = ""; Kind type = Kind::Melee; i64 count = 0; bool has = false; i64 at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; f64 only = 0.0; bool same = false; bool one = false; };
@@ -1551,7 +1551,7 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 
   struct vertexResult { Text result = ""; };
   KERN_OVERRIDE KERN_PURE vertexResult vertex() {
-    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+    return {text_append("vWater = aWater * ", num_text<f64>(Time), ";")};
   }
 
   KERN_OVERRIDE void bind(Object<kern::Program> program = Object<kern::Program>{}) {
