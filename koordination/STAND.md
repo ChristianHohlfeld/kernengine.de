@@ -38,3 +38,14 @@ Offen: Zahlen nur 64 Bit vs. Geschwindigkeit (Performance-Schritt, mit Messung);
 ## Nächste Schritte
 1. 4b auswerten → $S/k4.log, $S/kandidat4_wartet.txt → test2. Grün → nach work (Absenkungen brauchen keinen Differenz-Beleg mehr: Spieltests + e2e + Vergleich).
 2. Kandidat 5: + tempo2, test2, tests, umschalten-b, umschalten-c, enginelib (sobald Suite wieder baut). 3. Prüfer-Liste umsetzen. 4. Engine-Plan Punkt 2 ff.
+
+## Nachtrag 26.11. 01:25 — Regeln für „sauber" (verbindlich)
+
+1. **Ein gemeinsamer Stand.** work-enginelib führt work-projekt + work-sauber zusammen; darauf kommen work-umschalten-c (schon in work-projekt), work-test2, work-tests, work-tempo2, work-umschalten-b. Gate für jeden Schritt: native, build, determinism, input, converter-cases und der Engine-Teil des e2e grün. Kein Zweig läuft länger allein weiter.
+2. **Engine-Tests hängen an keinem Spiel.** e2e ist getrennt in Engine-Fälle (eigenes kleines Projekt) und Spiel-Fälle.
+3. **Maßstab ist ein zweites Spiel** (Zweig work-zweitspiel, Befunde in zweitspiel_befunde.md). Öffentliche Schnittstellen (Akteure, Komponenten, Level zur Laufzeit) werden aus dem entworfen, was beide Spiele TUN — nicht aus dem, was SpawnCity gerade nennt. Die Entscheidung „game::Actor/Komponenten/Level als Structs öffentlich" ist zurückgenommen.
+4. **Voller Lauf erst nach den schnellen Prüfungen:** converter-cases grün, `engine_api.py --check` gegen Level/Texte = 0, Konverter schreibt Programm-Blueprints ins .kproject. Kein Zwei-Stunden-Lauf, der an Bekanntem scheitert.
+5. **Nach `work`** nur der gemeinsame Stand mit vollem Lauf + ganzer CI grün (auch Spiel-Jobs).
+6. Bewiesen heißt: CI-Lauf mit Nummer. „Gepusht" ist nicht „bewiesen".
+
+Stand der Teile: Exporte (CI grün), Einstieg kern_main + Projekt-Einstellungen + Exporte am Programm (CI 45722359527 grün), Object<I>/Implements als Typ/KERN_PLACE/Blätter (CI 45717868592 grün bis auf Spiel-Jobs), Engine-Bibliotheken aus der Engine (lokal grün, CI offen), Pure-Regel + converter-cases (Probe 45725044600 rc=0). Kandidat 4b gescheitert (Pure sc_gamepad) — behoben auf work-test2.
