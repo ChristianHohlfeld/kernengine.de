@@ -15707,8 +15707,8 @@ class TestWriter:
                 if m:
                     last = int(m.group(1))
                 e = re.search(r"\berror: (.*)", line)
-                if not e:
-                    continue
+                if not e or "too many errors emitted" in line:
+                    continue   # (the compiler stopping after so many is no complaint of a piece: those before it are)
                 at = int(m.group(1)) if m else last
                 if at is None:
                     for later in out[i + 1:i + 12]:

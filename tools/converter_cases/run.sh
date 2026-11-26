@@ -14,6 +14,8 @@
 #             missing object (the test writer refuses the same where it writes a test: guard).
 #   nodekind.cpp an enum of the engine's logic (kern::logic::NodeKind) in the program's source: in its test the real
 #             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of game.cpp).
+#   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece ("too many errors"
+#             in the test of game.cpp: the piece before it went for it).
 # Each case is a program of its own, its Blueprints read into a level of their own, as the game's are: the engine's
 # reader refuses what is wrong (a function read as a value that changes something).
 set -euo pipefail
@@ -71,6 +73,8 @@ check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 
 
 convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
+
+python3 "$here/compiles.py" || fail=1
 
 if [ $fail != 0 ]; then
   for c in pad getter nodekind bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
