@@ -304,6 +304,9 @@ struct Actor {
   std::string folder;           // outliner folder ("" = top level)
   bool hidden = false;          // hidden in the editor and in game
   bool locked = false;          // not selectable in the viewport
+  /// A template ("template": true): not in the world when it starts; GameWorld::spawn makes copies of it and its
+  /// children (kern/docs/runtime_actors.md). It stands at the top of the level.
+  bool is_template = false;
   Transform transform;          // relative to the parent
   std::vector<std::string> tags;
   std::optional<MeshComponent> mesh;
@@ -408,9 +411,12 @@ struct EditorCamera {
   f32 yaw = 51, pitch = -24;    // degrees
 };
 
-/// The actor Play possesses: world.player when it has a Player Controller, else the first that has one.
+/// The actor Play possesses: world.player when it has a Player Controller, else the first that has one (never one of
+/// a template).
 struct Level;
 u32 default_player(const Level& level);
+/// The template an actor belongs to (itself or the template at the top of its parents), 0: none.
+u32 template_of(const Level& level, u32 actor);
 
 /// The names of a level's collision channels, in the order of their bits (WorldSettings::channels).
 std::vector<std::string> channel_names(const WorldSettings& w);

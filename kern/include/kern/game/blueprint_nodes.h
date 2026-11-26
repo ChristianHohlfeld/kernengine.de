@@ -72,13 +72,14 @@ void actor_launch(GameWorld& w, Self self, Actor target, Vector velocity);
 void actor_simulate(GameWorld& w, Self self, Actor target, Bool simulate);
 void actor_joint_motor(GameWorld& w, Self self, Actor target, Int joint, Bool enable, Float speed, Float force);
 void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float impulse, Float damage);
-/// `named`: the node's setting (a template's name), used when no Template is given.
-Actor actor_spawn(GameWorld& w, Self self, logic::Host& host, std::string_view named, Actor tpl, Vector location, Vector rotation);
+/// A copy of the level's template `template_name` (the node's setting) - GameWorld::spawn; an error to the host with the reason.
+/// (The one place of the actor reference a spawn gives: kern/docs/runtime_actors.md.)
+Actor actor_spawn(GameWorld& w, Self self, logic::Host& host, std::string_view template_name, Vector location, Vector rotation, Vector scale);
 void actor_destroy(GameWorld& w, Self self, Actor target);
 void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled);
 void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, std::string_view path, std::string_view value);
-void actor_set_light(GameWorld& w, Self self, Actor target, Vector color, Float intensity, Float range);
-void actor_set_color(GameWorld& w, Self self, Actor target, Vector color);
+void actor_set_light(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color, Float intensity, Float range);
+void actor_set_color(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color);
 
 // ---- the game ----
 void game_message(GameWorld& w, Self self, std::string_view text);
@@ -131,11 +132,13 @@ template <class Core> struct BlueprintNodesOf : Core {
   logic::ActorRef kern_self() const { return this->kern_world.self; }
 
   // ---- actors: values ----
-  Actor actor_self() const { return kern_game() ? Actor{kern_self()} : Actor{}; }
+  /// An actor of the world the class runs in (0: none) - what the interpreter's Context::actor gives.
+  Actor kern_actor(logic::ActorRef id) const { return id && this->kern_world.host ? Actor{id, this->kern_world.host->world()} : Actor{}; }
+  Actor actor_self() const { return kern_game() ? kern_actor(kern_self()) : Actor{}; }
   Actor actor_player(Int index) const { GameWorld* g = kern_game(); return g ? nodes::actor_player(*g, kern_self(), index) : Actor{}; }
   Int actor_player_count() const { GameWorld* g = kern_game(); return g ? nodes::actor_player_count(*g, kern_self()) : 0; }
   /// (by the host: a game's finds the actor of its world - logic::Host::find_actor)
-  Actor actor_find(const Text& name) const { return this->kern_world.host ? Actor{this->kern_world.host->find_actor(name)} : Actor{}; }
+  Actor actor_find(const Text& name) const { return this->kern_world.host ? kern_actor(this->kern_world.host->find_actor(name)) : Actor{}; }
   nodes::Found actor_find_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_find_tag(*g, kern_self(), tag) : nodes::Found{}; }
   List<Actor> actor_all_with_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_all_with_tag(*g, kern_self(), tag) : List<Actor>(); }
   template <class N> Actor actor_random_tag(N& n, const Text& tag) {
@@ -167,19 +170,21 @@ template <class Core> struct BlueprintNodesOf : Core {
   }
   void actor_explode(Vector location, Float radius, Float impulse, Float damage) { if (GameWorld* g = kern_game()) nodes::actor_explode(*g, kern_self(), location, radius, impulse, damage); }
   /// (with n: the node's member, when what it gives is read - n.spawned)
-  template <Setting Template> void actor_spawn(Actor tpl, Vector location, Vector rotation) {
-    if (GameWorld* g = kern_game()) nodes::actor_spawn(*g, kern_self(), *this->kern_world.host, Template.view(), tpl, location, rotation);
+  template <Setting Template> void actor_spawn(Vector location, Vector rotation, Vector scale) {
+    if (GameWorld* g = kern_game()) nodes::actor_spawn(*g, kern_self(), *this->kern_world.host, Template.view(), location, rotation, scale);
   }
-  template <Setting Template, class N> void actor_spawn(N& n, Actor tpl, Vector location, Vector rotation) {
-    if (GameWorld* g = kern_game()) n.spawned = nodes::actor_spawn(*g, kern_self(), *this->kern_world.host, Template.view(), tpl, location, rotation);
+  template <Setting Template, class N> void actor_spawn(N& n, Vector location, Vector rotation, Vector scale) {
+    if (GameWorld* g = kern_game()) n.spawned = nodes::actor_spawn(*g, kern_self(), *this->kern_world.host, Template.view(), location, rotation, scale);
   }
   void actor_destroy(Actor target) { if (GameWorld* g = kern_game()) nodes::actor_destroy(*g, kern_self(), target); }
   void actor_enable(Actor target, Bool enabled) { if (GameWorld* g = kern_game()) nodes::actor_enable(*g, kern_self(), target, enabled); }
   void actor_set_property(Actor target, const Text& path, const Text& value) {
     if (GameWorld* g = kern_game()) nodes::actor_set_property(*g, kern_self(), *this->kern_world.host, target, path, value);
   }
-  void actor_set_light(Actor target, Vector color, Float intensity, Float range) { if (GameWorld* g = kern_game()) nodes::actor_set_light(*g, kern_self(), target, color, intensity, range); }
-  void actor_set_color(Actor target, Vector color) { if (GameWorld* g = kern_game()) nodes::actor_set_color(*g, kern_self(), target, color); }
+  void actor_set_light(Actor target, Vector color, Float intensity, Float range) {
+    if (GameWorld* g = kern_game()) nodes::actor_set_light(*g, kern_self(), *this->kern_world.host, target, color, intensity, range);
+  }
+  void actor_set_color(Actor target, Vector color) { if (GameWorld* g = kern_game()) nodes::actor_set_color(*g, kern_self(), *this->kern_world.host, target, color); }
 
   // ---- the game ----
   void game_message(const Text& text) { if (GameWorld* g = kern_game()) nodes::game_message(*g, kern_self(), text); }
@@ -247,7 +252,7 @@ template <class Core> struct BlueprintNodesOf : Core {
       first = false;
       const std::size_t at = static_cast<std::size_t>(n.memory[0]);
       if (at >= n.list.size() || !self.kern_pass()) return false;
-      n.actor = {n.list[at]};
+      n.actor = self.kern_actor(n.list[at]);
       n.index = static_cast<i64>(at);
       return true;
     }

@@ -1,10 +1,12 @@
 // Kern application host: runs a game written in C++ against kern::App
 // (kern/include/kern/app/app.h) in a canvas. Owns only what the browser
 // forces into JavaScript: the WebGL2 context, the frame callback, the
-// drawing-buffer size and input events, all forwarded to the module.
+// drawing-buffer size, input events and the sound device (the engine's mixer,
+// kern/docs/app.md 3.), all forwarded to the module.
 // The input events themselves are read by kern.mjs' BrowserInput (the same
 // for every Kern host); this file says what they are to kern::Input.
-import {loadKern, BrowserInput} from "./kern.mjs";
+import {loadKern, BrowserInput, readGamepad} from "./kern.mjs";
+import {KernAudio} from "./audio.mjs";
 
 export const KERN_APP_VERSION = "kern-app-host-1";
 
@@ -19,16 +21,100 @@ export const KEY_CODES = Object.freeze([
 const KEY_INDEX = new Map(KEY_CODES.map((code, i) => [code, i]));
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Tab"]);
 
+const UI_STYLE = `
+.kern-ui { position: fixed; pointer-events: none; overflow: hidden; font: 15px system-ui, sans-serif; color: #eef3f8; z-index: 5; }
+.kern-ui > * { position: absolute; max-width: 90%; box-sizing: border-box; }
+.kern-ui-text { padding: 6px 10px; background: rgba(0,0,0,.5); border-radius: 6px; white-space: pre; }
+.kern-ui-bar { width: 25%; padding: 4px 8px; background: rgba(0,0,0,.5); border-radius: 6px; }
+.kern-ui-bar > div { height: 8px; margin-top: 3px; background: rgba(255,255,255,.2); border-radius: 4px; overflow: hidden; }
+.kern-ui-bar > div > div { height: 100%; background: #f2c230; }
+.kern-ui button { pointer-events: auto; font: inherit; color: inherit; padding: 8px 16px; margin: 2px 0; background: rgba(20,40,70,.85);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 8px; cursor: pointer; display: block; width: 100%; }
+.kern-ui button:hover, .kern-ui button:focus-visible { background: rgba(40,80,140,.95); outline: none; }
+.kern-ui-menu { padding: 6px; background: rgba(0,0,0,.55); border-radius: 10px; min-width: 12em; }
+`;
+
+/** The widgets' layer over `canvas`: `show(list)` draws the list the engine handed over, `event(id, index)` goes back. */
+function mountUi(canvas, event, onStatus) {
+  const doc = canvas.ownerDocument;
+  if (!doc.getElementById("kern-ui-style")) {
+    const st = doc.createElement("style");
+    st.id = "kern-ui-style";
+    st.textContent = UI_STYLE;
+    doc.head.appendChild(st);
+  }
+  const layer = doc.createElement("div");
+  layer.className = "kern-ui";
+  doc.body.appendChild(layer);
+  const fit = () => {
+    const r = canvas.getBoundingClientRect();
+    Object.assign(layer.style, {left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px"});
+  };
+  fit();
+  const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+  observer?.observe(canvas);
+  addEventListener("resize", fit);
+  let status = null;
+  return {
+    layer,
+    show(list) {
+      fit();
+      layer.replaceChildren();
+      let st = "";
+      for (const w of list) {
+        if (w.status) { st = w.text; if (onStatus) continue; }
+        let el;
+        if (w.kind === "text") { el = doc.createElement("div"); el.className = "kern-ui-text"; el.textContent = w.text; }
+        else if (w.kind === "bar") {
+          el = doc.createElement("div");
+          el.className = "kern-ui-bar";
+          el.style.width = (w.width * 100) + "%";
+          el.textContent = w.label;
+          const track = doc.createElement("div"), fill = doc.createElement("div");
+          fill.style.width = (w.value * 100) + "%";
+          track.appendChild(fill);
+          el.appendChild(track);
+        } else if (w.kind === "button") {
+          el = doc.createElement("button");
+          el.textContent = w.label;
+          el.style.width = "auto";
+          el.addEventListener("click", ev => { ev.stopPropagation(); event(w.id, 0); });
+        } else if (w.kind === "menu") {
+          el = doc.createElement("div");
+          el.className = "kern-ui-menu";
+          w.items.forEach((item, i) => {
+            const b = doc.createElement("button");
+            b.textContent = item;
+            b.addEventListener("click", ev => { ev.stopPropagation(); event(w.id, i); });
+            el.appendChild(b);
+          });
+        } else continue;
+        el.dataset.id = w.id;
+        el.dataset.kind = w.kind;
+        // the widget hangs by the same point of itself: x = 1 right-aligned, 0.5 centred
+        Object.assign(el.style, {left: (w.x * 100) + "%", top: (w.y * 100) + "%", transform: `translate(${-w.x * 100}%, ${-w.y * 100}%)`});
+        layer.appendChild(el);
+      }
+      if (st !== status) { status = st; onStatus?.(st); }
+    },
+    dispose() { observer?.disconnect(); removeEventListener("resize", fit); layer.remove(); },
+  };
+}
+
 /**
  * Starts the app in `canvas`. Module source: one of bytes / base64 / url / module.
- * `onStatus(text)` receives kern::Engine::set_status text.
+ * The app's widgets (kern::Engine::ui_text, ui_bar, ui_button, ui_menu and the status line set_status) are drawn
+ * over the canvas (class kern-ui); `onStatus(text)`, when given, receives the status line instead (a page that
+ * draws it itself).
  * `maxPixelRatio` caps the drawing-buffer density (default: full device ratio).
+ * `audio` (default true): the engine's mixer (kern::Engine::mixer) is heard - after the page's first gesture, paused
+ * while it is hidden (kern/web/audio.mjs); false: no sound device (a page that plays its own).
  * The page's own share of the input (all optional, after the app had the event; BrowserInput):
  * `onKey(event, down)`, `onLook(dx, dy)` - the locked pointer's movement in css px -,
  * `onLock(locked)`, `onDevice(kind, event)`, `onFingersGone()`, `onVisibility(hidden)`.
  */
 export async function runKernApp({canvas, bytes = null, base64 = null, url = null, module = null, onStatus = null, onError = null,
-  maxPixelRatio = Infinity, contextAttributes = {}, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null, onDevice = null, onFingersGone = null,
+  maxPixelRatio = Infinity, contextAttributes = {}, audio = true, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null, onDevice = null, onFingersGone = null,
   onVisibility = null} = {}) {
   if (!canvas?.getContext) throw Error("canvas required");
   const kern = await loadKern({bytes, base64, url, module});
@@ -39,7 +125,15 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   const gl = canvas.getContext("webgl2", {alpha: false, antialias: false, depth: true, powerPreference: "high-performance", ...contextAttributes});
   if (!gl) throw Error("WebGL2 required");
   kern.attachContext(canvas, gl);
-  kern.statusSink = text => onStatus?.(text);
+  // the app's widgets (kern/docs/app.md 6.): drawn over the canvas; the status line goes to onStatus when the page
+  // draws it itself
+  const ui = mountUi(canvas, (id, index) => {
+    const text = kern.encoder.encode(id), ptr = e.kern_alloc(text.length + 1);
+    kern.u8.set(text, ptr);
+    e.kern_app_ui_event(ptr, text.length, index);
+    e.kern_free(ptr);
+  }, onStatus);
+  kern.uiSink = json => ui.show(JSON.parse(json));
   let input = null;
   kern.pointerLockSink = lock => { if (lock) input?.lock(); else input?.unlock(); };  // kern::Engine::request_pointer_lock
   const ratio = () => Math.min(globalThis.devicePixelRatio || 1, maxPixelRatio);
@@ -57,7 +151,23 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     e.kern_free(ptr);
   }
   if (e.kern_main() !== 0) throw kern.fail("kern_main (kern::run)");
+  // the sound device, before the start: the App finds its mixer ready at the device's rate (kern/docs/app.md 3.)
+  let sound = null;
+  const heard = {frames: 0, peak: 0};
+  if (audio && KernAudio.supported()) {
+    const lenAt = e.kern_alloc(4);
+    sound = new KernAudio(frames => {
+      const ptr = e.kern_app_audio(frames, lenAt), n = new Uint32Array(kern.memory.buffer, lenAt, 1)[0];
+      const pcm = new Float32Array(kern.memory.buffer, ptr, n).slice();
+      heard.frames += n >> 1;
+      for (let i = 0; i < n; i++) heard.peak = Math.max(heard.peak, Math.abs(pcm[i]));
+      return pcm;
+    });
+    const rate = sound.create();
+    if (!rate || !e.kern_app_audio_init(rate)) { console.warn(rate ? kern.fail("audio") : "kern app: no sound device - the app runs without sound"); sound = null; }
+  } else if (audio) console.warn("kern app: this browser has no Web Audio - the app runs without sound");
   if (!e.kern_app_start(width, height)) throw kern.fail("app start");
+  const pump = sound ? setInterval(() => sound.pump(), 20) : 0;
 
   const listeners = [];
   const on = (target, type, fn, options) => { target.addEventListener(type, fn, options); listeners.push(() => target.removeEventListener(type, fn, options)); };
@@ -109,6 +219,11 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   let running = true, handle = 0;
   const frame = now => {
     if (!running) return;
+    sound?.pump();
+    // the gamepad (standard mapping) for kern::Input::gamepad - read each frame, the browser has no events for it
+    const pad = readGamepad();
+    if (pad) e.kern_app_gamepad(1, pad.lx, pad.ly, pad.rx, pad.ry, pad.lt, pad.rt, pad.bits >>> 0);
+    else e.kern_app_gamepad(0, 0, 0, 0, 0, 0, 0, 0);
     if (!e.kern_app_frame(now, document.hidden ? 1 : 0)) {
       running = false;
       const error = kern.fail("frame");
@@ -181,12 +296,18 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     exitXR() { xr?.session.end().catch(() => {}); },
     get inXR() { return !!xr; },
     get xrSpace() { return xr?.space || null; },
+    /** The sound device: its state ("none" without one, else the AudioContext's: "suspended" until a gesture,
+     *  "running"), how it plays ("worklet" / "script"), the frames it has pulled from the mixer and their peak. */
+    get audio() { return {state: sound?.context?.state ?? "none", mode: sound?.mode ?? "none", frames: heard.frames, peak: heard.peak}; },
     stop() {
       running = false;
+      clearInterval(pump);
+      sound?.close();
       xr?.session.end().catch(() => {});
       cancelAnimationFrame(handle);
       observer?.disconnect();
       for (const off of listeners) off();
+      ui.dispose();
       e.kern_app_stop();
     },
   };

@@ -17,12 +17,16 @@ using rt::kDegree;
 
 
 namespace {
-logic::Value act(ActorId id) { return logic::Value::actor(static_cast<logic::ActorRef>(id)); }
+/// An actor of the world in an event (0: none).
+logic::Value act(logic::WorldId world, ActorId id) { return logic::Value::actor(id ? logic::ActorHandle{static_cast<logic::ActorRef>(id), world} : logic::ActorHandle{}); }
 }  // namespace
+
+logic::WorldId GameWorld::world_id() const { return world_id_; }
 
 void GameWorld::start_logic() {
   logic_.reset();
   logic_host_.reset();
+  world_id_ = logic::new_world();   // (a new world at every start: an actor of the level before names nothing in this one)
   prop_changes_.clear();
   prop_log_.clear();
   spawn_changes_.clear();
@@ -31,6 +35,7 @@ void GameWorld::start_logic() {
   if ((mode_ != SimMode::play && mode_ != SimMode::simulate) || starting_replica_) return;
   bool any = !level_.logic.empty();
   for (const Actor& a : level_.actors) any |= a.logic.has_value() && !a.logic->empty();
+  for (const Actor& a : templates_.actors) any |= a.logic.has_value() && !a.logic->empty();   // (what spawn makes runs too)
   if (!any) return;
   logic_host_ = std::make_unique<LogicHost>(*this);
   logic_ = std::make_unique<logic::Runtime>(*logic_host_);
@@ -53,8 +58,8 @@ void GameWorld::logic_fire(const char* type, ActorId actor, ActorId other, std::
   e.target = static_cast<logic::ActorRef>(target);
   e.level = true;
   e.key = std::move(key);
-  e.args.push_back({"actor", act(actor)});
-  e.args.push_back({"other", act(other)});
+  e.args.push_back({"actor", act(world_id(), actor)});
+  e.args.push_back({"other", act(world_id(), other)});
   for (auto& x : extra) e.args.push_back(std::move(x));
   if (!target) {  // events about nobody in particular (game over...) reach every graph
     e.target = 0;
@@ -115,7 +120,7 @@ void GameWorld::key_event(const std::string& code, bool down) {
   e.type = "game.key";
   e.key = code;
   e.args.push_back({"pressed", logic::Value::boolean(down)});
-  e.args.push_back({"actor", act(player_)});
+  e.args.push_back({"actor", act(world_id(), player_)});
   logic_->fire(e);
 }
 
@@ -139,23 +144,49 @@ void GameWorld::replicated_state(std::vector<PropertyChange>& props, std::vector
 }
 
 namespace {
-json::Value* path_mut(json::Value& root, std::string_view path) {
+/// The value at `path` in `root` (dots between keys, an index for a list or a vector's channel), null with the reason
+/// where it stops - the keys there, or how long the list is.
+json::Value* path_mut(json::Value& root, std::string_view path, std::string& why) {
   json::Value* v = &root;
-  while (!path.empty() && v) {
+  std::string at;
+  while (!path.empty()) {
     const std::size_t dot = path.find('.');
     const std::string_view token = path.substr(0, dot);
+    const std::string where = at.empty() ? std::string("the actor") : "\"" + at + "\"";
     if (v->is_array()) {
-      const std::size_t i = static_cast<std::size_t>(std::atoi(std::string(token).c_str()));
-      v = i < v->size() ? &v->at(i) : nullptr;
+      bool digits = !token.empty() && token.size() < 10;
+      for (char c : token) digits &= c >= '0' && c <= '9';
+      const std::size_t i = digits ? static_cast<std::size_t>(std::atoi(std::string(token).c_str())) : 0;
+      if (!digits || i >= v->size()) {
+        why = where + " is a list of " + std::to_string(v->size()) + ": \"" + std::string(token) + "\" is no index of it (0.." +
+              std::to_string(v->size() ? v->size() - 1 : 0) + ")";
+        return nullptr;
+      }
+      v = &v->at(i);
     } else if (v->is_object()) {
-      v = v->find(token);
+      json::Value* next = v->find(token);
+      if (!next) {
+        std::string keys;
+        for (const auto& [k, x] : v->members()) keys += (keys.empty() ? "" : ", ") + k;
+        why = where + " has no \"" + std::string(token) + "\"" + (keys.empty() ? std::string(" (it has nothing)") : " - it has " + keys);
+        return nullptr;
+      }
+      v = next;
     } else {
-      v = nullptr;
+      why = where + " is a single value: it has no \"" + std::string(token) + "\"";
+      return nullptr;
     }
+    at += (at.empty() ? "" : ".") + std::string(token);
     path = dot == std::string_view::npos ? std::string_view() : path.substr(dot + 1);
   }
   return v;
 }
+
+const char* kind_name(const json::Value& v) {
+  return v.is_number() ? "a number" : v.is_bool() ? "true or false" : v.is_string() ? "a text" : v.is_array() ? "a list" : v.is_object() ? "an object" : "nothing";
+}
+
+std::string actor_name(const Actor& a) { return a.name.empty() ? "actor " + std::to_string(a.id) : "actor \"" + a.name + "\""; }
 }  // namespace
 
 bool GameWorld::set_property_number(ActorId id, const std::string& path, f64 value) { return set_property(id, path, json::Value(value)); }
@@ -164,23 +195,41 @@ bool GameWorld::set_property_text(ActorId id, const std::string& path, const std
 
 bool GameWorld::set_property(ActorId id, const std::string& path, const json::Value& value) {
   Actor* a = level_.find(id);
-  if (!a || path.empty() || path == "id" || path == "parent" || path.rfind("components.logic", 0) == 0) return false;
+  if (!a) return fail("set property \"%s\": no actor %u in the world", path.c_str(), id);
+  const std::string who = actor_name(*a);
+  if (path.empty()) return fail("set property of %s: the path is empty (e.g. \"components.light.intensity\")", who.c_str());
+  if (path == "id" || path == "parent" || path.rfind("components.logic", 0) == 0)
+    return fail("set property \"%s\" of %s: it cannot be set while the world runs (an actor's id, parent and Blueprint stay)", path.c_str(), who.c_str());
   json::Value doc = actor_to_json(*a);
-  json::Value* target = path_mut(doc, path);
-  if (!target) return fail("actor \"%s\" has no property \"%s\"", a->name.c_str(), path.c_str());
+  std::string why;
+  json::Value* target = path_mut(doc, path, why);
+  if (!target) return fail("set property \"%s\" of %s: %s", path.c_str(), who.c_str(), why.c_str());
   json::Value v = value;
-  if (target->is_number() && v.is_string()) v = std::strtod(v.as_string().c_str(), nullptr);
-  if (target->is_number() && v.is_bool()) v = v.as_bool() ? 1.0 : 0.0;
-  if (target->is_bool() && !v.is_bool()) v = v.truthy();
-  if (target->is_array() && v.is_number() && target->size() == 3) {  // a number for a vector: all three
+  auto wrong = [&](const char* wants) {
+    return fail("set property \"%s\" of %s: it is %s, the value is %s", path.c_str(), who.c_str(), wants, kind_name(value));
+  };
+  if (target->is_number()) {
+    if (v.is_string()) {   // (a text that is all a number: what the node "Set Property" gives)
+      const std::string& t = v.as_string();
+      char* end = nullptr;
+      const f64 n = t.empty() ? 0 : std::strtod(t.c_str(), &end);
+      if (t.empty() || *end) return wrong("a number");
+      v = n;
+    }
+    if (!v.is_number()) return wrong("a number");
+  } else if (target->is_bool()) {
+    if (!v.is_bool()) return wrong("true or false");
+  } else if (target->is_array() && target->size() == 3 && v.is_number()) {   // a number for a vector: all three
     json::Value arr = json::Value::array();
     for (int i = 0; i < 3; ++i) arr.push(v.as_number());
     v = std::move(arr);
+  } else if (target->is_string() ? !v.is_string() : target->is_array() ? !v.is_array() : target->is_object() && !v.is_object()) {
+    return wrong(kind_name(*target));
   }
   *target = std::move(v);
   Actor updated;
   std::string error;
-  if (!actor_from_json(doc, updated, &error)) return fail("%s", error.c_str());
+  if (!actor_from_json(doc, updated, &error)) return fail("set property \"%s\" of %s: %s", path.c_str(), who.c_str(), error.c_str());
   updated.id = a->id;
   updated.parent = a->parent;
   updated.logic = std::move(a->logic);
@@ -208,48 +257,75 @@ bool GameWorld::set_property(ActorId id, const std::string& path, const json::Va
   return true;
 }
 
-ActorId GameWorld::spawn_copy(ActorId source, Vec3 position, Vec3 rotation_deg, ActorId id) {
-  if (!running()) return 0;
-  const Actor* src = level_.find(source);
-  if (!src) { fail("spawn: no template actor %u", source); return 0; }
+bool GameWorld::set_material_color(ActorId id, Vec3 color) {
+  const Actor* a = level_.find(id);
+  if (!a) return fail("set material color: no actor %u in the world", id);
+  if (!a->mesh) return fail("set material color of %s: it has no mesh", actor_name(*a).c_str());
+  return set_property(id, "components.mesh.material.color", json::Value(hex_color(color)));
+}
+
+logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
+  const std::string name(template_name);
+  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return {}; }
+  const Actor* src = nullptr;
+  std::string known;
+  for (const Actor& a : templates_.actors) {
+    if (!a.is_template) continue;
+    if (a.name == template_name) { src = &a; break; }
+    known += (known.empty() ? "" : ", ") + a.name;
+  }
+  if (!src) {
+    if (known.empty()) fail("no template \"%s\" - the level has no templates (an actor with \"template\": true)", name.c_str());
+    else fail("no template \"%s\" - the level's templates: %s", name.c_str(), known.c_str());
+    return {};
+  }
+  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return {}; }
+  for (int i = 0; i < 3; ++i)
+    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return {}; }
+  // The template's subtree in the level's order (root first).
   std::vector<const Actor*> subtree{src};
   for (std::size_t i = 0; i < subtree.size(); ++i)
-    for (ActorId k : level_.children(subtree[i]->id))
-      if (const Actor* c = level_.find(k)) subtree.push_back(c);
-  ActorId root = id ? id : level_.next_id;
-  if (!id) for (const Actor& a : level_.actors) root = max_of(root, a.id + 1);
+    for (ActorId k : templates_.children(subtree[i]->id))
+      if (const Actor* c = templates_.find(k)) subtree.push_back(c);
+  // The next free ids: past every actor of the world and every template (a copy is never called like a template).
+  ActorId root = id;
+  if (!root) {
+    root = level_.next_id;
+    for (const Actor& a : level_.actors) root = max_of(root, a.id + 1);
+    for (const Actor& a : templates_.actors) root = max_of(root, a.id + 1);
+  }
   for (std::size_t i = 0; i < subtree.size(); ++i)
-    if (level_.find(root + static_cast<ActorId>(i))) { fail("spawn: actor ids are taken"); return 0; }
+    if (level_.find(root + static_cast<ActorId>(i)) || templates_.find(root + static_cast<ActorId>(i))) {
+      fail("spawn \"%s\": the ids %u..%u are taken", name.c_str(), root, root + static_cast<ActorId>(subtree.size() - 1));
+      return {};
+    }
   std::unordered_map<ActorId, ActorId> remap;
   for (std::size_t i = 0; i < subtree.size(); ++i) remap[subtree[i]->id] = root + static_cast<ActorId>(i);
-  // Copies are made from the level (they may be modified copies); collect them first, the vector grows.
-  std::vector<Actor> copies;
-  for (const Actor* a : subtree) copies.push_back(*a);
   std::vector<ActorId> created;
-  for (Actor& copy : copies) {
-    const ActorId old = copy.id;
-    copy.id = remap[old];
-    if (old == source) {
+  for (const Actor* a : subtree) {
+    Actor copy = *a;
+    copy.id = remap[a->id];
+    if (a == src) {
+      copy.is_template = false;
       copy.parent = 0;
-      copy.transform.position = position;
-      copy.transform.rotation = rotation_deg;
-      const Mat4 sw = level_.world_matrix(source);
-      copy.transform.scale = matrix_transform(sw).scale;
+      copy.transform = at;
       copy.hidden = false;
     } else {
-      copy.parent = remap.count(copy.parent) ? remap[copy.parent] : 0;
+      copy.parent = remap[copy.parent];
     }
     for (JointComponent& j : copy.joints)
       if (remap.count(j.target)) j.target = remap[j.target];
-    level_.add(copy);
-    created.push_back(copy.id);
-    alive_[copy.id] = true;
-    order_.push_back(copy.id);
+    level_.add(std::move(copy));
+    const ActorId made = remap[a->id];
+    created.push_back(made);
+    alive_[made] = true;
+    order_.push_back(made);
   }
   level_.next_id = max_of(level_.next_id, root + static_cast<ActorId>(subtree.size()));
   for (ActorId aid : created) {
     world_[aid] = level_.world_matrix(aid);
     if (const Actor* a = level_.find(aid); a && a->mesh) sync_actor_mesh(*a, world_[aid]);
+    if (const Actor* a = level_.find(aid); a && a->pickup) ++hud_.pickups_total;   // (collect all: what spawn makes counts)
   }
   Level part;
   part.world = level_.world;
@@ -269,14 +345,16 @@ ActorId GameWorld::spawn_copy(ActorId source, Vec3 position, Vec3 rotation_deg, 
   if (mode_ != SimMode::replica) {
     for (ActorId aid : created) if (const Actor* a = level_.find(aid)) create_joints(*a);
     for (ActorId aid : created) init_combat(aid);
-    SpawnChange c{source, root, position, rotation_deg};
+    SpawnChange c{name, root, at};
     spawn_changes_.push_back(c);
     if (spawn_log_.size() < 4096) spawn_log_.push_back(c);
-    if (logic_)
+    if (logic_) {
       for (ActorId aid : created)
         if (const Actor* a = level_.find(aid); a && a->logic && !a->logic->empty()) logic_->add(*a->logic, static_cast<logic::ActorRef>(aid), a->name);
+      logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
+    }
   }
-  return root;
+  return {root, world_id_};   // (the root, an Actor of this world: kern/docs/project.md 7)
 }
 
 void GameWorld::destroy_actor(ActorId id) {

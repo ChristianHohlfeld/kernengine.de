@@ -190,13 +190,20 @@ struct BlueprintCore : logic::PureNodes {
     if (kern_world.host) kern_world.host->print(text.str(), screen);
   }
   Float time_now() const { return kern_world.host ? kern_world.host->time() : 0.0; }
-  /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{0}).
+  /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{}).
   template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
-    if (kern_world.runtime)
-      kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
+    logic::ActorRef to = 0;
+    if (kern_world.runtime && kern_actor_here(target, "Call Event", to))
+      kern_world.runtime->call(Name.view(), to, {{"actor", logic::Value::actor(actor)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
+  }
+  /// The id an Actor names in the runtime of the class (Runtime::actor_here: one of another world names nothing, and the
+  /// host is told why). A class without a runtime reaches no actor.
+  bool kern_actor_here(Actor a, std::string_view node, logic::ActorRef& id) const {
+    id = 0;
+    return kern_world.runtime && kern_world.runtime->actor_here(kern_world.instance ? std::string_view(kern_world.instance->name()) : std::string_view("a class"), a, node, id);
   }
 
-  /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{0}: the Level's)
+  /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{}: the Level's)
   /// with `args`, and `out` takes what it gave - func_call_on<"Stars">(who, kern::out(n7.stars), x);
   template <Setting Name, class... O, class... A> void func_call_on(Actor target, Out<O...> out, const A&... args) {
     // (the arguments and what the function gives in places of this call: no memory asked for - Runtime::call_on)
@@ -204,7 +211,7 @@ struct BlueprintCore : logic::PureNodes {
     std::array<logic::Value, sizeof...(O)> results{};
     std::size_t given = 0;
     if (kern_world.runtime && kern_world.instance)
-      given = kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, std::span<const logic::Value>(in), std::span<logic::Value>(results));
+      given = kern_world.runtime->call_on(*kern_world.instance, Name.view(), target, std::span<const logic::Value>(in), std::span<logic::Value>(results));
     out.take(std::span<const logic::Value>(results.data(), given));
   }
 
@@ -214,18 +221,22 @@ struct BlueprintCore : logic::PureNodes {
   /// what is no value of T is T's default.)
   template <Setting Name, class T> T func_get_on(Actor target) {
     logic::Value held;
-    if (!kern_world.runtime || !kern_world.runtime->get_on(target.id, Name.view(), logic::pin_type_of<T>(), held)) return T{};
+    logic::ActorRef id = 0;
+    if (!kern_actor_here(target, "Get Variable on Actor", id) || !kern_world.runtime->get_on(id, Name.view(), logic::pin_type_of<T>(), held)) return T{};
     return logic::from_value<T>(held.converted(logic::pin_type_of<T>()));
   }
-  /// Has Blueprint: does `target` (Actor{0}: the Level) have a Blueprint that runs - what Call on Actor
+  /// Has Blueprint: does `target` (Actor{}: the Level) have a Blueprint that runs - what Call on Actor
   /// and Get Variable on Actor reach? func_has_blueprint(actor_find("Wanted")).
-  Bool func_has_blueprint(Actor target) const { return kern_world.runtime && kern_world.runtime->has_blueprint(target.id); }
+  Bool func_has_blueprint(Actor target) const {
+    logic::ActorRef id = 0;
+    return kern_actor_here(target, "Has Blueprint", id) && kern_world.runtime->has_blueprint(id);
+  }
   /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` is as the interface I
   /// (Runtime::engine_object: what fails is told to the host, as in the interpreter) -
   /// func_engine_object<kern::ShaderExtension>(actor_find("Water")). A class without a world has none, and says so.
   template <class I> Object<I> func_engine_object(Actor target) const {
     static const std::string interface = logic::engine_class_name(logic::cpp_name_of<I>());
-    if (kern_world.runtime && kern_world.instance) return Object<I>{kern_world.runtime->engine_object(*kern_world.instance, target.id, interface)};
+    if (kern_world.runtime && kern_world.instance) return Object<I>{kern_world.runtime->engine_object(*kern_world.instance, target, interface)};
     if (kern_world.host) kern_world.host->error("Engine Object of Blueprint: a class without a runtime has no Blueprints to ask");
     return {};
   }
@@ -233,6 +244,9 @@ struct BlueprintCore : logic::PureNodes {
   template <class I> static Bool object_valid(Object<I> object) { return object.valid(); }
   template <class I> static Int object_handle(Object<I> object) { return object.ref.handle; }
   template <class I> static Bool object_equal(Object<I> a, Object<I> b) { return a == b; }
+  /// Same Actor, Id of Actor (kern/docs/project.md 7): the same world and id; its id as an Int, the one way to a number.
+  static Bool actor_equal(Actor a, Actor b) { return a == b; }
+  static Int actor_id(Actor a) { return static_cast<i64>(a.id); }
 
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's

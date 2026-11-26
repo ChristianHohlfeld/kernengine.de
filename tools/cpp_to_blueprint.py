@@ -198,7 +198,16 @@ ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "
          "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "uint8_t": "unsigned char", "uint16_t": "unsigned short",
          "uint32_t": "unsigned int", "int8_t": "signed char", "int16_t": "short", "int32_t": "int", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
-ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
+ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""', "Actor": "Actor{}"}
+# An actor as C++ holds it, kern::logic::ActorHandle (its id and its world: kern/docs/project.md 7), is the Blueprint's Actor -
+# none is Actor{}, two compared Same Actor (actor_equal), its .id the node Id of Actor (actor_id): the one way to an Int. No
+# number becomes one (an ActorHandle made of an id waits, with the reason).
+ACTOR = "kern::logic::ActorHandle"
+
+
+def is_actor(t):
+    """Is the C++ type (cleaned) kern::logic::ActorHandle - as the engine's own headers spell it too (logic::ActorHandle)?"""
+    return re.fullmatch(r"(?:(?:::)?kern::)?logic::ActorHandle", (t or "").strip()) is not None
 # A place (a variable, a field, an input, what a function gives, an entry of a list) of a whole number of a fixed width
 # is, in the Blueprint, a place of that width: U8 ... I32 (kern/docs/blueprint_cpp.md "Whole numbers of a fixed width") -
 # storing there keeps the low bits, as C++ stores them. What flows through a pin, what an expression is, is an Int:
@@ -1987,6 +1996,8 @@ class Unit:
             return "Text"
         if t in ("kern::Vec3", "kern::Vec2"):
             return "Vector"
+        if is_actor(t):
+            return "Actor"
         if t == "void":
             return None
         if ITERATOR.match(t) or REVERSE_ITERATOR.match(t):
@@ -10324,6 +10335,10 @@ class Emit:
                 if b.get("name") not in ("x", "y", "z"):
                     raise Wait(f"vector: .{b.get('name')}")
                 return f"vector_break({self.ex(base, 'Vector')}).{b['name']}", "Float"
+            if is_actor(self.u.clean(qtype(base))):   # (an actor: its id, the one way to an Int - its world no node gives)
+                if b.get("name") != "id":
+                    raise Wait(f"the {b.get('name')} of an Actor: an Actor says its world itself - only its id is a number (Id of Actor)")
+                return f"actor_id({self.ex(base, 'Actor')})", "Int"
             if b.get("name") == "size" and re.match(r"(?:kern::)?Span<", self.ctype(base)):
                 # (a view of a list is the list: its size is the list's length - its data the place of its first entry, see place)
                 lt = self.tp(base)
@@ -11287,6 +11302,9 @@ class Emit:
                     return old, "Int"
                 self.hoist(self.effect(b))
                 return var, "Int"
+        if ops and not b.get("_op") and name in ("operator==", "operator!=") and len(ops) == 2 and is_actor(self.u.clean(qtype(ops[0]))):
+            same = f"actor_equal({self.ex(ops[0], 'Actor')}, {self.ex(ops[1], 'Actor')})"   # (Same Actor: the same world and id)
+            return (same if name == "operator==" else f"logic_not({same})"), "Bool"
         if self.own(ref.get("id")) and ref.get("id") in self.tree.body:   # an operator the program itself defines
             d = self.tree.body[ref["id"]]
             g = self.u.function(ref["id"])
@@ -11401,6 +11419,12 @@ class Emit:
             return self.made(d, a), t
         t = self.tp(b)
         a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+        if t == "Actor":   # (an actor: none, or one handed on - one made of numbers no Blueprint makes: kern/docs/project.md 7)
+            if all(bare(x).get("kind") in ("ImplicitValueInitExpr", "CXXDefaultInitExpr") for x in a):   # ({}: every field its default)
+                return "Actor{}", t
+            if len(a) == 1 and is_actor(self.u.clean(qtype(a[0]))):
+                return self.ex(a[0], t), t
+            raise Wait("an Actor made of numbers: an actor comes from its world (Self, Find Actor, Spawn Actor, an event) - no number becomes one")
         if self.language_value(b) and len(a) == 1:
             # (a value of the language as a Blueprint's class holds it, made of one value: a Text of a std::string, an
             # Int of a long, a U8 of an int - C++'s conversion of it, as a cast to that number says it: kern::logic::Sized
@@ -11771,7 +11795,7 @@ def engine_skipped(q):
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
 # bits, as C++ has them; a list of them a List<Int64>)
-ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64"}
+ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64", "Actor": "actor"}
 
 
 def snake(name):
@@ -11881,7 +11905,7 @@ class Api:
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN or bt in WIDTHS:
-            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[wire(bt)]
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l", "Actor": "a"}[wire(bt)]
         if object_class(bt):
             return "o"   # (an object of the engine - or none; `h` where it is always one: what a maker gives)
         if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
@@ -13507,6 +13531,18 @@ class TestWriter:
             return name
         if q not in self.names:
             raise Wait(f"the class {q.split('::')[-1]} is not written")
+        if q == ACTOR:   # (an actor is the Blueprint's Actor, not a struct: none, or one of a few ids in one of two worlds)
+            t = self.names[q]
+            self.helped[q] = [
+                f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{ if (!draw.below(4)) return {t}{{}}; {t} s{{}}; s.id = static_cast<unsigned int>(1 + draw.below(6));"
+                f" s.world = static_cast<unsigned int>(2 + draw.below(2)); return s; }}",
+                f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ return converted::Value::actor(kern::logic::ActorHandle{{s.id, s.world}}); }}",
+                f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return got.type == kern::logic::PinType::actor && got.as_actor() == kern::logic::ActorHandle{{want.id, want.world}}; }}",
+                f"[[maybe_unused]] static bool defined(const {t}&) {{ return true; }}",
+                f"[[maybe_unused]] static std::string text(const {t}& s) {{ return converted::Value::actor(kern::logic::ActorHandle{{s.id, s.world}}).as_text(); }}",
+                f"[[maybe_unused]] static void take({t}& s, const converted::Value& v) {{ const kern::logic::ActorHandle a = v.as_actor(); s.id = a.id; s.world = a.world; }}"]
+            self.helped.move_to_end(q)
+            return name
         o = self.tree.records[q]
         t = self.names[q]
         ctors = [c for c in kids(o) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]

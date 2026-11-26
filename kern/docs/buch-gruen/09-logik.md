@@ -274,7 +274,7 @@ Besucher, nicht zwei.
 
 Die **Aktionen** sind in Familien sortiert. Je ein Beispiel:
 
-- **Dinge:** **Spawn Actor** erzeugt eine Kopie eines Dings – samt Kindern und Spielregeln. So
+- **Dinge:** **Spawn Actor** erzeugt eine Kopie einer Vorlage – eines Dings, das als „Template“ markiert ist – samt Kindern und Spielregeln. So
   entsteht ein Spawner, der alle paar Sekunden eine Kiste ausspuckt.
 - **Physik:** **Launch** gibt einem Ding einen kräftigen Schwung, etwa nach oben wie ein
   Trampolin. Andere Knoten schubsen,

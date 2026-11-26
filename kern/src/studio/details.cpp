@@ -460,6 +460,7 @@ json::Value Studio::details_json() const {
     }
     fields.push(simple("hidden", "Hidden (editor and game)", F::boolean));
     fields.push(simple("locked", "Locked (not selectable)", F::boolean));
+    if (!p.parent) fields.push(simple("template", "Template (not in the world: Spawn Actor makes copies)", F::boolean));
     sections.push(std::move(s));
   }
   {

@@ -56,7 +56,12 @@ inline std::string native_show(const kern::logic::Value& v) {
 /// The host of the native Blueprint test: time stands still, errors are kept; its random numbers
 /// are one fixed sequence (a Blueprint draws its seed from it). Its engine is the stand-in: every
 /// function answers by its outputs' forms, the same in every tier.
+/// The world of a host of the native test (its actors) and of the objects of a host of a case on the engine itself: one number for every such host, so that two
+/// sides a test compares, set up alike, hold the same ObjectRefs (kern/docs/engine_object.md) - no EngineObjects of the
+/// process is given it (theirs count from 1).
+inline constexpr kern::logic::WorldId kNativeTestWorld = 0x7e57;
 struct NativeTestHost : kern::logic::Host {
+  NativeTestHost() : kern::logic::Host(kNativeTestWorld) {}
   std::vector<std::string> errors;
   kern::logic::EngineStandIn stand_in;
   bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override { return stand_in.engine(function, in, out); }
@@ -75,10 +80,6 @@ struct NativeTestHost : kern::logic::Host {
 /// objects, and the class calls the engine's functions on them itself (kern/logic/engine_direct.h); else
 /// every call comes through its door. It counts the calls that came through the door and keeps what it
 /// was told of calls that failed, in their order.
-/// The world of the objects of a host of a case on the engine itself: one number for every such host, so that two
-/// sides a test compares, set up alike, hold the same ObjectRefs (kern/docs/engine_object.md) - no EngineObjects of the
-/// process is given it (theirs count from 1).
-inline constexpr kern::logic::WorldId kNativeTestWorld = 0x7e57;
 struct NativeEngineHost : NativeTestHost {
   kern::logic::EngineObjects objects{kNativeTestWorld};
   bool direct = false;

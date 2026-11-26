@@ -474,10 +474,11 @@ ends with the last one that leaves it (a player's capsule and head are one visit
 `actor.all_with_tag` All Actors with Tag (an Actor List) ·
 `actor.random_tag` · `actor.has_tag` · `actor.name` · `actor.valid` · `actor.location` ·
 `actor.rotation` · `actor.forward` · `actor.velocity` · `actor.distance` · `actor.set_location` ·
-`actor.set_rotation` (degrees) · `actor.move_by` · `actor.spawn` Spawn Actor (copy of a template with
-children and logic, replicated to all players) · `actor.destroy` · `actor.enable` Set Enabled ·
+`actor.set_rotation` (degrees) · `actor.move_by` · `actor.spawn` Spawn Actor (copy of a template of the level – an actor
+marked Template – with children, components and logic, replicated to all players; [runtime_actors.md](../runtime_actors.md)) · `actor.destroy` · `actor.enable` Set Enabled ·
 `actor.set_property` Set Property (any component value via its path as in the level file, e.g.
-`components.mesh.material.color` – replicated)
+`components.light.intensity` – replicated; a path the actor does not have or a value of another kind is an error with the reason) ·
+`actor.set_color` Set Color (the mesh colour, `GameWorld::set_material_color`)
 
 ### Physics
 
@@ -537,7 +538,7 @@ If a level has logic, the GameWorld enables **sensor events on all movable shape
 all dynamic shapes** – otherwise there would be no overlaps and hits for the graphs.
 
 **Replication.** Whatever logic changes in the world is recorded: `set_property` (path and value),
-`spawn_copy` (template, ID, pose) and moving static bodies (`teleport` writes
+`spawn` (template name, ID, transform) and moving static bodies (`teleport` writes
 `transform.position`/`rotation`). The server sends these changes to all clients, including players
 who join later ([Chapter 10](10-networking.md)).
 
@@ -766,7 +767,7 @@ output has exactly one wire.
 ### Spawner (template `spawner`)
 
 Every 3 s → Branch (Spawned < 10) → Spawn Actor (template "Physics Cube" at (0, 0, 6)) → Add to
-Spawned. Spawned copies are replicated to all players.
+Spawned. "Physics Cube" must be marked Template in its details (it is then not in the world itself). Spawned copies are replicated to all players.
 
 ### Traffic light (template `traffic_light`)
 

@@ -955,7 +955,7 @@ und die Zielraten des Soldaten an (`web/studio/game.mjs`, `GamepadInput`). Tests
 Jeder Actor und das Level können einen Logik-Graphen tragen. Die GameWorld startet sie auf der
 Autorität (Standalone oder Server) beim Spielen und Simulieren, liefert ihnen Ereignisse (Überlappung,
 Treffer, Pickup, Trigger, Schaden, Tod, Respawn, Interact, Eingabe, Taste, Spielende, neuer Spieler)
-und bietet ihren Knoten Operationen an (`set_property`, `spawn_copy`, `teleport`, `push_actor`,
+und bietet ihren Knoten Operationen an (`set_property`, `spawn`, `teleport`, `push_actor`,
 `set_joint_motor`, `line_trace`, `add_score`, `end_game` …). Was Logik ändert, wird für das Netz
 mitgeschrieben. Alles Weitere in [Kapitel 9](09-logik.md).
 
@@ -990,7 +990,7 @@ Tests: `game_world_orb_run_play`, `game_world_physics_lab`, `game_shooting_range
 | Meldungen | `events()` (Pickups, gebrochene Gelenke, übergangene Collider, Logik-Ausgaben), `sound_cues()`, `shots()` |
 | Kampf | `damage`, `health_of`, `set_health`, `heal`, `give_ammo`, `soldier_state`, `apply_soldier_state`, `set_view` |
 | Netz | `add_pawn`, `remove_pawn`, `set_pawn_input`, `set_local_pawn`, `pawns`, `take_alive_changes`, `dead_actors`, `set_alive`, `networked_actors`, `start_replica`, `set_replica_pose`, `step_replica`, `take_replicated_changes`, `replicated_state` |
-| Logik | `logic_runtime`, `key_event`, `set_property`, `spawn_copy`, `teleport`, `actor_velocity`, `set_actor_velocity`, `push_actor`, `set_simulate_physics`, `set_joint_motor`, `find_actor`, `actors_with_tag`, `has_tag`, `line_trace`, `add_score`, `end_game`, `show_message`, `play_sound`, `particle_burst`, `shake_camera`, `destroy_actor`, `call_logic_event` |
+| Logik | `logic_runtime`, `key_event`, `set_property`, `spawn`, `teleport`, `actor_velocity`, `set_actor_velocity`, `push_actor`, `set_simulate_physics`, `set_joint_motor`, `find_actor`, `actors_with_tag`, `has_tag`, `line_trace`, `add_score`, `end_game`, `show_message`, `play_sound`, `particle_burst`, `shake_camera`, `destroy_actor`, `call_logic_event` |
 | Griff | `begin_grab`, `move_grab`, `end_grab`, `grabbing` |
 
 ---

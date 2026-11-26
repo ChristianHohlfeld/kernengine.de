@@ -577,7 +577,7 @@ Was womit kollidiert und was ein Strahl trifft, folgt genau Box3D (Erin Catto, *
 - Im Blueprint: **Line Trace by Channels** (wie Line Trace, dazu *Channels* und *Own Channels*)
   und **Channels**, das die Bits zu Namen gibt (`"World, Vehicle"`, `"All"`). Ein Name, den das
   Level nicht hat, ist kein Bit. In C++:
-  `physics_trace_channels(n4, start, end, Actor{0}, physics_channels("World"), 4294967295);`
+  `physics_trace_channels(n4, start, end, Actor{}, physics_channels("World"), 4294967295);`
 
 ### Listen und For Each
 

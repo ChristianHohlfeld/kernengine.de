@@ -1370,6 +1370,56 @@ TEST(level_errors_say_where_and_which_values) {
   CHECK(error.find("actor \"Ball\": controller.mode: unknown value \"rollin\" - one of hovercar, rolling, character") == 0);
 }
 
+// A key the reader of a level or a project does not know is an error with its place and the keys there are
+// (kern/docs/app.md 2.) - in every object they read, not only under "components"; nothing is passed over in silence.
+TEST(level_and_project_refuse_unknown_keys) {
+  game::Level l = game::basic_level();
+  game::Actor pad;
+  pad.name = "Pad";
+  pad.mesh = game::MeshComponent{};
+  pad.colliders.push_back({});
+  l.add(pad);
+  const std::string text = game::to_text(l, -1);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));   // (what the writer writes, the reader knows)
+  const auto refused = [&](const std::string& from, const std::string& to) {
+    std::string t = text;
+    const std::size_t at = t.find(from);
+    CHECK(at != std::string::npos);
+    if (at != std::string::npos) t.replace(at, from.size(), to);
+    game::Level b;
+    std::string why;
+    CHECK(!game::from_text(t, b, &why));
+    return why;
+  };
+  // the component's name, one letter off (the case of the second game: "collider" for "colliders")
+  std::string e = refused("\"colliders\":", "\"collider\":");
+  CHECK(e.find("actor \"") == 0 && e.find("\": components.collider: unknown key - one of mesh, light, body, colliders, joints, controller") != std::string::npos);
+  CHECK(refused("\"radius\":", "\"radios\":").find("mesh.radios: unknown key - one of shape, size, radius") != std::string::npos);
+  CHECK(refused("\"roughness\":", "\"ruffness\":").find("ruffness: unknown key - one of color, roughness") != std::string::npos);
+  CHECK(refused("\"sensor\":", "\"sensr\":").find("colliders.sensr: unknown key - one of shape, center") != std::string::npos);
+  CHECK(refused("\"transform\":{\"position\":", "\"transform\":{\"positon\":").find("transform.positon: unknown key - one of position, rotation, scale") != std::string::npos);
+  CHECK(refused("\"name\":\"Pad\"", "\"name\":\"Pad\",\"colour\":1").find("actor \"Pad\": colour: unknown key - one of id, name, parent, folder") == 0);
+  CHECK(refused("\"gravity\":", "\"gravty\":").find("world.gravty: unknown key - one of channels, gravity, substeps") == 0);
+  CHECK(refused("\"yaw\":", "\"jaw\":") .find("camera.jaw: unknown key - one of position, yaw, pitch") == 0);
+  CHECK(refused("\"nextId\":", "\"nextID\":").find("nextID: unknown key - one of name, format, version, world, logic, actors, textures, sounds, motions, camera, nextId") == 0);
+  CHECK(refused("\"textures\":[]", "\"textures\":[{\"id\":\"t\",\"sorce\":\"\"}]") == "textures[0].sorce: unknown key - one of id, name, src, width, height");
+  // the project: its own keys, the settings, the renderer and its parts, a profile, a Blueprint's entry
+  const auto project = [](const std::string& body) {
+    game::Project p;
+    std::string why;
+    CHECK(!game::from_text("{\"format\":\"kern-project\"," + body + "}", p, &why));
+    return why;
+  };
+  CHECK(project("\"start\":\"a\"") == "start: unknown key - one of format, version, name, settings, levels, startLevel, blueprints");
+  CHECK(project("\"settings\":{\"heapReserve\":1}") == "settings: heapReserve: unknown key - one of renderer, profiles, heapReserveMb, loopBudget, input");
+  CHECK(project("\"settings\":{\"renderer\":{\"shadw\":1}}") == "settings: renderer.shadw: unknown key - one of shadows, shadow, bloom, ao, grade");
+  CHECK(project("\"settings\":{\"renderer\":{\"ao\":{\"radios\":1}}}") == "settings: renderer.ao.radios: unknown key - one of enabled, quality, halfResolution, radius, power, adaptive");
+  CHECK(project("\"settings\":{\"profiles\":[{\"name\":\"m\",\"renderer\":{\"bloom\":{\"on\":true}}}]}") == "settings: profiles[0].renderer.bloom.on: unknown key - one of enabled, forced");
+  CHECK(project("\"blueprints\":[{\"name\":\"A\",\"logik\":{}}]") == "blueprints[0] \"A\": logik: unknown key - one of name, folder, logic");
+}
+
 // A project that does not read says where and why.
 TEST(game_project_errors) {
   const auto why = [](const std::string& text) {
@@ -2634,7 +2684,7 @@ struct Caller : kern::Blueprint {
 
   KERN_EVENT(on1, event_custom<"Ask">)
   void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Level_Stars">(Actor{0}, kern::out(n2.stars), kern::to<Int>(value));
+    func_call_on<"Level_Stars">(Actor{}, kern::out(n2.stars), kern::to<Int>(value));
     Got = n2.stars;
   }
 
@@ -2662,7 +2712,7 @@ struct Caller : kern::Blueprint {
     CHECK(lv && c);
     if (!lv || !c) continue;
     rt.begin();
-    rt.call("Ask", 7, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 7, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Got").i == 14);
   }
   // (a name of another Blueprint's function is only for a function of another Blueprint)
@@ -2785,7 +2835,7 @@ struct Cop : kern::Blueprint {
   KERN_EXTERN MissingResult Missing();
 
   struct DownResult { Float sum = 0.0; };
-  DownResult Down(Int n = 0, Actor me = Actor{0}) {
+  DownResult Down(Int n = 0, Actor me = Actor{}) {
     Int Mine = 0;
     Mine = n;
     if (math_compare<">">(kern::to<Float>(n), 0.0)) {
@@ -2794,14 +2844,14 @@ struct Cop : kern::Blueprint {
     return {math_add(kern::to<Float>(Mine), n20.sum)};
   }
 
-  void Forever(Actor me = Actor{0}) {
+  void Forever(Actor me = Actor{}) {
     Deep += 1;
     func_call_on<"Forever">(me, kern::out(), me);
   }
 
   KERN_EVENT(on1, event_custom<"Ask">)
   void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Stars">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
+    func_call_on<"Stars">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
     Got = n2.stars;
     Heard = n2.who;
     func_call_on<"Missing">(actor, kern::out(n5.value));
@@ -2829,7 +2879,7 @@ struct Cop : kern::Blueprint {
   std::string text;
   CHECK(logic::to_cpp(cop, "Cop", text, &error));
   CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = \"x\");\n") != std::string::npos);
-  CHECK(text.find("    func_call_on<\"Stars\">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Stars\">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
   CHECK(text.find("    func_call_on<\"Forever\">(me, kern::out(), me);\n") != std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(text, read, nullptr, &error) && read == cop);
@@ -2845,23 +2895,23 @@ struct Cop : kern::Blueprint {
     if (!lv || !a || !b) continue;
     rt.begin();
     // on the Level (no target): its Stars runs, with what this call gave it
-    rt.call("Ask", 7, {{"actor", logic::Value::actor(99)}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
+    rt.call("Ask", 7, {{"actor", logic::Value::actor({99, host.world()})}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
     CHECK(lv->get("Asked").i == 3 && a->get("Got").i == 3 && b->get("Got").i == 0);
     // ... a target without a Blueprint, and one whose Blueprint has no such function: the declared defaults
     CHECK(a->get("Heard").as_text() == "joe!nobody");
     CHECK_NEAR(a->get("Miss").as_number(), 2.5, 1e-12);
-    rt.call("Ask", 8, {{"actor", logic::Value::actor(7)}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 8, {{"actor", logic::Value::actor({7, host.world()})}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
     CHECK(lv->get("Asked").i == 5 && b->get("Got").i == 5 && b->get("Heard").as_text() == "!nobody");
     // a function that calls itself on its own actor: every call has its own parameters and locals
     std::vector<logic::Value> out;
-    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor(7)}, out) && out.size() == 1);
+    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor({7, host.world()})}, out) && out.size() == 1);
     CHECK_NEAR(out[0].as_number(), 10.0, 1e-12);
     // ... and on another actor's Blueprint, back and forth
-    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor(8)}, out));
+    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor({8, host.world()})}, out));
     CHECK_NEAR(out[0].as_number(), 6.0, 1e-12);
     // calls that never end are stopped: 64 deep, reported, and the Blueprint goes on
     const std::size_t before = host.errors.size();
-    CHECK(a->call("Forever", {logic::Value::actor(7)}, out));
+    CHECK(a->call("Forever", {logic::Value::actor({7, host.world()})}, out));
     CHECK(host.errors.size() == before + 1 && host.errors.back().find("nest more than 64 deep") != std::string::npos);
     CHECK(a->get("Deep").i >= 63 && a->get("Deep").i <= 65 && !a->disabled());
   }
@@ -2883,10 +2933,10 @@ struct Cop : kern::Blueprint {
   logic::Graph none;
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EXTERN void F() {\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("no body here") != std::string::npos);
-  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{0}, kern::out());\n  }\n};\n", none, nullptr, &error));
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{}, kern::out());\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("KERN_EXTERN") != std::string::npos);
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
-                         "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
+                         "    func_call_on<\"F\">(Actor{}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
   CHECK(error.find("in their order") != std::string::npos);
 }
 
@@ -3031,7 +3081,7 @@ struct Caller : kern::Blueprint {
     rt.begin();
     // bound: Has Blueprint - of the actor, and of a name nobody has: the Level, which has none yet
     CHECK(rules.bind(rt) && !lost.bind(rt));
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Has").b && !c->get("HasLost").b);
     // the call: what the Blueprint gives and does, in both forms
     CHECK_NEAR(c->get("Got").as_number(), 10.5, 1e-12);
@@ -3071,7 +3121,7 @@ struct Caller : kern::Blueprint {
     // the Level's Blueprint: what a name nobody has reaches
     logic::Instance* lv = rt.add(level_g, 0, "Level");
     CHECK(lv && lost.bind(rt) && lost.number("Twice", 4.0) == 12);
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("AtLevel").as_number() == 12 && c->get("HasLost").b);
     // by its name, at every call: the actor's Blueprint taken out and one with errors put in its place -
     // nothing runs there (the defaults; Has Blueprint is false) ...
@@ -3079,7 +3129,7 @@ struct Caller : kern::Blueprint {
     logic::Instance* bad = rt.add(broken, 7, "Rules");
     CHECK(bad && bad->disabled() && !rules.bind(rt));
     CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 7);  // (its variables are there to read: Get Variable on Actor)
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Got").as_number() == 0 && !c->get("Has").b && c->get("Speed").as_number() == 7);
     // ... a new one: reached as it is, without binding again; and another actor of the name: that one
     rt.remove(7);
@@ -3173,7 +3223,7 @@ TEST(logic_lists) {
   // (whole numbers in a list are held as every Int is)
   CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).i == -std::numeric_limits<i64>::max());
   const Value every[] = {Value::of(std::vector<bool>{true, false}),      Value::of(std::vector<i64>{-3, 9007199254740992}),   Value::of(std::vector<f64>{0.1, -1e300}),
-                         Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{4}, {0}})};
+                         Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{}, {}})};
   for (const Value& v : every) {
     CHECK(logic::is_list(v.type) && logic::list_of(logic::element_of(v.type)) == v.type && Value::from_json(v.to_json(), v.type) == v);
     PinType named = PinType::exec;
@@ -3184,7 +3234,7 @@ TEST(logic_lists) {
     CHECK(v.converted(PinType::text).s == v.as_text() && v.converted(v.type) == v);
   }
   CHECK(!logic::convertible(PinType::integer_list, PinType::number_list) && a.converted(PinType::integer_list).size() == 0);
-  CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[actor 4, none]" && every[0].as_text() == "[true, false]");
+  CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[none, none]" && every[0].as_text() == "[true, false]");
 
   // The nodes. The steps change a list variable; For Each goes through the list as it was when
   // the loop started, whatever its body does to the variable.
@@ -3563,7 +3613,7 @@ TEST(logic_tween_and_every) {
 TEST(game_logic_graphs_drive_the_world) {
   GameFixture f;
   game::Level l = game::basic_level();
-  for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {40, 40, 0.5f};
+  for (game::Actor& a : l.actors) if (a.name == "Cube") a.is_template = true;   // (Spawn Actor copies it: kern/docs/runtime_actors.md)
   const game::ActorId me = add_soldier(l, {0, 0, 0.8f});
   // A sensor volume with its own graph: entering it scores and opens the "Door" (moves it up over 1 s).
   game::Actor zone;
@@ -3627,6 +3677,235 @@ TEST(game_logic_graphs_drive_the_world) {
   for (const std::string& e : f.world->events()) printed |= e == "Logic: Cube";
   CHECK(printed);
   CHECK(!props.empty());  // the door's moves (a body-less actor) replicate as transform changes
+}
+
+// Templates (kern/docs/runtime_actors.md): a level's actor with "template": true is not in the world; spawn makes copies
+// of it with its children, body, colliders and Blueprint, at the next free ids (the same calls, the same ids).
+namespace {
+game::Level template_level() {
+  game::Level l = game::basic_level();
+  game::Actor crate;
+  crate.name = "Crate";
+  crate.is_template = true;
+  crate.transform.position = {50, 50, 50};   // (where it stands in the level does not matter: spawn says where)
+  crate.mesh = game::MeshComponent{};
+  crate.body = game::BodyComponent{};
+  crate.body->motion = game::Motion::dynamic;
+  crate.body->mass = 7;
+  game::ColliderComponent box;
+  box.shape = game::ColliderShape::box;
+  box.size = {1, 1, 1};
+  crate.colliders.push_back(box);
+  crate.logic = logic_graph(R"({"variables":[{"name":"Began","type":"int","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Began"}}],"links":[[1,"then",2,"exec"]]})");
+  const game::ActorId crate_id = l.add(crate).id;
+  game::Actor lid;
+  lid.name = "Lid";
+  lid.parent = crate_id;
+  lid.transform.position = {0, 0, 0.6f};
+  lid.mesh = game::MeshComponent{};
+  l.add(lid);
+  game::Actor coin;
+  coin.name = "Coin";
+  coin.is_template = true;
+  coin.mesh = game::MeshComponent{};
+  coin.pickup = game::PickupComponent{};
+  coin.pickup->sound = "builtin:laser";
+  l.add(coin);
+  l.world.goal = game::GameGoal::collect_all;
+  return l;
+}
+}  // namespace
+
+TEST(world_templates_spawn) {
+  GameFixture f;
+  const game::Level l = template_level();
+  CHECK(no_errors(game::validate(l)));
+  game::ActorId tpl = 0, lid_tpl = 0, last = 0;
+  for (const game::Actor& a : l.actors) {
+    if (a.name == "Crate") tpl = a.id;
+    if (a.name == "Lid") lid_tpl = a.id;
+    last = std::max(last, a.id);
+  }
+  CHECK(game::template_of(l, lid_tpl) == tpl && game::template_of(l, tpl) == tpl && game::template_of(l, 1) == 0);
+  // A template round-trips through the level file.
+  game::Level read;
+  std::string error;
+  CHECK(game::from_text(game::to_text(l), read, &error) && read.find(tpl) && read.find(tpl)->is_template && !read.find(lid_tpl)->is_template);
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  // The template is not in the world: no actor, no body, no Blueprint; the world keeps it apart.
+  CHECK(!f.world->level().find(tpl) && !f.world->level().find(lid_tpl) && f.world->find_actor("Crate") == 0 && f.world->find_actor("Lid") == 0);
+  CHECK(f.world->templates().find(tpl) && f.world->templates().find(lid_tpl));
+  CHECK(!f.world->actor_body(tpl).valid());
+  CHECK(f.world->hud().pickups_total == 0);
+  // spawn: the copy with its child, its body and collider, its Blueprint (Begin Play ran).
+  const game::Transform at{{3, 4, 5}, {0, 0, 90}, {1, 1, 1}};
+  const logic::ActorHandle made = f.world->spawn("Crate", at);
+  CHECK(made.world != 0 && made.world == f.world->world_id());   // (an Actor of this world: kern/docs/project.md 7)
+  const game::ActorId a = made.id;
+  CHECK(a == last + 1);   // (past every actor of the level and every template)
+  const game::Actor* copy = f.world->level().find(a);
+  CHECK(copy && copy->name == "Crate" && !copy->is_template && copy->parent == 0 && copy->transform.position == at.position && copy->transform.rotation == at.rotation);
+  const game::Actor* lid = f.world->level().find(a + 1);
+  CHECK(lid && lid->name == "Lid" && lid->parent == a);
+  CHECK(copy && copy->body && copy->body->mass == 7 && copy->colliders.size() == 1);
+  CHECK(f.world->actor_body(a).valid());
+  CHECK(f.world->actor_alive(a) && f.world->actor_alive(a + 1));
+  logic::Instance* inst = f.world->logic_runtime() ? f.world->logic_runtime()->find(a) : nullptr;
+  CHECK(inst && inst->get("Began").as_int() == 1);
+  // A second copy: the next ids; the template itself is unchanged.
+  const game::ActorId b = f.world->spawn("Crate", game::Transform{{-3, 4, 5}, {}, {2, 2, 2}}).id;
+  CHECK(b == a + 2 && f.world->level().find(b)->transform.scale == Vec3(2, 2, 2));
+  CHECK(f.world->templates().find(tpl)->transform.position == Vec3(50, 50, 50));
+  // Its body falls (a dynamic body of the template).
+  Mat4 m0, m1;
+  CHECK(f.world->actor_matrix(a, m0));
+  f.run(0.5f);
+  CHECK(f.world->actor_matrix(a, m1) && m1.translation().z < m0.translation().z - 0.5f);
+  // A pickup of a template counts once it is spawned (collect all).
+  const game::ActorId c = f.world->spawn("Coin", game::Transform{{0, 8, 0.5f}, {}, {1, 1, 1}}).id;
+  CHECK(c == b + 2 && f.world->hud().pickups_total == 1);
+  // Replicated: the template's name, the id and the transform.
+  std::vector<game::GameWorld::PropertyChange> props;
+  std::vector<game::GameWorld::SpawnChange> spawns;
+  f.world->take_replicated_changes(props, spawns);
+  CHECK(spawns.size() == 3 && spawns[0].template_name == "Crate" && spawns[0].id == a && spawns[0].at.position == at.position && spawns[2].template_name == "Coin");
+  // despawn: destroy_actor - out of the world, its Blueprint ends.
+  f.world->destroy_actor(a);
+  CHECK(!f.world->actor_alive(a) && !f.world->logic_runtime()->find(a));
+  // Deterministic: the same level and the same calls give the same ids in another world.
+  GameFixture g;
+  CHECK(g.world->start(l, game::SimMode::simulate));
+  CHECK(g.world->spawn("Crate", at).id == a && g.world->spawn("Crate", at).id == b && g.world->spawn("Coin", at).id == c);
+  // A replica's spawn takes the server's id.
+  CHECK(g.world->spawn("Coin", at, 500).id == 500 && g.world->level().find(500));
+  // After the run, the level is the level again (the editor sees the template).
+  f.world->stop();
+  CHECK(f.world->level().find(tpl) && f.world->level().find(tpl)->is_template && !f.world->level().find(a));
+}
+
+TEST(world_spawn_errors) {
+  GameFixture f;
+  const game::Level l = template_level();
+  // The world does not run.
+  CHECK(f.world->spawn("Crate", {}).id == 0 && std::string(last_error()) == "spawn \"Crate\": the world does not run");
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  // No template of that name: the level's templates are named.
+  CHECK(f.world->spawn("Barrel", {}).id == 0);
+  CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
+  CHECK(f.world->spawn("", {}).id == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
+  // An actor of the world is no template.
+  CHECK(f.world->spawn("Cube", {}).id == 0 && std::string(last_error()).find("no template \"Cube\"") == 0);
+  // A transform that is no place.
+  CHECK(f.world->spawn("Crate", game::Transform{{0, 0, 0}, {}, {0, 1, 1}}).id == 0 && std::string(last_error()) == "spawn \"Crate\": the scale must not be zero");
+  // An id that is taken (a replica told a wrong one).
+  CHECK(f.world->spawn("Crate", {}, 1).id == 0 && std::string(last_error()).find("are taken") != std::string::npos);
+  f.world->stop();
+  // A level without templates says so.
+  CHECK(f.world->start(game::basic_level(), game::SimMode::simulate));
+  CHECK(f.world->spawn("Crate", {}).id == 0 && std::string(last_error()) == "no template \"Crate\" - the level has no templates (an actor with \"template\": true)");
+  f.world->stop();
+  // What a level must not do with templates (validate: errors with the actor and the reason, start refuses).
+  auto first_error = [](const game::Level& x) {
+    for (const game::Issue& i : game::validate(x)) if (i.error) return i.text;
+    return std::string();
+  };
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors) if (a.name == "Lid") a.is_template = true;
+    CHECK(first_error(x) == "\"Lid\": a template must be a top-level actor (it has a parent)");
+    CHECK(!f.world->start(x, game::SimMode::simulate));
+  }
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors) if (a.name == "Coin") a.name = "Crate";
+    CHECK(first_error(x).find("two templates are called so") != std::string::npos);
+  }
+  {
+    game::Level x = template_level();
+    game::JointComponent j;
+    j.kind = game::JointKind::hinge;
+    for (game::Actor& a : x.actors) if (a.name == "Cube") j.target = a.id;
+    for (game::Actor& a : x.actors) if (a.name == "Crate") a.joints.push_back(j);
+    CHECK(first_error(x) == "\"Crate\": a joint connects a template's actor with one outside of it (a template is copied whole)");
+  }
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors)
+      if (a.name == "Crate") { a.controller = game::ControllerComponent{}; x.world.player = a.id; }
+    CHECK(game::default_player(x) == 0);   // (a template's controller is no player of the world)
+    CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
+  }
+  {
+    // "template" in the file must be true or false.
+    game::Level x;
+    std::string error;
+    CHECK(!game::from_text(R"({"format":"kern-level","version":1,"actors":[{"id":1,"name":"A","template":"yes"}]})", x, &error));
+    CHECK(error.find("template must be true or false") != std::string::npos);
+  }
+}
+
+// Setting a property says why it does not (kern/docs/runtime_actors.md): no silent nothing; the material colour is a
+// typed function (Set Color).
+TEST(world_set_property_says_why) {
+  GameFixture f;
+  game::Level l = game::basic_level();
+  game::Actor lamp;
+  lamp.name = "Lamp";
+  lamp.light = game::LightComponent{};
+  const game::ActorId lamp_id = l.add(lamp).id;
+  game::ActorId cube = 0;
+  for (const game::Actor& a : l.actors) if (a.name == "Cube") cube = a.id;
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  auto why = [] { return std::string(last_error()); };
+  CHECK(!f.world->set_property(999, "components.light.intensity", json::Value(3.0)) && why() == "set property \"components.light.intensity\": no actor 999 in the world");
+  CHECK(!f.world->set_property(lamp_id, "", json::Value(3.0)) && why().find("the path is empty") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "parent", json::Value(1.0)) && why().find("cannot be set while the world runs") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.lamp.intensity", json::Value(3.0)));
+  CHECK(why() == "set property \"components.lamp.intensity\" of actor \"Lamp\": \"components\" has no \"lamp\" - it has light");
+  CHECK(!f.world->set_property(lamp_id, "components.light.brightness", json::Value(3.0)) && why().find("\"components.light\" has no \"brightness\" - it has ") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "transform.position.x", json::Value(3.0)) && why().find("\"transform.position\" is a list of 3: \"x\" is no index of it (0..2)") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.light.intensity", json::Value("bright")) && why().find("it is a number, the value is a text") != std::string::npos);
+  CHECK(!f.world->set_property(cube, "components.mesh.collision", json::Value(1.0)) && why().find("it is true or false, the value is a number") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.light.color", json::Value("red")) && why().find("#rrggbb") != std::string::npos);
+  // What is right is set: a number, a text that is all a number, a number for all three of a vector, a colour.
+  CHECK(f.world->set_property(lamp_id, "components.light.intensity", json::Value(3.0)) && f.world->level().find(lamp_id)->light->intensity == 3.0f);
+  CHECK(f.world->set_property(lamp_id, "components.light.intensity", json::Value("4.5")) && f.world->level().find(lamp_id)->light->intensity == 4.5f);
+  CHECK(f.world->set_property(lamp_id, "transform.scale", json::Value(2.0)) && f.world->level().find(lamp_id)->transform.scale == Vec3(2, 2, 2));
+  CHECK(f.world->set_property(lamp_id, "components.light.color", json::Value("#ff0000")) && f.world->level().find(lamp_id)->light->color.y < 0.01f);
+  // The material colour, typed.
+  CHECK(!f.world->set_material_color(lamp_id, {1, 0, 0}) && why() == "set material color of actor \"Lamp\": it has no mesh");
+  CHECK(!f.world->set_material_color(999, {1, 0, 0}) && why() == "set material color: no actor 999 in the world");
+  CHECK(f.world->set_material_color(cube, {0, 1, 0}));
+  const Vec3 c = f.world->level().find(cube)->mesh->material.color;
+  CHECK(c.x < 0.01f && c.y > 0.99f && c.z < 0.01f);
+  // The nodes: Set Color and Set Light do it (Set Light gave its colour as a list, which the light's #rrggbb field never
+  // took - silently), an error goes to the host.
+  f.world->stop();
+  game::Level n = l;
+  n.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.find","values":{"name":"Lamp"}},
+      {"id":3,"type":"actor.set_light","values":{"color":[0,0,1],"intensity":7,"range":3}},{"id":4,"type":"actor.set_color","values":{"color":[1,0,0]}}],
+    "links":[[1,"then",3,"exec"],[2,"actor",3,"target"],[3,"then",4,"exec"],[2,"actor",4,"target"]]})");
+  CHECK(f.world->start(n, game::SimMode::simulate));
+  const game::Actor* lit = f.world->level().find(lamp_id);
+  CHECK(lit && lit->light->intensity == 7.0f && lit->light->range == 3.0f && lit->light->color.z > 0.99f && lit->light->color.x < 0.01f);
+  bool said = false;
+  for (const std::string& e : f.world->events()) said |= e.find("Set Color: set material color of actor \"Lamp\": it has no mesh") != std::string::npos;
+  CHECK(said);
+}
+
+// The sounds of a world: its actors' and its templates' (what spawn makes sounds at once) - without a level as a value.
+TEST(sound_bank_request_world) {
+  GameFixture f;
+  audio::Mixer mixer;
+  CHECK(mixer.init(48000));
+  game::SoundBank bank(mixer);
+  CHECK(f.world->start(template_level(), game::SimMode::simulate));
+  bank.request_world(*f.world);
+  while (!bank.prepare(5)) {}
+  CHECK(bank.ready("builtin:laser"));   // (only the template Coin has it)
+  CHECK(bank.ready("builtin:goal"));   // (collect all)
 }
 
 // Parse Float / Parse Int / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
@@ -4223,7 +4502,7 @@ static logic::Graph every_node_graph(bool wired) {
                                : of == "SB" ? logic::Value::structure({logic::Value::integer(-123456)})
                                           : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
                                                                      logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
-                                                                     logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
+                                                                     logic::Value::vector({1, -2, 3.5f}), logic::Value::actor({}), logic::Value::enumerations({2, 0})});
       return t == PinType::structure ? one : logic::Value::structures({one, logic::zero_of({PinType::structure, of}, g)});
     }
     if (t == PinType::map || t == PinType::set) {
@@ -4241,7 +4520,7 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::number: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
-      case PinType::actor: return logic::Value::actor(3);
+      case PinType::actor: return logic::Value::actor({});   // (an actor written down is none: one comes from its world)
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
       case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
         return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
@@ -4250,7 +4529,7 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
       case PinType::enumeration: return logic::Value::enumeration(2);
       case PinType::enumeration_list: return logic::Value::enumerations({2, 0, 1});
-      default: return logic::Value::of(std::vector<logic::ActorHandle>{{3}, {0}});
+      default: return logic::Value::of(std::vector<logic::ActorHandle>{{}, {}});
     }
   };
   // (list variables that start with items, a list a function takes and one it gives)
@@ -4676,7 +4955,7 @@ struct Door : kern::Blueprint {
   Int Hits = 0;
   Text Note = "a \"door\"\n\ttab \\ end \101";
   Vector Home = Vector{1.0, -2.5, 3.0};
-  Actor Other = Actor{7};
+  Actor Other = Actor{};
 
   kern::Machine machine3 = machine("Door")
       .state(4, "closed", 100, 80.5, true)
@@ -4722,7 +5001,7 @@ struct Door : kern::Blueprint {
           Angle = math_add(n44(), n44());
         }},
         {"finished", [this] {
-          flow_call<"Open">(Actor{0}, Other, n20(), Note);
+          flow_call<"Open">(Actor{}, Other, n20(), Note);
         }},
       });
     }
@@ -4758,7 +5037,7 @@ struct Door : kern::Blueprint {
     (void)Home;
   }
 
-  struct { Actor actor = Actor{0}; Float value = 0.0; Text text = ""; } n2;
+  struct { Actor actor = Actor{}; Float value = 0.0; Text text = ""; } n2;
   kern::Node<30> n30;
   kern::Node<41> n41;
   struct : kern::Node<42> { Int index = 0; } n42;
@@ -5024,7 +5303,7 @@ TEST(game_blueprints_as_classes) {
   for (const char* happened :
        {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
         "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
-        "event: Logic error: Spawn Actor: no template \"Nothing\"", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
+        "event: Logic error: Spawn Actor: no template \"Nothing\" - the level's templates: Template", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
     if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
     CHECK(played.text.find(happened) != std::string::npos);
   }
@@ -6004,7 +6283,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
       if (!logic::same_blueprint(g, again, &difference)) return "not the same: " + difference;
       return text;
     };
-    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n";
+    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{}, Actor{}, car.Speed, \"\");\n  }\n";
     CHECK(wrong(shouts + in_event("    Shout(Cars[0]);")).empty());
     {
       const std::string text = held_text(shouts + in_event("    Shout(Cars[0]);"));
@@ -6015,8 +6294,8 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     }
     // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
     // that list is - but an entry of a list of any length inside it can go)
-    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n"
-                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, mark, \"\");\n  }\n";
+    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{}, Actor{}, car.Speed, \"\");\n  }\n"
+                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{}, Actor{}, mark, \"\");\n  }\n";
     CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
     CHECK(wrong(shout + in_event("    Hum(Two[1].Marks[0]);")).empty());
     CHECK(held_text(shout + in_event("    Hum(Two[1].Marks[0]);")).find("(Two[1].Marks);") != std::string::npos);
@@ -8302,6 +8581,108 @@ TEST(engine_object_of_a_blueprint) {
 // An object of the engine is a type of its own (kern/docs/engine_object.md): Object<I> goes where an Object of the same
 // class goes - or an input of any (Is Valid Object) -, never where another class or a number is, and no number becomes
 // one; an ObjectRef names its object only in its own world, and says why elsewhere.
+TEST(actors_know_their_world) {
+  // An Actor is its id and its world (kern/docs/project.md 7): two worlds whose actors have the same ids - an actor of
+  // world B in a Blueprint of world A names nothing there (not A's actor of that id) and says why; no number becomes one.
+  game::Level l = game::basic_level();
+  game::Actor door, poker;
+  door.name = "Door";
+  poker.name = "Poker";
+  door.logic = logic::Graph{};
+  poker.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit() {\n"
+                        "    Hits += 1;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  actors_know_their_world (Door): %s\n", error.c_str());
+  error.clear();
+  CHECK(logic::from_cpp("struct Poker : kern::Blueprint {\n"
+                        "  Int Got = -1;\n"
+                        "  Bool Same = false;\n"
+                        "  Int Id = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  KERN_EXTERN HitResult Hit();\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
+                        "    Got = n2.hits;\n"
+                        "    Same = actor_equal(actor, actor_find(\"Door\"));\n"
+                        "    Id = actor_id(actor);\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n2;\n"
+                        "};\n", *poker.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  actors_know_their_world (Poker): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  l.add(poker);
+  GameFixture fa, fb;
+  CHECK(fa.world->start(l, game::SimMode::play) && fb.world->start(l, game::SimMode::play));
+  logic::Runtime* a = fa.world->logic_runtime();
+  logic::Runtime* b = fb.world->logic_runtime();
+  CHECK(a && b);
+  if (!a || !b) return;
+  const logic::WorldId wa = fa.world->world_id(), wb = fb.world->world_id();
+  CHECK(wa != 0 && wb != 0 && wa != wb && a->host().world() == wa);
+  const logic::ActorHandle a_door{door_id, wa}, b_door{door_id, wb};
+  CHECK(fa.world->find_actor("Door") == door_id && fb.world->find_actor("Door") == door_id);   // (the same id in both)
+  const auto poke = [&](logic::ActorHandle who) {
+    a->call("Poke", 0, {{"actor", logic::Value::actor(who)}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+    fa.world->step(1.0f / 60, game::PlayInput{});
+  };
+  const auto hits = [](logic::Runtime* rt, game::ActorId id) { const logic::Instance* i = rt->find(id); return i ? i->get("Hits").as_int() : -1; };
+  const auto poker_now = [&](const char* var) { const logic::Instance* i = a->find(fa.world->find_actor("Poker")); return i ? i->get(var) : logic::Value{}; };
+  fa.world->events().clear();
+  // B's door in A: nothing is reached - not A's door of the same id -, and the host is told why, naming the node
+  poke(b_door);
+  CHECK(hits(a, door_id) == 0 && hits(b, door_id) == 0);
+  CHECK(poker_now("Got").as_int() == 0 && !poker_now("Same").as_bool() && poker_now("Id").as_int() == static_cast<i64>(door_id));
+  bool told = false;
+  for (const std::string& e : fa.world->events())
+    told |= e.find("Logic error: Poker: Call on Actor: actor " + std::to_string(door_id) + " is of world " + std::to_string(wb) + ", this Blueprint runs in world " +
+                   std::to_string(wa) + " - an actor names nothing in another world") != std::string::npos;
+  CHECK(told);
+  // A's own door: reached
+  poke(a_door);
+  CHECK(hits(a, door_id) == 1 && hits(b, door_id) == 0 && poker_now("Got").as_int() == 1 && poker_now("Same").as_bool());
+  // a Blueprint's class asks the same way (BlueprintCore::kern_actor_here - Runtime::actor_here)
+  struct Reach : kern::Blueprint {
+    Bool Has = false;
+    void run(Actor x) { Has = func_has_blueprint(x); }
+  } reach;
+  reach.kern_world.host = &a->host();
+  reach.kern_world.runtime = a;
+  reach.run(b_door);
+  CHECK(!reach.Has);
+  reach.run(a_door);
+  CHECK(reach.Has);
+  CHECK(kern::Blueprint::actor_equal(a_door, a_door) && !kern::Blueprint::actor_equal(a_door, b_door) && kern::Blueprint::actor_id(b_door) == static_cast<i64>(door_id));
+  fa.world->stop();
+  fb.world->stop();
+  // no number becomes an actor: not on a wire, not converted, not written down
+  CHECK(!logic::convertible(logic::PinType::integer, logic::PinType::actor) && !logic::convertible(logic::PinType::number, logic::PinType::actor));
+  CHECK(logic::Value::integer(5).converted(logic::PinType::actor).as_actor() == logic::ActorHandle{});
+  CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::actor).as_actor() == logic::ActorHandle{});
+  logic::Graph g;
+  error.clear();
+  CHECK(!logic::from_cpp("struct T : kern::Blueprint {\n  Actor Who = Actor{5};\n};\n", g, nullptr, &error) &&
+        error.find("an actor is no number: the one actor a text writes is Actor{} (none)") != std::string::npos);
+  error.clear();
+  CHECK(logic::from_cpp("struct T : kern::Blueprint {\n  Actor Who = Actor{};\n};\n", g, nullptr, &error));
+  g.variables[0].value = json::Value(5.0);   // (a document that holds one as a number: check says so)
+  bool refused = false;
+  for (const logic::Issue& i : logic::check(g)) refused |= i.text.find("holds an actor as a number") != std::string::npos;
+  CHECK(refused);
+}
+
 TEST(object_refs_know_their_world) {
   using logic::PinType;
   using logic::TypeRef;
@@ -8929,6 +9310,277 @@ TEST(run_the_program_of_a_project) {
   // started again: its program again, from the project
   CHECK(kern_app_start(64, 48) == 1);
   kern_app_stop();
+}
+
+// The app runtime says why an App does not start (kern/docs/app.md 1.): no App, or the App's start() gave false - with
+// the reason the App gave (kern::fail), or that it named none; an error from before the start is never the reason.
+// A test makes its own app runtime (kern::AppRuntime): the process's one is the platform's.
+TEST(app_runtime_start_says_why) {
+  struct Refuses final : App {
+    const char* why = nullptr;
+    int starts = 0, stops = 0;
+    bool start(Engine&) override { ++starts; return why ? fail("%s", why) : false; }
+    void update(Engine&, const Frame&) override {}
+    void stop(Engine&) override { ++stops; }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(!rt.start(64, 48) && std::string(last_error()).find("no App: the program's kern_main()") == 0);
+  CHECK(rt.give(app) == 0 && rt.give(app) == 1);   // (one App, once)
+  fail("an earlier error");
+  CHECK(!rt.start(64, 48) && !rt.running() && app.starts == 1);
+  CHECK(std::string(last_error()) == "the App did not start: its start() gave false and named no reason (an App says why with kern::fail)");
+  app.why = "the level levels/a.klevel: world.gravty: unknown key";
+  CHECK(!rt.start(64, 48) && std::string(last_error()) == "the App did not start: the level levels/a.klevel: world.gravty: unknown key");
+  CHECK(!rt.frame(0, false) && app.stops == 0);   // (not running: no frame, no stop)
+  rt.stop();
+  CHECK(app.stops == 0);
+  struct Starts final : App {
+    int frames = 0;
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame& f) override { frames += f.index == static_cast<u64>(frames); }
+  } good;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(good) == 0 && rt2.start(64, 48) && rt2.running());
+  CHECK(rt2.frame(0, false) && rt2.frame(16, false) && good.frames == 2);
+  rt2.stop();
+  CHECK(!rt2.running());
+}
+
+// The app's sound (kern/docs/app.md 3.): the App plays on engine.mixer() - ready at its start, at the device's rate -
+// and the app runtime hands the mix out (kern_app_audio); a rate outside the mixer's, a rate after the start and too
+// many frames a call are refused with the reason. The mixer ends with the app (its clips go), its rate stays.
+TEST(app_runtime_plays_its_mixer) {
+  struct Tone final : App {
+    u32 rate = 0;
+    bool start(Engine& e) override {
+      rate = e.mixer().sample_rate();
+      std::vector<f32> wave(4800);
+      for (std::size_t i = 0; i < wave.size(); ++i) wave[i] = 0.5f * std::sin(static_cast<f32>(i) * 0.05f);
+      const audio::ClipId clip = e.mixer().adopt_clip(std::move(wave), 1, "tone", true);
+      audio::PlayParams p;
+      p.loop = true;
+      return clip && e.mixer().play(clip, p) != 0;
+    }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0);
+  CHECK(!rt.audio_init(4000) && std::string(last_error()).find("8000 to 192000") != std::string::npos);
+  CHECK(rt.audio(256).size == 0);   // (not running: nothing)
+  CHECK(rt.audio_init(44100) && rt.start(64, 48) && app.rate == 44100);
+  CHECK(!rt.audio_init(48000) && std::string(last_error()).find("before kern_app_start") != std::string::npos);
+  const Span<const f32> pcm = rt.audio(512);
+  f32 peak = 0;
+  for (f32 x : pcm) peak = std::fmax(peak, std::fabs(x));
+  CHECK(pcm.size == 1024 && peak > 0.05f);
+  CHECK(rt.audio(AppRuntime::kMaxAudioFrames + 1).size == 0 && std::string(last_error()).find("at most 8192") != std::string::npos);
+  rt.stop();
+  CHECK(rt.engine().mixer().sample_rate() == 44100 && rt.engine().mixer().clip_count() == 0);
+  // without a rate from the device: 48000 Hz
+  Tone other;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(other) == 0 && rt2.start(64, 48) && other.rate == 48000);
+  rt2.stop();
+}
+
+// Input actions (kern/docs/app.md 4.): the project names actions and axes and binds keys, pad buttons and sticks,
+// mouse buttons and touch to them; the engine answers by the name. Read and written with the project's settings,
+// every error with its place and the names there are.
+TEST(input_actions_of_the_project) {
+  const char* text = R"({"input": {
+    "actions": [{"name": "jump", "keys": ["space"], "pad": ["a"], "mouse": [0], "touch": "right"}],
+    "axes": [{"name": "moveX", "negative": ["left", "a"], "positive": ["right", "d"], "pad": "leftX", "deadzone": 0.2, "touch": "stickX"},
+             {"name": "moveY", "negative": ["down"], "positive": ["up"], "pad": "leftY", "touch": "stickY"}]}})";
+  json::Value v;
+  CHECK(json::parse(text, v));
+  ProjectSettings ps;
+  std::string error;
+  CHECK(project_from_json(v, ps, &error) && ps.input.actions.size() == 1 && ps.input.axes.size() == 2);
+  ProjectSettings back;
+  CHECK(project_from_json(project_to_json(ps), back, &error) && json::stringify(input_to_json(back.input)) == json::stringify(input_to_json(ps.input)));
+  const auto refused = [](const char* t) {
+    json::Value x;
+    ProjectSettings p;
+    std::string why;
+    CHECK(json::parse(t, x) && !project_from_json(x, p, &why));
+    return why;
+  };
+  CHECK(refused(R"({"input": {"action": []}})") == "settings: input.action: unknown key - one of actions, axes");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "keys": ["spcae"]}]}})").find("settings: input.actions[0].keys[0]: unknown name \"spcae\" - one of a, b, c") == 0);
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "pad": ["z"]}]}})").find("input.actions[0].pad[0]: unknown name \"z\" - one of a, b, x, y, lb") != std::string::npos);
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "pad": "left"}]}})").find("input.axes[0].pad: unknown name \"left\" - one of none, leftX, leftY") != std::string::npos);
+  CHECK(refused(R"({"input": {"actions": [{"name": "go"}], "axes": [{"name": "go"}]}})") == "settings: input.axes[0] \"go\": the name stands twice (actions and axes share their names)");
+  CHECK(refused(R"({"input": {"actions": [{"keys": []}]}})") == "settings: input.actions[0]: has no name");
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "deadzone": 1}]}})") == "settings: input.axes[0].deadzone: from 0 to under 1");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "mouse": [3]}]}})").find("mouse[0]: a mouse button is 0 (left)") != std::string::npos);
+  // the engine answers by the name
+  struct Still final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app, ps) == 0 && rt.start(200, 100));
+  Engine& e = rt.engine();
+  Input& in = e.input();
+  CHECK(!e.action("jump") && e.axis("moveX") == 0);
+  in.key(Key::space, true);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.key(Key::space, false);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::right, true);
+  CHECK(e.axis("moveX") == 0);   // (both: none)
+  in.key(Key::a, false);
+  in.key(Key::right, false);
+  // the pad: a button, a stick past its deadzone (scaled back), the largest of all wins
+  Gamepad g;
+  g.connected = true;
+  g.lx = 0.1f;
+  g.buttons = 1u << static_cast<u32>(PadButton::a);
+  in.set_gamepad(g);
+  CHECK(e.action("jump") && e.action_pressed("jump") && e.axis("moveX") == 0);
+  g.lx = 0.6f;
+  in.set_gamepad(g);
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-5f);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::a, false);
+  in.set_gamepad({});
+  in.end_frame();
+  CHECK(!e.action("jump"));
+  // the mouse
+  in.pointer_buttons(1);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.pointer_buttons(0);
+  in.end_frame();
+  // touch: a finger on the right half holds "jump"; one on the left half is the stick (an eighth of 100 px = 1)
+  in.touch(1, 0, {150, 50});
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.touch(1, 2, {150, 50});
+  CHECK(!e.action("jump"));
+  in.touch(2, 0, {40, 50});
+  in.touch(2, 1, {46.25f, 43.75f});
+  CHECK(!e.action("jump"));
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-4f);
+  CHECK_NEAR(e.axis("moveY"), 0.5f, 1e-4f);
+  in.touch(2, 2, {46, 44});
+  // a name the project has not: false / 0, and the reason with the names there are
+  CHECK(!e.action("jmup") && std::string(last_error()) == "the project has no action \"jmup\" (its actions: jump)");
+  CHECK(e.axis("moveZ") == 0 && std::string(last_error()) == "the project has no axis \"moveZ\" (its axes: moveX, moveY)");
+  rt.stop();
+}
+
+// Saving and loading (kern/docs/app.md 5.): named slots of named values of the language, written through to the host
+// at once; every error says why - a name, a value that is none, a host that refuses, a slot that is no kern-save,
+// a value of another type. A missing value is the fallback, not an error.
+TEST(app_storage_slots) {
+  struct Memory final : StorageHost {
+    std::map<std::string, std::string> slots;
+    bool refuse = false;
+    bool read(std::string_view slot, std::string& text, bool& found, std::string&) override {
+      auto it = slots.find(std::string(slot));
+      found = it != slots.end();
+      if (found) text = it->second;
+      return true;
+    }
+    bool write(std::string_view slot, std::string_view text, std::string& why) override {
+      if (refuse) { why = "the quota is used up"; return false; }
+      slots[std::string(slot)] = std::string(text);
+      return true;
+    }
+    bool remove(std::string_view slot, std::string&) override { slots.erase(std::string(slot)); return true; }
+  } host;
+  Renderer r;
+  Engine e(r);
+  e.set_storage(host);
+  CHECK(e.load_int("game", "best", 7) == 7 && !e.saved("game", "best"));   // (none: the fallback)
+  CHECK(e.save_int("game", "best", 9007199254740993LL) && e.save_float("game", "volume", 0.25) && e.save_bool("game", "music", true) && e.save_text("game", "name", "Ada"));
+  // read again from the host (a new start of the app)
+  Engine again(r);
+  again.set_storage(host);
+  CHECK(again.load_int("game", "best", 0) == 9007199254740993LL);   // (64 bits, exactly)
+  CHECK(again.load_float("game", "volume", 1) == 0.25 && again.load_bool("game", "music", false) && std::string(again.load_text("game", "name", "")) == "Ada");
+  CHECK(again.saved("game", "name") && !again.saved("game", "other"));
+  CHECK(host.slots["game"].find("\"format\": \"kern-save\"") != std::string::npos);
+  // another type than it holds: the fallback, and why
+  CHECK(again.load_int("game", "name", -1) == -1 && std::string(last_error()) == "save slot game: name holds a text, not an int");
+  // names, values
+  CHECK(!e.save_int("my game", "best", 1) && std::string(last_error()).find("save slot \"my game\": a slot's name is 1 to 64") == 0);
+  CHECK(!e.save_int("game", "", 1) && std::string(last_error()).find("the key \"\"") != std::string::npos);
+  CHECK(!e.save_float("game", "volume", std::nan("")) && std::string(last_error()).find("volume is not a number that can be kept") != std::string::npos);
+  // the host refuses: false, why, and the slot keeps what the host holds
+  host.refuse = true;
+  CHECK(!e.save_int("game", "best", 1) && std::string(last_error()) == "save slot game: the host cannot write it: the quota is used up");
+  CHECK(e.load_int("game", "best", 0) == 9007199254740993LL);
+  host.refuse = false;
+  // a slot that is no kern-save is neither read nor written over, until it is erased
+  host.slots["old"] = "{\"best\": 3}";
+  CHECK(e.load_int("old", "best", 5) == 5 && std::string(last_error()).find("save slot old: it is no kern-save") == 0);
+  CHECK(!e.save_int("old", "best", 4) && std::string(last_error()).find("not written over until it is erased") != std::string::npos && host.slots["old"] == "{\"best\": 3}");
+  CHECK(e.erase_saved("old") && !host.slots.count("old") && e.save_int("old", "best", 4) && e.load_int("old", "best", 0) == 4);
+  // natively, the platform's host keeps a slot in a file of the folder saves=<folder>
+  Engine native(r);
+  const std::string dir = std::string(std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp") + "/kern-saves-test";
+  const std::string args = "saves=" + dir;
+  native.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native.erase_saved("t") && native.save_int("t", "n", 3));
+  Engine native2(r);
+  native2.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native2.load_int("t", "n", 0) == 3 && native2.erase_saved("t") && native2.load_int("t", "n", 0) == 0);
+}
+
+// Widgets (kern/docs/app.md 6.), immediate mode: what the App names in a frame is the list the page gets after it
+// (only when it changed); a button's or a menu's event from the page answers in the next frame; the status line is
+// the one widget that stays; a widget that is none is not shown and says why.
+TEST(app_ui_widgets) {
+  struct Hud final : App {
+    int frame = 0;
+    bool clicked = false;
+    i32 chosen = -2;
+    bool start(Engine& e) override { e.set_status("loading"); return true; }
+    void update(Engine& e, const Frame&) override {
+      ++frame;
+      if (frame == 2) e.set_status("");
+      e.ui_text("score", "Points 3", 0, 0);
+      e.ui_bar("coins", "Coins", 1.5f, 1, 0, 0.25f);
+      clicked = e.ui_button("again", "Again", 0.5f, 0.5f);
+      chosen = e.ui_menu("menu", "Play\nQuit", 0.5f, 0.7f);
+      if (frame == 3) e.ui_text("score", "twice", 0, 1);
+      if (frame == 4) e.ui_text("", "no id", 0, 0);
+      if (frame == 5) e.ui_text("bad", "nowhere", std::nanf(""), 0);
+    }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0 && rt.start(64, 48));
+  Engine& e = rt.engine();
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true}])");   // (the status of the start)
+  CHECK(rt.frame(0, false));
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true},{"kind":"text","id":"score","x":0,"y":0,"text":"Points 3"},)"
+                       R"({"kind":"bar","id":"coins","x":1,"y":0,"label":"Coins","value":1,"width":0.25},{"kind":"button","id":"again","x":0.5,"y":0.5,"label":"Again"},)"
+                       R"({"kind":"menu","id":"menu","x":0.5,"y":0.699999988079071,"items":["Play","Quit"]}])");
+  CHECK(!app.clicked && app.chosen == -1);
+  // the page's events: in the next frame, once
+  e.ui_event("again", 0);
+  e.ui_event("menu", 1);
+  CHECK(rt.frame(16, false) && app.clicked && app.chosen == 1 && e.ui_json().find("\"status\"") == std::string::npos);   // (status "" : gone)
+  CHECK(rt.frame(32, false) && !app.clicked && app.chosen == -1);
+  CHECK(std::string(last_error()) == "the widget text \"score\": the id stands twice in this frame - it is not shown");
+  CHECK(rt.frame(48, false) && std::string(last_error()) == "the widget text \"\": an id is 1 to 64 characters - it is not shown");
+  CHECK(rt.frame(64, false) && std::string(last_error()) == "the widget text \"bad\": its place, value or width is not a finite number - it is not shown");
+  // an entry the menu has not: no choice
+  e.ui_event("menu", 7);
+  CHECK(rt.frame(80, false) && app.chosen == -1);
+  rt.stop();
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
@@ -9880,6 +10532,7 @@ TEST(net_game_replicates_logic_changes) {
   crate.transform.position = {30, 30, 0.5f};
   crate.mesh = game::MeshComponent{};
   crate.body = game::BodyComponent{};
+  crate.is_template = true;   // (the copies are in the world, the template is not: kern/docs/runtime_actors.md)
   l.add(crate);
   l.logic = logic_graph(R"({"nodes":[{"id":1,"type":"game.input","params":{"action":"interact"}},
       {"id":2,"type":"actor.find","values":{"name":"Door"}},{"id":3,"type":"actor.set_location","values":{"location":[10,0,4.5]}},
@@ -9916,7 +10569,7 @@ TEST(net_game_replicates_logic_changes) {
   CHECK(cw.level().find(door_id)->mesh->material.color.y < 0.05f);
   int crates = 0;
   for (const game::Actor& a : cw.level().actors) crates += a.name == "Crate" ? 1 : 0;
-  CHECK(crates == 2);
+  CHECK(crates == 1);   // (the copy the server spawned; the template is in no world)
   // A player joining later sees the same world.
   auto t2 = hub.create();
   game::GameWorld lw(renderer, &windows);
@@ -9934,7 +10587,7 @@ TEST(net_game_replicates_logic_changes) {
   CHECK(lw.actor_matrix(door_id, m) && std::fabs(m.translation().z - 4.5f) < 0.01f);
   crates = 0;
   for (const game::Actor& a : lw.level().actors) crates += a.name == "Crate" ? 1 : 0;
-  CHECK(crates == 2);
+  CHECK(crates == 1);
   late.stop();
   server.stop();
   client.stop();
@@ -13057,15 +13710,13 @@ TEST(micro_duck_blueprint_nodes_drive_and_sense) {
   // The level's Logic drives the duck: autonomy off, walk forward; its camera sees the cube ahead.
   GameFixture f;
   game::Level l = game::basic_level();
-  game::ActorId cube = 0;
-  for (game::Actor& a : l.actors) if (a.name == "Cube") { a.transform.position = {6, 0, 0.5f}; cube = a.id; }
+  for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {6, 0, 0.5f};
   const game::ActorId duck = add_duck(l, {0, 0, 0}, true);
   l.logic = logic_graph(R"({"variables":[{"name":"Sees","type":"bool","value":false},{"name":"Dist","type":"float","value":-1}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"walker.autonomous","values":{"enable":false}},{"id":3,"type":"walker.move","values":{"forward":0.3}},
       {"id":4,"type":"event.tick"},{"id":5,"type":"var.set","params":{"variable":"Sees"}},{"id":6,"type":"walker.sees"},
-      {"id":7,"type":"var.set","params":{"variable":"Dist"}},{"id":8,"type":"walker.tof"}],
-    "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"visible",5,"value"],[5,"then",7,"exec"],[8,"distance",7,"value"]]})");
-  for (logic::Node& n : l.logic.nodes) if (n.type == "walker.sees") n.set_value("other", json::Value(static_cast<f64>(cube)));
+      {"id":7,"type":"var.set","params":{"variable":"Dist"}},{"id":8,"type":"walker.tof"},{"id":9,"type":"actor.find","values":{"name":"Cube"}}],
+    "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"visible",5,"value"],[5,"then",7,"exec"],[8,"distance",7,"value"],[9,"actor",6,"other"]]})");
   f.world->sync(l);
   CHECK(f.world->start(l, game::SimMode::simulate));
   Mat4 m;
@@ -13968,7 +14619,7 @@ TEST(studio_logic_call_on_actor) {
   CHECK(on_actor && !plain);
   // the actor's Blueprint asks the Level on Begin Play
   CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  Float Got = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(Float x = 1.0);\n\n"
-                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{0}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
+                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
                                                 "  struct { Float out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
   st = f.s->state();
   for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);

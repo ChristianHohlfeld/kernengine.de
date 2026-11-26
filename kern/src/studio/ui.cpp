@@ -345,6 +345,7 @@ json::Value Studio::outliner_json() const {
     r.set("depth", depth);
     if (a.hidden) r.set("hidden", true);
     if (a.locked) r.set("locked", true);
+    if (a.is_template) r.set("template", true);
     if (selected(a.id)) r.set("selected", true);
     if (a.id == primary()) r.set("primary", true);
     if (a.id == the_player) r.set("player", true);

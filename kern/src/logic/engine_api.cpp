@@ -1,6 +1,7 @@
 // Kern Logic: the engine as nodes - the nodes of the table, and the stand-in of the tests
 // (kern/logic/engine_api.h).
 #include "kern/logic/engine_api.h"
+#include "kern/logic/engine_host.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -80,6 +81,15 @@ void add_engine_nodes(Library& lib) {
 bool Host::engine(std::string_view, const std::vector<Value>&, std::vector<Value>&) { return false; }
 ActorRef Host::find_actor(std::string_view) { return 0; }
 EngineObjects* Host::engine_objects() { return nullptr; }
+WorldId new_world() {
+  static WorldId next = 0;
+  return ++next;
+}
+WorldId Host::world() {
+  if (EngineObjects* o = engine_objects()) return o->world();
+  if (!own_world_) own_world_ = new_world();
+  return own_world_;
+}
 void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {
@@ -150,6 +160,10 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       return Value::object(h ? ObjectRef{h, kStandInWorld} : ObjectRef{});
     }
     case 'h': return Value::object({1 + static_cast<i64>(next(state) % 7), kStandInWorld});
+    case 'a': {  // (an actor, of the stand-in's own world, or none)
+      const ActorRef id = static_cast<ActorRef>(next(state) % 7);
+      return Value::actor(id ? ActorHandle{id, kStandInWorld} : ActorHandle{});
+    }
     case 'v': {
       Vec3 v;
       v.x = static_cast<f32>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0f;

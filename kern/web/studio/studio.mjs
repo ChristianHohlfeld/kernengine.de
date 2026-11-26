@@ -127,7 +127,7 @@ const fillIcons = (root = document) => {
 async function moduleSources() {
   if (window.KERN_SOURCES) return window.KERN_SOURCES;
   const get = async rel => (await fetch(new URL(rel, import.meta.url))).text();
-  return (window.KERN_SOURCES = {kern: await get("../kern.mjs"), game: await get("./game.mjs")});
+  return (window.KERN_SOURCES = {kern: await get("../kern.mjs"), audio: await get("../audio.mjs"), game: await get("./game.mjs")});
 }
 
 export async function startStudio({url = null, base64 = null, bytes = null} = {}) {
@@ -1047,6 +1047,27 @@ class StudioPage {
           if (path && this.projectCommand({cmd: "projectSet", levels: [...p.levels, path]})?.ok) input.value = "";
           break;
         }
+        // the input actions and axes (kern/docs/app.md 4.): each a row - its bindings as JSON, read by the project's
+        // reader (the same checks as the file: errors say where and which names there are)
+        case "addInput": case "setInput": case "removeInput": {
+          const act = b.dataset.act;
+          const input = {actions: [...(p.settings.input?.actions ?? [])], axes: [...(p.settings.input?.axes ?? [])]};
+          if (act === "addInput") {
+            const n = $("#projectInputName").value.trim(), kind = $("#projectInputKind").value;
+            if (!n) { this.toast("an action or axis needs a name"); break; }
+            input[kind].push(kind === "axes" ? {name: n, negative: [], positive: []} : {name: n, keys: []});
+          } else {
+            const kind = row.dataset.kind, i = Number(row.dataset.index);
+            if (act === "removeInput") input[kind].splice(i, 1);
+            else {
+              let bound;
+              try { bound = JSON.parse(row.querySelector("input.binding").value || "{}"); } catch (error) { this.toast(input[kind][i].name + ": not JSON - " + error.message); break; }
+              input[kind][i] = {name: input[kind][i].name, ...bound};
+            }
+          }
+          if (this.projectCommand({cmd: "projectSet", settings: {...p.settings, input}})?.ok && act === "addInput") $("#projectInputName").value = "";
+          break;
+        }
         case "settings": {
           let settings;
           try { settings = JSON.parse($("#projectSettings").value || "{}"); } catch (error) { this.toast("settings: not JSON - " + error.message); break; }
@@ -1079,6 +1100,11 @@ class StudioPage {
         <span class="muted">${b.library ? "library" : b.implements ? "implements " + esc(b.implements) : ""}</span>
         <input class="rename" value="${esc(b.name)}" spellcheck="false" title="New name"><button class="ph" data-act="renameBp">Rename</button>
         <button class="ph icon" data-act="removeBp" title="Remove" data-icon="close"></button></div>`).join("");
+    const binding = b => { const {name, ...rest} = b; return JSON.stringify(rest); };
+    const inputs = ["actions", "axes"].flatMap(kind => (p.settings.input?.[kind] ?? []).map((b, i) => `<div class="prow" data-kind="${kind}" data-index="${i}" data-name="${esc(b.name)}">
+        <span>${esc(b.name)}</span><span class="muted">${kind === "axes" ? "axis" : "action"}</span>
+        <input class="binding" value="${esc(binding(b))}" spellcheck="false" title="${kind === "axes" ? "negative, positive: keys; pad: leftX, leftY, rightX, rightY, triggers; deadzone; touch: stickX, stickY" : "keys; pad: a, b, x, y, lb, rb, lt, rt, start ...; mouse: 0, 1, 2; touch: left, right, anywhere"}">
+        <button class="ph" data-act="setInput">Apply</button><button class="ph icon" data-act="removeInput" title="Remove" data-icon="close"></button></div>`)).join("");
     $("#projectBody").innerHTML = `
       <div class="prow"><label>Name <input id="projectNameInput" value="${esc(p.name)}" spellcheck="false"></label>
         <button class="ph" data-act="new">New</button><button class="ph" data-act="open">Open</button><button class="ph" data-act="save">Save</button></div>
@@ -1087,6 +1113,9 @@ class StudioPage {
       <div class="phead">Program Blueprints</div>${bps || '<div class="muted">none</div>'}
       <div class="prow"><input id="projectBpName" placeholder="Name" spellcheck="false"><label><input type="checkbox" id="projectBpLibrary"> library</label>
         <button class="ph" data-act="addBp">Add</button></div>
+      <div class="phead">Input (actions and axes: what is bound to them)</div>${inputs || '<div class="muted">none</div>'}
+      <div class="prow"><input id="projectInputName" placeholder="Name (jump, moveX)" spellcheck="false"><select id="projectInputKind"><option value="actions">action</option><option value="axes">axis</option></select>
+        <button class="ph" data-act="addInput">Add</button></div>
       <div class="phead">Settings</div>
       <textarea id="projectSettings" rows="4" spellcheck="false">${esc(JSON.stringify(p.settings, null, 1))}</textarea>
       <div class="prow"><button class="ph" data-act="settings">Apply settings</button></div>`;
@@ -1206,7 +1235,7 @@ class StudioPage {
       const cls = ["row", r.selected && "sel", r.primary && "primary", r.hidden && "hidden-actor"].filter(Boolean).join(" ");
       return `<div class="${cls}" data-id="${r.id}" data-key="a:${r.id}" draggable="true">` +
         `<button class="eye" tabindex="-1" title="Show / hide (H)">${icon(r.hidden ? "eyeOff" : "eye")}</button>` +
-        `<span class="name" style="padding-left:${pad}px">${tw}<span class="ico">${icon(r.icon)}</span><span class="label">${esc(r.name)}</span>${r.player ? `<span class="badge player" title="Play controls this actor">Player</span>` : ""}${r.locked ? `<span class="lock" title="Locked">${icon("lock")}</span>` : ""}</span>` +
+        `<span class="name" style="padding-left:${pad}px">${tw}<span class="ico">${icon(r.icon)}</span><span class="label">${esc(r.name)}</span>${r.player ? `<span class="badge player" title="Play controls this actor">Player</span>` : ""}${r.template ? `<span class="badge template" title="Not in the world when it starts: Spawn Actor makes copies of it">Template</span>` : ""}${r.locked ? `<span class="lock" title="Locked">${icon("lock")}</span>` : ""}</span>` +
         `<span class="type">${esc(r.type)}</span></div>`;
     }).join("");
     host.innerHTML = html || `<div class="empty dim" style="padding:16px">${o.filter ? "No actor matches" : "The level is empty - add actors from the toolbar or the content drawer"}</div>`;

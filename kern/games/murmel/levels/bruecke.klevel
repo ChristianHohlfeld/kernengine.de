@@ -111,7 +111,8 @@
   },
   {
    "id": 3,
-   "name": "Muenze 1",
+   "name": "Muenze",
+   "template": true,
    "transform": {
     "position": [
      0,
@@ -138,105 +139,11 @@
       0.12
      ],
      "material": {
-      "color": "#f2c230"
+      "color": "#f2c230",
+      "emissive": "#5a4000"
      },
      "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
-    },
-    "pickup": {
-     "points": 10
-    },
-    "rotator": {
-     "rate": [
-      0,
-      0,
-      120
-     ]
-    }
-   }
-  },
-  {
-   "id": 4,
-   "name": "Muenze 2",
-   "transform": {
-    "position": [
-     3,
-     8,
-     0.5
-    ],
-    "rotation": [
-     90,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "mesh": {
-     "shape": "cylinder",
-     "size": [
-      0.7,
-      0.7,
-      0.12
-     ],
-     "material": {
-      "color": "#f2c230"
-     },
-     "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
-    },
-    "pickup": {
-     "points": 10
-    },
-    "rotator": {
-     "rate": [
-      0,
-      0,
-      120
-     ]
-    }
-   }
-  },
-  {
-   "id": 5,
-   "name": "Muenze 3",
-   "transform": {
-    "position": [
-     3,
-     12,
-     0.5
-    ],
-    "rotation": [
-     90,
-     0,
-     0
-    ],
-    "scale": [
-     1,
-     1,
-     1
-    ]
-   },
-   "components": {
-    "mesh": {
-     "shape": "cylinder",
-     "size": [
-      0.7,
-      0.7,
-      0.12
-     ],
-     "material": {
-      "color": "#f2c230"
-     },
-     "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
+     "height": 0.12
     },
     "pickup": {
      "points": 10
@@ -506,7 +413,7 @@
  "logic": {
   "kind": "kern-logic",
   "version": 1,
-  "nextId": 3,
+  "nextId": 6,
   "variables": [],
   "nodes": [
    {
@@ -523,6 +430,84 @@
     "values": {
      "text": "Level 2: das blaue Feld wirft dich hoch (+5)"
     }
+   },
+   {
+    "id": 3,
+    "type": "actor.spawn",
+    "x": 568,
+    "y": 56,
+    "params": {
+     "template": "Muenze"
+    },
+    "values": {
+     "location": [
+      0,
+      4,
+      0.5
+     ],
+     "rotation": [
+      90,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "id": 4,
+    "type": "actor.spawn",
+    "x": 856,
+    "y": 112,
+    "params": {
+     "template": "Muenze"
+    },
+    "values": {
+     "location": [
+      3,
+      8,
+      0.5
+     ],
+     "rotation": [
+      90,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "id": 5,
+    "type": "actor.spawn",
+    "x": 1144,
+    "y": 168,
+    "params": {
+     "template": "Muenze"
+    },
+    "values": {
+     "location": [
+      3,
+      12,
+      0.5
+     ],
+     "rotation": [
+      90,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
    }
   ],
   "links": [
@@ -530,6 +515,24 @@
     1,
     "then",
     2,
+    "exec"
+   ],
+   [
+    2,
+    "then",
+    3,
+    "exec"
+   ],
+   [
+    3,
+    "then",
+    4,
+    "exec"
+   ],
+   [
+    4,
+    "then",
+    5,
     "exec"
    ]
   ],

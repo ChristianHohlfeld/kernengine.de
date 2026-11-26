@@ -185,7 +185,7 @@ std::string literal(const Value& v) {
     case PinType::number: return float_text(v.n);
     case PinType::vector: return "Vector{" + f32_text(v.v.x) + ", " + f32_text(v.v.y) + ", " + f32_text(v.v.z) + "}";
     case PinType::text: return text_literal(v.s);
-    case PinType::actor: return "Actor{" + std::to_string(v.a) + "}";
+    case PinType::actor: return "Actor{}";  // (none: the one actor a text writes out - check refuses another)
     case PinType::int64: {  // its bits: Int64{0x1f}
       char b[24];
       std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i)));
@@ -1098,6 +1098,14 @@ struct Shape {
       if (element_of(type) == PinType::structure) {
         if (!g.structure(of)) return fail(what + " is of the struct \"" + of + "\", which is not declared");
         if (!is_value_of(Value::from_json(value, type, g, of), {type, of}, g)) return fail(what + " holds what is no value of " + of);
+        return true;
+      }
+      if (element_of(type) == PinType::actor) {   // (an actor comes from its world: one written down is none)
+        const auto zero = [](const json::Value& j) { return j.is_null() || (j.is_number() && j.as_number() == 0); };
+        bool none = zero(value) || value.is_array();
+        if (value.is_array())
+          for (std::size_t k = 0; k < value.size(); ++k) none = none && zero(value[k]);
+        if (!none) return fail(what + " holds an actor as a number: an actor comes from its world (Self, Find Actor, Spawn Actor, an event) - one written down is none (Actor{})");
         return true;
       }
       if (element_of(type) != PinType::enumeration) return true;
@@ -2620,11 +2628,14 @@ struct Reader {
       return true;
     }
     if (t.kind == Tok::id && t.s == "Actor" && is("{", 1)) {
+      // Actor{}: none - the one actor a text writes out (an actor comes from its world: no number becomes one)
       p += 2;
-      i64 a = 0;
-      if (!is("}") && !integer(a, "the actor's id")) return true;
+      if (!is("}")) {
+        fail(p, "an actor is no number: the one actor a text writes is Actor{} (none) - one comes from its world (Self, Find Actor, Spawn Actor, an event)");
+        return true;
+      }
       expect("}");
-      v = Value::actor(static_cast<ActorRef>(a));
+      v = Value::zero(PinType::actor);
       return true;
     }
     if (t.kind == Tok::id && (t.s == "List" || t.s == "Fixed") && is("<", 1)) {

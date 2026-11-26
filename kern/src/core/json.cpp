@@ -419,6 +419,19 @@ void write(std::string& out, const Value& v, i32 indent, i32 depth) {
 
 }  // namespace
 
+std::string unknown_key(const Value& object, Span<const std::string_view> known) {
+  if (!object.is_object()) return {};
+  for (const Value::Member& m : object.members()) {
+    bool found = false;
+    for (std::string_view k : known) found |= k == m.first;
+    if (found) continue;
+    std::string names;
+    for (std::string_view k : known) { if (!names.empty()) names += ", "; names += k; }
+    return m.first + ": unknown key - one of " + (names.empty() ? std::string("none (it has no keys)") : names);
+  }
+  return {};
+}
+
 std::string stringify(const Value& value, i32 indent) {
   std::string out;
   write(out, value, indent > 10 ? 10 : indent, 0);

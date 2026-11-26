@@ -1,0 +1,11 @@
+{
+  "format": "kern-project",
+  "version": 1,
+  "name": "Mini",
+  "settings": {
+    "input": { "actions": [ { "name": "go", "keys": ["space"] } ], "axes": [] }
+  },
+  "levels": ["levels/eins.klevel"],
+  "startLevel": "levels/eins.klevel",
+  "blueprints": []
+}

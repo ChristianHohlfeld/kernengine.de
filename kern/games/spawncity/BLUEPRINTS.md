@@ -56,8 +56,13 @@ Editor-Test der CI laufen durch.
 - [x] **Blueprint-Funktionen:** Funktionen mit typisierten Eingängen und Rückgabewerten
   (Function Entry, Return, Call, pure Aufrufe), in allen drei Ausführungsarten, im Editor
   anlegbar; aus C++ aufrufbar (`logic::Instance::call`).
-- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `build_level()` beginnt
-  mit dieser Datei (Welt-Einstellungen, Regel-Actors) und ergänzt, was noch im Code gebaut wird.
+- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `build_level()` liest
+  diese Datei (Welt-Einstellungen, Regel-Actors, der Spieler mit Kopf, die Fahrzeuge als Vorlagen) und setzt
+  nur, was das Gerät entscheidet (Schrittrate, Unterschritte, Schattenweite). Die Fahrzeuge (Drone, Jet, Car, Bus,
+  Parachute) sind Vorlagen (`kern/docs/runtime_actors.md`); `Game::start` setzt sie mit `GameWorld::spawn`
+  (42 Autos und 8 Busse, am Telefon 28 und 5, 3 Polizeiwagen aus „Car“). Geschrieben hat sie
+  `tools/level_templates.sh` aus den Starrkörpern der Fahrzeuge (`rigid_spec`); der Test
+  `entry_vehicle_templates_are_the_rigid_specs` hält beide gleich.
   Die Datei öffnet sich im Editor; die CI prüft das (`kern/tests/e2e/blueprint_e2e.mjs`).
 - [x] **Erstes Regelwerk als Blueprint:** die Fahndung (`wanted`) – Actor „Wanted“ im Level mit
   19 Funktionen und den Variablen Heat / HiddenMs. Die Formeln sind aus dem C++ gelöscht;
@@ -188,7 +193,7 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 - [x] Aufzählungen (Enum) als Pin-Typ mit Auswahl: `KERN_ENUM(Mode, Closed, Open)`, Variablen, Listen und Funktions-Pins des Typs, „Switch on Enum“ (`case Mode::Open:`), Namen und Plätze der Werte als Knoten.
 - [x] Lokale Variablen in Funktionen: je Funktion eigene Variablen, die bei jedem Aufruf mit ihrem Default beginnen – in C++ die lokalen Variablen am Anfang des Rumpfs (`Float Total = 0.0;`), gelesen und gesetzt mit denselben Knoten wie jede Variable. Nur auf einem Weg der eigenen Funktion (wie Return).
 - **Entschieden: Eine Funktion ruft sich nicht selbst auf** – weder direkt noch über andere; Wiederholen ist Sache der Schleifen. Das bleibt eine Regel der Sprache, kein offener Punkt: Was ein Knoten sich merkt (Schleifenstand, Do Once, Wartezeit), gehört dem Knoten des Blueprints, nicht einem Aufruf – deshalb ist ein Blueprint in Graph, JIT und Klasse dasselbe und im Editor Schritt für Schritt zu verfolgen. Keiner der 17 Regel-Blueprints von SpawnCity hat es gebraucht (die Umkehrung einer Kurve und die Farbvergabe sind Schleifen).
-- [x] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen. Ein Blueprint sagt, wie die Funktion aussieht (`KERN_EXTERN StarsResult Stars(Actor who = Actor{0});` – kein Rumpf), und ruft sie mit **Call on Actor** auf dem Blueprint eines Actors auf, ohne Target auf dem des Levels: `func_call_on<"Stars">(target, kern::out(n7.stars), who);`. Das Level-Blueprint ist damit die Bibliothek für alle. Hat das Ziel die Funktion nicht, gelten die erklärten Defaults; Aufrufe liegen höchstens 64 tief. In Interpreter, JIT und Klasse dasselbe (Tier-Fall `call_on`).
+- [x] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen. Ein Blueprint sagt, wie die Funktion aussieht (`KERN_EXTERN StarsResult Stars(Actor who = Actor{});` – kein Rumpf), und ruft sie mit **Call on Actor** auf dem Blueprint eines Actors auf, ohne Target auf dem des Levels: `func_call_on<"Stars">(target, kern::out(n7.stars), who);`. Das Level-Blueprint ist damit die Bibliothek für alle. Hat das Ziel die Funktion nicht, gelten die erklärten Defaults; Aufrufe liegen höchstens 64 tief. In Interpreter, JIT und Klasse dasselbe (Tier-Fall `call_on`).
 - [x] Typen des Projekts: Aufzählungen und Strukturen, die mehrere Blueprints eines Levels haben – in jedem gleich. Ein Blueprint holt sich den Typ eines anderen („+ An enum / A struct of another Blueprint…“; wer eine Funktion eines anderen erklärt, bekommt die Typen ihrer Pins von selbst), oder ein eigener Typ wird in Details zum Typ des Projekts. Eine Änderung daran geschieht in allen Blueprints, die ihn haben, als ein Schritt, und wird als Ganzes abgelehnt, wenn einer nicht folgen kann. Jeder Blueprint trägt die Erklärung selbst (`project`, im C++ `KERN_PROJECT_ENUM` / `KERN_PROJECT_STRUCT`): Er bleibt für sich lesbar und ausführbar, die drei Ausführungsarten sehen einen gewöhnlichen Typ. Editor-Test `studio_logic_project_types`, Browser-Test Abschnitt 1i.
 
 ### 3 – Die reinen Regeln als Blueprints

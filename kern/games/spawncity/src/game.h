@@ -673,7 +673,6 @@ class Game {
   f32 sensitivity_ = 1;
   f32 dpr_ = 1;
   // input devices
-  kern::game::ControllerComponent soldier_controller_;
   TouchPlay pad_touch_;   // every mode's touch controls (touch_play.h)
   ControlsState ctl_;     // game_controls.h
   bool touch_mode_ = false;
