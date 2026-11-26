@@ -190,6 +190,7 @@ async function run({name, url, context, mapped}) {
     await holdFor(async () => { await finger("touchStart", b.x, b.y); await finger("touchMove", b.x + dx, b.y + dy); }, () => finger("touchEnd"), seconds);
     return true;
   };
+  const vw = context.viewport.width, vh = context.viewport.height;
   const shot = async file => {
     await page.waitForTimeout(400);
     const p = path.join(shots, `${name}-${file}.png`);
@@ -217,7 +218,10 @@ async function run({name, url, context, mapped}) {
   // (W, the left stick).
   check(await until(h => h.drone && !h.drone.calibrating, 120000), `[${name}] the flight controller has calibrated`);
   if (context.hasTouch) {
-    check(await until(h => h.touch, 5000) || (await tap(".k-touch [data-touch]"), await until(h => h.touch, 30000)), `[${name}] the touch layout`);
+    // (the first finger on the glass brings up the touch layout - it is not a control's yet)
+    await finger("touchStart", vw / 2, vh / 3); await page.waitForTimeout(250); await finger("touchEnd");
+    check(await until(h => h.touch && h.ctl.device === "touch", 30000), `[${name}] the touch layout`);
+    await until(() => false, 1500);   // (the page draws it)
     check(await tap('.k-touch [data-touch="arm"]'), `[${name}] the ARM button is there`);
   } else await page.keyboard.press("KeyR");
   check(await until(h => h.drone.armed, 60000), `[${name}] armed`);
@@ -244,6 +248,8 @@ async function run({name, url, context, mapped}) {
     if (context.hasTouch) await cmd("cam");
     else await page.keyboard.press("KeyC");
     check(await until(h => h.drone.cam === (c + 1) % 3, 30000), `[${name}] the next camera (${c} -> ${(await hud()).drone.cam})`);
+    const s0 = (await hud()).steps;
+    await until(h => h.steps > s0 + 60, 60000);   // (the view of a few frames on)
     eyes.push(JSON.parse(await cmd("camera")).eye);
     await shot(`3-cam${(c + 1) % 3}`);
   }
