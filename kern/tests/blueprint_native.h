@@ -1886,17 +1886,20 @@ inline std::vector<Case> cases() {
     Case& c = read("Water", kImplementsWater);
     c.calls.push_back({"name", {}});
     c.calls.push_back({"vertex", {}});
-    c.calls.push_back({"bind", {I(5)}});
-    c.calls.push_back({"frame_uniforms", {I(3), I(4)}});
-    c.calls.push_back({"frame_uniforms", {I(0), I(4)}});
+    // (the engine's objects it is handed are Objects of their classes, of one world - none is no object; never a number)
+    auto O = [](i64 h) { return h ? Value::object(logic::ObjectRef{h, 2}) : Value::object({}); };
+    c.calls.push_back({"bind", {O(5)}});
+    c.calls.push_back({"frame_uniforms", {O(3), O(4)}});
+    c.calls.push_back({"frame_uniforms", {O(0), O(4)}});
     c.calls.push_back({"vertex", {}});
   }
   {
     Case& c = read("Running", kImplementsGame);
-    c.calls.push_back({"start", {I(2)}});
-    c.calls.push_back({"update", {I(2), Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
-    c.calls.push_back({"update", {I(2), Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
-    c.calls.push_back({"stop", {I(2)}});
+    const Value engine = Value::object(logic::ObjectRef{2, 2});   // (an Object<kern::Engine>, never a number)
+    c.calls.push_back({"start", {engine}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
+    c.calls.push_back({"stop", {engine}});
   }
   {
     Case& c = read("Loop", kImplementsLoop);
