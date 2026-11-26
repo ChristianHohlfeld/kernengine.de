@@ -3741,6 +3741,8 @@ TEST(world_spawn_errors) {
   // No template of that name: the level's templates are named.
   CHECK(f.world->spawn("Barrel", {}) == 0);
   CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
+  CHECK(f.world->spawn("", {}) == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
   // An actor of the world is no template.
   CHECK(f.world->spawn("Cube", {}) == 0 && std::string(last_error()).find("no template \"Cube\"") == 0);
   // A transform that is no place.
@@ -3782,13 +3784,6 @@ TEST(world_spawn_errors) {
       if (a.name == "Crate") { a.controller = game::ControllerComponent{}; x.world.player = a.id; }
     CHECK(game::default_player(x) == 0);   // (a template's controller is no player of the world)
     CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
-  }
-  {
-    // Spawn Actor without a template's name: a problem when the graph is checked (which names a level has, it says when it runs).
-    const logic::Graph g = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.spawn"}],"links":[[1,"then",2,"exec"]]})");
-    bool said = false;
-    for (const logic::Issue& i : logic::check(g)) said |= i.error && i.text.find("Spawn Actor: names no template") != std::string::npos;
-    CHECK(said);
   }
   {
     // "template" in the file must be true or false.
