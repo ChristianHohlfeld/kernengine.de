@@ -2,13 +2,12 @@
 // Eine Kugel rollt über zwei Levels, sammelt Münzen und rollt ins Ziel; danach kommt das nächste Level, der
 // Punktestand bleibt. Die Welt (Physik, Münzen, Ziel, Töne) ist die GameWorld der Engine; das Programm ist die App:
 // es lädt die Levels des Projekts, macht aus der Tastatur die Eingabe der Welt, zeigt den Stand als Text und wechselt
-// das Level.
+// das Level. Ihre Töne spielt die Welt auf dem Mixer der Engine (engine.mixer()).
 #pragma once
 #include <memory>
 #include <string>
 
 #include "kern/app/app.h"
-#include "kern/audio/audio.h"
 #include "kern/game/level.h"
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
@@ -50,7 +49,7 @@ class Murmel final : public kern::App {
   kern::Renderer* renderer_ = nullptr;
   std::unique_ptr<kern::game::GameWorld> welt_;
   kern::game::Level geladen_;
-  kern::audio::Mixer mixer_;
+  // (die Töne spielen auf dem Mixer der Engine: die App-Laufzeit macht ihn hörbar - kern/docs/app.md 3.)
   std::unique_ptr<kern::game::SoundBank> bank_;
   std::unique_ptr<kern::game::GameAudio> audio_;
   kern::Camera kamera_;

@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "kern/audio/audio.h"
 #include "kern/gfx/renderer.h"
 
 namespace kern {
@@ -87,6 +88,9 @@ class Engine {
   Renderer& renderer() const { return renderer_; }
   Input& input() { return input_; }
   const Input& input() const { return input_; }
+  /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime
+  /// makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
+  audio::Mixer& mixer() { return mixer_; }
   /// Text shown by the host page in its status overlay (empty hides it).
   void set_status(const char* text);
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
@@ -162,6 +166,7 @@ class Engine {
  private:
   Renderer& renderer_;
   Input input_;
+  audio::Mixer mixer_;
   Vec4 clear_color_{0.045f, 0.07f, 0.12f, 1};
   bool xr_ = false;
   Vec3 xr_eye_, xr_forward_{1, 0, 0};

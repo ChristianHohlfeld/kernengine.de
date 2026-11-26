@@ -53,6 +53,8 @@ bool AppRuntime::start(i32 width, i32 height) {
     return fail("the renderer did not start: %s", why.c_str());
   }
   reserve_heap(settings_);
+  // the mixer at the device's rate (kern_app_audio_init), else at 48000 Hz: ready when the App starts
+  if (!engine_.mixer().ready() && !engine_.mixer().init(48000)) return fail("the mixer did not start: %s", last_error());
   // (what went wrong before the start is not its reason)
   clear_error();
   if (!app_->start(engine_)) {
@@ -220,9 +222,29 @@ bool AppRuntime::resize(i32 width, i32 height) {
   return true;
 }
 
+bool AppRuntime::audio_init(u32 rate) {
+  if (running_) return fail("kern_app_audio_init: the app runs already - the device's rate is given before kern_app_start");
+  if (rate < 8000 || rate > 192000) return fail("kern_app_audio_init: a sample rate of %u Hz - the mixer takes 8000 to 192000", rate);
+  if (engine_.mixer().ready() && engine_.mixer().sample_rate() == rate) return true;
+  return engine_.mixer().init(rate) || fail("kern_app_audio_init: the mixer did not start at %u Hz: %s", rate, last_error());
+}
+
+Span<const f32> AppRuntime::audio(u32 frames) {
+  if (!running_ || frames == 0) return {};
+  if (frames > kMaxAudioFrames) {
+    fail("kern_app_audio: %u frames in one call - at most %u", frames, kMaxAudioFrames);
+    return {};
+  }
+  audio_out_.resize(static_cast<std::size_t>(frames) * 2);
+  engine_.mixer().render(audio_out_.data(), Count<2>{frames});
+  return {audio_out_.data(), audio_out_.size()};
+}
+
 void AppRuntime::stop() {
   if (!running_) return;
   app_->stop(engine_);
+  // (the mixer ends with the app: its clips and voices go, the rate stays for the next start)
+  engine_.mixer().init(engine_.mixer().sample_rate());
   engine_.renderer().shutdown();
   running_ = false;
 }
@@ -245,6 +267,14 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) { return a
 /// One display frame: update + render. Returns 0 when rendering failed.
 KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) { return app_runtime().frame(now_ms, page_hidden != 0) ? 1 : 0; }
 KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, const f32* views) { return app_runtime().frame_xr(now_ms, count, views) ? 1 : 0; }
+/// The sound device's sample rate, before kern_app_start (kern/docs/app.md 3.). 0: kern_last_error says why.
+KERN_EXPORT(kern_app_audio_init) i32 kern_app_audio_init(u32 rate) { return app_runtime().audio_init(rate) ? 1 : 0; }
+/// The next `frames` frames of the app's mixer, interleaved stereo; `out_len` gets the count of numbers (2 a frame).
+KERN_EXPORT(kern_app_audio) const f32* kern_app_audio(u32 frames, u32* out_len) {
+  const Span<const f32> pcm = app_runtime().audio(frames);
+  if (out_len) *out_len = static_cast<u32>(pcm.size);
+  return pcm.data;
+}
 KERN_EXPORT(kern_app_resize) i32 kern_app_resize(i32 width, i32 height) { return app_runtime().resize(width, height) ? 1 : 0; }
 
 namespace {

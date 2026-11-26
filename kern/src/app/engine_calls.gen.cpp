@@ -243,8 +243,17 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.engine.set_status: kern::Engine::set_status
+// engine.engine.mixer: kern::Engine::mixer
 bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
+  if (!self) return false;
+  decltype(auto) r = self->mixer();
+  out[0] = Value::integer(ev::handle_of<kern::audio::Mixer>(o, std::forward<decltype(r)>(r)));
+  return true;
+}
+
+// engine.engine.set_status: kern::Engine::set_status
+bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   std::string a0;
@@ -254,7 +263,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.request_pointer_lock: kern::Engine::request_pointer_lock
-bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -264,7 +273,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.arg: kern::Engine::arg
-bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   std::string a0;
@@ -277,7 +286,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.has_arg: kern::Engine::has_arg
-bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   std::string a0;
@@ -288,7 +297,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.arg_number: kern::Engine::arg_number
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   std::string a0;
@@ -301,7 +310,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_args: kern::Engine::set_args
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   std::string a0;
@@ -313,7 +322,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.width: kern::Engine::width
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->width();
@@ -322,7 +331,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.height: kern::Engine::height
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->height();
@@ -331,7 +340,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.aspect: kern::Engine::aspect
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->aspect();
@@ -340,7 +349,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.stats: kern::Engine::stats
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->stats();
@@ -349,7 +358,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.clear_color: kern::Engine::clear_color
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->clear_color();
@@ -358,7 +367,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_clear_color: kern::Engine::set_clear_color
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec4>>();
@@ -368,7 +377,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr: kern::Engine::xr
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr();
@@ -377,7 +386,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr: kern::Engine::set_xr
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -387,7 +396,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_eye: kern::Engine::xr_eye
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_eye();
@@ -396,7 +405,7 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_eye: kern::Engine::set_xr_eye
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -406,7 +415,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_forward: kern::Engine::xr_forward
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_forward();
@@ -415,7 +424,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_forward: kern::Engine::set_xr_forward
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -425,7 +434,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_room_forward: kern::Engine::xr_room_forward
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_room_forward();
@@ -434,7 +443,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_room_forward: kern::Engine::set_xr_room_forward
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -444,7 +453,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_head_yaw: kern::Engine::xr_head_yaw
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_head_yaw();
@@ -453,7 +462,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_head_yaw: kern::Engine::set_xr_head_yaw
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -463,7 +472,7 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_follow_head: kern::Engine::xr_follow_head
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_follow_head();
@@ -472,7 +481,7 @@ bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_follow_head: kern::Engine::set_xr_follow_head
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -482,7 +491,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_hold_room: kern::Engine::xr_hold_room
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_hold_room();
@@ -491,7 +500,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_hold_room: kern::Engine::set_xr_hold_room
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -501,7 +510,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_full_room: kern::Engine::xr_full_room
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_full_room();
@@ -510,7 +519,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_full_room: kern::Engine::set_xr_full_room
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -520,7 +529,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_room_up: kern::Engine::xr_room_up
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_room_up();
@@ -529,7 +538,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_room_up: kern::Engine::set_xr_room_up
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -539,7 +548,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_vignette: kern::Engine::xr_vignette
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_vignette();
@@ -548,7 +557,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_vignette: kern::Engine::set_xr_vignette
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -558,7 +567,7 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_vignette_mesh: kern::Engine::xr_vignette_mesh
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_vignette_mesh();
@@ -567,7 +576,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_vignette_mesh: kern::Engine::set_xr_vignette_mesh
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -577,7 +586,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_scope: kern::Engine::xr_scope
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope();
@@ -586,7 +595,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_scope: kern::Engine::set_xr_scope
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -596,7 +605,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_scope_camera: kern::Engine::xr_scope_camera
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope_camera();
@@ -605,7 +614,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_scope_camera: kern::Engine::set_xr_scope_camera
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
@@ -615,7 +624,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_scope_fbo: kern::Engine::xr_scope_fbo
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope_fbo();
@@ -624,7 +633,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_scope_fbo: kern::Engine::set_xr_scope_fbo
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -634,7 +643,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.xr_scope_size: kern::Engine::xr_scope_size
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope_size();
@@ -643,7 +652,7 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_xr_scope_size: kern::Engine::set_xr_scope_size
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
@@ -653,7 +662,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.stereo: kern::Engine::stereo
-bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->stereo();
@@ -662,7 +671,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_stereo: kern::Engine::set_stereo
-bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -672,7 +681,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.stereo_ipd: kern::Engine::stereo_ipd
-bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->stereo_ipd();
@@ -681,7 +690,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_stereo_ipd: kern::Engine::set_stereo_ipd
-bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -691,7 +700,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.stereo_cross: kern::Engine::stereo_cross
-bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->stereo_cross();
@@ -700,7 +709,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.set_stereo_cross: kern::Engine::set_stereo_cross
-bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -710,7 +719,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.app.extensions: kern::App::extensions
-bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   decltype(auto) r = self->extensions();
@@ -719,7 +728,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.app.start: kern::App::start
-bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   kern::Engine* a0 = ev::object<kern::Engine>(o, in, 1, "engine");
@@ -730,7 +739,7 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.app.update: kern::App::update
-bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   kern::Engine* a0 = ev::object<kern::Engine>(o, in, 1, "engine");
@@ -742,7 +751,7 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.app.resized: kern::App::resized
-bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   kern::Engine* a0 = ev::object<kern::Engine>(o, in, 1, "engine");
@@ -752,7 +761,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.app.stop: kern::App::stop
-bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   kern::Engine* a0 = ev::object<kern::Engine>(o, in, 1, "engine");
@@ -762,7 +771,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.make: kern::Engine::Engine
-bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   out[0] = Value::integer(o.own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*a0))));
@@ -770,7 +779,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.engine.release: kern::Engine::~Engine
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::Engine>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no Engine that was made";
     return false;
@@ -779,13 +788,13 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.input.make: kern::Input::Input
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::Input>(std::unique_ptr<kern::Input>(new kern::Input())));
   return true;
 }
 
 // engine.input.release: kern::Input::~Input
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::Input>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no Input that was made";
     return false;
@@ -863,63 +872,64 @@ const EngineCall kCalls[] = {
     {"engine.engine.renderer", &c18},
     {"engine.engine.input", &c19},
     {"engine.engine.input_2", &c20},
-    {"engine.engine.set_status", &c21},
-    {"engine.engine.request_pointer_lock", &c22},
-    {"engine.engine.arg", &c23},
-    {"engine.engine.has_arg", &c24},
-    {"engine.engine.arg_number", &c25},
-    {"engine.engine.set_args", &c26},
-    {"engine.engine.width", &c27},
-    {"engine.engine.height", &c28},
-    {"engine.engine.aspect", &c29},
-    {"engine.engine.stats", &c30},
-    {"engine.engine.clear_color", &c31},
-    {"engine.engine.set_clear_color", &c32},
-    {"engine.engine.xr", &c33},
-    {"engine.engine.set_xr", &c34},
-    {"engine.engine.xr_eye", &c35},
-    {"engine.engine.set_xr_eye", &c36},
-    {"engine.engine.xr_forward", &c37},
-    {"engine.engine.set_xr_forward", &c38},
-    {"engine.engine.xr_room_forward", &c39},
-    {"engine.engine.set_xr_room_forward", &c40},
-    {"engine.engine.xr_head_yaw", &c41},
-    {"engine.engine.set_xr_head_yaw", &c42},
-    {"engine.engine.xr_follow_head", &c43},
-    {"engine.engine.set_xr_follow_head", &c44},
-    {"engine.engine.xr_hold_room", &c45},
-    {"engine.engine.set_xr_hold_room", &c46},
-    {"engine.engine.xr_full_room", &c47},
-    {"engine.engine.set_xr_full_room", &c48},
-    {"engine.engine.xr_room_up", &c49},
-    {"engine.engine.set_xr_room_up", &c50},
-    {"engine.engine.xr_vignette", &c51},
-    {"engine.engine.set_xr_vignette", &c52},
-    {"engine.engine.xr_vignette_mesh", &c53},
-    {"engine.engine.set_xr_vignette_mesh", &c54},
-    {"engine.engine.xr_scope", &c55},
-    {"engine.engine.set_xr_scope", &c56},
-    {"engine.engine.xr_scope_camera", &c57},
-    {"engine.engine.set_xr_scope_camera", &c58},
-    {"engine.engine.xr_scope_fbo", &c59},
-    {"engine.engine.set_xr_scope_fbo", &c60},
-    {"engine.engine.xr_scope_size", &c61},
-    {"engine.engine.set_xr_scope_size", &c62},
-    {"engine.engine.stereo", &c63},
-    {"engine.engine.set_stereo", &c64},
-    {"engine.engine.stereo_ipd", &c65},
-    {"engine.engine.set_stereo_ipd", &c66},
-    {"engine.engine.stereo_cross", &c67},
-    {"engine.engine.set_stereo_cross", &c68},
-    {"engine.app.extensions", &c69},
-    {"engine.app.start", &c70},
-    {"engine.app.update", &c71},
-    {"engine.app.resized", &c72},
-    {"engine.app.stop", &c73},
-    {"engine.engine.make", &c74},
-    {"engine.engine.release", &c75},
-    {"engine.input.make", &c76},
-    {"engine.input.release", &c77},
+    {"engine.engine.mixer", &c21},
+    {"engine.engine.set_status", &c22},
+    {"engine.engine.request_pointer_lock", &c23},
+    {"engine.engine.arg", &c24},
+    {"engine.engine.has_arg", &c25},
+    {"engine.engine.arg_number", &c26},
+    {"engine.engine.set_args", &c27},
+    {"engine.engine.width", &c28},
+    {"engine.engine.height", &c29},
+    {"engine.engine.aspect", &c30},
+    {"engine.engine.stats", &c31},
+    {"engine.engine.clear_color", &c32},
+    {"engine.engine.set_clear_color", &c33},
+    {"engine.engine.xr", &c34},
+    {"engine.engine.set_xr", &c35},
+    {"engine.engine.xr_eye", &c36},
+    {"engine.engine.set_xr_eye", &c37},
+    {"engine.engine.xr_forward", &c38},
+    {"engine.engine.set_xr_forward", &c39},
+    {"engine.engine.xr_room_forward", &c40},
+    {"engine.engine.set_xr_room_forward", &c41},
+    {"engine.engine.xr_head_yaw", &c42},
+    {"engine.engine.set_xr_head_yaw", &c43},
+    {"engine.engine.xr_follow_head", &c44},
+    {"engine.engine.set_xr_follow_head", &c45},
+    {"engine.engine.xr_hold_room", &c46},
+    {"engine.engine.set_xr_hold_room", &c47},
+    {"engine.engine.xr_full_room", &c48},
+    {"engine.engine.set_xr_full_room", &c49},
+    {"engine.engine.xr_room_up", &c50},
+    {"engine.engine.set_xr_room_up", &c51},
+    {"engine.engine.xr_vignette", &c52},
+    {"engine.engine.set_xr_vignette", &c53},
+    {"engine.engine.xr_vignette_mesh", &c54},
+    {"engine.engine.set_xr_vignette_mesh", &c55},
+    {"engine.engine.xr_scope", &c56},
+    {"engine.engine.set_xr_scope", &c57},
+    {"engine.engine.xr_scope_camera", &c58},
+    {"engine.engine.set_xr_scope_camera", &c59},
+    {"engine.engine.xr_scope_fbo", &c60},
+    {"engine.engine.set_xr_scope_fbo", &c61},
+    {"engine.engine.xr_scope_size", &c62},
+    {"engine.engine.set_xr_scope_size", &c63},
+    {"engine.engine.stereo", &c64},
+    {"engine.engine.set_stereo", &c65},
+    {"engine.engine.stereo_ipd", &c66},
+    {"engine.engine.set_stereo_ipd", &c67},
+    {"engine.engine.stereo_cross", &c68},
+    {"engine.engine.set_stereo_cross", &c69},
+    {"engine.app.extensions", &c70},
+    {"engine.app.start", &c71},
+    {"engine.app.update", &c72},
+    {"engine.app.resized", &c73},
+    {"engine.app.stop", &c74},
+    {"engine.engine.make", &c75},
+    {"engine.engine.release", &c76},
+    {"engine.input.make", &c77},
+    {"engine.input.release", &c78},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

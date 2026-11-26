@@ -47,3 +47,19 @@ settings.renderer.shadw: unknown key - one of shadows, shadow, bloom, ao, grade
   eigenen Meldungen.
 Geprüft: `level_and_project_refuse_unknown_keys`.
 
+## 3. Ton (A3)
+
+Ein Spiel füllt nur seinen Mixer; hörbar macht ihn die App-Laufzeit – wie das Bild ohne Zutun des Spiels.
+
+| | |
+|---|---|
+| C++ | `engine.mixer()` (`kern::audio::Mixer&`): der eine Mixer der App, beim Start der App bereit (`ready()`), mit der Rate des Geräts. `GameAudio`/`SoundBank` nehmen ihn: `GameAudio(engine.mixer(), bank)`. |
+| Knoten | „Mixer“ an der Engine (`engine.engine.mixer`, aus der Tabelle der Engine): ein Programm-Blueprint holt ihn von seiner Engine und spielt darauf. |
+| Plattform | `kern/web/audio.mjs` (`KernAudio`): ein AudioContext, ein AudioWorklet (ohne Worklet: ScriptProcessor), freigeschaltet bei der ersten Geste (Taste, Zeiger, Berührung); auf einer verborgenen Seite angehalten, danach weiter. `runKernApp` legt ihn an (Option `audio`, Vorgabe an) und zieht aus `kern_app_audio(frames)`. |
+| C-Schnittstelle | `kern_app_audio_init(rate)` – vor `kern_app_start`, die Rate des Geräts (8000–192000); `kern_app_audio(frames, len*)` – die nächsten `frames` Frames, Stereo verschränkt (höchstens 8192 je Aufruf). Ohne `audio_init` (nativ, ohne Gerät) läuft der Mixer mit 48000 Hz, und wer will (ein Test), zieht mit `AppRuntime::audio(frames)`. |
+| Fehler | eine Rate außerhalb 8000–192000 oder nach dem Start: `kern_app_audio_init` gibt 0, `last_error` sagt warum; zu viele Frames je Aufruf: 0 Frames und der Grund. Kein Gerät im Browser (kein AudioContext): die Seite meldet es einmal im Log, das Spiel läuft stumm weiter. |
+| bewusst nicht | ein zweiter Mixer je App; Musik oder Ton in JavaScript (alles klingt aus dem Mixer); eine eigene Audio-Schleife je Spiel. |
+
+Geprüft: `app_runtime_plays_its_mixer` (Engine-Test), Murmel (nativ: die Töne kommen aus `engine.mixer()`; e2e: die
+Seite hat nach einer Taste einen laufenden AudioContext und zieht nicht-stille Proben).
+

@@ -8590,6 +8590,45 @@ TEST(app_runtime_start_says_why) {
   CHECK(!rt2.running());
 }
 
+// The app's sound (kern/docs/app.md 3.): the App plays on engine.mixer() - ready at its start, at the device's rate -
+// and the app runtime hands the mix out (kern_app_audio); a rate outside the mixer's, a rate after the start and too
+// many frames a call are refused with the reason. The mixer ends with the app (its clips go), its rate stays.
+TEST(app_runtime_plays_its_mixer) {
+  struct Tone final : App {
+    u32 rate = 0;
+    bool start(Engine& e) override {
+      rate = e.mixer().sample_rate();
+      std::vector<f32> wave(4800);
+      for (std::size_t i = 0; i < wave.size(); ++i) wave[i] = 0.5f * std::sin(static_cast<f32>(i) * 0.05f);
+      const audio::ClipId clip = e.mixer().adopt_clip(std::move(wave), 1, "tone", true);
+      audio::PlayParams p;
+      p.loop = true;
+      return clip && e.mixer().play(clip, p) != 0;
+    }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0);
+  CHECK(!rt.audio_init(4000) && std::string(last_error()).find("8000 to 192000") != std::string::npos);
+  CHECK(rt.audio(256).size == 0);   // (not running: nothing)
+  CHECK(rt.audio_init(44100) && rt.start(64, 48) && app.rate == 44100);
+  CHECK(!rt.audio_init(48000) && std::string(last_error()).find("before kern_app_start") != std::string::npos);
+  const Span<const f32> pcm = rt.audio(512);
+  f32 peak = 0;
+  for (f32 x : pcm) peak = std::fmax(peak, std::fabs(x));
+  CHECK(pcm.size == 1024 && peak > 0.05f);
+  CHECK(rt.audio(AppRuntime::kMaxAudioFrames + 1).size == 0 && std::string(last_error()).find("at most 8192") != std::string::npos);
+  rt.stop();
+  CHECK(rt.engine().mixer().sample_rate() == 44100 && rt.engine().mixer().clip_count() == 0);
+  // without a rate from the device: 48000 Hz
+  Tone other;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(other) == 0 && rt2.start(64, 48) && other.rate == 48000);
+  rt2.stop();
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).

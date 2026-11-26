@@ -53,9 +53,8 @@ f32 Murmel::punkte() const {
 bool Murmel::start(Engine& engine) {
   renderer_ = &engine.renderer();
   welt_ = std::make_unique<game::GameWorld>(engine.renderer());
-  mixer_.init(48000);
-  bank_ = std::make_unique<game::SoundBank>(mixer_);
-  audio_ = std::make_unique<game::GameAudio>(mixer_, *bank_);
+  bank_ = std::make_unique<game::SoundBank>(engine.mixer());
+  audio_ = std::make_unique<game::GameAudio>(engine.mixer(), *bank_);
   kamera_ = engine.renderer().camera();
   kamera_.fov = 60 * kPi / 180;
   level_ = 0;

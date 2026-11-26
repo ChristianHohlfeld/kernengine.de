@@ -1,5 +1,5 @@
 // Murmel im Browser (Playwright, Software-WebGL): (1) die Seite des Spiels lädt das Modul, eine gedrückte Pfeiltaste
-// rollt die Murmel über die erste Münze, der Punktestand der Anzeige steigt; (2) Kern Studio öffnet das Projekt und
+// rollt die Murmel über die erste Münze, der Punktestand der Anzeige steigt, der Ton läuft (der Mixer der Engine); (2) Kern Studio öffnet das Projekt und
 // sein Start-Level, Play spielt es: der Level-Graph meldet sich, die Pfeiltaste rollt, die Punkte steigen.
 //
 //   node kern/games/murmel/tests/murmel_e2e.mjs <base-url>     (die Wurzel des Repos, mit generated/studio.html und
@@ -42,6 +42,10 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(await until(async () => await punkte() >= 10, 90000), "an arrow key rolls the marble over a coin: the points go up (" + (await text()).split("\n")[0] + ")");
   await page.keyboard.up("ArrowUp");
   check(await until(async () => /Muenzen [1-3]\/3/.test(await text())), "the display counts the coin");
+  // the sound (kern/docs/app.md 3.): the page's key was the gesture - the engine's mixer plays, the host pulls it
+  const heard = () => page.evaluate(() => window.__kernApp?.audio);
+  check(await until(async () => (await heard())?.state === "running"), "the key unlocked the sound device (" + JSON.stringify(await heard()) + ")");
+  check(await until(async () => (await heard())?.frames > 4800 && (await heard())?.peak > 0.01, 30000), "the app runtime pulls the mixer, and the coin is heard (" + JSON.stringify(await heard()) + ")");
   check(!(await page.evaluate(() => window.__kernError)), "no error from the module");
   check(errors.length === 0, "no page errors" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await page.close();

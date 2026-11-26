@@ -18,6 +18,7 @@ extern "C" kern::i32 kern_app_start(kern::i32 width, kern::i32 height);
 extern "C" kern::i32 kern_app_frame(kern::f64 now_ms, kern::i32 page_hidden);
 extern "C" void kern_app_key(kern::u32 key, kern::i32 down);
 extern "C" void kern_app_stop();
+extern "C" const kern::f32* kern_app_audio(kern::u32 frames, kern::u32* out_len);
 
 using namespace kern;
 
@@ -31,6 +32,7 @@ struct Lauf {
   u32 toene = 0;
   std::string text;
   std::string stufen;               // wie die Blueprints der Welt laufen (am Ende, im Level 2)
+  f32 lautest = 0;                  // der lauteste Wert, den die App-Laufzeit aus dem Mixer der Engine gab
 };
 
 bool unten[static_cast<u32>(Key::count)] = {};
@@ -81,6 +83,10 @@ Lauf spiele(murmel::Murmel& spiel, int frames, bool zeigen) {
     const int vorher = spiel.level();
     const bool war_fertig = spiel.fertig();
     kern_app_frame(i * (1000.0 / 60.0), 0);
+    // (wie die Seite: die App-Laufzeit gibt den Mix des Mixers der Engine, ein Frame Ton je Bild)
+    u32 n = 0;
+    const f32* pcm = kern_app_audio(800, &n);
+    for (u32 k = 0; k < n; ++k) l.lautest = std::fmax(l.lautest, std::fabs(pcm[k]));
     if (spiel.level() == 1 && vorher == 0 && l.wechsel < 0) l.wechsel = i;
     if (spiel.fertig() && !war_fertig && l.geschafft < 0) l.geschafft = i;
     if (i % 60 == 0) {
@@ -126,6 +132,8 @@ int main(int argc, char** argv) {
   pruefe(a.punkte == MURMEL_PUNKTE, "die erwarteten Punkte (6 Muenzen und das Sprungfeld)");
   pruefe(a.toene == MURMEL_TOENE, "die erwarteten Toene");
   pruefe(a.text.find("Geschafft!") == 0, "die Anzeige sagt: Geschafft!");
+  std::printf("Ton: lautester Wert %.3f\n", a.lautest);
+  pruefe(a.lautest > 0.01f, "die Toene sind im Mix der Engine zu hoeren (engine.mixer, kern_app_audio)");
   // die Blueprints der Welt laufen in der Stufe, die der Bau sagt: ohne ihre Klassen im Interpreter, mit ihnen als C++
   std::printf("Stufen: %s\n", a.stufen.c_str());
   pruefe(a.stufen == std::string("Level: ") + MURMEL_STUFE + "; Sprungfeld: " + MURMEL_STUFE + "; ", "die Blueprints laufen als " MURMEL_STUFE);

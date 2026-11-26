@@ -1,10 +1,12 @@
 // Kern application host: runs a game written in C++ against kern::App
 // (kern/include/kern/app/app.h) in a canvas. Owns only what the browser
 // forces into JavaScript: the WebGL2 context, the frame callback, the
-// drawing-buffer size and input events, all forwarded to the module.
+// drawing-buffer size, input events and the sound device (the engine's mixer,
+// kern/docs/app.md 3.), all forwarded to the module.
 // The input events themselves are read by kern.mjs' BrowserInput (the same
 // for every Kern host); this file says what they are to kern::Input.
-import {loadKern, BrowserInput} from "./kern.mjs";
+import {loadKern, BrowserInput, readGamepad} from "./kern.mjs";
+import {KernAudio} from "./audio.mjs";
 
 export const KERN_APP_VERSION = "kern-app-host-1";
 
@@ -23,12 +25,14 @@ const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "S
  * Starts the app in `canvas`. Module source: one of bytes / base64 / url / module.
  * `onStatus(text)` receives kern::Engine::set_status text.
  * `maxPixelRatio` caps the drawing-buffer density (default: full device ratio).
+ * `audio` (default true): the engine's mixer (kern::Engine::mixer) is heard - after the page's first gesture, paused
+ * while it is hidden (kern/web/audio.mjs); false: no sound device (a page that plays its own).
  * The page's own share of the input (all optional, after the app had the event; BrowserInput):
  * `onKey(event, down)`, `onLook(dx, dy)` - the locked pointer's movement in css px -,
  * `onLock(locked)`, `onDevice(kind, event)`, `onFingersGone()`, `onVisibility(hidden)`.
  */
 export async function runKernApp({canvas, bytes = null, base64 = null, url = null, module = null, onStatus = null, onError = null,
-  maxPixelRatio = Infinity, contextAttributes = {}, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null, onDevice = null, onFingersGone = null,
+  maxPixelRatio = Infinity, contextAttributes = {}, audio = true, args = globalThis.location?.search ?? "", onKey = null, onLook = null, onLock = null, onDevice = null, onFingersGone = null,
   onVisibility = null} = {}) {
   if (!canvas?.getContext) throw Error("canvas required");
   const kern = await loadKern({bytes, base64, url, module});
@@ -57,7 +61,23 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     e.kern_free(ptr);
   }
   if (e.kern_main() !== 0) throw kern.fail("kern_main (kern::run)");
+  // the sound device, before the start: the App finds its mixer ready at the device's rate (kern/docs/app.md 3.)
+  let sound = null;
+  const heard = {frames: 0, peak: 0};
+  if (audio && KernAudio.supported()) {
+    const lenAt = e.kern_alloc(4);
+    sound = new KernAudio(frames => {
+      const ptr = e.kern_app_audio(frames, lenAt), n = new Uint32Array(kern.memory.buffer, lenAt, 1)[0];
+      const pcm = new Float32Array(kern.memory.buffer, ptr, n).slice();
+      heard.frames += n >> 1;
+      for (let i = 0; i < n; i++) heard.peak = Math.max(heard.peak, Math.abs(pcm[i]));
+      return pcm;
+    });
+    const rate = sound.create();
+    if (!rate || !e.kern_app_audio_init(rate)) { console.warn(rate ? kern.fail("audio") : "kern app: no sound device - the app runs without sound"); sound = null; }
+  } else if (audio) console.warn("kern app: this browser has no Web Audio - the app runs without sound");
   if (!e.kern_app_start(width, height)) throw kern.fail("app start");
+  const pump = sound ? setInterval(() => sound.pump(), 20) : 0;
 
   const listeners = [];
   const on = (target, type, fn, options) => { target.addEventListener(type, fn, options); listeners.push(() => target.removeEventListener(type, fn, options)); };
@@ -109,6 +129,11 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   let running = true, handle = 0;
   const frame = now => {
     if (!running) return;
+    sound?.pump();
+    // the gamepad (standard mapping) for kern::Input::gamepad - read each frame, the browser has no events for it
+    const pad = readGamepad();
+    if (pad) e.kern_app_gamepad(1, pad.lx, pad.ly, pad.rx, pad.ry, pad.lt, pad.rt, pad.bits >>> 0);
+    else e.kern_app_gamepad(0, 0, 0, 0, 0, 0, 0, 0);
     if (!e.kern_app_frame(now, document.hidden ? 1 : 0)) {
       running = false;
       const error = kern.fail("frame");
@@ -181,8 +206,13 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     exitXR() { xr?.session.end().catch(() => {}); },
     get inXR() { return !!xr; },
     get xrSpace() { return xr?.space || null; },
+    /** The sound device: its state ("none" without one, else the AudioContext's: "suspended" until a gesture,
+     *  "running"), how it plays ("worklet" / "script"), the frames it has pulled from the mixer and their peak. */
+    get audio() { return {state: sound?.context?.state ?? "none", mode: sound?.mode ?? "none", frames: heard.frames, peak: heard.peak}; },
     stop() {
       running = false;
+      clearInterval(pump);
+      sound?.close();
       xr?.session.end().catch(() => {});
       cancelAnimationFrame(handle);
       observer?.disconnect();

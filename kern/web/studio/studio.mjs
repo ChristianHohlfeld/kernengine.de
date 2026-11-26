@@ -127,7 +127,7 @@ const fillIcons = (root = document) => {
 async function moduleSources() {
   if (window.KERN_SOURCES) return window.KERN_SOURCES;
   const get = async rel => (await fetch(new URL(rel, import.meta.url))).text();
-  return (window.KERN_SOURCES = {kern: await get("../kern.mjs"), game: await get("./game.mjs")});
+  return (window.KERN_SOURCES = {kern: await get("../kern.mjs"), audio: await get("../audio.mjs"), game: await get("./game.mjs")});
 }
 
 export async function startStudio({url = null, base64 = null, bytes = null} = {}) {

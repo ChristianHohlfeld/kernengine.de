@@ -3353,6 +3353,30 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.engine.input_2", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
+  /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
+  void engine_engine_mixer(Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.mixer"); return; }
+      decltype(auto) kern_r = kern_self->mixer();
+      (void)::kern::logic::engine_values::handle_of<kern::audio::Mixer>(*kern_o, std::forward<decltype(kern_r)>(kern_r));
+      return;
+    }
+    this->kern_engine("engine.engine.mixer", {to_value(engine)}, {PinType::integer});
+  }
+  template <class KernNode> void engine_engine_mixer(KernNode& kern_n, Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.mixer"); return; }
+      decltype(auto) kern_r = kern_self->mixer();
+      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(::kern::logic::engine_values::handle_of<kern::audio::Mixer>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.mixer", {to_value(engine)}, {PinType::integer});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
   /// Text shown by the host page in its status overlay (empty hides it).
   void engine_engine_set_status(Int engine, const Text& text) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

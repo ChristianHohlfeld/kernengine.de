@@ -26,6 +26,13 @@ class AppRuntime {
   /// One WebXR frame (kern_app_frame_xr in runtime.cpp says what `views` holds).
   bool frame_xr(f64 now_ms, i32 count, const f32* views);
   bool resize(i32 width, i32 height);
+  /// The device's sample rate for the mixer (kern/docs/app.md 3.), before the start: 8000..192000. False (with the
+  /// reason in last_error) outside that or once started. Without it the mixer starts at 48000 Hz.
+  bool audio_init(u32 rate);
+  /// The next `frames` frames of the mixer, interleaved stereo (2 numbers a frame; at most kMaxAudioFrames a call).
+  /// Not running or too many frames: none (too many: last_error says why).
+  Span<const f32> audio(u32 frames);
+  static constexpr u32 kMaxAudioFrames = 8192;
   /// App::stop, then the renderer ends. Not running: nothing.
   void stop();
 
@@ -43,6 +50,7 @@ class AppRuntime {
   f64 start_ms_ = -1, last_ms_ = -1;
   u64 frame_ = 0;
   bool running_ = false;
+  std::vector<f32> audio_out_;
 };
 
 /// The process's one app runtime: the C ABI kern_app_* drives it, kern::run gives it the App.
