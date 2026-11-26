@@ -1411,13 +1411,14 @@ TEST(game_level_round_trip_and_validation) {
   CHECK(back.actors.size() == l.actors.size());
   CHECK(game::validate(back).empty() || !game::validate(back)[0].error);
   for (const game::Issue& i : game::validate(back)) CHECK(!i.error);
-  // Orb Run round-trips too and has 24 orbs, one player, a city.
+  // Orb Run round-trips too and has 24 orbs, one player, a city (and the template of a joining player's car).
   const game::Level orb = game::orb_run_level();
   game::Level orb2;
   CHECK(game::from_text(game::to_text(orb), orb2, &error));
   u32 orbs = 0, players = 0, cities = 0;
-  for (const game::Actor& a : orb2.actors) { orbs += a.pickup ? 1 : 0; players += a.controller ? 1 : 0; cities += a.city ? 1 : 0; }
+  for (const game::Actor& a : orb2.actors) { orbs += a.pickup ? 1 : 0; players += a.controller && !a.is_template ? 1 : 0; cities += a.city ? 1 : 0; }
   CHECK(orbs == 24 && players == 1 && cities == 1);
+  CHECK(!orb2.world.pawn_template.empty() && game::default_player(orb2) != 0);
   for (const game::Issue& i : game::validate(orb2)) CHECK(!i.error);
   // Rejections and repairs.
   CHECK(!game::from_text("{\"format\":\"other\"}", back, &error));
@@ -8979,7 +8980,7 @@ TEST(world_takes_its_device_profile) {
   CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"shadowDistanz":70}}]}})", read, &error));
   CHECK(error.find("settings: profiles[0] \"mobile\".world: unknown key \"shadowDistanz\" - one of ") != std::string::npos && error.find("shadowDistance") != std::string::npos);
   // A value the level's reader does not take; a world that is no object.
-  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"stepHz":1}}]}})", read, &error) && error.find("stepHz") != std::string::npos);
+  CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":{"groundColor":"green"}}]}})", read, &error) && error.find("groundColor") != std::string::npos);
   CHECK(!game::from_text(R"({"format":"kern-project","version":1,"settings":{"profiles":[{"name":"mobile","world":7}]}})", read, &error) && error.find("profiles[0].world: must be an object") != std::string::npos);
   // A world of the project with the profile: the level's settings, the profile's keys on top.
   CHECK(game::from_text(text, read, &error));
