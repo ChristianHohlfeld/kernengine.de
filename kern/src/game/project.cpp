@@ -45,6 +45,7 @@ json::Value to_json(const Project& p) {
   for (const ProgramBlueprint& b : p.blueprints) {
     json::Value x = json::Value::object();
     x.set("name", b.name);
+    if (!b.folder.empty()) x.set("folder", b.folder);
     x.set("logic", logic::graph_to_json(b.logic));
     bps.push(std::move(x));
   }
@@ -90,6 +91,10 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
       ProgramBlueprint bp;
       bp.name = b["name"].is_string() ? b["name"].as_string() : std::string();
       if (bp.name.empty()) return fail(error, place(i, "") + ": has no name");
+      if (const json::Value* f = b.find("folder")) {
+        if (!f->is_string()) return fail(error, place(i, bp.name) + ": folder: must be a name (a text)");
+        bp.folder = f->as_string();
+      }
       for (std::size_t j = 0; j < p.blueprints.size(); ++j)
         if (p.blueprints[j].name == bp.name)
           return fail(error, place(i, bp.name) + ": the name stands twice (also blueprints[" + std::to_string(j) + "])");

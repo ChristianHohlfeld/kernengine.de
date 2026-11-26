@@ -20,17 +20,19 @@ root="$(cd "$here/../../.." && pwd)"
 out="$(mkdir -p "$1" && cd "$1" && pwd)"
 cxx="${CXX:-c++}"
 cp "$here/level/spawncity.klevel" "$out/all.klevel"
+cp "$here/level/spawncity.kproject" "$out/all.kproject"   # (the program's Blueprints stand in the project: kern/docs/project.md)
 if [ -n "${REFRESH:-}" ]; then
   (cd "$here" && mkdir -p "$out/refresh/converted" "$out/refresh/texts" && cp tests/*.h "$out/refresh/" &&
    CLANGXX="${CLANGXX:-clang++}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert sc --program firmware=fc,hwcontract \
-     -I../../include -I../../third_party/box3d/include -Isrc --level "$out/all.klevel" --test "$out/refresh/converted" --texts "$out/refresh/texts" \
+     -I../../include -I../../third_party/box3d/include -Isrc --level "$out/all.klevel" --project "$out/all.kproject" --test "$out/refresh/converted" --texts "$out/refresh/texts" \
      -- $REFRESH > "$out/refresh.log" 2>&1)
   echo "refresh ($REFRESH): rc=$? - $(tail -n 3 "$out/refresh.log" | tr '\n' ' ')"
 fi
-python3 - "$out/all.klevel" <<'PY'
+python3 - "$out/all.klevel" "$out/all.kproject" <<'PY'
 import sys
-s = open(sys.argv[1]).read()
-open(sys.argv[1], "w").write(s.replace('"folder": "Source"', '"folder": "Program"'))
+for path in sys.argv[1:]:
+    s = open(path).read()
+    open(path, "w").write(s.replace('"folder": "Source"', '"folder": "Program"'))
 PY
 # The structs of the engine as the Blueprints of the engine's headers hold them (and every Blueprint that holds a copy of
 # them, "from" that library): a field the engine has since got (kern/logic/engine_nodes.gen.h, S_<struct>)
@@ -61,7 +63,7 @@ json.dump(level, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)
 print(f"structs of the engine brought up to its headers: {added} fields added" + (f"; not sayable: {', '.join(sorted(missing))}" if missing else ""))
 PY
 mkdir -p "$out/gen"
-"$root/tools/blueprint_cpp.sh" "$out/all.klevel" "$out/gen/level_blueprints.cpp" "$out/gen/level_blueprints.h" Program || exit 1
+"$root/tools/blueprint_cpp.sh" --project "$out/all.kproject" "$out/all.klevel" "$out/gen/level_blueprints.cpp" "$out/gen/level_blueprints.h" Program || exit 1
 export cxx root out
 compile() {
   local f="$1" log="$out/logs/$(basename "$1" .cpp).log"

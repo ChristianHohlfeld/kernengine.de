@@ -69,7 +69,7 @@ called_by_tests=(
   touch_play_cpp
   mp_rules_cpp
 )
-"$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program "${called_by_tests[@]}"
+"$kern/../tools/blueprint_cpp.sh" --project "$game/level/spawncity.kproject" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program "${called_by_tests[@]}"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
 # Kern's GL stub, Kern Logic for the rules that are Blueprints, the game layer for the Blueprints
 # that ask the world - a ray, an actor), every component the game is built with (kern/build.sh --app

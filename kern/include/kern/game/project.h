@@ -5,7 +5,7 @@
 //   { "format": "kern-project", "version": 1, "name": "My Game",
 //     "settings": { "renderer": { ... }, "profiles": [{ "name": ..., "renderer": { ... } }], "heapReserveMb": 0 },   (kern/app/project.h)
 //     "levels": ["levels/start.klevel"], "startLevel": "levels/start.klevel",
-//     "blueprints": [ { "name": "MyGame", "logic": { ... } }, { "name": "Math", "logic": { "library": true, ... } } ] }
+//     "blueprints": [ { "name": "MyGame", "logic": { ... } }, { "name": "Math", "folder": "Tools", "logic": { "library": true, ... } } ] }
 //
 // Where a Blueprint finds the libraries it uses (`uses`, by name): one of the program only in the project; one of a
 // world first in its level, then in the project. A name that stands in the level and in the project is an error
@@ -28,6 +28,9 @@ struct Level;
 struct ProgramBlueprint {
   std::string name;
   logic::Graph logic;
+  /// Order in the editor, as an actor's folder in a level ("": none) - it means nothing to the engine; a tool that
+  /// writes Blueprints (tools/cpp_to_blueprint.py) knows its own by it.
+  std::string folder;
 };
 
 struct Project {

@@ -1288,6 +1288,7 @@ TEST(game_project_round_trip) {
   game::ProgramBlueprint math;
   math.name = "Mathe";
   math.logic.library = true;
+  math.folder = "Werkzeuge";
   game::ProgramBlueprint spiel;
   spiel.name = "Spiel";
   spiel.logic.uses = {"Mathe"};
@@ -1307,6 +1308,9 @@ TEST(game_project_round_trip) {
   CHECK(p.heap_reserve_mb == 320);
   CHECK(back.name == "Probe" && back.levels.size() == 2 && back.start_level == "levels/wald.klevel" && back.first_level() == "levels/wald.klevel");
   CHECK(back.blueprints.size() == 2 && back.blueprints[0].name == "Spiel" && back.blueprints[1].logic.library && back.blueprint("Mathe") == &back.blueprints[1]);
+  // (a folder is order in the editor, as an actor's: kept, and written only where there is one)
+  CHECK(back.blueprints[1].folder == "Werkzeuge" && back.blueprints[0].folder.empty() && text.find("\"folder\": \"Werkzeuge\"") != std::string::npos);
+  CHECK(text.find("\"folder\"") == text.rfind("\"folder\""));
   back.start_level.clear();
   CHECK(back.first_level() == "levels/start.klevel");
   // The settings as the project file holds them (the one way to set up the renderer - kern::run hands them over): a
@@ -1362,6 +1366,7 @@ TEST(game_project_errors) {
   CHECK(why(head + "\"blueprints\":{}}") == "blueprints: must be a list");
   CHECK(why(head + "\"blueprints\":[{\"logic\":{}}]}") == "blueprints[0]: has no name");
   CHECK(why(head + "\"blueprints\":[{\"name\":\"A\"}]}") == "blueprints[0] \"A\": has no logic (its Blueprint)");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"folder\":3,\"logic\":{}}]}") == "blueprints[0] \"A\": folder: must be a name (a text)");
   CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{}},{\"name\":\"A\",\"logic\":{}}]}") ==
         "blueprints[1] \"A\": the name stands twice (also blueprints[0])");
   CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{\"uses\":[\"X\",\"X\"]}}]}") == "blueprints[0] \"A\": logic graph: the library \"X\" is used twice");

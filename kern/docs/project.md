@@ -170,6 +170,29 @@ Eingang **World** (Int, der Handle einer GameWorld):
 - In die andere Richtung, von der Welt zum Programm, gibt es **kein** stilles Durchfallen. Der Weg führt nur über Objekte
   der Engine, die das Programm der Welt gibt: den festen Schritt (6.1) oder eine Schnittstelle.
 
+## 7a. Ein Programm aus C++: wohin der Konverter schreibt
+
+`tools/cpp_to_blueprint.py --convert <ns> --level <level.klevel> --project <spiel.kproject>` schreibt jeden Blueprint
+dorthin, wo er nach 1. hingehört – die Regel folgt daraus, was ein Blueprint ist und wer ihn benutzt, nie aus einem
+Namen oder Ordner:
+
+- **ins Projekt** (Programm): die App (ein Zustand, der `App` implementiert – `kern::run` startet das Programm mit
+  ihrem Objekt), jeder Blueprint mit einem Export (Exporte gehören zum Programm, 4.), und jeder Blueprint, den ein
+  Blueprint des Programms benutzt (`uses`, auch über andere hinweg – ein Programm-Blueprint findet Bibliotheken nur im
+  Projekt, 5.). Eine Bibliothek, die Programm und Welt benutzen, steht also im Projekt; die Welt findet sie dort.
+- **ins Level** (Welt): jeder andere.
+
+Das Protokoll nennt je Blueprint Ort und Grund („where the Blueprints stand“, z. B. `CasesApp: the project - it
+implements App …`, `door_cpp: the level - a world's …`). Ein Blueprint des Programms, der aus einem früheren Stand im
+Level steht (auch einer eines anderen Ordners, eine eigene Quelle), zieht unverändert ins Projekt um – mit eigener
+Zeile im Protokoll. Ein Lauf ohne `--project`, der Programm-Blueprints hat, bricht mit ihren Namen und Gründen ab.
+Projekt-Blueprints tragen wie Akteure einen Ordner (`"folder"`, Ordnung im Editor); der Konverter kennt daran seine
+eigenen. Beide Dateien werden vom Leser der Engine gelesen (`tools/blueprint_cpp.sh --apply <datei> [--with <projekt>]`;
+ein Level weist dabei einen Export ab, `game::world_export`) und nur geschrieben, wenn alle Blueprints gelesen sind.
+Die Klassen schreibt `tools/blueprint_cpp.sh --project <spiel.kproject> <level> …` aus beiden. Geprüft:
+`tools/converter_cases/run.sh` (Fall `program` + `door`: App, Export und deren Bibliothek im Projekt, die Tür im
+Level, beide gelesen, ein Export im Level abgewiesen).
+
 ## 8. Ein zweites Spiel anlegen – Schritt für Schritt
 
 1. Im Editor „Neues Projekt“ wählen. Das legt `spiel.kproject` und ein leeres `levels/start.klevel` an.

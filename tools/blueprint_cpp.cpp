@@ -1,8 +1,13 @@
 // Host tool: the Blueprints of a Kern level as C++ classes a game links.
 //
-//   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]   (builds this file once, then runs it)
-//   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]
-//                                                        (the other way: Blueprints from their C++ texts)
+//   tools/blueprint_cpp.sh [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]
+//                                                        (builds this file once, then runs it; with --project the
+//                                                        project's Blueprints - the program's - too, a folder of theirs
+//                                                        as an actor's)
+//   tools/blueprint_cpp.sh --apply <level.klevel | name.kproject> [--with <name.kproject>] <name | Level> <text.cpp> [<name> <text.cpp> ...]
+//                                                        (the other way: Blueprints from their C++ texts, into a level -
+//                                                        its libraries found there, then in the project --with names -
+//                                                        or into a project; a level refuses an export)
 //   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
 //   tools/blueprint_cpp.sh --classes <level.klevel> <out.h> <actor> [<actor> ...]
 //                                                        (only the classes of these actors' Blueprints and of the
@@ -53,6 +58,7 @@
 
 #include "kern/core/json.h"
 #include "kern/game/logic_nodes.h"
+#include "kern/game/project.h"  // (game::world_export: what a level may not hold)
 #include "kern/logic/logic.h"
 
 using namespace kern;
@@ -69,33 +75,52 @@ bool read_file(const char* path, std::string& out) {
   return true;
 }
 
-/// In the level `doc`, the Blueprint of the actor called <actor> ("Level": the level's own)
-/// becomes what the C++ text says - the text is the Blueprint's other notation
-/// (kern/docs/blueprint_cpp.md), read as the editor's C++ view reads it (Apply). An actor of that
-/// name that is not there yet is made, in the folder "Rules". 0: it is there; else the text is no
-/// Blueprint that compiles, and what is wrong is said.
-int apply_one(json::Value& doc, const char* level_path, const std::string& actor, const char* text_path) {
+/// Whether a document is a project (kern/game/project.h: "format": "kern-project") - else it is a level.
+bool is_project(const json::Value& doc) { return doc["format"].as_string() == "kern-project"; }
+
+/// The Blueprint called `name` in a document: an actor's in a level, one of "blueprints" in a project (null: none).
+const json::Value* graph_in(const json::Value& doc, std::string_view name) {
+  for (const json::Value& a : doc[is_project(doc) ? "blueprints" : "actors"].items()) {
+    if (a["name"].as_string() != name) continue;
+    const json::Value* logic = is_project(doc) ? a.find("logic") : a["components"].find("logic");
+    return logic && logic->is_object() ? logic : nullptr;
+  }
+  return nullptr;
+}
+
+/// In the level or project `doc`, the Blueprint called <name> ("Level": the level's own graph) becomes what the C++
+/// text says - the text is the Blueprint's other notation (kern/docs/blueprint_cpp.md), read as the editor's C++ view
+/// reads it (Apply). A Blueprint of that name that is not there yet is made: an actor of a level in the folder "Rules",
+/// a Blueprint of a project without a folder. The libraries the text names are the document's other Blueprints - for a
+/// level, then those of `with` (its project: kern/docs/project.md 5.). 0: it is there; else the text is no Blueprint
+/// that compiles, or one a level may not hold (an export: game::world_export), and what is wrong is said.
+int apply_one(json::Value& doc, const char* path, const std::string& actor, const char* text_path, const json::Value* with) {
   std::string text, why;
   if (!read_file(text_path, text)) {
     std::fprintf(stderr, "%s: cannot read it\n", text_path);
     return 1;
   }
-  // (where the level holds that Blueprint: made empty where there is none yet)
+  const bool project = is_project(doc);
+  // (where the document holds that Blueprint: made empty where there is none yet)
   auto member = [](json::Value& of, const char* key, json::Value fresh) -> json::Value* {
     if (!of.find(key) || (fresh.is_object() && !of.find(key)->is_object()) || (fresh.is_array() && !of.find(key)->is_array())) of.set(key, std::move(fresh));
     return of.find(key);
   };
   json::Value* held = nullptr;
-  if (actor == "Level") {
+  if (actor == "Level" && !project) {
     held = member(doc, "logic", json::Value::object());
   } else {
-    json::Value* actors = member(doc, "actors", json::Value::array());
+    json::Value* entries = member(doc, project ? "blueprints" : "actors", json::Value::array());
     auto named = [&]() -> json::Value* {
-      for (json::Value& a : actors->items())
+      for (json::Value& a : entries->items())
         if (a["name"].as_string() == actor) return &a;
       return nullptr;
     };
-    if (!named()) {
+    if (!named() && project) {
+      json::Value b = json::Value::object();
+      b.set("name", actor);
+      entries->push(std::move(b));
+    } else if (!named()) {
       const f64 id = doc["nextId"].as_number(1);
       json::Value a = json::Value::object(), transform = json::Value::object();
       auto triple = [](f64 v) {
@@ -110,34 +135,37 @@ int apply_one(json::Value& doc, const char* level_path, const std::string& actor
       transform.set("rotation", triple(0));
       transform.set("scale", triple(1));
       a.set("transform", std::move(transform));
-      actors->push(std::move(a));
+      entries->push(std::move(a));
       doc.set("nextId", id + 1);
     }
-    held = member(*member(*named(), "components", json::Value::object()), "logic", json::Value::object());
+    held = project ? member(*named(), "logic", json::Value::object()) : member(*member(*named(), "components", json::Value::object()), "logic", json::Value::object());
   }
   logic::Graph before, g;
   std::string error;
   if (held->is_object() && held->find("nodes")) logic::graph_from_json(*held, before, &error);
-  // (the libraries the text names: the Blueprints of the level's other actors, by their names)
+  // (the libraries the text names: the document's other Blueprints by their names - a level's, then its project's)
   std::map<std::string, std::unique_ptr<logic::Graph>> others;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     auto known = others.find(std::string(name));
     if (known != others.end()) return known->second.get();
     std::unique_ptr<logic::Graph> found;
-    if (name != actor)
-      for (const json::Value& a : doc["actors"].items()) {
-        const json::Value* logic = a["components"].find("logic");
-        if (a["name"].as_string() != name || !logic || !logic->is_object()) continue;
-        found = std::make_unique<logic::Graph>();
-        if (!logic::graph_from_json(*logic, *found)) found.reset();
-        break;
-      }
+    const json::Value* logic = name != actor ? graph_in(doc, name) : nullptr;
+    if (!logic && with) logic = graph_in(*with, name);
+    if (logic) {
+      found = std::make_unique<logic::Graph>();
+      if (!logic::graph_from_json(*logic, *found)) found.reset();
+    }
     return (others[std::string(name)] = std::move(found)).get();
   };
   if (!(before.empty() ? logic::from_cpp(text, g, nullptr, &error, logic::library(), all) : logic::apply_cpp(text, before, g, &error, logic::library(), all))) {
     std::fprintf(stderr, "%s: %s\n", text_path, error.c_str());
     return 1;
   }
+  if (!project)  // (exports belong to the program: a level holds none - as the engine reads a level)
+    if (const std::string e = game::world_export(g); !e.empty()) {
+      std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", path, actor.c_str(), e.c_str());
+      return 1;
+    }
   int errors = 0;
   // (with its libraries it is one graph: the rules that follow calls judge that one)
   logic::Graph whole;
@@ -151,27 +179,40 @@ int apply_one(json::Value& doc, const char* level_path, const std::string& actor
   }
   if (errors) return 1;
   *held = logic::graph_to_json(g);
-  std::printf("%s: the Blueprint of %s is %s (%zu nodes, %zu functions)\n", level_path, actor.c_str(), text_path, g.nodes.size(), g.functions.size());
+  std::printf("%s: the Blueprint of %s is %s (%zu nodes, %zu functions)\n", path, actor.c_str(), text_path, g.nodes.size(), g.functions.size());
   return 0;
 }
 
-/// --apply <level.klevel> <actor> <text.cpp> [<actor> <text.cpp> ...]: several Blueprints in the
-/// order given - a library before the Blueprints that use it. The level is written when all of
-/// them were read: all of them, or nothing.
-int apply(const char* level_path, int count, char** pairs) {
-  std::string level_text, why;
-  json::Value doc;
-  if (!read_file(level_path, level_text) || !json::parse(level_text, doc, &why)) {
-    std::fprintf(stderr, "%s: %s\n", level_path, why.empty() ? "cannot read it" : why.c_str());
-    return 1;
+bool read_doc(const char* path, std::string& text, json::Value& doc) {
+  std::string why;
+  if (read_file(path, text) && json::parse(text, doc, &why)) return true;
+  std::fprintf(stderr, "%s: %s\n", path, why.empty() ? "cannot read it" : why.c_str());
+  return false;
+}
+
+/// --apply <level.klevel | name.kproject> [--with <name.kproject>] <name> <text.cpp> [<name> <text.cpp> ...]: several
+/// Blueprints in the order given - a library before the Blueprints that use it. The file is written when all of them
+/// were read: all of them, or nothing. A level's Blueprints find libraries in the level, then in the project `--with`
+/// names; a project's only in the project (kern/docs/project.md 5.).
+int apply(const char* path, const char* with_path, int count, char** pairs) {
+  std::string text, with_text;
+  json::Value doc, with;
+  if (!read_doc(path, text, doc) || (with_path && !read_doc(with_path, with_text, with))) return 1;
+  if (with_path && is_project(doc)) {
+    std::fprintf(stderr, "%s: --with %s: a Blueprint of the program finds its libraries only in the project (kern/docs/project.md 5.)\n", path, with_path);
+    return 2;
+  }
+  if (with_path && !is_project(with)) {
+    std::fprintf(stderr, "--with %s: not a Kern project (format must be \"kern-project\")\n", with_path);
+    return 2;
   }
   for (int k = 0; k + 1 < count; k += 2)
-    if (apply_one(doc, level_path, pairs[k], pairs[k + 1]) != 0) return 1;
-  const std::string out = json::stringify(doc, 1) + "\n";
-  if (out != level_text) {
-    FILE* f = std::fopen(level_path, "wb");
+    if (apply_one(doc, path, pairs[k], pairs[k + 1], with_path ? &with : nullptr) != 0) return 1;
+  const std::string out = json::stringify(doc, is_project(doc) ? 2 : 1) + "\n";
+  if (out != text) {
+    FILE* f = std::fopen(path, "wb");
     if (!f || std::fwrite(out.data(), 1, out.size(), f) != out.size() || std::fclose(f) != 0) {
-      std::fprintf(stderr, "cannot write %s\n", level_path);
+      std::fprintf(stderr, "cannot write %s\n", path);
       return 1;
     }
   }
@@ -182,7 +223,8 @@ int apply(const char* level_path, int count, char** pairs) {
 
 int main(int argc, char** argv) {
   (void)game::logic_node_shapes_registered();  // the gameplay nodes, as the library knows them
-  if (argc >= 5 && argc % 2 == 1 && std::string(argv[1]) == "--apply") return apply(argv[2], argc - 3, argv + 3);
+  if (argc >= 7 && argc % 2 == 1 && std::string(argv[1]) == "--apply" && std::string(argv[3]) == "--with") return apply(argv[2], argv[4], argc - 5, argv + 5);
+  if (argc >= 5 && argc % 2 == 1 && std::string(argv[1]) == "--apply") return apply(argv[2], nullptr, argc - 3, argv + 3);
   if (argc == 2 && std::string(argv[1]) == "--node-names") {
     // (the names the nodes have in a Blueprint's C++ - math_add, list_get ...: nothing else of a Blueprint is called so)
     for (const auto& d : logic::library().all()) {
@@ -203,6 +245,9 @@ int main(int argc, char** argv) {
     std::printf("%a\n", f.evaluate(nullptr, 0));
     return 0;
   }
+  // --project <name.kproject>: the project's Blueprints too (the program's - kern/docs/project.md), beside the level's
+  const char* project_path = nullptr;
+  if (argc >= 4 && std::string(argv[1]) == "--project") project_path = argv[2], argv += 2, argc -= 2;
   // --classes: only these actors' Blueprints and the libraries they use, as classes without glue
   std::set<std::string> only;
   const bool classes_only = argc >= 5 && std::string(argv[1]) == "--classes";
@@ -211,7 +256,7 @@ int main(int argc, char** argv) {
     argv += 1, argc -= 1;
   }
   if (argc < 3 || (!classes_only && argc != 3 && argc < 5) || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+    std::fprintf(stderr, "usage: blueprint_cpp [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> <folder> [<name> ...]]\n       blueprint_cpp [--project <name.kproject>] --classes <level.klevel> <out.h> <name> [<name> ...]\n       blueprint_cpp --apply <level.klevel | name.kproject> [--with <name.kproject>] <name | Level> <text.cpp> [<name> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   // (the header of the Blueprints the program calls by their classes, and the folder they stand in)
@@ -223,19 +268,45 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "%s: %s\n", argv[1], why.empty() ? "cannot read it" : why.c_str());
     return 1;
   }
-  // (owner as the file says it, the graph)
-  std::vector<std::pair<std::string, const json::Value*>> found;
-  std::set<std::string> called;  // (the actors of the folder whose Blueprints the program calls by their classes)
+  std::string project_text;
+  json::Value project_doc;
+  if (project_path) {
+    if (!read_doc(project_path, project_text, project_doc)) return 1;
+    if (!is_project(project_doc)) {
+      std::fprintf(stderr, "--project %s: not a Kern project (format must be \"kern-project\")\n", project_path);
+      return 1;
+    }
+  }
+  // (owner as the file says it, the name the others use it by, the graph)
+  struct Found {
+    std::string owner, name;
+    const json::Value* graph;
+  };
+  std::vector<Found> found;
+  std::set<std::string> called;  // (the Blueprints of the folder whose classes the program calls)
   std::set<std::string> named_too;  // (and those named after the folder, wherever they stand)
   if (header_path)
     for (int k = 5; k < argc; ++k) named_too.insert(argv[k]), called.insert(argv[k]);
-  if (const json::Value* g = doc.find("logic"); g && g->is_object()) found.push_back({"the level", g});
-  for (const json::Value& a : doc["actors"].items())
-    if (const json::Value* g = a["components"].find("logic"); g && g->is_object()) {
-      found.push_back({"actor \"" + a["name"].as_string() + "\"", g});
-      if (header_path && a["folder"].as_string() == called_folder) called.insert(a["name"].as_string());
-      named_too.erase(a["name"].as_string());
+  if (const json::Value* g = doc.find("logic"); g && g->is_object()) found.push_back({"the level", "Level", g});
+  std::map<std::string, std::string> where;  // (a name: where it stands - a name stands once, in the level or in the project)
+  auto take = [&](const json::Value& a, const json::Value* g, const std::string& owner) {
+    const std::string n = a["name"].as_string();
+    if (!g || !g->is_object()) return true;
+    if (where.count(n)) {
+      std::fprintf(stderr, "%s: the Blueprint %s stands as %s and as %s - rename one (kern/docs/project.md 5.)\n", argv[1], n.c_str(), where[n].c_str(), owner.c_str());
+      return false;
     }
+    where[n] = owner;
+    found.push_back({owner, n, g});
+    if (header_path && a["folder"].as_string() == called_folder) called.insert(n);
+    named_too.erase(n);
+    return true;
+  };
+  for (const json::Value& a : doc["actors"].items())
+    if (!take(a, a["components"].find("logic"), "actor \"" + a["name"].as_string() + "\"")) return 1;
+  if (project_path)
+    for (const json::Value& b : project_doc["blueprints"].items())
+      if (!take(b, b.find("logic"), "the project's Blueprint \"" + b["name"].as_string() + "\"")) return 1;
 
   std::string name = argv[1];
   if (const std::size_t slash = name.find_last_of("/\\"); slash != std::string::npos) name.erase(0, slash + 1);
@@ -273,10 +344,10 @@ int main(int argc, char** argv) {
     bool done = false;
   };
   std::vector<Held> held;
-  for (const auto& [owner, json] : found) {
+  for (const auto& [owner, found_name, json] : found) {
     Held h;
     h.owner = owner;
-    h.name = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
+    h.name = found_name;
     std::string error;
     if (!logic::graph_from_json(*json, h.g, &error)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
@@ -436,12 +507,12 @@ int main(int argc, char** argv) {
   if (classes_only) out += "\nnamespace blueprints {\n" + aliases + "}  // namespace blueprints\n";
   if (header_path) {
     for (const std::string& c : named_too) {
-      std::fprintf(stderr, "%s: no actor %s with a Blueprint\n", argv[1], c.c_str());
+      std::fprintf(stderr, "%s: no Blueprint %s (an actor's%s)\n", argv[1], c.c_str(), project_path ? " or the project's" : "");
       return 1;
     }
     for (const std::string& c : called)
       if (std::none_of(held.begin(), held.end(), [&](const Held& h) { return h.owner != "the level" && h.name == c; })) {
-        std::fprintf(stderr, "%s: the actor %s of the folder %s has no Blueprint\n", argv[1], c.c_str(), called_folder.c_str());
+        std::fprintf(stderr, "%s: the Blueprint %s of the folder %s is empty\n", argv[1], c.c_str(), called_folder.c_str());
         return 1;
       }
     // The classes by their names, and how the program binds them (each to the object the runtime runs it as).
