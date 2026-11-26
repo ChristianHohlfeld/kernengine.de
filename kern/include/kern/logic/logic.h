@@ -948,8 +948,8 @@ class Context;
 
 /// event: starts a chain. action: one step that always goes on (one exec output) or ends the
 /// chain (none). pure: a value, no exec pins. flow: decides where the chain goes on - several exec
-/// outputs, or one it may not take (Do Once, Gate).
-enum class NodeKind : u8 { event, action, pure, flow };
+/// outputs, or one it may not take (Do Once, Gate). A Blueprint may hold it (one that describes nodes).
+enum class KERN_BLUEPRINT_TYPE NodeKind : u8 { event, action, pure, flow };
 
 struct NodeDef {
   std::string type, label, category, help;
