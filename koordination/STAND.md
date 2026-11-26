@@ -93,3 +93,13 @@ Zweig work-zahlen (Stufen 2–6 in Arbeit): numbers.h, elf Pin-Typen, getypte Kn
 **Volle Läufe.** Kandidat 7 (cc4c2673): rc=1, fatal engine_input_actions (Handliste der Bibliotheks-Header) → behoben (Header werden gefunden; frühes Scheitern). Kandidat 8 (fa64fb01): ERSTER durchgelaufener Konverter-Lauf — rc=0, Level+Projekt gelesen, 0× „goes round" (k7: 619), 103 statt 178 min, 1631/1839 geschrieben, 1588 verglichen (alter Durchgang), 208 warten; Suite rot: Klassen kompilieren nicht (ActorHandle statt Object in Held<Struct>, behoben in 2436faf4). Kandidat 9 (work-projekt ac491f28, mit dem Fix) rechnet seit 13:55.
 Gate work-projekt zuletzt ganz grün: CI 45813948422 (3e540160).
 Nichts geht als „bitgenau" nach work, bis der ehrliche Durchgang für Murmel und SpawnCity ohne Abweichung grün ist.
+
+## Nachtrag 26.11. 16:00
+
+**Entscheidung Besitzer 15:22 — Presets/Bausteine:** Soldat, Waffen, Micro Duck, Fahrzeuge … wandern NICHT ins Spiel, sondern werden mitgelieferte Bausteine der Engine (zweite Schicht neben dem Kern): Vorlagen + Blueprint-Bibliotheken + Assets, im Editor als Bibliothek zum Hineinziehen. Regeln: nur die öffentliche Schnittstelle; als Blueprints (lesbar, kopier- und änderbar); abwählbar je Projekt. „Kein Spielname im Kern" gilt für den Kern. Bau NACH den Zahl-Typen.
+
+**Wartende Funktionen (k8: 208)** — koordination/wartende_funktionen.md: 137 an EINER Ursache (Test nimmt Stücke anderer Dateien ohne deren Header → Basisklasse fehlt), lokal behoben (Fall far); 26 Typnamen-Verwechslung (drei Structs „Blast", hält Game::explosion); 23 Engine-Objekt als Int (wohl behoben seit 2436faf4); 6 Exporte out_len; 5 Getter anderer Zustand (3f); 6 einzelne; 4 heute nicht schreibbar (Engine-Schnittstelle: WorldSettings, Text::view, embedded_level, Sicht auf Listenteil). Agent konverter7 auf work-konverter.
+
+**Zahl-Typen (work-zahlen):** Formel getypt, NaN-Regel als Regel der Sprache (kanonisch, wo Bits sichtbar werden), lokal alles grün (kern_tests 62.470, blueprint_native 83 Blueprints, game_native). CI noch nicht ganz grün (zuletzt UBSan: i64-Überlauf bei Add to Variable in der Klasse). Entschieden: KEIN -fwrapv; die Rechnung kommt vom Typ (Plätze der Sprache in Klassen = Typ mit den Operationen aus numbers.h). size_t: LP64 bleibt; Konverter-Prüfung (Hinweis) für Stellen, an denen die Breite das Ergebnis ändern kann — Zählung steht aus. JIT auf work-zahlen 1,0× (Performance-Schritt).
+
+Kandidat 9 (ac491f28) rechnet seit 13:55, noch ohne Ergebnis.

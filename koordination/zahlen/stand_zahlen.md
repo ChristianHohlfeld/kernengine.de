@@ -198,3 +198,86 @@ kern/tests/logic_cases.h mit diesen Rändern; logic_wasm_test.mjs vergleicht Int
 - Rote Jobs auf work-zahlen erwartet bis Stufe 5/8: murmel, murmel-web, converter-cases, native-spawncity-*, e2e (Editor-JS Stufe 7).
 - Nicht getan: Formel neu (Stufe 3), Konverter-Ausdrücke (Stufe 5 Rest), Stufe 4/5 (work-projekt typen/bigint/Murmel-Summe grün),
   Stufe 8 Murmel, Mathe-Knoten cosh/asinh/log2/cbrt/ldexp (work-projekt fbf8eee2 einmischen).
+
+### Letzter Stand (Übergabe)
+- Commits bis 87ee24e3 + „Klassen-Fall Running …“ gepusht. CI 45825477474 (87ee24e3): determinism GRÜN, native-build GRÜN; native läuft:
+  kern_tests grün (57279/0 lokal und in CI 45822208759), danach blueprint_native_test ROT (lokal nachgestellt, $S/rd/bnt.log).
+- blueprint_native_test rot = Klasse ≠ Interpreter in den Fällen Tier_formula_* (R=/W=-Listen, 8+8 Zeilen): die ALTE Formel rechnet
+  im Interpreter in f64 (dann num_cast, sättigend), in der Klasse als i64-Lambda (Umbruch) bzw. mit kern::math::wrap32/mul32/single
+  (nodes.h, Übergang). Das löst nur die getypte Formel (Stufe 3, Entscheidung 3): formula.cpp neu auf numbers.h, Typen der Eingänge
+  als Einstellung, Literale mit Typ, gemischte Typen = Fehler, Klasse ruft num::-Funktionen; dann die 93 math.formula in logic_cases.h
+  (formula_*-Fälle) auf die neue Schreibweise (band/shl/wrap32 -> Operatoren/static_cast im Typ) umschreiben.
+- Der update-Fall (Frame dt f32) ist behoben (blueprint_native.h:1911).
+- game_native_test (run.sh, nach blueprint_native_test) lokal noch nicht gefahren.
+
+## Dritte Sitzung (Agent zahlen, 26.11. nachmittags) – Formel getypt (Stufe 3 Ende)
+### Fertig
+- CI 45825477474 (87ee24e3) ausgewertet: native: kern_tests grün (57.279), danach blueprint_native_test rot (Tier_formula_*);
+  build rot NUR wegen Bench-Graph in kern/tests/logic_wasm_test.cpp ("float") -> umgestellt (f64, math.rem, num.cast);
+  determinism, native-build grün; murmel, murmel-web, converter-cases, native-spawncity-build rot (erwartet, Stufe 5/8).
+- 908e8b33 + Folgecommit: **Formel neu** (kern/src/logic/formula.cpp ganz neu; logic.h class Formula(text, types)):
+  Eingänge getypt (Einstellung "types", Reihenfolge des ersten Vorkommens), jede Operation = Funktion aus numbers.h
+  (Programm aus Schritten `u64 (*)(u64,u64,u64)` je Typ), C++-Bindung (% << >> & | ^ ~ && || ?:), gemischte Typen = Fehler
+  mit Stelle, Umwandlung nur num_cast/num_bit_cast, Literale: 0.5f f32, 0.5 f64, ganze Zahl nimmt den Typ dessen, was sie
+  trifft (allein: i32/i64, 7u: u32/u64), Operation nur auf Literalen = Fehler. Formula::constant() für blueprint_cpp --formula
+  (Konverter faltet Konstanten; Ausgabe jetzt "<typ> <wert>", cpp_to_blueprint.py engine_formula liest das).
+  Klasse: `kern::formula<T...>([](auto a, ...) { return <formel>; }, werte)` (blueprint.h) über `num::Typed<T>` (numbers.h:
+  Operatoren/Funktionen = numbers.h, Literal-Übernahme wie die Formel, Shift mit Literal links = C++-Typ). Notation liest/
+  schreibt das; int_inputs/int_sums/formula_types entfernt. nodes.h: wrap32/wrap32s/mul32/single/band/bor/bxor/shl/shr weg;
+  num::clamp/num::lerp (Knoten Clamp/Lerp rufen sie). Doku blueprint_cpp.md „Formeln“ neu.
+- logic_cases.h: formula_bits_edges/whole_ints/whole_arith/int_sums/whole_indexed ersetzt durch formula_<i8..u64,f32,f64>,
+  formula_casts, formula_whole_indexed (Generator $S/fx/gen.py: jedes Paar der Randwerte durch ~24 Formeln, Bits nach Out;
+  NaN vor dem Bit-Cast auf einen Wert gebracht - welche NaN, legt C++ nicht fest). Übrige 9 Formeln von Hand getypt
+  (formulas, signed_zero, float_bits_end, bytes, function_reentry, recursion_through, fixed_widths: mul32 -> a * num_cast<u32,i32>(b)).
+- Tests: logic_formulas neu (jede Operation, Literale, Fehler mit Stelle, kanonische Schreibweise), **logic_formula_is_its_nodes**
+  (je Typ i8..f64: Formel == ihr Knotenbaum im Interpreter über alle Randwert-Tripel; kern::formula == C++s eigene Rechnung),
+  Lese-Ablehnungen in logic_notation_refuses_with_place_and_reason neu, e2e blueprint_e2e.mjs Formel "x * 2.0f + bonus".
+- Aufgabe 2: fixed_width_lists W (logic_number_types_at_places) jetzt zusätzlich in C++ gerechnet (std::vector<u8>/<i8>/<u32>,
+  find/insert/memcpy/remove) und gleich dem Text - lokal grün.
+- Aufgabe 5 (vorgezogen, klein): kern/tests/size_edges.h - size_t am Rand (n-1 bei 0, <, nach i32/f32/f64/u32) über die Funktionen
+  der Klasse und über C++s u64; TEST numbers_size_t_edges (nativ == kWant), logic_wasm_test exportiert logic_test_size_edges,
+  logic_wasm_test.mjs vergleicht Wasm-Klasse == Wasm-C++ == kWant. BEFUND: im Wasm-Bau ist C++s eigenes size_t 32 Bit (wasm32,
+  ILP32) - eine Quelle, die nativ und in Wasm gebaut wird, rechnet mit size_t verschieden; das Subset legt LP64 fest (u64). Ein
+  Konverter-Fehler/-Umwandlung für size_t im Wasm-Bau der Quelle ist offen (Frage an main).
+### Welche erwarteten Zahl-Werte gegen C++ abgesichert sind (Aufgabe 2)
+- gegen C++ selbst gerechnet: numbers_against_cpp, numbers_nodes_interpreter (number_cases.h), logic_formulas (C++-Werte im Test
+  gerechnet: f32 a*b+c, dm::sin, pow/hypot, fmod/lerp), logic_formula_is_its_nodes, fixed_width_lists W, numbers_size_t_edges.
+- Gleichheit der Stufen (kein absoluter Wert): logic_tier_cases_* (Interpreter/JIT/Klasse), blueprint_native_test.
+- NICHT eigens gegen C++ gerechnet (Werte von Hand nach C++-Regel eingetragen, nicht nachgerechnet): test_main.cpp whole_numbers
+  (Edge 9007199254740995, Top least+4/TopAsFloat), Twice i16->u8 (256->0, -25536->64), set Small -1 -> 255, text_to_u64-Ränder.
+  Diese sind einfache C++20-Regeln (Umbruch modulo 2^N); eine Nachrechnung als C++ im Test fehlt noch.
+### Gefunden, offen
+- list.resize "value" und list.remove "item" sind f64-Pins und wandeln per from_value<T> still in den Listentyp (core_nodes.cpp
+  ~843/859) - widerspricht „kein Draht wandelt“: Pins sollten den Elementtyp der Liste haben (shape).
+- NaN-Bits: GCC -O1 vertauscht Operanden kommutativer Operationen -> welche NaN durchkommt, unterscheidet sich zwischen Klasse
+  und Interpreter (CI 45830999051, logic_formula_is_its_nodes). Vergleich jetzt „beide NaN = gleich“ (wie number_cases::same).
+### Nachtrag (spät, 26.11.)
+- 7f7393fe: Shift mit Literal links (numbers.h freie Templates), Formula::constant (blueprint_cpp --formula "<typ> <wert>"),
+  size_edges.h + numbers_size_t_edges + Wasm-Vergleich (CI 45835265511 build: "size_t at its edges ... same" GRÜN).
+  CI 45835265511: native-build GRÜN, determinism GRÜN; native: kern_tests 62.380/0 GRÜN, dann blueprint_native_test unter
+  UBSan ROT: bp_Structs.h:117 `Count += ...` (var.add eines i64 = eingebauter Operator) 3 + 2^63-1 -> UB.
+  build rot NUR beim Packen (generated/spawncity.html fehlt: SpawnCity, Stufe 8).
+- 4b4a2c06: NaN-Regel der Sprache (numbers.h seen/seen_bits/same_seen an Bit Cast, Copy Bytes, Struct to Bytes, Text, JSON;
+  Testvergleich), Test numbers_one_nan_where_its_bits_are_seen, Doku. Entscheidung main: gut so.
+- -fwrapv (d. Commit nach 4b4a2c06) von main ABGELEHNT, in 164a8651 zurückgenommen. CI 45840448190 (164a8651) zeigt den
+  ehrlichen Stand: native rot erwartet nur durch diesen UBSan-Fall.
+- **OFFEN 1 (Entscheidung main, nächster Schritt):** ein Platz der Sprache (Variable, Feld, lokale Variable) ist in der Klasse
+  ein Typ mit den Operatoren aus numbers.h (wie num::Typed<T>); `Count += x` bleibt im Text; an der Engine-Tür/bei Aufrufen gibt
+  er seinen rohen Wert an EINER Stelle im Kleber; Felder von Engine-Structs (roh f32/i32): Klassenschreiber ruft dort die
+  numbers.h-Funktion (Stelle melden). Engine-Test: i64/i32-Überlauf über Add to Variable, Interpreter == Klasse == numbers.h,
+  unter UBSan still. Idee zur Umsetzung: in BlueprintCore (blueprint.h) die Typnamen i8..f64 als Klassen-Aliase auf einen
+  Platz-Typ (Typed) schatten - dann trifft es jede Template-Funktion der PureNodes (math_add<i64> ...): die müssen den rohen
+  Wert nehmen (Konzept-Erweiterung) - großer Umbau, nicht angefangen.
+  Dazu: der ehrliche Vergleichstest der QUELLE muss unter UBSan laufen (prüfen: tools/converter_cases/compare.sh, Testrahmen).
+- **OFFEN 2 (Entscheidung main):** size_t in Wasm: Prüfung im Konverter (Hinweis mit Ort, eigene Zahl im Protokoll und in
+  log_numbers.py) für Stellen, an denen die Breite von size_t das Ergebnis ändern kann (Subtraktion/Negation/Dekrement,
+  Shift links, Multiplikation auf size_t, Umwandlung solcher Ergebnisse in breiteren Typ/Float); Zählung SpawnCity + Murmel
+  an main. Nicht angefangen.
+- Stufe 6 Inline-Knoten: Schalter KERN_ENGINE_INLINE_NODES entfernt (tools/cpp_to_blueprint.py engine_inline immer), Tür:
+  ein Parameter std::initializer_list ist ein Wartegrund ("C++ makes none of a list the program holds") - 932 Knoten, 105
+  warten. *.gen.* neu erzeugt (engine_api.py, --libraries). Lokaler Volllauf damit: siehe unten / nächster Commit.
+- Noch nicht angefangen: Engine-Konstanten (kPi math.h:15 f32, kEarthRadius/kRad roads.h:88 f64) als Konstanten mit C++-Typ,
+  ShaderExtension_material_uniforms, work-projekt einmischen, Mathe-Knoten cosh/asinh/log2/cbrt/ldexp, Stufe 5 Konverter
+  (conv() ~10177, cast() ~6084, formula() ~10749 schreibt noch `kern::formula([](Float x) -> Float ...)` - muss
+  `kern::formula<T...>([](auto ...) ...)` mit Typen der Quelle schreiben), Testrahmen ein Weg, Stufe 8 Murmel.
+- Bekannt: list.resize "value"/list.remove "item" sind f64-Pins mit stiller Umwandlung (core_nodes.cpp ~843/859).
