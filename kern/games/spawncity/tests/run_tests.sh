@@ -153,7 +153,7 @@ rc=0
 [ "$pass" = 2 ] || [ -n "$beleg" ] || "$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
-# for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
+# for every call - the description of every node they call has to fit the real function (kern/test/blueprint.h).
 if [ $# -eq 0 ] && [ "$pass" != 1 ] && [ -z "$beleg" ]; then KERN_TEST_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The differential tests in the form "two builds" (tools/source_diff.py; tests/lowered/builds/<file>/): each side is the
 # whole program in its state - the old tree (the game's sources as they stood at the test's base: these sources with

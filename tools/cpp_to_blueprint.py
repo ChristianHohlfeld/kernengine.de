@@ -12342,7 +12342,7 @@ class Held:
 class TestWriter:
     # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
     OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
-    """The test of one converted file (see tests/converted.h of the game). It holds the source of the
+    """The test of one converted file (see kern/test/converted.h). It holds the source of the
     file's converted functions once more, compiled with the numbers and the mathematics of the
     Blueprint language - classes and constants along with them - and calls each function there and
     in the Blueprint with the same arguments. What they give must be the same, bit for bit."""

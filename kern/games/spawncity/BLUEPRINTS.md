@@ -671,7 +671,7 @@ und schreibt sie in der Schreibweise:
   Reihenfolge der Übersetzungseinheit – und wird mit den Zahlen der Blueprint-Sprache übersetzt:
   `f32` ist `double`, Zahlen ohne das `f`, das sie auf 32 Bit bringt, die Funktionen der Zahlen
   (`sin`, `pow`, `sqrt` …) sind die der Formel (`kern::math`), und ein Vektor hält seine Komponenten
-  in 32 Bit, gelesen sind sie Zahlen wie alle anderen (`kern::converted::wide` in `tests/converted.h`); was
+  in 32 Bit, gelesen sind sie Zahlen wie alle anderen (`kern::converted::wide` in `kern/test/converted.h`); was
   Vektoren als Ganzes tun, tun die Funktionen der Engine, wie in den Knoten. Dieser Quelltext steht in
   einem eigenen Namensraum: Vom Programm selbst ist dort nichts erreichbar – was er nennt und der
   Test nicht hält, übersetzt nicht, statt still auf die 32-Bit-Funktion des Programms zu fallen.
