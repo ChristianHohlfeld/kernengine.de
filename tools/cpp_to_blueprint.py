@@ -1405,6 +1405,8 @@ class World:
         self.table = {}        # a function's key -> what a call of it needs to know (of the Blueprints written before)
         self.wanted = None     # of a Blueprint that is not the program's own: the functions to write (keys)
         self.bars = {}         # a function's key -> why it is not written this time
+        self.reaching = set()  # the keys of functions of other Blueprints that call - themselves or through others - one that waits
+                               # for a reason of its own (main: reaching_own): no one leans on them, they wait
         self.nodes = set()     # the names of the engine's nodes (NODES)
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
@@ -1506,11 +1508,34 @@ def copies_whole(n):
     return own(m.group(1)) == own(qtype(n))
 
 
+def implicit_maker(d):
+    """C++'s own constructor without arguments of a class that declares none, where the program makes an object of it
+    (`static MyApp a;`): the same as one declared `S(); ... S::S() = default;` - nothing of it is written in C++."""
+    return (d.get("kind") == "CXXConstructorDecl" and bool(d.get("isImplicit")) and bool(d.get("isUsed")) and d.get("explicitlyDefaulted") == "default"
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
+
+
+def states_made_by_cpp(tree, world, namespace):
+    """The states (World.states) of a tree whose class declares no constructor and whose constructor C++ has not written
+    in it (the tree of headers alone: no object of the class is made there) - their names in C++ (::<namespace>::State)."""
+    out = []
+    for q in sorted(world.states):
+        rec = tree.records.get(q)
+        if rec is None or rec.get("_local"):
+            continue
+        makers = [k for k in kids(rec) if k.get("kind") == "CXXConstructorDecl"]
+        if any(not k.get("isImplicit") for k in makers) or any(implicit_maker(k) for k in makers):
+            continue
+        out.append(f"::{namespace}::{q}" if namespace and not q.startswith(ENGINE + "::") else f"::{q}")
+    return out
+
+
 def defaulted_maker(d):
     """A constructor without arguments a class declares and defines `= default` outside itself, where its parts
-    are known (`Game::Game() = default;` in its source file): C++'s own constructor, written down there."""
+    are known (`Game::Game() = default;` in its source file): C++'s own constructor, written down there - or C++'s
+    own of a class that declares none (implicit_maker): one way, whether the program writes it down or not."""
     return (d.get("kind") == "CXXConstructorDecl" and d.get("explicitlyDefaulted") == "default" and bool(d.get("previousDecl"))
-            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d))) or implicit_maker(d)
 
 
 def ends_itself(d):
@@ -2908,7 +2933,7 @@ class Unit:
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
             computed = init is not None and self.computed_init(c)   # (set where the object is made: its constructor)
             if computed and self.state in self.tree.records and self.state not in self.world.defaulted and not any(
-                    k.get("kind") == "CXXConstructorDecl" and not k.get("isImplicit") for k in kids(self.tree.records[self.state])):
+                    k.get("kind") == "CXXConstructorDecl" and (not k.get("isImplicit") or implicit_maker(k)) for k in kids(self.tree.records[self.state])):
                 # (C++'s own constructor, which the class does not write down, is no function of the program: the step
                 # has no place - the class declares one, `S() = default;` defined outside it, and it is written there)
                 raise Wait(f"it starts with what is computed when the object is made, and the state {self.name} has no constructor of its own (declare one: `{self.state.split('::')[-1]}();` ... `= default`)")
@@ -3138,7 +3163,8 @@ class Unit:
                 raise Wait(f"{self.cpp_name(d)}() of the Blueprint {self.world.parts.get(part, part)} is not written")
             # A function of another part of this Blueprint that waits only because what it calls waits - it may be in a
             # circle with this one: called as written, a step, leaning on it (main: written in the end, or this waits too)
-            leans = e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
+            leans = (e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
+                     and key not in self.world.reaching)
             why_waits = e["wait"]
             if leans:
                 e = dict(e, wait=None, pure=False, effects=[*e.get("effects", []), "it leans on a function of its circle"])
@@ -4130,11 +4156,13 @@ class Emit:
                     continue
                 if "anyInit" not in init:
                     # (a base that is an interface of the engine - kern::App -, made without arguments: it has nothing
-                    # to make - its object is the Blueprint's own, Graph::implements)
+                    # to make - its object is the Blueprint's own, Graph::implements; what the interface holds -
+                    # ShaderExtension::material_base - is the engine's, which the class does not name: engine_interface_of)
                     base = (init.get("baseInit") or {}).get("qualType", "")
                     made = kids(init)[0] if kids(init) else {}
-                    if base.startswith(ENGINE + "::") and base in self.tree.records and made.get("kind") == "CXXConstructExpr" and not kids(made) and not any(
-                            c.get("kind") == "FieldDecl" for c in kids(self.tree.records.get(base, {}))):
+                    implemented = (u.world.state_implements.get(u.state) or [None] * 4)[3] if u.state else None
+                    if base.startswith(ENGINE + "::") and base in self.tree.records and made.get("kind") == "CXXConstructExpr" and not kids(made) and (
+                            base == implemented or not any(c.get("kind") == "FieldDecl" for c in kids(self.tree.records.get(base, {})))):
                         continue
                     raise Wait("a constructor that calls another constructor or a base class")
                 e = kids(init)[0] if kids(init) else None
@@ -12589,6 +12617,8 @@ class TestWriter:
     def piece(self, d):
         a, b = d["_at"]
         text = self.tree.said(self.cut(d["_file"], a, b))
+        if implicit_maker(d):   # (C++'s own, declared nowhere: nothing of it stands in the test's source - C++ makes it there too)
+            return ""
         if defaulted_maker(d):   # (the compiler's tree ends `Game::Game() = default;` before `= default`)
             text = re.sub(r"\s*(=\s*default\s*)?;?\s*$", "", text) + " = default;"
         return text
@@ -15009,6 +15039,9 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
+                if (scope or "").startswith(ENGINE + "::") and scope in self.tree.records:
+                    continue   # (a name a class of the engine gives inside itself - `using Object = kern::net::Simulator;` of a node's
+                               # description - is that class's: the test reaches the engine as the engine, never through a copy of it)
                 if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
                     continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather - but for what a value of it the test holds names: logic_value)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
@@ -16097,7 +16130,7 @@ def survey_one(job):
             ending.add(tree.owner[d["id"]])
     for i, d in tree.body.items():
         # (a constructor defined `= default` outside its class is C++'s own: a function only of the state - see main)
-        if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
+        if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or (d.get("isImplicit") and not implicit_maker(d)) or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
                 or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))):
             continue
         file = os.path.abspath(d["_file"])
@@ -16454,12 +16487,18 @@ def convert_unit(job):
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
         tree = Tree(path, namespace, flags, world.spaces)
+        if source is None and (made := states_made_by_cpp(tree, world, namespace)):
+            # (C++ writes the constructor of a state that declares none where its object is made - in a source file;
+            # read from its headers alone the tree has none: the file that reads them makes one, and C++ writes it -
+            # with what the fields start as, `ext_[1] = {&look()}`. That function is none of the program's.)
+            open(path, "a").write("namespace kern_cpp_to_blueprint_made {\n" + "".join(f"inline void made_{k}() {{ (void)new {q}; }}\n" for k, q in enumerate(made)) + "}\n")
+            tree = Tree(path, namespace, flags, world.spaces)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                and not ((d.get("isImplicit") and not (implicit_maker(d) and tree.owner.get(d["id"]) in world.states)) or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
@@ -16479,6 +16518,9 @@ def convert_unit(job):
             for d in mine:
                 if world.wanted is not None and function_key(tree, d) not in world.wanted:
                     continue   # (of a Blueprint that is not the program's own: what the program calls)
+                if implicit_maker(d) and not any(unit.computed_init(c) for c in kids(tree.records.get(tree.owner.get(d["id"], ""), {}))):
+                    continue   # (C++'s own constructor of a state that has nothing to make - no field starts with what is computed: its
+                               # fields start as the struct says, and there is no step to write)
                 try:
                     unit.function(d["id"])
                 except Wait:
@@ -17132,7 +17174,11 @@ def main(argv):
         w.state_implements, w.not_states = world.state_implements, world.not_states
         w.pointer_lists, w.globals, w.state_functions, w.getters = world.pointer_lists, world.globals, world.state_functions, world.getters
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
-        w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
+        # (what is written but calls - itself or through others - one that waits for a reason of its own waits for it:
+        # given so, whoever calls it waits in this round, however long the chain - reaching_own)
+        w.table = {k: (dict(e, wait=f"it calls {reach[k]}(), which waits") if k in reach and not e["wait"] else e)
+                   for d in need for k, e in tables.get(d, {}).items()}
+        w.reaching = {k for d in need for k in tables.get(d, {}) if k in reach}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
             for d in sorted(need):
@@ -17174,7 +17220,41 @@ def main(argv):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
         of what they gave the Blueprints it may call give now."""
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
-                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
+                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())),
+                tuple(sorted((k, reach[k]) for d in needs[u] for k in tables.get(d, {}) if k in reach)))
+
+    def reaching_own():
+        """Of the functions written so far, those that wait in the end because what they call waits: each that calls -
+        itself or through others, over every Blueprint and part - one that waits for a reason of its own (not only
+        because what it calls waits: follow_on). A function -> the one it calls on that way (its name). Taken from the
+        tables of the round before, at once over the whole chain: a chain of calls over parts waits in one round, not
+        one link a round."""
+        every = {k: e for u in tables for k, e in tables[u].items()}
+        named = collections.defaultdict(set)
+        for k, e in every.items():
+            named[(e["unit"], e["cpp"])].add(k)
+        callers = collections.defaultdict(set)
+        for k, e in every.items():
+            if not e["wait"]:
+                on = set(e.get("calls", ())) | set(e.get("leans", ()))
+            else:
+                m = follow_on(e["wait"]) and (re.match(r"it calls (.*)\(\), which waits$", e["wait"]) or re.match(r"(.*)\(\) of the Blueprint \S+ is not written$", e["wait"]))
+                on = set(named.get((e["unit"], m.group(1)), ())) if m else set()
+            for c in on & set(every):
+                callers[c].add(k)
+        own = sorted(k for k, e in every.items() if e["wait"] and not follow_on(e["wait"]))
+        out, todo = {}, list(own)
+        seen = set(own)
+        while todo:   # (breadth first, in the order of the keys: the same whatever the order the round was done in)
+            nxt = []
+            for c in todo:
+                for k in sorted(callers.get(c, ())):
+                    if k not in seen:
+                        seen.add(k)
+                        out[k] = every[c]["cpp"]
+                        nxt.append(k)
+            todo = sorted(nxt)
+        return out
 
     def pin_circles():
         """At the fixpoint: what leaned (Unit.foreign) on a function of another part of its Blueprint, and calls -
@@ -17208,7 +17288,30 @@ def main(argv):
                 pinned = True
         return pinned
 
+    def why_again(now, asks):
+        """Why the round is needed: per Blueprint of it, what is new in what it is given (one line, for the log)."""
+        first, gave_anew, other = [], set(), collections.Counter()
+        for u in now:
+            if u not in given:
+                first.append(u)
+                continue
+            a, b = asks[u], given[u]
+            if a[:2] != b[:2]:
+                other["what it is made of"] += 1
+            gave_anew |= {d for (d, v), (d2, v2) in zip(a[2], b[2]) if v != v2} if [d for d, _ in a[2]] == [d for d, _ in b[2]] else set()
+            if [d for d, _ in a[2]] != [d for d, _ in b[2]]:
+                other["it calls more Blueprints"] += 1
+            if a[3] != b[3]:
+                other["more of it waits for good"] += 1
+            if a[4] != b[4]:
+                other["what waits of what it calls"] += 1
+        said = ([f"{len(first)} for the first time"] if first else []) + \
+               ([f"what {', '.join(sorted(gave_anew)[:4])}{f' and {len(gave_anew) - 4} more' if len(gave_anew) > 4 else ''} gave is new"] if gave_anew else []) + \
+               [f"{why} ({n})" for why, n in sorted(other.items())]
+        return "; ".join(said)
+
     while True:
+        reach = reaching_own()
         needs = {u: need_of(u) for u in deps}
         asks = {u: asked_of(u, needs) for u in deps}
         new = {u for u in deps if given.get(u) != asks[u]}
@@ -17275,7 +17378,7 @@ def main(argv):
         met[state] = rounds + 1
         now = sorted(u for u in new if all(d not in new or u in needs[d] for d in needs[u]))
         rounds += 1
-        print(f"round {rounds}: {len(now)} Blueprints", flush=True)
+        print(f"round {rounds}: {len(now)} Blueprints - {why_again(now, asks)}", flush=True)
         jobs = {u: job_of(u) for u in now}   # (all of the round's from the same state, before any of them is done)
         # (the longest first: as long as it took the last time, or - the first time - as long as its files are)
         first = sorted(now, key=lambda u: (u in took, -took.get(u, 0), -sum(os.path.getsize(f) for f in unit_files[u]), u))

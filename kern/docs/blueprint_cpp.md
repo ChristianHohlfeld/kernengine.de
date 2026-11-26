@@ -1922,6 +1922,19 @@ sich oder nicht nach Zufall (die Länge eines Pfads verschob sie). Darum ist die
 Quellen liegen: `tools/converter_cases/run.sh` wandelt einen Fall aus zwei verschieden langen Ordnern und vergleicht
 Texte und Level Byte für Byte.
 
+### Konverter: Runden, und wer wartet
+
+Die Blueprints werden in Runden gewandelt: jede Runde nimmt, was die Blueprints der Runde davor geschrieben haben
+(ihre Tabellen – je Funktion geschrieben oder der Grund, warum sie wartet). Eine Funktion wartet aus **eigenem**
+Grund (etwas, das kein Blueprint ist; ihr Test vergleicht sie noch nicht) oder nur, **weil sie eine wartende
+ruft** („it calls X(), which waits“). Vor jeder Runde bildet der Konverter in einem Schritt über alle Tabellen und
+Teile, wer – selbst oder über andere, wie lang die Kette auch ist – eine Funktion mit eigenem Grund ruft
+(`reaching_own`): jede solche wartet, und keine andere Funktion lehnt sich an sie an (das Anlehnen gilt nur Kreisen,
+in denen nichts aus eigenem Grund wartet – sie werden zusammen geschrieben). So wartet eine Aufrufkette über
+Dateien in **einer** Runde, nicht ein Glied je Runde; ihr Grund nennt die Funktion, die sie ruft. Das Protokoll sagt
+je Runde, warum sie nötig ist („for the first time“, „what X gave is new“, „what waits of what it calls“ …). Fall:
+`tools/converter_cases/run.sh` (chain).
+
 ## Regeln: was kein Blueprint sein darf
 
 Damit jeder Blueprint genau ein C++ hat, gelten für Blueprints diese Regeln. `check()` meldet
