@@ -183,23 +183,51 @@ struct Tuer : virtual kern::Blueprint, virtual Mathe { … clamped(Hoehe) … };
 
 Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.1).
 
-## 7. Akteure einer Welt aus dem Programm erreichen: der Eingang „World“
+## 7. Ein Akteur kennt seine Welt: der typisierte Verweis `Actor`
 
-**Entwurf, nicht gebaut** (siehe Stand). Der Verweis wird ein eigener Typ `{WorldId, ActorRef}` (wie `Object<I>`,
-docs/engine_object.md: die Welt im Wert, nie aus einem Int), nicht der Int-Handle, den der Text unten noch nennt.
+**Gebaut** (26.11.2026). Ein Akteur im Blueprint ist ein Verweis eines eigenen Typs, nach demselben Muster wie
+`Object<I>` (docs/engine_object.md): **seine Id und seine Welt**, nie eine Zahl.
 
-Die Knoten, die einen anderen Blueprint ansprechen (Call on Actor, Get Variable on Actor, Has Blueprint), haben einen
-Eingang **World** (Int, der Handle einer GameWorld):
+| | |
+|---|---|
+| Pin-Typ | `actor` (Liste: `actor_list`) |
+| C++-Text | `Actor`, `List<Actor>` – in der Engine `kern::logic::ActorHandle` |
+| Wert | `logic::ActorHandle { ActorRef id; WorldId world; }` – die Id in ihrer Welt und die Nummer dieser Welt |
+| kein Akteur | `Actor{}` (Id 0, Welt 0): die Vorgabe jeder Variablen dieses Typs, das einzige Literal |
+| Welt | `logic::Host::world()`: die Welt der Objekte der Engine des Hosts (`EngineObjects::world`) – die Akteure einer `GameWorld` und ihre Objekte sind **eine** Welt (`GameWorld::world_id()`); ein Host ohne Objekte hat eine eigene Nummer (`logic::new_world`). Jeder Start einer Welt gibt eine neue Nummer: ein Akteur des Levels davor nennt im nächsten nichts. |
 
-- `0` (die Vorgabe) bedeutet die eigene Laufzeit, wie bisher.
-- Ein Handle bedeutet die Logik-Laufzeit **dieser** Welt (`Host::runtime_of(handle)`). Ist der Handle keine Welt mit
-  Logik, gibt der Knoten seine Vorgaben und meldet den Grund.
-- Actor-Ids gelten nur in ihrer Welt. Eine Id aus Welt A in Welt B zu verwenden, ist ein Fehler des Programms.
-- Einen Akteur in einer Welt findet man mit `GameWorld::find_actor(name)` (Knoten der Engine, mit dem Handle der Welt).
-- In der Notation steht der Eingang nur, wenn er verbunden oder ungleich 0 ist:
-  `func_call_on<"Oeffnen">(kern::in_world(welt, tuer), kern::out())`. Ohne ihn bleibt der Text wie bisher.
-- In die andere Richtung, von der Welt zum Programm, gibt es **kein** stilles Durchfallen. Der Weg führt nur über Objekte
-  der Engine, die das Programm der Welt gibt: den festen Schritt (6.1) oder eine Schnittstelle.
+- **Woher ein Akteur kommt:** nur aus seiner Welt – Self, Find Actor by Name, Find Actor with Tag, Spawn Actor,
+  Get Player, ein Ereignis (Overlap, Hit …), For Each Actor with Tag, Line Trace. Jede dieser Stellen gibt den Akteur
+  mit der Welt, in der der Knoten läuft (`Context::actor`, in der Klasse `kern_actor`).
+- **Aus einer Zahl wird nie ein Akteur:** kein Draht Int → Actor, keine Umwandlung (`Value::converted` gibt keinen),
+  kein Literal außer `Actor{}` – der Leser des C++-Texts weist `Actor{5}` mit Stelle und Grund ab („an actor is no
+  number …“), `check` weist einen Wert eines Dokuments ab, der einen Akteur als Zahl hält („… holds an actor as a number“),
+  ein JSON-Wert wird kein Akteur. Der Editor bietet am Akteur-Eingang keine Auswahl einer Id mehr: unverbunden heißt
+  der Eingang, was der Knoten sagt (Self oder keiner); ein Akteur wird angeschlossen.
+- **Der eine ausdrückliche Übergang zu Int:** der Knoten **Id of Actor** (`actor.id`, `actor_id(a)`) – zum Zeigen oder
+  Zählen. Es gibt keinen Weg zurück.
+- **Same Actor** (`actor.equal`, `actor_equal(a, b)`): dieselbe Welt und dieselbe Id; keiner und keiner sind derselbe.
+  Ein Akteur einer anderen Welt ist nie derselbe, auch mit derselben Id. **Is Valid** (Gameplay, `actor.valid`) fragt
+  wie bisher, ob der Akteur in dieser Welt lebt.
+- **Ein Verweis aus fremder Welt trifft nie still einen Akteur:** jeder Knoten, der einen Akteur benutzt – die
+  Gameplay-Knoten (Get Location, Set Location, Damage, Spawn Actor mit Template …) und die, die einen anderen
+  Blueprint erreichen (Call on Actor, Get Variable on Actor, Has Blueprint, Call Event, Engine Object of Blueprint) –,
+  fragt `logic::Runtime::actor_here` (die eine Prüfung, im Interpreter und in der Klasse gleich): ist die Welt des
+  Akteurs nicht die der Laufzeit, erreicht der Knoten nichts (nicht den Akteur gleicher Id und nicht Self), gibt seine
+  Vorgaben und sagt dem Host den Grund mit Blueprint und Knoten:
+  `Poker: Call on Actor: actor 3 is of world 7, this Blueprint runs in world 6 - an actor names nothing in another world`.
+- **Konverter:** `kern::logic::ActorHandle` im C++ eines Spiels ist `Actor`; `ActorHandle{}` ist `Actor{}`, `a == b`
+  Same Actor, `a.id` Id of Actor; ein `ActorHandle` aus Zahlen wartet mit Grund. Der Testschreiber zieht Akteure als
+  Werte der Sprache (keiner oder einer von wenigen Ids in einer von zwei Welten), nicht als Struct
+  (tools/converter_cases: `actors`).
+- **Tests:** `actors_know_their_world` (zwei Welten mit Akteuren gleicher Id: einer aus Welt B erreicht in Welt A
+  nichts und sagt warum, der eigene schon; die Klasse fragt ebenso; kein Int wird ein Akteur), die Fälle der Stufen
+  (blueprint_native: Akteure als Werte mit Welt), `tools/converter_cases/run.sh` (actors).
+- **Offen:** Akteure einer Welt vom Programm aus erreichen (der Host des Programms schlägt die Laufzeit der Welt des
+  Verweises nach, statt abzuweisen) und `GameWorld::spawn` der Vorlagen mit `ActorHandle` als Rückgabe (Zweig
+  work-vorlagen; die Knoten geben schon den typisierten Verweis). In die andere Richtung, von der Welt zum Programm,
+  gibt es **kein** stilles Durchfallen: der Weg führt nur über Objekte der Engine, die das Programm der Welt gibt (den
+  festen Schritt, 6.1, oder eine Schnittstelle).
 
 ## 7a. Ein Programm aus C++: wohin der Konverter schreibt
 
@@ -264,7 +292,7 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   Browser belegt (CI-Jobs `murmel`, `murmel-web`); seine App als Blueprint wartet noch am Testrahmen der Vergleichstests
   (er gehört heute SpawnCity: Namensraum `sc`).
 - Offen: „Play Project“ im Editor (die Programm-Laufzeit mit der App im Viewport; braucht die Engine – `Engine`,
-  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit), der Eingang „World“ als typisierter
-  Verweis (7.), Feld-Anfangswerte, die keine Konstante sind, im Vergleichstest.
+  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit), Akteure einer Welt vom Programm aus (7.),
+  Feld-Anfangswerte, die keine Konstante sind, im Vergleichstest.
 - SpawnCity: `kern::run(sc::app(), embedded_project())`; seine Programm-Klassen stehen im Projekt.
 

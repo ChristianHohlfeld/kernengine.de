@@ -2634,7 +2634,7 @@ struct Caller : kern::Blueprint {
 
   KERN_EVENT(on1, event_custom<"Ask">)
   void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Level_Stars">(Actor{0}, kern::out(n2.stars), kern::to<Int>(value));
+    func_call_on<"Level_Stars">(Actor{}, kern::out(n2.stars), kern::to<Int>(value));
     Got = n2.stars;
   }
 
@@ -2662,7 +2662,7 @@ struct Caller : kern::Blueprint {
     CHECK(lv && c);
     if (!lv || !c) continue;
     rt.begin();
-    rt.call("Ask", 7, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 7, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Got").i == 14);
   }
   // (a name of another Blueprint's function is only for a function of another Blueprint)
@@ -2785,7 +2785,7 @@ struct Cop : kern::Blueprint {
   KERN_EXTERN MissingResult Missing();
 
   struct DownResult { Float sum = 0.0; };
-  DownResult Down(Int n = 0, Actor me = Actor{0}) {
+  DownResult Down(Int n = 0, Actor me = Actor{}) {
     Int Mine = 0;
     Mine = n;
     if (math_compare<">">(kern::to<Float>(n), 0.0)) {
@@ -2794,14 +2794,14 @@ struct Cop : kern::Blueprint {
     return {math_add(kern::to<Float>(Mine), n20.sum)};
   }
 
-  void Forever(Actor me = Actor{0}) {
+  void Forever(Actor me = Actor{}) {
     Deep += 1;
     func_call_on<"Forever">(me, kern::out(), me);
   }
 
   KERN_EVENT(on1, event_custom<"Ask">)
   void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Stars">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
+    func_call_on<"Stars">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
     Got = n2.stars;
     Heard = n2.who;
     func_call_on<"Missing">(actor, kern::out(n5.value));
@@ -2829,7 +2829,7 @@ struct Cop : kern::Blueprint {
   std::string text;
   CHECK(logic::to_cpp(cop, "Cop", text, &error));
   CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = \"x\");\n") != std::string::npos);
-  CHECK(text.find("    func_call_on<\"Stars\">(Actor{0}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Stars\">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
   CHECK(text.find("    func_call_on<\"Forever\">(me, kern::out(), me);\n") != std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(text, read, nullptr, &error) && read == cop);
@@ -2845,23 +2845,23 @@ struct Cop : kern::Blueprint {
     if (!lv || !a || !b) continue;
     rt.begin();
     // on the Level (no target): its Stars runs, with what this call gave it
-    rt.call("Ask", 7, {{"actor", logic::Value::actor(99)}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
+    rt.call("Ask", 7, {{"actor", logic::Value::actor({99, host.world()})}, {"value", logic::Value::number(3)}, {"text", logic::Value::text("joe")}});
     CHECK(lv->get("Asked").i == 3 && a->get("Got").i == 3 && b->get("Got").i == 0);
     // ... a target without a Blueprint, and one whose Blueprint has no such function: the declared defaults
     CHECK(a->get("Heard").as_text() == "joe!nobody");
     CHECK_NEAR(a->get("Miss").as_number(), 2.5, 1e-12);
-    rt.call("Ask", 8, {{"actor", logic::Value::actor(7)}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 8, {{"actor", logic::Value::actor({7, host.world()})}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
     CHECK(lv->get("Asked").i == 5 && b->get("Got").i == 5 && b->get("Heard").as_text() == "!nobody");
     // a function that calls itself on its own actor: every call has its own parameters and locals
     std::vector<logic::Value> out;
-    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor(7)}, out) && out.size() == 1);
+    CHECK(a->call("Down", {logic::Value::integer(4), logic::Value::actor({7, host.world()})}, out) && out.size() == 1);
     CHECK_NEAR(out[0].as_number(), 10.0, 1e-12);
     // ... and on another actor's Blueprint, back and forth
-    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor(8)}, out));
+    CHECK(a->call("Down", {logic::Value::integer(3), logic::Value::actor({8, host.world()})}, out));
     CHECK_NEAR(out[0].as_number(), 6.0, 1e-12);
     // calls that never end are stopped: 64 deep, reported, and the Blueprint goes on
     const std::size_t before = host.errors.size();
-    CHECK(a->call("Forever", {logic::Value::actor(7)}, out));
+    CHECK(a->call("Forever", {logic::Value::actor({7, host.world()})}, out));
     CHECK(host.errors.size() == before + 1 && host.errors.back().find("nest more than 64 deep") != std::string::npos);
     CHECK(a->get("Deep").i >= 63 && a->get("Deep").i <= 65 && !a->disabled());
   }
@@ -2883,10 +2883,10 @@ struct Cop : kern::Blueprint {
   logic::Graph none;
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EXTERN void F() {\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("no body here") != std::string::npos);
-  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{0}, kern::out());\n  }\n};\n", none, nullptr, &error));
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{}, kern::out());\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("KERN_EXTERN") != std::string::npos);
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
-                         "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
+                         "    func_call_on<\"F\">(Actor{}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
   CHECK(error.find("in their order") != std::string::npos);
 }
 
@@ -3031,7 +3031,7 @@ struct Caller : kern::Blueprint {
     rt.begin();
     // bound: Has Blueprint - of the actor, and of a name nobody has: the Level, which has none yet
     CHECK(rules.bind(rt) && !lost.bind(rt));
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Has").b && !c->get("HasLost").b);
     // the call: what the Blueprint gives and does, in both forms
     CHECK_NEAR(c->get("Got").as_number(), 10.5, 1e-12);
@@ -3071,7 +3071,7 @@ struct Caller : kern::Blueprint {
     // the Level's Blueprint: what a name nobody has reaches
     logic::Instance* lv = rt.add(level_g, 0, "Level");
     CHECK(lv && lost.bind(rt) && lost.number("Twice", 4.0) == 12);
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("AtLevel").as_number() == 12 && c->get("HasLost").b);
     // by its name, at every call: the actor's Blueprint taken out and one with errors put in its place -
     // nothing runs there (the defaults; Has Blueprint is false) ...
@@ -3079,7 +3079,7 @@ struct Caller : kern::Blueprint {
     logic::Instance* bad = rt.add(broken, 7, "Rules");
     CHECK(bad && bad->disabled() && !rules.bind(rt));
     CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 7);  // (its variables are there to read: Get Variable on Actor)
-    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    rt.call("Ask", 9, {{"actor", logic::Value::actor({})}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
     CHECK(c->get("Got").as_number() == 0 && !c->get("Has").b && c->get("Speed").as_number() == 7);
     // ... a new one: reached as it is, without binding again; and another actor of the name: that one
     rt.remove(7);
@@ -3173,7 +3173,7 @@ TEST(logic_lists) {
   // (whole numbers in a list are held as every Int is)
   CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).i == -std::numeric_limits<i64>::max());
   const Value every[] = {Value::of(std::vector<bool>{true, false}),      Value::of(std::vector<i64>{-3, 9007199254740992}),   Value::of(std::vector<f64>{0.1, -1e300}),
-                         Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{4}, {0}})};
+                         Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{}, {}})};
   for (const Value& v : every) {
     CHECK(logic::is_list(v.type) && logic::list_of(logic::element_of(v.type)) == v.type && Value::from_json(v.to_json(), v.type) == v);
     PinType named = PinType::exec;
@@ -4223,7 +4223,7 @@ static logic::Graph every_node_graph(bool wired) {
                                : of == "SB" ? logic::Value::structure({logic::Value::integer(-123456)})
                                           : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
                                                                      logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
-                                                                     logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
+                                                                     logic::Value::vector({1, -2, 3.5f}), logic::Value::actor({}), logic::Value::enumerations({2, 0})});
       return t == PinType::structure ? one : logic::Value::structures({one, logic::zero_of({PinType::structure, of}, g)});
     }
     if (t == PinType::map || t == PinType::set) {
@@ -4241,7 +4241,7 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::number: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
-      case PinType::actor: return logic::Value::actor(3);
+      case PinType::actor: return logic::Value::actor({});   // (an actor written down is none: one comes from its world)
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
       case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
         return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
@@ -4250,7 +4250,7 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
       case PinType::enumeration: return logic::Value::enumeration(2);
       case PinType::enumeration_list: return logic::Value::enumerations({2, 0, 1});
-      default: return logic::Value::of(std::vector<logic::ActorHandle>{{3}, {0}});
+      default: return logic::Value::of(std::vector<logic::ActorHandle>{{}, {}});
     }
   };
   // (list variables that start with items, a list a function takes and one it gives)
@@ -4676,7 +4676,7 @@ struct Door : kern::Blueprint {
   Int Hits = 0;
   Text Note = "a \"door\"\n\ttab \\ end \101";
   Vector Home = Vector{1.0, -2.5, 3.0};
-  Actor Other = Actor{7};
+  Actor Other = Actor{};
 
   kern::Machine machine3 = machine("Door")
       .state(4, "closed", 100, 80.5, true)
@@ -4722,7 +4722,7 @@ struct Door : kern::Blueprint {
           Angle = math_add(n44(), n44());
         }},
         {"finished", [this] {
-          flow_call<"Open">(Actor{0}, Other, n20(), Note);
+          flow_call<"Open">(Actor{}, Other, n20(), Note);
         }},
       });
     }
@@ -4758,7 +4758,7 @@ struct Door : kern::Blueprint {
     (void)Home;
   }
 
-  struct { Actor actor = Actor{0}; Float value = 0.0; Text text = ""; } n2;
+  struct { Actor actor = Actor{}; Float value = 0.0; Text text = ""; } n2;
   kern::Node<30> n30;
   kern::Node<41> n41;
   struct : kern::Node<42> { Int index = 0; } n42;
@@ -6004,7 +6004,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
       if (!logic::same_blueprint(g, again, &difference)) return "not the same: " + difference;
       return text;
     };
-    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n";
+    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{}, Actor{}, car.Speed, \"\");\n  }\n";
     CHECK(wrong(shouts + in_event("    Shout(Cars[0]);")).empty());
     {
       const std::string text = held_text(shouts + in_event("    Shout(Cars[0]);"));
@@ -6015,8 +6015,8 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     }
     // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
     // that list is - but an entry of a list of any length inside it can go)
-    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n"
-                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, mark, \"\");\n  }\n";
+    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{}, Actor{}, car.Speed, \"\");\n  }\n"
+                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{}, Actor{}, mark, \"\");\n  }\n";
     CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
     CHECK(wrong(shout + in_event("    Hum(Two[1].Marks[0]);")).empty());
     CHECK(held_text(shout + in_event("    Hum(Two[1].Marks[0]);")).find("(Two[1].Marks);") != std::string::npos);
@@ -8302,6 +8302,108 @@ TEST(engine_object_of_a_blueprint) {
 // An object of the engine is a type of its own (kern/docs/engine_object.md): Object<I> goes where an Object of the same
 // class goes - or an input of any (Is Valid Object) -, never where another class or a number is, and no number becomes
 // one; an ObjectRef names its object only in its own world, and says why elsewhere.
+TEST(actors_know_their_world) {
+  // An Actor is its id and its world (kern/docs/project.md 7): two worlds whose actors have the same ids - an actor of
+  // world B in a Blueprint of world A names nothing there (not A's actor of that id) and says why; no number becomes one.
+  game::Level l = game::basic_level();
+  game::Actor door, poker;
+  door.name = "Door";
+  poker.name = "Poker";
+  door.logic = logic::Graph{};
+  poker.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit() {\n"
+                        "    Hits += 1;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  actors_know_their_world (Door): %s\n", error.c_str());
+  error.clear();
+  CHECK(logic::from_cpp("struct Poker : kern::Blueprint {\n"
+                        "  Int Got = -1;\n"
+                        "  Bool Same = false;\n"
+                        "  Int Id = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  KERN_EXTERN HitResult Hit();\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
+                        "    Got = n2.hits;\n"
+                        "    Same = actor_equal(actor, actor_find(\"Door\"));\n"
+                        "    Id = actor_id(actor);\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n2;\n"
+                        "};\n", *poker.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  actors_know_their_world (Poker): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  l.add(poker);
+  GameFixture fa, fb;
+  CHECK(fa.world->start(l, game::SimMode::play) && fb.world->start(l, game::SimMode::play));
+  logic::Runtime* a = fa.world->logic_runtime();
+  logic::Runtime* b = fb.world->logic_runtime();
+  CHECK(a && b);
+  if (!a || !b) return;
+  const logic::WorldId wa = fa.world->world_id(), wb = fb.world->world_id();
+  CHECK(wa != 0 && wb != 0 && wa != wb && a->host().world() == wa);
+  const logic::ActorHandle a_door{door_id, wa}, b_door{door_id, wb};
+  CHECK(fa.world->find_actor("Door") == door_id && fb.world->find_actor("Door") == door_id);   // (the same id in both)
+  const auto poke = [&](logic::ActorHandle who) {
+    a->call("Poke", 0, {{"actor", logic::Value::actor(who)}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+    fa.world->step(1.0f / 60, game::PlayInput{});
+  };
+  const auto hits = [](logic::Runtime* rt, game::ActorId id) { const logic::Instance* i = rt->find(id); return i ? i->get("Hits").as_int() : -1; };
+  const auto poker_now = [&](const char* var) { const logic::Instance* i = a->find(fa.world->find_actor("Poker")); return i ? i->get(var) : logic::Value{}; };
+  fa.world->events().clear();
+  // B's door in A: nothing is reached - not A's door of the same id -, and the host is told why, naming the node
+  poke(b_door);
+  CHECK(hits(a, door_id) == 0 && hits(b, door_id) == 0);
+  CHECK(poker_now("Got").as_int() == 0 && !poker_now("Same").as_bool() && poker_now("Id").as_int() == static_cast<i64>(door_id));
+  bool told = false;
+  for (const std::string& e : fa.world->events())
+    told |= e.find("Logic error: Poker: Call on Actor: actor " + std::to_string(door_id) + " is of world " + std::to_string(wb) + ", this Blueprint runs in world " +
+                   std::to_string(wa) + " - an actor names nothing in another world") != std::string::npos;
+  CHECK(told);
+  // A's own door: reached
+  poke(a_door);
+  CHECK(hits(a, door_id) == 1 && hits(b, door_id) == 0 && poker_now("Got").as_int() == 1 && poker_now("Same").as_bool());
+  // a Blueprint's class asks the same way (BlueprintCore::kern_actor_here - Runtime::actor_here)
+  struct Reach : kern::Blueprint {
+    Bool Has = false;
+    void run(Actor x) { Has = func_has_blueprint(x); }
+  } reach;
+  reach.kern_world.host = &a->host();
+  reach.kern_world.runtime = a;
+  reach.run(b_door);
+  CHECK(!reach.Has);
+  reach.run(a_door);
+  CHECK(reach.Has);
+  CHECK(kern::Blueprint::actor_equal(a_door, a_door) && !kern::Blueprint::actor_equal(a_door, b_door) && kern::Blueprint::actor_id(b_door) == static_cast<i64>(door_id));
+  fa.world->stop();
+  fb.world->stop();
+  // no number becomes an actor: not on a wire, not converted, not written down
+  CHECK(!logic::convertible(logic::PinType::integer, logic::PinType::actor) && !logic::convertible(logic::PinType::number, logic::PinType::actor));
+  CHECK(logic::Value::integer(5).converted(logic::PinType::actor).as_actor() == logic::ActorHandle{});
+  CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::actor).as_actor() == logic::ActorHandle{});
+  logic::Graph g;
+  error.clear();
+  CHECK(!logic::from_cpp("struct T : kern::Blueprint {\n  Actor Who = Actor{5};\n};\n", g, nullptr, &error) &&
+        error.find("an actor is no number: the one actor a text writes is Actor{} (none)") != std::string::npos);
+  error.clear();
+  CHECK(logic::from_cpp("struct T : kern::Blueprint {\n  Actor Who = Actor{};\n};\n", g, nullptr, &error));
+  g.variables[0].value = json::Value(5.0);   // (a document that holds one as a number: check says so)
+  bool refused = false;
+  for (const logic::Issue& i : logic::check(g)) refused |= i.text.find("holds an actor as a number") != std::string::npos;
+  CHECK(refused);
+}
+
 TEST(object_refs_know_their_world) {
   using logic::PinType;
   using logic::TypeRef;
@@ -13968,7 +14070,7 @@ TEST(studio_logic_call_on_actor) {
   CHECK(on_actor && !plain);
   // the actor's Blueprint asks the Level on Begin Play
   CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  Float Got = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(Float x = 1.0);\n\n"
-                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{0}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
+                                                "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
                                                 "  struct { Float out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
   st = f.s->state();
   for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);

@@ -40,12 +40,12 @@ gegangen“ – `func.engine_object` gab bei vier verschiedenen Ursachen still `
 | Same Object | `object_equal<kern::App>(a, b)` | Bool: dasselbe Objekt (Welt und Handle gleich; keins und keins sind dasselbe) – wie C++ zwei Zeiger vergleicht. |
 | Handle of Object | `object_handle<kern::App>(x)` | Int: das Handle in seiner Welt – zum Zeigen oder Zählen. Der eine ausdrückliche Übergang zu Int: keine Funktion der Engine nimmt oder gibt ein Objekt als Int. |
 
-## Für den Akteur-Verweis mit Welt (Zweig work-projekt)
+## Der Akteur-Verweis mit Welt
 
-Ein Akteur-Verweis, der seine Welt trägt, nimmt dieselbe Welt-Nummer: `{u32 world; ActorRef id;}`, wobei `world` die
-Nummer der `EngineObjects` der Welt ist, in der der Akteur lebt (`GameWorld` hat genau eine). Damit sind „Objekt der
-Engine aus Welt A“ und „Akteur aus Welt A“ dieselbe Frage: `world` vergleichen, dann das Handle / die Id in dieser Welt
-nachschlagen. Der Wert hat dafür das Feld `Value::world` (für `object` gesetzt, sonst 0).
+Gebaut nach demselben Muster (docs/project.md 7.): `Actor` ist `{ActorRef id; WorldId world;}`, `world` die Nummer der
+`EngineObjects` der Welt, in der der Akteur lebt (`GameWorld` hat genau eine; `Host::world()`). „Objekt der Engine aus
+Welt A“ und „Akteur aus Welt A“ sind dieselbe Frage: `world` vergleichen, dann das Handle / die Id in dieser Welt
+nachschlagen (`EngineObjects::get`, `Runtime::actor_here`). Der Wert nutzt dafür das Feld `Value::world`.
 
 ## Stand
 

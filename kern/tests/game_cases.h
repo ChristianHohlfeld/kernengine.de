@@ -43,8 +43,8 @@ struct Level : kern::Blueprint {
   Vector At = Vector{0.0, 0.0, 0.0};
   Vector Facing = Vector{0.0, 0.0, 0.0};
   Vector HitAt = Vector{0.0, 0.0, 0.0};
-  Actor Last = Actor{0};
-  Actor Made = Actor{0};
+  Actor Last = Actor{};
+  Actor Made = Actor{};
   List<Actor> Tagged = List<Actor>{};
   Bool Ok = false;
   Bool Won = false;
@@ -90,13 +90,13 @@ struct Level : kern::Blueprint {
     actor_launch(actor_find(text), Vector{0.0, 0.0, 4.0});
     actor_simulate(actor_find("Sleeper"), true);
     actor_joint_motor(actor_find("Flap"), 0, true, 90.0, 500.0);
-    physics_trace(n40, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{0});
+    physics_trace(n40, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{});
     Ok = n40.hit;
     Last = n40.actor;
     At = vector_add(n40.location, n40.normal);
     physics_trace(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor);
-    physics_trace_channels(n41, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{0}, physics_channels("World"), 4294967295);
-    physics_trace_channels(n42, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{0}, physics_channels("Nothing"), 4294967295);
+    physics_trace_channels(n41, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{}, physics_channels("World"), 4294967295);
+    physics_trace_channels(n42, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{}, physics_channels("Nothing"), 4294967295);
     Log = text_append(Log, kern::to<Text>(n41.hit), kern::to<Text>(n42.hit));
     Log = text_append(Log, kern::to<Text>(physics_channels("All")), actor_name(n41.actor));
     physics_trace_channels(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor, 1, 1);
@@ -129,7 +129,7 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on9, event_custom<"Spawn">)
   void on9(Actor actor, Float value, Text text) {
-    actor_spawn<"Template">(n50, Actor{0}, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0});
+    actor_spawn<"Template">(n50, Actor{}, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0});
     Made = n50.spawned;
     Log = text_append(Log, actor_name(n50.spawned), ";");
     actor_spawn<"Nothing">(actor, Vector{0.0, 9.0, 0.5}, Vector{0.0, 0.0, 0.0});
@@ -239,12 +239,12 @@ struct Level : kern::Blueprint {
   }
 
   kern::Node<20> n20;
-  struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n40;
-  struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n41;
-  struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n42;
-  struct { Actor spawned = Actor{0}; } n50;
-  struct : kern::Node<60> { Actor actor = Actor{0}; Int index = 0; } n60;
-  struct : kern::Node<61> { Actor item = Actor{0}; Int index = 0; } n61;
+  struct { Bool hit = false; Actor actor = Actor{}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n40;
+  struct { Bool hit = false; Actor actor = Actor{}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n41;
+  struct { Bool hit = false; Actor actor = Actor{}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n42;
+  struct { Actor spawned = Actor{}; } n50;
+  struct : kern::Node<60> { Actor actor = Actor{}; Int index = 0; } n60;
+  struct : kern::Node<61> { Actor item = Actor{}; Int index = 0; } n61;
 };
 )kn";
 
@@ -257,7 +257,7 @@ struct Zone : kern::Blueprint {
   void on1(Actor actor, Actor other) {
     Visits += 1;
     game_add_score(5.0);
-    flow_call<"OpenDoor">(Actor{0}, actor_self(), 1.0, "");
+    flow_call<"OpenDoor">(Actor{}, actor_self(), 1.0, "");
   }
 };
 )kn";
@@ -272,7 +272,7 @@ struct Door : kern::Blueprint {
     Opener = actor_name(actor);
     flow_tween<"linear">(n2, "play", 1.0, {
       {"update", [this] {
-        actor_set_location(Actor{0}, vector_lerp(Vector{10.0, 0.0, 1.5}, Vector{10.0, 0.0, 4.5}, n2.alpha));
+        actor_set_location(Actor{}, vector_lerp(Vector{10.0, 0.0, 1.5}, Vector{10.0, 0.0, 4.5}, n2.alpha));
       }},
       {"finished", [this] {
         actor_set_color(actor_self(), Vector{0.2, 0.8, 0.2});
@@ -321,8 +321,8 @@ struct Crate : virtual kern::Blueprint, virtual Tally {
 
   KERN_EVENT(on3, event_custom<"Home">)
   void on3(Actor actor, Float value, Text text) {
-    actor_set_location(Actor{0}, Home);
-    actor_set_velocity(Actor{0}, Vector{0.0, 0.0, 0.0});
+    actor_set_location(Actor{}, Home);
+    actor_set_velocity(Actor{}, Vector{0.0, 0.0, 0.0});
   }
 };
 )kn";
@@ -336,15 +336,15 @@ struct Dummy : kern::Blueprint {
   KERN_EVENT(on1, game_damaged)
   void on1(Actor actor, Actor other, Float amount, Bool head) {
     Taken += amount;
-    if (math_compare<"<">(actor_health(Actor{0}).health, 30.0)) {
-      combat_heal(Actor{0}, 10.0);
+    if (math_compare<"<">(actor_health(Actor{}).health, 30.0)) {
+      combat_heal(Actor{}, 10.0);
     }
   }
 
   KERN_EVENT(on2, game_death)
   void on2(Actor actor, Actor other, Bool head) {
     Deaths += 1;
-    game_particles(actor_location(Actor{0}), Vector{1.0, 0.0, 0.0});
+    game_particles(actor_location(Actor{}), Vector{1.0, 0.0, 0.0});
   }
 };
 )kn";
@@ -368,9 +368,9 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on1, event_every<"0.25">)
   void on1(Int count) {
-    const auto n10 = [&] { return walker_sees(Actor{0}, actor_find("Ball")); };
-    const auto n20 = [&] { return walker_tof(Actor{0}); };
-    const auto n30 = [&] { return walker_state(Actor{0}); };
+    const auto n10 = [&] { return walker_sees(Actor{}, actor_find("Ball")); };
+    const auto n20 = [&] { return walker_tof(Actor{}); };
+    const auto n30 = [&] { return walker_state(Actor{}); };
     Looks += 1;
     Seen = n10().visible;
     BallBearing = n10().bearing;
@@ -382,28 +382,28 @@ struct Level : kern::Blueprint {
     State = n30().state;
     Fallen = n30().fallen;
     Speed = n30().speed;
-    Holding = walker_holding(Actor{0});
+    Holding = walker_holding(Actor{});
   }
 
   KERN_EVENT(on2, event_custom<"Drive">)
   void on2(Actor actor, Float value, Text text) {
-    walker_autonomous(Actor{0}, false);
-    walker_move(Actor{0}, value, 0.0, 20.0, 0.0);
-    walker_look(Actor{0}, 30.0, 10.0, 0.5);
-    walker_beak(Actor{0}, 1.0);
+    walker_autonomous(Actor{}, false);
+    walker_move(Actor{}, value, 0.0, 20.0, 0.0);
+    walker_look(Actor{}, 30.0, 10.0, 0.5);
+    walker_beak(Actor{}, 1.0);
   }
 
   KERN_EVENT(on3, event_custom<"Play">)
   void on3(Actor actor, Float value, Text text) {
-    walker_skill(Actor{0}, text);
-    walker_pet(Actor{0}, value);
-    walker_hear(Actor{0}, true);
-    walker_quack(Actor{0});
+    walker_skill(Actor{}, text);
+    walker_pet(Actor{}, value);
+    walker_hear(Actor{}, true);
+    walker_quack(Actor{});
   }
 
   KERN_EVENT(on4, event_custom<"Free">)
   void on4(Actor actor, Float value, Text text) {
-    walker_autonomous(Actor{0}, true);
+    walker_autonomous(Actor{}, true);
   }
 };
 )kn";
@@ -620,7 +620,7 @@ struct Stage {
   game::ActorId id(const char* name) const { return w.find_actor(name); }
   /// A Custom Event of every Blueprint, with its three values.
   void call(const char* event, game::ActorId actor, f64 value, const char* words) {
-    rt.call(event, 0, {{"actor", logic::Value::actor(actor)}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(words)}});
+    rt.call(event, 0, {{"actor", logic::Value::actor(actor ? logic::ActorHandle{actor, w.world_id()} : logic::ActorHandle{})}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(words)}});
   }
   void show(const char* at) { text += dump(w, at); }
 };

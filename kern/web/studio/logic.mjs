@@ -1149,7 +1149,9 @@ export class LogicEditor {
       case "text": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v)}" spellcheck="false">`;
       case "int64": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="64 bits: a whole number up to 18446744073709551615, or 0x... in hexadecimal">`;
       case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
-      case "actor": return `<select class="lg-lit act" ${attr}><option value="0">${p.id === "target" || p.id === "a" ? "Self" : "None"}</option>${actors.map(([id, name]) => `<option value="${id}"${id === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
+      // an actor comes from its world (Self, Find Actor by Name, Spawn Actor, an event) - never typed in as a number
+      // (kern/docs/project.md 7): unwired, the input means what the node says of an empty one
+      case "actor": return `<span class="lg-dim" title="Wire an actor in: Self, Find Actor by Name, Spawn Actor, an event">${p.id === "target" || p.id === "a" || p.id === "this" ? "Self" : "None"}</span>`;
       default:
         // a list that is not wired: how many items are typed in (they are edited in Details); a struct: its first fields
         if (lgIsList(p.type)) return `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type, this.data))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>`;

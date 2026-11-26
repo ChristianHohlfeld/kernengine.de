@@ -708,7 +708,7 @@ struct Locals : kern::Blueprint {
     Float Mine = 0.25;
     Mine += math_mul(x, 10.0);
     if (again) {
-      flow_call<"Again">(Actor{0}, Actor{0}, 5.0, "");
+      flow_call<"Again">(Actor{}, Actor{}, 5.0, "");
     }
     return {Mine, Limit(Mine).out};
   }
@@ -732,7 +732,7 @@ struct Casts : kern::Blueprint {
   Float F = 0.0;
   Vector V = Vector{0.0, 0.0, 0.0};
   Text T = "";
-  Actor A = Actor{0};
+  Actor A = Actor{};
 
   /// Every wire between pins of different types.
   void FromFloat(Float x = 0.0) {
@@ -763,18 +763,18 @@ struct Casts : kern::Blueprint {
     T = kern::to<Text>(x);
   }
 
-  void FromActor(Actor x = Actor{0}) {
+  void FromActor(Actor x = Actor{}) {
     A = x;
     B = kern::to<Bool>(x);
     T = kern::to<Text>(x);
   }
 
-  struct PickResult { Float number = 0.0; Int whole = 0; Bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{0}; };
+  struct PickResult { Float number = 0.0; Int whole = 0; Bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{}; };
   /// Select and Reroute in every type; the typed-in values of a node.
-  KERN_PURE PickResult Pick(Bool first = true, Actor who = Actor{0}) {
+  KERN_PURE PickResult Pick(Bool first = true, Actor who = Actor{}) {
     return {logic_select<Float>(first, 1.5, -2.5), logic_select<Int>(first, 7, -7), logic_select<Bool>(first, true, false),
             value_reroute<Vector>(logic_select<Vector>(first, Vector{1.0, 2.0, 3.0}, Vector{-1.0, 0.5, 0.25})), value_reroute<Text>(logic_select<Text>(first, "a \"word\"", "tab\tand\\slash")),
-            value_reroute<Actor>(logic_select<Actor>(first, who, Actor{7}))};
+            value_reroute<Actor>(logic_select<Actor>(first, who, Actor{}))};
   }
 };
 )kn";
@@ -825,7 +825,7 @@ struct Lists : kern::Blueprint {
     return {Total, list_length<Text>(Names), n20.index};
   }
 
-  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; Bool same = false; Bool shorter = false; };
+  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{}; Int where = 0; Bool has = false; Bool same = false; Bool shorter = false; };
   /// Get Item of every type (beyond the list: its zero), Find, Contains and Lists Equal.
   KERN_PURE AtResult At(Int index = 0, Text name = "a") {
     return {list_get<Float>(Scores, index), list_get<Text>(Names, index), list_get<Int>(Counts, index), list_get<Bool>(Flags, index), list_get<Vector>(Points, index),
@@ -835,7 +835,7 @@ struct Lists : kern::Blueprint {
 
   struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
   /// Lists of every type filled in a loop; a function gives lists.
-  FillResult Fill(Int n = 3, Int big = 4611686018427387904, Actor who = Actor{0}) {
+  FillResult Fill(Int n = 3, Int big = 4611686018427387904, Actor who = Actor{}) {
     list_clear(Counts);
     list_clear(Flags);
     list_clear(Points);
@@ -976,14 +976,14 @@ struct Structs : kern::Blueprint {
     Aim Sight = Aim{Vector{0.0, 0.0, 1.0}, 3};
     List<Aim> Marks = List<Aim>{};
     Bool Ready = true;
-    Actor Owner = Actor{0};
+    Actor Owner = Actor{};
     List<Kind> Also = List<Kind>{Kind::Magic};
   };
   KERN_STRUCT(Solo) {
     Float Only = 0.5;
   };
 
-  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}, Aim{Vector{1.0, 0.0, 0.0}, 1}, List<Aim>{}, true, Actor{0}, List<Kind>{}};
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}, Aim{Vector{1.0, 0.0, 0.0}, 1}, List<Aim>{}, true, Actor{}, List<Kind>{}};
   List<Weapon> Rack = List<Weapon>{};
   Aim Last = Aim{Vector{0.0, 0.0, 1.0}, 3};
   Solo One = Solo{0.5};
@@ -991,18 +991,18 @@ struct Structs : kern::Blueprint {
   Int Count = 0;
   Text Log = "";
 
-  struct ForgeResult { Weapon made = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}; Solo one = Solo{0.5}; };
+  struct ForgeResult { Weapon made = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}; Solo one = Solo{0.5}; };
   /// Make: a struct from a value for each field - a struct and lists inside it.
-  KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{0}) {
+  KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{}) {
     return {struct_make<Weapon>(name, kind, damage, list_make<Float, "2">(damage, math_div(damage, 2.0)), struct_make<Aim>(at, kern::to<Int>(damage)), list_make<Aim, "2">(struct_make<Aim>(at, 1), Last), false, who,
                                 list_make<Kind, "1">(kind)),
             struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
   }
 
-  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; Bool same = false; Bool one = false; };
+  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; Bool same = false; Bool one = false; };
   /// A function takes a struct and a list of them (with defaults); Break; the list nodes of a
   /// struct's type - an item from beyond the list is the struct's default.
-  TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
+  TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
     Held = w;
     Rack = more;
     One = one;
@@ -1019,7 +1019,7 @@ struct Structs : kern::Blueprint {
             list_find_row<&Weapon::Damage>(Rack, damage).index};
   }
 
-  struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Float was = 0.0; Int rack = 0; Int tries = 0; };
+  struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Float was = 0.0; Int rack = 0; Int tries = 0; };
   /// Set Field: one field of a struct variable changes, the others stay - a number, a text, an
   /// enum's value, a struct, a list; what the step gives is read.
   TuneResult Tune(Float damage = 1.0, Text name = "x", Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}, Kind kind = Kind::Magic) {
@@ -1036,10 +1036,10 @@ struct Structs : kern::Blueprint {
     return {Held, n30.value, list_length<Weapon>(Rack), n38.value};
   }
 
-  struct EditResult { Int count = 0; Bool removed = false; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Int index = 0; };
+  struct EditResult { Int count = 0; Bool removed = false; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Int index = 0; };
   /// The steps that change a list variable, on a list of structs; Remove Item takes out what
   /// equals the struct - every field of it.
-  EditResult Edit(Text what = "insert", Int at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}) {
+  EditResult Edit(Text what = "insert", Int at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}) {
     switch (flow_switch_text<"insert, set, remove_at, remove, clear, add">(what)) {
       case 0: { list_insert(Rack, at, w); } break;
       case 1: { Rack[at] = w; } break;
@@ -1051,7 +1051,7 @@ struct Structs : kern::Blueprint {
     return {list_length<Weapon>(Rack), n44.removed, list_get<Weapon>(Rack, 0), n46.index};
   }
 
-  struct WalkResult { Float total = 0.0; Text names = ""; Aim last = Aim{Vector{0.0, 0.0, 1.0}, 3}; Weapon picked = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; };
+  struct WalkResult { Float total = 0.0; Text names = ""; Aim last = Aim{Vector{0.0, 0.0, 1.0}, 3}; Weapon picked = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; };
   /// For Each over a list of structs; Select and Reroute of a struct's type.
   WalkResult Walk(Bool pick = true) {
     Log = "";
@@ -1071,7 +1071,7 @@ struct Structs : kern::Blueprint {
   struct { Int value = 0; } n38;
   struct { Bool removed = false; } n44;
   struct { Int index = 0; } n46;
-  struct : kern::Node<60> { Weapon item = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Int index = 0; } n60;
+  struct : kern::Node<60> { Weapon item = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Int index = 0; } n60;
   struct : kern::Node<64> { Aim item = Aim{Vector{0.0, 0.0, 1.0}, 3}; Int index = 0; } n64;
 };
 )kn";
@@ -1144,7 +1144,8 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
         r.push_back(Value::text(v));
       break;
     case PinType::actor:
-      for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
+      // (none, and actors of a world: what a caller hands over - the class takes it as it is)
+      r = {Value::actor({}), Value::actor({1, 2}), Value::actor({42, 2})};
       break;
     case PinType::object:  // (no object, and one of a world: what a caller hands over - the class takes it as it is)
       r = {Value::object({}), Value::object({7, 2})};
@@ -1694,8 +1695,8 @@ inline std::vector<Case> cases() {
     for (const Value& v : samples(PinType::boolean)) c.calls.push_back({"FromBool", {v}});
     for (const Value& v : samples(PinType::vector)) c.calls.push_back({"FromVector", {v}});
     for (const Value& v : samples(PinType::actor)) c.calls.push_back({"FromActor", {v}});
-    c.calls.push_back({"Pick", {yes, Value::actor(3)}});
-    c.calls.push_back({"Pick", {no, Value::actor(3)}});
+    c.calls.push_back({"Pick", {yes, Value::actor({3, 2})}});
+    c.calls.push_back({"Pick", {no, Value::actor({3, 2})}});
   }
   {
     Case& c = read("Lists", kLists);
@@ -1711,7 +1712,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Edit", {T("nothing"), I(0), N(0)}});
     c.calls.push_back({"Grow", {}});
     c.calls.push_back({"Sum", {}});
-    for (i64 n : {i64{0}, i64{1}, i64{3}, i64{6}}) c.calls.push_back({"Fill", {I(n), I(n == 3 ? 4611686018427387904 : 1000000007), Value::actor(static_cast<logic::ActorRef>(n * 7))}});
+    for (i64 n : {i64{0}, i64{1}, i64{3}, i64{6}}) c.calls.push_back({"Fill", {I(n), I(n == 3 ? 4611686018427387904 : 1000000007), Value::actor(n ? logic::ActorHandle{static_cast<logic::ActorRef>(n * 7), 2} : logic::ActorHandle{})}});
     for (i64 at : {i64{-1}, i64{0}, i64{1}, i64{2}, i64{5}, i64{6}, most}) c.calls.push_back({"At", {I(at), T(at == 1 ? "b" : at == 2 ? "zz" : "a")}});
     for (const Value& v : samples(PinType::number_list)) {
       c.calls.push_back({"Take", {v, yes}});
@@ -1746,7 +1747,7 @@ inline std::vector<Case> cases() {
                              solos = samples({PinType::structure, "Solo"}, g);
     c.calls.push_back({"Walk", {yes}});
     for (f64 damage : {12.0, 0.0, -3.5, std::numeric_limits<f64>::infinity()})
-      for (i64 kind = 0; kind < 3; ++kind) c.calls.push_back({"Forge", {T(kind ? "Bow" : ""), E(kind), N(damage), Value::vector({1, static_cast<f32>(kind), -2.5f}), Value::actor(static_cast<logic::ActorRef>(kind * 21))}});
+      for (i64 kind = 0; kind < 3; ++kind) c.calls.push_back({"Forge", {T(kind ? "Bow" : ""), E(kind), N(damage), Value::vector({1, static_cast<f32>(kind), -2.5f}), Value::actor(kind ? logic::ActorHandle{static_cast<logic::ActorRef>(kind * 21), 2} : logic::ActorHandle{})}});
     for (std::size_t k = 0; k < weapons.size(); ++k) {
       c.calls.push_back({"Take", {weapons[k], racks[k % racks.size()], solos[k % solos.size()]}});
       c.calls.push_back({"Edit", {T("add"), I(0), weapons[(k * 7 + 3) % weapons.size()]}});
@@ -1766,7 +1767,7 @@ inline std::vector<Case> cases() {
     // From outside a struct's input takes a struct of its type: anything else is the struct's
     // default - no struct at all, one of another type, one with a field that is none of its
     // type's; a list, item by item.
-    const Value other = aims[1], broken = Value::structure({T("x"), E(7), N(1), Value::of(std::vector<f64>{}), aims[0], Value::structures({}), yes, Value::actor(0), Value::enumerations({})});
+    const Value other = aims[1], broken = Value::structure({T("x"), E(7), N(1), Value::of(std::vector<f64>{}), aims[0], Value::structures({}), yes, Value::actor({}), Value::enumerations({})});
     for (const Value& odd : {N(4), T("Weapon"), other, broken, Value::structure({}), Value::zero(PinType::structure), racks[2]})
       c.outside.push_back({"Take", {odd, Value::structures({weapons[1], odd, weapons[3]}), odd}});
     c.outside.push_back({"Take", {weapons[4], N(1), solos[1]}});
@@ -2038,7 +2039,7 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::number: return number(v.n, "");
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
-    case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
+    case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu, %uu}", static_cast<unsigned long long>(v.a), static_cast<unsigned>(v.world)); return b;   // (its id and its world, as they are)
     case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
     case PinType::object:  // (its handle and its world, as they are)
       std::snprintf(b, sizeof b, "{kern::logic::ObjectRef{%lldLL, %uu}}", static_cast<long long>(v.i), static_cast<unsigned>(v.world));

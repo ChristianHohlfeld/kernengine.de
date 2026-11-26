@@ -198,9 +198,9 @@ KERN_LAYOUT(Demo) {
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
-| Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
+| Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
-| Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
+| Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
 | Engine Object of Blueprint | `func_engine_object<kern::App>(target)` – das Objekt der Engine, das der Blueprint auf Target als die Schnittstelle der Einstellung ist (App, ShaderExtension …), als `Object<kern::App>` (kern/docs/engine_object.md) – einmal gemacht, jedes Mal dasselbe. Kein Objekt, und das Log sagt den Grund: Target hat keinen laufenden Blueprint, er implementiert keine oder eine andere Schnittstelle, der Host hat keine Objekte der Engine, der Build hat die Schnittstelle nicht (`Runtime::engine_object`); ein Wert-Knoten |
 | Is Valid Object | `object_valid<kern::audio::Mixer>(x)` – verweist es auf ein Objekt der Engine (nicht `Object<…>{}`)? Die Einstellung Class ist jede Klasse der Engine mit Objekten (`engine_classes`); C++ fragt so einen Zeiger (`if (p)`, `p != nullptr`) |
 | Same Object | `object_equal<kern::audio::Mixer>(a, b)` – dasselbe Objekt (dieselbe Welt, dasselbe Handle; keins und keins sind dasselbe)? C++ vergleicht so zwei Zeiger (`a == b`) |
@@ -262,7 +262,7 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Float | `Float` | `0.5`, `12.0`, `1e+21` |
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
-| Actor | `Actor` | `Actor{7}` |
+| Actor | `Actor` | `Actor{}` (keiner – das einzige Literal: ein Akteur kommt aus seiner Welt, project.md 7.; Same Actor `actor_equal(a, b)`, Id of Actor `actor_id(a)`) |
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
@@ -2047,19 +2047,19 @@ void on1(Actor actor, Actor other) {
   Visits += 1;
   game_add_score(5.0);
   if (actor_has_tag(other, "player")) {
-    actor_spawn<"Crate">(n7, Actor{0}, actor_location(other), Vector{0.0, 0.0, 0.0});
+    actor_spawn<"Crate">(n7, Actor{}, actor_location(other), Vector{0.0, 0.0, 0.0});
     actor_impulse(n7.spawned, Vector{0.0, 0.0, 300.0});
   }
 }
 ```
 
 - Das Spiel und der eigene Actor kommen aus der Welt der Klasse (`kern_world`); ein leer
-  gelassener Actor-Eingang (`Actor{0}`) meint Self – in der Funktion, also für Graph und Text
+  gelassener Actor-Eingang (`Actor{}`) meint Self – in der Funktion, also für Graph und Text
   gleich.
 - Ein Wert-Knoten mit mehreren Ausgängen gibt ein `struct`, dessen Felder wie die Pins heißen:
-  `actor_velocity(a).speed`, `walker_tof(Actor{0}).distance`.
+  `actor_velocity(a).speed`, `walker_tof(Actor{}).distance`.
 - Ein Schritt, dessen Ausgänge gelesen werden, bekommt seinen Member als erstes Argument und
-  füllt ihn: `physics_trace(n40, start, end, Actor{0});`, danach `n40.hit`, `n40.location`.
+  füllt ihn: `physics_trace(n40, start, end, Actor{});`, danach `n40.hit`, `n40.location`.
 - Einstellungen sind Template-Argumente: `actor_spawn<"Crate">`, `game_sound<"builtin:confirm">`,
   `game_input<"jump", "pressed">`.
 - For Each Actor with Tag ist eine Schleife wie jede: `for (auto it9 = flow_for_each_tag(n9,

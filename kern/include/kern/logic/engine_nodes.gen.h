@@ -5776,6 +5776,17 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.logic_runtime", {to_value(game_world)}, {PinType::object});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
+  /// The world of this world's actors and its objects of the engine while it runs (0: it does not run): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of the level before names nothing in the next.
+  Int engine_game_world_world_id(::kern::logic::Object<::kern::game::GameWorld> game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.world_id"); return Int{}; }
+      decltype(auto) kern_r = kern_self->world_id();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
+    }
+    return from_value<Int>(this->kern_engine("engine.game_world.world_id", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+  }
   /// A key of this machine's keyboard while playing ("KeyF", "Digit1"...): On Key events.
   void engine_game_world_key_event(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& code, Bool down) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

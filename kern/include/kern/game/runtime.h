@@ -335,6 +335,10 @@ class GameWorld {
   // ---- logic (Kern Logic graphs: the level's and the actors') ----
   /// The running graphs (Play and Simulate on the authority; null otherwise).
   logic::Runtime* logic_runtime() { return logic_.get(); }
+  /// The world of this world's actors and its objects of the engine while it runs (0: it does not run): what an
+  /// Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of
+  /// the level before names nothing in the next.
+  logic::WorldId world_id() const;
   /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
   /// Off: the interpreter or the JIT, whatever the program has - read when the game starts.
   bool logic_native = true;

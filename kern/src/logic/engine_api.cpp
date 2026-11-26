@@ -1,6 +1,7 @@
 // Kern Logic: the engine as nodes - the nodes of the table, and the stand-in of the tests
 // (kern/logic/engine_api.h).
 #include "kern/logic/engine_api.h"
+#include "kern/logic/engine_host.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -80,6 +81,15 @@ void add_engine_nodes(Library& lib) {
 bool Host::engine(std::string_view, const std::vector<Value>&, std::vector<Value>&) { return false; }
 ActorRef Host::find_actor(std::string_view) { return 0; }
 EngineObjects* Host::engine_objects() { return nullptr; }
+WorldId new_world() {
+  static WorldId next = 0;
+  return ++next;
+}
+WorldId Host::world() {
+  if (EngineObjects* o = engine_objects()) return o->world();
+  if (!own_world_) own_world_ = new_world();
+  return own_world_;
+}
 void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {
@@ -91,7 +101,7 @@ std::string engine_shown(const Value& v) {
     case PinType::number: std::snprintf(b, sizeof b, "%.17g", v.n); return b;
     case PinType::vector: std::snprintf(b, sizeof b, "(%.9g, %.9g, %.9g)", static_cast<f64>(v.v.x), static_cast<f64>(v.v.y), static_cast<f64>(v.v.z)); return b;
     case PinType::text: return "\"" + v.s + "\"";
-    case PinType::actor: std::snprintf(b, sizeof b, "actor %u", v.a); return b;
+    case PinType::actor: std::snprintf(b, sizeof b, "actor %u of world %u", v.a, v.world); return b;
     case PinType::object: std::snprintf(b, sizeof b, "object %lld of world %u", static_cast<long long>(v.i), v.world); return b;
     case PinType::int64: std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;  // (its 64 bits)
     case PinType::map:
