@@ -115,3 +115,86 @@ kern/src/logic/codegen.cpp (JIT, Wasm) rechnet anders als der Interpreter und di
 Bitte prüfen, ob es auf work-zahlen damit weg ist (dort rechnet der JIT keine Zahl mehr selbst). Sonst beheben: der JIT ruft
 die C++-Funktion des Knotens. Ein Engine-Test auf work-projekt ist noch NICHT gebaut (Vorschlag: ein Fall in
 kern/tests/logic_cases.h mit diesen Rändern; logic_wasm_test.mjs vergleicht Interpreter und JIT, und er wird rot).
+
+
+## Nachfolger (Agent zahlen, zweite Sitzung, 26.11.) – Stand
+### Fertig (Commits auf work-zahlen)
+- CI 45809444360 (3615820e) ausgewertet: determinism grün; native-build rot (Engine-Bibliotheken mit float/int), murmel rot
+  (Murmel-Texte mit Int, bruecke.Sprungfeld.cpp:3), converter-cases rot (pad: level/project lesen nicht), native-spawncity-build rot
+  (spawncity.klevel: Wanted.Heat "float"). Alles erwartet (Stufe 5/8).
+- 5bd… (erster Commit dieser Sitzung): Segfault logic_native_blueprints: cases() las `.front()` leerer Beispiele, wenn ein Klassen-Text
+  nicht las -> Case::error, Test prüft ihn (blueprint_native.h read(), first_of/last_of; test_main.cpp logic_native_blueprints).
+- work-projekt (c1e07544) eingemischt (Testrahmen zweiter Durchgang, converter_cases numbers_*).
+- Konverter Typen (tools/cpp_to_blueprint.py): EXACT/INTS/FLOATS/NUMS, exact_type, f32_of/f32_of_text/f32_literal/number_literal;
+  btype/place geben die C++-Typen (float f32, int i32, unsigned u32, long/size_t u64/i64 (!), Count<Per> u32, Iterator i64);
+  Const.number rechnet im C++-Typ (f32-Literal aus dem Dezimaltext korrekt gerundet, jeder Schritt gerundet, ganze Zahlen exakt,
+  u64 vorzeichenlos); literal() schreibt Literale mit Typ (0.05f); "Bool" heißt "bool"; --engine: KEINE Graphen mehr für Funktionen,
+  die ein Header definiert (nur virtuelle bleiben) - Entscheidung main (Stufe 6 vorgezogen). KERN_DEBUG_WAIT=1 druckt Wartegründe.
+- Engine-Bibliotheken neu (lesen wieder). Fehlend: Konstanten kPi/kEarthRadius/kRad/kWidthNames (Entscheidung main: als Konstanten
+  der Engine mit C++-Typ erzeugen - OFFEN), ShaderExtension_material_uniforms ("no default for Int": Zeiger-Parameter, offen).
+- Stufe 6 Tür: engine_values::Num<T> (engine_host.h Conv/Held, engine_direct.h Direct), engine_api.py tag()/PLAIN/plain, Api.pin/shape/
+  NUM_SHAPE (Formen f f32, w i32, u u32, s i16, r u16, k i8, y u8 in engine_api.cpp answer()), Callback-Typen exakt, written_list
+  Zahltypen, Struct-Bindung field_<k>. 857 Knoten wie vorher, Pins jetzt mit Signaturtypen (f32 bleibt f32). *.gen.* neu.
+- Knoten list.text (List to Text; Klasse list_text<T>), Entscheidung main: in Ordnung (Doku fehlt noch: blueprint_cpp.md).
+- Notation: kern::to ganz abgewiesen; Listenliteral anderen Typs = Fehler; Meldungen mit neuen Typnamen; Schreiber ohne kern::to.
+- Tests umgestellt (semantisch, Cast-Knoten): blueprint_native.h (alle 20 Texte lesen), logic_cases.h (Porter $S/rd/port_cases.py:
+  num.cast/num.text/list.text auf jedem Draht zwischen Typen; int64.* -> getypte Knoten; copy_bytes/bytes/functions von Hand typisiert),
+  game_cases.h, test_main.cpp (Werte nach C++: whole_numbers i64-Umbruch, inf/NaN; Probe-Klassen f32 bitgleich gegen Engine), Editor-
+  Vorlagen (src/studio/logic_edit.cpp, Vorgaben f32/i64). Werkzeuge: $S/rd/{rd,rdc,lnk,port_raw.py,port_cases.py,each.sh}.
+- ddce2e54: Stand gepusht, CI 45820290037 gestartet.
+
+### Zuordnung der entfernten Tests (logic_fixed_widths, logic_int64_is_u64_and_i64) -> neue Tests
+| alte Aussage | neu in |
+|---|---|
+| Platz einer Breite hält die niedrigen Bits (Variable, Feld, Eingang, Ausgang, lokal; Set/Add/Aufruf/von außen), alle Stufen | logic_number_types_at_places (Interpreter+JIT: u8 += Umbruch, num_cast i8/i32/u16, u32-Umbruch, set von außen, Twice i16->u8); Klasse: Fall Numbers (blueprint_native) |
+| wrapped() an den Enden jeder Breite | numbers_against_cpp ("Whole numbers to narrower ones: the low bits"), numbers_nodes_interpreter (num.cast jede Typ-Kombination) |
+| Text/JSON-Rundreise mit Breiten, type_text/type_from_text | logic_number_types_at_places; logic_notation_tier_cases (alle Fälle, auch fixed_widths) |
+| Literal außerhalb der Breite (Variable, Map-Wert, Listen-Eintrag), Map/Fixed, Schlüsseltypen | logic_number_types_at_places (says ...) |
+| List<U8> ist keine List<Int>; Copy Bytes / Struct of Bytes Breite | logic_number_types_at_places; logic_copy_bytes; logic_bytes_of_struct |
+| check(): Vorgabe außerhalb | logic_number_types_at_places (u16 70000) |
+| fixed_width_lists in allen Stufen | logic_tier_cases_* (Interpreter/JIT/Klasse gleich); Werte gedruckt in logic_number_types_at_places (OFFEN: feste Erwartung eintragen) |
+| alle u64/i64-Operationen gegen C++ mit Zufallsbits und Rändern, Div/Rem/Shift signed/unsigned, Rotate, Vergleich | numbers_against_cpp + numbers_nodes_interpreter (Operation x Typ, Ränder, 64 Bit über 2^53) |
+| bits of float (f32/u32, NaN-Nutzlast) | numbers_against_cpp ("The bits of a value stay its bits - a NaN's too"), num.bit_cast im Knotentest |
+| Text u64/i64/hex, of_text-Ränder | logic_number_types_at_places (num_text, num_text_hex, text_to_u64 ""/zz/Überlauf/-5/0x1F) |
+| Float->Int64 an den Enden, NaN | numbers_against_cpp (Float -> Integer beyond the ends, NaN 0) |
+| JSON des u64 (Text), from_json Zahl/"0x10" | logic_number_types_at_places (Rundreise ~0, 5.0) - "0x10" entfällt (JSON ist Zahl oder Dezimaltext) |
+| convertible u64<->f64 usw. false | logic_number_types_at_places (Schleife), numbers_nodes_interpreter |
+| list_of/element_of/pin_type_name u64_list | logic_number_types_at_places |
+
+### Offen (Datei:Stelle)
+1. Engine-Suite lokal: letzter Stand siehe kqz_run5.log; Formel (Stufe 3) NICHT neu gebaut: formula.cpp rechnet f64, nur shl-Erwartung
+   (test_main.cpp logic_formulas) an numbers.h angepasst. Formel-Fälle in logic_cases.h (93 math.formula) sind nur mit Casts portiert.
+2. Konverter Stufe 5 (Ausdrücke): conv()/cast()/Formel-Lambdas/synthetische Temporäre "Int"/"Float" (cpp_to_blueprint.py ~10180
+   conv, 6082 cast, ~281 Stellen "Int"/"Float"/"Int64") schreiben noch die alte Sprache -> jeder Programm-Lauf (Murmel, SpawnCity,
+   converter_cases) bricht. Plan: synthetische Typen i64/f64, conv() schreibt num_cast<want, have> zwischen Zahltypen, jede
+   ImplicitCastExpr ein num_cast, Formel-Lambdas getypt (nach Stufe 3).
+3. Entscheidung main 1: long/size_t/ptrdiff_t/long double = Konverter-Fehler mit Vorschlag; .size()/Index = u64 (kern::usize),
+   Umwandlung sichtbar. NICHT gebaut (EXACT bildet long/unsigned long noch auf i64/u64 ab). Zählung in SpawnCity/Murmel offen.
+4. Stufe 6 Rest: Inline-Funktionen der Header als Engine-Knoten (engine_api.py: declared_only/Filter "defines"), Konverter ruft sie;
+   Konstanten der Engine; Engine-Test Knoten == Header-Funktion bitgleich.
+5. Mathe-Knoten (Nachricht main): hypot/log10/expm1 sind Knoten (core_nodes.cpp add_math); cosh/asinh/log2/cbrt/ldexp fehlen
+   (nach Einmischen von work-projekt fbf8eee2, musl std_names.c).
+6. Entscheidung B2 (main): rules::decimal (kern/games/spawncity/src/blueprint_call.h:27, 235 Aufrufe) wird bei Stufe 8 im Spiel
+   ENTFERNT, Regel-Blueprints mit f32 gerufen.
+7. Doku blueprint_cpp.md: list.text, Num<T>-Tür, kein kern::to, Literale u64 dezimal.
+
+## Performance-Schritt: JIT getypt wieder inline (von Agent projekt, 26.11. ~12:45)
+- work-projekt d449961d (B4): math.mod/round/min/max/clamp/sqrt sind im JIT nicht mehr inline (Instance::inline_pure), der JIT ruft die
+  Funktion des Knotens (Richtigkeit vor Tempo). Fall number_edges in kern/tests/logic_cases.h (9 Werte an NaN/-0/Rändern + FloorZero).
+- Folge im Bench von logic_wasm_test (Job build, For über 1e6 mit math.mod im Rumpf): JIT 9,1 ms (CI 45818297493) -> 209,3 ms (CI 45819295104),
+  Interpreter ~1500-1800 ms. Später: getypte Knoten wieder inline, aber bitgleich (fmod/round wie der Knoten), Beleg number_edges.
+
+### Nachtrag (Ende dieser Sitzung)
+- a6b47e9d: Engine-Suite LOKAL GRÜN (kqz.sh, 57279 Prüfungen, 0 Fehler). CI 45822208759 gestartet (native/determinism/build/
+  native-build abwarten). CI 45820290037 (ddce2e54): determinism rot (macOS: u64 = unsigned long long ≠ size_t) -> behoben in
+  a6b47e9d (Conv<Num<T>>::fits: gleiche Zahl unter anderem Namen, std::size_t ≡ u64); native-build rot (mini.kproject "int") -> behoben;
+  build rot (kern_lehrer.wasm fehlte - vermutlich dieselbe size_t-Prüfung auf wasm32; mit a6b47e9d prüfen).
+- Entscheidung main: Datenmodell LP64 (size_t ≡ u64 …), in blueprint_cpp.md „Zahl-Typen“ + static_assert (number_tests.h).
+  long double/intptr_t/uintptr_t = Konverter-Wait. OFFEN: Engine-Test „Klasse in Wasm == nativ für size_t-Arithmetik am Rand“.
+- fixed_width_lists W (logic_number_types_at_places) ist der Wert des Interpreters (Stufen gleich), nicht unabhängig gegen C++ geprüft.
+- Stufe 6 Inline-Knoten: Api.engine_inline gebaut, hinter KERN_ENGINE_INLINE_NODES=1 (mit Schalter 933 statt 857 Knoten; engine_calls
+  von app kompiliert nicht: std::initializer_list<std::string_view> an der Tür). Bis dahin sind die Header-Funktionen (dot, Mat4_mul …)
+  weder Graph noch Knoten -> konvertierte Programme, die sie rufen, warten.
+- Rote Jobs auf work-zahlen erwartet bis Stufe 5/8: murmel, murmel-web, converter-cases, native-spawncity-*, e2e (Editor-JS Stufe 7).
+- Nicht getan: Formel neu (Stufe 3), Konverter-Ausdrücke (Stufe 5 Rest), Stufe 4/5 (work-projekt typen/bigint/Murmel-Summe grün),
+  Stufe 8 Murmel, Mathe-Knoten cosh/asinh/log2/cbrt/ldexp (work-projekt fbf8eee2 einmischen).
