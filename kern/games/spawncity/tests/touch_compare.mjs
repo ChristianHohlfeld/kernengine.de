@@ -1,9 +1,10 @@
 // Touch-only comparison of the original (spawncity.de) and SpawnCity on Kern on a phone: the same
 // emulated touch phone (isMobile + hasTouch, coarse pointer), landscape and portrait, every step
 // driven by taps (CDP touch events) - no keyboard, no mouse, so the original stays in its touch
-// layout (desktop_controls.mjs switches to body.desktop-input on any key or mouse). States a finger
-// cannot reach in a short run (car, jet) are entered through the games' own mode APIs, which send
-// no input events either. Per step: a screenshot and a dump of every visible HUD element (id,
+// layout (desktop_controls.mjs switches to body.desktop-input on any key or mouse). Kern is the small game (a drone
+// over the city): the steps are the drone's - ARM, the camera, STOP, RESET. (Until 26.11.2026 also the big map, foot,
+// car and jet: out of the small game with them - BLUEPRINTS.md, "Herausgenommen am 26.11.".)
+// Per step: a screenshot and a dump of every visible HUD element (id,
 // class, rect, text, computed display), plus diff.md - element by element, original vs Kern.
 //
 //   node kern/games/spawncity/tests/touch_compare.mjs [out-dir] [original-url] [kern-url]
@@ -66,13 +67,6 @@ const GAMES = {
     url: ORIGINAL,
     boot: page => page.waitForFunction(() => document.getElementById("gameMenuStart")?.textContent?.trim() === "START", null, {timeout: 120000}),
     afterStart: page => page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000}),
-    mode: (page, m) => page.evaluate(m => {
-      const walk = globalThis.__arondightWalkMode;
-      if (m === "car") { walk?.setMode?.("foot", {persist: false, reason: "compare"}); const d = globalThis.__arondightVehicleDrive; let r = d?.enterNearest?.(); if (!d?.active) r = `nearest ${r}; gta ${globalThis.__arondightGtaRuntime?.setMode?.("vehicle")}`; return String(r); }
-      if (m === "jet") { try { globalThis.__arondightVehicleDrive?.exit?.(); } catch {} walk?.setMode?.("foot", {persist: false, reason: "compare"}); return String(globalThis.__jetMode?.enter?.() ?? "no jet api"); }
-      if (m === "unjet") { try { globalThis.__jetMode?.exit?.(); } catch {} return walk?.setMode?.("foot", {persist: false, reason: "compare"}); }
-      return walk?.setMode?.(m, {persist: false, reason: "compare"}) ?? "no walk mode";
-    }, m),
     state: page => page.evaluate(() => ({mode: globalThis.__arondightWalkMode?.mode, car: !!globalThis.__arondightVehicleDrive?.active, jet: !!globalThis.__jetMode?.active, desktop: document.body.classList.contains("desktop-input"), coarse: matchMedia("(pointer: coarse)").matches, touch: navigator.maxTouchPoints})),
   },
   kern: {
@@ -80,7 +74,6 @@ const GAMES = {
     // the snapshot's START is there before the game has loaded: wait for the game to say placed
     boot: page => page.waitForFunction(() => { let placed = false; try { placed = !!window.SpawnCity?.hud?.()?.placed; } catch {} const b = document.querySelector("html.sc-original-view #gameMenuStart"); return placed && b && !b.disabled && b.textContent.trim() === "START"; }, null, {timeout: 180000, polling: 500}),
     afterStart: page => page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000}),
-    mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(m === "unjet" ? "mode foot" : `mode ${m}`), m),
     state: page => page.evaluate(() => { try { const h = window.SpawnCity.hud(); return {mode: h.mode, device: h.ctl?.device, desktop: document.body.classList.contains("desktop-input"), coarse: matchMedia("(pointer: coarse)").matches, touch: navigator.maxTouchPoints}; } catch (e) { return {error: String(e)}; } }),
   },
 };
@@ -120,16 +113,11 @@ try {
       const url = new URL(g.url); url.searchParams.set("menu", "1");
       await step("title", async () => { await page.goto(url.href, {waitUntil: "domcontentloaded", timeout: 90000}); await g.boot(page); }, 2500);
       await step("start", async () => { const n = await tap("#gameMenuStart"); await g.afterStart(page).catch(() => {}); return n; }, 7000);
-      await step("minimap-expanded", () => tap("#worldLookHud [data-map-expand]"), 2500);
-      // close the big map: the original's ✕ (#worldMapFull .wm-close), else the expand button again
-      if ((await tap("#worldMapFull .wm-close")).startsWith("no ")) await tap("#worldLookHud [data-map-expand]");
-      await pause(1000);
-      await step("mode-tap", () => tap("#mobileGameplayMode"), 3500);
-      await step("drone", () => g.mode(page, "drone"), 2500);
-      await step("foot", () => g.mode(page, "foot"), 2500);
-      await step("car", () => g.mode(page, "car"), 3500);
-      await step("jet", () => g.mode(page, "jet"), 4000);
-      await g.mode(page, "unjet").catch(() => {}); await pause(1500);
+      await step("arm", () => tap("#soloArm"), 3500);
+      await step("camera", () => tap("#soloCamera"), 2500);
+      await step("camera-2", () => tap("#soloCamera"), 2500);
+      await step("stop", () => tap("#soloKill"), 2500);
+      await step("reset", async () => { const n = await tap("#mobileGameplayReset"); return n.startsWith("no ") ? tap("#soloReset") : n; }, 3500);
       await step("menu", () => tap("#mobileGameplaySettings"), 2000);
       await ctx.close();
     }

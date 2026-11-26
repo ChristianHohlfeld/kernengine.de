@@ -1,7 +1,9 @@
 // Side-by-side comparison of the original (spawncity.de) and SpawnCity on Kern, same browser, same
 // GPS position, same device profiles and the same steps. Writes for every step and both games a
 // screenshot and a dump of everything visible on the page (text, position, size, colours), plus
-// compare.json - the material for checking the translation screen by screen.
+// compare.json - the material for checking the translation screen by screen. Kern is the small game (a drone over
+// the city); the steps are the drone's: start, its cameras, the menus. (Until 26.11.2026 also foot, car and the big
+// map: out of the small game with them - BLUEPRINTS.md, "Herausgenommen am 26.11.".)
 //
 //   node kern/games/spawncity/tests/compare.mjs [out-dir] [original-url] [kern-url]
 import {createRequire} from "node:module";
@@ -53,12 +55,7 @@ const GAMES = {
       await page.waitForFunction(() => document.getElementById("gameMenu")?.hidden === true, null, {timeout: 60000});
       await page.waitForFunction(() => Number(document.querySelector("#viewport")?.dataset.worldCityBuildings) > 20, null, {timeout: 60000}).catch(() => {});
     },
-    mode: (page, m) => page.evaluate(m => {
-      if (m === "car") return globalThis.__arondightGtaRuntime?.setMode?.("vehicle") ?? "no gta runtime";
-      return globalThis.__arondightWalkMode?.setMode?.(m, {persist: false, reason: "compare"}) ?? "no walk mode";
-    }, m),
     state: page => page.evaluate(() => { const d = document.querySelector("#viewport")?.dataset || {}; return {mode: globalThis.__arondightWalkMode?.mode, gta: globalThis.__arondightGtaRuntime?.mode, camera: d.cameraMode, buildings: d.worldCityBuildings, roads: d.worldCityRoads, bloom: d.neonBloom, style: d.visualStyle}; }),
-    minimap: page => page.evaluate(() => globalThis.__arondightRealWorld?.toggleMinimapExpanded?.()),
     pauseMenu: page => page.keyboard.press("Escape"),
   },
   kern: {
@@ -71,9 +68,7 @@ const GAMES = {
       await page.evaluate(() => (document.querySelector("html.sc-original-view #gameMenuStart") || document.getElementById("scStart")).click());
       await page.waitForFunction(() => document.getElementById("scMenu")?.hidden === true || getComputedStyle(document.getElementById("scMenu")).display === "none", null, {timeout: 60000}).catch(() => {});
     },
-    mode: (page, m) => page.evaluate(m => window.SpawnCity?.command?.(`mode ${m}`), m),
-    state: page => page.evaluate(() => { try { const h = window.SpawnCity.hud(); return {mode: h.mode, hp: h.hp, buildings: h.buildings, fps: h.fps}; } catch (e) { return {error: String(e)}; } }),
-    minimap: page => page.evaluate(() => window.SpawnCity?.command?.("map")),
+    state: page => page.evaluate(() => { try { const h = window.SpawnCity.hud(); return {mode: h.mode, armed: h.drone.armed, camera: h.drone.cam, buildings: h.tiles.buildings, fps: h.fps}; } catch (e) { return {error: String(e)}; } }),
     pauseMenu: page => page.keyboard.press("Escape"),
   },
 };
@@ -127,11 +122,10 @@ try {
       await step("title-world", () => clickIf("#gameMenuWorld"), 1500); await escape(); await pause(600);
       await step("title-place", () => clickIf("#startPlaceButton"), 1500); await escape(); await clickIf("#startPlacePanel .sp-x"); await pause(600);
       await step("start-drone", () => g.start(page), 6000);
-      await step("foot", () => g.mode(page, "foot"), 3000);
-      await step("car", () => g.mode(page, "car"), 3000);
-      await step("drone-again", () => g.mode(page, "drone"), 3000);
-      await step("minimap", () => g.minimap(page), 1200);
-      await g.minimap(page).catch(() => {});
+      // the drone's cameras (both games: the original's buttons)
+      await step("cam-follow", () => clickIf("#camFollow"), 3000);
+      await step("cam-third", () => clickIf("#camThird"), 3000);
+      await step("cam-fpv", () => clickIf("#camFpv"), 3000);
       await step("pause-menu", () => g.pauseMenu(page), 1200);
       await escape(); await pause(800);
       await step("settings-menu", () => clickIf("#mobileGameplaySettings"), 1500);

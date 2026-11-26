@@ -66,74 +66,9 @@ List<U8> bytes_of(const std::vector<unsigned char>& b) {
   for (unsigned char x : b) r.push_back(U8(x));
   return r;
 }
-List<kern::Vec3> road(int points, bench::u64 seed) {
-  bench::Gen g(seed);
-  List<kern::Vec3> v;
-  double x = 0, y = 0;
-  for (int i = 0; i < points; ++i) {
-    v.push_back({static_cast<kern::f32>(x), static_cast<kern::f32>(y), 0});
-    x += g.range(20, 80);
-    y += g.range(-40, 40);
-  }
-  return v;
-}
 
 }  // namespace
 
-bench::u64 cls_qr_encode() {
-  static const kern::logic::Text url = std::string(bench::kUrl);
-  bp::qr_code::qr_Code c;
-  the<bp::qr_code_cpp>().encode(url, c);
-  bench::u64 h = bench::fold(0, static_cast<bench::u64>(static_cast<kern::i64>(c.version)));
-  for (const Int& m : c.modules) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(m)));
-  return h;
-}
-bench::u64 cls_qr_gf_mul() {
-  static const auto in = [] { bench::Gen g(1); std::vector<int> v; for (int i = 0; i < 2 * bench::kMany; ++i) v.push_back(g.below(256)); return v; }();
-  auto& q = the<bp::qr_code_cpp>();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 2) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(q.gf_mul(in[i], in[i + 1]).Result)));
-  return h;
-}
-bench::u64 cls_qr_rs_remainder() {
-  static const auto in = [] { bench::Gen g(2); std::vector<List<U8>> v(8); for (auto& d : v) for (int i = 0; i < 64; ++i) d.push_back(U8(g.below(256))); return v; }();
-  auto& q = the<bp::qr_code_cpp>();
-  static const List<U8> div = q.rs_divisor(18).Result;
-  bench::u64 h = 0;
-  for (const auto& d : in)
-    for (const U8 b : q.rs_remainder(d, div).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
-  return h;
-}
-bench::u64 cls_nostr_sha256() {
-  static const auto in = [] { bench::Gen g(3); std::vector<List<U8>> v(4); for (auto& d : v) for (int i = 0; i < 100; ++i) d.push_back(U8(g.below(256))); return v; }();
-  auto& n = the<bp::nostr_cpp>();
-  bench::u64 h = 0;
-  for (const auto& d : in)
-    for (const U8 b : n.sha256(d).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
-  return h;
-}
-bench::u64 cls_nostr_mulm() {
-  using U256 = bp::nostr_cpp::nostr_U256;
-  static const auto in = [] { bench::Gen g(4); std::vector<U256> v(32); for (auto& x : v) for (int k = 0; k < 8; ++k) x.w[k] = Int(static_cast<kern::i64>(static_cast<kern::u32>(g.next()) & (k == 7 ? 0x7fffffffu : 0xffffffffu))); return v; }();
-  auto& n = the<bp::nostr_cpp>();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 2) {
-    const U256 r = n.mulm(in[i], in[i + 1], bp::nostr_cpp::kP).Result;
-    for (const Int& w : r.w) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(w)));
-  }
-  return h;
-}
-bench::u64 cls_nostr_from_hex() {
-  static const kern::logic::Text hex = std::string(bench::kHex);
-  auto& n = the<bp::nostr_cpp>();
-  bench::u64 h = 0;
-  for (int i = 0; i < 16; ++i) {
-    kern::Fixed<U8, 32> out{};
-    h = bench::fold(h, n.from_hex(out, hex).Result);
-    for (const Int& b : out) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
-  }
-  return h;
-}
 bench::u64 cls_common_rng_next() {
   bp::common::Rng r{Int(12345), 0.0, false};
   auto& c = the<bp::common>();
@@ -153,13 +88,6 @@ bench::u64 cls_tiles_key_hash() {
   auto& t = the<bp::tiles>();
   bench::u64 h = 0;
   for (const auto& k : in) h = bench::fold(h, t.TileKey_hash(k).Result.bits);
-  return h;
-}
-bench::u64 cls_lamps_grid_key() {
-  static const auto in = [] { bench::Gen g(20); std::vector<double> v; for (int i = 0; i < 2 * bench::kMany; ++i) v.push_back(g.range(-5000, 5000)); return v; }();
-  auto& l = the<bp::lamps_cpp>();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 2) h = bench::fold(h, l.grid_key(in[i], in[i + 1]).Result.bits);
   return h;
 }
 bench::u64 cls_mvt_zigzag() {
@@ -276,64 +204,6 @@ bench::u64 cls_common_to_local() {
   auto& c = the<bp::common>();
   bench::u64 h = 0;
   for (std::size_t i = 0; i < in.size(); i += 7) h = fold(h, c.to_local(c.qnormalize(quat(&in[i])).Result, vec(&in[i + 4])).Result);
-  return h;
-}
-bench::u64 cls_person_hit() {
-  static const auto in = numbers(15, 10 * bench::kMany, -4, 4);
-  auto& ph = the<bp::person_hit>();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 10) {
-    const double* p = &in[i];
-    const kern::Vec3 feet{static_cast<kern::f32>(p[0] / 4), static_cast<kern::f32>(p[1] / 4), 0}, from{static_cast<kern::f32>(p[4]), static_cast<kern::f32>(p[5]), static_cast<kern::f32>(p[6] / 4 + 1)};
-    const kern::Vec3 seg{static_cast<kern::f32>((p[0] / 4 - p[4]) * 2 + p[7] / 8), static_cast<kern::f32>((p[1] / 4 - p[5]) * 2 + p[8] / 8), static_cast<kern::f32>(p[9] / 8)};
-    Float t = 0;
-    const auto part = ph.hit(t, feet, p[2], p[3] + 4, from, seg, 1.0, 1.0).Result;
-    h = bench::fold_number(bench::fold(h, static_cast<bench::u64>(part)), t);
-  }
-  return h;
-}
-bench::u64 cls_person_sphere() {
-  static const auto in = numbers(16, 10 * bench::kMany, -4, 4);
-  auto& ph = the<bp::person_hit>();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 10) {
-    Float t = 0;
-    const bool hit = ph.sphere_entry(t, vec(&in[i]), vec(&in[i + 3]), vec(&in[i + 6]), in[i + 9] / 4 + 1.5).Result;
-    h = bench::fold_number(bench::fold(h, hit), t);
-  }
-  return h;
-}
-bench::u64 cls_perf_governor() {
-  static const auto in = [] { bench::Gen g(25); std::vector<double> v; for (int i = 0; i < bench::kMany; ++i) v.push_back(g.range(0.005, 0.06)); return v; }();
-  auto& p = the<bp::perf_cpp>();
-  bp::perf_cpp::perf_Governor gov;
-  bench::u64 h = 0;
-  for (double dt : in) h = bench::fold(h, p.Governor_update(gov, dt).Result);
-  return h;  // (as src_perf.inc)
-}
-bench::u64 cls_audio_render() {
-  const List<Float> pcm = the<bp::combat_audio_cpp>().render(bp::combat_audio_cpp::combat_audio_Kind::shot, 1, 8000).Result;
-  bench::u64 h = bench::fold(0, pcm.size());
-  for (Float x : pcm) h = bench::fold_number(h, x);
-  return h;
-}
-bench::u64 cls_lamps_place_road() {
-  static const auto pts = road(24, 21);
-  auto& l = the<bp::lamps_cpp>();
-  bp::lamps_cpp::lamps_Field f;
-  l.Field_place_road(f, pts, 12, 1, 0);
-  bench::u64 h = 0;  // (as src_lamps.inc: through near() at three points of the road)
-  for (int k : {0, 11, 23})
-    for (const Int& i : l.Field_near(f, pts[k].x, pts[k].y, 40).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(i)));
-  return h;
-}
-bench::u64 cls_lamps_near() {
-  auto& l = the<bp::lamps_cpp>();
-  static const bp::lamps_cpp::lamps_Field f = [&] { bp::lamps_cpp::lamps_Field f; l.Field_place_road(f, road(200, 22), 12, 1, 0); return f; }();
-  static const auto in = [] { bench::Gen g(23); std::vector<double> v; for (int i = 0; i < 2 * 64; ++i) v.push_back(i % 2 ? g.range(-200, 200) : g.range(0, 9000)); return v; }();
-  bench::u64 h = 0;
-  for (std::size_t i = 0; i < in.size(); i += 2)
-    for (const Int& k : l.Field_near(f, in[i], in[i + 1], 40).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(k)));
   return h;
 }
 

@@ -52,7 +52,14 @@ if [ "$skip_wasm" = 0 ]; then
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
   # The project's - the program's: files of the game that are Blueprints now - the game's C++ calls as their
   # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").
-  "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h"
+  # (a project that ships no Blueprint of the program - the small game: its program is C++, the level's rules are
+  # world Blueprints - has no such header: the game's C++ calls no class of it)
+  if python3 -I -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("blueprints") else 1)' "$shipped_project"; then
+    "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h"
+  else
+    rm -f "$here/src/level_blueprints.h"
+    "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp"
+  fi
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).

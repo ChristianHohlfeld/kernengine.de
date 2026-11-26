@@ -64,11 +64,24 @@ schreiben die Bibliotheken weiter; der Renderer übergeht sie ohne Erweiterung.
 Die Tests der entfernten Bereiche gingen mit ihnen, ebenso ihre Differenztests (`tests/lowered`) und
 Vergleichstests (`tests/converted`). Es wurde kein Test abgeschwächt.
 
-**Bewusst noch offen (spätere Schritte):** Die Seite bekommt das HUD weiter als JSON (`sc_hud`), den Ton über
-die eigenen Exporte (`sc_audio_*`). Eingabe-Aktionen, Widgets und Mixer der Engine kommen erst, wenn die
-Seite des Originals das zulässt. Die Browser-Tests des großen Spiels in den Workflows auf Abruf
-(`tests/smoke.mjs`, `compare.mjs`, `profile.mjs`, `touch_*.mjs`, `view_check.mjs`, `shotfx_original.mjs`)
-und `tests/bench` (Kopien alter Quellen) sind noch nicht auf das kleine Spiel umgestellt.
+**Browser-Tests, Workflows auf Abruf und Messung - umgestellt auf das kleine Spiel.** Was einen entfernten
+Bereich prüfte, ging mit ihm und kommt mit ihm zurück:
+
+| Test | jetzt (die Drohne) | herausgenommen, kommt mit dem Bereich zurück |
+|---|---|---|
+| `tests/smoke.mjs` (Workflow `spawncity.yml`) | Desktop mit Kacheln und Höhen, Telefon offline: Stadt mit Kollision, ARM, Steigen, Vorwärtsflug, drei Kameras, TON / MUSIK / RESET, keine Seitenfehler | die Liste der laufenden Blueprints (`blueprints`: ein Befehl des großen Spiels; die Logik der Welt ist ein Zeiger, den der Konverter nicht schreibt), zu Fuß (Gehen, Waffen, Q/4/Esc, Hilfezeile), Boden-/Wasserprüfung über `ground`, Auto, Schwimmen, Jet und Schleudersitz, Fallschirm, Mehrspieler mit zwei Tabs |
+| `tests/compare.mjs`, `touch_compare.mjs` (Workflow `spawncity-compare.yml`) | Titel, Start, Kameras der Drohne, ARM, STOP, RESET, Menüs - Original und Kern nebeneinander | Schritte zu Fuß, Auto, Jet, große Karte |
+| `tests/touch_check.mjs`, `profile.mjs` (Workflow `spawncity-profile.yml`) | Daumenknöpfe der Drohne, ARM- und Kamera-Tipp, TON / MUSIK / RESET; Profil der Drohne und ihrer Kameras | WAFFE- und DROHNE-Tipp, Sniper-Visier; Profile zu Fuß, Auto, Jet |
+| `tests/view_check.mjs` (Workflow `spawncity-view.yml`) | Ansicht des Originals: Titel, START, die Drohne nach dem Start, ihre Kameras | Modi zu Fuß und Auto, Minikarte |
+| `tests/shotfx_original.mjs`, Workflow `spawncity-shotfx.yml` | - (ganz heraus: Schusseffekte des Originals, die Vorlage der Waffen) | kommt mit den Waffen zurück |
+| `tests/bench` (`tools/blueprint_bench.sh`) | `common`, `tiles`, `mvt`, `wire`, `settings` | Fälle von `qr_code`, `nostr`, `lamps`, `perf`, `person_hit`, `combat_audio` (und `jet_seats` in der Liste) |
+| `kern/tests/e2e/blueprint_e2e.mjs` mit dem Level | prüft eine Regel, die das Spiel ausführt (ein Blueprint außerhalb „Source“), ohne Spielnamen | die feste Regel `Wanted` |
+
+Die Seite bekommt das HUD weiter als JSON (`sc_hud`), den Ton über die eigenen Exporte (`sc_audio_*`).
+Eingabe-Aktionen, Widgets und Mixer der Engine kommen erst, wenn die Seite des Originals das zulässt.
+Die Daumenknöpfe der Drohne (`touch_play.cpp`) zeigen noch ⇄ FPS, STRIKE und die Waffe: Knöpfe entfernter
+Bereiche, die nichts tun; eine Kamera-Taste hat das Touch-Layout der Drohne nicht (die Seite des Originals
+hat `#soloCamera`).
 
 ---
 

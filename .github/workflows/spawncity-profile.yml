@@ -9,7 +9,7 @@ on:
       original_url:
         default: https://spawncity.de/drone_simulator.html
       modes:
-        default: foot drone car
+        default: drone follow third
 
 permissions:
   contents: write

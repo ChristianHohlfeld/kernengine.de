@@ -28,7 +28,7 @@ mkdir -p "$dir"
 bench="$root/kern/games/spawncity/tests/bench"
 # (the actors whose Blueprints are measured - the libraries they use come with them)
 "$root/tools/blueprint_cpp.sh" --classes "$level" "$dir/classes.h" \
-  qr_code_cpp nostr_cpp mvt_cpp lamps_cpp perf_cpp settings_cpp combat_audio_cpp jet_seats_cpp wire person_hit common tiles >&2
+  mvt_cpp settings_cpp wire common tiles >&2
 . "$root/kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
 read -r -a mathflags <<< "$(kern_math_flags "${BENCH_CXX:-clang++-18}")"
 flags=(-std=c++20 -O3 -flto=thin -DNDEBUG -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$dir"
