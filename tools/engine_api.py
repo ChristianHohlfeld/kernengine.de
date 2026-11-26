@@ -73,7 +73,7 @@ def c_text(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
 
 
-def table_text(api, functions, interfaces=()):
+def table_text(api, functions, interfaces=(), classes=()):
     lines = ["// The engine's functions as nodes: the table (written by tools/engine_api.py from the engine's headers -",
              "// see kern/logic/engine_api.h; not edited by hand).",
              '#include "kern/logic/engine_api.h"', "", "namespace kern::logic {", "",
@@ -99,6 +99,12 @@ def table_text(api, functions, interfaces=()):
     for q, name, virtuals, waits in interfaces:
         fs = ", ".join(f"{{{c_text(f['decl']['name'])}, {c_text(f['type'])}, {'true' if pure else 'false'}" + (f", {c_text(why)}" if why else "") + "}" for f, pure, why in virtuals)
         lines.append(f"      {{{c_text(name)}, {c_text(q)}, {{{fs}}}" + (f", {c_text(waits)}" if waits else "") + "},")
+    lines += ["  };", "  return all;", "}", ""]
+    # the classes of the engine a Blueprint holds objects of (EngineClass): Object<kern::physics::World> - with the
+    # classes each derives from that are objects of the engine too (an Object of one goes where one of those is wanted)
+    lines += ["const std::vector<EngineClass>& engine_classes() {", "  static const std::vector<EngineClass> all = {"]
+    for q, bases in classes:
+        lines.append(f"      {{{c_text(c2b.type_name_of(q))}, {c_text(q)}, {{{', '.join(c_text(c2b.type_name_of(b)) for b in bases)}}}}},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -1477,7 +1483,11 @@ def main(argv):
         calls.default_makers()
         for q, why in sorted(calls.unmade.items()):
             print(f"not made for a handle: {q}: {why}")
-    outputs = (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces())), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
+    # (every class of the engine a node takes or gives an object of, and every interface - with their bases)
+    held = {h for f in functions for _, _, h in [*f["ins"], *f["outs"]] if h} | {q for q, _, _, _ in calls.interfaces()}
+    held = sorted(held | {b for q in held for b in calls.bases(q)})
+    classes = [(q, calls.bases(q)) for q in held]
+    outputs = (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces(), classes)), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
                ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items())
     differ = []   # (--check: what a run would change - written anew or removed)
     for rel, text in outputs:

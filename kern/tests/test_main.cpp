@@ -8248,6 +8248,10 @@ TEST(object_refs_know_their_world) {
   using logic::TypeRef;
   CHECK(logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "App"}));
   CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "ShaderExtension"}));
+  // (an object of a class goes where one of a class it derives from is wanted - a HostTransport is a Transport -, not back)
+  CHECK(logic::fits(TypeRef{PinType::object, "net_HostTransport"}, TypeRef{PinType::object, "net_Transport"}) &&
+        !logic::fits(TypeRef{PinType::object, "net_Transport"}, TypeRef{PinType::object, "net_HostTransport"}));
+  CHECK(logic::engine_class("physics_World") && std::string(logic::engine_class("physics_World")->cpp) == "kern::physics::World" && !logic::engine_class("Nothing"));
   CHECK(!logic::fits(TypeRef{PinType::integer, ""}, TypeRef{PinType::object, "App"}));
   CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::integer, ""}));
   CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::text, ""}));
@@ -8288,7 +8292,7 @@ TEST(object_refs_know_their_world) {
   logic::Value made = logic::Value::of(std::vector<logic::ObjectRef>{r, logic::ObjectRef{}});
   CHECK(made.size() == 2 && made.item(0).as_object() == r && !made.item(1).as_object().valid());
   CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::Nothing> Main = Object<kern::Nothing>{};\n};\n", g, nullptr, &error) &&
-        error.find("the engine has no interface Nothing") != std::string::npos);
+        error.find("the engine has no class Nothing") != std::string::npos);
 }
 
 // The program's fixed step (kern/game/runtime.h FixedStep, kern/docs/project.md 6.): a world calls it once in every fixed

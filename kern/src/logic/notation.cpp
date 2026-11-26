@@ -2726,7 +2726,7 @@ struct Reader {
       p += 2;
       std::string of;
       if (!engine_class_here(of)) return false;
-      if (!engine_interface(of)) return fail(p - 1, "Object<" + engine_class_cpp(of) + ">: the engine has no interface " + of + " (" + interface_names() + ")");
+      if (!engine_class(of)) return fail(p - 1, "Object<" + engine_class_cpp(of) + ">: the engine has no class " + of + " a Blueprint holds objects of");
       t = {PinType::object, of};
       return expect(">");
     }
@@ -4995,7 +4995,8 @@ struct Reader {
       // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
       // (an input that reads a list of Ints of any width takes each as it is: kAnyWidth)
       const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer) ||
-                        (to_type.of == kAnyWidth && fits(from_type, to_type));
+                        (to_type.of == kAnyWidth && fits(from_type, to_type)) ||
+                        (element_of(to_type.type) == PinType::object && from_type.type == to_type.type && fits(from_type, to_type));   // (an object where one of a class it derives from goes, as in C++)
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
         return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
       if (int_inputs.count({w.to, w.in})) {

@@ -25,6 +25,21 @@ const EngineInterface* engine_interface(std::string_view name) {
   return nullptr;
 }
 
+const EngineClass* engine_class(std::string_view name) {
+  for (const EngineClass& c : engine_classes())
+    if (name == c.name) return &c;
+  return nullptr;
+}
+
+bool engine_class_is(std::string_view from, std::string_view to) {
+  if (from == to) return engine_class(from) != nullptr;
+  const EngineClass* const c = engine_class(from);
+  if (!c) return false;
+  for (const char* b : c->bases)
+    if (to == b) return true;
+  return false;
+}
+
 void add_engine_nodes(Library& lib) {
   for (const EngineFunction& f : engine_functions()) {
     NodeDef d;

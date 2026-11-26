@@ -1326,11 +1326,14 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::type) {
       // (a generic node in every type it can have; an enum node for the enum, Make and Break for every struct)
       variants.clear();
-      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph))
+        if (logic::element_of(t.type) != PinType::object || t.of == "App")   // (every class of the engine is the same Object<I>: one of them)
+          variants.push_back({{d->params[0].key, logic::type_text(t)}});
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();
-      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{"type", logic::type_text(t)}, {"count", "3"}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph))
+        if (logic::element_of(t.type) != PinType::object || t.of == "App") variants.push_back({{"type", logic::type_text(t)}, {"count", "3"}});
       for (const char* count : {"0", "1", "16"}) variants.push_back({{"type", "int"}, {"count", count}});
     }
     for (const auto& params : variants) {

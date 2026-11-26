@@ -2435,4 +2435,57 @@ const std::vector<EngineInterface>& engine_interfaces() {
   return all;
 }
 
+const std::vector<EngineClass>& engine_classes() {
+  static const std::vector<EngineClass> all = {
+      {"AmbientOcclusionPass", "kern::AmbientOcclusionPass", {}},
+      {"App", "kern::App", {}},
+      {"BloomPass", "kern::BloomPass", {}},
+      {"BuildingBuilder", "kern::BuildingBuilder", {}},
+      {"Bvh", "kern::Bvh", {}},
+      {"Earcut", "kern::Earcut", {}},
+      {"Engine", "kern::Engine", {}},
+      {"FootprintStream", "kern::FootprintStream", {}},
+      {"Input", "kern::Input", {}},
+      {"LightPool", "kern::LightPool", {}},
+      {"Mesh", "kern::Mesh", {}},
+      {"Particles", "kern::Particles", {}},
+      {"Program", "kern::Program", {}},
+      {"Renderer", "kern::Renderer", {}},
+      {"RoadBuilder", "kern::RoadBuilder", {}},
+      {"RoadStream", "kern::RoadStream", {}},
+      {"ShaderExtension", "kern::ShaderExtension", {}},
+      {"SkyPass", "kern::SkyPass", {}},
+      {"SunShadowMap", "kern::SunShadowMap", {}},
+      {"TextureDesc", "kern::TextureDesc", {}},
+      {"UniformCache", "kern::UniformCache", {}},
+      {"audio_BuiltinJob", "kern::audio::BuiltinJob", {}},
+      {"audio_Mixer", "kern::audio::Mixer", {}},
+      {"game_FixedStep", "kern::game::FixedStep", {}},
+      {"game_GameAudio", "kern::game::GameAudio", {}},
+      {"game_GameWorld", "kern::game::GameWorld", {}},
+      {"game_GameWorld_PropertyChange", "kern::game::GameWorld::PropertyChange", {}},
+      {"game_NightWindows", "kern::game::NightWindows", {"ShaderExtension"}},
+      {"game_SoundBank", "kern::game::SoundBank", {}},
+      {"json_Value", "kern::json::Value", {}},
+      {"logic_Runtime", "kern::logic::Runtime", {}},
+      {"net_BitReader", "kern::net::BitReader", {}},
+      {"net_BitWriter", "kern::net::BitWriter", {}},
+      {"net_Client", "kern::net::Client", {}},
+      {"net_Connection", "kern::net::Connection", {}},
+      {"net_Endpoint", "kern::net::Endpoint", {}},
+      {"net_HostTransport", "kern::net::HostTransport", {"net_Transport"}},
+      {"net_LoopbackNetwork", "kern::net::LoopbackNetwork", {}},
+      {"net_MeasureStream", "kern::net::MeasureStream", {}},
+      {"net_ReadStream", "kern::net::ReadStream", {}},
+      {"net_Server", "kern::net::Server", {}},
+      {"net_Simulator", "kern::net::Simulator", {}},
+      {"net_Transport", "kern::net::Transport", {}},
+      {"net_WriteStream", "kern::net::WriteStream", {}},
+      {"physics_CharacterMover", "kern::physics::CharacterMover", {}},
+      {"physics_MouseGrab", "kern::physics::MouseGrab", {}},
+      {"physics_World", "kern::physics::World", {}},
+  };
+  return all;
+}
+
 }  // namespace kern::logic

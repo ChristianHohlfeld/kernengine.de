@@ -103,6 +103,19 @@ struct EngineInterface {
 };
 const std::vector<EngineInterface>& engine_interfaces();
 const EngineInterface* engine_interface(std::string_view name);
+/// A class of the engine a Blueprint holds objects of (kern/docs/engine_object.md): Object<kern::physics::World>.
+/// `bases`: the classes of the engine it derives from that are objects of it too, the nearest first - an Object of it
+/// goes where an Object of one of them is wanted (a HostTransport is a net::Transport), never the other way round.
+struct EngineClass {
+  const char* name;  // as a Blueprint names it: "physics_World"
+  const char* cpp;   // "kern::physics::World"
+  std::vector<const char*> bases;
+};
+const std::vector<EngineClass>& engine_classes();
+/// The class of that name (every interface is one too), or null.
+const EngineClass* engine_class(std::string_view name);
+/// Does an object of the class `from` go where one of `to` is wanted: the same class, or one it derives from?
+bool engine_class_is(std::string_view from, std::string_view to);
 /// The nodes of the table, in a library (Library::core has them).
 void add_engine_nodes(Library& lib);
 
