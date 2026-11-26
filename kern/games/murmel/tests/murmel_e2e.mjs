@@ -68,6 +68,8 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "opening the project opens its start level " + start);
   await cmd({cmd: "play", mode: "play"});
   check(await until(async () => /Level 1/.test((await status()).hud?.message ?? "")), "Play runs the level's Blueprint (its message: " + ((await status()).hud?.message ?? "-") + ")");
+  // (every mouse movement the page sees from here on, and whether the pointer was locked: printed with the state below)
+  await page.evaluate(() => { window.__moves = []; document.addEventListener("mousemove", e => window.__moves.push([e.movementX, e.movementY, !!document.pointerLockElement])); });
   const box = await page.locator(".vp canvas, #gl").first().boundingBox();
   if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   // (what the editor knows while the key is held: printed when the marble does not reach the coin)
@@ -75,12 +77,12 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
     const s = window.KernStudio.status, st = window.KernStudio.state, a = document.activeElement;
     return {play: s.play, paused: s.paused, captured: s.captured, fps: s.fps, steps: s.sim?.steps, hud: s.hud && {score: s.hud.score, status: s.hud.status, message: s.hud.message},
             focus: document.hasFocus(), visible: document.visibilityState, active: a ? a.tagName + (a.id ? "#" + a.id : "") + (a.className ? "." + String(a.className).split(" ")[0] : "") : null,
-            locked: !!document.pointerLockElement, logicOpen: !!st?.logic?.open, layout: st?.prefs?.layout, activeView: (st?.viewports ?? []).findIndex(v => v.active)};
+            locked: !!document.pointerLockElement, logicOpen: !!st?.logic?.open, layout: st?.prefs?.layout, activeView: (st?.viewports ?? []).findIndex(v => v.active), moves: (window.__moves ?? []).slice(0, 12), moveCount: (window.__moves ?? []).length};
   });
   const before = await seen();
   await page.keyboard.down("ArrowUp");
   const rolled = await until(async () => ((await status()).hud?.score ?? 0) >= 10, 90000);
-  if (!rolled) console.log("editor before the key:", JSON.stringify(before), "\neditor after 90 s:", JSON.stringify(await seen()));
+  console.log((rolled ? "" : "(not rolled) ") + "editor before the key:", JSON.stringify(before), "\neditor after:", JSON.stringify(await seen()));
   check(rolled, "an arrow key rolls the marble over a coin in the editor (score " + ((await status()).hud?.score ?? "-") + ")");
   await page.keyboard.up("ArrowUp");
   check(errors.length === 0, "no page errors in the editor" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
