@@ -151,3 +151,8 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - work-projekt f2249a51: acht Mathe-Funktionen (log2, log1p, exp2, cbrt, acosh, atanh, ldexp, remainder), Gate 45887919129 läuft (converter-cases, murmel, build, input, determinism grün; native/e2e laufen).
 - work-zahlen 9c2d1474: push_extra(Span), CI 45888727173 läuft.
 - work-spiel CI 45885597397 (b5e16e81): input ROT (offen), native-spawncity-build/e2e-spawncity rot (Level alt).
+
+## Nachtrag 26.11. 22:15
+- ~21:50: ALLE Opus-Agenten endeten mit „monthly spend limit" (HTTP 429; Reset 2.12. 13 Uhr). Nachfolger auf Fable 5.2 gestartet: leser2 (ac0331a0…, w-konv2, lokaler a885d6c0 logic::link-Fix), konverter9 (a693bd07…, w-konv: freie Funktionen mit Welt-Akteur, 6 Exporte), zahlen8 (a1430cbc…, w-zahlen: unfertiger Merge work-projekt, Mathe-Knoten, Murmel-Beleg CI 45892882964), kleinspiel4 (ac993caf…, w-spiel c23667f8).
+- work-projekt 486a6900 = Merge work-konverter c2a349c5, Gate 45893050993 läuft. Zusammenführen macht vorerst der Koordinator selbst.
+- Besitzer 22:07: „Finish fully now, we need to finalize and merge into Main now". Bedingung bleibt: ganzes Gate grün inkl. SpawnCity.
