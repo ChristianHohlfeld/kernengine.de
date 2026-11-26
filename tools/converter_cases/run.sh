@@ -65,6 +65,15 @@
 #             another state, Look) and that declares no constructor: C++'s own constructor, which makes that field, is
 #             its function (LookApp::LookApp - before: every function reading ext_ waited, "declare one: `LookApp();` ... =
 #             default"); Look, whose fields start with nothing computed, has no such function (nothing to make).
+#   far.cpp + far_b.cpp + far_rules.cpp  a function (reach) that calls one of another file (far::pole_radius), whose pieces
+#             name a class of a third file's header (rules::Blueprint : kern::logic::ActorBlueprint, far_rules.h) that the
+#             caller does not include: its test holds the pieces with the headers of their files - written and compared
+#             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
+#             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
+#             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
+#             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
+#             List<Blast> is needed").
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -93,7 +102,8 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
   local f files=()
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
-  echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
+  # (a case with actors of its own in the level - Blueprints the program calls by an actor's name: <case>.klevel)
+  if [ -f "$here/$1.klevel" ]; then cp "$here/$1.klevel" "$out/cases.klevel"; else echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"; fi
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
   (cd "$out" && KERN_TEST_SOURCE_NUMBERS="${SOURCE_NUMBERS:-}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
@@ -228,6 +238,14 @@ logged chain "each round says why it is needed" '^round 2: 2 Blueprints - what C
 if grep -q '^round 4' "$top/chain/convert.log"; then echo "FAIL chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fail=1
 else echo "ok   chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fi
 
+convert blasts
+logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
+logged blasts "both are compared" '^2 functions of the Blueprints are compared'
+
+convert far far_b far_rules
+logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
+logged far "all three are compared" '^3 functions of the Blueprints are compared'
+
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
 if grep -q 'has no constructor of its own' "$top/look/convert.log"; then echo "FAIL look: nothing waits for a constructor written down"; fail=1; else echo "ok   look: nothing waits for a constructor written down"; fi
@@ -304,6 +322,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
