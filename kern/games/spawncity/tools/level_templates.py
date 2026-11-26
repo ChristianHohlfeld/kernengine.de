@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Puts the actors that tools/level_templates.cpp writes (the player with its head, the vehicle templates) into a
+"""Puts the actors that tools/level_templates.cpp writes (the drone's template) into a
 level file - nothing else of it changes (the file is written as the converter writes it: indent 1, UTF-8).
 
     level_templates.py <actors.json> <level.klevel>

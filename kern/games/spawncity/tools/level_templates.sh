@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds tools/level_templates.cpp (the player and the vehicle templates as the level file has actors) and puts what it
+# Builds tools/level_templates.cpp (the drone's template as the level file has actors) and puts what it
 # writes into level/spawncity.klevel (tools/level_templates.py: nothing else of the level changes).
 #
 #   kern/games/spawncity/tools/level_templates.sh [<level.klevel>]      (CXX / CC: the compilers, default c++ / cc)
@@ -14,7 +14,7 @@ mkdir -p "$out/obj"
 . "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
 read -r -a mathflags <<< "$(kern_math_flags "${CXX:-c++}")"
 flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -ffunction-sections -fdata-sections -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src")
-sources=("$here/level_templates.cpp" "$game/src/car.cpp" "$game/src/drone.cpp" "$game/src/jet.cpp" "$kern/src/game/level.cpp" "$kern/src/audio/audio.cpp"
+sources=("$here/level_templates.cpp" "$game/src/drone.cpp" "$kern/src/game/level.cpp" "$kern/src/audio/audio.cpp"
          "$kern/src/game/logic_node_shapes.cpp" "$kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/logic" "$kern/src/core" -name '*.cpp' | sort)
 export cxx out
