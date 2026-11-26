@@ -79,7 +79,7 @@ struct Register {
   void test_##name()
 
 }  // namespace
-#include "number_cases.h"
+#include "number_tests.h"
 namespace {
 
 bool mat_near(const Mat4& a, const Mat4& b, f32 eps = 1e-5f) {

@@ -192,7 +192,7 @@ bool fits(const TypeRef& from, const TypeRef& to) {
 bool convertible(PinType from, PinType to) {
   // No wire turns a value into another type - a conversion is a node of its own (number to number: Cast; a
   // number to a text: To Text), as nothing in C++ converts without a conversion the compiler names.
-  return from == to && from != PinType::exec;
+  return from == to;  // (exec to exec: the flow)
 }
 
 namespace {

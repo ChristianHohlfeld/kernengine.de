@@ -20,6 +20,7 @@
 #include "engine_case.gen.h"
 #include "logic_cases.h"
 #include "native_show.h"
+#include "number_cases.h"
 
 namespace blueprint_native {
 using namespace kern;
@@ -1645,6 +1646,16 @@ inline std::vector<Case> cases() {
   auto I = [](i64 v) { return Value::integer(v); };
   auto T = [](const char* v) { return Value::text(v); };
   {
+    // (the nodes of the numbers - number_cases.h: one function per operation and type and per conversion, with the edge
+    // values; the class gives the interpreter's answers, call for call - and the interpreter numbers.h's:
+    // numbers_nodes_interpreter)
+    all.push_back({"Numbers", {}, {}});
+    json::Value j;
+    std::string error;
+    if (!json::parse(number_cases::numbers_graph_json(), j, &error) || !logic::graph_from_json(j, all.back().graph, &error)) std::printf("blueprint_native Numbers: %s\n", error.c_str());
+    for (auto& [fn, args] : number_cases::numbers_calls(all.back().graph)) all.back().calls.push_back({fn, args});
+  }
+  {
     Case& c = read("Flow", kFlow);
     for (f64 v : {95.0, 90.0, 89.999, 50.0, 12.5, -3.0, 0.0, std::numeric_limits<f64>::quiet_NaN()}) c.calls.push_back({"Grade", {N(v)}});
     c.calls.push_back({"FirstAbove", {I(0), I(9), N(4.5)}});
@@ -2023,9 +2034,11 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
   };
   if (logic::is_number(v.type) && v.type != PinType::boolean) {
     // (a number, bit for bit: its type and its bits - std::bit_cast of the bits)
-    std::snprintf(b, sizeof b, "std::bit_cast<kern::%s>(static_cast<std::conditional_t<sizeof(kern::%s) == 8, kern::u64, std::conditional_t<sizeof(kern::%s) == 4, kern::u32, std::conditional_t<sizeof(kern::%s) == 2, kern::u16, kern::u8>>>>(0x%llxull))",
-                  logic::pin_type_name(v.type), logic::pin_type_name(v.type), logic::pin_type_name(v.type), logic::pin_type_name(v.type), static_cast<unsigned long long>(v.bits()));
-    return b;
+    const std::string t = logic::pin_type_name(v.type);
+    const int w = logic::num::width(logic::kind_of(v.type));
+    const std::string holder = w == 8 ? "kern::u8" : w == 16 ? "kern::u16" : w == 32 ? "kern::u32" : "kern::u64";
+    std::snprintf(b, sizeof b, "0x%llxull", static_cast<unsigned long long>(v.bits() & (w == 64 ? ~0ull : ((1ull << w) - 1))));
+    return "std::bit_cast<kern::" + t + ">(static_cast<" + holder + ">(" + b + "))";
   }
   switch (v.type) {
     case PinType::boolean: return v.b ? "true" : "false";

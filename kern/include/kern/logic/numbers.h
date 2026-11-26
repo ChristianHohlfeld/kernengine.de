@@ -22,6 +22,7 @@
 //     (WebAssembly's trunc_sat; C++: UB);
 //   - floating numbers are IEEE 754, as C++ has them: x / 0 is +-inf (0 / 0 NaN), sqrt of a negative NaN.
 //     Which NaN an operation gives (its sign and payload bits) neither C++ nor WebAssembly fix; a NaN stays a NaN.
+//     fmin/fmax of 0 and -0: -0 and 0 (C leaves it open).
 // The rest is C++'s own: a whole number to a narrower one keeps its low bits (C++20), a number to bool is != 0,
 // bool to a number 0 or 1, a whole number to a floating one the nearest, f64 to f32 the nearest (beyond f32's
 // range: +-inf, IEEE). sin, exp, pow ... are the engine's own (kern::dm, musl: the same bits natively and in
@@ -271,9 +272,21 @@ template <Floating T> inline T round(T a) { return std::round(a); }  // (half aw
 template <Floating T> inline T fabs(T a) { return std::fabs(a); }
 template <Floating T> inline T copysign(T a, T b) { return std::copysign(a, b); }
 template <Floating T> inline T fmod(T a, T b) { return std::fmod(a, b); }
-/// std::fmin / std::fmax: a NaN on one side gives the other.
-template <Floating T> inline T fmin(T a, T b) { return std::fmin(a, b); }
-template <Floating T> inline T fmax(T a, T b) { return std::fmax(a, b); }
+/// std::fmin / std::fmax: a NaN on one side gives the other. Of 0 and -0 C leaves open which it gives (and two calls of
+/// std::fmin in one program give different ones - the builtin and the library): here fmin gives -0, fmax 0, as IEEE
+/// 754-2019's minimumNumber and maximumNumber do.
+template <Floating T> inline T fmin(T a, T b) {
+  if (a != a) return b;
+  if (b != b) return a;
+  if (a == b) return std::signbit(a) ? a : b;
+  return a < b ? a : b;
+}
+template <Floating T> inline T fmax(T a, T b) {
+  if (a != a) return b;
+  if (b != b) return a;
+  if (a == b) return std::signbit(a) ? b : a;
+  return a < b ? b : a;
+}
 template <Floating T> inline T sin(T a) { return dm::sin(a); }
 template <Floating T> inline T cos(T a) { return dm::cos(a); }
 template <Floating T> inline T tan(T a) { return dm::tan(a); }

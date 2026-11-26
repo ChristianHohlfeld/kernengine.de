@@ -256,23 +256,22 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 
 | Pin-Typ | C++ | Literal |
 |---|---|---|
-| Boolean | `Bool` | `true`, `false` |
-| Integer | `Int` | `12`, `-3` |
-| Integer fester Breite – der Typ eines **Platzes** (siehe „Ganze Zahlen fester Breite“) | `U8`, `U16`, `U32`, `I8`, `I16`, `I32` | `200`, `-3` – eine Zahl, die die Breite hält |
-| Float | `Float` | `0.5`, `12.0`, `1e+21` |
+| bool | `bool` | `true`, `false` |
+| ganze Zahl fester Breite (siehe „Zahl-Typen“) | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `12`, `-3`, `200`, `18446744073709551615u` (eine Zahl, die der Typ genau hält; `-9223372036854775807 - 1`) |
+| Fließkommazahl (siehe „Zahl-Typen“) | `f32`, `f64` | `0.5f`, `12.0f` (f32), `0.5`, `1e+21` (f64); unendlich/NaN: `std::numeric_limits<f32>::infinity()`, `::quiet_NaN()` |
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
 | Actor | `Actor` | `Actor{}` (keiner – das einzige Literal: ein Akteur kommt aus seiner Welt, project.md 7.; Same Actor `actor_equal(a, b)`, Id of Actor `actor_id(a)`) |
-| Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
+| Liste eines dieser Typen | `List<bool>`, `List<i64>`, `List<u8>`, `List<f32>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<f32>{1.0f, 2.5f}`, leer: `List<f32>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
-| Int64 – 64 Bit, wie `u64` und `i64` von C++ sie halten (siehe „Int64“) | `Int64`, Liste: `List<Int64>` | `Int64{0x1f}` – die Bits, hexadezimal geschrieben; gelesen wird jede ganze Zahl, die C++ schreibt (`Int64{31}`) |
 | Map – Werte eines Typs unter Schlüsseln, in der Reihenfolge, in der die Schlüssel kamen (siehe „Maps und Sets“) | `Map<Int, Float>`, `Map<Text, Cell>`, `Map<Kind, List<Float>>` | `Map<Int, Float>{{3, 1.5}, {1, 2.0}}` – die Einträge in ihrer Reihenfolge, je `{Schlüssel, Wert}`; leer: `Map<Int, Float>{}` |
 | Set – Schlüssel in der Reihenfolge, in der sie kamen | `Set<Int>`, `Set<Int64>`, `Set<Text>` | `Set<Text>{"a", "b"}`, leer: `Set<Text>{}` |
 | Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5}` – die Einträge bis zum letzten, der nicht null ist: Was nicht dasteht, ist null, wie in C++ (lauter Nullen: `Fixed<Float, 3>{}`); mehr als die Länge ist ein Fehler |
 
-Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
-Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
+Zahlen stehen in der kürzesten Form, die genau denselben Wert ihres Typs wieder ergibt (`std::to_chars`).
+Kein Draht wandelt um: Haben seine Enden verschiedene Typen, ist das ein Fehler des Graphen; eine Umwandlung
+ist ein Knoten (`num_cast<f64, i32>(x)`, To Text `num_text<f32>(x)`). Der Wert
 einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“);
 für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 
@@ -484,77 +483,44 @@ void on1(Actor actor, Float value, Text text) {
   ist. Herausnehmen schiebt die folgenden Einträge nach vorn und baut den Index neu – das kostet so
   viel, wie Einträge hinter dem herausgenommenen stehen.
 
-### Ganze Zahlen fester Breite
+### Zahl-Typen
 
-Ein Platz – eine Variable, ein Feld, ein Ein- oder Ausgang, eine lokale Variable – kann ein Int fester Breite sein:
-`U8`, `U16`, `U32` (0 bis 2^w − 1) und `I8`, `I16`, `I32` (−2^(w−1) bis 2^(w−1) − 1); im Graphen ein Int mit der Breite
-am Platz (`"type":"int","of":"u32"`, Einstellung `u32`), wie die Länge bei `Fixed`. **Über einen Draht fließt ein Int** –
-die Breite hat nur der Platz. Was der Platz bekommt, hält er, wie C++ eine ganze Zahl in einem `std::uint32_t` speichert
-(`static_cast<u32>(x)`): die unteren w Bits des Int, bei Vorzeichen im Zweierkomplement – beim Setzen (`X = n3.item;`,
-`S.a = …`, `return {…}`, Aufruf, von außen) und bei Add to Variable (`E += -4294967297;`: die unteren Bits der Summe).
-Eine Float wird erst zum Int (`kern::to<Int>(x)` – auf null zu, außerhalb das nächste Ende von Int), dann gespeichert;
-`kern::to<U8>` gibt es nicht. Jeder Wert einer Breite ist kleiner als 2^32 und so in einem double genau – Interpreter
-und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen der Funktion des Knotens. Das Produkt zweier
-`U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
-als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
-Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`). Die Schlüssel einer Map haben keine Breite; ihre **Werte**
-können eine haben (`Map<Int, U8>`, `Map<Int, List<U32>>`, im Graphen `"of":"int>int_list:u32"`, Einstellung Value `u32_list`): die Map ist
-der Platz, ein Wert wird gespeichert wie C++ ihn in einer `std::map<…, std::vector<u32>>` speichert – Set at Key, Set Variable auf
-`M[i]`, Add/Insert/Set Length auf der Liste eines Werts (`list_add(M[0], x)`), eine ganze Map beim Setzen und von außen; ihre
-Vorgabe und ein Literal halten nur Werte der Breite (`Map<Int, U8>{{1, 256}}` ist ein Fehler). In der Klasse ist ein solcher Wert
-`logic::Sized<u32>` bzw. `List<Sized<u32>>`; Find gibt ihn als Int.
+Die Sprache hat die Zahl-Typen des C++-Teilsatzes, jeder ein eigener Pin-Typ: `bool`, `i8`, `i16`, `i32`, `i64`,
+`u8`, `u16`, `u32`, `u64`, `f32`, `f64`. Vorgaben im Editor: „Float“ ist `f32` (wie die Engine, Grafik und Physik
+rechnen), „Int“ ist `i64`. Eine Operation rechnet in ihrem Typ, wie C++ es tut – `f32 + f32` rundet auf f32, jeder
+Zwischenwert (`a*b + c` ist nicht das double-Ergebnis einmal gerundet), `u32 * u32` bricht bei 2^32 um. Die eine
+Implementierung steht in `kern/logic/numbers.h` (`kern::logic::num`): Interpreter (PureNodes), Klasse und JIT
+rufen dieselben Funktionen; sin, exp, pow … sind die der Engine (`kern::dm`, musl, mit f-Varianten: nativ wie in
+WebAssembly dieselben Bits), sqrt, floor, fmod sind in IEEE exakt.
 
-**Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
-Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,
-`List<U8>{…}` (Make List mit Typ `u8`), Insert Text Bytes (eine `List<I8>` hält die Bytes 128 … 255 als −128 … −1), eine ganze Liste
-beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Breite (`list_copy_bytes<"u8", …>(B, …)` bei
-`List<U8> B`). Find, Contains und Remove Item vergleichen die Zahl, wie C++ ein `std::uint8_t` mit einem `int` vergleicht
-(`std::find` von 256 in einem `std::vector<u8>` findet nichts): in der Klasse `logic::Sought<T>` (ein Int bei `Sized<T>`).
-Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
-`std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
-Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
-`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Was Bytes gibt – Bytes of Text,
-Bytes of S –, gibt eine `List<U8>` (C++: `std::vector<u8>`, `std::array<u8, N>`). Ein Feld einer Breite hat in
-einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
-(`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
+Die Knoten der Zahlen haben ihren Typ als Einstellung: `math_add<f32>(a, b)`, `math_compare<"<", i64>(a, b)`,
+`math_shift_left<u32>(h, 5)`, `math_sin<f64>(x)` (Radiant, wie C++). Eine Umwandlung ist ein Knoten für jede
+Umwandlung, die C++ kennt (IntegralCast, FloatingCast, IntegralToFloating, FloatingToIntegral, Promotion):
+`num_cast<To, From>(x)` – wie `static_cast<To>(x)`; `num_bit_cast<u32, f32>(x)` wie `std::bit_cast`.
 
-### Int64
+Was C++ offenlässt, legt `numbers.h` fest – auf jeder Plattform gleich; der Konverter meldet eine solche Stelle der
+Quelle als Fehler:
+- ganze Zahlen: `+ - *` brechen im Zweierkomplement an ihrer Breite um (signed-Überlauf ist in C++ UB); `-x` und
+  `abs` der kleinsten signed-Zahl geben sie selbst;
+- `/` und `%` durch 0 geben 0; kleinste signed-Zahl `/ -1` gibt sie selbst, `% -1` gibt 0; sonst auf null zu wie C++;
+- ein Shift geht um die Weite modulo der Breite (wie x86 und WebAssembly); `>>` einer signed-Zahl bringt das Vorzeichen;
+- Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly).
+Der Rest ist C++: ganze Zahl → schmalere behält die unteren Bits, Zahl → bool ist `!= 0`, ganze Zahl → Fließkomma und
+f64 → f32 die nächste (jenseits von f32: ±inf). Fließkomma ist IEEE 754 wie in C++: `x / 0` ist ±inf, `0 / 0` und
+`sqrt(-1)` NaN. Welche NaN-Bits eine Rechnung ergibt, legen weder C++ noch WebAssembly fest; ein Wert behält seine
+Bits (`Value` hält jede Zahl als ihre Bits).
 
-`Int64` sind 64 Bit, wie ein `u64` oder ein `i64` von C++ sie hält: ein Schlüssel aus zwei
-32-Bit-Zahlen, ein Hash, der Zustand eines Zufallsgenerators. Ein `Int` ist eine ganze Zahl, wie
-ein Blueprint sie hält – bis 2^53 genau; ein `Int64` hat alle 64 Bit. **Was die Bits bedeuten, sagt
-der Knoten**, der sie liest – wie in WebAssembly: Int64 Less vergleicht sie als `i64`, Int64 Less
-Unsigned als `u64`; Divide und Remainder gibt es als `i64` und als `u64`, Shift Right mit und ohne
-Vorzeichen.
+**Was sich gegenüber den alten Knoten ändert** (vor den Zahl-Typen: ein Float = f64, ein Int als double):
+Divide und Modulo von Fließkommazahlen durch 0 gaben 0 – jetzt IEEE (inf, NaN); Square Root einer negativen Zahl gab 0
+– jetzt NaN; Log von 0 und Negativem gab 0 – jetzt -inf/NaN; Asin/Acos klemmten auf [-1, 1] – jetzt NaN außerhalb;
+Power gab bei nicht-endlichem Ergebnis 0 – jetzt das Ergebnis von `pow`; Compare `==`/`!=` hatte eine Toleranz 1e-9 –
+jetzt der Vergleich von C++; Sin/Cos/Atan2 rechneten in Grad – jetzt Radiant; Round/Floor gaben ein Int – jetzt den
+Fließkomma-Typ (wie `std::round`); Modulo heißt Remainder (`math.rem`); ein Int war bis 2^53 genau – jetzt i64 mit
+Umbruch; Int64 und die Breite am Platz (`U8` …, `"of":"u32"`) gehen in den Typen auf; kein Draht wandelt mehr um (auch
+nicht Zahl → Text, Zahl → Vector, bool ↔ Zahl).
 
-```cpp
-Int64 State = Int64{0x853c49e6748fea9b};
-
-KERN_PURE Int64 Next(Int64 s) {
-  return int64_add(int64_mul(s, Int64{0x5851f42d4c957f2d}), Int64{0x14057b7ef767814f});
-}
-```
-
-- **Wie C++, für jeden Wert festgelegt:** Add, Subtract und Multiply gehen bei 2^64 herum, Shift
-  Left auch. Wo C++ nichts festlegt, legt der Knoten es fest, in jeder Stufe gleich: Divide und
-  Remainder durch 0 geben 0, das kleinste `i64` durch −1 gibt sich selbst (Remainder 0); ein Shift und
-  ein Rotate gehen um die letzten 6 Bit ihres Betrags; Float to Int64 gibt für „keine Zahl“ 0 und
-  jenseits der Enden das nächste Ende (Unsigned: unter 0 ist 0).
-- **Umwandeln sagt ein Knoten**, keiner still: Int to Int64 (die Bits eines `i64`), Int64 to Int
-  und Int64 to Int Unsigned (die Bits als `i64` bzw. `u64`, so genau, wie ein Int es hält), Int64
-  to Float (Unsigned), Float to Int64 (Unsigned), Bits of Float und Float of Bits (IEEE 754), Int64
-  of Halves, High, Low (je 32 Bit), Count Ones, Leading Zeros, Trailing Zeros, Int64 to Text (als
-  `u64`, als `i64`, hexadezimal) und Text to Int64 (dezimal, `0x`, ein `-` davor: das
-  Zweierkomplement; was keine Zahl ist: 0). Ein Draht von Int64 zu Int, Float oder Text ist ein
-  Fehler.
-- **Im Text** ist ein Int64 `Int64{0x1f}` (die Bits, hexadezimal), im Dokument der Text seiner
-  Bits als `u64` (`"18446744073709551615"` – mehr, als eine Zahl von JSON genau hält). Es kann
-  Schlüssel einer Map und eines Sets sein, und eine `List<Int64>` sortiert nach den Bits als `u64`.
-- **Was sie tun, steht einmal:** `PureNodes::int64_*` in `kern/logic/nodes.h` – der Knoten und die
-  Klasse rufen dieselbe Funktion; in der Klasse ist ein Int64 ein `kern::logic::Int64` (ein `u64`),
-  ein Knoten ein Ausdruck auf ihm, ohne Speicher anzufordern.
-- Ein `u64` oder `i64` eines Programms, das ein Bitmuster ist, ist im Blueprint ein `Int64`; die
-  Knoten der Engine nehmen und geben ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
+Ein Text, ein Level oder ein Projekt mit den alten Typnamen (`"float"`, `"int"`, `"int64"`, `Float`, `Int`, `U8` …)
+wird nicht gelesen – Fehler mit Ort und Grund; keine Rückwärtskompatibilität.
 
 ### Aufzählungen
 
