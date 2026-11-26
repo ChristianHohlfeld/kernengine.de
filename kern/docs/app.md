@@ -89,3 +89,20 @@ Gamepads, Maustasten und Finger das sind, steht als Daten im Projekt.
 
 Geprüft: `input_actions_of_the_project` (Lesen/Schreiben, Fehler, Tasten, Pad, Touch, Maus). Murmel: `steuerung()` liest
 nur noch `moveX`, `moveY`, `jump` aus seinem Projekt.
+
+## 5. Speichern und Laden (B6)
+
+Ein Spiel hält Spielstand, Bestwert und Einstellungen in **benannten Ständen** (Slots); ein Stand hält **benannte Werte
+der Sprache** (Int, Float, Bool, Text). Jeder Aufruf, der etwas ändert, schreibt den Stand sofort zum Host.
+
+| | |
+|---|---|
+| C++ / Knoten | `engine.save_int(slot, key, v)`, `save_float`, `save_bool`, `save_text` → Bool (geschrieben?); `engine.load_int(slot, key, fallback)`, `load_float`, `load_bool`, `load_text` → der Wert oder `fallback`; `engine.saved(slot, key)` → Bool; `engine.erase_saved(slot)` → Bool. Die Knoten heißen wie die Funktionen (Save Int … Erase Saved). |
+| Namen | Slot und Schlüssel: 1–64 Zeichen aus `A–Z a–z 0–9 _ - .` |
+| Format | ein Stand ist JSON `{"format": "kern-save", "version": 1, "values": {"best": {"int": "65"}, "name": {"text": "Ada"}}}` – getypt, Int als Text (64 Bit genau), Float endlich |
+| Host | `kern::StorageHost` (lesen, schreiben, löschen eines Stands). Web: `localStorage` unter `kern-save:<Pfad der Seite>:<slot>` (zwei Spiele derselben Seite-Adresse trennen sich nach ihrem Pfad); nativ: Dateien `<slot>.kern-save` im Ordner des Startparameters `saves=<ordner>` (Vorgabe `kern-saves`). Ein Test gibt seinen eigenen Host (`Engine::set_storage`). |
+| Fehler | ausdrücklich, mit Grund in `last_error`: ein Name außerhalb der Regel, ein Wert, der keiner ist (Float nicht endlich), ein Stand, den der Host nicht schreiben kann (Speicher voll, privater Modus), ein Stand, der kein kern-save ist (er wird nicht überschrieben, bis er gelöscht ist), ein Wert anderen Typs als verlangt („best holds a text, not an int“) – dann gibt `load_*` den Fallback. Ein fehlender Wert ist kein Fehler: `fallback`, `saved` sagt false. |
+| bewusst nicht | ganze Akteure/Welten speichern (das Spiel entscheidet, was ein Stand ist), Wolke/Konto, Verschlüsselung; Listen und Structs als ein Wert (ein Spiel legt sie als mehrere Schlüssel ab). |
+
+Geprüft: `app_storage_slots` (Werte aller Typen, Fehler, Host-Fehler, kaputter Stand). Murmel: der Bestwert
+(Slot `murmel`, Schlüssel `best`) steht in der Anzeige und überlebt einen Neustart der App.

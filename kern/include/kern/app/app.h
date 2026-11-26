@@ -18,7 +18,9 @@
 #include <utility>
 #include <vector>
 
+#include "kern/app/storage.h"
 #include "kern/audio/audio.h"
+#include "kern/core/json.h"
 #include "kern/gfx/renderer.h"
 #include "kern/input/actions.h"
 
@@ -110,6 +112,26 @@ class Engine {
   /// The actions the app runtime gives the engine (the project's settings "input").
   void set_actions(const InputActions& actions) { actions_ = actions; }
   const InputActions& actions() const { return actions_; }
+  /// Saving and loading (kern/docs/app.md 5.): named slots of named values (a slot and a key: 1..64 of A-Z a-z 0-9
+  /// _ - .). A save writes the slot to the host at once; false: last_error says why (a name, a value that is none, the
+  /// host, a slot that is no kern-save). A load gives the value, or `fallback` when there is none - or, with the
+  /// reason in last_error, when it is of another type or the slot cannot be read.
+  bool save_int(const char* slot, const char* key, i64 value);
+  bool save_float(const char* slot, const char* key, f64 value);
+  bool save_bool(const char* slot, const char* key, bool value);
+  bool save_text(const char* slot, const char* key, const char* value);
+  i64 load_int(const char* slot, const char* key, i64 fallback);
+  f64 load_float(const char* slot, const char* key, f64 fallback);
+  bool load_bool(const char* slot, const char* key, bool fallback);
+  /// (the text lives until the next load_text)
+  const char* load_text(const char* slot, const char* key, const char* fallback);
+  /// Whether the slot holds a value of that key.
+  bool saved(const char* slot, const char* key);
+  /// Removes the whole slot from the host.
+  bool erase_saved(const char* slot);
+  /// The host of the slots (default: the platform's, kern/app/storage.h - natively the folder of the launch parameter
+  /// saves=<folder>, else kern-saves). The slots read so far are read again from it.
+  void set_storage(StorageHost& host);
   /// Text shown by the host page in its status overlay (empty hides it).
   void set_status(const char* text);
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
@@ -187,6 +209,17 @@ class Engine {
   Input input_;
   audio::Mixer mixer_;
   InputActions actions_;
+  struct Slot {
+    std::string name;
+    json::Value values;     // key -> {"int": "..."} / {"float": x} / {"bool": b} / {"text": "..."}
+    std::string broken;     // the host's text is no kern-save (why): not read, not written over
+  };
+  StorageHost* storage_ = nullptr;
+  std::vector<Slot> slots_;
+  std::string loaded_text_;
+  Slot* slot(const char* name, const char* key, bool for_write);
+  bool store(Slot& s, const char* key, json::Value value);
+  const json::Value* stored(const char* slot, const char* key, const char* type);
   mutable std::vector<std::string> unknown_actions_;   // (said once each)
   const ActionBinding* find_action(const char* name) const;
   const AxisBinding* find_axis(const char* name) const;

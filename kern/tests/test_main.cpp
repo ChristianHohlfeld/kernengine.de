@@ -8721,6 +8721,65 @@ TEST(input_actions_of_the_project) {
   rt.stop();
 }
 
+// Saving and loading (kern/docs/app.md 5.): named slots of named values of the language, written through to the host
+// at once; every error says why - a name, a value that is none, a host that refuses, a slot that is no kern-save,
+// a value of another type. A missing value is the fallback, not an error.
+TEST(app_storage_slots) {
+  struct Memory final : StorageHost {
+    std::map<std::string, std::string> slots;
+    bool refuse = false;
+    bool read(std::string_view slot, std::string& text, bool& found, std::string&) override {
+      auto it = slots.find(std::string(slot));
+      found = it != slots.end();
+      if (found) text = it->second;
+      return true;
+    }
+    bool write(std::string_view slot, std::string_view text, std::string& why) override {
+      if (refuse) { why = "the quota is used up"; return false; }
+      slots[std::string(slot)] = std::string(text);
+      return true;
+    }
+    bool remove(std::string_view slot, std::string&) override { slots.erase(std::string(slot)); return true; }
+  } host;
+  Renderer r;
+  Engine e(r);
+  e.set_storage(host);
+  CHECK(e.load_int("game", "best", 7) == 7 && !e.saved("game", "best"));   // (none: the fallback)
+  CHECK(e.save_int("game", "best", 9007199254740993LL) && e.save_float("game", "volume", 0.25) && e.save_bool("game", "music", true) && e.save_text("game", "name", "Ada"));
+  // read again from the host (a new start of the app)
+  Engine again(r);
+  again.set_storage(host);
+  CHECK(again.load_int("game", "best", 0) == 9007199254740993LL);   // (64 bits, exactly)
+  CHECK(again.load_float("game", "volume", 1) == 0.25 && again.load_bool("game", "music", false) && std::string(again.load_text("game", "name", "")) == "Ada");
+  CHECK(again.saved("game", "name") && !again.saved("game", "other"));
+  CHECK(host.slots["game"].find("\"format\": \"kern-save\"") != std::string::npos);
+  // another type than it holds: the fallback, and why
+  CHECK(again.load_int("game", "name", -1) == -1 && std::string(last_error()) == "save slot game: name holds a text, not an int");
+  // names, values
+  CHECK(!e.save_int("my game", "best", 1) && std::string(last_error()).find("save slot \"my game\": a slot's name is 1 to 64") == 0);
+  CHECK(!e.save_int("game", "", 1) && std::string(last_error()).find("the key \"\"") != std::string::npos);
+  CHECK(!e.save_float("game", "volume", std::nan("")) && std::string(last_error()).find("volume is not a number that can be kept") != std::string::npos);
+  // the host refuses: false, why, and the slot keeps what the host holds
+  host.refuse = true;
+  CHECK(!e.save_int("game", "best", 1) && std::string(last_error()) == "save slot game: the host cannot write it: the quota is used up");
+  CHECK(e.load_int("game", "best", 0) == 9007199254740993LL);
+  host.refuse = false;
+  // a slot that is no kern-save is neither read nor written over, until it is erased
+  host.slots["old"] = "{\"best\": 3}";
+  CHECK(e.load_int("old", "best", 5) == 5 && std::string(last_error()).find("save slot old: it is no kern-save") == 0);
+  CHECK(!e.save_int("old", "best", 4) && std::string(last_error()).find("not written over until it is erased") != std::string::npos && host.slots["old"] == "{\"best\": 3}");
+  CHECK(e.erase_saved("old") && !host.slots.count("old") && e.save_int("old", "best", 4) && e.load_int("old", "best", 0) == 4);
+  // natively, the platform's host keeps a slot in a file of the folder saves=<folder>
+  Engine native(r);
+  const std::string dir = std::string(std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp") + "/kern-saves-test";
+  const std::string args = "saves=" + dir;
+  native.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native.erase_saved("t") && native.save_int("t", "n", 3));
+  Engine native2(r);
+  native2.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native2.load_int("t", "n", 0) == 3 && native2.erase_saved("t") && native2.load_int("t", "n", 0) == 0);
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).

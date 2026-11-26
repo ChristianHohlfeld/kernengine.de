@@ -24,7 +24,7 @@ const char* level_pfad(int nummer);
 kern::game::PlayInput steuerung(const kern::Engine& engine);
 
 /// Der Text der Anzeige: Level, Punkte, Münzen und was gerade los ist.
-std::string anzeige(int level, kern::f32 punkte, kern::u32 muenzen, kern::u32 alle, bool fertig, const std::string& meldung);
+std::string anzeige(int level, kern::f32 punkte, kern::u32 muenzen, kern::u32 alle, bool fertig, const std::string& meldung, kern::i64 bestwert);
 
 /// Das Spiel: eine App der Engine.
 class Murmel final : public kern::App {
@@ -40,6 +40,8 @@ class Murmel final : public kern::App {
   /// Wie viele Töne die Welt bisher verlangt hat.
   kern::u32 toene() const { return toene_; }
   const std::string& text() const { return text_; }
+  /// Der Bestwert: gespeichert im Stand "murmel" unter "best" (kern/docs/app.md 5.), über einen Neustart hinaus.
+  kern::i64 bestwert() const { return bestwert_; }
   /// Die Welt des laufenden Levels (zum Ansehen, etwa im Test).
   const kern::game::GameWorld* welt() const { return welt_.get(); }
 
@@ -59,6 +61,7 @@ class Murmel final : public kern::App {
   bool fertig_ = false;
   kern::f32 gewonnen_seit_ = -1;   // Sekunden seit dem Ziel (< 0: noch nicht)
   kern::u32 toene_ = 0;
+  kern::i64 bestwert_ = 0;
   std::string text_;
 };
 

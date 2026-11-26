@@ -32,11 +32,14 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
+  // a best score the page's storage holds already (kern/docs/app.md 5.: localStorage, the page's folder, the slot)
+  await page.addInitScript(() => localStorage.setItem("kern-save:/kern/games/murmel/web/:murmel", JSON.stringify({format: "kern-save", version: 1, values: {best: {int: "42"}}})));
   await page.goto(base + "/kern/games/murmel/web/index.html");
   const text = () => page.evaluate(() => document.getElementById("status").textContent);
   const punkte = async () => Number((/Punkte (\d+)/.exec(await text()) || [])[1] ?? -1);
   check(await until(async () => /Level 1\/2/.test(await text()), 90000), "the game page starts level 1 (" + (await text()).split("\n")[0] + ")");
   check(await punkte() === 0, "it starts with 0 points");
+  check(/Bestwert 42/.test(await text()), "the best score comes from the page's storage (" + (await text()).split("\n")[0] + ")");
   await page.click("#game");
   await page.keyboard.down("ArrowUp");
   check(await until(async () => await punkte() >= 10, 90000), "an arrow key rolls the marble over a coin: the points go up (" + (await text()).split("\n")[0] + ")");

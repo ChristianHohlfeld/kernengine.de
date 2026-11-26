@@ -23,13 +23,14 @@ game::PlayInput steuerung(const Engine& engine) {
   return in;
 }
 
-std::string anzeige(int level, f32 punkte, u32 muenzen, u32 alle, bool fertig, const std::string& meldung) {
-  char zeile[160];
+std::string anzeige(int level, f32 punkte, u32 muenzen, u32 alle, bool fertig, const std::string& meldung, i64 bestwert) {
+  char zeile[200];
   if (fertig) {
-    std::snprintf(zeile, sizeof zeile, "Geschafft! %d Punkte - Enter: noch einmal", static_cast<int>(punkte));
+    std::snprintf(zeile, sizeof zeile, "Geschafft! %d Punkte (Bestwert %lld) - Enter: noch einmal", static_cast<int>(punkte), static_cast<long long>(bestwert));
     return zeile;
   }
-  std::snprintf(zeile, sizeof zeile, "Level %d/%d   Punkte %d   Muenzen %u/%u", level + 1, kLevels, static_cast<int>(punkte), muenzen, alle);
+  std::snprintf(zeile, sizeof zeile, "Level %d/%d   Punkte %d   Muenzen %u/%u   Bestwert %lld", level + 1, kLevels, static_cast<int>(punkte), muenzen, alle,
+                static_cast<long long>(bestwert));
   std::string text = zeile;
   if (!meldung.empty()) text += "\n" + meldung;
   return text;
@@ -56,6 +57,9 @@ bool Murmel::start(Engine& engine) {
   vorher_ = 0;
   fertig_ = false;
   toene_ = 0;
+  clear_error();
+  bestwert_ = engine.load_int("murmel", "best", 0);   // (keiner: 0; ein Stand, der nicht lesbar ist: 0 und der Grund im Log)
+  if (*last_error()) log(LogLevel::warn, "%s", last_error());
   return lade(0);
 }
 
@@ -98,6 +102,11 @@ void Murmel::update(Engine& engine, const Frame& frame) {
           if (!lade(level_ + 1)) log(LogLevel::error, "%s", last_error());
         } else {
           fertig_ = true;
+          // der Bestwert bleibt über einen Neustart (der Stand "murmel" beim Host: Seite oder Datei)
+          if (static_cast<i64>(vorher_) > bestwert_) {
+            bestwert_ = static_cast<i64>(vorher_);
+            if (!engine.save_int("murmel", "best", bestwert_)) log(LogLevel::error, "%s", last_error());
+          }
         }
       }
     } else if (hud.status == game::GameStatus::lost) {
@@ -112,7 +121,7 @@ void Murmel::update(Engine& engine, const Frame& frame) {
   bank_->prepare(4);
   audio_->update(*welt_, kamera_, frame.dt);
   const game::Hud& hud = welt_->hud();
-  text_ = anzeige(level_, punkte(), hud.pickups, hud.pickups_total, fertig_, hud.message_age < 3.0f ? hud.message : std::string());
+  text_ = anzeige(level_, punkte(), hud.pickups, hud.pickups_total, fertig_, hud.message_age < 3.0f ? hud.message : std::string(), bestwert_);
   engine.set_status(text_.c_str());
 }
 
