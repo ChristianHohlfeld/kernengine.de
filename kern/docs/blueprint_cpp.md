@@ -1270,6 +1270,10 @@ enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
   von ihnen benutzt, aus der Engine (`hold_engine`). Bekommt ein Engine-Struct ein Feld dazu, bleibt das Level gültig.
   Ein Level, das doch eine Kopie hält (einen Akteur `engine_*` oder einen Typ oder eine Funktion mit
   `"from": "engine_…"`), wird abgelehnt, mit Akteur, Name und Grund. Einen zweiten Leseweg gibt es nicht.
+- **Der Konverter schreibt keine Bibliothek der Engine in Level oder Projekt**, auch wenn eine Quelle des Programms einen
+  Header der Engine einbindet und seine Funktionen ruft (`engine_library`): Er schreibt ihren Text und ihren Test, sein
+  Protokoll sagt „engine_math_math: the engine - a library of the engine …“, und was das Programm von ihr benutzt, ist nie
+  deshalb im Projekt. Nur ein Lauf über die Engine selbst (`--engine`) schreibt sie. Fall: `tools/converter_cases/placement.py`.
 - Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
   und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
 - Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.

@@ -5451,10 +5451,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::number_list: return "kern::List<kern::f64>";
       case PinType::vector_list: return "kern::List<kern::Vec3>";
       case PinType::text_list: return "kern::List<kern::logic::Text>";
+      case PinType::actor: return "kern::logic::ActorHandle";
       case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
       case PinType::int64: return "kern::logic::Int64";
       case PinType::int64_list: return "kern::List<kern::logic::Int64>";
-      default: return "kern::logic::ActorHandle";
+      default: return "kern_no_cpp_type_for_this_pin";   // (no pin of another type gets here: type_in names those - else it says so where it compiles)
     }
   };
   // (an enum and a struct are the class's own: <Class>::Mode)
@@ -5518,12 +5519,9 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   for (const StructType& st : g.structs) {
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
-    auto held = [&](const StructField& f) -> std::string {
-      if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
-      if (is_list(f.type.type) && has_width(f.type)) return type_in(f.type.type, f.type.of, rooted);  // (a List<U8> ...: its items of that width)
-      if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
-      return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
-    };
+    // (a field is held as the type the class's struct declares it with - one way for every type: an Object field is an
+    // Object<I>, a List<U8> one of that width, a struct or enum the class's own, named from anywhere)
+    auto held = [&](const StructField& f) -> std::string { return type_in(f.type.type, f.type.of, rooted); };
     std::string is, from, to;
     for (std::size_t k = 0; k < st.fields.size(); ++k) {
       const std::string at = "*v.field(" + std::to_string(k) + ")";

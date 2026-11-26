@@ -68,3 +68,6 @@ project.md 7. „Vom Programm aus“); ein Objekt der Engine nennt nur in seiner
 - Der Konverter schreibt einen Zeiger, eine Referenz, ein `std::unique_ptr` der Engine als `Object<…>`: Nullzeiger
   `Object<…>{}`, `if (p)`/`p != nullptr` Is Valid Object, `a == b` Same Object, Container von Zeigern `List<Object<…>>`,
   `unique_ptr<…>::get()` das Objekt; ein Objekt wird nie eine Zahl (Fall tools/converter_cases/objects).
+- In der Klasse (`tools/blueprint_cpp`) hält ein Struct des Programms ein Objekt-Feld als dasselbe `Object<…>`, mit dem
+  es deklariert ist – auch in seiner Hülle als Wert (`Held<Struct>`, `native_glue`: ein Typ je Feld, eine Regel für alle
+  Feld-Typen). Früher wurde es dort still ein `ActorHandle`, und die Klasse kompilierte nicht (Fall objects: „the classes compile“).

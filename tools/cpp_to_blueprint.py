@@ -16758,6 +16758,14 @@ def blueprints_of(level, project=None):
 APP_INTERFACE = "App"
 
 
+def engine_library(name):
+    """A Blueprint of the engine's own headers (engine_<header>: the libraries of the engine, kern/logic/engine_libraries.h).
+    The engine has them, built from its headers (tools/engine_api.py --libraries): a run over a program's sources writes
+    their texts and their tests, never into its level or its project - one way, whatever source includes the header.
+    (A run over the engine itself, --engine, writes them.)"""
+    return not ENGINE_RUN[0] and name.startswith("engine_")
+
+
 def place_blueprints(written, uses, implements, texts, known, in_project=()):
     """Where each Blueprint of a run stands (kern/docs/project.md 1., 4., 5.): {name: ("project" | "level", why)}. The
     program's - in the project - are its App (a state that implements the engine's App: kern::run starts the program
@@ -16769,7 +16777,10 @@ def place_blueprints(written, uses, implements, texts, known, in_project=()):
     `in_project`: the Blueprints that stand in the project and that this run does not write - the program's already
     (what the program's C++ calls as their classes): what they use is the program's too."""
     why = {}
+    engine = {u for u in written if engine_library(u)}
     for u in sorted(written):
+        if u in engine:
+            continue
         if implements.get(u) == APP_INTERFACE:
             why[u] = f"it implements {APP_INTERFACE} - the program's App (kern::run starts the program with its object)"
         else:
@@ -16780,10 +16791,12 @@ def place_blueprints(written, uses, implements, texts, known, in_project=()):
     while todo:   # (what a Blueprint of the program uses, and what that uses: the program's too)
         u = todo.pop(0)
         for x in sorted(uses.get(u, ()) if u in uses else known.get(u, ())):
-            if x not in why and (x in uses or x in known):
+            if x not in why and x not in engine and (x in uses or x in known):
                 why[x] = f"the program's {u} uses it - a Blueprint of the program finds its libraries only in the project"
                 todo.append(x)
     out = {u: ("project", why[u]) for u in why}
+    for u in sorted(engine):
+        out[u] = ("engine", "a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one")
     for u in sorted(written):
         out.setdefault(u, ("level", "a world's - it is not the App, has no export, and no Blueprint of the program uses it"))
     return out
@@ -16799,10 +16812,10 @@ def apply_to_level(level, folder, blueprints, prune=False, project=None, placed=
     Blueprint of another folder - a source of its own - is never moved: one the program uses that stands in the level
     stops the run (its place is the project; the files stay as they are). All of them, or nothing: the files are
     written when every Blueprint was read."""
-    if not ENGINE_RUN[0]:
-        # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
-        # engine has, written by tools/engine_api.py --libraries; neither a level nor a project holds one)
-        blueprints = [(name, text) for name, text in blueprints if not name.startswith("engine_")]
+    # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
+    # engine has, written by tools/engine_api.py --libraries; neither a level nor a project holds one)
+    blueprints = [(name, text) for name, text in blueprints if not engine_library(name)]
+    placed = {name: why for name, why in (placed or {}).items() if not engine_library(name)} or None
     placed = placed or {name: ("level", "") for name, _ in blueprints}
     program = {name for name, (where, _) in placed.items() if where == "project"}
     if program and not project:
@@ -17653,8 +17666,7 @@ def main(argv):
             users = sorted(u for u in blue if name in blue[u]["types"])
             if users:
                 return min(users, key=lambda h: (depth_of(h), h))
-        if not ENGINE_RUN[0]:   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
-            below = {h for h in below if not h.startswith("engine_")}
+        below = {h for h in below if not engine_library(h)}   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
         return max(below, key=lambda h: (depth_of(h), h)) if below else SHAPES
     homes = collections.defaultdict(list)
     for name in declared:
@@ -17758,7 +17770,7 @@ def main(argv):
         placed = place_blueprints(set(order), {u: uses[u] for u in order}, {u: (blueprint_implements[u] or [None])[0] for u in order}, blueprints, known, in_project)
         print("\nwhere the Blueprints stand (kern/docs/project.md):")
         for u in order:
-            print(f"  {u}: {'the project' if placed[u][0] == 'project' else 'the level'} - {placed[u][1]}")
+            print(f"  {u}: the {placed[u][0]} - {placed[u][1]}")
         apply_to_level(level, folder, [(u, blueprints[u]) for u in order], prune=whole, project=project, placed=placed)
     for f in nowhere:   # (a header's function that needs a source file which is not among those converted)
         if world.program(f["file"]):

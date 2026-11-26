@@ -40,7 +40,8 @@
 #             - written and compared.
 #   objects.cpp objects of the engine are Object<I> (kern/docs/engine_object.md), never a number: as an input, what a
 #             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
-#             compared, a function of the engine called on one - written and compared, and no Handle of Object.
+#             compared, a function of the engine called on one - written and compared, and no Handle of Object; its classes
+#             compile (a struct of the program with an Object field is held as that Object - before: as an Actor).
 #   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
 #             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
 #             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
@@ -76,6 +77,12 @@ here="$root/tools/converter_cases"
 top="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($top)" >&2 || trap 'rm -rf "$top"' EXIT
 fail=0
+classes() {   # classes <case> <what>: the case's Blueprints as classes (tools/blueprint_cpp.sh --project), compiled
+  python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(p,'w'))" "$top/$1/cases.klevel"
+  if "$root/tools/blueprint_cpp.sh" --project "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/classes.cpp" > "$top/$1/classes.log" 2>&1 &&
+     "${CLANGXX:-clang++}" -std=c++20 -fsyntax-only -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" "$top/$1/classes.cpp" > "$top/$1/classes.err" 2>&1
+  then echo "ok   $1: $2"; else echo "FAIL $1: $2: $(grep -m1 'error' "$top/$1/classes.log" "$top/$1/classes.err" | cut -c1-300)"; fail=1; fi
+}
 convert() {   # convert <case> [<file> ...]: the case's program (its files), converted with its test, into a project and a level of their own
   out="$top/${INTO:-}$1"
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
@@ -156,6 +163,7 @@ check objects "a field of a struct" yes 'KERN_STRUCT\(Rig\) \{ Object<kern::audi
 check objects "a function of the engine on an Object" yes 'engine_mixer_sample_rate\(m\)'
 check objects "no Object becomes a number (Handle of Object)" no 'object_handle'
 logged objects "all nine are written and compared" '^9 functions of the Blueprints are compared'
+classes objects "the classes compile: a struct's field that is an Object is held as an Object (Held<Rig>), never as an Actor"
 
 convert actors
 check actors "an Actor as an input" yes 'void add\(Actor a = Actor\{\}\)'
