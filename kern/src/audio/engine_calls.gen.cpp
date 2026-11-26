@@ -553,32 +553,28 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 
 // engine.builtin_job.make: kern::audio::BuiltinJob::BuiltinJob
 bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::audio::BuiltinJob>(std::unique_ptr<kern::audio::BuiltinJob>(new kern::audio::BuiltinJob())));
+  out[0] = Value::object(o.ref(o.own<kern::audio::BuiltinJob>(std::unique_ptr<kern::audio::BuiltinJob>(new kern::audio::BuiltinJob()))));
   return true;
 }
 
 // engine.builtin_job.release: kern::audio::BuiltinJob::~BuiltinJob
 bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::audio::BuiltinJob>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no BuiltinJob that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "builtin_job", r)) return false;
+  return ev::release_of<kern::audio::BuiltinJob>(o, r, "builtin_job", "BuiltinJob");
 }
 
 // engine.mixer.make: kern::audio::Mixer::Mixer
 bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::audio::Mixer>(std::unique_ptr<kern::audio::Mixer>(new kern::audio::Mixer())));
+  out[0] = Value::object(o.ref(o.own<kern::audio::Mixer>(std::unique_ptr<kern::audio::Mixer>(new kern::audio::Mixer()))));
   return true;
 }
 
 // engine.mixer.release: kern::audio::Mixer::~Mixer
 bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::audio::Mixer>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Mixer that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "mixer", r)) return false;
+  return ev::release_of<kern::audio::Mixer>(o, r, "mixer", "Mixer");
 }
 
 // engine.mixer.speed_of_sound: kern::audio::Mixer::speed_of_sound

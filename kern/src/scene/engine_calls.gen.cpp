@@ -80,17 +80,15 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 
 // engine.bvh.make: kern::Bvh::Bvh
 bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Bvh>(std::unique_ptr<kern::Bvh>(new kern::Bvh())));
+  out[0] = Value::object(o.ref(o.own<kern::Bvh>(std::unique_ptr<kern::Bvh>(new kern::Bvh()))));
   return true;
 }
 
 // engine.bvh.release: kern::Bvh::~Bvh
 bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Bvh>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Bvh that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "bvh", r)) return false;
+  return ev::release_of<kern::Bvh>(o, r, "bvh", "Bvh");
 }
 
 const EngineCall kCalls[] = {

@@ -36,8 +36,9 @@ gegangen“ – `func.engine_object` gab bei vier verschiedenen Ursachen still `
 | Knoten | C++-Text | |
 |---|---|---|
 | Engine Object of Blueprint | `func_engine_object<kern::App>(target)` | Einstellung `interface` (Vorgabe `App`, am Knoten zu sehen): das Objekt der Engine, das der Blueprint auf Target als diese Schnittstelle ist. Gibt `Object<I>`. Fehler mit Grund statt 0: Target hat keinen laufenden Blueprint · der Blueprint implementiert keine / eine andere Schnittstelle · der Host hat keine Objekte der Engine · der Build hat die Schnittstelle nicht. `check` meldet eine fehlende oder unbekannte Schnittstelle zur Bearbeitungszeit. |
-| Is Valid Object | `object_valid<kern::App>(x)` | Bool: ist es ein Objekt (nicht `{}`)? Die Schnittstelle ist eine Einstellung wie oben. |
-| Handle of Object | `object_handle<kern::App>(x)` | Int: das Handle. Der ausdrückliche Übergang, solange die Funktionen der Engine ihre Objekte noch als `Int` nehmen (siehe Stand). |
+| Is Valid Object | `object_valid<kern::App>(x)` | Bool: ist es ein Objekt (nicht `{}`)? Die Einstellung `class` ist jede Klasse der Engine mit Objekten (nicht nur Schnittstellen): `object_valid<kern::audio::Mixer>`. |
+| Same Object | `object_equal<kern::App>(a, b)` | Bool: dasselbe Objekt (Welt und Handle gleich; keins und keins sind dasselbe) – wie C++ zwei Zeiger vergleicht. |
+| Handle of Object | `object_handle<kern::App>(x)` | Int: das Handle in seiner Welt – zum Zeigen oder Zählen. Der eine ausdrückliche Übergang zu Int: keine Funktion der Engine nimmt oder gibt ein Objekt als Int. |
 
 ## Für den Akteur-Verweis mit Welt (Zweig work-projekt)
 
@@ -54,6 +55,14 @@ nachschlagen. Der Wert hat dafür das Feld `Value::world` (für `object` gesetzt
 - Listen: `List<Object<I>>` (`object_list`, Typtext `object<App>_list`, Einträge `ObjectRef`); die Knoten der Listen nehmen
   Objekte jeder Schnittstelle als „Type“ (Make List, Get, Add, Sort – sortiert nach Welt, dann Handle). Geschrieben
   steht eine Liste nur ohne Objekte (`List<Object<kern::App>>{}`); ihre Objekte gibt die Engine.
-- Offen (eigener Schritt, groß): die Tabelle der Engine (`tools/engine_api.py`) beschreibt ihre Objekte noch als `Int`
-  (Form `h`/`i`). Wenn sie `Object<Klasse>` schreibt, entfällt `object_handle`, und der Konverter schreibt einen Zeiger
-  der Engine als `Object<…>` statt `Int`. Bis dahin ist `object_handle` der eine, ausdrückliche Übergang.
+- Die Tabelle der Engine (`tools/engine_api.py`, Stand work-object): jedes Objekt der Engine an einem Knoten ist ein
+  `Object<Klasse>` (Pin `object`/`object_list`, Form `o` – eines oder keins – und `h` – was ein Maker gibt, nie keins).
+  Die Tür (`engine_host.h`, `Conv<Handle>`) und die Klasse (`engine_direct.h`, `Direct<Handle>`) lesen den Verweis mit
+  der Prüfung der Welt: ein Verweis einer anderen Welt, keiner Objekts oder einer anderen Klasse lässt den Aufruf
+  scheitern, mit dem Eingang und dem Grund (`EngineObjects::error`, an den Host); ein `Int` an einem Objekt-Eingang ist ein
+  Fehler, kein Handle. Steht ein Objekt in einem Wert (Feld eines Structs, Eintrag einer Liste), fragt der Aufruf vor der
+  Engine (`object_in`). Der Stellvertreter gibt Objekte seiner eigenen Welt (`kStandInWorld`); Seiten eines Vergleichs
+  haben eine Welt (`EngineObjects(world)`: `kNativeTestWorld`, `kTestWorld` der Vergleichstests).
+- Der Konverter schreibt einen Zeiger, eine Referenz, ein `std::unique_ptr` der Engine als `Object<…>`: Nullzeiger
+  `Object<…>{}`, `if (p)`/`p != nullptr` Is Valid Object, `a == b` Same Object, Container von Zeigern `List<Object<…>>`,
+  `unique_ptr<…>::get()` das Objekt; ein Objekt wird nie eine Zahl (Fall tools/converter_cases/objects).

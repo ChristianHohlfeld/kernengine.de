@@ -15,6 +15,7 @@
 #pragma once
 
 #include <algorithm>
+#include <unordered_map>
 #include <array>
 #include <bit>
 #include <cfenv>
@@ -497,6 +498,7 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 // release.
 struct EngineObject {
   long long kern_handle = 0;
+  kern::logic::WorldId kern_world = 0;   // (the world of the Object it is in the Blueprint: kTestWorld, or the stand-in's)
   bool kern_owned = false;
   EngineObject() = default;
   /// One the source makes with what the engine's class is made with, where it has no constructor of its
@@ -505,15 +507,17 @@ struct EngineObject {
   template <class A, class... B>
     requires(!std::is_base_of_v<EngineObject, std::remove_cvref_t<A>>)
   explicit EngineObject(const A&, const B&...) {}
-  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle) {}
-  EngineObject(EngineObject&& o) noexcept : kern_handle(o.kern_handle), kern_owned(o.kern_owned) { o.kern_owned = false; }
+  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle), kern_world(o.kern_world) {}
+  EngineObject(EngineObject&& o) noexcept : kern_handle(o.kern_handle), kern_world(o.kern_world), kern_owned(o.kern_owned) { o.kern_owned = false; }
   /// (set from a copy: the place stays as much the owner of what it holds as it was)
   EngineObject& operator=(const EngineObject& o) {
     kern_handle = o.kern_handle;
+    kern_world = o.kern_world;
     return *this;
   }
   EngineObject& operator=(EngineObject&& o) noexcept {
     kern_handle = o.kern_handle;
+    kern_world = o.kern_world;
     kern_owned = o.kern_owned;
     o.kern_owned = false;
     return *this;
@@ -555,22 +559,45 @@ template <class T> std::unique_ptr<T> quiet_static() {
   const Quiet q;
   return made_static<T>();
 }
-/// One of the few objects of an engine class a test keeps, by its handle.
-template <class T> T* engine_object(long long handle) {
+/// One of the few objects of an engine class a test keeps, as the Object it is in the Blueprint (its handle and world).
+template <class T> T* engine_object(kern::logic::ObjectRef ref) {
   static T* const kept = [] {
     g_keeping = true;
     T* k = new T[8];
     g_keeping = false;
     return k;
   }();
-  T* object = &kept[static_cast<unsigned long long>(handle) % 8];
-  object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(handle) % 8);
+  T* object = &kept[static_cast<unsigned long long>(ref.handle) % 8];
+  object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(ref.handle) % 8);
+  object->kern_world = object->kern_handle ? ref.world : 0;
   return object;
+}
+/// ... one the test draws: of the test's world (kTestWorld).
+template <class T> T* engine_object(long long handle) { return engine_object<T>(kern::logic::ObjectRef{handle, handle ? kTestWorld : 0}); }
+/// The ObjectRef of an object of the source (none: 0).
+inline kern::logic::ObjectRef ref_of(const EngineObject* object) {
+  return object && object->kern_handle ? kern::logic::ObjectRef{object->kern_handle, object->kern_world} : kern::logic::ObjectRef{};
+}
+/// The logic the Blueprints run in, as a stand-in of the engine gave it (an Object of logic::Runtime): a pointer the
+/// source only hands back to the engine, never follows - and back (the same Object, its world kept).
+inline std::unordered_map<long long, kern::logic::WorldId>& logic_worlds() {
+  static std::unordered_map<long long, kern::logic::WorldId> worlds;
+  return worlds;
+}
+template <class P> P logic_pointer(const Value& v) {
+  const kern::logic::ObjectRef r = v.as_object();
+  logic_worlds()[r.handle] = r.world;
+  return reinterpret_cast<P>(static_cast<std::uintptr_t>(r.handle));
+}
+inline Value logic_value(const void* p) {
+  const long long h = static_cast<long long>(reinterpret_cast<std::uintptr_t>(p));
+  const auto at = logic_worlds().find(h);
+  return Value::object(h ? kern::logic::ObjectRef{h, at != logic_worlds().end() ? at->second : kTestWorld} : kern::logic::ObjectRef{});
 }
 /// What the source asked the engine in the call being compared - and, where the test runs on the engine
 /// itself (KERN_TEST_ENGINE=real: kern::test::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
-inline kern::logic::EngineObjects g_source_objects;
+inline kern::logic::EngineObjects g_source_objects{kTestWorld};
 /// (the places of the engine the source holds: set back before every call of the engine, read again after it - below)
 inline void places_set();
 inline void places_get();
@@ -587,14 +614,15 @@ inline std::vector<Value> engine_call(const char* function, const std::vector<Va
 }
 /// What a stand-in's constructor is given by the engine: the handle of the object it made, its own.
 inline void take_made(EngineObject& object, const Value& handle) {
-  object.kern_handle = handle.as_int();
+  object.kern_handle = handle.as_object().handle;
+  object.kern_world = handle.as_object().world;
   object.kern_owned = true;
 }
-inline Value arg(const EngineObject* object) { return Value::integer(object ? object->kern_handle : 0); }
+inline Value arg(const EngineObject* object) { return Value::object(ref_of(object)); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 Value arg(const std::unique_ptr<T>& object) { return arg(static_cast<const EngineObject*>(object.get())); }
-inline Value arg(const EngineObject& object) { return Value::integer(object.kern_handle); }
+inline Value arg(const EngineObject& object) { return Value::object(ref_of(&object)); }
 
 // ---- a C++ value as the Blueprint gets it ----
 template <class T> inline constexpr bool is_list = false;
@@ -836,8 +864,9 @@ inline bool same(Whole want, const Value& got) {
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) {
-  return got.as_int() == (want ? want->kern_handle : 0) ||
-         differ_at([&] { return "object " + std::to_string(want ? want->kern_handle : 0); }, [&] { return "object " + std::to_string(got.as_int()); });
+  const auto shown = [](kern::logic::ObjectRef r) { return "object " + std::to_string(r.handle) + " of world " + std::to_string(r.world); };
+  return (got.type == kern::logic::PinType::object && got.as_object() == ref_of(want)) ||
+         differ_at([&] { return shown(ref_of(want)); }, [&] { return got.type == kern::logic::PinType::object ? shown(got.as_object()) : std::string("no Object"); });
 }
 inline bool same(const EngineObject& want, const Value& got) { return same(&want, got); }
 template <class T>
@@ -949,7 +978,9 @@ inline std::string text(Whole w) {
 inline std::string text(wide::Vec3 v) { return text(kern::Vec3(v)); }
 inline std::string text(wide::Vec2 v) { return text(kern::Vec2(v)); }
 inline std::string text(const char* s) { return std::string("\"") + (s ? s : "") + "\""; }
-inline std::string text(const EngineObject* object) { return "object " + std::to_string(object ? object->kern_handle : 0); }
+inline std::string text(const EngineObject* object) {
+  return "object " + std::to_string(ref_of(object).handle) + " of world " + std::to_string(ref_of(object).world);
+}
 inline std::string text(const EngineObject& object) { return text(&object); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
@@ -1118,10 +1149,10 @@ template <class E>
 void take(E& to, const Value& v) { to = enum_value<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
-void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_int()); }   // (one the source may only read: the same object)
+void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_object()); }   // (one the source may only read: the same object)
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
-void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
+void take(T& to, const Value& v) { to = *engine_object<T>(v.as_object()); }
 /// An owned object of the engine (std::unique_ptr): the one of that handle, none for 0.
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
@@ -1129,8 +1160,8 @@ void take(std::unique_ptr<T>& to, const Value& v) {
   // (what this replaces is the test's handing over, not the source's: no release - and what it holds then
   // is the source's, as the Blueprint's handle there)
   const Quiet q;
-  if (v.as_int() == 0) to.reset();
-  else to = std::make_unique<T>(owned(*engine_object<T>(v.as_int())));
+  if (!v.as_object().valid()) to.reset();
+  else to = std::make_unique<T>(owned(*engine_object<T>(v.as_object())));
 }
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// A view of a list the source holds (kern::Span - what Renderer::meshes() gives): of the list, kept for it
@@ -1266,8 +1297,8 @@ template <class S, std::size_t N> struct Take<std::array<S, N>> {
 template <class S> struct Take<std::unique_ptr<S>> {
   template <class T> static void to(std::unique_ptr<T>& target, const Value& v) {
     if constexpr (std::is_base_of_v<EngineObject, T>) {
-      const long long handle = v.as_int();
-      target = handle ? std::make_unique<T>(owned(*engine_object<T>(handle))) : nullptr;
+      const kern::logic::ObjectRef r = v.as_object();
+      target = r.valid() ? std::make_unique<T>(owned(*engine_object<T>(r))) : nullptr;
     } else {
       if (v.size() == 0) {
         target.reset();
