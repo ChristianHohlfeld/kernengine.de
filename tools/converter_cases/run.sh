@@ -68,7 +68,7 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
-#   numbers_same.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
+#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
 #             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
 #             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
 #             subset's (f32 intermediate, f32 sum of 1/60 against a threshold, long long past 2^53) - one of them right is a fault of the list.
@@ -278,6 +278,14 @@ SOURCE_NUMBERS=1 convert numbers_same
 logged numbers_same "both passes compare both functions" '^2 functions are compared once more with their source as C\+\+ computes it'
 if right numbers_same; then echo "ok   numbers_same: written, and the same as the source in both passes (u32 that wraps, u64)"
 else echo "FAIL numbers_same: written, and the same as the source in both passes"; cat "$top/numbers_same/numbers.txt" 2>/dev/null; fail=1; fi
+# numbers_engine: the engine's own types (kern::Quat, physics::Pose, physics::BodyType) - in the second pass the test holds them as
+# the engine has them, never a copy; right today, and it must stay so.
+SOURCE_NUMBERS=1 convert numbers_engine
+tested numbers_engine "the second pass holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
+tested numbers_engine "the second pass holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
+logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
+if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
+else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
 # Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
 # the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
 # (red): the number types have come, and the case goes up to numbers_same.
