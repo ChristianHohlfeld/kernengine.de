@@ -159,7 +159,8 @@ const lgStructSummary = (v, type, data) => {
   return "{" + parts.join(", ") + (s.fields.length > 2 ? ", …" : "") + "}";
 };
 const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : lgIsKeyed(item) ? [] : lgStructNames.has(item) ? {} : 0;
-const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
+// (a Vector typed in: its X, Y, Z as typed - the engine reads each as an f32 and says which one is none)
+const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean); return [n[0] ?? "0", n[1] ?? "0", n[2] ?? "0"]; };
 
 /** The editor of a list's items (the default of a variable or a function input, a list typed
  *  into a node): one row per item with the field of its type, × takes it out, + adds one. */
@@ -1229,7 +1230,7 @@ export class LogicEditor {
       if (el.classList.contains("v")) {
         el.onchange = () => {
           const box = el.closest(".lg-vec");
-          send(+box.dataset.node, box.dataset.lit, [...box.querySelectorAll("input")].map(i => +i.value || 0));
+          lgMark(el, send(+box.dataset.node, box.dataset.lit, [...box.querySelectorAll("input")].map(i => i.value.trim() || "0")));
         };
         continue;
       }
@@ -1726,7 +1727,7 @@ export class LogicEditor {
             else if (k === "mapkey" || k === "mapvalue") edit({op: "pinType", side, pin, type: this.keyedWith(def.type, k, f.value)});
             else if (k === "count") edit({op: "pinType", side, pin, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))});
             else if (k === "ref") edit({op: "pinRef", side, pin, ref: f.value});
-            else lgMark(f, edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : lgLiteral(def.type, f.value)}));
+            else lgMark(f, edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? lgVector(f.value) : lgLiteral(def.type, f.value)}));
           };
         }
       }
@@ -1804,7 +1805,7 @@ export class LogicEditor {
         else if (k === "count") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: variable.type, count: Math.max(0, Math.floor(+f.value || 0))});
         else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
-          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : lgLiteral(variable.type, f.value);
+          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? lgVector(f.value) : lgLiteral(variable.type, f.value);
           lgMark(f, this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value}));
         }
       };

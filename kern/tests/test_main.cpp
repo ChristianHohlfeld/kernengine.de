@@ -15989,6 +15989,14 @@ TEST(studio_logic_number_types) {
   r = wire(add, "result", print, "text");
   CHECK(r["ok"].as_bool() && g.find(static_cast<u32>(r["inserted"].as_number()))->type == "num.text" && g.find(static_cast<u32>(r["inserted"].as_number()))->param("type") == "i64");
   CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Where"}, {"type", "vector"}})["ok"].as_bool());
+  // (a Vector typed in: each of X, Y, Z an f32, a bad one named)
+  json::Value xyz = json::Value::array();
+  for (const char* part : {"1", "2.5", "x"}) xyz.push(part);
+  r = value_of("Where", xyz);
+  CHECK(!r["ok"].as_bool() && has(r["error"].as_string(), "Z: ") && has(r["error"].as_string(), "is no f32"));
+  xyz = json::Value::array();
+  for (const char* part : {"1", "2.5", "0.1"}) xyz.push(part);
+  CHECK(value_of("Where", xyz)["ok"].as_bool() && var("Where")->value[2].as_number() == static_cast<f64>(0.1f));
   const u32 place = added("var.set", {{"variable", "Where"}});
   r = wire(hits, "value", place, "value");
   CHECK(r["ok"].as_bool());

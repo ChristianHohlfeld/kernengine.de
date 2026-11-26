@@ -649,7 +649,8 @@ check(await until(async () => (await vars()).find(v => v.name === "Hits")?.value
 await hitsValue.fill("3");
 await hitsValue.press("Enter");
 await until(async () => (await vars()).find(v => v.name === "Hits")?.value === 3);
-check(await page.locator('.lg-var[data-var="Hits"] .lg-pt').textContent() === "i64" && await page.locator('.lg-var[data-var="Pace"] .lg-pt').textContent() === "f32", "My Blueprint says each variable's type");
+check(await until(async () => await page.locator('.lg-var[data-var="Hits"] .lg-pt').count() === 1 && await page.locator('.lg-var[data-var="Hits"] .lg-pt').textContent() === "i64" &&
+      await page.locator('.lg-var[data-var="Pace"] .lg-pt').textContent() === "f32"), "My Blueprint says each variable's type");
 // Begin Play: Hits = Hits + Pace (an Add of i64), shown
 const nb = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 0})).id;
 const getHits = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 160, params: {variable: "Hits"}})).id;
