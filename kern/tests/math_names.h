@@ -29,9 +29,11 @@ struct Result {
     digest = (digest ^ bits(engine_value)) * 1099511628211ull;
     if (bits(std_value) == bits(engine_value)) return;
     if (++differ == 1) {
-      char b[200];
-      std::snprintf(b, sizeof b, "%s(%.17g, %.17g): std %.17g, the engine %.17g", fn, static_cast<double>(x), static_cast<double>(y),
-                    static_cast<double>(std_value), static_cast<double>(engine_value));
+      char b[300];
+      const int hex = sizeof(T) * 2;
+      std::snprintf(b, sizeof b, "%s(%.17g, %.17g): std %.17g (bits %0*llx), the engine %.17g (bits %0*llx)", fn, static_cast<double>(x),
+                    static_cast<double>(y), static_cast<double>(std_value), hex, static_cast<unsigned long long>(bits(std_value)),
+                    static_cast<double>(engine_value), hex, static_cast<unsigned long long>(bits(engine_value)));
       first = b;
     }
   }
@@ -71,16 +73,7 @@ template <class T> void compare_all(Result& r) {
     r.take("log10", x, x, std::log10(x), kern::dm::log10(x));
     r.take("atan2", x, y, std::atan2(x, y), kern::dm::atan2(x, y));
     r.take("pow", x, y, std::pow(x, y), kern::dm::pow(x, y));
-#if defined(__GNUC__) && !defined(__clang__)
-    // (GCC rewrites std::pow(x, 2) - __builtin_pow, what libstdc++ calls - as x * x itself, whatever the switches say: there
-    // it is not the engine's pow. A program of the subset is built with clang (the game's compiler, E13); kern::dm::pow is
-    // the engine's on every compiler. Said once, not compared.)
-    static bool said = false;
-    if (!said) said = true, std::printf("  note: GCC computes std::pow(x, 2) as x * x itself - not compared on GCC (kern::dm::pow is the engine's)\n");
-    r.take("pow2", x, T(2), kern::dm::pow(x, T(2)), kern::dm::pow(x, T(2)));   // (in the digest all the same)
-#else
-    r.take("pow2", x, T(2), std::pow(x, T(2)), kern::dm::pow(x, T(2)));
-#endif
+    r.take("pow2", x, T(2), std::pow(x, T(2)), kern::dm::pow(x, T(2)));   // (GCC: -fdisable-tree-powcabs, flags.sh)
     r.take("hypot", x, y, std::hypot(x, y), kern::dm::hypot(x, y));
     // (sin and cos of one value side by side: what a compiler may make one call of, sincos)
     const T s = std::sin(x), c = std::cos(x);

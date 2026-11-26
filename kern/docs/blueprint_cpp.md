@@ -2424,10 +2424,14 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   run_tests.sh, murmel/tests/engine.sh, tools/blueprint_cpp.sh, tools/converter_cases/compare.sh, all_program.sh,
   level_templates.sh, lehrer.sh, blueprint_bench.sh: ~11 Skripte); sinh/tanh (+f) aus musl nachziehen; ein Engine-Test (std::sin ==
   kern::dm::sin, Bit für Bit, nativ und in Wasm). Klein bis mittel, kein Umschreiben der Quelle.
-- Compiler: Quellen des Teilsatzes und die Engine werden mit clang gebaut. Ein Bau mit GCC ist für die Bitgenauigkeit nicht belegt:
-  GCC schreibt `std::pow(x, 2)` trotz `-fno-builtin-pow` selbst als `x*x`, weil libstdc++ `__builtin_pow` ruft. Gegen das Falten von
-  `__builtin_sinf` hilft dort nur `-frounding-math` (in `flags.sh`). Auch clang braucht `-fmath-errno`: ohne es macht es aus
-  `__builtin_pow(x, 2)` (libc++, Wasm) `x*x` (CI 45810300304).
+- Compiler: Quellen des Teilsatzes und die Engine werden mit clang gebaut (das Spiel: E13). Die Engine-Tests laufen in der CI auch mit
+  GCC 13 (Job `native`); dort gilt dieselbe Mathe nur mit zwei Schaltern mehr (in `flags.sh`, erkannt an `__GNUC__` ohne `__clang__`,
+  nicht am Namen - `c++`/`cc` sind oft GCC): `-frounding-math` (sonst faltet GCC `__builtin_atan2f(1.5f, -2.f)`, was libstdc++s
+  `std::atan2(float, float)` ist, korrekt gerundet und 1 ULP neben musl - voller Lauf Kandidat 9 mit `c++` = GCC 13.3) und
+  `-fdisable-tree-powcabs` (sonst macht GCC aus `__builtin_powf(x, 2)` trotz aller Schalter `x*x`; das rundet einen Gleichstand
+  auf gerade, musls powf nicht: 90.109375f², 663 von 2 Mio. Werten). Jede GCC-Übersetzung sagt dazu eine Zeile „note: disable
+  pass tree-powcabs“. Ein GCC ohne diesen Pass bricht den Bau ab („unknown pass“). Der Test vergleicht auch auf GCC alles, auch
+  `pow(x, 2)`. Auch clang braucht `-fmath-errno`: ohne es macht es aus `__builtin_pow(x, 2)` (libc++, Wasm) `x*x` (CI 45810300304).
 - Gebaut (fbf8eee2): `kern/third_party/musl_math/src/std_names.c` (Hüllen, ohne sinh/tanh/cosh: die fehlen der Engine, und der
   Konverter lässt eine Funktion, die sie ruft, mit Ort warten) und `kern/third_party/musl_math/flags.sh` (`kern_math_flags`).
   Engine-Test `math_of_the_standard_library_is_the_engines` (nativ) und `kern/tests/math_names_wasm_test.mjs` (Wasm).
