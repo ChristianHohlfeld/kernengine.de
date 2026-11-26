@@ -68,7 +68,8 @@ if [ $# -eq 0 ]; then
   rm -rf "$gam" && mkdir -p "$gam"
   "$out/kern_tests" --emit-game-native "$gam"
   shapes="$out/obj/$(echo "$root/src/game/logic_node_shapes.cpp" | sed "s|/|_|g").o"
-  "$cxx" "${flags[@]}" -w "$root/../tools/blueprint_cpp.cpp" "$shapes" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_cpp"
+  rules="$out/obj/$(echo "$root/src/game/world_export.cpp" | sed "s|/|_|g").o"
+  "$cxx" "${flags[@]}" -w "$root/../tools/blueprint_cpp.cpp" "$shapes" "$rules" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_cpp"
   for level in "$gam"/*.klevel; do "$out/blueprint_cpp" "$level" "${level%.klevel}_blueprints.cpp"; done
   "$cxx" "${flags[@]}" "$here/game_native_test.cpp" "$gam"/*_blueprints.cpp "${engine[@]}" "${objects[@]}" -lm -o "$out/game_native_test"
   "$out/game_native_test" "$gam"

@@ -11,7 +11,8 @@
 
 #include "game.h"
 #include "kern/api/c_api.h"
-#include "kern/game/embedded.h"  // (the project the game carries: its settings for kern::run)
+#include "kern/game/embedded.h"  // (the project the game carries: kern::run)
+#include "kern/game/program.h"  // (kern::run(App&, const Project&): the program beside the App)
 #include "kern/logic/blueprint_class.h"  // (what an export gives: kern::logic::export_text, export_bytes, export_floats)
 #include "kern/kern.h"
 
@@ -22,6 +23,9 @@ namespace sc {
 // "Schnittstellen der Engine").
 class SpawnCityApp final : public kern::App {
  public:
+  // (made as C++ makes it - its extensions first: the step of making the object, which its Blueprint runs when it
+  // begins; tools/cpp_to_blueprint.py writes a constructor the class declares, `= default` below)
+  SpawnCityApp();
   // The renderer (desktop and phone) and the heap taken ahead are the project's settings (spawncity.kproject,
   // kern/app/project.h): kern_main hands them to the engine with the App, which applies them before start().
   kern::Span<kern::ShaderExtension* const> extensions() override { return {extensions_, 2}; }
@@ -37,6 +41,8 @@ class SpawnCityApp final : public kern::App {
   kern::ShaderExtension* extensions_[2] = {&sc::facades(), &sc::water_look()};
 };
 
+SpawnCityApp::SpawnCityApp() = default;
+
 SpawnCityApp& app() {
   static SpawnCityApp a;
   return a;
@@ -44,8 +50,9 @@ SpawnCityApp& app() {
 
 }  // namespace sc
 
-// The program's entry (kern/docs/project.md 4.): the App, with the settings of the project the game carries.
-int kern_main() { return kern::run(sc::app(), kern::game::embedded_project().settings); }
+// The program's entry (kern/docs/project.md 4.): the App, with the project the game carries - its settings, and its
+// program's Blueprints running beside the App (bound as their classes: what the game's C++ calls).
+int kern_main() { return kern::run(sc::app(), kern::game::embedded_project()); }
 
 namespace sc {
 

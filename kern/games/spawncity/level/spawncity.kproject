@@ -46,7 +46,8 @@
         }
       }
     ],
-    "heapReserveMb": 320
+    "heapReserveMb": 320,
+    "loopBudget": 2000000000
   },
   "levels": [
     "spawncity.klevel"

@@ -32,6 +32,23 @@ std::string Project::first_level() const {
   return levels.empty() ? std::string() : levels.front();
 }
 
+const std::string* Project::level_text(std::string_view path, std::string* error) const {
+  bool named = false;
+  std::string all;
+  for (const std::string& l : levels) {
+    named |= l == path;
+    all += (all.empty() ? "" : ", ") + l;
+  }
+  if (!named) {
+    if (error) *error = "the project " + name + " has no level " + std::string(path) + " - its levels: " + (all.empty() ? "none" : all);
+    return nullptr;
+  }
+  for (const auto& [p, text] : level_texts)
+    if (p == path) return &text;
+  if (error) *error = "the level " + std::string(path) + " of the project " + name + " was not loaded with it (Project::level_texts)";
+  return nullptr;
+}
+
 json::Value to_json(const Project& p) {
   json::Value o = json::Value::object();
   o.set("format", "kern-project");
@@ -46,6 +63,7 @@ json::Value to_json(const Project& p) {
   for (const ProgramBlueprint& b : p.blueprints) {
     json::Value x = json::Value::object();
     x.set("name", b.name);
+    if (!b.folder.empty()) x.set("folder", b.folder);
     x.set("logic", logic::graph_to_level_json(b.logic));  // (without what it holds of the engine: kern/logic/engine_libraries.h)
     bps.push(std::move(x));
   }
@@ -93,6 +111,10 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
       if (bp.name.empty()) return fail(error, place(i, "") + ": has no name");
       if (logic::is_engine_library(bp.name))
         return fail(error, place(i, bp.name) + ": is called like the engine's library " + bp.name + " - the engine's libraries are the engine's, a project does not hold them");
+      if (const json::Value* f = b.find("folder")) {
+        if (!f->is_string()) return fail(error, place(i, bp.name) + ": folder: must be a name (a text)");
+        bp.folder = f->as_string();
+      }
       for (std::size_t j = 0; j < p.blueprints.size(); ++j)
         if (p.blueprints[j].name == bp.name)
           return fail(error, place(i, bp.name) + ": the name stands twice (also blueprints[" + std::to_string(j) + "])");

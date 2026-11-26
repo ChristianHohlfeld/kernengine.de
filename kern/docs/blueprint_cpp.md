@@ -1297,8 +1297,10 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   Instanz, die als T läuft – oder `bind_blueprint<T>(instance)` für genau diese; `kern/logic/blueprint_class.h`).
   Nichts bindet still, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht. Die
   Programm-Laufzeit (`kern::game::Program`, `kern/docs/project.md` 4.) bindet beim Start jeden ihrer Blueprints, der als
-  Klasse mit Exporten läuft (`NativeBlueprint::bind_exports`, im Kleber: `bind_blueprint_object`), und löst sie am Ende;
-  zwei Objekte einer solchen Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`).
+  seine Klasse läuft – mit Exporten oder ohne, auch eine Bibliothek (`NativeBlueprint::bind_class`, im Kleber:
+  `bind_blueprint_object`) –, und löst sie am Ende: das C++ des Programms ruft sie mit `blueprint<T>()`, ohne selbst zu
+  binden. Zwei Objekte einer Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`,
+  `program_beside_an_app_of_cpp`).
   Ein Export in einem Blueprint einer **Welt** wird abgewiesen: beim Lesen des Levels mit Stelle, von `validate`
   (Play startet nicht) und im Editor als Fehler des offenen Blueprints.
 - **Exporte gehören zum Programm, nicht zu Welten:** je Klasse ist genau ein Objekt gebunden. Ein zweites
@@ -1626,11 +1628,16 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 - **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
   Schnittstelle (eine mit `?` darf fehlen).
 - **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
-  `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
+  `state_classes`) – `static T x;` in einer Funktion des umgewandelten Namensraums (`Game& game() { static Game g; return g; }`)
+  oder im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }` außerhalb jedes Namensraums –
+  und die das Programm auf keinem anderen Weg macht (Feld, lokale Variable, Wert, `new`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
   Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
   `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<kern::App>` im Text, ihre Funktionen mit `KERN_OVERRIDE`), ihre Overrides sind seine
   Funktionen mit den Namen der Schnittstelle – sobald jede reine geschrieben ist (bis dahin hat die Engine kein Objekt
   von ihm: was noch wartet, hält die Schnittstelle von ihm fern wie jeden Aufrufer); was dann nicht passt, sagt check().
+  Ist eine solche Klasse kein Zustand, sagt die Wartemeldung warum („has a base class, and it is no state: 2 objects of
+  it have static storage …“ / „… makes objects of it in other ways too“ / „its base is no interface of the engine“).
+  Die Parameter ihrer Overrides sind Werte in der Reihenfolge von C++ (die Engine reicht Werte: `update(Int, Frame)`).
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.

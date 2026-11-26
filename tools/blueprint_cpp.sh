@@ -15,7 +15,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cxx="${HOST_CXX:-c++}" cc="${HOST_CC:-cc}"
 # (the gameplay nodes as the library knows them - names, pins, settings - need nothing of the game)
-sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp")
+sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp" "$root/kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/kern/src/logic" "$root/kern/src/core" -name '*.cpp' | sort)
 key="$({ cat "${sources[@]}"; find "$root/kern/include" -name '*.h' | sort | xargs cat; cat "$root"/kern/third_party/musl_math/src/*.c; echo "$cxx $cc"; } | sha256sum | cut -c1-16)"
 dir="${TMPDIR:-/tmp}/kern-blueprint-cpp/$key"

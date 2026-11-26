@@ -26,7 +26,8 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   "settings": {
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
     "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } } } ],
-    "heapReserveMb": 0
+    "heapReserveMb": 0,
+    "loopBudget": 200000
   },
   "levels": ["levels/start.klevel", "levels/wald.klevel"],
   "startLevel": "levels/start.klevel",
@@ -71,6 +72,14 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   Programm macht (ein GameWorld, das ein Knoten im Host des Programms macht), bekommt dabei das Projekt
   (`GameWorld::set_project`, über `EngineObjects::on_made`): ihre Blueprints finden Bibliotheken erst im Level, dann
   im Projekt (5.). Sie endet spätestens mit den Objekten des Programms. Geprüft: `program_world_has_the_project`.
+- **Ein Level starten und wechseln:** `GameWorld::start_level(path, mode)` (Knoten „Start Level“ an einer Welt des
+  Programms) startet das Level des Projekts mit diesem Pfad (wie `levels` ihn nennt). Das Projekt hält die Texte seiner
+  Levels (`Project::level_texts`, nicht Teil der Datei: `embedded_project()` füllt sie aus dem Bau, der Editor aus den
+  Dateien daneben). Wechseln heißt: „Stop“, dann „Start Level“ des nächsten; was das Programm behält (Punkte, ein
+  Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (eine Welt aus C++
+  bekommt es mit `set_project`), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
+  nicht, der Text ist kein Level. Geprüft: `world_starts_a_level_of_its_project` (zwei Levels, Wechsel, Wert bleibt,
+  auch über den Knoten einer Welt des Programms).
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der
   Level-Graph, dann die Akteure in der Reihenfolge des Levels.
@@ -82,6 +91,9 @@ Ein Programm hat **genau einen**, ausdrücklichen Einstieg und keine schwachen S
 ```cpp
 // ein Spiel, dessen App C++ ist
 int kern_main() { static MeinSpiel app; return kern::run(app); }
+
+// ein Spiel, dessen App C++ ist und das ein Projekt hat (Einstellungen, Programm-Blueprints neben der App)
+int kern_main() { static MeinSpiel app; return kern::run(app, kern::game::embedded_project()); }
 
 // ein Spiel aus seinem Projekt (die App ist ein Programm-Blueprint)
 int kern_main() { return kern::run(kern::game::embedded_project()); }
@@ -97,6 +109,16 @@ int kern_main() { return kern::run(kern::game::embedded_project()); }
   Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<kern::App>`). Gibt es keinen oder
   zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
   `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
+- `kern::run(App&, const Project&)` (`kern/game/program.h`): die App ist C++, das Programm des Projekts läuft neben ihr
+  (`Program::start(project, app)`) – seine Blueprints (Menüs, Bibliotheken, die das C++ der App als ihre Klassen ruft)
+  sind ab vor `App::start` bis nach `App::stop` gebunden. Ein Blueprint des Projekts, der ebenfalls `App` implementiert,
+  weist den Start ab und wird genannt (ein Programm hat eine App); ein Projekt ohne Blueprints ist ein leeres Programm.
+  Geprüft: `program_beside_an_app_of_cpp`.
+- **Die Programm-Laufzeit bindet ihre Klassen.** Jeder Programm-Blueprint ist eine Instanz – eine Bibliothek auch, wie
+  der Akteur einer Welt –, und jeder, der als seine Klasse läuft, ist beim Start gebunden (`NativeBlueprint::bind_class`):
+  was das C++ des Programms ruft (`kern::logic::blueprint<T>()`) und was ein Export ruft, ohne dass das Programm selbst
+  bindet. Die Schleifenwache der Programm-Logik ist die Einstellung `loopBudget` des Projekts (Vorgabe 200000,
+  `logic::Runtime::budget`).
 - **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
   Programm-Blueprint. Die Programm-Laufzeit bindet beim Start jeden ihrer Blueprints, der als Klasse mit Exporten
   läuft (`NativeBlueprint::bind_exports`), und löst sie am Ende (danach meldet ein Export „no instance … is bound“);
@@ -170,6 +192,32 @@ Eingang **World** (Int, der Handle einer GameWorld):
 - In die andere Richtung, von der Welt zum Programm, gibt es **kein** stilles Durchfallen. Der Weg führt nur über Objekte
   der Engine, die das Programm der Welt gibt: den festen Schritt (6.1) oder eine Schnittstelle.
 
+## 7a. Ein Programm aus C++: wohin der Konverter schreibt
+
+`tools/cpp_to_blueprint.py --convert <ns> --level <level.klevel> --project <spiel.kproject> --folder <ordner>` schreibt jeden Blueprint
+dorthin, wo er nach 1. hingehört – die Regel folgt daraus, was ein Blueprint ist und wer ihn benutzt, nie aus einem
+Namen oder Ordner:
+
+- **ins Projekt** (Programm): die App (ein Zustand, der `App` implementiert – `kern::run` startet das Programm mit
+  ihrem Objekt), jeder Blueprint mit einem Export (Exporte gehören zum Programm, 4.), und jeder Blueprint, den ein
+  Blueprint des Programms benutzt (`uses`, auch über andere hinweg – ein Programm-Blueprint findet Bibliotheken nur im
+  Projekt, 5.). Eine Bibliothek, die Programm und Welt benutzen, steht also im Projekt; die Welt findet sie dort.
+- **ins Level** (Welt): jeder andere.
+
+Das Protokoll nennt je Blueprint Ort und Grund („where the Blueprints stand“, z. B. `CasesApp: the project - it
+implements App …`, `door_cpp: the level - a world's …`). Ein Blueprint des Programms, der aus einem früheren Stand im
+Level steht (auch einer eines anderen Ordners, eine eigene Quelle), zieht unverändert ins Projekt um – mit eigener
+Zeile im Protokoll. Ein Lauf ohne `--project`, der Programm-Blueprints hat, bricht mit ihren Namen und Gründen ab.
+Projekt-Blueprints tragen wie Akteure einen Ordner (`"folder"`, Ordnung im Editor); der Konverter kennt daran seine
+eigenen – `--folder` ist darum anzugeben (keine Vorgabe). Nur mit `--whole-program` (ein Lauf über das ganze
+Programm, ausdrücklich, nie aus der Zahl der Dateien geschlossen) fällt aus seinem Ordner, was er nicht mehr schreibt.
+Klassen, die das C++ des Programms direkt ruft, nennt `--classes <header.h>=<ordner>` (keine Vorgabe). Das eine Objekt
+der App findet er auch im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }`. Beide Dateien werden vom Leser der Engine gelesen (`tools/blueprint_cpp.sh --apply <datei> [--with <projekt>]`;
+ein Level weist dabei einen Export ab, `game::world_export`) und nur geschrieben, wenn alle Blueprints gelesen sind.
+Die Klassen schreibt `tools/blueprint_cpp.sh --project <spiel.kproject> <level> …` aus beiden. Geprüft:
+`tools/converter_cases/run.sh` (Fall `program` + `door`: App, Export und deren Bibliothek im Projekt, die Tür im
+Level, beide gelesen, ein Export im Level abgewiesen).
+
 ## 8. Ein zweites Spiel anlegen – Schritt für Schritt
 
 1. Im Editor „Neues Projekt“ wählen. Das legt `spiel.kproject` und ein leeres `levels/start.klevel` an.
@@ -197,8 +245,9 @@ Eingang **World** (Int, der Handle einer GameWorld):
   Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`). Welten, die
   das Programm macht, bekommen das Projekt (`program_world_has_the_project`). Exporte: die Programm-Laufzeit bindet
   und löst sie; ein Export in einer Welt wird abgewiesen (`program_binds_the_exports`).
-  OFFEN (SpawnCity): `Game::start` bindet die Klassen des Ordners „Program“ noch an die Logik der Welt
-  (`blueprints::bind(*world_->logic_runtime())`) – sie stehen bis zum Schaltschritt im Level und das Spiel hat eine
-  App aus C++; das Binden fällt weg, sobald der Konverter sie ins Projekt schreibt (`spawncity.kproject`).
+  SpawnCity startet mit `kern::run(sc::app(), embedded_project())`; `Game::start` bindet keine Programm-Klassen mehr
+  an die Logik der Welt – die Programm-Laufzeit bindet sie. Sie stehen nach dem nächsten vollen Lauf des Konverters im
+  Projekt (7a); bis dahin stehen die Klassen des Ordners „Program“ noch im Level und sind ungebunden (Spiel rot bis
+  zum vollen Lauf).
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

@@ -43,10 +43,15 @@ class Program {
   /// why, with the names: it runs already, the project has no program Blueprints, none of them implements App, more
   /// than one does (named), the one gives no App; then nothing runs.
   bool start(const Project& project, std::string* error = nullptr);
+  /// Starts the program of `project` with an App of C++ (kern::run(App&, const Project&)): the project's Blueprints run
+  /// beside it - menus, libraries the App calls as their classes -, none of them may implement App (one App: false,
+  /// named); a project without Blueprints is an empty program.
+  bool start(const Project& project, App& app, std::string* error = nullptr);
   /// start with the project of a project file's text (kern/game/project.h); a text that is no project: false.
   bool start(std::string_view project_text, std::string* error = nullptr);
   bool running() const;
-  /// The App: the engine's object of the program Blueprint that implements App (null: not running).
+  /// The App: the engine's object of the program Blueprint that implements App, or the App of C++ it was started with
+  /// (null: not running).
   App* app() const;
   logic::Runtime* runtime() const;
   /// The project it was started from (null: not running).
@@ -58,6 +63,7 @@ class Program {
   void end();
 
  private:
+  bool begin(const Project& project, App* app, std::string* error);
   struct State;
   State* state_ = nullptr;
 };
@@ -71,9 +77,10 @@ class ProgramApp final : public App {
  public:
   game::Project project;
   game::Program program;
+  App* given = nullptr;   // (an App of C++: kern::run(App&, const Project&))
   /// The program's App - started again from the project if it ended (null: it does not start; the log says why).
   App* app() {
-    if (!program.running()) program.start(project);
+    if (!program.running()) given ? program.start(project, *given) : program.start(project);
     return program.app();
   }
   Span<ShaderExtension* const> extensions() override { App* a = app(); return a ? a->extensions() : Span<ShaderExtension* const>{}; }
@@ -92,16 +99,26 @@ class ProgramApp final : public App {
 /// (kern::run(App&, ProjectSettings)). When the app stops, the program ends after App::stop. Returns 0; when the
 /// program does not start (Program::start says why, in the log) or an App was given already: 1.
 /// (Inline: a program that links the game runtime without the app runtime - a tool, a test - does not need run.)
-inline int run(const game::Project& project) {
+namespace detail {
+inline int run_program(const game::Project& project, App* given) {
   // (the app runtime's one program, kept to the end of the process: the app runtime holds its App)
   static detail::ProgramApp* const app = new detail::ProgramApp;
   if (app->program.running()) {
     log(LogLevel::error, "kern::run: the program of the project %s runs already - kern_main starts one program, once", app->program.project()->name.c_str());
     return 1;
   }
-  if (!app->program.start(project)) return 1;
+  if (!(given ? app->program.start(project, *given) : app->program.start(project))) return 1;
   app->project = project;
+  app->given = given;
   return run(*app, project.settings);
 }
+}  // namespace detail
+inline int run(const game::Project& project) { return detail::run_program(project, nullptr); }
+
+/// The entry of a game whose App is C++ and that has a project (kern/docs/project.md 4.): the project's program runs
+/// beside the App (its Blueprints bound as their classes - what the App's C++ calls, its exports - from before
+/// App::start to after App::stop), with the project's settings. One App: a Blueprint of the project that implements
+/// App refuses the start (1, the log names it). (A game without a project: kern::run(App&, settings).)
+inline int run(App& app, const game::Project& project) { return detail::run_program(project, &app); }
 
 }  // namespace kern

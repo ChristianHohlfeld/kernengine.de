@@ -60,7 +60,7 @@ template <class T> bool bind_blueprint(Instance& instance, const char* name = "a
   if (blueprint_object<T>) return fail("%s is bound already: the program unbinds it first (unbind_blueprint) or rebinds it (rebind_blueprint)", name);
   return rebind_blueprint<T>(instance, name);
 }
-/// Binds the class T to this object of it (the glue of a class with exports: NativeBlueprint::bind_exports) - refused,
+/// Binds the class T to this object of it (the glue of every class: NativeBlueprint::bind_class - the program's runtime binds its Blueprints so) - refused,
 /// with an error, while another object of it is bound; the same one again: true.
 template <class T> bool bind_blueprint_object(T& object, const char* name = "a Blueprint class") {
   if (blueprint_object<T> && blueprint_object<T> != &object)

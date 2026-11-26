@@ -753,8 +753,9 @@ und zeichenweise lesen.
 
 Aufruf (in `kern/games/spawncity`):
 
-    ../../../tools/cpp_to_blueprint.py --convert sc --level level/spawncity.klevel --test tests/converted \
-        -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
+    ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract --level level/spawncity.klevel \
+        --project level/spawncity.kproject --folder Source --classes level_blueprints.h=Program --whole-program \
+        --test tests/converted -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
 
 Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
 1. [x] **Objekte:** Die Daten einer Klasse sind eine Struktur, ihre Methoden Funktionen über diesen

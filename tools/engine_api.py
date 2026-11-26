@@ -1330,7 +1330,7 @@ def write_libraries():
         open(driver, "w").write("".join(f'#include "kern/{h}"\n' for h in LIBRARY_HEADERS))
         level = os.path.join(work, "engine.klevel")
         json.dump({"format": "kern-level", "version": 1, "name": "engine", "world": {}, "nextId": 1, "actors": []}, open(level, "w"))
-        cmd = [sys.executable, os.path.join(HERE, "cpp_to_blueprint.py"), "--convert", "kern_engine_libraries", "--level", level]
+        cmd = [sys.executable, os.path.join(HERE, "cpp_to_blueprint.py"), "--convert", "kern_engine_libraries", "--level", level, "--folder", "Engine"]
         for h in LIBRARY_HEADERS:
             cmd += ["--engine", os.path.join(KERN, "include", "kern", h)]
         cmd += [f"-I{KERN}/include", f"-I{KERN}/third_party/box3d/include", "--", driver]
