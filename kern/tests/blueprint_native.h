@@ -1908,7 +1908,7 @@ inline std::vector<Case> cases() {
   if (Case& c = read("Running", kImplementsGame); c.error.empty()) {
     const Value engine = Value::object(logic::ObjectRef{2, 2});   // (an Object<kern::Engine>, never a number)
     c.calls.push_back({"start", {engine}});
-    c.calls.push_back({"update", {engine, Value::structure({N(1.5), N(0.016), Value::of_number<u64>(7)})}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.5), Value::of_number<f32>(0.016f), Value::of_number<u64>(7)})}});
     c.calls.push_back({"update", {engine, Value::structure({N(1.75), Value::of_number<f32>(0.25f), Value::of_number<u64>(8)})}});
     c.calls.push_back({"stop", {engine}});
   }
