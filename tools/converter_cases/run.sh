@@ -78,7 +78,7 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   out="$top/${INTO:-}$1"
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
   local f files=()
-  for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
+  for f in "$@"; do cp "${CASE_DIR:-$here}/$f.h" "${CASE_DIR:-$here}/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
   echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
   (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases ${CASE_OPTS:-} -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
@@ -186,11 +186,22 @@ logged numbers "Clock's three are written" '^3 of 3 functions of the program are
 logged numbers "... and compared (the engine's f32 read exactly, a Float rounded into a component)" '^3 functions of the Blueprints are compared'
 CASE_OPTS=--language-numbers REFUSED=1 convert numbers_f32
 for why in 'numbers_f32\.h:[0-9]+: Real is a float - no number' 'numbers_f32\.h:[0-9]+: seconds is a f32 - no number of the language: write kern::Float' \
-           'numbers_f32\.h:[0-9]+: total is a double - no number' 'numbers_f32\.h:[0-9]+: scale is a Real' \
+           'numbers_f32\.h:[0-9]+: total is a double - no number' 'numbers_f32\.h:[0-9]+: scale is a Real - no number' \
            'numbers_f32\.cpp:[0-9]+: 1\.0f is a 32-bit number - write 1\.0' 'numbers_f32\.cpp:[0-9]+: area gives a f32' \
            'numbers_f32\.cpp:[0-9]+: computes in 32 bit \(\* of float\)' 'numbers_f32\.cpp:[0-9]+: x is a f64' 'numbers_f32\.cpp:[0-9]+: a cast to float'; do
   logged numbers_f32 "refused with its place: ${why//\\/}" "$why"
 done
+# tools/language_numbers.py rewrites numbers_f32 to kern::Float: what is left is the one computation in 32 bit with no
+# type written (the product of two components) - the converter says it, and nothing else
+mkdir -p "$top/rewritten" && cp "$here/numbers_f32.h" "$here/numbers_f32.cpp" "$top/rewritten/"
+python3 "$root/tools/language_numbers.py" --write "$top/rewritten" > "$top/rewritten.log"
+grep -q '| a type f32/f64/float/double of the program -> Float | 7 |' "$top/rewritten.log" && grep -q '| a literal with f -> without | 1 |' "$top/rewritten.log" \
+  && echo "ok   language_numbers: the dry run counts 7 types and 1 literal" || { echo "FAIL language_numbers: the dry run counts 7 types and 1 literal"; cat "$top/rewritten.log"; fail=1; }
+mv "$top/rewritten/numbers_f32.h" "$top/rewritten/numbers_f32_rewritten.h"
+sed 's/numbers_f32\.h/numbers_f32_rewritten.h/' "$top/rewritten/numbers_f32.cpp" > "$top/rewritten/numbers_f32_rewritten.cpp"
+CASE_DIR="$top/rewritten" CASE_OPTS=--language-numbers REFUSED=1 convert numbers_f32_rewritten
+logged numbers_f32_rewritten "rewritten, only the product of two components is refused" 'numbers_f32_rewritten\.cpp:[0-9]+: computes in 32 bit \(\* of float\)'
+if [ "$(grep -c 'no number of the language\|is a 32-bit number' "$top/numbers_f32_rewritten/convert.log")" = 0 ]; then echo "ok   numbers_f32_rewritten: no other place is refused"; else echo "FAIL numbers_f32_rewritten: no other place is refused"; grep 'no number\|32-bit' "$top/numbers_f32_rewritten/convert.log"; fail=1; fi
 
 convert views
 check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<Float> values = List<Float>\{\}\)'

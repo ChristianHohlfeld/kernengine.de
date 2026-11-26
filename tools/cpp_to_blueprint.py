@@ -16502,7 +16502,7 @@ def language_number_errors(tree, world):
         m = NOT_A_NUMBER_OF_THE_LANGUAGE.search(q)
         if m:
             return m.group(0)
-        if re.search(r"\bfloat\b", d) or (re.search(r"\bdouble\b", d) and not re.search(r"\bFloat\b", q)):
+        if re.search(r"\bfloat\b", d):   # (a name of the program's for float; one for double is said where it is declared)
             return q
         return None
 
