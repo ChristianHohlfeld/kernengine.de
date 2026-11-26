@@ -1514,7 +1514,7 @@ export class LogicEditor {
       : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
       : v.type === "vector" ? `<input data-vk="value" value="${lgEsc((v.value || [0, 0, 0]).join(", "))}">`
       : v.type === "actor" ? `<span class="lg-dim">none (set it while playing)</span>`
-      : `<input data-vk="value" value="${lgEsc(lgNumText(v.value, v.type))}" title="${lgEsc(lgTypeLabel(v.type))}" spellcheck="false">`;
+      : (bad => `<input data-vk="value"${bad ? ' class="lg-bad"' : ""} value="${lgEsc(bad ? bad.text : lgNumText(v.value, v.type))}" title="${lgEsc(bad ? bad.error : lgTypeLabel(v.type))}" spellcheck="false">`)(this.fieldErrors?.get("var:" + v.name));
     const refs = this.data.counts?.variables?.[v.name] || 0;
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${lgColor(v.type)}"></i>${lgEsc(v.name)}</div><div class="lg-dsub">Variable</div>
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
@@ -1806,7 +1806,11 @@ export class LogicEditor {
         else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
           const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? lgVector(f.value) : lgLiteral(variable.type, f.value);
-          lgMark(f, this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value}));
+          // (refused: the field keeps what was typed, marked with the reason - also when Details is drawn again)
+          const r = this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value});
+          this.fieldErrors ??= new Map();
+          if (r?.ok === false) this.fieldErrors.set("var:" + variable.name, {text: f.value, error: r.error}); else this.fieldErrors.delete("var:" + variable.name);
+          lgMark(f, r);
         }
       };
     }
