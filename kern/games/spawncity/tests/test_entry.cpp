@@ -5,7 +5,9 @@
 // a node of an engine function that is gone): this test holds that.
 #include <string>
 
+#include "kern/game/embedded.h"
 #include "kern/game/level.h"
+#include "kern/game/project.h"
 #include "kern/logic/logic.h"
 #include "rules.h"
 #include "test_util.h"
@@ -77,6 +79,16 @@ SC_TEST(entry_vehicle_templates_are_the_rigid_specs) {
   same("Jet", sc::Jet::rigid_spec());
   same("Car", sc::Car::rigid_spec(sc::CarSpec::car()));
   same("Bus", sc::Car::rigid_spec(sc::CarSpec::bus()));
+  // What the game's code set on the level at every start is the level's and the project's (tools/level_world.py): the
+  // 240 Hz step the vehicles' force models run at, one Box3D sub-step, the shadow over 110 m - on a phone 70 m, the
+  // device profile "mobile" (kern/docs/project.md 2.).
+  SC_CHECK(l.world.step_hz == 240 && l.world.substeps == 1 && l.world.shadow_distance == 110, "the level's world steps at 240 Hz, one sub-step, shadow 110 m");
+  kern::game::Project project;
+  SC_CHECK(kern::game::from_text(kern::game::embedded_project_text(), project, &error), "the project reads: %s", error.c_str());
+  const kern::DeviceProfile* mobile = project.settings.profile("mobile");
+  kern::game::WorldSettings phone = l.world;
+  SC_CHECK(mobile && kern::game::overlay_world(mobile->world, phone, &error) && phone.shadow_distance == 70 && phone.step_hz == 240,
+           "the profile mobile has the phone's shadow (70 m), nothing else of the world: %s", error.c_str());
   const kern::game::Actor* chute = find("Parachute");
   SC_CHECK(chute && chute->is_template && chute->body && chute->body->lock_angular[0] && chute->body->lock_angular[2] && chute->colliders.size() == 1,
            "the level has the template Parachute (an upright capsule)");

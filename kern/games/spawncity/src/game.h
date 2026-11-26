@@ -160,7 +160,6 @@ class Game {
 
  private:
   struct Spot { Vec3 p; f32 yaw; };
-  kern::game::Level build_level() const;
   void take_fixed_step();   // the game's fixed step in its world (game.cpp: FixedStepper)
   void place_world();
   bool clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out, bool off_road = false) const;
@@ -725,7 +724,6 @@ class Game {
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
-  i32 substeps_ = 1;  // Box3D sub-steps per 240 Hz step (game.cpp: 240 solver passes a second)
   std::vector<kern::Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;

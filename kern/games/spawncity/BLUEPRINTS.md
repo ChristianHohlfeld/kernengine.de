@@ -56,9 +56,10 @@ Editor-Test der CI laufen durch.
 - [x] **Blueprint-Funktionen:** Funktionen mit typisierten Eingängen und Rückgabewerten
   (Function Entry, Return, Call, pure Aufrufe), in allen drei Ausführungsarten, im Editor
   anlegbar; aus C++ aufrufbar (`logic::Instance::call`).
-- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `build_level()` liest
-  diese Datei (Welt-Einstellungen, Regel-Actors, der Spieler mit Kopf, die Fahrzeuge als Vorlagen) und setzt
-  nur, was das Gerät entscheidet (Schrittrate, Unterschritte, Schattenweite). Die Fahrzeuge (Drone, Jet, Car, Bus,
+- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `Game::start` startet es mit
+  `GameWorld::start_level` (Welt-Einstellungen mit 240 Hz, einem Unterschritt, Schatten 110 m; Regel-Actors, der Spieler
+  mit Kopf, die Fahrzeuge als Vorlagen); was das Gerät entscheidet, ist das Profil `mobile` des Projekts (Schatten 70 m,
+  `profile=mobile`, `tools/level_world.py`). Kein Code baut oder ändert mehr ein Level. Die Fahrzeuge (Drone, Jet, Car, Bus,
   Parachute) sind Vorlagen (`kern/docs/runtime_actors.md`); `Game::start` setzt sie mit `GameWorld::spawn`
   (42 Autos und 8 Busse, am Telefon 28 und 5, 3 Polizeiwagen aus „Car“). Geschrieben hat sie
   `tools/level_templates.sh` aus den Starrkörpern der Fahrzeuge (`rigid_spec`); der Test
