@@ -63,10 +63,11 @@ json::Value sig(f32 v) {
 struct Reader {
   const json::Value& v;
   std::string* error;
+  const char* where = nullptr;   // what it reads ("world", "controller" ...): the start of every message it gives
   bool ok = true;
 
   bool fail(const std::string& what) {
-    if (ok && error) *error = what;
+    if (ok && error) *error = where ? std::string(where) + "." + what : what;
     ok = false;
     return false;
   }
@@ -129,7 +130,12 @@ struct Reader {
   void enumeration(const char* key, const char* const (&names)[N], E& out) {
     const json::Value* x = v.find(key);
     if (!x) return;
-    if (!x->is_string() || !parse_enum(x->as_string(), names, out)) fail(std::string(key) + ": unknown value");
+    if (!x->is_string() || !parse_enum(x->as_string(), names, out)) {
+      // (which value, and the ones there are)
+      std::string known;
+      for (const char* n : names) known += (known.empty() ? "" : ", ") + std::string(n);
+      fail(std::string(key) + ": unknown value " + (x->is_string() ? "\"" + x->as_string() + "\"" : std::string("(not a text)")) + " - one of " + known);
+    }
   }
   void flags(const char* key, bool (&out)[3]) {
     const json::Value* x = v.find(key);
@@ -671,7 +677,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
   r.boolean("hidden", a.hidden);
   r.boolean("locked", a.locked);
   if (const json::Value* t = v.find("transform")) {
-    Reader tr{*t, error};
+    Reader tr{*t, error, "transform"};
     tr.vector("position", a.transform.position);
     tr.vector("rotation", a.transform.rotation);
     tr.vector("scale", a.transform.scale);
@@ -685,7 +691,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     const json::Value& c = *comps;
     if (const json::Value* x = c.find("mesh")) {
       MeshComponent m;
-      Reader mr{*x, error};
+      Reader mr{*x, error, "mesh"};
       mr.enumeration("shape", kShapeNames, m.shape);
       mr.vector("size", m.size);
       mr.number("radius", m.radius, 0.001, 1e5);
@@ -702,7 +708,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("light")) {
       LightComponent l;
-      Reader lr{*x, error};
+      Reader lr{*x, error, "light"};
       lr.color("color", l.color);
       lr.number("intensity", l.intensity, 0, 1e5);
       lr.number("range", l.range, 0.1, 1e4);
@@ -711,7 +717,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("body")) {
       BodyComponent b;
-      Reader br{*x, error};
+      Reader br{*x, error, "body"};
       br.enumeration("motion", kMotionNames, b.motion);
       br.number("mass", b.mass, 0, 1e9);
       br.number("linearDamping", b.linear_damping, 0, 1e4);
@@ -734,7 +740,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     if (const json::Value* list = c.find("colliders"); list && list->is_array())
       for (const json::Value& x : list->items()) {
         ColliderComponent k;
-        Reader kr{x, error};
+        Reader kr{x, error, "colliders"};
         kr.enumeration("shape", kColliderNames, k.shape);
         kr.vector("center", k.center);
         kr.vector("rotation", k.rotation);
@@ -762,7 +768,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     if (const json::Value* list = c.find("joints"); list && list->is_array())
       for (const json::Value& x : list->items()) {
         JointComponent j;
-        Reader jr{x, error};
+        Reader jr{x, error, "joints"};
         jr.enumeration("kind", kJointNames, j.kind);
         jr.uinteger("target", j.target);
         jr.vector("anchor", j.anchor);
@@ -792,7 +798,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       }
     if (const json::Value* x = c.find("controller")) {
       ControllerComponent k;
-      Reader kr{*x, error};
+      Reader kr{*x, error, "controller"};
       kr.enumeration("mode", kControlNames, k.mode);
       kr.boolean("autonomous", k.autonomous);
       kr.string("gait", k.gait);
@@ -825,7 +831,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("weapon")) {
       WeaponComponent k;
-      Reader wr{*x, error};
+      Reader wr{*x, error, "weapon"};
       wr.enumeration("kind", kWeaponNames, k.kind);
       wr.number("damage", k.damage, 0, 1e6);
       wr.number("fireRate", k.fire_rate, 1, 6000);
@@ -848,7 +854,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("health")) {
       HealthComponent k;
-      Reader hr{*x, error};
+      Reader hr{*x, error, "health"};
       hr.number("maxHealth", k.max_health, 1, 1e7);
       hr.number("armor", k.armor, 0, 1e7);
       hr.number("regenDelay", k.regen_delay, 0, 1e5);
@@ -865,7 +871,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("pickup")) {
       PickupComponent p;
-      Reader pr{*x, error};
+      Reader pr{*x, error, "pickup"};
       pr.number("points", p.points, -1e6, 1e6);
       pr.color("burstColor", p.burst_color);
       pr.number("respawn", p.respawn, 0, 1e5);
@@ -877,7 +883,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("trigger")) {
       TriggerComponent t;
-      Reader tr{*x, error};
+      Reader tr{*x, error, "trigger"};
       tr.enumeration("action", kTriggerNames, t.action);
       tr.string("message", t.message);
       tr.boolean("once", t.once);
@@ -889,14 +895,14 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("rotator")) {
       RotatorComponent t;
-      Reader tr{*x, error};
+      Reader tr{*x, error, "rotator"};
       tr.vector("rate", t.rate);
       if (!tr.ok) return false;
       a.rotator = t;
     }
     if (const json::Value* x = c.find("mover")) {
       MoverComponent m;
-      Reader mr{*x, error};
+      Reader mr{*x, error, "mover"};
       mr.vector("offset", m.offset);
       mr.number("period", m.period, 0.05, 1e5);
       mr.number("phase", m.phase, 0, 1);
@@ -906,7 +912,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("city")) {
       CityComponent k;
-      Reader kr{*x, error};
+      Reader kr{*x, error, "city"};
       kr.uinteger("seed", k.seed);
       kr.integer("blocks", k.blocks, 1, 16);
       kr.number("pitch", k.pitch, 30, 400);
@@ -921,7 +927,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("audio")) {
       AudioComponent k;
-      Reader kr{*x, error};
+      Reader kr{*x, error, "audio"};
       kr.string("sound", k.sound);
       kr.number("volume", k.volume, 0, 4);
       kr.number("pitch", k.pitch, 0.05, 8);
@@ -1030,7 +1036,7 @@ json::Value world_to_json(const WorldSettings& w) {
 
 bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error) {
   if (!v.is_object()) return true;
-  Reader r{v, error};
+  Reader r{v, error, "world"};
   r.string("channels", w.channels);
   r.vector("gravity", w.gravity);
   r.integer("substeps", w.substeps, 1, 16);
@@ -1193,7 +1199,7 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   if (doc.has("project")) { if (error) *error = "project: a level holds only its world - the settings belong in the project file (.kproject, kern/game/project.h)"; return false; }
   if (!world_from_json(doc["world"], l.world, error)) return false;
   if (const json::Value* c = doc.find("camera")) {
-    Reader cr{*c, error};
+    Reader cr{*c, error, "camera"};
     cr.vector("position", l.camera.position);
     cr.number("yaw", l.camera.yaw, -1e4, 1e4);
     cr.number("pitch", l.camera.pitch, -90, 90);

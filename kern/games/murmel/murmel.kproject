@@ -1,0 +1,11 @@
+{
+  "format": "kern-project",
+  "version": 1,
+  "name": "Murmel",
+  "settings": {
+    "renderer": { "shadows": true }
+  },
+  "levels": ["levels/wiese.klevel", "levels/bruecke.klevel"],
+  "startLevel": "levels/wiese.klevel",
+  "blueprints": []
+}

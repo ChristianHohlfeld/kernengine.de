@@ -132,7 +132,7 @@ Save Project); eine `.kproject`-Datei kann auch auf die Seite gezogen werden.
   **einem** Ort: Ein Programm-Blueprint mit dem Namen eines Blueprints im Level wird abgelehnt, ebenso ein Projekt
   oder ein Level, das so einen Namen mitbringt (Meldung mit beiden Stellen). Eine Bibliothek, die noch jemand
   benutzt, wird weder umbenannt noch entfernt (die Meldung nennt die Benutzer).
-- **Settings**: der Abschnitt `settings` der Datei als JSON (Renderer, Telefon, Heap).
+- **Settings**: der Abschnitt `settings` der Datei als JSON (Renderer, Geräteprofile `profiles`, Heap).
 
 Jede Änderung am Projekt ist ein Schritt im Verlauf (Undo/Redo zusammen mit dem Level); Öffnen beginnt einen neuen
 Verlauf. Projekt und Level werden getrennt gespeichert; „*“ hinter dem Namen heißt: ungespeicherte Änderungen. Was
