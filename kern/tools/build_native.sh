@@ -33,7 +33,9 @@ cxx="${CXX:-c++}" cc="${CC:-cc}" jobs="${KERN_JOBS:-$(nproc)}"
 cache="${KERN_NATIVE_CACHE:-${TMPDIR:-/tmp}/kern-native}"
 san=()
 [ "$sanitize" = 1 ] && san=(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
+. "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w "${san[@]}" -I"$kern/include" -I"$kern/third_party/box3d/include")
 key="$( { echo "${flags[*]} $cxx $cc"; "$cxx" --version 2>/dev/null | head -1; } | sha256sum | cut -c1-12)"
 mkdir -p "$cache/box3d-$key" "$cache/musl-$key" "$cache/obj-$key" "$cache/gen"
 work=()

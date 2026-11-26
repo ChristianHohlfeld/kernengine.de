@@ -40,6 +40,7 @@
 #include "game_cases.h"
 #include "kern/logic/nodes.h"
 #include "logic_cases.h"
+#include "math_names.h"
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
@@ -12703,6 +12704,24 @@ TEST(lehrer_ppo_learns_from_collectors_elsewhere) {
   ppo.act(obs, a);
   copy.act(obs, b);
   CHECK(a[0] == b[0] && a[1] == b[1]);
+}
+
+TEST(math_of_the_standard_library_is_the_engines) {
+  // std::sin, sinf, atan2 ... are the engine's musl (third_party/musl_math/src/std_names.c, flags.sh): bit for bit what
+  // kern::dm gives, f32 and f64, edge values and a drawn series, beside each other (sincos) and as constants the compiler
+  // knows. Their digest is the same in every build: tests/math_names_digest.txt (also the WebAssembly module,
+  // math_names_wasm_test.mjs).
+  const math_names::Result r = math_names::run();
+  if (r.differ) std::printf("  %d of %d differ - the first: %s\n", r.differ, r.compared, r.first.c_str());
+  CHECK(r.differ == 0);
+  std::string path = __FILE__;
+  path = path.substr(0, path.find_last_of('/') + 1) + "math_names_digest.txt";
+  FILE* f = std::fopen(path.c_str(), "r");
+  unsigned long long want = 0;
+  const bool read = f && std::fscanf(f, "%llx", &want) == 1;
+  if (f) std::fclose(f);
+  if (!read || want != r.digest) std::printf("  digest %016llx (math_names_digest.txt: %016llx)\n", static_cast<unsigned long long>(r.digest), want);
+  CHECK(read && want == r.digest);
 }
 
 TEST(determinism_is_bit_identical_across_builds_and_platforms) {

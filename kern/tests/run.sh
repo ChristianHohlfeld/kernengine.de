@@ -35,7 +35,9 @@ while IFS= read -r f; do sources+=("$f"); done < <(find "$root/src" -name '*.cpp
 sources+=("$here/gl_stub.cpp" "$here/test_main.cpp")
 # One object per source, compiled in parallel (all cores).
 cxx="${CXX:-c++}"
-flags=(-std=c++20 -O1 -g -ffp-contract=off -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
+. "$root/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -g -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
        -Wall -Wextra -Wno-unused-parameter -Werror -I"$root/include" -I"$root/third_party/box3d/include" -I"$here")
 mkdir -p "$out/obj"
 export cxx

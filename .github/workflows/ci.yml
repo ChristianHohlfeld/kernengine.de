@@ -275,6 +275,12 @@ jobs:
           export WASI_SDK=/home/runner/wasi-sdk
           kern/build.sh /tmp/logic_test.wasm kern/tests/logic_wasm_test.cpp -Ikern/tests
           node kern/tests/logic_wasm_test.mjs /tmp/logic_test.wasm
+      - name: Mathematics of the standard library is the engine's in WebAssembly (math_names.h)
+        run: |
+          set -euo pipefail
+          export WASI_SDK=/home/runner/wasi-sdk
+          kern/build.sh /tmp/math_names_test.wasm kern/tests/math_names_wasm_test.cpp -Ikern/tests
+          node kern/tests/math_names_wasm_test.mjs /tmp/math_names_test.wasm
       - name: Assemble the site
         run: |
           set -euo pipefail

@@ -91,7 +91,9 @@ if [ -n "$beleg" ]; then
   keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$kern"/tools/test_memory.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
   sources=("${keep[@]}")
 fi
-flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
+. "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 "${build[@]}" -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests" -I"$out/base")
 # The old programs the differential tests of tests/lowered compare with (tools/source_diff.py): for every commit a
 # test names as its base (`// base: <commit>`), the game's sources as they stood there - built as the game's are,

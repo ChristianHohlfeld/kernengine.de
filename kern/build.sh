@@ -77,9 +77,11 @@ add_component() { while IFS= read -r f; do sources+=("$f"); done < <(find "$here
 [ "$with_studio" = 1 ] && add_component studio
 [ "$with_lehrer" = 1 ] && add_component lehrer
 
+. "$here/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$CXX")"
 objects=()
 if [ "$with_physics" = 1 ]; then
-  cflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -DBOX3D_DISABLE_SIMD -ffp-contract=off
+  cflags=("${target[@]}" -std=c17 "${opt[@]}" "${features[@]}" -fvisibility=hidden -ffunction-sections -fdata-sections -DBOX3D_DISABLE_SIMD -ffp-contract=off "${mathflags[@]}"
           -I"$here/third_party/box3d/include" -I"$here/third_party/box3d/src" -w)
   key="$(printf '%s ' "${cflags[@]}" "$({ "$CC" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
   cache="$cache_root/box3d-$key"
@@ -134,7 +136,7 @@ for a in "$@"; do
   esac
 done
 cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
-          -fno-exceptions -fno-rtti -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off
+          -fno-exceptions -fno-rtti -fvisibility=hidden -ffunction-sections -fdata-sections -ffp-contract=off "${mathflags[@]}"
           -Wall -Wextra -Wno-unused-parameter -Werror=return-type
           "${includes[@]}" "${extra_flags[@]}")
 flags_key="$(printf '%s ' "${cxxflags[@]}" "$({ "$CXX" --version || true; } | head -1)" | sha256sum | cut -c1-16)"

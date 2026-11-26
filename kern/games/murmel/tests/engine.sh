@@ -14,7 +14,9 @@ for c in "$kern"/third_party/musl_math/src/*.c; do
   o="$out/musl/$(basename "$c" .c).o"
   [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $o")
 done
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include")
+. "$kern/third_party/musl_math/flags.sh"   # (kern_math_flags: the engine's mathematics, never computed by the compiler)
+read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include")
 # (ein Objekt je Quelle, unter dem Hash von Quelle, Flags und allen Headern der Engine: ein geänderter Header baut neu)
 headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
 engine=()

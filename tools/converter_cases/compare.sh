@@ -20,7 +20,8 @@ cxx="${CXX:-${CLANGXX:-clang++}}"
 cc="${CC:-$(dirname "$(command -v "$cxx")")/$(basename "$cxx" | sed 's/clang++/clang/; s/g++/gcc/')}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$o/obj"
 read -r -a more <<< "${INCLUDES:-}"
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
+. "$kern/third_party/musl_math/flags.sh"; read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
+flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$kern/tests")
 jobs=() objects=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   x="$out/box3d/$(basename "$c" .c).o"; objects+=("$x")
