@@ -16145,7 +16145,7 @@ def convert_unit(job):
     variables, functions, members, types = unit.parts()
     return {"name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
-            "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
+            "said": [f"    {f.cpp} ({f.lines}): " + (("written" + ("" if f.pure else " (a step)")) if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue(),
