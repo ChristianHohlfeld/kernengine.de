@@ -1,6 +1,6 @@
 #pragma once
 #include "kern/math/math.h"
-namespace sc {
+namespace cases {
 struct PadState { bool connected = false; kern::f32 lx = 0; kern::u32 buttons = 0, pressed = 0; };
 struct Holder { PadState pad; };
 Holder& holder();

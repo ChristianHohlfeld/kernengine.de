@@ -1,4 +1,4 @@
 #include "ownget.h"
-namespace sc {
+namespace cases {
 Holder& holder() { static Holder h; return h; }
 }

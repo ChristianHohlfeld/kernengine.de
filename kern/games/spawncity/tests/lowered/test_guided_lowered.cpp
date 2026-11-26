@@ -168,7 +168,7 @@ Dodge update_dodge(Dodge state, Vec2 previous, Vec2 current, f32 dt, bool pedest
   if (!g_rules.call("UpdateDodge", {rules::number(state.seconds), Value::boolean(state.lost), Value::vector({previous.x, previous.y, 0}), Value::vector({current.x, current.y, 0}),
                                     rules::number(dt), Value::boolean(pedestrian)}, r) || r.size() < 2)
     return state;
-  return {static_cast<f32>(::sc::converted::at(r, 0).as_number()), ::sc::converted::at(r, 1).b};
+  return {static_cast<f32>(::kern::converted::at(r, 0).as_number()), ::kern::converted::at(r, 1).b};
 }
 
 f32 pick_score(Vec3 eye, Vec3 forward, f32 fov, f32 height_px, Vec3 target) {
@@ -178,19 +178,19 @@ f32 pick_score(Vec3 eye, Vec3 forward, f32 fov, f32 height_px, Vec3 target) {
 Missile launch(Vec3 start, Vec3 target, f32 now, bool pedestrian) {
   Missile m;
   std::vector<Value> r;
-  if (g_rules.call("Launch", {Value::vector(start), Value::vector(target), rules::number(now), Value::boolean(pedestrian)}, r) && !r.empty()) to_missile(::sc::converted::at(r, 0), m);
+  if (g_rules.call("Launch", {Value::vector(start), Value::vector(target), rules::number(now), Value::boolean(pedestrian)}, r) && !r.empty()) to_missile(::kern::converted::at(r, 0), m);
   return m;
 }
 
 void track(Missile& m, Vec3 at, f32 dt) {
   std::vector<Value> r;
-  if (g_rules.call("Track", {to_value(m), Value::vector(at), rules::number(dt)}, r) && !r.empty()) to_missile(::sc::converted::at(r, 0), m);
+  if (g_rules.call("Track", {to_value(m), Value::vector(at), rules::number(dt)}, r) && !r.empty()) to_missile(::kern::converted::at(r, 0), m);
 }
 
 Result step(Missile& m, f32 now, f32 dt, f32 ground) {
   std::vector<Value> r;
-  if (!g_rules.call("Step", {to_value(m), rules::number(now), rules::number(dt), rules::number(ground)}, r) || r.size() < 2 || !to_missile(::sc::converted::at(r, 0), m)) return Result::flying;
-  return static_cast<Result>(::sc::converted::at(r, 1).i);
+  if (!g_rules.call("Step", {to_value(m), rules::number(now), rules::number(dt), rules::number(ground)}, r) || r.size() < 2 || !to_missile(::kern::converted::at(r, 0), m)) return Result::flying;
+  return static_cast<Result>(::kern::converted::at(r, 1).i);
 }
 
 }  // namespace sc::guided
@@ -395,15 +395,15 @@ template <> struct Values<::sc_new_guided::sc::guided::TargetKind> { static cons
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_guided_cpp) {
+KERN_TEST(lowered_guided_cpp) {
   ::sc::lowered::World world({"Guided"});
   ::sc_new_guided::sc::guided::g_rules.bind(world.logic(false));
   ::sc_old_guided::sc::guided::bind(world.instance(true, "Guided"));
   ::sc_new_guided::sc::guided::bind(world.logic(false));
-  SC_CHECK(::sc_old_guided::sc::guided::blueprint() == world.instance(true, "Guided"), "blueprint(): not the Blueprint it was bound to");
+  KERN_CHECK(::sc_old_guided::sc::guided::blueprint() == world.instance(true, "Guided"), "blueprint(): not the Blueprint it was bound to");
   {  // speed()  ->  speed()
     ::sc::lowered::Tally tally("speed()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::speed())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::speed())>> n_r;
@@ -419,7 +419,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // turn_g()  ->  turn_g()
     ::sc::lowered::Tally tally("turn_g()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::turn_g())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::turn_g())>> n_r;
@@ -435,7 +435,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // blast_radius()  ->  blast_radius()
     ::sc::lowered::Tally tally("blast_radius()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::blast_radius())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::blast_radius())>> n_r;
@@ -451,7 +451,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // damage()  ->  damage()
     ::sc::lowered::Tally tally("damage()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::damage())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::damage())>> n_r;
@@ -467,7 +467,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // cooldown()  ->  cooldown()
     ::sc::lowered::Tally tally("cooldown()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::cooldown())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::cooldown())>> n_r;
@@ -483,7 +483,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // pick_px()  ->  pick_px()
     ::sc::lowered::Tally tally("pick_px()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::pick_px())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::pick_px())>> n_r;
@@ -499,7 +499,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // range()  ->  range()
     ::sc::lowered::Tally tally("range()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::range())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::range())>> n_r;
@@ -515,7 +515,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // ignite()  ->  ignite()
     ::sc::lowered::Tally tally("ignite()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::ignite())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::ignite())>> n_r;
@@ -531,7 +531,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)  ->  update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)
     ::sc::lowered::Tally tally("update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_guided::sc::guided::Dodge> o0;
       ::sc::lowered::Arg<::sc_new_guided::sc::guided::Dodge> n0;
@@ -562,7 +562,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)  ->  pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)
     ::sc::lowered::Tally tally("pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<kern::Vec3> o0;
       ::sc::lowered::Arg<kern::Vec3> n0;
@@ -593,7 +593,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // launch(kern::Vec3, kern::Vec3, f32, bool)  ->  launch(kern::Vec3, kern::Vec3, f32, bool)
     ::sc::lowered::Tally tally("launch(kern::Vec3, kern::Vec3, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<kern::Vec3> o0;
       ::sc::lowered::Arg<kern::Vec3> n0;
@@ -621,7 +621,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // track(Missile &, kern::Vec3, f32)  ->  track(Missile &, kern::Vec3, f32)
     ::sc::lowered::Tally tally("track(Missile &, kern::Vec3, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_guided::sc::guided::Missile &> o0;
       ::sc::lowered::Arg<::sc_new_guided::sc::guided::Missile &> n0;
@@ -644,7 +644,7 @@ SC_TEST(lowered_guided_cpp) {
   }
   {  // step(Missile &, f32, f32, f32)  ->  step(Missile &, f32, f32, f32)
     ::sc::lowered::Tally tally("step(Missile &, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_guided::sc::guided::Missile &> o0;
       ::sc::lowered::Arg<::sc_new_guided::sc::guided::Missile &> n0;
@@ -671,7 +671,7 @@ SC_TEST(lowered_guided_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_guided::sc::guided::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_guided::sc::guided::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_guided::sc::guided::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

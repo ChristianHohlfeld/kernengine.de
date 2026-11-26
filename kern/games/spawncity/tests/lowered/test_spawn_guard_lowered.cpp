@@ -113,7 +113,7 @@ bool seen_by(const Viewer& v, Vec3 point, f32 far_entry, f32 height) {
 
 bool can_spawn(const std::vector<Viewer>& viewers, Vec3 point, f32 far_entry, f32 height) {
   std::vector<Value> list;
-  list.reserve(::sc::converted::count(viewers.size()));
+  list.reserve(::kern::converted::count(viewers.size()));
   for (const Viewer& v : viewers) list.push_back(to_value(v));
   return g_rules.flag("CanSpawn", {Value::of(std::move(list)), Value::vector(point), rules::number(far_entry), rules::number(height)});
 }
@@ -242,15 +242,15 @@ template <> struct Fields<::sc_new_spawn_guard::sc::spawn::Viewer> { static auto
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_spawn_guard_cpp) {
+KERN_TEST(lowered_spawn_guard_cpp) {
   ::sc::lowered::World world({"SpawnGuard"});
   ::sc_new_spawn_guard::sc::spawn::g_rules.bind(world.logic(false));
   ::sc_old_spawn_guard::sc::spawn::bind(world.instance(true, "SpawnGuard"));
   ::sc_new_spawn_guard::sc::spawn::bind(world.logic(false));
-  SC_CHECK(::sc_old_spawn_guard::sc::spawn::blueprint() == world.instance(true, "SpawnGuard"), "blueprint(): not the Blueprint it was bound to");
+  KERN_CHECK(::sc_old_spawn_guard::sc::spawn::blueprint() == world.instance(true, "SpawnGuard"), "blueprint(): not the Blueprint it was bound to");
   {  // default_far()  ->  default_far()
     ::sc::lowered::Tally tally("default_far()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_spawn_guard::sc::spawn::default_far())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_spawn_guard::sc::spawn::default_far())>> n_r;
@@ -266,7 +266,7 @@ SC_TEST(lowered_spawn_guard_cpp) {
   }
   {  // cone_half_angle(f32, f32)  ->  cone_half_angle(f32, f32)
     ::sc::lowered::Tally tally("cone_half_angle(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -288,7 +288,7 @@ SC_TEST(lowered_spawn_guard_cpp) {
   }
   {  // seen_by(const Viewer &, kern::Vec3, f32, f32)  ->  seen_by(const Viewer &, kern::Vec3, f32, f32)
     ::sc::lowered::Tally tally("seen_by(const Viewer &, kern::Vec3, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_spawn_guard::sc::spawn::Viewer &> o0;
       ::sc::lowered::Arg<const ::sc_new_spawn_guard::sc::spawn::Viewer &> n0;
@@ -316,7 +316,7 @@ SC_TEST(lowered_spawn_guard_cpp) {
   }
   {  // can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)  ->  can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)
     ::sc::lowered::Tally tally("can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<::sc_old_spawn_guard::sc::spawn::Viewer> &> o0;
       ::sc::lowered::Arg<const std::vector<::sc_new_spawn_guard::sc::spawn::Viewer> &> n0;
@@ -344,7 +344,7 @@ SC_TEST(lowered_spawn_guard_cpp) {
   }
   {  // footprints_overlap(const Footprint &, const Footprint &, f32)  ->  footprints_overlap(const Footprint &, const Footprint &, f32)
     ::sc::lowered::Tally tally("footprints_overlap(const Footprint &, const Footprint &, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_spawn_guard::sc::spawn::Footprint &> o0;
       ::sc::lowered::Arg<const ::sc_new_spawn_guard::sc::spawn::Footprint &> n0;
@@ -367,7 +367,7 @@ SC_TEST(lowered_spawn_guard_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_spawn_guard::sc::spawn::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_spawn_guard::sc::spawn::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_spawn_guard::sc::spawn::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

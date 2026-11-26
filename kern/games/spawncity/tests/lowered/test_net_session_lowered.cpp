@@ -411,7 +411,7 @@ std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const std::v
   wire::put_u8(w, static_cast<u8>(part | (last ? 0x80 : 0)));
   wire::put_u8(w, static_cast<u8>(n));
   for (std::size_t i = 0; i < n; ++i) {
-    const SwarmUnit& u = ::sc::converted::at(units, from + i);
+    const SwarmUnit& u = ::kern::converted::at(units, from + i);
     const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
     wire::put_u16(w, u.id);
     wire::put_u8(w, static_cast<u8>(u.kind));
@@ -630,7 +630,7 @@ bool Session::origin(f64& lon, f64& lat) const {
 }
 
 i32 Session::remote_index(u8 slot) const {
-  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::sc::converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::kern::converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
   return -1;
 }
 
@@ -638,7 +638,7 @@ std::vector<u8> Session::roster() const {
   std::vector<u8> r{self_slot_};
   for (const Remote& x : remotes_) r.push_back(x.state.slot);
   std::stable_sort(r.begin(), r.end());
-  ::sc::converted::erase(r, std::unique(r.begin(), r.end()), r.end());
+  ::kern::converted::erase(r, std::unique(r.begin(), r.end()), r.end());
   return r;
 }
 
@@ -647,7 +647,7 @@ u32 Session::color_of(u8 slot) const {
   std::vector<std::string> ids;
   for (u8 s : r) ids.push_back(std::to_string(s));
   const std::vector<u32> c = mp::assign_colors(ids);
-  for (std::size_t i = 0; i < r.size(); ++i) if (::sc::converted::at(r, i) == slot) return ::sc::converted::at(c, i);
+  for (std::size_t i = 0; i < r.size(); ++i) if (::kern::converted::at(r, i) == slot) return ::kern::converted::at(c, i);
   return mp::color_of(std::to_string(slot));
 }
 
@@ -655,7 +655,7 @@ u32 Session::index_of(u8 slot) const {
   // The host is P1 (the oldest), then the clients in slot order.
   std::vector<u8> r = roster();
   std::stable_partition(r.begin(), r.end(), [](u8 s) { return s == kHost; });
-  for (std::size_t i = 0; i < r.size(); ++i) if (::sc::converted::at(r, i) == slot) return static_cast<u32>(i + 1);
+  for (std::size_t i = 0; i < r.size(); ++i) if (::kern::converted::at(r, i) == slot) return static_cast<u32>(i + 1);
   return 0;
 }
 
@@ -668,7 +668,7 @@ Vec3 Session::focus_of(u8 slot) const {
   if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
   const i32 at = remote_index(slot);
   if (at < 0) return {};
-  const Remote& r = ::sc::converted::at(remotes_, static_cast<std::size_t>(at));
+  const Remote& r = ::kern::converted::at(remotes_, static_cast<std::size_t>(at));
   return r.state.mode == PlayerMode::foot || r.state.mode == PlayerMode::drone ? r.person_shown : r.shown;
 }
 
@@ -676,7 +676,7 @@ f32 Session::hp_of(u8 slot) const {
   if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
   const i32 at = remote_index(slot);
   if (at < 0) return 0;
-  const Remote& r = ::sc::converted::at(remotes_, static_cast<std::size_t>(at));
+  const Remote& r = ::kern::converted::at(remotes_, static_cast<std::size_t>(at));
   return r.state.flags & kDead ? 0 : r.state.health;
 }
 
@@ -726,14 +726,14 @@ bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
 // later), never shown with units missing.
 void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
   i32 at = -1;
-  for (std::size_t i = 0; i < swarm_parts_.size(); ++i) if (::sc::converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
+  for (std::size_t i = 0; i < swarm_parts_.size(); ++i) if (::kern::converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
   if (at < 0) {
     swarm_parts_.push_back({});
     at = ::sc::lowered::minus(static_cast<i32>(swarm_parts_.size()), 1);
-    ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
-    ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(::sc::lowered::minus(serial, 1));
+    ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
+    ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(::sc::lowered::minus(serial, 1));
   }
-  SwarmParts& p = ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at));
+  SwarmParts& p = ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at));
   if (p.serial != serial) {
     if (static_cast<kern::i8>(::sc::lowered::minus(serial, p.serial)) < 0) return;  // a part of an older snapshot, late
     p = SwarmParts{};
@@ -741,12 +741,12 @@ void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<Sw
     p.serial = serial;
   }
   const u64 mark = u64{1} << (part & 63);
-  if (::sc::converted::at(p.have, part >> 6) & mark) return;  // (twice)
-  ::sc::converted::at(p.have, part >> 6) |= mark;
+  if (::kern::converted::at(p.have, part >> 6) & mark) return;  // (twice)
+  ::kern::converted::at(p.have, part >> 6) |= mark;
   p.units.insert(p.units.end(), units.begin(), units.end());
   if (last) p.last = part;
   if (p.last < 0) return;
-  for (int k = 0; k <= p.last; ::sc::lowered::pre_inc(k)) if (!(::sc::converted::at(p.have, k >> 6) & (u64{1} << (k & 63)))) return;
+  for (int k = 0; k <= p.last; ::sc::lowered::pre_inc(k)) if (!(::kern::converted::at(p.have, k >> 6) & (u64{1} << (k & 63)))) return;
   swarms_.push_back({owner, std::move(p.units)});
   p.units.clear();
   p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
@@ -1213,7 +1213,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     }
     case kLeft: {
       const u8 slot = r.get_u8(d);
-      ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
+      ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
       std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });
       return;
     }
@@ -1226,16 +1226,16 @@ void Session::on_pose(const PlayerState& s) {
   const f64 now = now_ms();
   // the remote of this slot: its place in remotes_ (the last one of the slot), a new one at the end if none
   std::size_t at = remotes_.size();
-  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::sc::converted::at(remotes_, i).state.slot == s.slot) at = i;
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::kern::converted::at(remotes_, i).state.slot == s.slot) at = i;
   if (at == remotes_.size()) {
     remotes_.emplace_back();
-    Remote& added = ::sc::converted::at(remotes_, at);
+    Remote& added = ::kern::converted::at(remotes_, at);
     added.shown = s.position;
     added.shown_rotation = s.rotation;
     added.person_shown = s.avatar;
     if (role_ == Role::host) { scores_.ensure(s.slot); send_scores(); }
   }
-  Remote& r = ::sc::converted::at(remotes_, at);
+  Remote& r = ::kern::converted::at(remotes_, at);
   // A mode change or a jump (respawn, new vehicle) starts the timelines over.
   if (r.state.mode != s.mode || kern::length(r.body.last_position() - s.position) > mp::kTeleportM) r.body.reset();
   if (kern::length(r.person.last_position() - s.avatar) > mp::kTeleportM) r.person.reset();
@@ -1280,7 +1280,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
         send_scores();
         if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
       } else {
-        ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
+        ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
         std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });  // (the slot's next player starts his own serials)
         scores_.remove(slot);
         if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
@@ -1312,7 +1312,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     }
     // A joining player gets his anchor once his first pose is in (the group is known then).
     for (std::size_t i = 0; i < pending_anchor_.size();)
-      if (remote_index(::sc::converted::at(pending_anchor_, i)) >= 0) { send_anchor(::sc::converted::at(pending_anchor_, i)); ::sc::converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
+      if (remote_index(::kern::converted::at(pending_anchor_, i)) >= 0) { send_anchor(::kern::converted::at(pending_anchor_, i)); ::kern::converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
       else ++i;
     if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
     if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
@@ -1339,9 +1339,9 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
     client_->send_packets();
   }
-  ::sc::converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
+  ::kern::converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
   // Players who went quiet are gone.
-  ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
+  ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
 }
 
 std::string Session::status() const {
@@ -1744,7 +1744,7 @@ std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const std::v
   wire::put_u8(w, static_cast<u8>(part | (last ? 0x80 : 0)));
   wire::put_u8(w, static_cast<u8>(n));
   for (std::size_t i = 0; i < n; ++i) {
-    const SwarmUnit& u = ::sc::converted::at(units, from + i);
+    const SwarmUnit& u = ::kern::converted::at(units, from + i);
     const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
     wire::put_u16(w, u.id);
     wire::put_u8(w, static_cast<u8>(u.kind));
@@ -1963,7 +1963,7 @@ bool Session::origin(f64& lon, f64& lat) const {
 }
 
 i32 Session::remote_index(u8 slot) const {
-  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::sc::converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::kern::converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
   return -1;
 }
 
@@ -1971,7 +1971,7 @@ std::vector<u8> Session::roster() const {
   std::vector<u8> r{self_slot_};
   for (const Remote& x : remotes_) r.push_back(x.state.slot);
   std::stable_sort(r.begin(), r.end());
-  ::sc::converted::erase(r, std::unique(r.begin(), r.end()), r.end());
+  ::kern::converted::erase(r, std::unique(r.begin(), r.end()), r.end());
   return r;
 }
 
@@ -1980,7 +1980,7 @@ u32 Session::color_of(u8 slot) const {
   std::vector<std::string> ids;
   for (u8 s : r) ids.push_back(std::to_string(s));
   const std::vector<u32> c = mp::assign_colors(ids);
-  for (std::size_t i = 0; i < r.size(); ++i) if (::sc::converted::at(r, i) == slot) return ::sc::converted::at(c, i);
+  for (std::size_t i = 0; i < r.size(); ++i) if (::kern::converted::at(r, i) == slot) return ::kern::converted::at(c, i);
   return mp::color_of(std::to_string(slot));
 }
 
@@ -1988,7 +1988,7 @@ u32 Session::index_of(u8 slot) const {
   // The host is P1 (the oldest), then the clients in slot order.
   std::vector<u8> r = roster();
   std::stable_partition(r.begin(), r.end(), [](u8 s) { return s == kHost; });
-  for (std::size_t i = 0; i < r.size(); ++i) if (::sc::converted::at(r, i) == slot) return static_cast<u32>(i + 1);
+  for (std::size_t i = 0; i < r.size(); ++i) if (::kern::converted::at(r, i) == slot) return static_cast<u32>(i + 1);
   return 0;
 }
 
@@ -2001,7 +2001,7 @@ Vec3 Session::focus_of(u8 slot) const {
   if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
   const i32 at = remote_index(slot);
   if (at < 0) return {};
-  const Remote& r = ::sc::converted::at(remotes_, static_cast<std::size_t>(at));
+  const Remote& r = ::kern::converted::at(remotes_, static_cast<std::size_t>(at));
   return r.state.mode == PlayerMode::foot || r.state.mode == PlayerMode::drone ? r.person_shown : r.shown;
 }
 
@@ -2009,7 +2009,7 @@ f32 Session::hp_of(u8 slot) const {
   if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
   const i32 at = remote_index(slot);
   if (at < 0) return 0;
-  const Remote& r = ::sc::converted::at(remotes_, static_cast<std::size_t>(at));
+  const Remote& r = ::kern::converted::at(remotes_, static_cast<std::size_t>(at));
   return r.state.flags & kDead ? 0 : r.state.health;
 }
 
@@ -2059,14 +2059,14 @@ bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
 // later), never shown with units missing.
 void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
   i32 at = -1;
-  for (std::size_t i = 0; i < swarm_parts_.size(); ++i) if (::sc::converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
+  for (std::size_t i = 0; i < swarm_parts_.size(); ++i) if (::kern::converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
   if (at < 0) {
     swarm_parts_.push_back({});
     at = ::sc::lowered::minus(static_cast<i32>(swarm_parts_.size()), 1);
-    ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
-    ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(::sc::lowered::minus(serial, 1));
+    ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
+    ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(::sc::lowered::minus(serial, 1));
   }
-  SwarmParts& p = ::sc::converted::at(swarm_parts_, static_cast<std::size_t>(at));
+  SwarmParts& p = ::kern::converted::at(swarm_parts_, static_cast<std::size_t>(at));
   if (p.serial != serial) {
     if (static_cast<kern::i8>(::sc::lowered::minus(serial, p.serial)) < 0) return;  // a part of an older snapshot, late
     p = SwarmParts{};
@@ -2074,12 +2074,12 @@ void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<Sw
     p.serial = serial;
   }
   const u64 mark = u64{1} << (part & 63);
-  if (::sc::converted::at(p.have, part >> 6) & mark) return;  // (twice)
-  ::sc::converted::at(p.have, part >> 6) |= mark;
+  if (::kern::converted::at(p.have, part >> 6) & mark) return;  // (twice)
+  ::kern::converted::at(p.have, part >> 6) |= mark;
   p.units.insert(p.units.end(), units.begin(), units.end());
   if (last) p.last = part;
   if (p.last < 0) return;
-  for (int k = 0; k <= p.last; ::sc::lowered::pre_inc(k)) if (!(::sc::converted::at(p.have, k >> 6) & (u64{1} << (k & 63)))) return;
+  for (int k = 0; k <= p.last; ::sc::lowered::pre_inc(k)) if (!(::kern::converted::at(p.have, k >> 6) & (u64{1} << (k & 63)))) return;
   swarms_.push_back({owner, std::move(p.units)});
   p.units.clear();
   p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
@@ -2548,7 +2548,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     }
     case kLeft: {
       const u8 slot = r.get_u8(d);
-      ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
+      ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
       std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });
       return;
     }
@@ -2561,16 +2561,16 @@ void Session::on_pose(const PlayerState& s) {
   const f64 now = now_ms();
   // the remote of this slot: its place in remotes_ (the last one of the slot), a new one at the end if none
   std::size_t at = remotes_.size();
-  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::sc::converted::at(remotes_, i).state.slot == s.slot) at = i;
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (::kern::converted::at(remotes_, i).state.slot == s.slot) at = i;
   if (at == remotes_.size()) {
     remotes_.emplace_back();
-    Remote& added = ::sc::converted::at(remotes_, at);
+    Remote& added = ::kern::converted::at(remotes_, at);
     added.shown = s.position;
     added.shown_rotation = s.rotation;
     added.person_shown = s.avatar;
     if (role_ == Role::host) { scores_.ensure(s.slot); send_scores(); }
   }
-  Remote& r = ::sc::converted::at(remotes_, at);
+  Remote& r = ::kern::converted::at(remotes_, at);
   // A mode change or a jump (respawn, new vehicle) starts the timelines over.
   if (r.state.mode != s.mode || kern::length(r.body.last_position() - s.position) > mp::kTeleportM) r.body.reset();
   if (kern::length(r.person.last_position() - s.avatar) > mp::kTeleportM) r.person.reset();
@@ -2615,7 +2615,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
         send_scores();
         if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
       } else {
-        ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
+        ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
         std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });  // (the slot's next player starts his own serials)
         scores_.remove(slot);
         if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
@@ -2647,7 +2647,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     }
     // A joining player gets his anchor once his first pose is in (the group is known then).
     for (std::size_t i = 0; i < pending_anchor_.size();)
-      if (remote_index(::sc::converted::at(pending_anchor_, i)) >= 0) { send_anchor(::sc::converted::at(pending_anchor_, i)); ::sc::converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
+      if (remote_index(::kern::converted::at(pending_anchor_, i)) >= 0) { send_anchor(::kern::converted::at(pending_anchor_, i)); ::kern::converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
       else ++i;
     if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
     if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
@@ -2674,9 +2674,9 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
     client_->send_packets();
   }
-  ::sc::converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
+  ::kern::converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
   // Players who went quiet are gone.
-  ::sc::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
+  ::kern::converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
 }
 
 std::string Session::status() const {
@@ -2745,10 +2745,10 @@ template <> struct Values<::sc_new_net_session::sc::net::Session::Role> { static
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_net_session_cpp) {
+KERN_TEST(lowered_net_session_cpp) {
   {  // Session::dispatch(u8, u16, const std::vector<u8> &)  ->  Session::dispatch(u8, u16, const std::vector<u8> &)
     ::sc::lowered::Tally tally("Session::dispatch(u8, u16, const std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_net_session::sc::net::Session o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -2776,7 +2776,7 @@ SC_TEST(lowered_net_session_cpp) {
   }
   {  // Session::deliver(u16, const std::vector<u8> &)  ->  Session::deliver(u16, const std::vector<u8> &)
     ::sc::lowered::Tally tally("Session::deliver(u16, const std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_net_session::sc::net::Session o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

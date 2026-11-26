@@ -579,7 +579,7 @@ class Version:
             a, b = span(n)
             # (an entry by a pointer: lowered::entry checks it against the lists the test handed - a pointer into
             # another place stands as it is)
-            out.append((a, a, "::sc::lowered::entry(" if by_pointer else "::sc::converted::at(", (a, 1, depth)))
+            out.append((a, a, "::sc::lowered::entry(" if by_pointer else "::kern::converted::at(", (a, 1, depth)))
             between(base, ks[1], "[", ", ")
             _, ib = span(ks[1])
             if raw[ib:b].strip() != "]":
@@ -592,7 +592,7 @@ class Version:
                 callee = C.bare(kids(callee)[0])
             if (callee.get("referencedDecl") or {}).get("name") == "operator[]" and LISTS.match(ct(ks[1])):
                 a, b = span(n)
-                out.append((a, a, "::sc::converted::at(", (a, 1, depth)))
+                out.append((a, a, "::kern::converted::at(", (a, 1, depth)))
                 between(ks[1], ks[2], "[", ", ")
                 _, ib = span(ks[2])
                 if raw[ib:b].strip() != "]":
@@ -607,7 +607,7 @@ class Version:
             if name in ("at", "front", "back", "pop_back", "erase") and not m.get("isArrow"):
                 a, b = span(n)
                 _, bb = span(base)
-                out.append((a, a, f"::sc::converted::{name}(", (a, 1, depth)))
+                out.append((a, a, f"::kern::converted::{name}(", (a, 1, depth)))
                 if len(ks) > 1:
                     xa, _ = span(ks[1])
                     if not re.fullmatch(r"\s*\.\s*" + name + r"\s*\(\s*", raw[bb:xa]):
@@ -618,9 +618,9 @@ class Version:
                         raise Stop(f".{name}() written by a macro")
                     out.append((bb, b, ")", (bb, 2, 0)))
             elif name in ("resize", "reserve", "assign") and len(ks) > 1 and ct(ks[1]) in INTEGRAL | {"unsigned char", "unsigned short", "short", "signed char"}:
-                wrap(ks[1], "::sc::converted::count(")
+                wrap(ks[1], "::kern::converted::count(")
         elif k == "CXXConstructExpr" and re.match(r"^(const )?std::vector<", ct(n)) and ks and not n.get("list") and len(ks) <= 2 and ct(ks[0]) in INTEGRAL:
-            wrap(ks[0], "::sc::converted::count(")
+            wrap(ks[0], "::kern::converted::count(")
         elif k == "CallExpr" and C.callee_name(n) in ("memcpy", "memmove") and len(ks) == 4:
             # a copy between places of lists (or of a value's bytes): checked against the lists it names
             a, b = span(n)
@@ -1443,7 +1443,7 @@ class Writer:
             out.append(f"template <> struct Values<{t}> {{ static constexpr long long all[] = {{{', '.join(f'static_cast<long long>({t}::{x})' for x in values)}}}; }};")
         out += ["}  // namespace sc::lowered", ""]
         out.append(f"namespace {m.namespace} {{")
-        out.append(f"SC_TEST(lowered_{re.sub(r'\W', '_', m.stem)}_cpp) {{")
+        out.append(f"KERN_TEST(lowered_{re.sub(r'\W', '_', m.stem)}_cpp) {{")
         actors = sorted(set(actors) | {a for _, _, a, _ in m.bindings})
         if actors or any(self.logic_param(t) for o, n, _ in tested for _, t, _ in o.params + n.params):
             out.append(f"  ::sc::lowered::World world({{{', '.join(C.text_literal(a) for a in actors)}}});")
@@ -1460,18 +1460,18 @@ class Writer:
                     held.append(f"b{b}_{j}.get()")
                 ncall = f"{self.call(n, 'new', ', '.join(['world.logic(false)'] + held))}"
                 if plain(o.ret) != "void" and plain(n.ret) != "void":
-                    out.append(f'  {{ const auto o_bound = {ocall}; const auto n_bound = {ncall}; SC_CHECK(::sc::lowered::same(o_bound, n_bound), "{o.label()} and {n.label()} give other results"); }}')
+                    out.append(f'  {{ const auto o_bound = {ocall}; const auto n_bound = {ncall}; KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "{o.label()} and {n.label()} give other results"); }}')
                 else:
                     out += [f"  {ocall};", f"  {ncall};"]
                 # (what the binding put into the file's state, the same in both)
                 for j, mapping in extra.items():
                     for fname, var in mapping.items():
-                        out.append(f'  SC_CHECK(::sc::lowered::same(::{self.ns["old"]}::{var}, b{b}_{j}.v.{fname}), "{n.label()}: {fname} is not what {o.label()} left in {var.split("::")[-1]}");')
+                        out.append(f'  KERN_CHECK(::sc::lowered::same(::{self.ns["old"]}::{var}, b{b}_{j}.v.{fname}), "{n.label()}: {fname} is not what {o.label()} left in {var.split("::")[-1]}");')
             for o in m.binding_gets:
                 actor = {a for _, _, a, _ in m.bindings}
                 if len(actor) != 1:
                     raise Stop(f"{o.label()} gives the Blueprint the file was bound to, and the file binds {len(actor)} actors")
-                out.append(f'  SC_CHECK({self.call(o, "old", "")} == world.instance(true, {C.text_literal(actor.pop())}), "{o.label()}: not the Blueprint it was bound to");')
+                out.append(f'  KERN_CHECK({self.call(o, "old", "")} == world.instance(true, {C.text_literal(actor.pop())}), "{o.label()}: not the Blueprint it was bound to");')
             world = True
         else:
             world = False
@@ -1482,7 +1482,7 @@ class Writer:
         if world:
             for v in (m.old, m.new):
                 for q, _ in v.actors():
-                    out.append(f"  ::{self.ns[v.side]}::{q}.bind(no_logic());   // (the test's logic is gone with it)")
+                    out.append(f"  ::{self.ns[v.side]}::{q}.bind(kern::test::no_logic());   // (the test's logic is gone with it)")
             for o, _, _, _ in m.bindings:
                 out.append(f"  {self.call(o, 'old', 'nullptr')};   // (the test's logic is gone with it)")
         out += ["}", f"}}  // namespace {m.namespace}", ""]
@@ -1558,7 +1558,7 @@ class Writer:
 
     def case(self, o, n, extra, world):
         m = self.m
-        lines = [f"  {{  // {o.label()}  ->  {n.label()}", f"    ::sc::lowered::Tally tally({C.text_literal(o.label())});", "    ::sc::converted::Draw draw;",
+        lines = [f"  {{  // {o.label()}  ->  {n.label()}", f"    ::sc::lowered::Tally tally({C.text_literal(o.label())});", "    ::kern::converted::Draw draw;",
                  "    for (int call = 0; tally.more(call); ++call) {"]
         body = []
         old_state = m.old.state()
@@ -2060,7 +2060,7 @@ class BuildsWriter(Writer):
             values = self.enum_values(node)
             if values and node.get("name"):
                 out.append(f"template <> struct Values<::{q}> {{ static constexpr long long all[] = {{{', '.join(str(v) for _, v in values)}}}; }};")
-        out += ["}  // namespace sc::lowered", "", f"namespace {m.namespace} {{", f"SC_TEST(lowered_{key}_cpp) {{"]
+        out += ["}  // namespace sc::lowered", "", f"namespace {m.namespace} {{", f"KERN_TEST(lowered_{key}_cpp) {{"]
         for j, (o, n, e) in enumerate(tested):
             out += self.builds_case(j, n, calls.get(j))
         out += ["}", f"}}  // namespace {m.namespace}", ""]
@@ -2085,7 +2085,7 @@ class BuildsWriter(Writer):
     def builds_case(self, j, n, robbed):
         label = n.label()
         T = f"::{n.owner}" if n.owner else None
-        body = [f"  {{  // {label}", f"    ::sc::lowered::Builds rec({C.text_literal(label)});", "    ::sc::converted::Draw draw;",
+        body = [f"  {{  // {label}", f"    ::sc::lowered::Builds rec({C.text_literal(label)});", "    ::kern::converted::Draw draw;",
                 "    for (int call = 0; rec.more(call); ++call) {"]
         inner = []
         method = n.method and not n.static and n.kind in ("CXXMethodDecl", "CXXDestructorDecl")

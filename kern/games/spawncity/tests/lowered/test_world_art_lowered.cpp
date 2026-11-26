@@ -120,7 +120,7 @@ void WorldArt::begin() {
 
 void WorldArt::put(PartId id, const Mat4& m, Vec3 tint) {
   if (id == 0 || id >= parts_.size()) return;
-  Part& p = ::sc::converted::at(parts_, id);
+  Part& p = ::kern::converted::at(parts_, id);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   if (p.tinted) p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
 }
@@ -247,7 +247,7 @@ void WorldArt::begin() {
 
 void WorldArt::put(PartId id, const Mat4& m, Vec3 tint) {
   if (id == 0 || id >= parts_.size()) return;
-  Part& p = ::sc::converted::at(parts_, id);
+  Part& p = ::kern::converted::at(parts_, id);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   if (p.tinted) p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
 }
@@ -295,10 +295,10 @@ template <> struct Values<::kern::AlphaMode> { static constexpr long long all[] 
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_world_art_cpp) {
+KERN_TEST(lowered_world_art_cpp) {
   {  // WorldArt::part(const kern::MeshData &, const kern::Material &, bool)  ->  WorldArt::part(const kern::MeshData &, const kern::Material &, bool)
     ::sc::lowered::Tally tally("WorldArt::part(const kern::MeshData &, const kern::Material &, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_world_art::sc::WorldArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -326,7 +326,7 @@ SC_TEST(lowered_world_art_cpp) {
   }
   {  // WorldArt::set_mesh(u32 &, const kern::MeshData &, const kern::Material &)  ->  WorldArt::set_mesh(u32 &, const kern::MeshData &, const kern::Material &)
     ::sc::lowered::Tally tally("WorldArt::set_mesh(u32 &, const kern::MeshData &, const kern::Material &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_world_art::sc::WorldArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

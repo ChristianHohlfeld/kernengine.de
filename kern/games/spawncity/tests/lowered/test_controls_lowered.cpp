@@ -211,7 +211,7 @@ f32 f(const Value& v) { return static_cast<f32>(v.as_number()); }
 Vec2 pair(const char* function, const std::vector<Value>& args) {
   std::vector<Value> r;
   if (!g_rules.call(function, args, r) || r.size() < 2) return {};
-  return {f(::sc::converted::at(r, 0)), f(::sc::converted::at(r, 1))};
+  return {f(::kern::converted::at(r, 0)), f(::kern::converted::at(r, 1))};
 }
 Value to_value(const WorldLook& l) { return Value::structure({N(l.yaw_deg), N(l.pitch_deg), B(l.snapping), N(l.idle), B(l.owned)}); }
 void from_value(const Value& v, WorldLook& l) {
@@ -224,7 +224,7 @@ void from_value(const Value& v, WorldLook& l) {
 }
 void look(const char* function, const std::vector<Value>& args, WorldLook& l) {
   std::vector<Value> r;
-  if (g_rules.call(function, args, r) && !r.empty()) from_value(::sc::converted::at(r, 0), l);
+  if (g_rules.call(function, args, r) && !r.empty()) from_value(::kern::converted::at(r, 0), l);
 }
 Value to_value(const GrenadeCook& g) {
   return Value::structure({Value::integer(g.carry), N(g.regen_at), B(g.cooking), N(g.at), N(g.power), Value::integer(g.source)});
@@ -265,10 +265,10 @@ AimAssist fps_aim_assist(f32 yaw, f32 pitch, f32 dist, f32 input, f32 in_yaw, f3
   AimAssist a;
   std::vector<Value> r;
   if (!g_rules.call("FpsAimAssist", {N(yaw), N(pitch), N(dist), N(input), N(in_yaw), N(in_pitch), N(s)}, r) || r.size() < 4) return a;
-  a.active = ::sc::converted::at(r, 0).b;
-  a.slowdown = f(::sc::converted::at(r, 1));
-  a.yaw = f(::sc::converted::at(r, 2));
-  a.pitch = f(::sc::converted::at(r, 3));
+  a.active = ::kern::converted::at(r, 0).b;
+  a.slowdown = f(::kern::converted::at(r, 1));
+  a.yaw = f(::kern::converted::at(r, 2));
+  a.pitch = f(::kern::converted::at(r, 3));
   return a;
 }
 f32 aim_ellipse(f32 yaw_err, f32 pitch_err) { return num("AimEllipse", {N(yaw_err), N(pitch_err)}); }
@@ -311,23 +311,23 @@ void CarHeadSpring::step(f32 x, f32 y, f32 dt) {
 int ViewButton::step(bool down, f32 now) {
   std::vector<Value> r;
   if (!g_rules.call("ViewButtonStep", {B(was), B(held_map), N(down_at), N(map_at), B(down), N(now)}, r) || r.size() < 5) return 0;
-  was = ::sc::converted::at(r, 1).b;
-  held_map = ::sc::converted::at(r, 2).b;
-  down_at = f(::sc::converted::at(r, 3));
-  map_at = f(::sc::converted::at(r, 4));
-  return static_cast<int>(::sc::converted::at(r, 0).i);
+  was = ::kern::converted::at(r, 1).b;
+  held_map = ::kern::converted::at(r, 2).b;
+  down_at = f(::kern::converted::at(r, 3));
+  map_at = f(::kern::converted::at(r, 4));
+  return static_cast<int>(::kern::converted::at(r, 0).i);
 }
 
 VoiceChord::Out VoiceChord::step(bool r3_now, bool y_now, bool allowed) {
   Out o;
   std::vector<Value> r;
   if (!g_rules.call("VoiceChordStep", {B(r3), B(y), B(latched), B(r3_now), B(y_now), B(allowed)}, r) || r.size() < 6) return o;
-  o.mic = ::sc::converted::at(r, 0).b;
-  o.mute = ::sc::converted::at(r, 1).b;
-  o.suppress_weapon = ::sc::converted::at(r, 2).b;
-  r3 = ::sc::converted::at(r, 3).b;
-  y = ::sc::converted::at(r, 4).b;
-  latched = ::sc::converted::at(r, 5).b;
+  o.mic = ::kern::converted::at(r, 0).b;
+  o.mute = ::kern::converted::at(r, 1).b;
+  o.suppress_weapon = ::kern::converted::at(r, 2).b;
+  r3 = ::kern::converted::at(r, 3).b;
+  y = ::kern::converted::at(r, 4).b;
+  latched = ::kern::converted::at(r, 5).b;
   return o;
 }
 
@@ -335,28 +335,28 @@ bool ReleaseLatch::step(const f32* values, int n) {
   std::vector<f64> list(values, values + n);
   std::vector<Value> r;
   if (!g_rules.call("ReleaseLatchStep", {B(armed), Value::of(std::move(list))}, r) || r.size() < 2) return false;
-  armed = ::sc::converted::at(r, 1).b;
-  return ::sc::converted::at(r, 0).b;
+  armed = ::kern::converted::at(r, 1).b;
+  return ::kern::converted::at(r, 0).b;
 }
 
 bool GrenadeCook::pull(f32 now, int from) {
   std::vector<Value> r;
   if (!g_rules.call("GrenadePull", {to_value(*this), N(now), Value::integer(from)}, r) || r.size() < 2) return false;
-  from_value(::sc::converted::at(r, 0), *this);
-  return ::sc::converted::at(r, 1).b;
+  from_value(::kern::converted::at(r, 0), *this);
+  return ::kern::converted::at(r, 1).b;
 }
 void GrenadeCook::drag(f32 up_px) { power = num("GrenadeDrag", {N(up_px)}); }
 f32 GrenadeCook::release(f32 now) {
   std::vector<Value> r;
   if (!g_rules.call("GrenadeRelease", {to_value(*this), N(now)}, r) || r.size() < 2) return 0;
-  from_value(::sc::converted::at(r, 0), *this);
-  return f(::sc::converted::at(r, 1));
+  from_value(::kern::converted::at(r, 0), *this);
+  return f(::kern::converted::at(r, 1));
 }
 bool GrenadeCook::step(f32 now) {
   std::vector<Value> r;
   if (!g_rules.call("GrenadeStep", {to_value(*this), N(now)}, r) || r.size() < 2) return false;
-  from_value(::sc::converted::at(r, 0), *this);
-  return ::sc::converted::at(r, 1).b;
+  from_value(::kern::converted::at(r, 0), *this);
+  return ::kern::converted::at(r, 1).b;
 }
 f32 GrenadeCook::left(f32 now) const { return num("GrenadeLeft", {to_value(*this), N(now)}); }
 f32 GrenadeCook::speed() const { return num("GrenadeSpeed", {N(power)}); }
@@ -371,14 +371,14 @@ void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_poi
 void Devices::input(Event e) {
   std::vector<Value> r;
   if (!g_rules.call("DeviceInput", {rules::of_enum(e), B(fine), B(coarse), B(desktop), B(pad)}, r) || r.size() < 2) return;
-  set(::sc::converted::at(r, 0).b);
-  pad = ::sc::converted::at(r, 1).b;
+  set(::kern::converted::at(r, 0).b);
+  pad = ::kern::converted::at(r, 1).b;
 }
 
 std::string hint_line(const char* mode, const char* weapon, bool dead) {
   std::vector<Value> r;
   if (!g_rules.call("HintLine", {Value::text(mode ? mode : ""), Value::text(weapon ? weapon : ""), B(dead)}, r) || r.empty()) return {};
-  return ::sc::converted::at(r, 0).s;
+  return ::kern::converted::at(r, 0).s;
 }
 
 }  // namespace sc::controls
@@ -810,14 +810,14 @@ template <> struct Values<::sc_new_controls::sc::controls::Devices::Event> { sta
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_controls_cpp) {
+KERN_TEST(lowered_controls_cpp) {
   ::sc::lowered::World world({"Controls"});
   ::sc_new_controls::sc::controls::g_rules.bind(world.logic(false));
   ::sc_old_controls::sc::controls::bind(world.instance(true, "Controls"));
   ::sc_new_controls::sc::controls::bind(world.logic(false));
   {  // smoothstep01(f32)  ->  smoothstep01(f32)
     ::sc::lowered::Tally tally("smoothstep01(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -836,7 +836,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // walk_pad_axis(f32)  ->  walk_pad_axis(f32)
     ::sc::lowered::Tally tally("walk_pad_axis(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -855,7 +855,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // shape_first_person_move(f32, f32, f32, bool)  ->  shape_first_person_move(f32, f32, f32, bool)
     ::sc::lowered::Tally tally("shape_first_person_move(f32, f32, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -883,7 +883,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // fps_dynamic_curve(f32)  ->  fps_dynamic_curve(f32)
     ::sc::lowered::Tally tally("fps_dynamic_curve(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -902,7 +902,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // look_curve_strength(f32)  ->  look_curve_strength(f32)
     ::sc::lowered::Tally tally("look_curve_strength(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -921,7 +921,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // shape_fps_stick(f32, f32, f32, f32)  ->  shape_fps_stick(f32, f32, f32, f32)
     ::sc::lowered::Tally tally("shape_fps_stick(f32, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -949,7 +949,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // LookAxis::step(f32, f32)  ->  LookAxis::step(f32, f32)
     ::sc::lowered::Tally tally("LookAxis::step(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::LookAxis o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -976,7 +976,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // touch_look_delta(f32, f32, f32, f32 &, f32 &)  ->  touch_look_delta(f32, f32, f32, f32 &, f32 &)
     ::sc::lowered::Tally tally("touch_look_delta(f32, f32, f32, f32 &, f32 &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1006,7 +1006,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // fps_aim_assist(f32, f32, f32, f32, f32, f32, f32)  ->  fps_aim_assist(f32, f32, f32, f32, f32, f32, f32)
     ::sc::lowered::Tally tally("fps_aim_assist(f32, f32, f32, f32, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1043,7 +1043,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // aim_ellipse(f32, f32)  ->  aim_ellipse(f32, f32)
     ::sc::lowered::Tally tally("aim_ellipse(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1065,7 +1065,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // gamepad_axis(f32, f32)  ->  gamepad_axis(f32, f32)
     ::sc::lowered::Tally tally("gamepad_axis(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1087,7 +1087,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // hard_cut(f32, f32)  ->  hard_cut(f32, f32)
     ::sc::lowered::Tally tally("hard_cut(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1109,7 +1109,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // height_axis(f32, f32)  ->  height_axis(f32, f32)
     ::sc::lowered::Tally tally("height_axis(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1131,7 +1131,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // phone_axis(f32, f32)  ->  phone_axis(f32, f32)
     ::sc::lowered::Tally tally("phone_axis(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1153,7 +1153,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // game_state_stick_magnitude(f32)  ->  game_state_stick_magnitude(f32)
     ::sc::lowered::Tally tally("game_state_stick_magnitude(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1172,7 +1172,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // inverse_game_state_stick_magnitude(f32)  ->  inverse_game_state_stick_magnitude(f32)
     ::sc::lowered::Tally tally("inverse_game_state_stick_magnitude(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1191,7 +1191,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // apply_game_stick_left(DroneAxes &, f32, f32, f32, bool, f32)  ->  apply_game_stick_left(DroneAxes &, f32, f32, f32, bool, f32)
     ::sc::lowered::Tally tally("apply_game_stick_left(DroneAxes &, f32, f32, f32, bool, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_controls::sc::controls::DroneAxes &> o0;
       ::sc::lowered::Arg<::sc_new_controls::sc::controls::DroneAxes &> n0;
@@ -1223,7 +1223,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // apply_game_stick_right(DroneAxes &, f32, f32, f32, bool, bool)  ->  apply_game_stick_right(DroneAxes &, f32, f32, f32, bool, bool)
     ::sc::lowered::Tally tally("apply_game_stick_right(DroneAxes &, f32, f32, f32, bool, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_controls::sc::controls::DroneAxes &> o0;
       ::sc::lowered::Arg<::sc_new_controls::sc::controls::DroneAxes &> n0;
@@ -1255,7 +1255,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // clearance_pad_axis(f32, f32, f32)  ->  clearance_pad_axis(f32, f32, f32)
     ::sc::lowered::Tally tally("clearance_pad_axis(f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1280,7 +1280,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // RateStick::step(kern::Vec2, f32)  ->  RateStick::step(kern::Vec2, f32)
     ::sc::lowered::Tally tally("RateStick::step(kern::Vec2, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::RateStick o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1304,7 +1304,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // WorldLook::add(f32, f32, f32, f32)  ->  WorldLook::add(f32, f32, f32, f32)
     ::sc::lowered::Tally tally("WorldLook::add(f32, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::WorldLook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1334,7 +1334,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // WorldLook::set(f32, f32)  ->  WorldLook::set(f32, f32)
     ::sc::lowered::Tally tally("WorldLook::set(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::WorldLook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1358,7 +1358,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // WorldLook::release()  ->  WorldLook::release()
     ::sc::lowered::Tally tally("WorldLook::release()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::WorldLook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1376,7 +1376,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // WorldLook::step(f32, bool)  ->  WorldLook::step(f32, bool)
     ::sc::lowered::Tally tally("WorldLook::step(f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::WorldLook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1400,7 +1400,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // CarHeadSpring::step(f32, f32, f32)  ->  CarHeadSpring::step(f32, f32, f32)
     ::sc::lowered::Tally tally("CarHeadSpring::step(f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::CarHeadSpring o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1427,7 +1427,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // ViewButton::step(bool, f32)  ->  ViewButton::step(bool, f32)
     ::sc::lowered::Tally tally("ViewButton::step(bool, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::ViewButton o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1454,7 +1454,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // VoiceChord::step(bool, bool, bool)  ->  VoiceChord::step(bool, bool, bool)
     ::sc::lowered::Tally tally("VoiceChord::step(bool, bool, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::VoiceChord o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1484,7 +1484,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // ReleaseLatch::step(const f32 *, int)  ->  ReleaseLatch::step(const std::array<f32, 9> &)
     ::sc::lowered::Tally tally("ReleaseLatch::step(const f32 *, int)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::ReleaseLatch o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1509,7 +1509,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::pull(f32, int)  ->  GrenadeCook::pull(f32, int)
     ::sc::lowered::Tally tally("GrenadeCook::pull(f32, int)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1536,7 +1536,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::drag(f32)  ->  GrenadeCook::drag(f32)
     ::sc::lowered::Tally tally("GrenadeCook::drag(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1557,7 +1557,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::release(f32)  ->  GrenadeCook::release(f32)
     ::sc::lowered::Tally tally("GrenadeCook::release(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1581,7 +1581,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::step(f32)  ->  GrenadeCook::step(f32)
     ::sc::lowered::Tally tally("GrenadeCook::step(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1605,7 +1605,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::left(f32)  ->  GrenadeCook::left(f32)
     ::sc::lowered::Tally tally("GrenadeCook::left(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1629,7 +1629,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // GrenadeCook::speed()  ->  GrenadeCook::speed()
     ::sc::lowered::Tally tally("GrenadeCook::speed()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::GrenadeCook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1650,7 +1650,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // grenade_fuse()  ->  grenade_fuse()
     ::sc::lowered::Tally tally("grenade_fuse()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_controls::sc::controls::grenade_fuse())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_controls::sc::controls::grenade_fuse())>> n_r;
@@ -1666,7 +1666,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // Devices::platform(bool, bool, i32)  ->  Devices::platform(bool, bool, i32)
     ::sc::lowered::Tally tally("Devices::platform(bool, bool, i32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::Devices o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1693,7 +1693,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // Devices::input(Event)  ->  Devices::input(Event)
     ::sc::lowered::Tally tally("Devices::input(Event)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::Devices o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1714,7 +1714,7 @@ SC_TEST(lowered_controls_cpp) {
   }
   {  // hint_line(const char *, const char *, bool)  ->  hint_line(const char *, const char *, bool)
     ::sc::lowered::Tally tally("hint_line(const char *, const char *, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const char *> o0;
       ::sc::lowered::Arg<const char *> n0;
@@ -1737,7 +1737,7 @@ SC_TEST(lowered_controls_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_controls::sc::controls::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_controls::sc::controls::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_controls::sc::controls::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

@@ -302,10 +302,10 @@ template <> struct Fields<::sc_new_facades::sc::Facades> { static auto of(::sc_n
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_facades_cpp) {
+KERN_TEST(lowered_facades_cpp) {
   {  // Facades::name()  ->  Facades::name()
     ::sc::lowered::Tally tally("Facades::name()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_facades::sc::Facades o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

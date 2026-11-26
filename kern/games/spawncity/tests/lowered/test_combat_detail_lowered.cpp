@@ -105,7 +105,7 @@ kern::logic::Instance* blueprint() { return g_blueprint; }
 
 bool is_critical(Critical k, f32 hp, f32 max_hp) {
   std::vector<Value> r;
-  return call("IsCritical", {of_enum(k), rules::number(hp), rules::number(max_hp)}, r) && !r.empty() && ::sc::converted::at(r, 0).b;
+  return call("IsCritical", {of_enum(k), rules::number(hp), rules::number(max_hp)}, r) && !r.empty() && ::kern::converted::at(r, 0).b;
 }
 f32 detonation_at(Critical k, f32 now) { return static_cast<f32>(number("DetonationAt", {of_enum(k), rules::number(now)})); }
 f32 accelerate(Critical k, f32 current_at, f32 now) { return static_cast<f32>(number("Accelerate", {of_enum(k), rules::number(current_at), rules::number(now)})); }
@@ -113,15 +113,15 @@ f32 accelerate(Critical k, f32 current_at, f32 now) { return static_cast<f32>(nu
 bool CriticalClock::update(Critical k, f32 hp, f32 max_hp, f32 now) {
   std::vector<Value> r;
   if (!call("ClockUpdate", {of_enum(k), rules::number(hp), rules::number(max_hp), rules::number(now), rules::number(at), rules::number(last_hp)}, r) || r.size() < 3) return false;
-  at = static_cast<f32>(::sc::converted::at(r, 1).as_number());
-  last_hp = static_cast<f32>(::sc::converted::at(r, 2).as_number());
-  return ::sc::converted::at(r, 0).b;
+  at = static_cast<f32>(::kern::converted::at(r, 1).as_number());
+  last_hp = static_cast<f32>(::kern::converted::at(r, 2).as_number());
+  return ::kern::converted::at(r, 0).b;
 }
 
 f32 momentum_ns(Round r) { return static_cast<f32>(number("MomentumNs", {of_enum(r)})); }
 Vec3 bullet_impulse(Vec3 direction, Round round) {
   std::vector<Value> r;
-  return call("BulletImpulse", {Value::vector(direction), of_enum(round)}, r) && !r.empty() ? ::sc::converted::at(r, 0).as_vector() : Vec3{};
+  return call("BulletImpulse", {Value::vector(direction), of_enum(round)}, r) && !r.empty() ? ::kern::converted::at(r, 0).as_vector() : Vec3{};
 }
 f32 projectile_gravity() { return g_blueprint ? static_cast<f32>(g_blueprint->get("ProjectileGravity").as_number()) : 0; }
 
@@ -257,15 +257,15 @@ template <> struct Values<::sc_new_combat_detail::sc::detail::Round> { static co
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_combat_detail_cpp) {
+KERN_TEST(lowered_combat_detail_cpp) {
   ::sc::lowered::World world({"CombatDetail"});
   ::sc_new_combat_detail::sc::detail::g_rules.bind(world.logic(false));
   ::sc_old_combat_detail::sc::detail::bind(world.instance(true, "CombatDetail"));
   ::sc_new_combat_detail::sc::detail::bind(world.logic(false));
-  SC_CHECK(::sc_old_combat_detail::sc::detail::blueprint() == world.instance(true, "CombatDetail"), "blueprint(): not the Blueprint it was bound to");
+  KERN_CHECK(::sc_old_combat_detail::sc::detail::blueprint() == world.instance(true, "CombatDetail"), "blueprint(): not the Blueprint it was bound to");
   {  // is_critical(Critical, f32, f32)  ->  is_critical(Critical, f32, f32)
     ::sc::lowered::Tally tally("is_critical(Critical, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_combat_detail::sc::detail::Critical> o0;
       ::sc::lowered::Arg<::sc_new_combat_detail::sc::detail::Critical> n0;
@@ -290,7 +290,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // detonation_at(Critical, f32)  ->  detonation_at(Critical, f32)
     ::sc::lowered::Tally tally("detonation_at(Critical, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_combat_detail::sc::detail::Critical> o0;
       ::sc::lowered::Arg<::sc_new_combat_detail::sc::detail::Critical> n0;
@@ -312,7 +312,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // accelerate(Critical, f32, f32)  ->  accelerate(Critical, f32, f32)
     ::sc::lowered::Tally tally("accelerate(Critical, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_combat_detail::sc::detail::Critical> o0;
       ::sc::lowered::Arg<::sc_new_combat_detail::sc::detail::Critical> n0;
@@ -337,7 +337,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // CriticalClock::update(Critical, f32, f32, f32)  ->  CriticalClock::update(Critical, f32, f32, f32)
     ::sc::lowered::Tally tally("CriticalClock::update(Critical, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_combat_detail::sc::detail::CriticalClock o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -370,7 +370,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // momentum_ns(Round)  ->  momentum_ns(Round)
     ::sc::lowered::Tally tally("momentum_ns(Round)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_combat_detail::sc::detail::Round> o0;
       ::sc::lowered::Arg<::sc_new_combat_detail::sc::detail::Round> n0;
@@ -389,7 +389,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // bullet_impulse(kern::Vec3, Round)  ->  bullet_impulse(kern::Vec3, Round)
     ::sc::lowered::Tally tally("bullet_impulse(kern::Vec3, Round)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<kern::Vec3> o0;
       ::sc::lowered::Arg<kern::Vec3> n0;
@@ -411,7 +411,7 @@ SC_TEST(lowered_combat_detail_cpp) {
   }
   {  // projectile_gravity()  ->  projectile_gravity()
     ::sc::lowered::Tally tally("projectile_gravity()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_combat_detail::sc::detail::projectile_gravity())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_combat_detail::sc::detail::projectile_gravity())>> n_r;
@@ -425,7 +425,7 @@ SC_TEST(lowered_combat_detail_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_combat_detail::sc::detail::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_detail::sc::detail::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_combat_detail::sc::detail::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

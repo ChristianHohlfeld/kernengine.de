@@ -89,14 +89,14 @@ constexpr u32 kK[64] = {
 inline u32 rotr(u32 x, u32 n) { return (::sc::lowered::shr(x, n)) | (::sc::lowered::shl(x, (32 - n))); }
 void block(u32 h[8], const u8* p) {
   u32 w[64];
-  for (int i = 0; (::sc::lowered::tick(), i < 16); ::sc::lowered::pre_inc(i)) ::sc::converted::at(w, i) = (u32{::sc::lowered::entry(p, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
+  for (int i = 0; (::sc::lowered::tick(), i < 16); ::sc::lowered::pre_inc(i)) ::kern::converted::at(w, i) = (u32{::sc::lowered::entry(p, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::lowered::entry(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
   for (int i = 16; i < 64; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const u32 s0 = rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 15)), 7) ^ rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 15)), 18) ^ (::sc::converted::at(w, ::sc::lowered::minus(i, 15)) >> 3), s1 = rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 2)), 17) ^ rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 2)), 19) ^ (::sc::converted::at(w, ::sc::lowered::minus(i, 2)) >> 10);
-    ::sc::converted::at(w, i) = ::sc::converted::at(w, ::sc::lowered::minus(i, 16)) + s0 + ::sc::converted::at(w, ::sc::lowered::minus(i, 7)) + s1;
+    const u32 s0 = rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 15)), 7) ^ rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 15)), 18) ^ (::kern::converted::at(w, ::sc::lowered::minus(i, 15)) >> 3), s1 = rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 2)), 17) ^ rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 2)), 19) ^ (::kern::converted::at(w, ::sc::lowered::minus(i, 2)) >> 10);
+    ::kern::converted::at(w, i) = ::kern::converted::at(w, ::sc::lowered::minus(i, 16)) + s0 + ::kern::converted::at(w, ::sc::lowered::minus(i, 7)) + s1;
   }
   u32 a = ::sc::lowered::entry(h, 0), b = ::sc::lowered::entry(h, 1), c = ::sc::lowered::entry(h, 2), d = ::sc::lowered::entry(h, 3), e = ::sc::lowered::entry(h, 4), f = ::sc::lowered::entry(h, 5), g = ::sc::lowered::entry(h, 6), k = ::sc::lowered::entry(h, 7);
   for (int i = 0; i < 64; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const u32 t1 = k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + ::sc::converted::at(kK, i) + ::sc::converted::at(w, i);
+    const u32 t1 = k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + ::kern::converted::at(kK, i) + ::kern::converted::at(w, i);
     const u32 t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
     k = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
   }
@@ -111,13 +111,13 @@ void sha256(const u8* data, std::size_t length, u8 out[32]) {
   u8 tail[128] = {};
   const std::size_t rest = length - i;
   ::sc::lowered::copy(::sc::lowered::pointer_place(tail), ::sc::lowered::pointer_place(data + i), rest);
-  ::sc::converted::at(tail, rest) = 0x80;
+  ::kern::converted::at(tail, rest) = 0x80;
   const std::size_t total = rest + 9 <= 64 ? 64 : 128;
   const u64 bits = static_cast<u64>(length) * 8;
-  for (int b = 0; (::sc::lowered::tick(), b < 8); ::sc::lowered::pre_inc(b)) ::sc::converted::at(tail, total - 1 - b) = static_cast<u8>(bits >> (::sc::lowered::times(8, b)));
+  for (int b = 0; (::sc::lowered::tick(), b < 8); ::sc::lowered::pre_inc(b)) ::kern::converted::at(tail, total - 1 - b) = static_cast<u8>(bits >> (::sc::lowered::times(8, b)));
   block(h, tail);
   if (total == 128) block(h, tail + 64);
-  for (int k = 0; (::sc::lowered::tick(), k < 8); ::sc::lowered::pre_inc(k)) for (int b = 0; (::sc::lowered::tick(), b < 4); ::sc::lowered::pre_inc(b)) ::sc::lowered::entry(out, ::sc::lowered::plus(::sc::lowered::times(4, k), b)) = static_cast<u8>(::sc::lowered::shr(::sc::converted::at(h, k), (::sc::lowered::minus(24, ::sc::lowered::times(8, b)))));
+  for (int k = 0; (::sc::lowered::tick(), k < 8); ::sc::lowered::pre_inc(k)) for (int b = 0; (::sc::lowered::tick(), b < 4); ::sc::lowered::pre_inc(b)) ::sc::lowered::entry(out, ::sc::lowered::plus(::sc::lowered::times(4, k), b)) = static_cast<u8>(::sc::lowered::shr(::kern::converted::at(h, k), (::sc::lowered::minus(24, ::sc::lowered::times(8, b)))));
 }
 
 Bytes32 sha256(std::string_view s) {
@@ -134,11 +134,11 @@ struct U256 { u32 w[8] = {}; };
 
 U256 from_be(const u8* b) {
   U256 r;
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::sc::converted::at(r.w, ::sc::lowered::minus(7, i)) = (u32{::sc::lowered::entry(b, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::kern::converted::at(r.w, ::sc::lowered::minus(7, i)) = (u32{::sc::lowered::entry(b, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
   return r;
 }
 void to_be(const U256& a, u8* b) {
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) for (int k = 0; (::sc::lowered::tick(), k < 4); ::sc::lowered::pre_inc(k)) ::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), k)) = static_cast<u8>(::sc::lowered::shr(::sc::converted::at(a.w, ::sc::lowered::minus(7, i)), (::sc::lowered::minus(24, ::sc::lowered::times(8, k)))));
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) for (int k = 0; (::sc::lowered::tick(), k < 4); ::sc::lowered::pre_inc(k)) ::sc::lowered::entry(b, ::sc::lowered::plus(::sc::lowered::times(4, i), k)) = static_cast<u8>(::sc::lowered::shr(::kern::converted::at(a.w, ::sc::lowered::minus(7, i)), (::sc::lowered::minus(24, ::sc::lowered::times(8, k)))));
 }
 U256 from_hex256(const char* s) {
   u8 b[32];
@@ -146,18 +146,18 @@ U256 from_hex256(const char* s) {
   return from_be(b);
 }
 int cmp(const U256& a, const U256& b) {
-  for (int i = 7; (::sc::lowered::tick(), i >= 0); ::sc::lowered::pre_dec(i)) if (::sc::converted::at(a.w, i) != ::sc::converted::at(b.w, i)) return ::sc::converted::at(a.w, i) < ::sc::converted::at(b.w, i) ? -1 : 1;
+  for (int i = 7; (::sc::lowered::tick(), i >= 0); ::sc::lowered::pre_dec(i)) if (::kern::converted::at(a.w, i) != ::kern::converted::at(b.w, i)) return ::kern::converted::at(a.w, i) < ::kern::converted::at(b.w, i) ? -1 : 1;
   return 0;
 }
 bool is_zero(const U256& a) { for (u32 x : a.w) if (x) return false; return true; }
 u32 add(U256& r, const U256& a, const U256& b) {
   u64 c = 0;
-  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += u64{::sc::converted::at(a.w, i)} + ::sc::converted::at(b.w, i); ::sc::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
+  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += u64{::kern::converted::at(a.w, i)} + ::kern::converted::at(b.w, i); ::kern::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
   return static_cast<u32>(c);
 }
 u32 sub(U256& r, const U256& a, const U256& b) {
   i64 c = 0;
-  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += static_cast<i64>(::sc::converted::at(a.w, i)) - ::sc::converted::at(b.w, i); ::sc::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
+  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += static_cast<i64>(::kern::converted::at(a.w, i)) - ::kern::converted::at(b.w, i); ::kern::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
   return c < 0 ? 1 : 0;
 }
 U256 addm(const U256& a, const U256& b, const U256& m) {
@@ -175,16 +175,16 @@ U256 mulm(const U256& a, const U256& b, const U256& m) {
   U256 r;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = addm(r, r, m);
-    if ((::sc::lowered::shr(::sc::converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
+    if ((::sc::lowered::shr(::kern::converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
   }
   return r;
 }
 U256 powm(const U256& a, const U256& e, const U256& m) {
   U256 r;
-  ::sc::converted::at(r.w, 0) = 1;
+  ::kern::converted::at(r.w, 0) = 1;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = mulm(r, r, m);
-    if ((::sc::lowered::shr(::sc::converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
+    if ((::sc::lowered::shr(::kern::converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
   }
   return r;
 }
@@ -204,7 +204,7 @@ const Pt& G() {
     Pt p;
     p.x = from_hex256("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
     p.y = from_hex256("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
-    ::sc::converted::at(p.z.w, 0) = 1;
+    ::kern::converted::at(p.z.w, 0) = 1;
     return p;
   }();
   return g;
@@ -248,7 +248,7 @@ Pt mul_pt(const Pt& p, const U256& k) {
   Pt r;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = dbl(r);
-    if ((::sc::lowered::shr(::sc::converted::at(k.w, i / 32), (i % 32))) & 1) r = add_pt(r, p);
+    if ((::sc::lowered::shr(::kern::converted::at(k.w, i / 32), (i % 32))) & 1) r = add_pt(r, p);
   }
   return r;
 }
@@ -264,14 +264,14 @@ bool affine(const Pt& p, U256& x, U256& y) {
 bool lift_x(const U256& x, Pt& out) {
   if (cmp(x, P()) >= 0) return false;
   U256 seven;
-  ::sc::converted::at(seven.w, 0) = 7;
+  ::kern::converted::at(seven.w, 0) = 7;
   const U256 c = fa(fm(fm(x, x), x), seven);
   U256 e;  // (p + 1) / 4
   add(e, P(), U256{{1}});
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::sc::converted::at(e.w, i) = (::sc::converted::at(e.w, i) >> 2) | (i < 7 ? ::sc::converted::at(e.w, ::sc::lowered::plus(i, 1)) << 30 : 0);
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::kern::converted::at(e.w, i) = (::kern::converted::at(e.w, i) >> 2) | (i < 7 ? ::kern::converted::at(e.w, ::sc::lowered::plus(i, 1)) << 30 : 0);
   U256 y = powm(c, e, P());
   if (cmp(fm(y, y), c) != 0) return false;
-  if (::sc::converted::at(y.w, 0) & 1) y = fs(U256{}, y);
+  if (::kern::converted::at(y.w, 0) & 1) y = fs(U256{}, y);
   out.x = x;
   out.y = y;
   out.z = U256{{1}};
@@ -304,13 +304,13 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
   if (is_zero(d) || cmp(d, N()) >= 0) return false;
   U256 px, py;
   if (!affine(mul_pt(G(), d), px, py)) return false;
-  if (::sc::converted::at(py.w, 0) & 1) d = subm(U256{}, d, N());
+  if (::kern::converted::at(py.w, 0) & 1) d = subm(U256{}, d, N());
   u8 pxb[32], db[32];
   to_be(px, pxb);
   to_be(d, db);
   const Bytes32 ah = tagged("BIP0340/aux", std::vector<u8>(aux.begin(), aux.end()));
   std::vector<u8> m;
-  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) m.push_back(::sc::converted::at(db, i) ^ ::sc::converted::at(ah, i));
+  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) m.push_back(::kern::converted::at(db, i) ^ ::kern::converted::at(ah, i));
   append(m, pxb, 32);
   append(m, message.data(), 32);
   const Bytes32 rand = tagged("BIP0340/nonce", m);
@@ -318,7 +318,7 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
   if (is_zero(k)) return false;
   U256 rx, ry;
   if (!affine(mul_pt(G(), k), rx, ry)) return false;
-  if (::sc::converted::at(ry.w, 0) & 1) k = subm(U256{}, k, N());
+  if (::kern::converted::at(ry.w, 0) & 1) k = subm(U256{}, k, N());
   u8 rxb[32];
   to_be(rx, rxb);
   std::vector<u8> c;
@@ -347,7 +347,7 @@ bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 
   ep.y = fs(U256{}, ep.y);
   U256 x, y;
   if (!affine(add_pt(mul_pt(G(), s), ep), x, y)) return false;
-  return (::sc::converted::at(y.w, 0) & 1) == 0 && cmp(x, r) == 0;
+  return (::kern::converted::at(y.w, 0) & 1) == 0 && cmp(x, r) == 0;
 }
 
 std::string hex(const u8* data, std::size_t n) {
@@ -361,7 +361,7 @@ bool from_hex(std::string_view s, u8* out, std::size_t n) {
   if (s.size() != 2 * n) return false;
   auto v = [](char c) { return c >= '0' && c <= '9' ? ::sc::lowered::minus(c, '0') : c >= 'a' && c <= 'f' ? ::sc::lowered::plus(::sc::lowered::minus(c, 'a'), 10) : c >= 'A' && c <= 'F' ? ::sc::lowered::plus(::sc::lowered::minus(c, 'A'), 10) : -1; };
   for (std::size_t i = 0; i < n; ++i) { ::sc::lowered::tick();
-    const int a = v(::sc::converted::at(s, 2 * i)), b = v(::sc::converted::at(s, 2 * i + 1));
+    const int a = v(::kern::converted::at(s, 2 * i)), b = v(::kern::converted::at(s, 2 * i + 1));
     if (a < 0 || b < 0) return false;
     ::sc::lowered::entry(out, i) = static_cast<u8>(::sc::lowered::plus(::sc::lowered::times(a, 16), b));
   }
@@ -474,18 +474,18 @@ constexpr u32 kK[64] = {
 inline u32 rotr(u32 x, u32 n) { return (::sc::lowered::shr(x, n)) | (::sc::lowered::shl(x, (32 - n))); }
 void block(std::array<u32, 8>& h, const std::array<u8, 64>& p) {
   u32 w[64];
-  for (int i = 0; (::sc::lowered::tick(), i < 16); ::sc::lowered::pre_inc(i)) ::sc::converted::at(w, i) = (u32{::sc::converted::at(p, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
+  for (int i = 0; (::sc::lowered::tick(), i < 16); ::sc::lowered::pre_inc(i)) ::kern::converted::at(w, i) = (u32{::kern::converted::at(p, ::sc::lowered::times(4, i))} << 24) | (u32{::kern::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::kern::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::kern::converted::at(p, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
   for (int i = 16; i < 64; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const u32 s0 = rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 15)), 7) ^ rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 15)), 18) ^ (::sc::converted::at(w, ::sc::lowered::minus(i, 15)) >> 3), s1 = rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 2)), 17) ^ rotr(::sc::converted::at(w, ::sc::lowered::minus(i, 2)), 19) ^ (::sc::converted::at(w, ::sc::lowered::minus(i, 2)) >> 10);
-    ::sc::converted::at(w, i) = ::sc::converted::at(w, ::sc::lowered::minus(i, 16)) + s0 + ::sc::converted::at(w, ::sc::lowered::minus(i, 7)) + s1;
+    const u32 s0 = rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 15)), 7) ^ rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 15)), 18) ^ (::kern::converted::at(w, ::sc::lowered::minus(i, 15)) >> 3), s1 = rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 2)), 17) ^ rotr(::kern::converted::at(w, ::sc::lowered::minus(i, 2)), 19) ^ (::kern::converted::at(w, ::sc::lowered::minus(i, 2)) >> 10);
+    ::kern::converted::at(w, i) = ::kern::converted::at(w, ::sc::lowered::minus(i, 16)) + s0 + ::kern::converted::at(w, ::sc::lowered::minus(i, 7)) + s1;
   }
-  u32 a = ::sc::converted::at(h, 0), b = ::sc::converted::at(h, 1), c = ::sc::converted::at(h, 2), d = ::sc::converted::at(h, 3), e = ::sc::converted::at(h, 4), f = ::sc::converted::at(h, 5), g = ::sc::converted::at(h, 6), k = ::sc::converted::at(h, 7);
+  u32 a = ::kern::converted::at(h, 0), b = ::kern::converted::at(h, 1), c = ::kern::converted::at(h, 2), d = ::kern::converted::at(h, 3), e = ::kern::converted::at(h, 4), f = ::kern::converted::at(h, 5), g = ::kern::converted::at(h, 6), k = ::kern::converted::at(h, 7);
   for (int i = 0; i < 64; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const u32 t1 = k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + ::sc::converted::at(kK, i) + ::sc::converted::at(w, i);
+    const u32 t1 = k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + ::kern::converted::at(kK, i) + ::kern::converted::at(w, i);
     const u32 t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
     k = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
   }
-  ::sc::converted::at(h, 0) += a; ::sc::converted::at(h, 1) += b; ::sc::converted::at(h, 2) += c; ::sc::converted::at(h, 3) += d; ::sc::converted::at(h, 4) += e; ::sc::converted::at(h, 5) += f; ::sc::converted::at(h, 6) += g; ::sc::converted::at(h, 7) += k;
+  ::kern::converted::at(h, 0) += a; ::kern::converted::at(h, 1) += b; ::kern::converted::at(h, 2) += c; ::kern::converted::at(h, 3) += d; ::kern::converted::at(h, 4) += e; ::kern::converted::at(h, 5) += f; ::kern::converted::at(h, 6) += g; ::kern::converted::at(h, 7) += k;
 }
 /// A hash in progress: the state, the block being filled and how many bytes went in. The bytes
 /// come one by one - from a list of bytes or from a text -, so nothing is copied to hash it.
@@ -496,7 +496,7 @@ struct Hasher {
   u64 length = 0;
 };
 void push(Hasher& s, u8 byte) {
-  ::sc::converted::at(s.chunk, s.filled) = byte;
+  ::kern::converted::at(s.chunk, s.filled) = byte;
   s.filled += 1;
   s.length += 1;
   if (s.filled == 64) {
@@ -511,7 +511,7 @@ Bytes32 finish(Hasher& s) {
   while ((::sc::lowered::tick(), s.filled != 56)) push(s, 0);
   for (int b = 7; (::sc::lowered::tick(), b >= 0); ::sc::lowered::pre_dec(b)) push(s, static_cast<u8>(bits >> (::sc::lowered::times(8, b))));
   Bytes32 out;
-  for (int k = 0; (::sc::lowered::tick(), k < 8); ::sc::lowered::pre_inc(k)) for (int b = 0; (::sc::lowered::tick(), b < 4); ::sc::lowered::pre_inc(b)) ::sc::converted::at(out, ::sc::lowered::plus(::sc::lowered::times(4, k), b)) = static_cast<u8>(::sc::lowered::shr(::sc::converted::at(s.h, k), (::sc::lowered::minus(24, ::sc::lowered::times(8, b)))));
+  for (int k = 0; (::sc::lowered::tick(), k < 8); ::sc::lowered::pre_inc(k)) for (int b = 0; (::sc::lowered::tick(), b < 4); ::sc::lowered::pre_inc(b)) ::kern::converted::at(out, ::sc::lowered::plus(::sc::lowered::times(4, k), b)) = static_cast<u8>(::sc::lowered::shr(::kern::converted::at(s.h, k), (::sc::lowered::minus(24, ::sc::lowered::times(8, b)))));
   return out;
 }
 }  // namespace
@@ -536,18 +536,18 @@ struct U256 { u32 w[8] = {}; };
 
 U256 from_be(const Bytes32& b) {
   U256 r;
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::sc::converted::at(r.w, ::sc::lowered::minus(7, i)) = (u32{::sc::converted::at(b, ::sc::lowered::times(4, i))} << 24) | (u32{::sc::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::sc::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::sc::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::kern::converted::at(r.w, ::sc::lowered::minus(7, i)) = (u32{::kern::converted::at(b, ::sc::lowered::times(4, i))} << 24) | (u32{::kern::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 1))} << 16) | (u32{::kern::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 2))} << 8) | ::kern::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), 3));
   return r;
 }
 Bytes32 to_be(const U256& a) {
   Bytes32 b;
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) for (int k = 0; (::sc::lowered::tick(), k < 4); ::sc::lowered::pre_inc(k)) ::sc::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), k)) = static_cast<u8>(::sc::lowered::shr(::sc::converted::at(a.w, ::sc::lowered::minus(7, i)), (::sc::lowered::minus(24, ::sc::lowered::times(8, k)))));
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) for (int k = 0; (::sc::lowered::tick(), k < 4); ::sc::lowered::pre_inc(k)) ::kern::converted::at(b, ::sc::lowered::plus(::sc::lowered::times(4, i), k)) = static_cast<u8>(::sc::lowered::shr(::kern::converted::at(a.w, ::sc::lowered::minus(7, i)), (::sc::lowered::minus(24, ::sc::lowered::times(8, k)))));
   return b;
 }
 /// One half of a signature: its first (0) or its second (1) 32 bytes.
 Bytes32 half(const std::array<u8, 64>& sig, int which) {
   Bytes32 b;
-  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) ::sc::converted::at(b, i) = ::sc::converted::at(sig, ::sc::lowered::plus(::sc::lowered::times(32, which), i));
+  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) ::kern::converted::at(b, i) = ::kern::converted::at(sig, ::sc::lowered::plus(::sc::lowered::times(32, which), i));
   return b;
 }
 U256 from_hex256(const char* s) {
@@ -556,18 +556,18 @@ U256 from_hex256(const char* s) {
   return from_be(b);
 }
 int cmp(const U256& a, const U256& b) {
-  for (int i = 7; (::sc::lowered::tick(), i >= 0); ::sc::lowered::pre_dec(i)) if (::sc::converted::at(a.w, i) != ::sc::converted::at(b.w, i)) return ::sc::converted::at(a.w, i) < ::sc::converted::at(b.w, i) ? -1 : 1;
+  for (int i = 7; (::sc::lowered::tick(), i >= 0); ::sc::lowered::pre_dec(i)) if (::kern::converted::at(a.w, i) != ::kern::converted::at(b.w, i)) return ::kern::converted::at(a.w, i) < ::kern::converted::at(b.w, i) ? -1 : 1;
   return 0;
 }
 bool is_zero(const U256& a) { for (u32 x : a.w) if (x) return false; return true; }
 u32 add(U256& r, const U256& a, const U256& b) {
   u64 c = 0;
-  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += u64{::sc::converted::at(a.w, i)} + ::sc::converted::at(b.w, i); ::sc::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
+  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += u64{::kern::converted::at(a.w, i)} + ::kern::converted::at(b.w, i); ::kern::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
   return static_cast<u32>(c);
 }
 u32 sub(U256& r, const U256& a, const U256& b) {
   i64 c = 0;
-  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += static_cast<i64>(::sc::converted::at(a.w, i)) - ::sc::converted::at(b.w, i); ::sc::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
+  for (int i = 0; i < 8; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); c += static_cast<i64>(::kern::converted::at(a.w, i)) - ::kern::converted::at(b.w, i); ::kern::converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
   return c < 0 ? 1 : 0;
 }
 U256 addm(const U256& a, const U256& b, const U256& m) {
@@ -585,16 +585,16 @@ U256 mulm(const U256& a, const U256& b, const U256& m) {
   U256 r;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = addm(r, r, m);
-    if ((::sc::lowered::shr(::sc::converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
+    if ((::sc::lowered::shr(::kern::converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
   }
   return r;
 }
 U256 powm(const U256& a, const U256& e, const U256& m) {
   U256 r;
-  ::sc::converted::at(r.w, 0) = 1;
+  ::kern::converted::at(r.w, 0) = 1;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = mulm(r, r, m);
-    if ((::sc::lowered::shr(::sc::converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
+    if ((::sc::lowered::shr(::kern::converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
   }
   return r;
 }
@@ -655,7 +655,7 @@ Pt mul_pt(const Pt& p, const U256& k) {
   Pt r;
   for (int i = 255; i >= 0; ::sc::lowered::pre_dec(i)) { ::sc::lowered::tick();
     r = dbl(r);
-    if ((::sc::lowered::shr(::sc::converted::at(k.w, i / 32), (i % 32))) & 1) r = add_pt(r, p);
+    if ((::sc::lowered::shr(::kern::converted::at(k.w, i / 32), (i % 32))) & 1) r = add_pt(r, p);
   }
   return r;
 }
@@ -671,14 +671,14 @@ bool affine(const Pt& p, U256& x, U256& y) {
 bool lift_x(const U256& x, Pt& out) {
   if (cmp(x, P()) >= 0) return false;
   U256 seven;
-  ::sc::converted::at(seven.w, 0) = 7;
+  ::kern::converted::at(seven.w, 0) = 7;
   const U256 c = fa(fm(fm(x, x), x), seven);
   U256 e;  // (p + 1) / 4
   add(e, P(), U256{{1}});
-  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::sc::converted::at(e.w, i) = (::sc::converted::at(e.w, i) >> 2) | (i < 7 ? ::sc::converted::at(e.w, ::sc::lowered::plus(i, 1)) << 30 : 0);
+  for (int i = 0; (::sc::lowered::tick(), i < 8); ::sc::lowered::pre_inc(i)) ::kern::converted::at(e.w, i) = (::kern::converted::at(e.w, i) >> 2) | (i < 7 ? ::kern::converted::at(e.w, ::sc::lowered::plus(i, 1)) << 30 : 0);
   U256 y = powm(c, e, P());
   if (cmp(fm(y, y), c) != 0) return false;
-  if (::sc::converted::at(y.w, 0) & 1) y = fs(U256{}, y);
+  if (::kern::converted::at(y.w, 0) & 1) y = fs(U256{}, y);
   out.x = x;
   out.y = y;
   out.z = U256{{1}};
@@ -709,11 +709,11 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
   if (is_zero(d) || cmp(d, N()) >= 0) return false;
   U256 px, py;
   if (!affine(mul_pt(G(), d), px, py)) return false;
-  if (::sc::converted::at(py.w, 0) & 1) d = subm(U256{}, d, N());
+  if (::kern::converted::at(py.w, 0) & 1) d = subm(U256{}, d, N());
   const Bytes32 pxb = to_be(px), db = to_be(d);
   const Bytes32 ah = tagged("BIP0340/aux", std::vector<u8>(aux.begin(), aux.end()));
   std::vector<u8> m;
-  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) m.push_back(::sc::converted::at(db, i) ^ ::sc::converted::at(ah, i));
+  for (int i = 0; (::sc::lowered::tick(), i < 32); ::sc::lowered::pre_inc(i)) m.push_back(::kern::converted::at(db, i) ^ ::kern::converted::at(ah, i));
   append(m, pxb);
   append(m, message);
   const Bytes32 rand = tagged("BIP0340/nonce", m);
@@ -721,7 +721,7 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
   if (is_zero(k)) return false;
   U256 rx, ry;
   if (!affine(mul_pt(G(), k), rx, ry)) return false;
-  if (::sc::converted::at(ry.w, 0) & 1) k = subm(U256{}, k, N());
+  if (::kern::converted::at(ry.w, 0) & 1) k = subm(U256{}, k, N());
   const Bytes32 rxb = to_be(rx);
   std::vector<u8> c;
   append(c, rxb);
@@ -731,8 +731,8 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
   const U256 s = addm(k, mulm(e, d, N()), N());
   const Bytes32 sb = to_be(s);
   for (int i = 0; i < 32; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    ::sc::converted::at(sig, i) = ::sc::converted::at(rxb, i);
-    ::sc::converted::at(sig, ::sc::lowered::plus(32, i)) = ::sc::converted::at(sb, i);
+    ::kern::converted::at(sig, i) = ::kern::converted::at(rxb, i);
+    ::kern::converted::at(sig, ::sc::lowered::plus(32, i)) = ::kern::converted::at(sb, i);
   }
   return verify(pxb, message, sig);
 }
@@ -753,14 +753,14 @@ bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 
   ep.y = fs(U256{}, ep.y);
   U256 x, y;
   if (!affine(add_pt(mul_pt(G(), s), ep), x, y)) return false;
-  return (::sc::converted::at(y.w, 0) & 1) == 0 && cmp(x, r) == 0;
+  return (::kern::converted::at(y.w, 0) & 1) == 0 && cmp(x, r) == 0;
 }
 
 namespace {
 constexpr char kHexDigits[] = "0123456789abcdef";
 void hex_of(std::string& o, u8 byte) {
-  o += ::sc::converted::at(kHexDigits, byte >> 4);
-  o += ::sc::converted::at(kHexDigits, byte & 15);
+  o += ::kern::converted::at(kHexDigits, byte >> 4);
+  o += ::kern::converted::at(kHexDigits, byte & 15);
 }
 }  // namespace
 
@@ -781,9 +781,9 @@ bool from_hex(std::string_view s, Bytes32& out) {
   if (s.size() != 2 * n) return false;
   auto v = [](char c) { return c >= '0' && c <= '9' ? ::sc::lowered::minus(c, '0') : c >= 'a' && c <= 'f' ? ::sc::lowered::plus(::sc::lowered::minus(c, 'a'), 10) : c >= 'A' && c <= 'F' ? ::sc::lowered::plus(::sc::lowered::minus(c, 'A'), 10) : -1; };
   for (std::size_t i = 0; i < n; ++i) { ::sc::lowered::tick();
-    const int a = v(::sc::converted::at(s, 2 * i)), b = v(::sc::converted::at(s, 2 * i + 1));
+    const int a = v(::kern::converted::at(s, 2 * i)), b = v(::kern::converted::at(s, 2 * i + 1));
     if (a < 0 || b < 0) return false;
-    ::sc::converted::at(out, i) = static_cast<u8>(::sc::lowered::plus(::sc::lowered::times(a, 16), b));
+    ::kern::converted::at(out, i) = static_cast<u8>(::sc::lowered::plus(::sc::lowered::times(a, 16), b));
   }
   return true;
 }
@@ -840,10 +840,10 @@ template <> struct Fields<::sc_new_nostr::sc::nostr::U256> { static auto of(::sc
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_nostr_cpp) {
+KERN_TEST(lowered_nostr_cpp) {
   {  // block(u32 *, const u8 *)  ->  block(std::array<u32, 8> &, const std::array<u8, 64> &)
     ::sc::lowered::Tally tally("block(u32 *, const u8 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::array<u32, 8>> o0;
       ::sc::lowered::Arg<std::array<u32, 8> &> n0;
@@ -863,7 +863,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // sha256(const u8 *, std::size_t, u8 *)  ->  sha256(const std::vector<u8> &)
     ::sc::lowered::Tally tally("sha256(const u8 *, std::size_t, u8 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::vector<u8>> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -882,7 +882,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // sha256(std::string_view)  ->  sha256(std::string_view)
     ::sc::lowered::Tally tally("sha256(std::string_view)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::string_view> o0;
       ::sc::lowered::Arg<std::string_view> n0;
@@ -899,7 +899,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // from_be(const u8 *)  ->  from_be(const Bytes32 &)
     ::sc::lowered::Tally tally("from_be(const u8 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::array<u8, 32>> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;
@@ -917,7 +917,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // to_be(const U256 &, u8 *)  ->  to_be(const U256 &)
     ::sc::lowered::Tally tally("to_be(const U256 &, u8 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_nostr::sc::nostr::U256 &> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::U256 &> n0;
@@ -935,7 +935,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // from_hex256(const char *)  ->  from_hex256(const char *)
     ::sc::lowered::Tally tally("from_hex256(const char *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const char *> o0;
       ::sc::lowered::Arg<const char *> n0;
@@ -952,7 +952,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // P()  ->  P()
     ::sc::lowered::Tally tally("P()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_nostr::sc::nostr::P())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_nostr::sc::nostr::P())>> n_r;
@@ -966,7 +966,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // N()  ->  N()
     ::sc::lowered::Tally tally("N()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_nostr::sc::nostr::N())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_nostr::sc::nostr::N())>> n_r;
@@ -980,7 +980,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // G()  ->  G()
     ::sc::lowered::Tally tally("G()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_nostr::sc::nostr::G())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_nostr::sc::nostr::G())>> n_r;
@@ -994,7 +994,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // tagged(std::string_view, const std::vector<u8> &)  ->  tagged(std::string_view, const std::vector<u8> &)
     ::sc::lowered::Tally tally("tagged(std::string_view, const std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::string_view> o0;
       ::sc::lowered::Arg<std::string_view> n0;
@@ -1014,7 +1014,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // append(std::vector<u8> &, const u8 *, std::size_t)  ->  append(std::vector<u8> &, const Bytes32 &)
     ::sc::lowered::Tally tally("append(std::vector<u8> &, const u8 *, std::size_t)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::vector<u8> &> o0;
       ::sc::lowered::Arg<std::vector<u8> &> n0;
@@ -1033,7 +1033,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // public_key(const Bytes32 &, Bytes32 &)  ->  public_key(const Bytes32 &, Bytes32 &)
     ::sc::lowered::Tally tally("public_key(const Bytes32 &, Bytes32 &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_nostr::sc::nostr::Bytes32 &> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;
@@ -1054,7 +1054,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // sign(const Bytes32 &, const Bytes32 &, const Bytes32 &, std::array<u8, 64> &)  ->  sign(const Bytes32 &, const Bytes32 &, const Bytes32 &, std::array<u8, 64> &)
     ::sc::lowered::Tally tally("sign(const Bytes32 &, const Bytes32 &, const Bytes32 &, std::array<u8, 64> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_nostr::sc::nostr::Bytes32 &> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;
@@ -1081,7 +1081,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // verify(const Bytes32 &, const Bytes32 &, const std::array<u8, 64> &)  ->  verify(const Bytes32 &, const Bytes32 &, const std::array<u8, 64> &)
     ::sc::lowered::Tally tally("verify(const Bytes32 &, const Bytes32 &, const std::array<u8, 64> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_nostr::sc::nostr::Bytes32 &> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;
@@ -1104,7 +1104,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // hex(const u8 *, std::size_t)  ->  hex(const Bytes32 &)
     ::sc::lowered::Tally tally("hex(const u8 *, std::size_t)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::array<u8, 32>> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;
@@ -1122,7 +1122,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // from_hex(std::string_view, u8 *, std::size_t)  ->  from_hex(std::string_view, Bytes32 &)
     ::sc::lowered::Tally tally("from_hex(std::string_view, u8 *, std::size_t)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<std::string_view> o0;
       ::sc::lowered::Arg<std::string_view> n0;
@@ -1144,7 +1144,7 @@ SC_TEST(lowered_nostr_cpp) {
   }
   {  // event_json(const Bytes32 &, const Bytes32 &, i64, u32, std::string_view, std::string_view, std::string &)  ->  event_json(const Bytes32 &, const Bytes32 &, i64, u32, std::string_view, std::string_view, std::string &)
     ::sc::lowered::Tally tally("event_json(const Bytes32 &, const Bytes32 &, i64, u32, std::string_view, std::string_view, std::string &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_nostr::sc::nostr::Bytes32 &> o0;
       ::sc::lowered::Arg<const ::sc_new_nostr::sc::nostr::Bytes32 &> n0;

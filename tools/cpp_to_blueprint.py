@@ -589,7 +589,7 @@ def kids(n):
 # "qualType") next to what it is (its "desugaredQualType", where size_t and u64 are the same): where the
 # spelling names one of those, the spelling is the type - unless it also names something only the other
 # says (a list's value_type - which the compiler may also name without its class -, auto).
-WHOLE64 = re.compile(r"(?<![\w:])(?:kern::|std::|sc::)?(u64|i64|uint64_t|int64_t)\b")
+WHOLE64 = re.compile(r"(?<![\w:])(?:\w+::)?(u64|i64|uint64_t|int64_t)\b")   # (kern::u64, std::uint64_t, the program's own <ns>::u64)
 UNSPELLED = re.compile(r"(?<![\w])(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
 
 
@@ -700,7 +700,7 @@ def record_of(tree, v):
     raw = re.sub(r"^(?:struct|class)\s+", "", raw)
     if raw in tree.records:
         return raw
-    # (the tree names a record without the namespace that is converted - `sc::wire::F32` is `wire::F32`)
+    # (the tree names a record without the namespace that is converted - `<ns>::wire::F32` is `wire::F32`)
     found = [r for r in tree.records if raw.endswith("::" + r) or r.endswith("::" + raw)]
     longest = [r for r in found if len(r) == max(map(len, found))]
     return longest[0] if len(longest) == 1 else None
@@ -876,7 +876,7 @@ class Tree:
         self.declared = set() # qualified names of the records declared without their definition (struct Tile;)
         self.enums = {}       # qualified name -> enum
         self.owner = {}       # id of a method -> its record's qualified name
-        self.scope_of = {}    # id -> the qualified scope it stands in ("sc::combat::")
+        self.scope_of = {}    # id -> the qualified scope it stands in ("<ns>::combat::")
         self.aliases = {}     # a name the program gives a type (using Bytes32 = ...) -> that type
         self.alias_decls = []
         self.template_of = {}  # a function made from a template (its id) -> the template
@@ -2223,6 +2223,9 @@ class Unit:
                                                    "or in the entry kern_main())")
             raise Wait(f"the class {q.split('::')[-1]} has a base class, and it is no state: {why}")
         self.structs[q] = None
+        # (the types of its fields are named as C++ looks them up there: from inside the struct - `std::vector<Tile>` in
+        # CityStream is CityStream::Tile, from whatever Blueprint the struct is first met in)
+        looked, self.lookup_scope = self.lookup_scope, q + "::"
         try:
             fields, taken, declared = [], set(), {}
             for c in kids(o):
@@ -2261,6 +2264,8 @@ class Unit:
         except Wait:
             del self.structs[q]
             raise
+        finally:
+            self.lookup_scope = looked
         name = self.type_name(q)
         if name in self.type_line:
             del self.structs[q]
@@ -4175,7 +4180,7 @@ class Emit:
     def implementing_state(self, n):
         """The Blueprint (its actor's name) and the interface of the engine it implements, whose one object `n` is, where that is a state that derives from an
         interface of the engine (World.state_implements: Facades, a ShaderExtension) and `n` its getter called -
-        `sc::facades()` (World.getters); else None."""
+        `<ns>::facades()` (World.getters); else None."""
         n = bare(n)
         while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
             n = bare(kids(n)[0])
@@ -7699,7 +7704,7 @@ class Emit:
 
     def other_state(self, n):
         """A call of a method of the one object of another class of the program that is the state of a Blueprint
-        (`sc::game().start(e)` in SpawnCityApp, whose Blueprint is another): (its Blueprint - an actor of the level -,
+        (`<ns>::game().start(e)` in an App, whose Blueprint is another): (its Blueprint - an actor of the level -,
         the method's function there); else None. (Its one object is that Blueprint: reached by its name, Call on Actor.)"""
         if n.get("kind") != "CXXMemberCallExpr":
             return None
@@ -10353,7 +10358,7 @@ class Emit:
                 return self.ex(kids(b)[0], t), t   # (an object of the engine and a pointer to it: one Object)
             implementing = self.implementing_state(kids(b)[0]) if op == "&" and kids(b) else None
             if implementing is not None:
-                # (&sc::facades(): the one object of a state that is an object of an interface of the engine - what
+                # (&<ns>::facades(): the one object of a state that is an object of an interface of the engine - what
                 # the engine is handed as that object: Engine Object of Blueprint on its Blueprint, as that interface -
                 # an Object of it, kern/docs/engine_object.md)
                 actor, interface = implementing
@@ -12410,7 +12415,7 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 TEXT_TYPE = re.compile(r"(?:const\s+)?std::(?:basic_string|string|string_view|basic_string_view|u8string|u16string|u32string|wstring)\b")
 # A view the test hands a function (kern::Span): its entries are a list a pointer of the source points into (`bytes.data`).
 SPAN_TYPE = re.compile(r"(?:const\s+)?(?:kern::)?Span<")
-WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
+WIDE_PRELUDE = """// the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
@@ -12447,9 +12452,9 @@ class Held:
 
 
 class TestWriter:
-    # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
+    # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, kern::test::BlueprintRun)
     OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
-    """The test of one converted file (see tests/converted.h of the game). It holds the source of the
+    """The test of one converted file (see kern/test/converted.h). It holds the source of the
     file's converted functions once more, compiled with the numbers and the mathematics of the
     Blueprint language - classes and constants along with them - and calls each function there and
     in the Blueprint with the same arguments. What they give must be the same, bit for bit."""
@@ -13493,15 +13498,15 @@ class TestWriter:
         space, inner = c.split("::", 1)
         fields = [f for f, _, _, _ in self.u.struct_fields[t]]
         n = len(fields)
-        lines = [f"namespace {space} {{ using sc::converted::arg; using sc::converted::same; using sc::converted::defined; using sc::converted::text; using sc::converted::take;",
-                 f"[[maybe_unused]] static {inner} draw_value(sc::converted::Draw& draw, const {inner}*) {{ {inner} s{{}}; "
-                 + " ".join(f"s.{f} = sc::converted::draw_class<decltype(s.{f})>(draw);" for f in fields) + " return s; }",
-                 f"[[maybe_unused]] static sc::converted::Value arg(const {inner}& s) {{ return sc::converted::Value::structure({{{', '.join(f'arg(s.{f})' for f in fields)}}}); }}",
-                 f"[[maybe_unused]] static bool same(const {inner}& want, const sc::converted::Value& got) {{ return sc::converted::rows_of(got, {n})"
-                 + "".join(f" && sc::converted::at_place(same(want.{f}, (*got.rows)[{i}]), \".{f}\")" for i, f in enumerate(fields)) + "; }",
+        lines = [f"namespace {space} {{ using ::kern::converted::arg; using ::kern::converted::same; using ::kern::converted::defined; using ::kern::converted::text; using ::kern::converted::take;",
+                 f"[[maybe_unused]] static {inner} draw_value(::kern::converted::Draw& draw, const {inner}*) {{ {inner} s{{}}; "
+                 + " ".join(f"s.{f} = ::kern::converted::draw_class<decltype(s.{f})>(draw);" for f in fields) + " return s; }",
+                 f"[[maybe_unused]] static ::kern::converted::Value arg(const {inner}& s) {{ return ::kern::converted::Value::structure({{{', '.join(f'arg(s.{f})' for f in fields)}}}); }}",
+                 f"[[maybe_unused]] static bool same(const {inner}& want, const ::kern::converted::Value& got) {{ return ::kern::converted::rows_of(got, {n})"
+                 + "".join(f" && ::kern::converted::at_place(same(want.{f}, (*got.rows)[{i}]), \".{f}\")" for i, f in enumerate(fields)) + "; }",
                  f"[[maybe_unused]] static bool defined(const {inner}& s) {{ return " + " && ".join(f"defined(s.{f})" for f in fields) + "; }",
                  f"[[maybe_unused]] static std::string text(const {inner}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f in fields) + ' + "}"; }',
-                 f"[[maybe_unused]] static void take({inner}& s, const sc::converted::Value& v) {{ if (!v.rows || v.rows->size() != {n}) return; "
+                 f"[[maybe_unused]] static void take({inner}& s, const ::kern::converted::Value& v) {{ if (!v.rows || v.rows->size() != {n}) return; "
                  + " ".join(f"take(s.{f}, (*v.rows)[{i}]);" for i, f in enumerate(fields)) + " }",
                  "}"]
         for f, ft, _, _ in self.u.struct_fields[t]:   # (a struct of a class a field is: its helpers before these)
@@ -13966,7 +13971,7 @@ class TestWriter:
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
         # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
-        # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
+        # runs the actors' Blueprints in a real one - converted::Blueprint, kern::test::BlueprintRun)
         own_logic = self.OWN_LOGIC
         objects = {q for q in u.objects_seen | set(by_class) | set(fields) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
@@ -14119,7 +14124,7 @@ class TestWriter:
 
     def space_written(self, name):
         """The namespace a using-directive in a text names as it is written there ('combat', 'kern::game',
-        '::sc::net') - by its full name, or None (as space_of_directive)."""
+        '::<ns>::net') - by its full name, or None (as space_of_directive)."""
         name = re.sub(r"\s+", "", name).lstrip(":")
         if name.startswith(self.tree.namespace + "::"):
             name = name[len(self.tree.namespace) + 2:]
@@ -14210,7 +14215,7 @@ class TestWriter:
 
     def renamer(self, pairs, spaces=()):
         """What is compiled along is the test's own: a name of the program or the engine written out in
-        full (`kern::Camera`, `sc::Game::Mode`) means the test's (`Camera`, `Mode`). A namespace the
+        full (`kern::Camera`, `<ns>::Game::Mode`) means the test's (`Camera`, `Mode`). A namespace the
         source gives another name (`namespace ph = kern::physics;`) is that namespace. (A pair may have a
         third part: what the test's name stands in - the namespace of another file's own pieces, see
         `exports`. `spaces`: the names other files give namespaces.)"""
@@ -15371,7 +15376,7 @@ class TestWriter:
             # (the stand-in of a function of the engine this file does not see: before the pieces that call it)
             foreign_chunks.append(((first[0], first[1] - (0.75 if piece["kind"] == "engine" else 0.5), i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
-        # them (converted::Blueprint, RuleBlueprint) - for the source, bound to the objects it calls them by, and
+        # them (converted::Blueprint, kern::test::BlueprintRun) - for the source, bound to the objects it calls them by, and
         # for the Blueprint beside it, where actor_find finds them (the host's find_actor); the engine is the
         # test's stand-in for all of them.
         actors = sorted({a for f in u.order for a in actors_called(f)})
@@ -15673,9 +15678,9 @@ class TestWriter:
             add(None, "\n".join([
                 f"// Generated by tools/cpp_to_blueprint.py from {os.path.basename(self.path)} - do not edit. The Blueprint \"{u.name}\" of the level is this",
                 "// file's C++, converted. Here the source of every converted function stands once more, compiled with the numbers",
-                "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (../converted.h).",
-                *system, *own, '#include "../converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
-                f"namespace {ns} {{", f"namespace converted = ::{tree.namespace}::converted;",
+                "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (kern/test/converted.h).",
+                *system, *own, '#include "kern/test/converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
+                f"namespace {ns} {{", "namespace converted = ::kern::converted;",
                 "[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                 WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
@@ -15765,14 +15770,14 @@ class TestWriter:
             for key, text in outs:
                 if key not in dropped and text:
                     add(key, text)
-            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{",
+            add(None, "\n".join(["", f"KERN_TEST(converted_{stem}) {{",
                                   f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
             for b in dict.fromkeys(bindings):
                 if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
                     add(("bind", b), f"  {b}.bind(bp.source_logic());")
             for a in actors:   # (the source calls a Blueprint as its class: bound to the object the source's logic runs it as)
                 if a in class_libraries(u.world) and ("class", a) not in dropped:
-                    add(("class", a), f"  SC_CHECK(kern::logic::bind_blueprint<blueprints::{a}>(bp.source_logic()), \"the Blueprint {a} runs as its class\");")
+                    add(("class", a), f"  KERN_CHECK(kern::logic::bind_blueprint<blueprints::{a}>(bp.source_logic()), \"the Blueprint {a} runs as its class\");")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
@@ -15897,7 +15902,7 @@ class TestWriter:
         d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
         path = os.path.join(d, f"test_{stem}.cpp")
         head = text.split("\n")
-        full = text.replace('#include "../converted.h"', f'#include "{os.path.abspath(os.path.join(self.test_dir, "..", "converted.h"))}"').replace(f'#include "{self.source_dir}/', f'#include "{os.path.dirname(self.path)}/')
+        full = text.replace(f'#include "{self.source_dir}/', f'#include "{os.path.dirname(self.path)}/')
         assert len(full.split("\n")) == len(head)
         open(path, "w").write(full)
         if os.environ.get("TEST_KEEP"):   # (to look at: every text of the tests, as it was compiled - numbered)
@@ -16317,7 +16322,7 @@ def entry_dumps(path, flags):
 def engine_interface_of(tree, rec):
     """The interface of the engine a class of the program derives from (kern/docs/blueprint_cpp.md, "Schnittstellen der
     Engine"): its one base, public, a class of the engine whose functions are all virtual, and what it holds the class
-    does not name (`class SpawnCityApp final : public kern::App`) - [the name the Blueprints give it (App), its pure
+    does not name (`class MyApp final : public kern::App`) - [the name the Blueprints give it (App), its pure
     functions]; else None."""
     bases = rec.get("bases") or []
     if len(bases) != 1 or bases[0].get("access", "public") != "public" or bases[0].get("isVirtual"):

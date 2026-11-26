@@ -135,8 +135,8 @@ constexpr std::size_t kLampBytes = 9, kPlankBytes = 11, kMarkBytes = 20;
 }  // namespace
 
 Kind kind_of(const std::vector<u8>& blob) {
-  if (blob.empty() || ::sc::converted::at(blob, 0) < 1 || ::sc::converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
-  return static_cast<Kind>(::sc::converted::at(blob, 0));
+  if (blob.empty() || ::kern::converted::at(blob, 0) < 1 || ::kern::converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
+  return static_cast<Kind>(::kern::converted::at(blob, 0));
 }
 
 std::vector<u8> pack(const CarHit& h) { return Out().put(static_cast<u8>(Kind::car_hit)).put(h.car).put(h.damage).put(static_cast<u8>(h.cause)).b; }
@@ -169,7 +169,7 @@ std::vector<std::vector<u8>> pack_lamps(const std::vector<LampRec>& lamps) {
     const std::size_t n = std::min<std::size_t>(255, lamps.size() - from);
     Out o;
     o.put(static_cast<u8>(Kind::lamps)).put(static_cast<u8>(n));
-    for (std::size_t i = from; (::sc::lowered::tick(), i < from + n); ++i) o.put(::sc::converted::at(lamps, i).key).put(::sc::converted::at(lamps, i).state);
+    for (std::size_t i = from; (::sc::lowered::tick(), i < from + n); ++i) o.put(::kern::converted::at(lamps, i).key).put(::kern::converted::at(lamps, i).state);
     out.push_back(std::move(o.b));
   }
   return out;
@@ -229,11 +229,11 @@ std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& l
     Out o;
     o.put(static_cast<u8>(Kind::state)).put(epoch).put(static_cast<u8>((out.empty() ? 1 : 0) | (last ? 2 : 0)));
     o.put(static_cast<u16>(nl));
-    for (std::size_t i = li; (::sc::lowered::tick(), i < li + nl); ++i) o.put(::sc::converted::at(lamps, i).key).put(::sc::converted::at(lamps, i).state);
+    for (std::size_t i = li; (::sc::lowered::tick(), i < li + nl); ++i) o.put(::kern::converted::at(lamps, i).key).put(::kern::converted::at(lamps, i).state);
     o.put(static_cast<u16>(np));
-    for (std::size_t i = pi; (::sc::lowered::tick(), i < pi + np); ++i) o.put(::sc::converted::at(planks, i).key).put(::sc::converted::at(planks, i).door).put(::sc::converted::at(planks, i).doors).put(::sc::converted::at(planks, i).planks);
+    for (std::size_t i = pi; (::sc::lowered::tick(), i < pi + np); ++i) o.put(::kern::converted::at(planks, i).key).put(::kern::converted::at(planks, i).door).put(::kern::converted::at(planks, i).doors).put(::kern::converted::at(planks, i).planks);
     o.put(static_cast<u16>(nm));
-    for (std::size_t i = mi; (::sc::lowered::tick(), i < mi + nm); ++i) o.put(::sc::converted::at(marks, i).at).put(::sc::converted::at(marks, i).radius).put(::sc::converted::at(marks, i).strength);
+    for (std::size_t i = mi; (::sc::lowered::tick(), i < mi + nm); ++i) o.put(::kern::converted::at(marks, i).at).put(::kern::converted::at(marks, i).radius).put(::kern::converted::at(marks, i).strength);
     out.push_back(std::move(o.b));
     li += nl;
     pi += np;
@@ -378,8 +378,8 @@ constexpr std::size_t kLampBytes = 9, kPlankBytes = 11, kMarkBytes = 20;
 }  // namespace
 
 Kind kind_of(const std::vector<u8>& blob) {
-  if (blob.empty() || ::sc::converted::at(blob, 0) < 1 || ::sc::converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
-  return static_cast<Kind>(::sc::converted::at(blob, 0));
+  if (blob.empty() || ::kern::converted::at(blob, 0) < 1 || ::kern::converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
+  return static_cast<Kind>(::kern::converted::at(blob, 0));
 }
 
 std::vector<u8> pack(const CarHit& h) {
@@ -429,7 +429,7 @@ std::vector<std::vector<u8>> pack_lamps(const std::vector<LampRec>& lamps) {
     std::vector<u8> o;
     wire::put_u8(o, static_cast<u8>(Kind::lamps));
     wire::put_u8(o, static_cast<u8>(n));
-    for (std::size_t i = from; i < from + n; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::sc::converted::at(lamps, i).key); wire::put_u8(o, ::sc::converted::at(lamps, i).state); }
+    for (std::size_t i = from; i < from + n; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::kern::converted::at(lamps, i).key); wire::put_u8(o, ::kern::converted::at(lamps, i).state); }
     out.push_back(std::move(o));
   }
   return out;
@@ -507,11 +507,11 @@ std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& l
     wire::put_u32(o, epoch);
     wire::put_u8(o, static_cast<u8>((out.empty() ? 1 : 0) | (last ? 2 : 0)));
     wire::put_u16(o, static_cast<u16>(nl));
-    for (std::size_t i = li; i < li + nl; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::sc::converted::at(lamps, i).key); wire::put_u8(o, ::sc::converted::at(lamps, i).state); }
+    for (std::size_t i = li; i < li + nl; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::kern::converted::at(lamps, i).key); wire::put_u8(o, ::kern::converted::at(lamps, i).state); }
     wire::put_u16(o, static_cast<u16>(np));
-    for (std::size_t i = pi; i < pi + np; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::sc::converted::at(planks, i).key); wire::put_u8(o, ::sc::converted::at(planks, i).door); wire::put_u8(o, ::sc::converted::at(planks, i).doors); wire::put_u8(o, ::sc::converted::at(planks, i).planks); }
+    for (std::size_t i = pi; i < pi + np; ++i) { ::sc::lowered::tick(); wire::put_i64(o, ::kern::converted::at(planks, i).key); wire::put_u8(o, ::kern::converted::at(planks, i).door); wire::put_u8(o, ::kern::converted::at(planks, i).doors); wire::put_u8(o, ::kern::converted::at(planks, i).planks); }
     wire::put_u16(o, static_cast<u16>(nm));
-    for (std::size_t i = mi; i < mi + nm; ++i) { ::sc::lowered::tick(); wire::put_vec3(o, ::sc::converted::at(marks, i).at); wire::put_f32(o, ::sc::converted::at(marks, i).radius); wire::put_f32(o, ::sc::converted::at(marks, i).strength); }
+    for (std::size_t i = mi; i < mi + nm; ++i) { ::sc::lowered::tick(); wire::put_vec3(o, ::kern::converted::at(marks, i).at); wire::put_f32(o, ::kern::converted::at(marks, i).radius); wire::put_f32(o, ::kern::converted::at(marks, i).strength); }
     out.push_back(std::move(o));
     li += nl;
     pi += np;
@@ -590,10 +590,10 @@ template <> struct Values<::sc_new_town_sync::sc::town::Cause> { static constexp
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_town_sync_cpp) {
+KERN_TEST(lowered_town_sync_cpp) {
   {  // pack(const CarHit &)  ->  pack(const CarHit &)
     ::sc::lowered::Tally tally("pack(const CarHit &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_town_sync::sc::town::CarHit &> o0;
       ::sc::lowered::Arg<const ::sc_new_town_sync::sc::town::CarHit &> n0;
@@ -610,7 +610,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack(const std::vector<u8> &, CarHit &)  ->  unpack(const std::vector<u8> &, CarHit &)
     ::sc::lowered::Tally tally("unpack(const std::vector<u8> &, CarHit &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -631,7 +631,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // pack(const PersonHit &)  ->  pack(const PersonHit &)
     ::sc::lowered::Tally tally("pack(const PersonHit &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_town_sync::sc::town::PersonHit &> o0;
       ::sc::lowered::Arg<const ::sc_new_town_sync::sc::town::PersonHit &> n0;
@@ -648,7 +648,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack(const std::vector<u8> &, PersonHit &)  ->  unpack(const std::vector<u8> &, PersonHit &)
     ::sc::lowered::Tally tally("unpack(const std::vector<u8> &, PersonHit &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -669,7 +669,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // pack_lamps(const std::vector<LampRec> &)  ->  pack_lamps(const std::vector<LampRec> &)
     ::sc::lowered::Tally tally("pack_lamps(const std::vector<LampRec> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<::sc_old_town_sync::sc::town::LampRec> &> o0;
       ::sc::lowered::Arg<const std::vector<::sc_new_town_sync::sc::town::LampRec> &> n0;
@@ -686,7 +686,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack_lamps(const std::vector<u8> &, std::vector<LampRec> &)  ->  unpack_lamps(const std::vector<u8> &, std::vector<LampRec> &)
     ::sc::lowered::Tally tally("unpack_lamps(const std::vector<u8> &, std::vector<LampRec> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -707,7 +707,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // pack(const PlankStep &)  ->  pack(const PlankStep &)
     ::sc::lowered::Tally tally("pack(const PlankStep &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_town_sync::sc::town::PlankStep &> o0;
       ::sc::lowered::Arg<const ::sc_new_town_sync::sc::town::PlankStep &> n0;
@@ -724,7 +724,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack(const std::vector<u8> &, PlankStep &)  ->  unpack(const std::vector<u8> &, PlankStep &)
     ::sc::lowered::Tally tally("unpack(const std::vector<u8> &, PlankStep &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -745,7 +745,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // pack(const PlankRec &)  ->  pack(const PlankRec &)
     ::sc::lowered::Tally tally("pack(const PlankRec &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_town_sync::sc::town::PlankRec &> o0;
       ::sc::lowered::Arg<const ::sc_new_town_sync::sc::town::PlankRec &> n0;
@@ -762,7 +762,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack(const std::vector<u8> &, PlankRec &)  ->  unpack(const std::vector<u8> &, PlankRec &)
     ::sc::lowered::Tally tally("unpack(const std::vector<u8> &, PlankRec &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -783,7 +783,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // pack_state(u32, const std::vector<LampRec> &, const std::vector<PlankRec> &, const std::vector<MarkRec> &)  ->  pack_state(u32, const std::vector<LampRec> &, const std::vector<PlankRec> &, const std::vector<MarkRec> &)
     ::sc::lowered::Tally tally("pack_state(u32, const std::vector<LampRec> &, const std::vector<PlankRec> &, const std::vector<MarkRec> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<u32> o0;
       ::sc::lowered::Arg<u32> n0;
@@ -809,7 +809,7 @@ SC_TEST(lowered_town_sync_cpp) {
   }
   {  // unpack_state(const std::vector<u8> &, State &)  ->  unpack_state(const std::vector<u8> &, State &)
     ::sc::lowered::Tally tally("unpack_state(const std::vector<u8> &, State &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;

@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 #include "kern/core/base.h"
-#include "test_util.h"
+#include "kern/test/test.h"
 #include "world_util.h"
 
 using namespace sc;
@@ -29,7 +29,7 @@ std::vector<u8> sample_tile() {
 }
 }  // namespace
 
-SC_TEST(stream_tile_pipeline) {
+KERN_TEST(stream_tile_pipeline) {
   kern::Renderer r;
   r.init(kern::RendererOptions{});
   kern::physics::World world;
@@ -44,7 +44,7 @@ SC_TEST(stream_tile_pipeline) {
   const std::string req = city.take_requests();
   char want[64];
   std::snprintf(want, sizeof want, "[[%d,%d,%d]]", key.z, key.x, key.y);
-  SC_CHECK(req == want, "requests the player's tile: %s", req.c_str());
+  KERN_CHECK(req == want, "requests the player's tile: %s", req.c_str());
   const std::vector<u8> bytes = sample_tile();
   city.provide(key, bytes);
   int frames = 0;
@@ -59,9 +59,9 @@ SC_TEST(stream_tile_pipeline) {
     if (took > worst) { worst = took; if (std::getenv("SC_VERBOSE")) std::printf("  frame %d took %.1f ms\n", frames, took); }
     ++frames;
   }
-  SC_CHECK(city.ready_at({0, 0, 0}) && built(), "tile built after %d frames", frames);
-  SC_CHECK(frames > 1, "built over several frames (%d)", frames);
-  SC_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on; slowest step %s %.1f ms)", worst, city.stats().worst_step, city.stats().worst_step_ms);
+  KERN_CHECK(city.ready_at({0, 0, 0}) && built(), "tile built after %d frames", frames);
+  KERN_CHECK(frames > 1, "built over several frames (%d)", frames);
+  KERN_CHECK(worst < 40, "no long frame (worst slice %.1f ms, budget 3 ms; sanitizers on; slowest step %s %.1f ms)", worst, city.stats().worst_step, city.stats().worst_step_ms);
   // world_building_collisions.mjs: one collider for each of the nearest 480 buildings within 340 m
   // (the sample tile's 401 houses; the ones whose centre is within 340 m of the player)
   {
@@ -74,26 +74,26 @@ SC_TEST(stream_tile_pipeline) {
       c = c * (1.0f / static_cast<f32>(city.building(b).rings[0].size()));
       within += std::hypot(c.x, c.y) <= 340 ? 1 : 0;
     }
-    SC_CHECK(within > 0 && city.stats().colliders == std::min<u32>(within, 480), "a collider per building of the working set (%u of %u)", city.stats().colliders, within);
+    KERN_CHECK(within > 0 && city.stats().colliders == std::min<u32>(within, 480), "a collider per building of the working set (%u of %u)", city.stats().colliders, within);
   }
-  SC_CHECK(city.stats().meshes >= 2, "building and road meshes (%u)", city.stats().meshes);
-  SC_CHECK(city.lanes().size() == 1, "one drivable lane");
+  KERN_CHECK(city.stats().meshes >= 2, "building and road meshes (%u)", city.stats().meshes);
+  KERN_CHECK(city.lanes().size() == 1, "one drivable lane");
   // The block in the middle: 21 m high.
   const RayResult hit = cast(world, {0, 0, 100}, {0, 0, -1}, 200, {});
-  SC_CHECK(hit.hit && std::fabs(hit.point.z - 21) < 0.05f, "roof at 21 m (hit %d z %.2f)", hit.hit, hit.point.z);
+  KERN_CHECK(hit.hit && std::fabs(hit.point.z - 21) < 0.05f, "roof at 21 m (hit %d z %.2f)", hit.hit, hit.point.z);
   // Walls stop a horizontal ray.
   const RayResult wall = cast(world, {-30, 0.5f, 5}, {1, 0, 0}, 60, {});
-  SC_CHECK(wall.hit && wall.normal.x < -0.9f, "wall facing west (hit %d n %.2f)", wall.hit, wall.normal.x);
+  KERN_CHECK(wall.hit && wall.normal.x < -0.9f, "wall facing west (hit %d n %.2f)", wall.hit, wall.normal.x);
   Rng rng{3};
   Vec3 p; f32 heading;
-  SC_CHECK(city.street_point(rng, {0, 0, 0}, 500, p, heading), "street point");
+  KERN_CHECK(city.street_point(rng, {0, 0, 0}, 500, p, heading), "street point");
   // Moving far away unloads it.
   city.update({20000, 0, 0}, 1);
   city.take_requests();
-  SC_CHECK(city.stats().colliders == 0 && city.stats().meshes == 0, "far tile unloaded (%u colliders)", city.stats().colliders);
+  KERN_CHECK(city.stats().colliders == 0 && city.stats().meshes == 0, "far tile unloaded (%u colliders)", city.stats().colliders);
 }
 
-SC_TEST(stream_offline_town) {
+KERN_TEST(stream_offline_town) {
   kern::Renderer r;
   r.init(kern::RendererOptions{});
   kern::physics::World world;
@@ -103,13 +103,13 @@ SC_TEST(stream_offline_town) {
   city.update({0, 0, 0}, 1);
   const TileKey key = tile_at(kKonstanzLon, kKonstanzLat);
   city.fail(key);  // one lost request: asked again, the real world is not given up
-  SC_CHECK(!city.offline(), "one failed request does not cost the real world");
+  KERN_CHECK(!city.offline(), "one failed request does not cost the real world");
   city.fail(key);
   city.fail(key);  // no map service: three times nothing
-  SC_CHECK(city.offline(), "falls back to the stand-in town");
+  KERN_CHECK(city.offline(), "falls back to the stand-in town");
   int frames = 0;
   while (!city.ready_at({0, 0, 0}) && frames++ < 3000) city.update({0, 0, 0}, 4);
-  SC_CHECK(city.ready_at({0, 0, 0}), "stand-in town built");
-  SC_CHECK(city.stats().colliders > 100, "with collision (%u)", city.stats().colliders);
-  SC_CHECK(!city.has_real_data(), "marked as not real map data");
+  KERN_CHECK(city.ready_at({0, 0, 0}), "stand-in town built");
+  KERN_CHECK(city.stats().colliders > 100, "with collision (%u)", city.stats().colliders);
+  KERN_CHECK(!city.has_real_data(), "marked as not real map data");
 }

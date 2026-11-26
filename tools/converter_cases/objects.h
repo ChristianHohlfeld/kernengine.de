@@ -2,7 +2,7 @@
 #include <memory>
 #include <vector>
 #include "kern/audio/audio.h"
-namespace sc {
+namespace cases {
 /// A value that holds an object of the engine by a pointer (a field of a struct).
 struct Rig {
   kern::audio::Mixer* mixer = nullptr;

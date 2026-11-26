@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "kern/logic/logic.h"
-namespace sc {
+namespace cases {
 /// A state that keeps actors (kern::logic::ActorHandle: the Blueprint's Actor - its id and its world, kern/docs/project.md 7).
 class Crowd {
  public:
