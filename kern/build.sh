@@ -12,7 +12,7 @@
 #   --game     levels, actors and components, the game runtime and the
 #              procedural city (kern/src/game); implies --physics.
 #   --studio   Kern Studio, the engine editor (kern/src/studio) and its C ABI;
-#              implies --game.
+#              implies --game and --app (Play Project runs the app runtime in the editor).
 #   --commercial  leaves out the assets that may not be used commercially: Pollen Robotics'
 #              Micro Duck 3D models (CC BY-NC-SA 4.0). Everything else in the module is
 #              Apache 2.0 or permissive (kern/LICENSES.md).
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     --app) with_app=1 ;;
     --physics) with_physics=1 ;;
     --game) with_game=1; with_physics=1 ;;
-    --studio) with_studio=1; with_game=1; with_physics=1 ;;
+    --studio) with_studio=1; with_app=1; with_game=1; with_physics=1 ;;   # (Play Project: the app runtime in the editor)
     --lehrer) with_lehrer=1; with_game=1; with_physics=1 ;;
     --commercial) commercial=1 ;;
     --project) project="${2:?--project needs a project file}"; shift ;;

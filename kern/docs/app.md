@@ -13,6 +13,8 @@ einen eigenen Audio-Host oder eigene Skripte schreibt. Je Sache ein Weg. Der Pr�
 | C++ | `kern::AppRuntime rt(renderer)`: `give(app, settings)` (das ist `kern::run`), `start(w, h)`, `frame(now_ms, hidden)`, `frame_xr(…)`, `resize(w, h)`, `stop()`, `engine()`, `running()` |
 | der Prozess | `kern::app_runtime()` ist die eine App-Laufzeit, die die C-Schnittstelle (`kern_app_*`) treibt; `kern::run(app)` gibt ihr die App |
 | warum ein Objekt | damit ein Engine-Test eine App-Laufzeit für sich hat (eine App, die nicht startet; eine mit Ton …) – vorher gab es sie nur einmal je Prozess, und ein Test konnte nicht prüfen, was beim Start schiefgeht |
+| in einem Host | `kern::AppRuntime rt(renderer, host)`: eine App-Laufzeit in einem Host, dessen Renderer schon läuft – der Editor bei „Play Project“ (docs/studio.md). `start` startet den Renderer nicht, `stop` beendet ihn nicht; eine App mit Shader-Erweiterungen wird dort mit Grund abgewiesen (sie gehören zum Start eines Renderers). `set_view(viewport, layers)`: wohin ein Frame zeichnet (der aktive Viewport) und welche Schichten die der App sind |
+| der Host | `kern::AppHost` (`kern/app/app.h`): was die Engine von ihrem Ort braucht – Zeiger fangen/freigeben (`pointer_lock`), die Widgets eines Frames (`widgets`, JSON, 6.). Der einzige Weg nach draußen: `Engine::request_pointer_lock` und die Widgets gehen nur über ihn, nie direkt an `kern_env`. Vorgabe: `platform_app_host()` (die Seite, `kern/web/app.mjs`). Der Speicher hat seinen eigenen Host (`Engine::set_storage`, 5.) |
 | bewusst nicht | zwei App-Laufzeiten auf einer Seite (die Plattform hat eine) |
 
 **Start mit Grund (C2).** `start` ist false mit dem Grund in `last_error()` (die Seite zeigt ihn: „app start: …“):

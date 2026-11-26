@@ -175,14 +175,30 @@ f32 Engine::axis(const char* name) const {
 #define KERN_ENV(name) __attribute__((import_module("kern_env"), import_name(#name)))
 extern "C" {
 KERN_ENV(pointer_lock) void kern_env_pointer_lock(kern::i32 lock);
+KERN_ENV(ui) void kern_env_ui(const char* json, kern::u32 length);
 }
 #else
 static void kern_env_pointer_lock(kern::i32) {}
+static void kern_env_ui(const char*, kern::u32) {}   // (natively: a test reads Engine::ui_json)
 #endif
 
 namespace kern {
 
-void Engine::request_pointer_lock(bool lock) { kern_env_pointer_lock(lock ? 1 : 0); }
+namespace {
+/// The page's (kern/web/app.mjs): what the engine asks goes to kern_env.
+class PlatformAppHost final : public AppHost {
+ public:
+  void pointer_lock(bool lock) override { kern_env_pointer_lock(lock ? 1 : 0); }
+  void widgets(std::string_view json) override { kern_env_ui(json.data(), static_cast<u32>(json.size())); }
+};
+}  // namespace
+
+AppHost& platform_app_host() {
+  static PlatformAppHost host;
+  return host;
+}
+
+void Engine::request_pointer_lock(bool lock) { host_->pointer_lock(lock); }
 
 namespace {
 std::string url_decode(const char* s, std::size_t n) {

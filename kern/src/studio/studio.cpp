@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "internal.h"
+#include "project_play.h"
 #include "kern/game/demos.h"
 
 namespace kern::studio {
@@ -40,6 +41,7 @@ Studio::Studio() {
 }
 
 Studio::~Studio() {
+  stop_project();
   if (world_) world_->stop();
   world_.reset();
   game_audio_.reset();
@@ -63,6 +65,10 @@ bool Studio::audio_init(u32 sample_rate) {
 
 void Studio::audio_render(f32* out, u32 frames) {
   if (!out || !frames) return;
+  if (project_play_ && project_play_->runtime.engine().mixer().ready()) {
+    project_play_->runtime.engine().mixer().render(out, frames);   // (Play Project: the App's mixer is heard)
+    return;
+  }
   if (!mixer_->ready()) {
     for (u32 i = 0; i < frames * audio::kOutputChannels; ++i) out[i] = 0;
     return;
@@ -954,6 +960,7 @@ bool Studio::play(game::SimMode mode) {
 }
 
 void Studio::stop() {
+  if (project_play_) { stop_project(); return; }
   if (play_ == PlayState::editing) return;
   if (trainer_open()) { close_trainer(); return; }  // the stage is the Lehrer's: stopping it leaves the workspace
   end_simulation();

@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "internal.h"
+#include "project_play.h"
 #include "kern/game/walker.h"
 #include "kern/game/demos.h"
 #include "kern/studio/studio.h"
@@ -126,6 +127,10 @@ json::Value Studio::key(std::string_view key, std::string_view code, bool down, 
     const bool was_touch = input_.touch();
     input_.key_down();
     if (was_touch) { touch_ctl_.release_all(); touch(); }
+  }
+  if (project_play_) {   // (Play Project: every key is the App's - Escape stops)
+    result.set("handled", project_key(code, down, repeat));
+    return result;
   }
   if (down) keys_.insert(std::string(code));
   else keys_.erase(std::string(code));
@@ -509,7 +514,8 @@ json::Value Studio::menu_json(std::string_view name) const {
     m.push(entry("Simulate", cmd("play", "mode", "simulate"), "Alt+S", play_ == PlayState::editing || trainer_open()));
     m.push(entry(paused_ ? "Resume" : "Pause", cmd("pause"), "Pause", !editing));
     m.push(entry("Advance One Frame", cmd("stepFrame"), ".", !editing && paused_));
-    m.push(entry("Stop", cmd("stop"), "Esc", !editing));
+    m.push(entry("Play Project", cmd("playProject"), "", editing && !project_play_ && !trainer_open()));
+    m.push(entry("Stop", cmd("stop"), "Esc", !editing || project_play_ != nullptr));
     m.push(separator());
     m.push(entry(play_ == PlayState::playing ? "Eject from Player" : "Possess Player", cmd("eject"), "F8", !editing && !trainer_open()));
     m.push(entry("Restart Game", cmd("restart"), "Ctrl+R", !editing && !trainer_open()));
@@ -1093,6 +1099,13 @@ json::Value Studio::status() {
   s.set("fps", internal::round_num(fps_, 10));
   static const char* play_names[] = {"editing", "simulating", "playing"};
   s.set("play", play_names[static_cast<u32>(play_)]);
+  if (project_play_) {   // (Play Project: the App's widgets as the page draws them, every frame - kern/docs/app.md 6.)
+    json::Value pp = json::Value::object();
+    json::Value widgets;
+    if (!json::parse(project_play_->host.widgets_json(), widgets)) widgets = json::Value::array();
+    pp.set("widgets", std::move(widgets));
+    s.set("projectPlay", std::move(pp));
+  }
   s.set("paused", paused_);
   s.set("captured", mouse_captured_);
   {
@@ -1522,6 +1535,16 @@ json::Value Studio::run(const json::Value& c) {
   if (name == "netJoin") return ok(net_join(static_cast<u64>(num("server"))));
   if (name == "netStop") { net_stop(); return ok(); }
   if (name == "stop") { stop(); return ok(); }
+  if (name == "playProject") {
+    std::string why;
+    json::Value r = ok(play_project(&why));
+    if (!why.empty()) r.set("error", why);
+    return r;
+  }
+  if (name == "projectUi") {   // a widget of the playing App clicked: {id, index} (a button 0, a menu's entry)
+    if (Engine* e = project_engine()) e->ui_event(str("id"), static_cast<i32>(num("index")));
+    return ok(project_engine() != nullptr);
+  }
   if (name == "setPlayer") {
     const ActorId id = static_cast<ActorId>(num("id"));
     const game::Actor* a = level_.find(id);

@@ -9,6 +9,7 @@
 import {loadKern, BrowserInput} from "../kern.mjs";
 import {LogicEditor, LOGIC_STYLE} from "./logic.mjs";
 import {Trainer} from "./trainer.mjs";
+import {mountUi} from "../app.mjs";
 import {StudioEngine, POINTER, modifiers, toBase64, escHtml, hudHtml, hudClick, applyAudioPrefs, mountAudioSwitches, HUD_STYLE, GamepadInput, backgroundTicker, TouchOverlay, TOUCH_STYLE, localizePage, setLanguage, I18N_LANG, tr, watchInputDevice, routeTouch, buildGameHtml, startAudio, KernNet, openNetwork} from "./game.mjs";
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -675,6 +676,18 @@ class StudioPage {
   }
 
   renderStatus(st) {
+    // Play Project (docs/studio.md): the App's widgets over the viewport (when they changed), a click back to its Engine
+    const widgets = st.projectPlay ? JSON.stringify(st.projectPlay.widgets || []) : null;
+    if (widgets !== this.projectWidgets) {
+      this.projectWidgets = widgets;
+      if (widgets !== null) {
+        this.projectUi ||= mountUi(this.canvas, (id, index) => this.runCommand({cmd: "projectUi", id, index}));
+        this.projectUi.show(st.projectPlay.widgets || []);
+      } else if (this.projectUi) {
+        this.projectUi.dispose();
+        this.projectUi = null;
+      }
+    }
     if (st?.logicTrace && this.state?.logic?.open) this.logic.setTrace(st.logicTrace);
     this.renderRobot(st?.robot);
     if (!st || !this.state) return;

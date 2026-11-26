@@ -32,9 +32,22 @@ bool c1(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   return true;
 }
 
+// engine.key_of_code: kern::key_of_code
+bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  std::string a0;
+  ev::take<ev::Text>(o, in, 0, a0);
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Key&>>();
+  ev::take<ev::Enum<E_Key>>(o, in, 1, a1);
+  decltype(auto) r = kern::key_of_code(a0, a1);
+  ev::give<ev::Bool>(o, out, 0, r);
+  ev::give<ev::Enum<E_Key>>(o, out, 1, a1);
+  return true;
+}
+
 const EngineCall kCalls[] = {
     {"engine.key_name", &c0},
     {"engine.parse_key", &c1},
+    {"engine.key_of_code", &c2},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

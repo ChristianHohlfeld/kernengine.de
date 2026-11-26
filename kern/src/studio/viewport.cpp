@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "internal.h"
+#include "project_play.h"
 #include "kern/studio/studio.h"
 
 namespace kern::studio {
@@ -824,6 +825,10 @@ void Studio::frame(f64 now_ms) {
   const f32 dt = static_cast<f32>(clamp(raw / 1000.0, 0.0, 0.1));
   last_frame_ = now_ms;
   if (raw > 0) fps_ = fps_ <= 0 ? static_cast<f32>(1000.0 / raw) : fps_ * 0.9f + static_cast<f32>(100.0 / raw);
+  if (project_play_) {   // (Play Project: the App updates and draws - the editor's views and scene rest)
+    frame_project(now_ms, dt);
+    return;
+  }
   update_cameras(dt);
   update_touch_controls(dt);
   if (play_ != PlayState::editing) {

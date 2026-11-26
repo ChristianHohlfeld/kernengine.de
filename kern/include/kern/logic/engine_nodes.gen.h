@@ -1976,6 +1976,36 @@ struct P_engine_character_mover_settings {
 };
 
 // The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).
+// kern::AppHost that a Blueprint's class is (kern::Implements<kern::AppHost>: kern::logic::implementation)
+template <class B> class ClassImplements_AppHost final : public kern::AppHost {
+ public:
+  explicit ClassImplements_AppHost(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_pointer_lock = requires { requires std::is_same_v<typename MemberOf<decltype(&X::pointer_lock)>::type, X>; };
+  template <class X> static constexpr bool kern_has_widgets = requires { requires std::is_same_v<typename MemberOf<decltype(&X::widgets)>::type, X>; };
+  decltype(std::declval<kern::AppHost&>().pointer_lock(std::declval<bool>())) pointer_lock(bool kern_p0) override {
+    static_assert(kern_has_pointer_lock<B>, "a Blueprint that implements AppHost has its function pointer_lock");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.pointer_lock(::kern::logic::engine_values::Given<::kern::logic::engine_values::Bool, bool const&>(kern_o, kern_p0));
+    }
+  }
+  decltype(std::declval<kern::AppHost&>().widgets(std::declval<std::basic_string_view<char, std::char_traits<char> >>())) widgets(std::basic_string_view<char, std::char_traits<char> > kern_p0) override {
+    static_assert(kern_has_widgets<B>, "a Blueprint that implements AppHost has its function widgets");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.widgets(::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string_view<char, std::char_traits<char> > const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<kern::AppHost> {
+  template <class B> using adapter = ClassImplements_AppHost<B>;
+};
+
 // kern::App that a Blueprint's class is (kern::Implements<kern::App>: kern::logic::implementation)
 template <class B> class ClassImplements_App final : public kern::App {
  public:
@@ -2570,6 +2600,51 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.input.end_frame", {to_value(input)}, {});
+  }
+  /// Capture (true) or release the mouse for mouse-look controls.
+  void engine_app_host_pointer_lock(::kern::logic::Object<::kern::AppHost> app_host, Bool lock) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::AppHost>(*kern_o, app_host.ref, "app_host");
+      if (!kern_self) { this->kern_engine_failed("engine.app_host.pointer_lock"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, lock, kern_a0);
+      kern_self->pointer_lock(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.app_host.pointer_lock", {to_value(app_host), to_value(lock)}, {});
+  }
+  /// The frame's widgets, after each frame in which they changed (JSON, kern/docs/app.md 6.).
+  void engine_app_host_widgets(::kern::logic::Object<::kern::AppHost> app_host, const Text& json) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::AppHost>(*kern_o, app_host.ref, "app_host");
+      if (!kern_self) { this->kern_engine_failed("engine.app_host.widgets"); return; }
+      const std::string_view kern_a0 = json.view();
+      kern_self->widgets(kern_a0);
+      return;
+    }
+    this->kern_engine("engine.app_host.widgets", {to_value(app_host), to_value(json)}, {});
+  }
+  /// The platform's: the page (kern_env pointer_lock and ui); natively nothing - a test reads Engine::ui_json.
+  ::kern::logic::Object<::kern::AppHost> engine_platform_app_host() const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      decltype(auto) kern_r = kern::platform_app_host();
+      return ::kern::logic::engine_values::object_as<::kern::logic::Object<::kern::AppHost>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::AppHost>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+    }
+    return from_value<::kern::logic::Object<::kern::AppHost>>(this->kern_engine("engine.platform_app_host", {}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::AppHost>>()));
+  }
+  /// The host it runs in (platform_app_host unless it was made with one).
+  ::kern::logic::Object<::kern::AppHost> engine_engine_host(::kern::logic::Object<::kern::Engine> engine) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.host"); return ::kern::logic::Object<::kern::AppHost>{}; }
+      decltype(auto) kern_r = kern_self->host();
+      return ::kern::logic::engine_values::object_as<::kern::logic::Object<::kern::AppHost>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::AppHost>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+    }
+    return from_value<::kern::logic::Object<::kern::AppHost>>(this->kern_engine("engine.engine.host", {to_value(engine)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::AppHost>>()));
   }
   /// The renderer and the input of the frame: objects of the engine (a Blueprint reaches them by these).
   ::kern::logic::Object<::kern::Renderer> engine_engine_renderer(::kern::logic::Object<::kern::Engine> engine) const {
@@ -11508,6 +11583,35 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
+  /// The key of a KeyboardEvent.code ("KeyW", "ArrowLeft", "Space" - the order of kern/web/app.mjs KEY_CODES): what a host that gets the browser's keys hands Input::key (the editor's Play Project). False: no key of the engine has that code.
+  template <class T1> void engine_key_of_code(const Text& code, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = code.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      decltype(auto) kern_r = kern::key_of_code(kern_a0, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::pass(*kern_o, kern_a1);
+      return;
+    }
+    this->kern_engine("engine.key_of_code", {to_value(code), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
+  }
+  template <class KernNode, class T1> void engine_key_of_code(KernNode& kern_n, const Text& code, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = code.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      decltype(auto) kern_r = kern::key_of_code(kern_a0, kern_a1);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.key_of_code", {to_value(code), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+  }
   template <class T1> Text engine_net_client_state_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -15360,6 +15464,32 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     const std::vector<Value> kern_out = this->kern_engine("engine.engine.make", {to_value(renderer)}, {PinType::object});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// An engine in another host than the platform's (the editor's Play Project): `host` must outlive it.
+  void engine_engine_make_2(::kern::logic::Object<::kern::Renderer> renderer, ::kern::logic::Object<::kern::AppHost> host) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::Renderer* const kern_a0 = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, renderer.ref, "renderer");
+      if (!kern_a0) { this->kern_engine_failed("engine.engine.make_2"); return; }
+      kern::AppHost* const kern_a1 = ::kern::logic::engine_values::object_of<kern::AppHost>(*kern_o, host.ref, "host");
+      if (!kern_a1) { this->kern_engine_failed("engine.engine.make_2"); return; }
+      (void)kern_o->own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*kern_a0, *kern_a1)));
+      return;
+    }
+    this->kern_engine("engine.engine.make_2", {to_value(renderer), to_value(host)}, {PinType::object});
+  }
+  template <class KernNode> void engine_engine_make_2(KernNode& kern_n, ::kern::logic::Object<::kern::Renderer> renderer, ::kern::logic::Object<::kern::AppHost> host) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::Renderer* const kern_a0 = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, renderer.ref, "renderer");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.make_2"); return; }
+      kern::AppHost* const kern_a1 = ::kern::logic::engine_values::object_of<kern::AppHost>(*kern_o, host.ref, "host");
+      if (!kern_a1) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.make_2"); return; }
+      kern_n.result = ::kern::logic::engine_values::object_as<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_o->own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*kern_a0, *kern_a1))));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.make_2", {to_value(renderer), to_value(host)}, {PinType::object});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Ends the Engine (its destructor): the handle is none after it.

@@ -13,6 +13,14 @@ constexpr const char* kKeyNames[] = {
     "digit9", "left", "right", "up", "down", "space", "enter", "escape", "tab", "backspace", "shiftLeft", "shiftRight",
     "controlLeft", "controlRight", "altLeft", "altRight"};
 static_assert(sizeof kKeyNames / sizeof kKeyNames[0] == static_cast<std::size_t>(Key::count), "a name for every key");
+// (KeyboardEvent.code of each key, in the order of Key - kern/web/app.mjs KEY_CODES)
+constexpr const char* kKeyCodes[] = {
+    "", "KeyA", "KeyB", "KeyC", "KeyD", "KeyE", "KeyF", "KeyG", "KeyH", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyM", "KeyN",
+    "KeyO", "KeyP", "KeyQ", "KeyR", "KeyS", "KeyT", "KeyU", "KeyV", "KeyW", "KeyX", "KeyY", "KeyZ", "Digit0", "Digit1",
+    "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "ArrowLeft", "ArrowRight", "ArrowUp",
+    "ArrowDown", "Space", "Enter", "Escape", "Tab", "Backspace", "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight",
+    "AltLeft", "AltRight"};
+static_assert(sizeof kKeyCodes / sizeof kKeyCodes[0] == static_cast<std::size_t>(Key::count), "a code for every key");
 constexpr const char* kPadButtonNames[] = {"a", "b", "x", "y", "lb", "rb", "lt", "rt", "back", "start", "ls", "rs", "up", "down", "left", "right", "home"};
 static_assert(sizeof kPadButtonNames / sizeof kPadButtonNames[0] == static_cast<std::size_t>(PadButton::count));
 constexpr const char* kPadAxisNames[] = {"none", "leftX", "leftY", "rightX", "rightY", "triggers"};
@@ -89,6 +97,14 @@ json::Value names_of(const std::vector<E>& v, const char* const (&names)[N]) {
 
 const char* key_name(Key k) { return static_cast<u32>(k) < static_cast<u32>(Key::count) ? kKeyNames[static_cast<u32>(k)] : "unknown"; }
 bool parse_key(std::string_view name, Key& out) { return parse_name(name, kKeyNames, out, 1); }
+bool key_of_code(std::string_view code, Key& out) {
+  for (u32 k = 1; k < static_cast<u32>(Key::count); ++k)
+    if (code == kKeyCodes[k]) {
+      out = static_cast<Key>(k);
+      return true;
+    }
+  return false;
+}
 
 json::Value input_to_json(const InputActions& input) {
   json::Value o = json::Value::object();

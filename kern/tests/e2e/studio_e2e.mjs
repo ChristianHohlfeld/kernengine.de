@@ -612,6 +612,46 @@ const vpCenter = async (page, i = 0) => {
     check(await until(async () => /not given: levels\/a\.klevel, levels\/b\.klevel/.test(await page.locator("#toast").textContent())), "project: a .kproject without its levels is refused, the levels named");
     await page.setInputFiles("#fileProject", [second, levelFile("a.klevel"), levelFile("b.klevel")]);
     check(await until(async () => (await state(page)).project.name === "Zweites" && !(await state(page)).project.dirty), "project: a .kproject opens from its files, with its levels");
+    // Play Project (docs/studio.md): the program Blueprint that implements App plays in the viewport - it starts a
+    // level of the project, its widget is drawn over the viewport, Escape stops and the editor is back
+    check((await cmd(page, {cmd: "logicOpen", program: "Spiel"})).ok, "play project: the App Blueprint opens");
+    const app = await cmd(page, {cmd: "logicCppApply", text: `struct Spiel : virtual kern::Blueprint, virtual engine_game_runtime, kern::Implements<kern::App> {
+  // ---- types ----
+  KERN_STRUCT(Frame) {
+    Float time = 0.0;
+    Float dt = 0.0;
+    Int64 index = Int64{0x0};
+  };
+
+  // ---- variables ----
+  Object<kern::game::GameWorld> Welt = Object<kern::game::GameWorld>{};
+
+  // ---- functions ----
+  struct startResult { Bool result = false; };
+  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
+    engine_game_world_make_2(n1, engine);
+    Welt = n1.result;
+    engine_game_world_start_level(n2, Welt, "levels/a.klevel", game_SimMode::play);
+    return {n2.result};
+  }
+
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+    engine_engine_ui_text(engine, "punkte", "Punkte", 0.1, 0.1);
+  }
+
+  struct { Object<kern::game::GameWorld> result = Object<kern::game::GameWorld>{}; } n1;
+  struct { Bool result = false; } n2;
+};
+`});
+    check(app.ok, "play project: the App is written as C++" + (app.ok ? "" : ": " + app.error));
+    await cmd(page, {cmd: "logicClose"});
+    const played = await cmd(page, {cmd: "playProject"});
+    check(played.ok, "play project: it starts" + (played.ok ? "" : ": " + played.error));
+    check(await until(async () => await page.locator('.kern-ui [data-id="punkte"]').count() === 1), "play project: the App's widget is drawn over the viewport");
+    await page.mouse.move(400, 300);
+    await page.keyboard.press("Escape");
+    check(await until(async () => await page.locator('.kern-ui [data-id="punkte"]').count() === 0 && (await page.evaluate(() => window.KernStudio.status.projectPlay)) === undefined),
+          "play project: Escape stops it, the widgets are gone");
   }
   check(errors.length === 0, "no page errors in the module build" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await ctx.close();

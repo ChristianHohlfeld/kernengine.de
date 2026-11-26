@@ -8,13 +8,6 @@
 
 #include "kern/app/app.h"
 
-#if defined(__wasm__)
-#define KERN_ENV(name) __attribute__((import_module("kern_env"), import_name(#name)))
-extern "C" {
-KERN_ENV(ui) void kern_env_ui(const char* json, kern::u32 length);
-}
-#endif
-
 namespace kern {
 
 void Engine::set_status(const char* text) {
@@ -122,9 +115,7 @@ void Engine::ui_end() {
   std::string text = json::stringify(list);
   if (text == ui_sent_) return;
   ui_sent_ = std::move(text);
-#if defined(__wasm__)
-  kern_env_ui(ui_sent_.data(), static_cast<u32>(ui_sent_.size()));
-#endif
+  host_->widgets(ui_sent_);
 }
 
 }  // namespace kern

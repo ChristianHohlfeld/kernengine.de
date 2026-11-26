@@ -9320,7 +9320,7 @@ TEST(world_of_an_app_of_cpp_has_the_project) {
   Renderer renderer;
   Engine engine(renderer);
   {
-    detail::ProgramApp app;
+    game::ProgramApp app;
     app.project = pr;
     app.given = &cpp;
     CHECK(app.start(engine));
@@ -14586,6 +14586,148 @@ TEST(studio_logic_implements) {
 // The project in the editor (kern/docs/project.md): a new one, its levels and start level, its settings, its program
 // Blueprints edited in the logic editor like a level's (one undo history for both), libraries found in the project by
 // a world's Blueprint, a name in one place only, saved and opened again - errors with where and why.
+// Play Project (docs/studio.md "Play Project"): the editor plays the project's program as the game runs it - its App
+// (a program Blueprint) on an app runtime of the editor's renderer, in the editor's host: it makes a world of a level of
+// the project, changes the level on an action (a key the editor hands the Engine's Input), keeps its value over both,
+// shows widgets (in the state; a click comes back as projectUi), is heard (the editor's audio is the App's mixer), and
+// Escape stops it - the editor's level and scene come back unchanged.
+TEST(studio_play_project) {
+  StudioFixture f;
+  game::Level a = game::basic_level(), b = game::basic_level();
+  a.name = "Erstes";
+  b.name = "Zweites";
+  logic::Graph spiel;
+  std::string error;
+  CHECK(logic::from_cpp("struct Spiel : virtual kern::Blueprint, virtual engine_game_runtime, virtual engine_audio_audio, kern::Implements<kern::App> {\n"
+                        "  // ---- types ----\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  // ---- variables ----\n"
+                        "  Object<kern::game::GameWorld> Welt = Object<kern::game::GameWorld>{};\n"
+                        "  Int Punkte = 0;\n"
+                        "  Int Level = 0;\n"
+                        "  Bool Ende = false;\n"
+                        "  Bool Gestoppt = false;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
+                        "    engine_game_world_make_2(n1, engine);\n"
+                        "    Welt = n1.result;\n"
+                        "    engine_game_world_start_level(n2, Welt, \"a.klevel\", game_SimMode::play);\n"
+                        "    Level = 1;\n"
+                        "    engine_engine_mixer(n3, engine);\n"
+                        "    engine_mixer_create_clip(n4, n3.result, List<Float>{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 256, 1, 48000, \"ton\");\n"
+                        "    engine_mixer_play(n5, n3.result, n4.result, audio_PlayParams{1.0, 1.0, 0.0, false, audio_Bus::sfx, 0.0, 0.0, 0, false, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, 1.0, 50.0, audio_Rolloff::inverse, 0.0, 1.0});\n"
+                        "    return {n2.result};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "    Punkte += 1;\n"
+                        "    engine_engine_ui_text(engine, \"punkte\", \"Punkte\", 0.1, 0.1);\n"
+                        "    engine_engine_ui_button(n6, engine, \"ende\", \"Ende\", 0.9, 0.1);\n"
+                        "    if (n6.result) {\n"
+                        "      Ende = true;\n"
+                        "    }\n"
+                        "    if (engine_engine_action_pressed(engine, \"weiter\")) {\n"
+                        "      engine_game_world_stop(Welt);\n"
+                        "      engine_game_world_start_level(n7, Welt, \"b.klevel\", game_SimMode::play);\n"
+                        "      Level = 2;\n"
+                        "    }\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_OVERRIDE void stop(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
+                        "    Gestoppt = true;\n"
+                        "  }\n"
+                        "\n"
+                        "  struct { Object<kern::game::GameWorld> result = Object<kern::game::GameWorld>{}; } n1;\n"
+                        "  struct { Bool result = false; } n2;\n"
+                        "  struct { Object<kern::audio::Mixer> result = Object<kern::audio::Mixer>{}; } n3;\n"
+                        "  struct { Int result = 0; } n4;\n"
+                        "  struct { Int64 result = Int64{0x0}; } n5;\n"
+                        "  struct { Bool result = false; } n6;\n"
+                        "  struct { Bool result = false; } n7;\n"
+                        "};\n", spiel, nullptr, &error));
+  if (!error.empty()) std::printf("  studio_play_project (Spiel): %s\n", error.c_str());
+  game::Project pr;
+  pr.name = "Zweiteilig";
+  pr.levels = {"a.klevel", "b.klevel"};
+  pr.start_level = "a.klevel";
+  pr.blueprints.push_back({"Spiel", spiel, ""});
+  ActionBinding weiter;
+  weiter.name = "weiter";
+  weiter.keys = {Key::space};
+  pr.settings.input.actions.push_back(weiter);
+  CHECK(f.s->load_project_text(game::to_text(pr), {{"a.klevel", game::to_text(a)}, {"b.klevel", game::to_text(b)}}, &error));
+  if (!error.empty()) std::printf("  studio_play_project (open): %s\n", error.c_str());
+  CHECK(f.s->level().name == "Erstes" && !f.s->playing_project());
+  game::Level edited = f.s->level();
+  // Play Project: the program runs, its App started its world of the start level
+  std::string why;
+  CHECK(f.s->play_project(&why));
+  if (!why.empty()) std::printf("  studio_play_project (play): %s\n", why.c_str());
+  game::Program* program = f.s->project_program();
+  CHECK(f.s->playing_project() && program && program->running() && f.s->project_engine());
+  if (!program || !program->running()) return;
+  logic::Runtime* rt = program->runtime();
+  const auto var = [&](const char* name) { const logic::Instance* i = rt->find(1); return i ? i->get(name) : logic::Value{}; };
+  logic::EngineObjects* objects = rt->host().engine_objects();
+  game::GameWorld* world = objects ? objects->get<game::GameWorld>(var("Welt").as_object()) : nullptr;
+  CHECK(world && world->running() && world->level().name == "Erstes" && world->project() == program->project() && var("Level").as_int() == 1);
+  // it is heard: the editor's audio is the App's mixer
+  std::vector<f32> pcm(512 * audio::kOutputChannels, 0.0f);
+  f.s->audio_render(pcm.data(), 512);
+  f32 loud = 0;
+  for (f32 x : pcm) loud = std::max(loud, std::fabs(x));
+  CHECK(loud > 0.01f);
+  // frames: update each, widgets in the state
+  f.frames(3);
+  CHECK(var("Punkte").as_int() == 3);
+  json::Value st = f.s->status();
+  CHECK(st["projectPlay"]["widgets"].size() == 2 && st["projectPlay"]["widgets"][0]["id"].as_string() == "punkte" &&
+        st["projectPlay"]["widgets"][1]["id"].as_string() == "ende");
+  if (st["projectPlay"]["widgets"].size() != 2) std::printf("  studio_play_project (widgets): %s\n", json::stringify(st["projectPlay"]).c_str());
+  // the action: Space (the editor's key) - the next level, the value kept
+  CHECK(f.s->key(" ", "Space", true, 0, false)["handled"].as_bool());
+  f.frames(1);
+  CHECK(f.s->key(" ", "Space", false, 0, false)["handled"].as_bool());
+  world = objects->get<game::GameWorld>(var("Welt").as_object());
+  CHECK(world && world->running() && world->level().name == "Zweites" && var("Level").as_int() == 2 && var("Punkte").as_int() == 4);
+  f.frames(2);
+  CHECK(var("Punkte").as_int() == 6 && var("Level").as_int() == 2);
+  // a widget clicked in the page: the button is true in the next frame
+  CHECK(f.cmd(R"({"cmd":"projectUi","id":"ende","index":0})")["ok"].as_bool());
+  f.frames(1);
+  CHECK(var("Ende").as_bool());
+  // a key the editor would take (Ctrl+Z is undo, KeyF focuses) is the game's while it plays
+  CHECK(f.s->key("f", "KeyF", true, 0, false)["handled"].as_bool());
+  f.s->key("f", "KeyF", false, 0, false);
+  // Escape stops: App::stop, the program ends, the editor's level is as it was
+  CHECK(f.s->key("Escape", "Escape", true, 0, false)["handled"].as_bool());
+  CHECK(!f.s->playing_project() && f.s->project_program() == nullptr && f.s->project_engine() == nullptr);
+  CHECK(game::to_text(f.s->level()) == game::to_text(edited) && f.s->play_state() == studio::PlayState::editing);
+  CHECK(f.s->status()["projectPlay"].is_null());
+  f.frames(1);
+  // started again, from the project
+  CHECK(f.s->play_project(&why));
+  CHECK(f.s->project_program() && f.s->project_program()->running());
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool() && !f.s->playing_project());
+  // refused with the reason: Play runs; a project whose program has no App
+  CHECK(f.cmd(R"({"cmd":"play","mode":"simulate"})")["ok"].as_bool());
+  why.clear();
+  CHECK(!f.s->play_project(&why) && why == "Play or Simulate runs - stop it first (Esc)");
+  f.s->stop();
+  game::Project none = pr;
+  none.blueprints.clear();
+  CHECK(f.s->load_project_text(game::to_text(none), {{"a.klevel", game::to_text(a)}, {"b.klevel", game::to_text(b)}}, &error));
+  const json::Value refused = f.cmd(R"({"cmd":"playProject"})");
+  CHECK(!refused["ok"].as_bool() && refused["error"].as_string() == "the project Zweiteilig has no program Blueprints (\"blueprints\")");
+}
+
 TEST(studio_project) {
   StudioFixture f;
   auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {

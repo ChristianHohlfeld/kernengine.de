@@ -10,7 +10,13 @@ namespace kern {
 
 class AppRuntime {
  public:
+  /// The runtime of a game: its renderer is started by start and ended by stop, the engine's host is the platform's.
   explicit AppRuntime(Renderer& renderer) : engine_(renderer) {}
+  /// The runtime of an App in a host whose renderer runs already (the editor's Play Project, docs/studio.md): the
+  /// engine asks `host` (pointer lock, widgets); start does not start the renderer and stop does not end it - an App
+  /// with shader extensions is refused there (they are given to a renderer when it starts). `host` and `renderer`
+  /// outlive the runtime.
+  AppRuntime(Renderer& renderer, AppHost& host) : engine_(renderer, host), renderer_runs_(true) {}
   AppRuntime(const AppRuntime&) = delete;
   AppRuntime& operator=(const AppRuntime&) = delete;
 
@@ -33,8 +39,11 @@ class AppRuntime {
   /// Not running or too many frames: none (too many: last_error says why).
   Span<const f32> audio(u32 frames);
   static constexpr u32 kMaxAudioFrames = 8192;
-  /// App::stop, then the renderer ends. Not running: nothing.
+  /// App::stop, then the renderer ends (not the renderer of a host that runs it already). Not running: nothing.
   void stop();
+  /// Where a frame draws, for a host that draws more than the App (the editor: its active viewport, the layers of the
+  /// App's meshes - not the editor's grid and gizmos). Without it: the whole drawing buffer, every layer.
+  void set_view(const Viewport& view, u32 layers);
 
   bool running() const { return running_; }
   App* app() const { return app_; }
@@ -50,6 +59,10 @@ class AppRuntime {
   f64 start_ms_ = -1, last_ms_ = -1;
   u64 frame_ = 0;
   bool running_ = false;
+  bool renderer_runs_ = false;   // (a host's renderer: not started, not ended here)
+  bool has_view_ = false;
+  Viewport view_;
+  u32 layers_ = ~0u;
   std::vector<f32> audio_out_;
 };
 

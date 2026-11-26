@@ -35,7 +35,12 @@ const UI_STYLE = `
 `;
 
 /** The widgets' layer over `canvas`: `show(list)` draws the list the engine handed over, `event(id, index)` goes back. */
-function mountUi(canvas, event, onStatus) {
+/**
+ * The app's widgets (kern/docs/app.md 6.) drawn over `canvas` (class kern-ui): show(list) with the list the engine hands
+ * over; `event(id, index)` when one is clicked (a button 0, a menu's entry). The page of a game and the editor's Play
+ * Project (kern/web/studio) draw them alike.
+ */
+export function mountUi(canvas, event, onStatus) {
   const doc = canvas.ownerDocument;
   if (!doc.getElementById("kern-ui-style")) {
     const st = doc.createElement("style");

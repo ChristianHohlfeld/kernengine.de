@@ -143,6 +143,30 @@ die Seite schickt, prüft der Editor wie den Leser der Datei (dieselben Meldunge
 `projectNew`, `projectOpen {text, levels: {pfad: text}}` (jedes Level des Projekts), `projectSave`, `projectSaved`, `projectSet {name, levels, startLevel, settings}`,
 `projectBlueprint {op: add|remove|rename, name, to, library}`, `logicOpen {program}` (`kern/src/studio/project.cpp`).
 
+### Play Project
+
+Menü Play → **Play Project** spielt das Projekt, wie das Spiel es spielt: die Programm-Laufzeit des Projekts
+(`game::Program`) mit ihrer App – dem einen Programm-Blueprint, der `App` implementiert – auf einer App-Laufzeit
+(`kern::AppRuntime` in einem Host, app.md 1.) mit dem Renderer des Editors; dieselbe App wie bei `kern::run`
+(`game::ProgramApp`). Was die App tut, ist ihres: sie macht eine Welt (`GameWorld` aus ihrer Engine), startet ein
+Level des Projekts („Start Level“) und wechselt zum nächsten; was sie in ihren Variablen hält, bleibt über die Levels.
+Die Levels sind die Texte des Projekts, das offene Level so, wie es jetzt ist (auch ungespeichert).
+
+- **Bild:** die Kamera der App im aktiven Viewport, die Szene des Editors ist aus (Raster, Gizmos, Icons auch); nach
+  dem Ende kommt sie unverändert zurück.
+- **Eingabe:** jede Taste geht an die Eingabe der Engine (`Input::key`, nach `KeyboardEvent.code`: `kern::key_of_code`),
+  die Aktionen des Projekts (`settings.input`) gelten wie im Spiel; **Esc** beendet. Der Zeigerfang der App
+  (`request_pointer_lock`) ist der des Editors über dem aktiven Viewport.
+- **Widgets:** die Widgets der App (app.md 6.) stehen im Status (`status().projectPlay.widgets`, jeden Frame) und über dem Bild; ein Klick
+  geht als `projectUi {id, index}` an die Engine zurück.
+- **Ton:** zu hören ist der Mischer der App (`Engine::mixer`), nicht der des Editors.
+- **Fehler mit Grund** (Meldung „Play Project: …“, Antwort `error`): Play oder Simulate läuft; das Programm startet
+  nicht (kein Blueprint implementiert App, zwei, keine Programm-Blueprints …, wie `Program::start`); die App hat
+  Shader-Erweiterungen; `App::start` gibt false (ihr Grund).
+
+Kommandos: `playProject`, `projectUi {id, index}`, `stop` (`kern/src/studio/project_play.cpp`). Geprüft:
+`studio_play_project` (zwei Levels, Wechsel über eine Aktion, Wert bleibt, Widgets und Klick, Ton, Esc, Abweisungen).
+
 ## Place Actors
 
 Shapes: Cube, Sphere, Cylinder, Cone, Capsule, Plane, Torus, Ramp, Empty Actor · Lights: Point Light · Physics: Physics Cube, Physics Sphere, Physics Barrel, Crate Stack, Pendulum, Hinged Door, Chain, See-Saw, Sock · Players: Soldier, Character, Hover Car, Rolling Ball, Drone, Micro Duck, Micro Duck (Rollers) · Gameplay: Orb, Star, Health Pack, Ammo Box, Goal, Hazard, Damage Zone, Checkpoint, Jump Pad, Teleporter, Message Trigger, Moving Platform, Spinner, Target Dummy, Explosive Barrel · Audio: Audio Source, Ambient Wind, City Ambience, Radio · World: Procedural City (Liste: `src/studio/catalog.cpp`).

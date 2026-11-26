@@ -16,7 +16,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "kern/app/app.h"
 #include "kern/core/json.h"
+#include "kern/game/program.h"
 #include "kern/game/project.h"
 #include "kern/game/runtime.h"
 #include "kern/game/net_game.h"
@@ -169,7 +171,11 @@ struct UiAction {
   json::Value data;
 };
 
+class StudioAppHost;
+
 class Studio {
+  friend class StudioAppHost;   // (Play Project's host: the editor's pointer capture - push_ui, active_view_)
+
  public:
   Studio();
   ~Studio();
@@ -388,6 +394,20 @@ class Studio {
 
   // play
   bool play(game::SimMode mode);
+  /// Play Project (docs/studio.md "Play Project"): the project's program as the game runs it - its program Blueprints
+  /// on a logic runtime of their own (game::Program), the one that implements App started on an Engine of the
+  /// editor's renderer in the editor's host (pointer lock, widgets: AppHost) - start, update each frame, stop. The
+  /// App's camera fills the active viewport, the editor's scene is off; keys go to the Engine's Input (Escape stops),
+  /// its mixer is heard, its widgets are in the state ("projectPlay"). What the App starts - a GameWorld of a level
+  /// of the project, the next level - is its own; the project's levels are their texts, the open level as it is now.
+  /// False with the reason (reported, and in `error`): Play or Simulate runs, the program does not start (its reason:
+  /// no App, two, a Blueprint with errors ...), the App does not.
+  bool play_project(std::string* error = nullptr);
+  bool playing_project() const { return project_play_ != nullptr; }
+  /// The playing program's Engine (null: no Play Project) - its Input, widgets, mixer.
+  Engine* project_engine();
+  /// The playing program (null: no Play Project) - its runtime, what it said.
+  game::Program* project_program();
   void stop();
   void toggle_pause();
   void eject();
@@ -546,6 +566,12 @@ class Studio {
   /// Ends Simulate / Play (and the stage) without a word: the world shows the level again.
   void end_simulation();
 
+  // Play Project (project_play.cpp)
+  struct ProjectPlay;
+  std::unique_ptr<ProjectPlay> project_play_;
+  void frame_project(f64 now_ms, f32 dt);
+  void stop_project();
+  bool project_key(std::string_view code, bool down, bool repeat);
   Renderer* r_ = nullptr;
   game::NightWindows* windows_ = nullptr;
   std::unique_ptr<game::GameWorld> world_;

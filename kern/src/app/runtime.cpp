@@ -50,11 +50,16 @@ bool AppRuntime::start(i32 width, i32 height) {
   options.width = width;
   options.height = height;
   clear_error();
-  if (!engine_.renderer().init(options, app_->extensions())) {
+  if (renderer_runs_) {
+    // (a host's renderer runs already: it took its shader extensions when it started)
+    if (app_->extensions().size > 0)
+      return fail("the App has %u shader extension(s) - this host's renderer runs already and takes none (they are given to a renderer when it starts: play it as a game)",
+                  static_cast<u32>(app_->extensions().size));
+  } else if (!engine_.renderer().init(options, app_->extensions())) {
     const std::string why = *last_error() ? last_error() : "it named no reason";
     return fail("the renderer did not start: %s", why.c_str());
-  }
-  reserve_heap(settings_);
+  } else
+    reserve_heap(settings_);
   // the mixer at the device's rate (kern_app_audio_init), else at 48000 Hz: ready when the App starts
   if (!engine_.mixer().ready() && !engine_.mixer().init(48000)) return fail("the mixer did not start: %s", last_error());
   // (what went wrong before the start is not its reason)
@@ -64,7 +69,7 @@ bool AppRuntime::start(i32 width, i32 height) {
   engine_.ui_end();   // (the status line of the start, before the first frame)
   if (!started) {
     const std::string why = *last_error() ? last_error() : "its start() gave false and named no reason (an App says why with kern::fail)";
-    engine_.renderer().shutdown();
+    if (!renderer_runs_) engine_.renderer().shutdown();
     return fail("the App did not start: %s", why.c_str());
   }
   running_ = true;
@@ -95,7 +100,13 @@ bool AppRuntime::frame(f64 now_ms, bool page_hidden) {
   RenderParams params;
   params.clear_color = engine_.clear_color();
   params.page_hidden = page_hidden != 0;
+  params.layers = layers_;
   RenderStats stats;
+  if (has_view_) {
+    params.has_viewport = true;
+    params.viewport = view_;
+    return engine_.renderer().render(params, stats);
+  }
   if (engine_.stereo() && engine_.renderer().width() >= 4) {
     // side by side: each half the camera's own view, the eye shifted half the eye distance along
     // the camera's right (parallel eyes, the same fov over half the width)
@@ -254,8 +265,14 @@ void AppRuntime::stop() {
   app_->stop(engine_);
   // (the mixer ends with the app: its clips and voices go, the rate stays for the next start)
   engine_.mixer().init(engine_.mixer().sample_rate());
-  engine_.renderer().shutdown();
+  if (!renderer_runs_) engine_.renderer().shutdown();
   running_ = false;
+}
+
+void AppRuntime::set_view(const Viewport& view, u32 layers) {
+  has_view_ = true;
+  view_ = view;
+  layers_ = layers;
 }
 
 AppRuntime& app_runtime() {

@@ -94,9 +94,28 @@ struct KERN_BLUEPRINT_TYPE Frame {
   u64 index = 0;
 };
 
+/// What the engine asks of the place it runs in (kern/docs/app.md 1.): the page of a game - the platform's
+/// (platform_app_host: kern/web/app.mjs through kern_env) - or the editor that plays a project in its viewport
+/// (kern/src/studio, docs/studio.md "Play Project"). The one way the engine reaches out of the program: nothing calls
+/// the platform past it. (The slots of a save have a host of their own: Engine::set_storage, kern/app/storage.h.)
+class AppHost {
+ public:
+  virtual ~AppHost() = default;
+  /// Capture (true) or release the mouse for mouse-look controls.
+  virtual void pointer_lock(bool lock) = 0;
+  /// The frame's widgets, after each frame in which they changed (JSON, kern/docs/app.md 6.).
+  virtual void widgets(std::string_view json) = 0;
+};
+/// The platform's: the page (kern_env pointer_lock and ui); natively nothing - a test reads Engine::ui_json.
+AppHost& platform_app_host();
+
 class Engine {
  public:
-  explicit Engine(Renderer& renderer) : renderer_(renderer) {}
+  explicit Engine(Renderer& renderer) : renderer_(renderer), host_(&platform_app_host()) {}
+  /// An engine in another host than the platform's (the editor's Play Project): `host` must outlive it.
+  Engine(Renderer& renderer, AppHost& host) : renderer_(renderer), host_(&host) {}
+  /// The host it runs in (platform_app_host unless it was made with one).
+  AppHost& host() const { return *host_; }
   /// The renderer and the input of the frame: objects of the engine (a Blueprint reaches them by these).
   Renderer& renderer() const { return renderer_; }
   Input& input() { return input_; }
@@ -258,6 +277,7 @@ class Engine {
   mutable std::vector<std::string> ui_said_;
   bool ui_add(Widget w);
   i32 ui_event_of(const std::string& id) const;
+  AppHost* host_;
   StorageHost* storage_ = nullptr;
   std::vector<Slot> slots_;
   std::string loaded_text_;

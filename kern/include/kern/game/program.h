@@ -75,9 +75,11 @@ class Program {
 
 }  // namespace game
 
-namespace detail {
-/// The App the app runtime runs for a program started by kern::run(project): the program's App, and at the end the
-/// program's end (after App::stop - its Blueprints end with it). An app started again starts its program again.
+namespace game {
+/// The App an app runtime (kern/app/runtime.h) runs for a program: the program's App - the engine's object of its
+/// Blueprint that implements App, or the App of C++ it was given -, and at the end the program's end (after
+/// App::stop - its Blueprints end with it). An app started again starts its program again. The one way a program
+/// runs on an app runtime: kern::run's (the game's) and the editor's Play Project (docs/studio.md).
 class ProgramApp final : public App {
  public:
   game::Project project;
@@ -103,7 +105,7 @@ class ProgramApp final : public App {
     program.end();
   }
 };
-}  // namespace detail
+}  // namespace game
 
 /// The entry of a game whose App is a Blueprint of its project (kern/docs/project.md 4.): starts the program of
 /// `project` (one Program of the app runtime) and hands the app runtime its App with the project's settings
@@ -113,7 +115,7 @@ class ProgramApp final : public App {
 namespace detail {
 inline int run_program(const game::Project& project, App* given) {
   // (the app runtime's one program, kept to the end of the process: the app runtime holds its App)
-  static detail::ProgramApp* const app = new detail::ProgramApp;
+  static game::ProgramApp* const app = new game::ProgramApp;
   if (app->program.running()) {
     log(LogLevel::error, "kern::run: the program of the project %s runs already - kern_main starts one program, once", app->program.project()->name.c_str());
     return 1;

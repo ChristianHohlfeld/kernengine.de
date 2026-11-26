@@ -72,6 +72,9 @@ struct InputActions {
 /// "anywhere", "stickX", "stickY").
 const char* key_name(Key k);
 bool parse_key(std::string_view name, Key& out);
+/// The key of a KeyboardEvent.code ("KeyW", "ArrowLeft", "Space" - the order of kern/web/app.mjs KEY_CODES): what a host
+/// that gets the browser's keys hands Input::key (the editor's Play Project). False: no key of the engine has that code.
+bool key_of_code(std::string_view code, Key& out);
 
 json::Value input_to_json(const InputActions& input);
 /// Reads the member "input" of the settings. False - `error` says where (input.actions[1].keys[0] ...) and why: a key
