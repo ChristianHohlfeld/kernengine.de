@@ -23,6 +23,8 @@
 #include "kern/gfx/renderer.h"
 #include "kern/physics/physics.h"
 
+namespace kern { class Engine; }  // kern/app/app.h
+
 namespace kern::game {
 struct Project;  // kern/game/project.h
 
@@ -186,6 +188,10 @@ class FixedStep {
 class GameWorld {
  public:
   explicit GameWorld(Renderer& renderer, NightWindows* windows = nullptr);
+  /// A world of the program the engine runs: the engine's renderer, and the engine's project (Engine::project) as its
+  /// own - how a program makes its worlds (kern/docs/project.md 3.); it starts the project's levels by their paths
+  /// (start_level) without handing the project on.
+  explicit GameWorld(Engine& engine);
   ~GameWorld();
   GameWorld(const GameWorld&) = delete;
   GameWorld& operator=(const GameWorld&) = delete;

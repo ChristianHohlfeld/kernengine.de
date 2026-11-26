@@ -22,6 +22,8 @@
 
 namespace kern {
 
+namespace game { struct Project; }
+
 /// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
 enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
@@ -87,6 +89,12 @@ class Engine {
   Renderer& renderer() const { return renderer_; }
   Input& input() { return input_; }
   const Input& input() const { return input_; }
+  /// The project of the program this engine runs (kern::run(App&, const Project&) or kern::run(Project),
+  /// kern/game/program.h) - null for an App without a project (kern::run(App&, settings)). A world the program makes
+  /// from its Engine has it (GameWorld(Engine&)): the program never hands it on itself.
+  const game::Project* project() const { return project_; }
+  /// Program side (kern/game/program.h, while its App runs): the project of the program.
+  void set_project(const game::Project* project) { project_ = project; }
   /// Text shown by the host page in its status overlay (empty hides it).
   void set_status(const char* text);
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
@@ -161,6 +169,7 @@ class Engine {
 
  private:
   Renderer& renderer_;
+  const game::Project* project_ = nullptr;
   Input input_;
   Vec4 clear_color_{0.045f, 0.07f, 0.12f, 1};
   bool xr_ = false;

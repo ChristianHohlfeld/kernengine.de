@@ -2123,8 +2123,16 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
-// engine.game_world.release: kern::game::GameWorld::~GameWorld
+// engine.game_world.make_2: kern::game::GameWorld::GameWorld
 bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  kern::Engine* a0 = ev::object<kern::Engine>(o, in, 0, "engine");
+  if (!a0) return false;
+  out[0] = Value::integer(o.own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*a0))));
+  return true;
+}
+
+// engine.game_world.release: kern::game::GameWorld::~GameWorld
+bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameWorld>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no GameWorld that was made";
     return false;
@@ -2133,7 +2141,7 @@ bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.logic_native: kern::game::GameWorld::logic_native
-bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->logic_native);
@@ -2141,7 +2149,7 @@ bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.logic_native@set: what stands at the place kern::game::GameWorld::logic_native gives
-bool c176_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c177_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->logic_native);
@@ -2149,13 +2157,13 @@ bool c176_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.property_change.make: kern::game::GameWorld::PropertyChange::PropertyChange
-bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::GameWorld::PropertyChange>(std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange())));
   return true;
 }
 
 // engine.property_change.release: kern::game::GameWorld::PropertyChange::~PropertyChange
-bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameWorld::PropertyChange>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no PropertyChange that was made";
     return false;
@@ -2164,7 +2172,7 @@ bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.actor: kern::game::GameWorld::PropertyChange::actor
-bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->actor);
@@ -2172,7 +2180,7 @@ bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.actor@set: what stands at the place kern::game::GameWorld::PropertyChange::actor gives
-bool c179_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c180_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->actor);
@@ -2180,7 +2188,7 @@ bool c179_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.property_change.path: kern::game::GameWorld::PropertyChange::path
-bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c181(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::give<ev::Text>(o, out, 0, self->path);
@@ -2188,7 +2196,7 @@ bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.path@set: what stands at the place kern::game::GameWorld::PropertyChange::path gives
-bool c180_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c181_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::take<ev::Text>(o, in, 1, self->path);
@@ -2196,13 +2204,13 @@ bool c180_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.night_windows.make: kern::game::NightWindows::NightWindows
-bool c181(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::NightWindows, kern::ShaderExtension>(std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows())));
   return true;
 }
 
 // engine.night_windows.release: kern::game::NightWindows::~NightWindows
-bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::NightWindows>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no NightWindows that was made";
     return false;
@@ -2211,7 +2219,7 @@ bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.night_windows.night: kern::game::NightWindows::night
-bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
   ev::give<ev::Float>(o, out, 0, self->night);
@@ -2219,7 +2227,7 @@ bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.night_windows.night@set: what stands at the place kern::game::NightWindows::night gives
-bool c183_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c184_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
   ev::take<ev::Float>(o, in, 1, self->night);
@@ -2227,7 +2235,7 @@ bool c183_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.sound_bank.make: kern::game::SoundBank::SoundBank
-bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::audio::Mixer* a0 = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!a0) return false;
   out[0] = Value::integer(o.own<kern::game::SoundBank>(std::unique_ptr<kern::game::SoundBank>(new kern::game::SoundBank(*a0))));
@@ -2235,7 +2243,7 @@ bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.release: kern::game::SoundBank::~SoundBank
-bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::SoundBank>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no SoundBank that was made";
     return false;
@@ -2437,17 +2445,18 @@ const EngineCall kCalls[] = {
     {"engine.game_audio.make", &c172},
     {"engine.game_audio.release", &c173},
     {"engine.game_world.make", &c174},
-    {"engine.game_world.release", &c175},
-    {"engine.game_world.logic_native", &c176},
-    {"engine.property_change.make", &c177},
-    {"engine.property_change.release", &c178},
-    {"engine.property_change.actor", &c179},
-    {"engine.property_change.path", &c180},
-    {"engine.night_windows.make", &c181},
-    {"engine.night_windows.release", &c182},
-    {"engine.night_windows.night", &c183},
-    {"engine.sound_bank.make", &c184},
-    {"engine.sound_bank.release", &c185},
+    {"engine.game_world.make_2", &c175},
+    {"engine.game_world.release", &c176},
+    {"engine.game_world.logic_native", &c177},
+    {"engine.property_change.make", &c178},
+    {"engine.property_change.release", &c179},
+    {"engine.property_change.actor", &c180},
+    {"engine.property_change.path", &c181},
+    {"engine.night_windows.make", &c182},
+    {"engine.night_windows.release", &c183},
+    {"engine.night_windows.night", &c184},
+    {"engine.sound_bank.make", &c185},
+    {"engine.sound_bank.release", &c186},
     {"engine.game_world.hud_mut@get", &c63},
     {"engine.game_world.hud_mut@set", &c63_set},
     {"engine.game_world.events@get", &c76},
@@ -2456,14 +2465,14 @@ const EngineCall kCalls[] = {
     {"engine.game_world.sound_cues@set", &c77_set},
     {"engine.game_world.shots@get", &c78},
     {"engine.game_world.shots@set", &c78_set},
-    {"engine.game_world.logic_native@get", &c176},
-    {"engine.game_world.logic_native@set", &c176_set},
-    {"engine.property_change.actor@get", &c179},
-    {"engine.property_change.actor@set", &c179_set},
-    {"engine.property_change.path@get", &c180},
-    {"engine.property_change.path@set", &c180_set},
-    {"engine.night_windows.night@get", &c183},
-    {"engine.night_windows.night@set", &c183_set},
+    {"engine.game_world.logic_native@get", &c177},
+    {"engine.game_world.logic_native@set", &c177_set},
+    {"engine.property_change.actor@get", &c180},
+    {"engine.property_change.actor@set", &c180_set},
+    {"engine.property_change.path@get", &c181},
+    {"engine.property_change.path@set", &c181_set},
+    {"engine.night_windows.night@get", &c184},
+    {"engine.night_windows.night@set", &c184_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

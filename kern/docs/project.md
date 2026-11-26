@@ -68,19 +68,23 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   Sie hat einen eigenen Host: keine Welt, keine Simulationszeit, eigene Objekte der Engine. Begin Play läuft einmal.
 - Eine **Welt** startet das Programm selbst, über die Knoten der Engine (`GameWorld` machen, ein Level des Projekts
   laden, starten). Der Handle der GameWorld ist ein Wert des Programms. Ein Levelwechsel bedeutet: Welt beenden, nächste
-  Welt starten. Die Programm-Laufzeit bleibt dabei bestehen. Mehrere Welten zugleich sind möglich. Eine Welt, die das
-  Programm macht (ein GameWorld, das ein Knoten im Host des Programms macht), bekommt dabei das Projekt
-  (`GameWorld::set_project`, über `EngineObjects::on_made`): ihre Blueprints finden Bibliotheken erst im Level, dann
-  im Projekt (5.). Sie endet spätestens mit den Objekten des Programms. Geprüft: `program_world_has_the_project`.
+  Welt starten. Die Programm-Laufzeit bleibt dabei bestehen. Mehrere Welten zugleich sind möglich. **Eine Welt, die das
+  Programm macht, hat sein Projekt von selbst** – kein Programm reicht es weiter: ein GameWorld, das ein Knoten im
+  Host des Programms macht (über `EngineObjects::on_made`), und ein GameWorld, das eine App in C++ aus ihrer Engine
+  macht (`GameWorld(Engine&)`: die Engine kennt das Projekt des Programms, das sie fährt – `Engine::project()`, gesetzt
+  von `kern::run(App&, const Project&)` und `kern::run(Project)` vor `App::start`, zurückgenommen nach `App::stop`).
+  Ihre Blueprints finden Bibliotheken erst im Level, dann im Projekt (5.). Eine Welt des Programms endet spätestens mit
+  den Objekten des Programms. `GameWorld::set_project` bleibt nur für einen Host ohne Programm (der Editor, ein Test).
+  Geprüft: `program_world_has_the_project`, `world_of_an_app_of_cpp_has_the_project`.
 - **Ein Level starten und wechseln:** `GameWorld::start_level(path, mode)` (Knoten „Start Level“ an einer Welt des
   Programms) startet das Level des Projekts mit diesem Pfad (wie `levels` ihn nennt). Das Projekt hält die Texte seiner
   Levels (`Project::level_texts`, nicht Teil der Datei: `embedded_project()` füllt sie aus dem Bau, der Editor aus den
   Dateien daneben). Wechseln heißt: „Stop“, dann „Start Level“ des nächsten; was das Programm behält (Punkte, ein
-  Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (eine Welt aus C++
-  bekommt es mit `set_project`), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
+  Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (die Meldung sagt, wie eine
+  Welt des Programms es hat), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
   nicht, der Text ist kein Level. Geprüft: `world_starts_a_level_of_its_project` (zwei Levels, Wechsel, Wert bleibt,
   auch über den Knoten einer Welt des Programms). Eine App in C++ macht es ebenso: `kern/games/murmel/src/murmel.cpp`
-  (`Murmel::lade`: `set_project(&embedded_project())` einmal, dann je Level `start_level`; die Töne der Welt lädt
+  (`Murmel::start`: `GameWorld(engine)`, `Murmel::lade`: je Level `start_level`; die Töne der Welt lädt
   `GameAudio::begin`), nativ belegt vom CI-Job `murmel` (Level 2 im erwarteten Frame, Punkte über beide Levels).
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der

@@ -4,7 +4,6 @@
 #include <cstdio>
 
 #include "kern/core/base.h"
-#include "kern/game/embedded.h"
 
 namespace murmel {
 
@@ -52,8 +51,7 @@ f32 Murmel::punkte() const {
 
 bool Murmel::start(Engine& engine) {
   renderer_ = &engine.renderer();
-  welt_ = std::make_unique<game::GameWorld>(engine.renderer());
-  welt_->set_project(&game::embedded_project());   // (die Levels des Spiels sind die seines Projekts)
+  welt_ = std::make_unique<game::GameWorld>(engine);   // (eine Welt des Programms: sie hat sein Projekt, also seine Levels)
   mixer_.init(48000);
   bank_ = std::make_unique<game::SoundBank>(mixer_);
   audio_ = std::make_unique<game::GameAudio>(mixer_, *bank_);

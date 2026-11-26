@@ -84,11 +84,16 @@ class ProgramApp final : public App {
     return program.app();
   }
   Span<ShaderExtension* const> extensions() override { App* a = app(); return a ? a->extensions() : Span<ShaderExtension* const>{}; }
-  bool start(Engine& engine) override { App* a = app(); return a && a->start(engine); }
+  bool start(Engine& engine) override {
+    App* a = app();
+    engine.set_project(program.project());   // (a world the App makes from its Engine is the project's: GameWorld(Engine&))
+    return a && a->start(engine);
+  }
   void update(Engine& engine, const Frame& frame) override { if (App* a = program.app()) a->update(engine, frame); }
   void resized(Engine& engine) override { if (App* a = program.app()) a->resized(engine); }
   void stop(Engine& engine) override {
     if (App* a = program.app()) a->stop(engine);
+    engine.set_project(nullptr);
     program.end();
   }
 };

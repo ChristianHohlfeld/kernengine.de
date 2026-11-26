@@ -8633,6 +8633,46 @@ TEST(program_world_has_the_project) {
   program.end();
 }
 
+// A world a program makes from its Engine is a world of its project (kern/docs/project.md 3.): an App of C++ run with
+// its project (kern::run(App&, const Project&): the app runtime's ProgramApp) makes GameWorld(Engine&) and starts the
+// project's levels by their paths - no call hands the project on. Without a project (kern::run(App&, settings)) the
+// world has none, and start_level says how a program's world gets one.
+TEST(world_of_an_app_of_cpp_has_the_project) {
+  game::Level a = game::basic_level();
+  a.name = "Erstes";
+  game::Project pr;
+  pr.name = "VonSelbst";
+  pr.levels = {"a.klevel"};
+  pr.level_texts = {{"a.klevel", game::to_text(a)}};
+  struct Cpp final : App {
+    std::unique_ptr<game::GameWorld> world;
+    bool started = false;
+    bool start(Engine& engine) override {
+      world = std::make_unique<game::GameWorld>(engine);
+      started = world->start_level("a.klevel", game::SimMode::play);
+      return true;
+    }
+    void update(Engine&, const Frame&) override {}
+    void stop(Engine&) override { world.reset(); }
+  } cpp;
+  Renderer renderer;
+  Engine engine(renderer);
+  {
+    detail::ProgramApp app;
+    app.project = pr;
+    app.given = &cpp;
+    CHECK(app.start(engine));
+    CHECK(engine.project() && engine.project()->name == "VonSelbst");
+    CHECK(cpp.world && cpp.world->project() == engine.project() && cpp.started && cpp.world->running() && cpp.world->level().name == "Erstes");
+    app.stop(engine);
+    CHECK(!engine.project() && !cpp.world);
+  }
+  // an engine without a program's project: its world has none, and says how to get one
+  game::GameWorld alone(engine);
+  CHECK(!alone.project());
+  CHECK(!alone.start_level("a.klevel", game::SimMode::play) && std::string(last_error()).find("a program makes its world from its Engine (GameWorld(Engine&))") != std::string::npos);
+}
+
 // The exports belong to the program (kern/docs/project.md 4.): the program's runtime binds each of its Blueprints that
 // runs as a class when it starts (NativeBlueprint::bind_class: what its exports call) and unbinds them at its end - two objects
 // of one such class in the program: the start is refused and names the Blueprint. An export in a Blueprint of a world

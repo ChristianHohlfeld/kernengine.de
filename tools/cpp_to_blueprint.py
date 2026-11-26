@@ -11075,6 +11075,17 @@ class Emit:
                     ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                     if len([p for p in ps if not kids(p)]) <= len(a) <= len(ps):
                         fit.append(d)
+                if len(fit) > 1:
+                    # (of several by the count, the one whose parameters take these arguments, as C++ chooses: an object
+                    # of the engine a parameter names - GameWorld(Renderer&) or GameWorld(Engine&) - is of that class)
+                    def takes(d):
+                        ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+                        for p, x in zip(ps, a):
+                            want, got = u.object_of(qtype(p)), u.object_of(qtype(x))
+                            if (want or got) and want != got:
+                                return False
+                        return True
+                    fit = [d for d in fit if takes(d)]
                 if len(fit) != 1:
                     raise Wait(f"std::make_unique of a {q.split('::')[-1]}: " + ("no constructor of it is a node" if not fit else "which of its constructors"))
                 return self.made(fit[0], a), "Int"

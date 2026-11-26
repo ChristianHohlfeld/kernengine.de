@@ -15044,6 +15044,28 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.make", {to_value(renderer), to_value(windows)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
+  /// A world of the program the engine runs: the engine's renderer, and the engine's project (Engine::project) as its own - how a program makes its worlds (kern/docs/project.md 3.); it starts the project's levels by their paths (start_level) without handing the project on.
+  void engine_game_world_make_2(Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::Engine* const kern_a0 = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_a0) { this->kern_engine_failed("engine.game_world.make_2"); return; }
+      (void)kern_o->own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*kern_a0)));
+      return;
+    }
+    this->kern_engine("engine.game_world.make_2", {to_value(engine)}, {PinType::integer});
+  }
+  template <class KernNode> void engine_game_world_make_2(KernNode& kern_n, Int engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::Engine* const kern_a0 = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.make_2"); return; }
+      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::game::GameWorld>(std::unique_ptr<kern::game::GameWorld>(new kern::game::GameWorld(*kern_a0))));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.make_2", {to_value(engine)}, {PinType::integer});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
   /// Ends the GameWorld (its destructor): the handle is none after it.
   void engine_game_world_release(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

@@ -1,5 +1,6 @@
 #include "kern/game/runtime.h"
 #include "kern/game/project.h"
+#include "kern/app/app.h"
 #include "kern/core/dmath.h"
 
 #include "runtime_internal.h"
@@ -427,6 +428,8 @@ struct GameWorld::Traffic {
 };
 
 GameWorld::GameWorld(Renderer& renderer, NightWindows* windows) : r_(renderer), windows_(windows) { (void)logic_nodes_registered(); }
+
+GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) { project_ = engine.project(); }
 
 GameWorld::~GameWorld() {
   stop();
@@ -1233,7 +1236,7 @@ physics::Body GameWorld::create_body(const BodyPlan& plan) {
 }
 
 bool GameWorld::start_level(std::string_view path, SimMode mode) {
-  if (!project_) return fail("start_level %.*s: the world has no project (GameWorld::set_project) - a program's world has its program's", static_cast<int>(path.size()), path.data());
+  if (!project_) return fail("start_level %.*s: the world has no project - a program makes its world from its Engine (GameWorld(Engine&)) or as an object of its Blueprints, then it has the program's; a host without a program gives one (set_project)", static_cast<int>(path.size()), path.data());
   std::string why;
   const std::string* text = project_->level_text(path, &why);
   if (!text) return fail("start_level: %s", why.c_str());
