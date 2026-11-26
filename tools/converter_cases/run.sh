@@ -80,6 +80,9 @@
 #   running.cpp the logic the Blueprints run in as the engine names it in its own namespace (GameWorld::logic_runtime gives a
 #             `logic::Runtime*`, kern::game::blueprints_running takes one): the test's stand-ins name it by its full name - written
 #             and compared (before: "no type named 'Runtime' in namespace converted_...::logic", the stand-in of GameWorld went).
+#   logicarg.cpp + logicarg_b.cpp  a function that takes the logic the Blueprints run in (kern::logic::Runtime&: no input, the
+#             Blueprint's own) called from another file: what it takes is told the same there and here - written (before: the
+#             converter stopped, "takes and gives ['I32', 'Bool'] there and ['Object<kern::logic::Runtime>', 'I32', 'Bool'] here").
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -252,6 +255,10 @@ logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes
 logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
 tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
 
+convert logicarg logicarg_b
+logged logicarg "both_ready (hands the logic on to a function of another file) is written" '^ +both_ready \([0-9]+\): written'
+logged logicarg "both are compared" '^2 functions of the Blueprints are compared'
+
 convert running
 logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
 logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
@@ -348,6 +355,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
