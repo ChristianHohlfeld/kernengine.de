@@ -1,6 +1,7 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
 #include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
 
@@ -474,7 +475,7 @@ Value number_of_json(const json::Value& j, PinType t) {
         else if (w == "-inf") x = -std::numeric_limits<T>::infinity();
         else if (w == "nan") x = std::numeric_limits<T>::quiet_NaN();
         else if (w == "-nan") x = -std::numeric_limits<T>::quiet_NaN();
-        else std::from_chars(w.data(), w.data() + w.size(), x);
+        else x = static_cast<T>(scan::real(w, std::is_same_v<T, f32>).value);  // (the engine's own reader, C's strtod/strtof - nodes.h)
       }
     } else {
       if (j.is_number()) {

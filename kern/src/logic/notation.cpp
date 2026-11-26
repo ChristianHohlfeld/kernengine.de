@@ -2572,11 +2572,10 @@ struct Reader {
       if (n.real) {
         if (n.suffix == 'f') {
           f32 x = 0;
-          std::from_chars(n.s.data(), n.s.data() + n.s.size(), x);   // (read as an f32 - rounded once, as C++ reads 0.1f)
+          x = static_cast<f32>(scan::real(n.s, true).value);   // (read as an f32 - rounded once, as C++ reads 0.1f: the engine's own reader, nodes.h)
           v = Value::of_number(minus ? -x : x);
         } else {
-          f64 x = 0;
-          std::from_chars(n.s.data(), n.s.data() + n.s.size(), x);
+          f64 x = scan::real(n.s, false).value;
           v = Value::of_number(minus ? -x : x);
         }
       } else {
