@@ -239,7 +239,7 @@ struct BlueprintRun {
     }
     /// The engine as the program has it (`BlueprintRun::Engine::direct`): the Blueprints' classes call the engine's
     /// functions on these objects themselves (kern/logic/engine_direct.h) - a test hands them its own (a physics
-    /// world: `objects.adopt(world)` is its handle) - and the interpreter calls them the same way.
+    /// world: BlueprintRun::object(world) is the Object<kern::physics::World> they take) - and the interpreter calls them the same way.
     bool direct = false;
     kern::logic::EngineObjects* engine_objects() override { return direct ? &objects : nullptr; }
     void engine_failed(std::string_view function) override {
@@ -298,6 +298,9 @@ struct BlueprintRun {
     rt.begin();
     if (bind) bound = bind(rt);
   }
+  /// An object of the test given to the Blueprints on the engine itself (Engine::direct): the Object<T> they hold of it - an
+  /// object of the engine is never a number (kern/docs/engine_object.md). The same object, the same Object<T>.
+  template <class T> kern::logic::Object<T> object(const T& o) { return kern::logic::Object<T>(host.objects.ref(host.objects.adopt(o))); }
   /// The running Blueprint of the actor of this name (null: none here).
   kern::logic::Instance* find(std::string_view name) {
     const kern::logic::ActorRef id = host.find_actor(name);

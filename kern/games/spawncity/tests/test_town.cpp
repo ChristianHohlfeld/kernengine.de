@@ -137,7 +137,7 @@ KERN_TEST(town_people_flee_and_walls) {
   kern::physics::World w;
   make_flat_world(w);
   make_static_box(w, {5, 0, 2}, {1, 60, 4});  // a long wall 4.5 m east
-  const i64 world = b.rules.host.objects.adopt(w);
+  const kern::logic::Object<kern::physics::World> world = b.rules.object(w);
   Pp::People people;
   const i32 p = static_cast<i32>(pp.People_add_officer(people, {0, 0, 0}, 0, 0, 3).Result);
   Pp::People_Person& who = people.people_[static_cast<std::size_t>(p)];

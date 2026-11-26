@@ -2,7 +2,7 @@
 // heights, ground tiles that a ray hits at height(), water basins, bridges and the current. The terrain is
 // the level's Blueprint terrain_cpp (its structs: terrain), called as its class - as the program calls it
 // (level_blueprints.h), with the game's loop guard - on the engine itself: the renderer and the physics world
-// are the test's, given to it by their handles.
+// are the test's, given to it as its objects of the engine (Object<kern::Renderer>, Object<kern::physics::World>).
 #include <cstring>
 #include <memory>
 
@@ -18,15 +18,17 @@ using namespace sc;
 
 namespace {
 using Tr = blueprints::terrain_cpp;
-/// terrain_cpp running as its class, on the engine itself (kern::test::BlueprintRun::Engine::direct).
+using Common = blueprints::common;   // (the ray onto the world, cast, is the project's Blueprint common's - as the program calls it)
+/// terrain_cpp running as its class, on the engine itself (kern::test::BlueprintRun::Engine::direct), common beside it.
 struct TerrainBlueprint {
-  kern::test::BlueprintRun rules{"terrain_cpp", nullptr, true, {}, kern::test::BlueprintRun::Engine::direct};
+  kern::test::BlueprintRun rules{"terrain_cpp", nullptr, true, {"common"}, kern::test::BlueprintRun::Engine::direct};
   bool bound = false;
   TerrainBlueprint() {
     rules.rt.budget = rules::kLoopBudget;
-    bound = rules.problems.empty() && kern::logic::bind_blueprint<Tr>(rules.rt);
+    bound = rules.problems.empty() && kern::logic::bind_blueprint<Tr>(rules.rt) && kern::logic::bind_blueprint<Common>(rules.rt);
   }
   Tr& operator*() { return kern::logic::blueprint<Tr>(); }
+  Common& common() { return kern::logic::blueprint<Common>(); }
 };
 /// Konstanz, where the game starts (tiles.h).
 constexpr f64 kLon = 9.1766, kLat = 47.6600;
@@ -35,7 +37,7 @@ struct TerrainRig {
   TerrainBlueprint bp;
   kern::Renderer r;
   kern::physics::World world;
-  i64 world_handle = 0;
+  kern::logic::Object<kern::physics::World> world_object;
   std::unique_ptr<Tr::Terrain> t = std::make_unique<Tr::Terrain>();
   explicit TerrainRig(bool dem) {
     r.init(kern::RendererOptions{});
@@ -43,11 +45,11 @@ struct TerrainRig {
     if (!bp.bound) return;
     Tr::GeoProjector proj;
     (*bp).GeoProjector_init(proj, kLon, kLat);
-    world_handle = bp.rules.host.objects.adopt(world);
-    (*bp).Terrain_start(*t, proj, bp.rules.host.objects.adopt(r), world_handle, dem);
+    world_object = bp.rules.object(world);
+    (*bp).Terrain_start(*t, proj, bp.rules.object(r), world_object, dem);
   }
   /// A ray straight down onto the world, as the program casts it (common: cast).
-  Tr::the_RayResult_ down(f64 x, f64 y, f64 from, f64 len) { return (*bp).cast(world_handle, {static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(from)}, {0, 0, -1}, len, {}, Tr::Int64{~0ull}).Result; }
+  Common::the_RayResult_ down(f64 x, f64 y, f64 from, f64 len) { return bp.common().cast(world_object, {static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(from)}, {0, 0, -1}, len, {}, Common::Int64{~0ull}).Result; }
 };
 Tr::List<Tr::U8> bytes_of(const std::vector<u8>& v) {
   Tr::List<Tr::U8> out;
@@ -58,7 +60,7 @@ Tr::List<Tr::U8> bytes_of(const std::vector<u8>& v) {
 
 KERN_TEST(terrain_crater_profile) {
   TerrainBlueprint bp;
-  KERN_CHECK(bp.bound, "terrain_cpp runs as its class: %s", bp.rules.problems.c_str());
+  KERN_CHECK(bp.bound, "terrain_cpp and common run as their classes: %s", bp.rules.problems.c_str());
   if (!bp.bound) return;
   Tr& tr = *bp;
   auto crater_profile = [&](f64 r, f64 radius, f64 depth, f64 rim) { return static_cast<f64>(tr.crater_profile(r, radius, depth, rim).Result); };
@@ -71,7 +73,7 @@ KERN_TEST(terrain_crater_profile) {
 
 KERN_TEST(terrain_bare_earth) {
   TerrainBlueprint bp;
-  KERN_CHECK(bp.bound, "terrain_cpp runs as its class: %s", bp.rules.problems.c_str());
+  KERN_CHECK(bp.bound, "terrain_cpp and common run as their classes: %s", bp.rules.problems.c_str());
   if (!bp.bound) return;
   Tr& tr = *bp;
   const u32 n = 201;
@@ -112,7 +114,7 @@ std::vector<u8> ramp_tile(const Tr::TileKey& k) {
 
 KERN_TEST(terrain_dem_tiles) {
   TerrainRig rig(true);
-  KERN_CHECK(rig.bp.bound, "terrain_cpp runs as its class: %s", rig.bp.rules.problems.c_str());
+  KERN_CHECK(rig.bp.bound, "terrain_cpp and common run as their classes: %s", rig.bp.rules.problems.c_str());
   if (!rig.bp.bound) return;
   Tr& tr = *rig.bp;
   Tr::Terrain& t = *rig.t;
@@ -146,7 +148,7 @@ KERN_TEST(terrain_dem_tiles) {
   KERN_CHECK(std::fabs(north) < 1, "1 km north the same (%.1f m)", north);
   KERN_CHECK(tr.Terrain_ready_at(t, {0, 0, 0}).Result, "ground collision under the origin");
   for (Vec2 p : {Vec2{37, -21}, Vec2{-120.5f, 64.2f}, Vec2{3, 3}}) {
-    const Tr::the_RayResult_ h = rig.down(p.x, p.y, 500, 1000);
+    const Common::the_RayResult_ h = rig.down(p.x, p.y, 500, 1000);
     const f64 at = tr.Terrain_height(t, p.x, p.y).Result;
     KERN_CHECK(h.hit && std::fabs(h.point.z - at) < 0.05f, "ray hits the ground at height() (%.2f vs %.2f)", static_cast<f64>(h.point.z), at);
   }
@@ -156,7 +158,7 @@ KERN_TEST(terrain_dem_tiles) {
 
 KERN_TEST(terrain_water) {
   TerrainRig rig(false);
-  KERN_CHECK(rig.bp.bound, "terrain_cpp runs as its class: %s", rig.bp.rules.problems.c_str());
+  KERN_CHECK(rig.bp.bound, "terrain_cpp and common run as their classes: %s", rig.bp.rules.problems.c_str());
   if (!rig.bp.bound) return;
   Tr& tr = *rig.bp;
   Tr::Terrain& t = *rig.t;
@@ -178,7 +180,7 @@ KERN_TEST(terrain_water) {
   tr.Terrain_add_crater(t, {300, 300, 0}, 8, 2);
   KERN_CHECK(height(300, 300) < -1.9f && tr.Terrain_surface_at(t, 300, 300).Result == 2, "a crater (%.2f)", height(300, 300));
   for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4);
-  const Tr::the_RayResult_ h = rig.down(20, 20, 50, 100);
+  const Common::the_RayResult_ h = rig.down(20, 20, 50, 100);
   KERN_CHECK(h.hit && std::fabs(h.point.z + Tr::kWaterBed) < 0.1f, "the lake bed is solid (%.2f)", static_cast<f64>(h.point.z));
 }
 
@@ -186,7 +188,7 @@ KERN_TEST(terrain_water) {
 // averaged to an albedo per node; the ground is rebuilt with them and nothing else is fetched.
 KERN_TEST(terrain_ground_imagery) {
   TerrainRig rig(false);
-  KERN_CHECK(rig.bp.bound, "terrain_cpp runs as its class: %s", rig.bp.rules.problems.c_str());
+  KERN_CHECK(rig.bp.bound, "terrain_cpp and common run as their classes: %s", rig.bp.rules.problems.c_str());
   if (!rig.bp.bound) return;
   Tr& tr = *rig.bp;
   Tr::Terrain& t = *rig.t;
