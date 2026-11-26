@@ -156,3 +156,10 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - ~21:50: ALLE Opus-Agenten endeten mit „monthly spend limit" (HTTP 429; Reset 2.12. 13 Uhr). Nachfolger auf Fable 5.2 gestartet: leser2 (ac0331a0…, w-konv2, lokaler a885d6c0 logic::link-Fix), konverter9 (a693bd07…, w-konv: freie Funktionen mit Welt-Akteur, 6 Exporte), zahlen8 (a1430cbc…, w-zahlen: unfertiger Merge work-projekt, Mathe-Knoten, Murmel-Beleg CI 45892882964), kleinspiel4 (ac993caf…, w-spiel c23667f8).
 - work-projekt 486a6900 = Merge work-konverter c2a349c5, Gate 45893050993 läuft. Zusammenführen macht vorerst der Koordinator selbst.
 - Besitzer 22:07: „Finish fully now, we need to finalize and merge into Main now". Bedingung bleibt: ganzes Gate grün inkl. SpawnCity.
+
+## Nachtrag 26.11. 23:23 (Kontrolle)
+- work-projekt 486a6900 Gate ganz grün (45893050993). work-konverter-leser b0eafcb4 (logic::link-Fix + TEST(logic_library_place)): CI 45901105063 alles grün außer e2e (läuft) und den zwei erwarteten.
+- mag kandidat-10-223348 (5486b432, ohne Fixes): convert rc=0 nach 6 min, suite rc=123 (auszuwerten: kleinspiel4), engine rc=0 23:16. Voller Lauf des Kleinspiels ≈ 42 min.
+- konverter9 lokal: Kleinspiel nur noch 4 wartend (SpawnCity::start an spiel.cpp:74 logic->budget) → Engine: GameWorld::start_logic setzt loopBudget aus dem Projekt; Zeile entfällt im Spiel. Noch nicht gepusht.
+- work-zahlen e5d4061b (Merge work-projekt 486a6900 fertig), CI 45902650621 läuft.
+- work-spiel a71d4ec2 (mit Leser-Fix), Probe 45901148156 success.
