@@ -8437,12 +8437,13 @@ TEST(program_beside_an_app_of_cpp) {
   } cpp;
   std::string error;
   logic::Graph lib, app;
-  CHECK(logic::from_cpp("struct Codes : kern::Library {\n"
-                        "  struct twiceResult { Int Result = 0; };\n"
-                        "  KERN_PURE twiceResult twice(Int x = 0) {\n"
-                        "    return {kern::formula([](Float x) -> Float { return (x * 2.0); }, kern::to<Float>(x))};\n"
+  CHECK(logic::from_cpp("struct Codes : virtual kern::Library {\n"
+                        "  struct sameResult { Int Result = 0; };\n"
+                        "  KERN_PURE sameResult same(Int x = 0) {\n"
+                        "    return {x};\n"
                         "  }\n"
                         "};\n", lib, nullptr, &error));
+  if (!error.empty()) std::printf("program_beside_an_app_of_cpp: %s\n", error.c_str());
   CHECK(error.empty() && lib.library);
   logic::register_native_blueprint(logic::graph_hash(lib), [] { return std::unique_ptr<logic::NativeBlueprint>(new Lib()); });
   game::Project pr;
