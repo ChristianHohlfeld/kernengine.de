@@ -438,3 +438,76 @@ jobs:
           python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
           sleep 1
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772 "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1"
+
+  # Murmel (kern/games/murmel): das zweite Spiel, allein aus der Engine gebaut - der Maßstab neben SpawnCity. Nativ:
+  # die Welt-Blueprints der Levels sind ihre Texte (blueprints/*.cpp), der Lauf mit Tasten ist deterministisch
+  # (tests/run.sh, tests/erwartet.txt), der Konverter liest die Quelle der App (tests/convert.sh).
+  murmel:
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Murmel nativ (deterministischer Lauf)
+        run: CXX=clang++ CC=clang kern/games/murmel/tests/run.sh
+      - name: Die Blueprints der Levels sind ihre Texte
+        run: kern/games/murmel/tests/blueprints.sh --check
+      - name: Der Konverter über die Quelle der App
+        run: CLANGXX=clang++ kern/games/murmel/tests/convert.sh
+
+  # Murmel im Browser: das Modul des Spiels und Kern Studio gebaut, dann spielt der e2e-Test die Seite des Spiels per
+  # Tastatur und das Start-Level im Editor (Play).
+  murmel-web:
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      KERN_OBJ_CACHE: /home/runner/kern-obj
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: wasi-sdk 25 (cached)
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/wasi-sdk
+          key: wasi-sdk-25.0-v2
+      - name: Install wasi-sdk 25
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /home/runner/wasi-sdk
+          curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
+          tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
+      - name: Object cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/kern-obj
+          key: kern-obj-murmel-${{ github.sha }}
+          restore-keys: |
+            kern-obj-murmel-
+            kern-obj-
+      - name: Murmel und Kern Studio bauen
+        run: |
+          set -euo pipefail
+          export WASI_SDK=/home/runner/wasi-sdk
+          kern/games/murmel/build.sh
+          tools/build_studio.sh
+      - name: Playwright (cached)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/e2e
+            ~/.cache/ms-playwright
+          key: playwright-1.56.0
+      - name: Murmel e2e
+        run: |
+          set -euo pipefail
+          [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
+          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
+          timeout 180 /tmp/e2e/node_modules/.bin/playwright install-deps chromium || echo "::warning::playwright install-deps failed"
+          python3 -m http.server 8773 --bind 127.0.0.1 >/tmp/http-murmel.log 2>&1 &
+          sleep 1
+          NODE_PATH=/tmp/e2e/node_modules node kern/games/murmel/tests/murmel_e2e.mjs http://127.0.0.1:8773

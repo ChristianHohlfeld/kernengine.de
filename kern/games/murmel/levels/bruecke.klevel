@@ -1,0 +1,386 @@
+{
+ "format": "kern-level",
+ "version": 1,
+ "name": "Bruecke",
+ "world": {
+  "gravity": [
+   0,
+   0,
+   -9.80665
+  ],
+  "stepHz": 60,
+  "title": "Murmel 2: Bruecke",
+  "goal": "collect_all",
+  "player": 2,
+  "killZ": -20,
+  "groundColor": "#2f5a2a",
+  "dayLength": 0,
+  "timeOfDay": 0.45
+ },
+ "camera": {
+  "position": [
+   0,
+   -12,
+   8
+  ],
+  "yaw": 90,
+  "pitch": -30
+ },
+ "nextId": 9,
+ "actors": [
+  {
+   "id": 1,
+   "name": "Boden",
+   "transform": {
+    "position": [
+     0,
+     0,
+     -0.1
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "box",
+     "size": [
+      12,
+      30,
+      0.2
+     ],
+     "material": {
+      "color": "#706a80"
+     }
+    }
+   }
+  },
+  {
+   "id": 2,
+   "name": "Murmel",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0.5
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "sphere",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "material": {
+      "color": "#d8d8e8"
+     },
+     "radius": 0.5,
+     "friction": 0.8
+    },
+    "body": {
+     "motion": "dynamic",
+     "mass": 1
+    },
+    "controller": {
+     "mode": "rolling",
+     "maxSpeed": 7,
+     "acceleration": 14,
+     "jumpSpeed": 5,
+     "boost": false
+    }
+   }
+  },
+  {
+   "id": 3,
+   "name": "Muenze 1",
+   "transform": {
+    "position": [
+     0,
+     4,
+     0.5
+    ],
+    "rotation": [
+     90,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "cylinder",
+     "size": [
+      0.7,
+      0.7,
+      0.12
+     ],
+     "material": {
+      "color": "#f2c230"
+     },
+     "radius": 0.35,
+     "height": 0.12,
+     "emissive": "#5a4000"
+    },
+    "pickup": {
+     "points": 10
+    },
+    "rotator": {
+     "rate": [
+      0,
+      0,
+      120
+     ]
+    }
+   }
+  },
+  {
+   "id": 4,
+   "name": "Muenze 2",
+   "transform": {
+    "position": [
+     3,
+     8,
+     0.5
+    ],
+    "rotation": [
+     90,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "cylinder",
+     "size": [
+      0.7,
+      0.7,
+      0.12
+     ],
+     "material": {
+      "color": "#f2c230"
+     },
+     "radius": 0.35,
+     "height": 0.12,
+     "emissive": "#5a4000"
+    },
+    "pickup": {
+     "points": 10
+    },
+    "rotator": {
+     "rate": [
+      0,
+      0,
+      120
+     ]
+    }
+   }
+  },
+  {
+   "id": 5,
+   "name": "Muenze 3",
+   "transform": {
+    "position": [
+     3,
+     12,
+     0.5
+    ],
+    "rotation": [
+     90,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "cylinder",
+     "size": [
+      0.7,
+      0.7,
+      0.12
+     ],
+     "material": {
+      "color": "#f2c230"
+     },
+     "radius": 0.35,
+     "height": 0.12,
+     "emissive": "#5a4000"
+    },
+    "pickup": {
+     "points": 10
+    },
+    "rotator": {
+     "rate": [
+      0,
+      0,
+      120
+     ]
+    }
+   }
+  },
+  {
+   "id": 7,
+   "name": "Schieber",
+   "transform": {
+    "position": [
+     -3,
+     8,
+     0.5
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "box",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "material": {
+      "color": "#c04040"
+     }
+    },
+    "body": {
+     "motion": "kinematic"
+    },
+    "mover": {
+     "offset": [
+      -2,
+      0,
+      0
+     ],
+     "period": 3,
+     "mode": "ping_pong"
+    }
+   }
+  },
+  {
+   "id": 8,
+   "name": "Sprungfeld",
+   "transform": {
+    "position": [
+     3,
+     10,
+     0.05
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "box",
+     "size": [
+      1.6,
+      1.6,
+      0.1
+     ],
+     "material": {
+      "color": "#4080e0"
+     },
+     "collision": false
+    },
+    "colliders": [
+     {
+      "shape": "box",
+      "sensor": true,
+      "size": [
+       1.6,
+       1.6,
+       0.6
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": 6,
+   "name": "Ziel",
+   "transform": {
+    "position": [
+     3,
+     15,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "mesh": {
+     "shape": "cylinder",
+     "size": [
+      2,
+      2,
+      0.1
+     ],
+     "material": {
+      "color": "#30c050"
+     },
+     "radius": 1,
+     "height": 0.1
+    },
+    "trigger": {
+     "action": "goal",
+     "message": "Ziel!"
+    }
+   }
+  }
+ ]
+}
