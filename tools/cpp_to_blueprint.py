@@ -1346,7 +1346,7 @@ class World:
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
-        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
+        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed": lists of several lengths; "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
         self.not_states = {}  # a class of the program that has objects with static storage and is no state: why (state_classes)
@@ -2084,10 +2084,10 @@ class Unit:
 
     def pointed(self, raw):
         """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
-        whether it is null: a pointer into a list - in the Blueprint the list, read where it stands (a const
-        reference input), and the place in it (an Int; null is the place -1). What a call hands it is that pair:
-        `a.data() + k` is (a, k), an array is (it, 0), nullptr (an empty list, -1). The Blueprint type of its
-        entries; None: the parameter is no such pointer."""
+        whether it is null: a pointer into a list - in the Blueprint the list, an input by value (a view to read
+        is no place: a list of any length or an array of a fixed length goes there), and the place in it (an Int;
+        null is the place -1). What a call hands it is that pair: `a.data() + k` is (a, k), an array is (it, 0),
+        nullptr (an empty list, -1). The Blueprint type of its entries; None: the parameter is no such pointer."""
         m = re.match(r"const\s+(.+?)\s*\*$", raw.strip())
         if m is None or self.object_of(raw) or raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return None
@@ -3982,25 +3982,21 @@ class Emit:
                 continue
             entries = u.pointed(raw)
             if entries is not None:
-                # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
+                # a pointer into a list to read (const T*): the list, as a value, and the place in it (Unit.pointed).
+                # A view only to read is no place: the call hands the entries - a list of any length or an array of a
+                # fixed length (kern/docs/blueprint_cpp.md, "Eine Sicht zum Lesen")
                 if p["id"] in assigned:
                     raise Wait("a pointer that is moved (the place it holds changes)")
                 into = u.world.pointer_lists.get((f.key, [x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"])), "list")
-                if into == "mixed":
-                    raise Wait("a pointer into lists of different lengths (the language has no view of a list: a reference input is one type)")
                 if into == "other":
                     raise Wait("a pointer into something that is no list (the address of a value)")
-                if isinstance(into, int):
-                    f.fixed[len(f.params)] = into   # (the list it points into: of that fixed length, as every call hands it)
                 lname = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
                 self.taken.add(lname)
                 aname = u.fresh(lname + "_at", self.taken)
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
                 f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
-                # (of an export the list is a value: the host's bytes, made into a list for the call - its inputs stay in
-                # the order of the C parameters)
-                f.kinds += ["" if exported else "const", ""]
+                f.kinds += ["", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
             t = u.place(raw)
@@ -4010,8 +4006,13 @@ class Emit:
             by_ref = "&" in raw and "&&" not in raw and not u.object_of(raw)
             const = bool(re.search(r"\bconst\b", raw))
             kind = "ref" if by_ref and not const else "const" if by_ref and (t in u.struct_fields or t.startswith("List<") or t == "Text") else ""
-            if not by_ref and t.startswith("List<") and p["id"] not in assigned and re.match(r"(?:const\s+)?(?:kern::)?Span<\s*const\s", raw.strip()):
-                kind = "const"   # (a view of a list to read - kern::Span<const T> - is that list, read where it stands: nothing is copied)
+            # (a view of a list to read - kern::Span<const T> - is a value: the entries the call hands, of a list or an
+            # array of a fixed length; a view to write through - kern::Span<T> - is the place, a reference input)
+            if not by_ref and t.startswith("List<") and re.match(r"(?:kern::)?Span<(?!\s*const\s)", re.sub(r"^const\s+", "", raw.strip())):
+                if any(n.get("kind") in ("BinaryOperator", "CXXOperatorCallExpr") and (n.get("opcode") == "=" or callee_name(n) == "operator=")
+                       and kids(n) and bare(kids(n)[0 if n.get("kind") == "BinaryOperator" else 1]).get("referencedDecl", {}).get("id") == p["id"] for n in walk(body)):
+                    raise Wait("a view to write through that is set to another list (the place it names changes)")
+                kind = "ref"
             if overrides and kind == "const":
                 kind = ""   # (what the engine hands an interface's function is a value: Graph::implements checks it so)
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
@@ -4876,10 +4877,14 @@ class Emit:
                             if not (x.get("name") or "").startswith("__") and x["id"] not in own:
                                 own.add(x["id"])
                                 grew = True
+        # (the iterators C++ makes for a range-for - __begin1, __end1 - are the loop's own: stepping them changes nothing
+        # else; what is written through them is written through the loop's variable, judged above)
+        stepped = {x["id"] for v in walk(body) if v.get("kind") == "CXXForRangeStmt" for c in kids(v) if c.get("kind") == "DeclStmt"
+                   for x in kids(c) if x.get("kind") == "VarDecl" and re.match(r"__(begin|end)\d*$", x.get("name") or "")}
         for i in sorted(self.assigned(body, steps=True), key=lambda x: (x is not None, str(x))):
             if i is None:
                 return "it changes what is not a variable of its own (through a pointer, a reference, the place a call gives)"
-            if i not in own:
+            if i not in own and i not in stepped:
                 v = next((x for x in [*kids(d), *walk(body)] if x.get("kind") in ("VarDecl", "ParmVarDecl") and x.get("id") == i), None) or self.tree.decl.get(i) or {}
                 what = "an input it is handed by reference or pointer" if v.get("kind") == "ParmVarDecl" else \
                        "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
@@ -8702,8 +8707,8 @@ class Emit:
         return {"kind": "UnaryOperator", "opcode": "*", "type": {"qualType": t}, "inner": [base]}
 
     def pointer_arg(self, a, entries, fixed=None):
-        """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
-        stands, read there (nothing is copied). `fixed`: the input is a list of that fixed length."""
+        """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list's entries,
+        as a value. `fixed`: the input is a list of that fixed length."""
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
@@ -8723,7 +8728,7 @@ class Emit:
             raise Wait("a pointer into a list of entries of another type")
         if lst.get("kind") == "_Text":
             return [lst["_text"], at]
-        return [self.place_arg(lst, lt, "const", []), at]
+        return [self.ex(lst, lt), at]   # (the entries, as a value: a view to read is no place)
 
     def place(self, n):
         """A place in a list as C++ names it (v.begin() + i, v.end(), an array's first entry + n, v.data(), a

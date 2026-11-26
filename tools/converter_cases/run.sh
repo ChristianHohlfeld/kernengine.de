@@ -38,6 +38,12 @@
 #   objects.cpp objects of the engine are Object<I> (kern/docs/engine_object.md), never a number: as an input, what a
 #             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
 #             compared, a function of the engine called on one - written and compared, and no Handle of Object.
+#   meshextra.cpp the engine's MeshData::push_extra(const f32* values) handed only arrays of a fixed length (`const f32
+#             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
+#             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
+#   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
+#             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
+#             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -79,6 +85,9 @@ check() {   # check <case> <what> yes|no <pattern in its Blueprint texts>
 tested() {    # tested <case> <what> <pattern in its tests>
   if grep -qE -- "$3" "$top/$1"/pt/converted/*.cpp 2>/dev/null; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
 }
+logged() {    # logged <case> <what> <pattern in its log>
+  if grep -qE -- "$3" "$top/$1/convert.log"; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
+}
 
 "$here/names.sh" || fail=1
 
@@ -86,9 +95,6 @@ convert pad
 check pad "take_pad is written" yes '\bvoid take_pad\('
 check pad "take_pad (writes through a reference) is a step, not KERN_PURE" no 'KERN_PURE[^(]*\btake_pad\('
 check pad "doubled (only its own values) is a value: KERN_PURE" yes 'KERN_PURE doubledResult doubled\('
-logged() {    # logged <case> <what> <pattern in its log>
-  if grep -qE -- "$3" "$top/$1/convert.log"; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
-}
 logged pad "the log says why take_pad is a step" '^ +take_pad \([0-9]+\): written \(a step: it changes p \(a reference it declares\)\)'
 logged pad "the log says doubled is a value" '^ +doubled \([0-9]+\): written$'
 tested pad "take_pad's test calls it on the object compared on" 'kern_state_now = s.get\(\), .*take_pad\('
@@ -138,6 +144,21 @@ check nested "Stream's field holds Stream::Tile, named from inside the struct (n
 check nested "... and nowhere a list of mvt::Tile" no 'List<mvt_Tile>'
 logged nested "both are compared" '^2 functions of the Blueprints are compared'
 
+convert meshextra
+check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<Float> values = List<Float>\{\}, Int values_at = 0\)'
+logged meshextra "extra_of_the_shore (hands an array) is written" '^ +extra_of_the_shore \([0-9]+\): written'
+
+convert views
+check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<Float> values = List<Float>\{\}\)'
+check views "const f32* is an input by value and its place" yes 'first_ofResult first_of\(List<Float> values = List<Float>\{\}, Int values_at = 0\)'
+check views "Span<f32> (to write through) is a reference input" yes 'void fill\(List<Float>& out, Float v = 0\.0\)'
+logged views "sum_of (a range-for over a view) is a value" '^ +sum_of \([0-9]+\): written$'
+logged views "first_of is a value" '^ +first_of \([0-9]+\): written$'
+logged views "push_extra handed an array is written" '^ +extra_from_an_array \([0-9]+\): written'
+logged views "push_extra handed a list and a place in it is written" '^ +extra_from_a_list \([0-9]+\): written'
+logged views "fill (a view to write through) is written" '^ +fill \([0-9]+\): written'
+logged views "all eight are written and compared" '^8 functions of the Blueprints are compared'
+
 convert program door
 logged program "the log says the App stands in the project, and why" '^  CasesApp: the project - it implements App - the program.s App'
 logged program "the log says the export's Blueprint stands in the project, and why" '^  program_cpp: the project - it exports case_score - exports belong to the program'
@@ -163,6 +184,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects bytes table nested program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects bytes table nested meshextra views program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

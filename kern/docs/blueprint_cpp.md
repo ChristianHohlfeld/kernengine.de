@@ -1109,6 +1109,18 @@ void on1(Float delta) {
   `<Eingang>.path`, je Listeneintrag ein Index-Eingang `<Eingang>.path0` …; „scope“ nennt die
   Funktion, in der der Aufruf steht). Der Platz hat genau den Typ des Eingangs – nichts wandelt
   sich um.
+- **Eine Sicht zum Lesen ist kein Platz** (Regel des Konverters, der Knoten der Engine und des Lesers
+  gleich): Ein `const T*`, durch den eine Funktion nur liest, und ein `kern::Span<const T>` sind im
+  Blueprint ein **Eingang als Wert** – `List<T> values` (der Zeiger dazu sein Platz darin, `Int
+  values_at`). Dorthin geht eine Liste jeder Länge und ebenso eine Liste fester Länge
+  (`const f32 rec[3]`, `Fixed<Float, 3>`: ihre Einträge als Liste) – ein Referenz-Eingang dagegen hätte
+  genau einen Typ. So ruft das Spiel `m.push_extra(rec)` der Engine (`MeshData::push_extra(const f32*)`)
+  mit einem Array, ein anderes mit `v.data() + k`. Eine Sicht zum **Schreiben** (`kern::Span<T>`) ist
+  der Platz: `List<T>& out`, ein Referenz-Eingang – was die Funktion hineinschreibt, steht beim
+  Aufrufer. Eine solche Sicht auf eine andere Liste zu setzen (`out = other;`) wartet mit Grund.
+  Die Knoten der Engine nehmen ein `Span<const T>` und einen `const T*` mit `Count` ebenso als Liste
+  (`tools/engine_api.py`). In der Klasse ist der Wert eine Liste des Aufrufs (aus einem Array: seine
+  Einträge kopiert); im Interpreter teilt er die Einträge, bis jemand schreibt.
 - **In jeder Stufe dasselbe.** In der Klasse ist der Eingang eine Referenz von C++. Im
   Interpreter ist er für die Dauer des Aufrufs der Platz, den der Aufruf genannt hat
   (`Instance::Spot`): Jeder Knoten, der ihn liest oder ändert, tut es dort. Nennt der Aufruf
