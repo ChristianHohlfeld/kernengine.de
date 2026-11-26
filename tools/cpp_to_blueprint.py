@@ -15686,9 +15686,10 @@ class TestWriter:
                     where.extend((first + x, first + y, k) for x, y, k in inner)
                     continue
                 if key[0] != "record":
-                    own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
+                    # (what an enum or an alias declares: its name - behind `enum class`, also behind a mark like KERN_BLUEPRINT_TYPE)
+                    own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?(?:[A-Z][A-Z0-9_]*\s+)*|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
                     d = tree.decl.get(key[1]) if key[0] == "function" and isinstance(key[1], str) else None
-                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else const_gives.get(key, ())
+                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else [self.absolute(key[1])] if key[0] == "enum" else const_gives.get(key, ())
                     add(key, self.with_usings(wide(text), tu_usings, wide, own_names, gives) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]

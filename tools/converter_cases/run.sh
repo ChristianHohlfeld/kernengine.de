@@ -41,6 +41,9 @@
 #   meshextra.cpp the engine's MeshData::push_extra(const f32* values) handed only arrays of a fixed length (`const f32
 #             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
 #             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
+#   synth.cpp a struct and an enum of the engine (kern::audio::SynthPatch, Wave) the file names with `using kern::audio::Wave;`:
+#             in its test the enum stands before every `using` of it (before: `using audio::Wave;` in front of the enum
+#             itself - the test went without it, its function was not compared).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -159,6 +162,10 @@ logged views "push_extra handed a list and a place in it is written" '^ +extra_f
 logged views "fill (a view to write through) is written" '^ +fill \([0-9]+\): written'
 logged views "all eight are written and compared" '^8 functions of the Blueprints are compared'
 
+convert synth
+logged synth "bright is written" '^ +bright \([0-9]+\): written$'
+logged synth "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+
 convert program door
 logged program "the log says the App stands in the project, and why" '^  CasesApp: the project - it implements App - the program.s App'
 logged program "the log says the export's Blueprint stands in the project, and why" '^  program_cpp: the project - it exports case_score - exports belong to the program'
@@ -184,6 +191,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects bytes table nested meshextra views program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects bytes table nested meshextra views synth program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
