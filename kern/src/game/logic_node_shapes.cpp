@@ -226,6 +226,10 @@ void add_actor_nodes(logic::Library& lib) {
                      "A copy of a template of the level (an actor marked Template, with its children, components and Blueprint) - replicated to every player.",
                      "create instantiate clone copy template");
     d.params = {param("template", "Template name", ParamDef::Kind::text, "")};
+    // (which templates a level has is known when it runs: an unknown name is an error then, naming them)
+    d.problem = [](const logic::Node& n, const logic::Graph&) -> std::string {
+      return n.param("template", "").empty() ? "names no template (its setting Template: an actor of the level marked Template)" : "";
+    };
     lib.add(std::move(d));
   }
   lib.add(step("actor.destroy", "Destroy Actor", "Actors", {actor_in}, {}, "Removes the actor for the rest of the game.", "delete remove kill"));

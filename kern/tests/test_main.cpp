@@ -3784,6 +3784,13 @@ TEST(world_spawn_errors) {
     CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
   }
   {
+    // Spawn Actor without a template's name: a problem when the graph is checked (which names a level has, it says when it runs).
+    const logic::Graph g = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.spawn"}],"links":[[1,"then",2,"exec"]]})");
+    bool said = false;
+    for (const logic::Issue& i : logic::check(g)) said |= i.error && i.text.find("Spawn Actor: names no template") != std::string::npos;
+    CHECK(said);
+  }
+  {
     // "template" in the file must be true or false.
     game::Level x;
     std::string error;
