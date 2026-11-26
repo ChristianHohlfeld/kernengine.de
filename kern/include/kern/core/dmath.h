@@ -9,8 +9,9 @@
 // arithmetic and stay std::.
 //
 // Use kern::dm:: instead of std:: for sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log,
-// log10, pow, hypot, sinh, cosh, tanh and asinh in everything that feeds the simulation. (sinh, cosh, tanh, asinh are
-// the engine's own, kern/src/math/hyperbolic.c - musl has them not here.)
+// log10, pow, hypot, sinh, cosh, tanh, asinh, acosh, atanh, log2, log1p, exp2, cbrt, ldexp and remainder in everything
+// that feeds the simulation. (sinh ... atanh are the engine's own, kern/src/math/hyperbolic.c; log2, log1p, exp2, cbrt,
+// ldexp, remainder kern/src/math/elementary.c - musl has them not here. ldexp and remainder are exact.)
 #pragma once
 
 #include <type_traits>
@@ -30,6 +31,12 @@ float kern_musl_hypotf(float, float);
 // expm1 and log and sqrt.
 double kern_math_sinh(double); double kern_math_cosh(double); double kern_math_tanh(double); double kern_math_asinh(double);
 float kern_math_sinhf(float); float kern_math_coshf(float); float kern_math_tanhf(float); float kern_math_asinhf(float);
+double kern_math_acosh(double); double kern_math_atanh(double); float kern_math_acoshf(float); float kern_math_atanhf(float);
+// (kern/src/math/elementary.c)
+double kern_math_log2(double); double kern_math_log1p(double); double kern_math_exp2(double); double kern_math_cbrt(double);
+float kern_math_log2f(float); float kern_math_log1pf(float); float kern_math_exp2f(float); float kern_math_cbrtf(float);
+double kern_math_ldexp(double, int); float kern_math_ldexpf(float, int);
+double kern_math_remainder(double, double); float kern_math_remainderf(float, float);
 }
 
 namespace kern::dm {
@@ -59,7 +66,18 @@ KERN_DM_OWN(sinh)
 KERN_DM_OWN(cosh)
 KERN_DM_OWN(tanh)
 KERN_DM_OWN(asinh)
+KERN_DM_OWN(acosh)
+KERN_DM_OWN(atanh)
+KERN_DM_OWN(log2)
+KERN_DM_OWN(log1p)
+KERN_DM_OWN(exp2)
+KERN_DM_OWN(cbrt)
 #undef KERN_DM_OWN
+// x * 2^n, exact (as std::ldexp: a whole number for n; a whole-number x is a double).
+inline float ldexp(float x, int n) { return kern_math_ldexpf(x, n); }
+inline double ldexp(double x, int n) { return kern_math_ldexp(x, n); }
+template <class T, class = std::enable_if_t<std::is_integral_v<T>>>
+inline double ldexp(T x, int n) { return kern_math_ldexp(static_cast<double>(x), n); }
 
 // Two arguments promote as std:: does: both float -> float, anything else -> double.
 #define KERN_DM_BINARY(name)                                                                          \
@@ -71,5 +89,10 @@ KERN_DM_BINARY(atan2)
 KERN_DM_BINARY(pow)
 KERN_DM_BINARY(hypot)
 #undef KERN_DM_BINARY
+// IEEE 754's remainder, exact (kern/src/math/elementary.c); promoted as std::remainder.
+inline float remainder(float a, float b) { return kern_math_remainderf(a, b); }
+template <class A, class B, class = std::enable_if_t<std::is_arithmetic_v<A> && std::is_arithmetic_v<B> &&
+                                                     !(std::is_same_v<A, float> && std::is_same_v<B, float>)>>
+inline double remainder(A a, B b) { return kern_math_remainder(static_cast<double>(a), static_cast<double>(b)); }
 
 }  // namespace kern::dm

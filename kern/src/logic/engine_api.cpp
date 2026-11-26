@@ -98,16 +98,13 @@ void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {
   char b[128];
+  if (is_number(v.type)) return number_as_text(v) + (v.type == PinType::boolean ? "" : std::string(" ") + pin_type_name(v.type));  // (its value, exactly, and its type)
   switch (v.type) {
-    case PinType::boolean: return v.b ? "true" : "false";
-    case PinType::integer:
     case PinType::enumeration: std::snprintf(b, sizeof b, "%lld", static_cast<long long>(v.i)); return b;
-    case PinType::number: std::snprintf(b, sizeof b, "%.17g", v.n); return b;
     case PinType::vector: std::snprintf(b, sizeof b, "(%.9g, %.9g, %.9g)", static_cast<f64>(v.v.x), static_cast<f64>(v.v.y), static_cast<f64>(v.v.z)); return b;
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "actor %u", v.a); return b;
     case PinType::object: std::snprintf(b, sizeof b, "object %lld of world %u", static_cast<long long>(v.i), v.world); return b;
-    case PinType::int64: std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;  // (its 64 bits)
     case PinType::map:
     case PinType::set: {  // (its entries in their order: {key: value, ...}, {key, ...} - a key's bits as the map holds them)
       std::string s = "{";
@@ -181,7 +178,15 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       ++at;
       return Value::callback(nullptr);
     }
-    case 'l': return Value::int64(next(state));  // (an Int64: all of its 64 bits)
+    case 'l': return Value::of_number(next(state));  // (a u64: all of its 64 bits)
+    // (the other number types: an f32 in eighths, whole numbers small enough for each)
+    case 'f': return Value::of_number(static_cast<f32>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0f);
+    case 'w': return Value::of_number(static_cast<i32>(next(state) % 7));
+    case 'u': return Value::of_number(static_cast<u32>(next(state) % 7));
+    case 's': return Value::of_number(static_cast<i16>(next(state) % 7));
+    case 'r': return Value::of_number(static_cast<u16>(next(state) % 7));
+    case 'k': return Value::of_number(static_cast<i8>(next(state) % 7));
+    case 'y': return Value::of_number(static_cast<u8>(next(state) % 7));
     case 'e': {
       i64 count = 0;
       while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') count = count * 10 + (shape[at++] - '0');
@@ -227,9 +232,18 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       if (what == 'o' || what == 'h') { std::vector<ObjectRef> v; for (const Value& x : items) v.push_back(x.as_object()); return Value::of(std::move(v)); }
       if (what == 'v') { std::vector<Vec3> v; for (const Value& x : items) v.push_back(x.v); return Value::of(std::move(v)); }
       if (what == 't') { std::vector<std::string> v; for (const Value& x : items) v.push_back(x.s); return Value::of(std::move(v)); }
-      if (what == 'l') { std::vector<Int64> v; for (const Value& x : items) v.push_back(Int64(static_cast<u64>(x.i))); return Value::of(std::move(v)); }
+      if (what == 'l') { std::vector<u64> v; for (const Value& x : items) v.push_back(x.as<u64>()); return Value::of(std::move(v)); }
+      // (a list of another number type: of that type - the letter's)
+      for (const auto& [letter, type] : {std::pair{'f', PinType::f32}, {'w', PinType::i32}, {'u', PinType::u32}, {'s', PinType::i16}, {'r', PinType::u16}, {'k', PinType::i8}, {'y', PinType::u8}})
+        if (what == letter)
+          return with_number(type, [&](auto tag) {
+            using T = typename decltype(tag)::type;
+            std::vector<T> v;
+            for (const Value& x : items) v.push_back(x.as<T>());
+            return Value::of(std::move(v));
+          });
       std::vector<f64> v;
-      for (const Value& x : items) v.push_back(x.n);
+      for (const Value& x : items) v.push_back(x.as<f64>());
       return Value::of(std::move(v));
     }
     default: return Value::number(static_cast<f64>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0);

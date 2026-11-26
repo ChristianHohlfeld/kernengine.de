@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""What the two passes of the comparison say, function by function (kern/docs/blueprint_cpp.md "Zahlen").
+"""What the comparison with the source says, function by function (kern/docs/blueprint_cpp.md "Der Beweis").
 
     tools/source_numbers.py <tests folder> <output of the tests> [--right]
 
-<tests folder>: what a run of tools/cpp_to_blueprint.py with KERN_TEST_SOURCE_NUMBERS=1 wrote to --test - for each
-Blueprint test_<name>.cpp (the first pass: the source with the numbers of the Blueprint language, as always) and
-test_<name>_source.cpp (the second: the source with its own numbers, as C++ computes it). <output of the tests>: what the
-built tests printed (their "off:" lines - kern/test/converted.h, Tally - and each test's ok/FAIL line).
+<tests folder>: what a run of tools/cpp_to_blueprint.py wrote to --test - for each Blueprint test_<name>.cpp (the source
+with its own numbers, as C++ computes it). <output of the tests>: what the built tests printed (their "off:" lines -
+kern/test/converted.h, Tally - and each test's ok/FAIL line).
 
-For every function compared: written; compared as before: same or differs; compared with the source as it is: same or
-differs in n of m calls (the largest difference), or not compared there. Then the counts. With --right the status is 0
-only if every function is compared in both passes and the same in both (a case that is right) - else 1.
+For every function in a test: the same as its source, or differs in n of m calls (the largest difference), or not
+compared. Then the counts. With --right the status is 0 only if every function is compared and the same (a case that
+is right) - else 1.
 """
 import os
 import re
@@ -46,59 +45,43 @@ def main(argv):
     if len(argv) < 3:
         sys.exit(__doc__)
     folder, said, right = argv[1], argv[2], "--right" in argv[3:]
-    tests = outcome(open(said, encoding="utf-8", errors="replace").read().split("\n"))
-    stems = sorted(n[len("test_"):-len(".cpp")] for n in os.listdir(folder) if n.startswith("test_") and n.endswith(".cpp") and not n.endswith("_source.cpp"))
-    n = dict(written=0, before=0, before_same=0, source=0, source_same=0, source_off=0, source_not=0)
+    text = open(said, encoding="utf-8", errors="replace").read()
+    tests = outcome(text.split("\n"))
+    stems = sorted(n[len("test_"):-len(".cpp")] for n in os.listdir(folder) if n.startswith("test_") and n.endswith(".cpp"))
+    n = dict(written=0, same=0, off=0, not_compared=0, failed=0)
     worst = []
     for stem in stems:
-        first = functions_of(os.path.join(folder, f"test_{stem}.cpp"))
-        second = set(functions_of(os.path.join(folder, f"test_{stem}_source.cpp")))
-        t1 = tests.get(f"converted_{stem}")
-        t2 = tests.get(f"converted_{stem}_source")
+        t = tests.get(f"converted_{stem}")
         print(f"{stem}:")
-        for f in first:
+        if t is not None and t[0] == "FAIL":
+            n["failed"] += 1
+        for f in functions_of(os.path.join(folder, f"test_{stem}.cpp")):
             n["written"] += 1
-            if t1 is None:
-                before = "not run"
+            if t is None:
+                said_f = "not run"
+                n["not_compared"] += 1
+            elif f in t[1]:
+                k, m, by, at = t[1][f]
+                said_f = f"differs in {k} of {m} calls (the largest difference {by}: {at})"
+                n["off"] += 1
+                worst.append((-1.0 if by == "-" else float(by), k, m, stem, f, at))   # (-: no number differs - a bool, a text: after those of numbers)
+            elif f in t[2]:   # (no call compared - the Blueprint did not run in the test: not a difference, not measured)
+                said_f = "not compared: " + t[2][f]
+                n["not_compared"] += 1
             else:
-                n["before"] += 1
-                if f in t1[1]:
-                    before = f"differs in {t1[1][f][0]} of {t1[1][f][1]} calls"
-                elif f in t1[2]:
-                    before = "not compared: " + t1[2][f]
-                    n["before"] -= 1
-                else:
-                    before = "same"
-                    n["before_same"] += 1
-            if f not in second:
-                source = "not compared (its source does not compile with its own numbers in the test - the converter's log says why)"
-                n["source_not"] += 1
-            elif t2 is None:
-                source = "not run"
-                n["source_not"] += 1
-            else:
-                n["source"] += 1
-                if f in t2[1]:
-                    k, m, by, at = t2[1][f]
-                    source = f"differs in {k} of {m} calls (the largest difference {by}: {at})"
-                    n["source_off"] += 1
-                    worst.append((-1.0 if by == "-" else float(by), k, m, stem, f, at))   # (-: no number differs - a bool, a text: after those of numbers)
-                elif f in t2[2]:   # (no call compared - the Blueprint did not run in the test: not a difference, not measured)
-                    source = "not compared: " + t2[2][f]
-                    n["source"] -= 1
-                    n["source_not"] += 1
-                else:
-                    source = "same"
-                    n["source_same"] += 1
-            print(f"  {f}: written; compared as before: {before}; compared with the source as it is: {source}")
-    print(f"\n{n['written']} functions written and in a test; as before (the language's numbers): {n['before_same']} of {n['before']} the same; "
-          f"with the source as it is (its own numbers): {n['source_same']} the same, {n['source_off']} differ, {n['source_not']} not compared")
+                said_f = "same"
+                n["same"] += 1
+            print(f"  {f}: {said_f}")
+    # (what UBSan says of the source - "runtime error:" -: C++ leaves it undefined, the test does not go on with it)
+    ub = [line for line in text.split("\n") if "runtime error:" in line]
+    print(f"\n{n['written']} functions in a test: {n['same']} the same as their source, {n['off']} differ, {n['not_compared']} not compared"
+          + (f"; {n['failed']} tests fail" if n["failed"] else "") + (f"; UBSan: {len(ub)} (the first: {ub[0].strip()[:300]})" if ub else ""))
     if worst:
-        print("the largest differences (with the source as it is):")
+        print("the largest differences:")
         for by, k, m, stem, f, at in sorted(worst, key=lambda w: (-w[0], -w[1]))[:int(os.environ.get("TOP", "15"))]:
             print(f"  {stem} {f}: {k} of {m} calls, the largest difference {by}: {at[:300]}")
     if right:
-        ok = n["written"] > 0 and n["before_same"] == n["written"] and n["source_same"] == n["written"]
+        ok = n["written"] > 0 and n["same"] == n["written"] and not n["failed"] and not ub
         return 0 if ok else 1
     return 0
 

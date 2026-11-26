@@ -6,6 +6,7 @@
 
 #include "kern/api/c_api.h"
 #include "logic_cases.h"
+#include "size_edges.h"
 
 namespace {
 struct Run {
@@ -43,11 +44,12 @@ KERN_EXPORT(logic_test_count) int logic_test_count() { return static_cast<int>(l
 
 /// Benchmark: a For loop over `n` with arithmetic and a variable in the body. Returns ms.
 KERN_EXPORT(logic_test_bench_prepare) int logic_test_bench_prepare(int jit) {
-  static const logic_cases::Case bench{"bench", R"({"variables":[{"name":"Acc","type":"float","value":0}],
+  static const logic_cases::Case bench{"bench", R"({"variables":[{"name":"Acc","type":"f64","value":0}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"flow.for","values":{"first":1,"last":1000000}},
-      {"id":3,"type":"var.set","params":{"variable":"Acc"}},{"id":4,"type":"math.add"},{"id":5,"type":"var.get","params":{"variable":"Acc"}},
-      {"id":6,"type":"math.mul","values":{"b":0.5}},{"id":7,"type":"math.mod","values":{"b":7}}],
-    "links":[[1,"then",2,"exec"],[2,"body",3,"exec"],[5,"value",4,"a"],[6,"result",4,"b"],[7,"result",6,"a"],[2,"index",7,"a"],[4,"result",3,"value"]]})"};
+      {"id":3,"type":"var.set","params":{"variable":"Acc"}},{"id":4,"type":"math.add","params":{"type":"f64"}},{"id":5,"type":"var.get","params":{"variable":"Acc"}},
+      {"id":6,"type":"math.mul","params":{"type":"f64"},"values":{"b":0.5}},{"id":7,"type":"math.rem","params":{"type":"f64"},"values":{"b":7}},
+      {"id":8,"type":"num.cast","params":{"to":"f64","from":"i64"}}],
+    "links":[[1,"then",2,"exec"],[2,"body",3,"exec"],[5,"value",4,"a"],[6,"result",4,"b"],[7,"result",6,"a"],[2,"index",8,"a"],[8,"result",7,"a"],[4,"result",3,"value"]]})"};
   g_run.inst = nullptr;
   g_run.rt.reset();
   g_run.host = logic_cases::Host{};
@@ -66,3 +68,11 @@ KERN_EXPORT(logic_test_bench_run) double logic_test_bench_run() {
 }
 
 KERN_EXPORT(logic_test_bench_value) double logic_test_bench_value() { return g_run.inst->get("Acc").as_number(); }
+
+/// std::size_t at its edges in WebAssembly (size_edges.h): what the class's functions give, what C++'s own u64 arithmetic
+/// gives, and what both give natively (kWant, checked by kern_tests) - three lines the test compares.
+KERN_EXPORT(logic_test_size_edges) const char* logic_test_size_edges(int which) {
+  static std::string text;
+  text = which == 0 ? size_edges::of_the_class() : which == 1 ? size_edges::of_cpp() : std::string(size_edges::kWant);
+  return text.c_str();
+}

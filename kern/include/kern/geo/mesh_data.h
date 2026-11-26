@@ -26,7 +26,15 @@ struct KERN_BLUEPRINT_TYPE MeshData {
     colors.insert(colors.end(), {c.x, c.y, c.z});
     uvs.insert(uvs.end(), {uv.x, uv.y});
   }
-  void push_extra(const f32* values) { extra.insert(extra.end(), values, values + extra_size); }
+  /// One record of the extra stream: extra_size numbers of `values` (an array of that length, a list). A shorter view
+  /// appends nothing and says why (fail) - nothing is read past its end.
+  void push_extra(Span<const f32> values) {
+    if (values.size < extra_size) {
+      fail("MeshData::push_extra: a record of %zu numbers, and the extra stream has %u in each", values.size, extra_size);
+      return;
+    }
+    extra.insert(extra.end(), values.data, values.data + extra_size);
+  }
   std::size_t bytes() const {
     return (positions.size() + normals.size() + colors.size() + uvs.size() + extra.size()) * 4 + indices.size() * (vertex_count() <= 65536 ? 2 : 4);
   }

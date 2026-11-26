@@ -48,7 +48,7 @@
 #   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
 #             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
 #             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
-#   meshextra.cpp the engine's MeshData::push_extra(const f32* values) handed only arrays of a fixed length (`const f32
+#   meshextra.cpp the engine's MeshData::push_extra(Span<const f32> values) handed only arrays of a fixed length (`const f32
 #             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
 #             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
 #   objects.cpp once more, from a folder of another length: the same texts and the same level, byte for byte.
@@ -97,11 +97,10 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
-#   hyperbolic.cpp std::sinh, cosh, tanh, asinh: the engine's own (kern/src/math/hyperbolic.c) - written and the same in both passes.
-#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
-#             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
-#             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
-#             subset's (f32 intermediate, f32 sum of 1/60 against a threshold, long long past 2^53) - one of them right is a fault of the list.
+#   hyperbolic.cpp std::sinh, cosh, tanh, asinh of f64 and f32: the engine's own (kern/src/math/hyperbolic.c) - written and the same as the source.
+#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the comparison with the source as C++
+#             computes it, its own numbers, under UBSan: each case's tests are built and run (compare.sh, tools/source_numbers.py):
+#             u32 that wraps, u64, the engine's own types, an f32 intermediate, an f32 sum of 1/60 against a threshold, a long long past 2^53.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -126,7 +125,7 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   # (a case with actors of its own in the level - Blueprints the program calls by an actor's name: <case>.klevel)
   if [ -f "$here/$1.klevel" ]; then cp "$here/$1.klevel" "$out/cases.klevel"; else echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"; fi
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
-  (cd "$out" && KERN_TEST_SOURCE_NUMBERS="${SOURCE_NUMBERS:-}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
     || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(cat "$out/cases.klevel" "$out/cases.kproject" | grep -c '"logic"')" = 0 ]; then
@@ -217,11 +216,11 @@ logged actors "an Actor made of numbers waits, with the reason" '^ +made_of \([0
 logged actors "the five of Crowd are written and compared" '^5 functions of the Blueprints are compared'
 
 convert bytes
-check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
+check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at_i, num_cast<i64, u32>\(length\)\)'
 classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table
-check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
+check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0f, 180\.0f\}'
 
 convert nested
 check nested "Stream's field holds Stream::Tile, named from inside the struct (not mvt::Tile)" yes 'List<Stream_Tile>'
@@ -229,19 +228,19 @@ check nested "... and nowhere a list of mvt::Tile" no 'List<mvt_Tile>'
 logged nested "both are compared" '^2 functions of the Blueprints are compared'
 
 convert meshextra
-check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<Float> values = List<Float>\{\}, Int values_at = 0\)'
+check meshextra "push_extra's record (Span<const f32>, a view to read) is the array itself, handed by value to the engine's node" yes 'engine_mesh_data_push_extra\(n[0-9]+, m, rec\)'
 logged meshextra "extra_of_the_shore (hands an array) is written" '^ +extra_of_the_shore \([0-9]+\): written'
 
 convert views
-check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<Float> values = List<Float>\{\}\)'
-check views "const f32* is an input by value and its place" yes 'first_ofResult first_of\(List<Float> values = List<Float>\{\}, Int values_at = 0\)'
-check views "Span<f32> (to write through) is a reference input" yes 'void fill\(List<Float>& out, Float v = 0\.0\)'
+check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<f32> values = List<f32>\{\}\)'
+check views "const f32* is an input by value and its place" yes 'first_ofResult first_of\(List<f32> values = List<f32>\{\}, i64 values_at = 0\)'
+check views "Span<f32> (to write through) is a reference input" yes 'void fill\(List<f32>& out, f32 v = 0\.0f\)'
 logged views "sum_of (a range-for over a view) is a value" '^ +sum_of \([0-9]+\): written$'
 logged views "first_of is a value" '^ +first_of \([0-9]+\): written$'
 logged views "push_extra handed an array is written" '^ +extra_from_an_array \([0-9]+\): written'
-logged views "push_extra handed a list and a place in it is written" '^ +extra_from_a_list \([0-9]+\): written'
+logged views "push_extra handed a list and a part of it (a Span) is written" '^ +extra_from_a_list \([0-9]+\): written'
 logged views "fill (a view to write through) is written" '^ +fill \([0-9]+\): written'
-logged views "all eight are written and compared" '^8 functions of the Blueprints are compared'
+logged views "all seven are written and compared (push_extra is the engine's node)" '^7 functions of the Blueprints are compared'
 
 convert inner
 check inner "the export inside the namespace is written" yes 'KERN_EXPORT_AS\("case_doubled"'
@@ -294,7 +293,7 @@ check worldrules "bind(world): the Actor of the world's actor of its name (GameW
 check worldrules "... of that world" yes 'actor_named = engine_game_world_actor_named\(world[_0-9]*, "Lamps"\);'
 check worldrules "... and what it gives: Has Blueprint of it" yes 'return \{func_has_blueprint\(worldrules_g_lamps\)\};'
 check worldrules "a call goes to that Actor (Call on Actor)" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, '
-check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", Float>\(worldrules_g_lamps\)'
+check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", f64>\(worldrules_g_lamps\)'
 check worldrules "no call names the actor by its name in the program's logic" no 'actor_find\("Lamps"\)'
 logged worldrules "bind, radius, twice, Runner::start, Runner::pole and Runner::lit are written" '^Runner/worldrules_cpp +6 / +6 functions'
 logged worldrules "one bound to a world and to a logic waits, with the reason" '^ +radius \([0-9]+\): the Blueprint of an actor \(g_both\) bound to a world and to a logic'
@@ -340,50 +339,44 @@ if out=$("$root/tools/blueprint_cpp.sh" --apply "$top/program/refuses.klevel" --
 elif echo "$out" | grep -q 'is an export (case_score) - exports belong to the program'; then echo "ok   program: a level refuses an export (with the reason)"
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
 
-# ---- the numbers of the source (kern/docs/blueprint_cpp.md "Zahlen"): the second pass of the comparison ----
-# Converted with KERN_TEST_SOURCE_NUMBERS=1, a case has two tests: as always (the source with the numbers of the Blueprint
-# language) and test_<x>_source.cpp (the source as C++ computes it - f32 stays f32). They are built and run (compare.sh);
-# tools/source_numbers.py --right: every function written, compared in both passes, the same in both.
-# numbers_same (u32 that wraps, u64): right today - and it must stay so.
-right() {   # right <case>: the case's tests, built and run, say every function is written and the same in both passes
+# ---- the numbers of the source (kern/docs/blueprint_cpp.md "Zahl-Typen", "Der Beweis") ----
+# A case's tests compare each function with its source as C++ computes it - its own numbers, under UBSan. They are built and
+# run (compare.sh); tools/source_numbers.py --right: every function written, compared and the same, UBSan silent.
+right() {   # right <case>: the case's tests, built and run, say every function is written and the same as its source
   INCLUDES="-I$top/$1/src" "$here/compare.sh" "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/pt/converted" "$top/$1/built" > "$top/$1/compare.build" 2>&1 ||
     { tail -20 "$top/$1/compare.build"; return 2; }
   if grep -q "does not compile" "$top/$1/compare.build"; then grep "does not compile" "$top/$1/compare.build"; return 2; fi
   python3 "$root/tools/source_numbers.py" "$top/$1/pt/converted" "$top/$1/built/compare.log" --right > "$top/$1/numbers.txt" &&
     grep -qE '^([0-9]+) of \1 functions of the program are written' "$top/$1/convert.log"   # (and none waits)
 }
-SOURCE_NUMBERS=1 convert numbers_same
-logged numbers_same "both passes compare both functions" '^2 functions are compared once more with their source as C\+\+ computes it'
-if right numbers_same; then echo "ok   numbers_same: written, and the same as the source in both passes (u32 that wraps, u64)"
-else echo "FAIL numbers_same: written, and the same as the source in both passes"; cat "$top/numbers_same/numbers.txt" 2>/dev/null; fail=1; fi
-# numbers_engine: the engine's own types (kern::Quat, physics::Pose, physics::BodyType) - in the second pass the test holds them as
-# the engine has them, never a copy; right today, and it must stay so.
-SOURCE_NUMBERS=1 convert numbers_engine
-tested numbers_engine "the second pass holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
-tested numbers_engine "the second pass holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
-logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
-if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
-else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
-# hyperbolic: std::sinh, cosh, tanh, asinh (f64) - the engine's own functions (kern/src/math/hyperbolic.c): written
-# (before: "std::sinh: the engine has no sinh yet"), and the same as the source in both passes.
-SOURCE_NUMBERS=1 convert hyperbolic
+numbers() {   # numbers <case> <how many are compared> <what it holds>
+  convert $1
+  logged $1 "its $2 functions are compared with their source" "^$2 functions? of the Blueprints (is|are) compared"
+  if right $1; then echo "ok   $1: written, and the same as its source ($3)"
+  else echo "FAIL $1: written, and the same as its source ($3)"; cat "$top/$1/numbers.txt" 2>/dev/null; fail=1; fi
+}
+#   numbers_same    u32 that wraps, u64
+#   numbers_engine  the engine's own types (kern::Quat, physics::Pose, physics::BodyType): the test holds them as the engine has them
+#   numbers_f32     an intermediate in f32 (a*b, then compared in f64)
+#   numbers_sum     an f32 sum of 1/60 against a threshold (past 1 after 61 frames in f32)
+#   numbers_i64     a long long past 2^53 (FNV): i64 that wraps
+#   hyperbolic      std::sinh, cosh, tanh, asinh of f64 and of f32 - the engine's own (kern/src/math/hyperbolic.c)
+#   elementary      std::log2 log1p exp2 cbrt acosh atanh ldexp remainder log10 expm1 hypot of f64 and of f32 - the engine's own
+numbers numbers_same 2 "u32 that wraps, u64"
+numbers numbers_engine 3 "the engine's own types"
+tested numbers_engine "the test holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
+tested numbers_engine "the test holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
+numbers numbers_f32 1 "an f32 intermediate"
+check numbers_f32 "the product is an f32 product, converted where C++ converts it" yes 'num_cast<f64, f32>'
+numbers numbers_sum 1 "an f32 sum against a threshold"
+numbers numbers_i64 2 "a long long past 2^53"
+numbers hyperbolic 6 "the engine's sinh, cosh, tanh, asinh, f64 and f32"
 check hyperbolic "std::sinh and std::cosh are the engine's" yes 'sinh\(.*cosh\('
 check hyperbolic "std::asinh is the engine's" yes 'asinh\('
-logged hyperbolic "all three are compared once more with their source" '^3 functions are compared once more with their source as C\+\+ computes it'
-if right hyperbolic; then echo "ok   hyperbolic: written, and the same as the source in both passes (the engine's sinh, cosh, tanh, asinh)"
-else echo "FAIL hyperbolic: written, and the same as the source in both passes"; cat "$top/hyperbolic/numbers.txt" 2>/dev/null; fail=1; fi
-# Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
-# the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
-# (red): the number types have come, and the case goes up to numbers_same.
-#   numbers_f32  an intermediate in f32 (a*b): the Blueprint computes it in 64 bit
-#   numbers_sum  an f32 sum of 1/60 against a threshold: past 1 after 60 frames in 64 bit, after 61 in f32
-#   numbers_i64  a long long past 2^53 (a Blueprint's Int is exact up to 2^53: the function waits)
-for c in numbers_f32 numbers_sum numbers_i64; do
-  SOURCE_NUMBERS=1 convert $c
-  if right $c; then echo "FAIL $c: expected red until the number types - but it is right: take it out of the list (to numbers_same)"; cat "$top/$c/numbers.txt"; fail=1
-  elif [ $? = 2 ]; then echo "FAIL $c: its tests do not build"; fail=1
-  else echo "ok   $c: expected red until the number types: $({ grep -m1 -P '^    \S+ \(\d+\): (?!written)' "$top/$c/convert.log" || grep -m1 -E 'differs|not compared' "$top/$c/numbers.txt"; } | sed 's/^ *//' | cut -c1-220)"; fi
-done
+check hyperbolic "std::tanh of an f32 is tanh of the f32 (its f-variant)" yes 'kern::formula<f32>\(\[\]\(auto x\) \{ return tanh\(x\); \}'
+numbers elementary 12 "the engine's log2 log1p exp2 cbrt acosh atanh ldexp remainder log10 expm1 hypot, f64 and f32"
+check elementary "std::log2 of an f32 is log2 of the f32" yes 'log2\(x\)'
+check elementary "std::ldexp is the engine's node Ldexp" yes 'math_ldexp<f32>\('
 
 python3 "$here/compiles.py" || fail=1
 python3 "$here/libraries.py" || fail=1

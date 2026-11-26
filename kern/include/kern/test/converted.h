@@ -2,16 +2,14 @@
 // file, in the namespace the converter was given - --convert <namespace>).
 //
 // A source file was converted to a Blueprint of the project or a level. Its test holds the source of every
-// converted function once more - the text as it stands in the program, compiled with the numbers and
-// the mathematics of the Blueprint language (f32 is a 64-bit number there, std::sin is
-// kern::math::sin; a class is compiled along, so that its data is 64-bit too). That is what the
-// source computes in the Blueprint language. The Blueprint - in the interpreter and as its
-// compiled class - must give exactly that: every number, every vector, every field, bit for bit.
-// There is no margin.
+// converted function once more - the text as it stands in the program, compiled as C++ computes it, with its own
+// numbers (an f32 is an f32, a u32 wraps at 2^32; std::sin is the engine's, kern/third_party/musl_math under the
+// standard names), under UBSan. The Blueprint - in the interpreter and as its compiled class - must give exactly
+// that: every number in its type, every vector, every field, bit for bit. There is no margin.
 //
-// One thing is not compared: a call in which the source divides by zero or leaves the numbers
-// otherwise has no result in C++ to compare with (the Blueprint's arithmetic gives one: x / 0 is
-// 0). Such calls are counted.
+// One thing is not compared: a call in which the source does what C++ leaves undefined (a whole number divided by
+// zero, a signed one past its range, an entry outside its list) has no result in C++ to compare with. Such calls are
+// counted. (A floating division by zero, a NaN: IEEE 754 says what they give - compared like any other.)
 #pragma once
 
 #include <algorithm>
@@ -58,112 +56,22 @@ using namespace ::kern::test;   // (the Blueprints a test runs, the cost of a ca
 
 using Value = kern::logic::Value;
 
-/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the language's
-/// Int64 (Value::int64). In C++ a u64 and a size_t are one type; the program's spelling tells them apart,
-/// and the generated test says which is which (shaped, below).
-struct Whole {
-  unsigned long long v = 0;
-  bool operator==(const Whole&) const = default;
-  kern::u64 hash() const { return kern::KeyHash<unsigned long long>{}(v); }   // (a key of a map, as the u64 it is)
-};
-struct SignedWhole {};
-
-// ---- the numbers of the Blueprint language, for the source a test holds ----
-// A number is 64-bit. A vector holds its components in 32 bit; read, a component is a number like any
-// other, and what is written into one is brought to 32 bit. What vectors do as a whole (add, dot, cross,
-// length, normalize ...) is what the nodes of the language do: the engine's own functions.
-namespace wide {
-using f32 = double;
-using f64 = double;
-using kern::i16;
-using kern::i32;
-using kern::i64;
-using kern::i8;
-using kern::u16;
-using kern::u32;
-using kern::u64;
-using kern::u8;
-
-/// A component of a vector.
-struct Num32 {
-  float v = 0;
-  constexpr Num32() = default;
-  // (explicit: read, a component is a number - `c ? p.x : 0.5` is a number, as in the Blueprint; what is
-  // written into one is brought to 32 bit)
-  constexpr explicit Num32(double x) : v(static_cast<float>(x)) {}
-  constexpr Num32& operator=(double x) { v = static_cast<float>(x); return *this; }
-  constexpr operator double() const { return static_cast<double>(v); }
-  constexpr Num32& operator+=(double x) { return *this = Num32(static_cast<double>(v) + x); }
-  constexpr Num32& operator-=(double x) { return *this = Num32(static_cast<double>(v) - x); }
-  constexpr Num32& operator*=(double x) { return *this = Num32(static_cast<double>(v) * x); }
-  constexpr Num32& operator/=(double x) { return *this = Num32(static_cast<double>(v) / x); }
-};
-
-struct Vec2 {
-  Num32 x, y;
-  constexpr Vec2() = default;
-  constexpr Vec2(double x_, double y_) : x(x_), y(y_) {}
-  constexpr Vec2(kern::Vec2 v) : x(v.x), y(v.y) {}
-  constexpr operator kern::Vec2() const { return {x.v, y.v}; }
-  constexpr Vec2 operator+(Vec2 o) const { return kern::Vec2(*this) + kern::Vec2(o); }
-  constexpr Vec2 operator-(Vec2 o) const { return kern::Vec2(*this) - kern::Vec2(o); }
-  constexpr Vec2 operator*(double s) const { return kern::Vec2(*this) * static_cast<float>(s); }
-  constexpr Vec2& operator+=(Vec2 o) { return *this = *this + o; }
-};
-constexpr double dot(Vec2 a, Vec2 b) { return kern::dot(kern::Vec2(a), kern::Vec2(b)); }
-constexpr double cross(Vec2 a, Vec2 b) { return kern::cross(kern::Vec2(a), kern::Vec2(b)); }
-inline double length(Vec2 a) { return kern::length(kern::Vec2(a)); }
-
-struct Vec3 {
-  Num32 x, y, z;
-  constexpr Vec3() = default;
-  constexpr Vec3(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
-  constexpr Vec3(kern::Vec3 v) : x(v.x), y(v.y), z(v.z) {}
-  constexpr operator kern::Vec3() const { return {x.v, y.v, z.v}; }
-  constexpr double operator[](int i) const { return i == 0 ? x : (i == 1 ? y : z); }
-  constexpr Num32& operator[](int i) { return i == 0 ? x : (i == 1 ? y : z); }
-  constexpr Vec3 operator+(Vec3 o) const { return kern::Vec3(*this) + kern::Vec3(o); }
-  constexpr Vec3 operator-(Vec3 o) const { return kern::Vec3(*this) - kern::Vec3(o); }
-  constexpr Vec3 operator-() const { return -kern::Vec3(*this); }
-  constexpr Vec3 operator*(double s) const { return kern::Vec3(*this) * static_cast<float>(s); }
-  constexpr Vec3 operator*(Vec3 o) const { return kern::Vec3(*this) * kern::Vec3(o); }
-  constexpr Vec3 operator/(double s) const { return kern::Vec3(*this) / static_cast<float>(s); }
-  constexpr Vec3& operator+=(Vec3 o) { return *this = *this + o; }
-  constexpr Vec3& operator-=(Vec3 o) { return *this = *this - o; }
-  constexpr Vec3& operator*=(double s) { return *this = *this * s; }
-  constexpr bool operator==(const Vec3& o) const { return kern::Vec3(*this) == kern::Vec3(o); }
-};
-constexpr double dot(Vec3 a, Vec3 b) { return kern::dot(kern::Vec3(a), kern::Vec3(b)); }
-constexpr Vec3 cross(Vec3 a, Vec3 b) { return kern::cross(kern::Vec3(a), kern::Vec3(b)); }
-inline double length(Vec3 a) { return kern::length(kern::Vec3(a)); }
-constexpr double length_sq(Vec3 a) { return kern::length_sq(kern::Vec3(a)); }
-inline double distance(Vec3 a, Vec3 b) { return kern::distance(kern::Vec3(a), kern::Vec3(b)); }
-constexpr double distance_sq(Vec3 a, Vec3 b) { return kern::distance_sq(kern::Vec3(a), kern::Vec3(b)); }
-inline bool finite(Vec3 a) { return kern::finite(kern::Vec3(a)); }
-constexpr Vec3 lerp(Vec3 a, Vec3 b, double t) { return kern::lerp(kern::Vec3(a), kern::Vec3(b), static_cast<float>(t)); }
-constexpr Vec3 vmin(Vec3 a, Vec3 b) { return kern::vmin(kern::Vec3(a), kern::Vec3(b)); }
-constexpr Vec3 vmax(Vec3 a, Vec3 b) { return kern::vmax(kern::Vec3(a), kern::Vec3(b)); }
-inline Vec3 normalize(Vec3 a, Vec3 fallback = {0, 0, 1}) { return kern::normalize(kern::Vec3(a), kern::Vec3(fallback)); }
-constexpr Vec3 hex_color(kern::u32 h) { return kern::hex_color(h); }   // (a colour's components are 32-bit, as a vector's)
-/// A view of a list (kern::Span): the engine's own - of the test's values.
-template <class T> using Span = kern::Span<T>;
-
-// the functions of numbers a formula does not have itself, as the converter writes them
-inline double hypot_bp(double a, double b) { return kern::math::sqrt((a * a) + (b * b)); }
-inline double ldexp_bp(double x, double n) { return (x * kern::math::pow(2.0, n)); }
-inline double tanh_bp(double x) { return kern::math::tanh(x); }   // (the engine's own: kern/src/math/hyperbolic.c)
-inline double sinh_bp(double x) { return kern::math::sinh(x); }
-inline double cosh_bp(double x) { return kern::math::cosh(x); }
-inline double asinh_bp(double x) { return kern::math::asinh(x); }
-inline double log2_bp(double x) { return kern::math::div(kern::math::log(x), 0.6931471805599453); }
-inline double log10_bp(double x) { return kern::math::div(kern::math::log(x), 2.302585092994046); }
-inline double cbrt_bp(double x) { return (kern::math::sign(x) * kern::math::pow(kern::math::abs(x), 0.3333333333333333)); }
-
-// A map and a set (kern::Map, kern::Set - the program's): the language's Map and Set are these very
-// containers, in the order the keys came (kern/core/map.h). The test's source holds them as they are.
-using kern::Map;
-using kern::Set;
-}  // namespace wide
+/// The language's number type of a C++ arithmetic type (kern/docs/blueprint_cpp.md "Zahl-Typen", LP64: long and long long
+/// are i64, char is i8 - signed, as on every machine the subset is built for).
+template <class T> constexpr auto lang_number() {
+  if constexpr (std::is_same_v<T, bool>) return std::type_identity<bool>{};
+  else if constexpr (std::is_floating_point_v<T>) {
+    static_assert(sizeof(T) == 4 || sizeof(T) == 8, "a long double has no number type of the language");
+    if constexpr (sizeof(T) == 4) return std::type_identity<f32>{}; else return std::type_identity<f64>{};
+  } else if constexpr (std::is_signed_v<T> || std::is_same_v<T, char>) {
+    if constexpr (sizeof(T) == 1) return std::type_identity<i8>{}; else if constexpr (sizeof(T) == 2) return std::type_identity<i16>{};
+    else if constexpr (sizeof(T) == 4) return std::type_identity<i32>{}; else return std::type_identity<i64>{};
+  } else {
+    if constexpr (sizeof(T) == 1) return std::type_identity<u8>{}; else if constexpr (sizeof(T) == 2) return std::type_identity<u16>{};
+    else if constexpr (sizeof(T) == 4) return std::type_identity<u32>{}; else return std::type_identity<u64>{};
+  }
+}
+template <class T> using Lang = typename decltype(lang_number<T>())::type;
 
 // ---- the bytes of a value, as the program lays it out (Bytes of Struct, Struct of Bytes) ----
 // The test's source holds a 32-bit float of the program as a 64-bit number (wide::f32). Where the program
@@ -274,14 +182,10 @@ template <bool ToSingle, class D> void* set_bytes(D* to, int value, std::size_t 
 }
 }  // namespace layout
 
-/// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
-/// 64-bit bit pattern is a Whole - also in a list, a pair, a map or a set. S is the type as the program
-/// spells it, with Whole where it says u64 or i64.
+/// A value of the source as the Blueprint holds it (S: the type as the program spells it) - as it is, also in a list,
+/// a pair, a map or a set.
 template <class S> struct Shape {
   template <class T> static const T& of(const T& v) { return v; }
-};
-template <> struct Shape<Whole> {
-  template <class T> static Whole of(T v) { return {static_cast<unsigned long long>(v)}; }
 };
 template <class S, class T> decltype(auto) shaped(const T& v) { return Shape<S>::of(v); }   // (a value that needs no shape: as it is, not a copy)
 template <class S, class T> using Shaped = std::decay_t<decltype(Shape<S>::of(std::declval<const T&>()))>;
@@ -716,16 +620,11 @@ template <class A, class B> std::string text(const std::pair<A, B>& p);
 // (the language's own types, as a Blueprint's class holds them - in the source where it calls a file of the program that is a
 // Blueprint now, level_blueprints.h: an Int of a fixed width, an Int, a Text, a List, a list of a fixed length; see "the types of a
 // Blueprint's class" below)
-template <class T> Value arg(const kern::logic::Sized<T>& x);
-template <class T> bool same(const kern::logic::Sized<T>& want, const Value& got);
-template <class T> bool defined(const kern::logic::Sized<T>&);
-template <class T> std::string text(const kern::logic::Sized<T>& x);
-template <class T> void take(kern::logic::Sized<T>& to, const Value& v);
-inline Value arg(const kern::logic::Whole& x);
-inline bool same(const kern::logic::Whole& want, const Value& got);
-inline bool defined(const kern::logic::Whole&);
-inline std::string text(const kern::logic::Whole& x);
-inline void take(kern::logic::Whole& to, const Value& v);
+template <class T> Value arg(const kern::logic::num::Typed<T>& x);
+template <class T> bool same(const kern::logic::num::Typed<T>& want, const Value& got);
+template <class T> bool defined(const kern::logic::num::Typed<T>&);
+template <class T> std::string text(const kern::logic::num::Typed<T>& x);
+template <class T> void take(kern::logic::num::Typed<T>& to, const Value& v);
 inline Value arg(const kern::logic::Text& x);
 inline bool same(const kern::logic::Text& want, const Value& got);
 inline bool defined(const kern::logic::Text&);
@@ -743,32 +642,28 @@ template <class T, std::size_t N> std::string text(const kern::logic::Fixed<T, N
 template <class T, std::size_t N> void take(kern::logic::Fixed<T, N>& to, const Value& v);
 inline void take(Vec3& to, const Value& v);   // (a Vector of a Blueprint's class: the engine's vector, as the Blueprint holds it)
 /// Entries the test keeps for a view to see (a drawn view, one the engine's stand-in gave): kept to the end.
-template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
+template <class U> kern::Span<const U> kept_span(std::vector<U> entries) {
   static std::deque<std::vector<U>> kept;
   kept.push_back(std::move(entries));
   return {kept.back().data(), kept.back().size()};
 }
 /// The same for a view through which the entries are changed.
-template <class U> wide::Span<U> kept_span_changed(std::vector<U> entries) {
+template <class U> kern::Span<U> kept_span_changed(std::vector<U> entries) {
   static std::deque<std::vector<U>> kept;
   kept.push_back(std::move(entries));
   return {kept.back().data(), kept.back().size()};
 }
 
-inline Value arg(f64 x) { return Value::number(x); }
-inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
 inline Value arg(bool x) { return Value::boolean(x); }
-inline Value arg(Whole w) { return Value::int64(w.v); }
 inline Value arg(Vec3 v) { return Value::vector(v); }
 inline Value arg(Vec2 v) { return Value::vector({v.x, v.y, 0}); }
-inline Value arg(wide::Vec3 v) { return arg(kern::Vec3(v)); }
-inline Value arg(wide::Vec2 v) { return arg(kern::Vec2(v)); }
 inline Value arg(const std::string& x) { return Value::text(x); }
 inline Value arg(const char* x) { return Value::text(x ? x : ""); }
 inline Value arg(std::string_view x) { return Value::text(std::string(x)); }
+/// A number: of its own type (an f32 an f32, an int an i32 - the language's are C++'s).
 template <class T>
-  requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
-Value arg(T x) { return Value::integer(static_cast<kern::i64>(x)); }
+  requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+Value arg(T x) { return Value::of_number(static_cast<Lang<T>>(x)); }
 /// The values of an enum, as the Blueprint has them: by their place in the enum (0, 1, 2 ...), not by the number C++ gives
 /// them. Where those differ (`enum class ClientState : i8 { denied = -3, ... }`), the test says the numbers in their order
 /// (converted::number_enum, written by the test); otherwise a value's place is its number.
@@ -799,26 +694,19 @@ template <class A, class B> Value arg(const std::pair<A, B>& p) { return Value::
 template <class T> Value arg(const std::vector<T>& v) {
   if constexpr (std::is_same_v<T, bool>) {
     return Value::of(std::vector<bool>(v.begin(), v.end()));
-  } else if constexpr (std::is_floating_point_v<T>) {
-    return Value::of(std::vector<f64>(v.begin(), v.end()));
-  } else if constexpr (std::is_integral_v<T>) {
-    return Value::of(std::vector<kern::i64>(v.begin(), v.end()));
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return Value::of(std::vector<Lang<T>>(v.begin(), v.end()));
   } else if constexpr (std::is_enum_v<T>) {
     std::vector<kern::i64> out;
     for (const T& x : v) out.push_back(enum_place(x));
     return Value::enumerations(std::move(out));
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
     return Value::of(std::vector<std::string>(v.begin(), v.end()));
-  } else if constexpr (std::is_same_v<T, Vec3> || std::is_same_v<T, wide::Vec3>) {
+  } else if constexpr (std::is_same_v<T, Vec3>) {
     return Value::of(std::vector<Vec3>(v.begin(), v.end()));
-  } else if constexpr (std::is_same_v<T, Vec2> || std::is_same_v<T, wide::Vec2>) {
+  } else if constexpr (std::is_same_v<T, Vec2>) {
     std::vector<Vec3> out;
     for (const kern::Vec2 x : v) out.push_back({x.x, x.y, 0});
-    return Value::of(std::move(out));
-  } else if constexpr (std::is_same_v<T, Whole>) {   // (64-bit patterns: a List<Int64>, as the Blueprint holds it)
-    std::vector<kern::logic::Int64> out;
-    out.reserve(v.size());
-    for (const Whole& x : v) out.push_back(kern::logic::Int64{x.v});
     return Value::of(std::move(out));
   } else if constexpr (is_list<T> || is_box<T>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
     std::vector<Value> out;
@@ -862,33 +750,42 @@ inline bool rows_of(const Value& got, std::size_t n) {
 inline std::string exact(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g", x); return b; }
 
 // ---- is what the Blueprint gives exactly what the source gives? ----
-// (Numbers by their bits: 0.0 and -0.0 are two results.)
-inline bool same_bits(f64 a, f64 b) { return std::bit_cast<kern::u64>(a) == std::bit_cast<kern::u64>(b); }
-inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); }); }
-inline bool same(f32 want, const Value& got) {
-  return same_bits(static_cast<f64>(want), got.as_number()) || off_at(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); });
+// (Numbers by their bits as the language sees them: 0.0 and -0.0 are two results, two NaNs the one NaN - numbers.h, seen.)
+inline std::string text(f32 x);
+inline std::string text(f64 x);
+template <class T>
+  requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
+std::string text(T x);
+/// What the Blueprint gives as a number of the type L, as a text (with its type where it is another).
+template <class L> std::string got_text(const Value& got) {
+  if (got.type != kern::logic::number_type<L>()) return std::string("a ") + kern::logic::pin_type_name(got.type) + " (not a " + kern::logic::pin_type_name(kern::logic::number_type<L>()) + ")";
+  return text(got.as<L>());
+}
+/// A number: of the same type, and the same as the language sees it (its bits: 0 and -0 are two, two NaNs the one NaN - numbers.h, seen).
+template <class T>
+  requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+bool same(T want, const Value& got) {
+  using L = Lang<T>;
+  const L w = static_cast<L>(want);
+  if (got.type == kern::logic::number_type<L>() && kern::logic::num::same_seen(w, got.as<L>())) return true;
+  if constexpr (std::is_floating_point_v<L>) { if (got.type == kern::logic::number_type<L>()) off_at(static_cast<double>(w), static_cast<double>(got.as<L>())); }
+  return differ_at([&] { return text(w); }, [&] { return got_text<L>(got); });
 }
 inline bool same(bool want, const Value& got) {
-  return got.as_bool() == want || differ_at([&] { return std::string(want ? "true" : "false"); }, [&] { return std::string(got.as_bool() ? "true" : "false"); });
+  return (got.type == kern::logic::PinType::boolean && got.as_bool() == want) ||
+         differ_at([&] { return std::string(want ? "true" : "false"); }, [&] { return got.type == kern::logic::PinType::boolean ? std::string(got.as_bool() ? "true" : "false") : std::string("no bool"); });
+}
+inline bool same_part(f32 want, f32 got) {
+  return kern::logic::num::same_seen(want, got) || off_at(want, got) || differ_at([&] { return text(want); }, [&] { return text(got); });
 }
 inline bool same(Vec3 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return at_place(same_bits(want.x, v.x) || off_at(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
-         at_place(same_bits(want.y, v.y) || off_at(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y") &&
-         at_place(same_bits(want.z, v.z) || off_at(want.z, v.z) || differ_at([&] { return exact(want.z); }, [&] { return exact(v.z); }), ".z");
+  return at_place(same_part(want.x, v.x), ".x") && at_place(same_part(want.y, v.y), ".y") && at_place(same_part(want.z, v.z), ".z");
 }
 inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return at_place(same_bits(want.x, v.x) || off_at(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
-         at_place(same_bits(want.y, v.y) || off_at(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y");
+  return at_place(same_part(want.x, v.x), ".x") && at_place(same_part(want.y, v.y), ".y");
 }
-inline bool same(Whole want, const Value& got) {
-  return (got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v) ||
-         differ_at([&] { return std::to_string(want.v); },
-                   [&] { return std::to_string(static_cast<unsigned long long>(got.i)) + (got.type == kern::logic::PinType::int64 ? "" : " (not an Int64)"); });
-}
-inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
-inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) {
   const auto shown = [](kern::logic::ObjectRef r) { return "object " + std::to_string(r.handle) + " of world " + std::to_string(r.world); };
   return (got.type == kern::logic::PinType::object && got.as_object() == ref_of(want)) ||
@@ -903,11 +800,6 @@ inline bool same(std::string_view want, const Value& got) {
 }
 inline bool same(const char* want, const Value& got) { return same(std::string_view(want ? want : ""), got); }
 inline bool same(const std::string& want, const Value& got) { return same(std::string_view(want), got); }
-template <class T>
-  requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
-bool same(T want, const Value& got) {
-  return got.as_int() == static_cast<kern::i64>(want) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want)); }, [&] { return std::to_string(got.as_int()); });
-}
 template <class E>
   requires std::is_enum_v<E>
 bool same(E want, const Value& got) {
@@ -922,17 +814,18 @@ template <class T> bool same(const std::vector<T>& want, const Value& got) {
     if (!lengths(want.size(), g.size())) return false;
     for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(static_cast<bool>(want[i]), Value::boolean(g[i])), "[" + std::to_string(i) + "]")) return false;
     return true;
-  } else if constexpr (std::is_floating_point_v<T>) {
-    const auto& g = got.items<f64>();
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    using L = Lang<T>;
+    if (got.type != kern::logic::list_type_of<L>()) return differ_at([&] { return std::string("a list of ") + kern::logic::pin_type_name(kern::logic::number_type<L>()); }, [&] { return std::string("a ") + kern::logic::pin_type_name(got.type); });
+    const auto& g = got.items<L>();
     if (!lengths(want.size(), g.size())) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(static_cast<f64>(want[i]), Value::number(g[i])), "[" + std::to_string(i) + "]")) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(static_cast<L>(want[i]), Value::of_number(g[i])), "[" + std::to_string(i) + "]")) return false;
     return true;
-  } else if constexpr (std::is_integral_v<T> || std::is_enum_v<T>) {
+  } else if constexpr (std::is_enum_v<T>) {
     const auto& g = got.items<kern::i64>();
     if (!lengths(want.size(), g.size())) return false;
-    const auto as_held = [](const T& x) -> kern::i64 { if constexpr (std::is_enum_v<T>) return enum_place(x); else return static_cast<kern::i64>(x); };
     for (std::size_t i = 0; i < want.size(); ++i)
-      if (!at_place(g[i] == as_held(want[i]) || differ_at([&] { return std::to_string(as_held(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
+      if (!at_place(g[i] == enum_place(want[i]) || differ_at([&] { return std::to_string(enum_place(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
         return false;
     return true;
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
@@ -940,16 +833,10 @@ template <class T> bool same(const std::vector<T>& want, const Value& got) {
     if (!lengths(want.size(), g.size())) return false;
     for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(std::string_view(want[i]), Value::text(std::string(g[i]))), "[" + std::to_string(i) + "]")) return false;
     return true;
-  } else if constexpr (std::is_same_v<T, Vec3> || std::is_same_v<T, Vec2> || std::is_same_v<T, wide::Vec3> || std::is_same_v<T, wide::Vec2>) {
+  } else if constexpr (std::is_same_v<T, Vec3> || std::is_same_v<T, Vec2>) {
     const auto& g = got.items<Vec3>();
     if (!lengths(want.size(), g.size())) return false;
     for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(want[i], Value::vector(g[i])), "[" + std::to_string(i) + "]")) return false;
-    return true;
-  } else if constexpr (std::is_same_v<T, Whole>) {   // (a List<Int64>)
-    const auto& g = got.items<kern::logic::Int64>();
-    if (!lengths(want.size(), g.size())) return false;
-    for (std::size_t i = 0; i < want.size(); ++i)
-      if (!at_place(g[i].bits == want[i].v || differ_at([&] { return std::to_string(want[i].v); }, [&] { return std::to_string(g[i].bits); }), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (is_list<T> || is_box<T>) {
     const auto& g = got.items<Value>();
@@ -969,9 +856,6 @@ inline bool defined(f32 x) { return std::isfinite(x); }
 inline bool defined(f64 x) { return std::isfinite(x); }
 inline bool defined(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
 inline bool defined(Vec2 v) { return std::isfinite(v.x) && std::isfinite(v.y); }
-inline bool defined(Whole) { return true; }
-inline bool defined(wide::Vec3 v) { return defined(kern::Vec3(v)); }
-inline bool defined(wide::Vec2 v) { return defined(kern::Vec2(v)); }
 inline bool defined(bool) { return true; }
 inline bool defined(const std::string&) { return true; }
 inline bool defined(const char*) { return true; }
@@ -996,13 +880,6 @@ inline std::string text(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g",
 inline std::string text(bool x) { return x ? "true" : "false"; }
 inline std::string text(Vec3 v) { return "{" + text(v.x) + ", " + text(v.y) + ", " + text(v.z) + "}"; }
 inline std::string text(Vec2 v) { return "{" + text(v.x) + ", " + text(v.y) + "}"; }
-inline std::string text(Whole w) {
-  char out[40];
-  std::snprintf(out, sizeof out, "0x%llx", w.v);
-  return out;
-}
-inline std::string text(wide::Vec3 v) { return text(kern::Vec3(v)); }
-inline std::string text(wide::Vec2 v) { return text(kern::Vec2(v)); }
 inline std::string text(const char* s) { return std::string("\"") + (s ? s : "") + "\""; }
 inline std::string text(const EngineObject* object) {
   return "object " + std::to_string(ref_of(object).handle) + " of world " + std::to_string(ref_of(object).world);
@@ -1015,7 +892,7 @@ inline std::string text(const std::string& s) { return "\"" + s + "\""; }
 inline std::string text(std::string_view s) { return text(std::string(s)); }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
-std::string text(T x) { return std::to_string(static_cast<long long>(x)); }
+std::string text(T x) { return std::is_signed_v<T> ? std::to_string(static_cast<long long>(x)) : std::to_string(static_cast<unsigned long long>(x)); }
 template <class E>
   requires std::is_enum_v<E>
 std::string text(E e) { return "#" + std::to_string(static_cast<long long>(e)); }
@@ -1124,7 +1001,7 @@ template <class K, class H> std::string text(const kern::Set<K, H>& s) {
 /// (Without a copy of what is there: a class may be one that is not to be copied.)
 template <class T> Value arg_one(const T* p) {
   if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T> || std::is_same_v<T, std::string> || std::is_same_v<T, Vec3> || std::is_same_v<T, Vec2> ||
-                std::is_same_v<T, wide::Vec3> || std::is_same_v<T, wide::Vec2> || is_list<T>) {
+                is_list<T>) {
     return arg(p ? std::vector<T>{*p} : std::vector<T>{});
   } else {
     std::vector<Value> out;
@@ -1152,14 +1029,10 @@ std::string text(const std::unique_ptr<T>& p) { return text_one(p.get()); }
 template <class T> std::string text(const std::optional<T>& p) { return text_one(p ? &*p : nullptr); }
 
 // ---- a value the engine's stand-in answered, as the source gets it ----
-inline void take(f64& to, const Value& v) { to = v.as_number(); }
-// (the source's own numbers - KERN_TEST_SOURCE_NUMBERS=1: an f32 of the source's object takes what the Blueprint holds there; a
-// Blueprint's Float of 64 bit that is no f32 is said by the comparison, not here)
-inline void take(f32& to, const Value& v) { to = static_cast<f32>(v.as_number()); }
+inline void take(f64& to, const Value& v) { to = v.as<f64>(); }
+inline void take(f32& to, const Value& v) { to = v.as<f32>(); }
 inline void take(Vec2& to, const Value& v) { to = Vec2{v.as_vector().x, v.as_vector().y}; }
 inline void take(bool& to, const Value& v) { to = v.as_bool(); }
-inline void take(wide::Vec3& to, const Value& v) { to = wide::Vec3(v.as_vector()); }
-inline void take(wide::Vec2& to, const Value& v) { to = wide::Vec2(v.as_vector().x, v.as_vector().y); }
 inline void take(std::string& to, const Value& v) { to = v.as_text(); }
 inline void take(const char*& to, const Value& v) {
   static std::deque<std::string> kept;   // (a text the source holds by a pointer: kept for it)
@@ -1173,7 +1046,7 @@ inline void take(std::string_view& to, const Value& v) {
 }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
-void take(T& to, const Value& v) { to = static_cast<T>(v.as_int()); }
+void take(T& to, const Value& v) { to = static_cast<T>(v.as<Lang<T>>()); }
 template <class E>
   requires std::is_enum_v<E>
 void take(E& to, const Value& v) { to = enum_value<E>(v.i); }
@@ -1204,7 +1077,7 @@ template <class A> int scan_one(const char*& p, const std::string& head, char co
   const std::string f = head + "%n";
   auto into = [&](auto tmp) {
     r = std::sscanf(p, f.c_str(), &tmp, &used);
-    if constexpr (std::is_arithmetic_v<A> || std::is_same_v<A, wide::Num32>) { if (r == 1) *out = static_cast<A>(tmp); }
+    if constexpr (std::is_arithmetic_v<A>) { if (r == 1) *out = static_cast<A>(tmp); }
   };
   if (conv == 's' || conv == 'c' || conv == '[') {
     if constexpr (std::is_same_v<A, char>) r = std::sscanf(p, f.c_str(), out, &used);
@@ -1260,7 +1133,6 @@ template <class T> void take(kern::Span<T>& to, const Value& v) {
   take(kept.back(), v);
   to = kern::Span<T>(kept.back().data(), kept.back().size());
 }
-/// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 /// Numbers the engine gives at a place of its own (`const f64* RoadStream::data()`): the test keeps those its stand-in
 /// answers, and the source reads them where the pointer points - as long as the test runs.
 /// How many numbers there are where a pointer the test took (take of a const T*) points - none for any other pointer.
@@ -1288,9 +1160,6 @@ template <class T> std::size_t room(const T* p, std::size_t count) {
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
 };
-template <> struct Take<Whole> {
-  template <class T> static void to(T& target, const Value& v) { target = v.type == kern::logic::PinType::int64 ? static_cast<T>(static_cast<unsigned long long>(v.i)) : T{}; }
-};
 template <class S> struct Take<std::vector<S>> {
   template <class T> static void to(std::vector<T>& target, const Value& v) {
     target.clear();
@@ -1306,7 +1175,7 @@ template <class S> struct Take<std::vector<S>> {
     }
   }
   /// (into a view: the entries, kept by the test - see kept_span)
-  template <class T> static void to(wide::Span<const T>& target, const Value& v) {
+  template <class T> static void to(kern::Span<const T>& target, const Value& v) {
     std::vector<T> entries;
     to(entries, v);
     target = kept_span(std::move(entries));
@@ -1403,21 +1272,23 @@ template <class T> void take(std::vector<T>& to, const Value& v) { Take<std::vec
 inline std::string shown(const Value& v) {
   using kern::logic::PinType;
   switch (v.type) {
-    case PinType::number: return text(v.n);
+    case PinType::f32: return text(v.as<f32>());
+    case PinType::f64: return text(v.as<f64>());
     case PinType::vector: return text(v.v);
     case PinType::structure: {
       std::string out = "{";
       if (v.rows) for (std::size_t i = 0; i < v.rows->size(); ++i) out += (i ? ", " : "") + shown((*v.rows)[i]);
       return out + "}";
     }
-    case PinType::number_list: return text(v.items<f64>());
+    case PinType::f32_list: return text(v.items<f32>());
+    case PinType::f64_list: return text(v.items<f64>());
     case PinType::structure_list: {
       std::string out = "[";
       const auto& l = v.items<Value>();
       for (std::size_t i = 0; i < l.size(); ++i) out += (i ? ", " : "") + shown(l[i]);
       return out + "]";
     }
-    default: return v.as_text();
+    default: return kern::logic::is_number(v.type) && v.type != PinType::boolean ? std::to_string(v.i) : v.as_text();
   }
 }
 /// The arguments of a call as the Blueprint is given them, for a failure's line.
@@ -1498,6 +1369,15 @@ __attribute__((format(printf, 1, 0))) inline std::string formatted(const char* f
   std::string out(n > 0 ? static_cast<std::size_t>(n) : 0, '\0');
   if (n > 0) std::vsnprintf(out.data(), out.size() + 1, format, again);
   va_end(again);
+  return out;
+}
+/// The same of values handed one by one (a stand-in of a free function of the engine that formats a text is a variadic
+/// template: the source's unqualified call - `log(LogLevel::warn, ...)` - finds it before the engine's own, which it
+/// finds too by its enum; a C ellipsis is the worse match).
+template <class... A> std::string formatted_of(const char* format, A... values) {
+  const int n = std::snprintf(nullptr, 0, format, values...);
+  std::string out(n > 0 ? static_cast<std::size_t>(n) : 0, '\0');
+  if (n > 0) std::snprintf(out.data(), out.size() + 1, format, values...);
   return out;
 }
 
@@ -1598,8 +1478,10 @@ template <class T, class Shape> T& engine_place(const char* function, const std:
 inline bool same_value(const Value& a, const Value& b) {
   using kern::logic::PinType;
   if (a.type != b.type) return false;
-  if (a.type == PinType::number) return same_bits(a.n, b.n);
-  if (a.type == PinType::vector) return same_bits(a.v.x, b.v.x) && same_bits(a.v.y, b.v.y) && same_bits(a.v.z, b.v.z);
+  if (a.type == PinType::f32) return kern::logic::num::same_seen(a.as<f32>(), b.as<f32>());
+  if (a.type == PinType::f64) return kern::logic::num::same_seen(a.as<f64>(), b.as<f64>());
+  if (kern::logic::is_number(a.type)) return a.bits() == b.bits();
+  if (a.type == PinType::vector) return kern::logic::num::same_seen(a.v.x, b.v.x) && kern::logic::num::same_seen(a.v.y, b.v.y) && kern::logic::num::same_seen(a.v.z, b.v.z);
   if (a.type == PinType::structure) {
     const std::size_t n = a.rows ? a.rows->size() : 0;
     if (n != (b.rows ? b.rows->size() : 0)) return false;
@@ -1659,8 +1541,7 @@ template <FnAndUser S> Value arg(const S& s) {
 /// The values a callback is called with to compare it (a number, a whole number, a flag, a vector of each input).
 template <class X> Value probe_value(f64 v) {
   if constexpr (std::is_same_v<X, bool>) return Value::boolean(v > 0);
-  else if constexpr (std::is_integral_v<X>) return Value::integer(static_cast<kern::i64>(v * 4));
-  else if constexpr (std::is_floating_point_v<X>) return Value::number(v);
+  else if constexpr (std::is_arithmetic_v<X>) return Value::of_number(static_cast<Lang<X>>(std::is_integral_v<X> ? v * 4 : v));
   else return Value::vector({static_cast<f32>(v), static_cast<f32>(-v), static_cast<f32>(v * 0.5)});
 }
 template <class... A> std::vector<Value> probe_values(std::tuple<A...>*, std::size_t from) {
@@ -2100,7 +1981,10 @@ struct Tally {
     }
     // (a callback the source gives, called to compare it, that went where C++ says nothing: not compared - probe_source)
     g_probe_open = false;
-    const bool equal = ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0]);
+    // (the interpreter's and the class's value are one value: equal as C++ compares them - or, where a NaN stands in them,
+    // which equals nothing and not itself, each the same as the source's the way the language sees a number: same)
+    const bool one = ia && ib && a.size() == 1 && b.size() == 1 && (a[0] == b[0] || (!(a[0] == a[0]) && !(b[0] == b[0])));
+    const bool equal = one && same(want, a[0]) && same(want, b[0]);
     if (g_probe_open) {
       g_probe_open = false;
       ++outside;
@@ -2260,7 +2144,7 @@ inline bool probe_source(const std::function<bool(std::span<const Value>, Value&
     open = true;
   }
   may_bail(false);
-  if (g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0) open = true;
+  if (g_open) open = true;   // (a floating division by zero, a NaN: IEEE 754 says what they give - no open place)
   std::memcpy(&g_bail, &outer, sizeof(std::jmp_buf));
   g_can_bail = could;
   if (could) may_bail(true);
@@ -2326,24 +2210,10 @@ template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
 }
 /// A number as a whole number of the type T: one T does not hold (or none at all) marks the call.
 template <class T> constexpr double fits(double x);
-template <> constexpr double fits<Whole>(double x) {
-  if (!(x > -1.0 && x < 18446744073709551616.0)) {
-    g_open = true;
-    return 0;
-  }
-  return x;
-}
-template <> constexpr double fits<SignedWhole>(double x) {
-  if (!(x > -9223372036854775809.0 && x < 9223372036854775808.0)) {
-    g_open = true;
-    return 0;
-  }
-  return x;
-}
 template <class T> constexpr double fits(double x) {
-  const bool in = std::is_signed_v<T> ? (x > -9007199254740992.0 && x < 9007199254740992.0 && x >= static_cast<double>(std::numeric_limits<T>::min()) - 0.5 &&
-                                         (sizeof(T) == 8 || x <= static_cast<double>(std::numeric_limits<T>::max()) + 0.5))
-                                      : (x > -1.0 && x < 9007199254740992.0 && (sizeof(T) == 8 || x <= static_cast<double>(std::numeric_limits<T>::max()) + 0.5));
+  // (C++ leaves a floating number that is no number of T after its fraction is cut undefined: [conv.fpint])
+  constexpr double lo = static_cast<double>(std::numeric_limits<T>::min()), hi = static_cast<double>(std::numeric_limits<T>::max() / 2 + 1) * 2.0;
+  const bool in = (std::is_signed_v<T> ? (x >= lo || x > lo - 1.0) : x > -1.0) && x < hi;
   if (!in) {   // (not a number: every comparison above is false)
     g_open = true;
     return 0;
@@ -2391,41 +2261,18 @@ template <class C, class A, class B> auto erase(C& c, A first, B last) -> declty
 template <class C> auto front(C&& c) -> decltype(c[0]) { return at(c, 0); }
 template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(entries(c)) - 1); }
 
-// A 64-bit whole number is, in a Blueprint, the number its bits are read with a sign - exact while it is
-// within 2^53 of zero (unsigned C++ arithmetic around 2^64 comes out the same there). What the source
-// computes with 64-bit numbers goes through these: a number out of that range marks the call.
-template <class T> constexpr bool held(T v) {
-  if constexpr (std::is_integral_v<T> && sizeof(T) == 8) {
-    const long long read = static_cast<long long>(v);
-    return read > -(1LL << 53) && read < (1LL << 53);
-  } else {
-    return true;
-  }
+// A whole number with a sign (i32 - and what is promoted to it -, i64): C++ leaves open what a sum, a difference, a
+// product or a negation gives outside its range (UBSan: "signed integer overflow"). The test computes it exactly, marks
+// the call there (open_read - it is given up and drawn again, never compared) and goes on with the bits the number
+// keeps, so the source itself never does what C++ leaves open. An unsigned one wraps, as C++ defines: computed as it is.
+template <class R> constexpr R kept_signed(__int128 exact) {
+  if (exact < static_cast<__int128>(std::numeric_limits<R>::min()) || exact > static_cast<__int128>(std::numeric_limits<R>::max())) open_read();
+  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(static_cast<unsigned __int128>(exact)));
 }
-template <class R> constexpr R kept(__int128 exact) {
-  if (exact <= -(static_cast<__int128>(1) << 53) || exact >= (static_cast<__int128>(1) << 53)) g_open = true;
-  return static_cast<R>(static_cast<unsigned long long>(exact));
-}
-template <class R, class A, class B> constexpr bool both_held(A a, B b) {
-  if constexpr (std::is_integral_v<R> && sizeof(R) == 8) {
-    if (!held(static_cast<R>(a)) || !held(static_cast<R>(b))) g_open = true;
-    return true;
-  } else {
-    return false;
-  }
-}
-// A whole number with a sign narrower than 64 bits (i32, and what is promoted to int): C++ leaves open what a
-// sum, a difference, a product or a negation gives outside its range (UBSan: "signed integer overflow"). The
-// test computes it exactly, marks the call there (open_read - it is given up and drawn again, never compared)
-// and goes on with the bits the number keeps, so the source itself never does what C++ leaves open.
-template <class R> constexpr bool narrow_signed() { return std::is_integral_v<R> && std::is_signed_v<R> && sizeof(R) < 8; }
-template <class R> constexpr R kept_narrow(long long exact) {
-  if (exact < static_cast<long long>(std::numeric_limits<R>::min()) || exact > static_cast<long long>(std::numeric_limits<R>::max())) open_read();
-  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(static_cast<unsigned long long>(exact)));
-}
+template <class R> constexpr bool is_signed_whole() { return std::is_integral_v<R> && std::is_signed_v<R>; }
 template <class A> constexpr auto neg(A a) -> decltype(-a) {
   using R = decltype(-a);
-  if constexpr (std::is_integral_v<R> && std::is_signed_v<R>) {
+  if constexpr (is_signed_whole<R>()) {
     if (static_cast<R>(a) == std::numeric_limits<R>::min()) {
       open_read();
       return static_cast<R>(a);
@@ -2435,21 +2282,18 @@ template <class A> constexpr auto neg(A a) -> decltype(-a) {
 }
 template <class A, class B> constexpr auto plus(A a, B b) -> decltype(a + b) {
   using R = decltype(a + b);
-  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) + static_cast<long long>(b));
-  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) + static_cast<long long>(static_cast<R>(b)));
-  return a + b;
+  if constexpr (is_signed_whole<R>()) return kept_signed<R>(static_cast<__int128>(static_cast<R>(a)) + static_cast<__int128>(static_cast<R>(b)));
+  else return a + b;
 }
 template <class A, class B> constexpr auto minus(A a, B b) -> decltype(a - b) {
   using R = decltype(a - b);
-  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) - static_cast<long long>(b));
-  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) - static_cast<long long>(static_cast<R>(b)));
-  return a - b;
+  if constexpr (is_signed_whole<R>()) return kept_signed<R>(static_cast<__int128>(static_cast<R>(a)) - static_cast<__int128>(static_cast<R>(b)));
+  else return a - b;
 }
 template <class A, class B> constexpr auto times(A a, B b) -> decltype(a * b) {
   using R = decltype(a * b);
-  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) * static_cast<long long>(b));
-  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * static_cast<long long>(static_cast<R>(b)));
-  return a * b;
+  if constexpr (is_signed_whole<R>()) return kept_signed<R>(static_cast<__int128>(static_cast<R>(a)) * static_cast<__int128>(static_cast<R>(b)));
+  else return a * b;
 }
 template <class A, class B> constexpr A& plus_to(A& a, B b) { return a = static_cast<A>(plus(a, b)); }
 template <class A, class B> constexpr A& minus_to(A& a, B b) { return a = static_cast<A>(minus(a, b)); }
@@ -2461,7 +2305,6 @@ template <class A> constexpr A post_dec(A& a) { const A was = a; a = static_cast
 
 template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
   using R = decltype(a / b);
-  both_held<R>(a, b);
   if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
     g_open = true;
     return 0;
@@ -2470,7 +2313,6 @@ template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
 }
 template <class A, class B> constexpr auto rem(A a, B b) -> decltype(a % b) {
   using R = decltype(a % b);
-  both_held<R>(a, b);
   if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
     g_open = true;
     return 0;
@@ -2484,13 +2326,11 @@ template <class A, class B> constexpr auto shl(A a, B b) -> decltype(a << b) {
     g_open = true;
     return 0;
   }
-  if (both_held<R>(a, 0)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * (static_cast<__int128>(1) << by));
   return a << b;
 }
 template <class A, class B> constexpr auto shr(A a, B b) -> decltype(a >> b) {
   using R = decltype(a >> b);
   const long long by = static_cast<long long>(b);
-  both_held<R>(a, 0);
   if (by < 0 || by >= static_cast<long long>(sizeof(R) * 8)) {
     g_open = true;
     return 0;
@@ -2502,86 +2342,9 @@ template <class A, class B> constexpr A& rem_to(A& a, B b) { return a = static_c
 template <class A, class B> constexpr A& shl_to(A& a, B b) { return a = static_cast<A>(shl(a, b)); }
 template <class A, class B> constexpr A& shr_to(A& a, B b) { return a = static_cast<A>(shr(a, b)); }
 
-// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Int64) is
-// computed around 2^64, as C++ computes with unsigned numbers: nothing to mark there. What C++ leaves open
-// marks the call: signed arithmetic that leaves the 64 bits, a division by zero, a shift by 64 or more.
-template <class R> constexpr R kept_bits(__int128 exact) {
-  if (exact < static_cast<__int128>(std::numeric_limits<R>::min()) || exact > static_cast<__int128>(std::numeric_limits<R>::max())) {
-    g_open = true;
-    return 0;
-  }
-  return static_cast<R>(exact);
-}
-template <class A, class B> constexpr auto plus_bits(A a, B b) -> decltype(a + b) {
-  using R = decltype(a + b);
-  if constexpr (std::is_signed_v<R>) {
-    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) + static_cast<__int128>(static_cast<R>(b)));
-  } else {
-    return a + b;
-  }
-}
-template <class A, class B> constexpr auto minus_bits(A a, B b) -> decltype(a - b) {
-  using R = decltype(a - b);
-  if constexpr (std::is_signed_v<R>) {
-    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) - static_cast<__int128>(static_cast<R>(b)));
-  } else {
-    return a - b;
-  }
-}
-template <class A, class B> constexpr auto times_bits(A a, B b) -> decltype(a * b) {
-  using R = decltype(a * b);
-  if constexpr (std::is_signed_v<R>) {
-    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) * static_cast<__int128>(static_cast<R>(b)));
-  } else {
-    return a * b;
-  }
-}
-template <class A, class B> constexpr auto quot_bits(A a, B b) -> decltype(a / b) {
-  using R = decltype(a / b);
-  if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
-    g_open = true;
-    return 0;
-  }
-  return a / b;
-}
-template <class A, class B> constexpr auto rem_bits(A a, B b) -> decltype(a % b) {
-  using R = decltype(a % b);
-  if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
-    g_open = true;
-    return 0;
-  }
-  return a % b;
-}
-template <class A, class B> constexpr auto shl_bits(A a, B b) -> decltype(a << b) {
-  using R = decltype(a << b);
-  if (b < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * 8) {
-    g_open = true;
-    return 0;
-  }
-  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(a) << b);
-}
-template <class A, class B> constexpr auto shr_bits(A a, B b) -> decltype(a >> b) {
-  using R = decltype(a >> b);
-  if (b < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * 8) {
-    g_open = true;
-    return 0;
-  }
-  return a >> b;
-}
-template <class A, class B> constexpr A& plus_bits_to(A& a, B b) { return a = static_cast<A>(plus_bits(a, b)); }
-template <class A, class B> constexpr A& minus_bits_to(A& a, B b) { return a = static_cast<A>(minus_bits(a, b)); }
-template <class A, class B> constexpr A& times_bits_to(A& a, B b) { return a = static_cast<A>(times_bits(a, b)); }
-template <class A, class B> constexpr A& quot_bits_to(A& a, B b) { return a = static_cast<A>(quot_bits(a, b)); }
-template <class A, class B> constexpr A& rem_bits_to(A& a, B b) { return a = static_cast<A>(rem_bits(a, b)); }
-template <class A, class B> constexpr A& shl_bits_to(A& a, B b) { return a = static_cast<A>(shl_bits(a, b)); }
-template <class A, class B> constexpr A& shr_bits_to(A& a, B b) { return a = static_cast<A>(shr_bits(a, b)); }
-template <class A> constexpr A& pre_inc_bits(A& a) { return a = static_cast<A>(plus_bits(a, static_cast<A>(1))); }
-template <class A> constexpr A& pre_dec_bits(A& a) { return a = static_cast<A>(minus_bits(a, static_cast<A>(1))); }
-template <class A> constexpr A post_inc_bits(A& a) { const A was = a; a = static_cast<A>(plus_bits(a, static_cast<A>(1))); return was; }
-template <class A> constexpr A post_dec_bits(A& a) { const A was = a; a = static_cast<A>(minus_bits(a, static_cast<A>(1))); return was; }
-
-/// Runs the source and says whether it left the numbers on the way (see Tally::take): a division by zero
-/// or a computation without a result, or one of the places above.
+/// Runs the source and says whether it did what C++ leaves open on the way (see Tally::take): one of the places above
+/// (a whole number divided by zero, a signed one past its range, an entry outside its list ...). A floating division by
+/// zero or a NaN is no such place: IEEE 754 says what it gives, and the Blueprint must give the same.
 struct Watch {
   Watch() {
     std::feclearexcept(FE_ALL_EXCEPT);
@@ -2594,34 +2357,28 @@ struct Watch {
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - kern/test/blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }
-  bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
+  bool left() const { return g_open; }
 };
 
 
 // ---- the types of a Blueprint's class ----
-// A file of the program that is a Blueprint now (BLUEPRINTS.md, "5 - Umschalten") is called by the rest of the program as its
-// class (level_blueprints.h): its values are of the language's own types (kern/logic/nodes.h) and of the structs and enums the
-// Blueprint declares. The test draws, hands over, compares and takes them back as the Blueprint holds them: an Int of a fixed
-// width as the whole number it is, an Int as an Int, a Text as a text, a List and a list of a fixed length entry by entry.
+// A file of the program that is a Blueprint now is called by the rest of the program as its class (level_blueprints.h): its
+// values are of the language's own types (kern/logic/nodes.h, numbers.h) and of the structs and enums the Blueprint declares.
+// The test draws, hands over, compares and takes them back as the Blueprint holds them: a place of a number (num::Typed<T>)
+// as the number it is, a Text as a text, a List and a list of a fixed length entry by entry.
 // (A struct of a class: the test writes its helpers - draw, arg, same, defined, text, take - field by field, in the namespace of
 // its class; an enum of a class is a C++ enum, its values their places.)
-/// A value of the language as the test's plain value of the same: an Int of a fixed width or an Int its i64, a Text its
-/// std::string, an entry of a List<Bool> its bool - anything else itself.
+/// A value of the language as the test's plain value of the same: a place of a number its number, a Text its std::string, an
+/// entry of a List<bool> its bool - anything else itself.
 template <class T> auto plain(const T& x) {
-  if constexpr (kern::logic::is_sized<T>) return static_cast<kern::i64>(x.v);
-  else if constexpr (std::is_same_v<T, kern::logic::Whole>) return static_cast<kern::i64>(x.v);
+  if constexpr (kern::logic::num::is_typed<T>) return kern::logic::num::raw_value(x);
   else if constexpr (std::is_same_v<T, kern::logic::Text>) return std::string(x.view());
   else if constexpr (std::is_same_v<T, kern::logic::Truth>) return static_cast<bool>(x);
   else return x;
 }
 /// ... and back: the language's value of a plain one.
 template <class T, class P> T unplain(const P& p) {
-  if constexpr (kern::logic::is_sized<T>) return T(static_cast<kern::i64>(p));
-  else if constexpr (std::is_same_v<T, kern::logic::Whole>) {
-    T w;
-    w.v = static_cast<kern::i64>(p);
-    return w;
-  } else if constexpr (std::is_same_v<T, kern::logic::Text>) return T(std::string(p));
+  if constexpr (std::is_same_v<T, kern::logic::Text>) return T(std::string(p));
   else return T(p);
 }
 template <class Items> auto plain_list(const Items& items) {
@@ -2632,16 +2389,11 @@ template <class Items> auto plain_list(const Items& items) {
   return out;
 }
 inline void take(Vec3& to, const Value& v) { to = v.as_vector(); }
-template <class T> Value arg(const kern::logic::Sized<T>& x) { return arg(static_cast<kern::i64>(x.v)); }
-template <class T> bool same(const kern::logic::Sized<T>& want, const Value& got) { return same(static_cast<kern::i64>(want.v), got); }
-template <class T> bool defined(const kern::logic::Sized<T>&) { return true; }
-template <class T> std::string text(const kern::logic::Sized<T>& x) { return text(static_cast<kern::i64>(x.v)); }
-template <class T> void take(kern::logic::Sized<T>& to, const Value& v) { to = kern::logic::Sized<T>(v.as_int()); }
-inline Value arg(const kern::logic::Whole& x) { return arg(static_cast<kern::i64>(x.v)); }
-inline bool same(const kern::logic::Whole& want, const Value& got) { return same(static_cast<kern::i64>(want.v), got); }
-inline bool defined(const kern::logic::Whole&) { return true; }
-inline std::string text(const kern::logic::Whole& x) { return text(static_cast<kern::i64>(x.v)); }
-inline void take(kern::logic::Whole& to, const Value& v) { to.v = v.as_int(); }
+template <class T> Value arg(const kern::logic::num::Typed<T>& x) { return arg(kern::logic::num::raw_value(x)); }
+template <class T> bool same(const kern::logic::num::Typed<T>& want, const Value& got) { return same(kern::logic::num::raw_value(want), got); }
+template <class T> bool defined(const kern::logic::num::Typed<T>&) { return true; }
+template <class T> std::string text(const kern::logic::num::Typed<T>& x) { return text(kern::logic::num::raw_value(x)); }
+template <class T> void take(kern::logic::num::Typed<T>& to, const Value& v) { to = kern::logic::num::Typed<T>(v.as<T>()); }
 inline Value arg(const kern::logic::Text& x) { return arg(std::string(x.view())); }
 inline bool same(const kern::logic::Text& want, const Value& got) { return same(want.view(), got); }
 inline bool defined(const kern::logic::Text&) { return true; }
@@ -2677,11 +2429,11 @@ template <class E> std::size_t class_enum_count() {
 /// A drawn value of a type of a Blueprint's class: as the test draws the plain value it is (a struct of the class: the helper
 /// the test writes for it, draw_value in its class's namespace).
 template <class T> T draw_class(Draw& draw) {
-  if constexpr (kern::logic::is_sized<T>) {
-    using N = decltype(T{}.v);
-    return T(std::is_unsigned_v<N> ? static_cast<kern::i64>(draw.below(40)) : static_cast<kern::i64>(draw.whole()));
-  } else if constexpr (std::is_same_v<T, kern::logic::Whole>) {
-    return unplain<T>(static_cast<kern::i64>(draw.whole()));
+  if constexpr (kern::logic::num::is_typed<T>) {
+    using N = kern::logic::num::raw<T>;
+    return T(static_cast<N>(draw_class<N>(draw)));
+  } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+    return std::is_unsigned_v<T> ? static_cast<T>(draw.below(40)) : static_cast<T>(draw.whole());
   } else if constexpr (std::is_same_v<T, kern::logic::Text>) {
     return T(draw.word());
   } else if constexpr (std::is_same_v<T, bool>) {

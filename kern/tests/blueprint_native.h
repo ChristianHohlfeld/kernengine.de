@@ -20,6 +20,7 @@
 #include "engine_case.gen.h"
 #include "logic_cases.h"
 #include "native_show.h"
+#include "number_cases.h"
 
 namespace blueprint_native {
 using namespace kern;
@@ -34,6 +35,8 @@ struct Case {
   std::string name;
   logic::Graph graph;
   std::vector<Call> calls;
+  /// What went wrong reading the case's text (logic_native_blueprints fails with it; the case has no calls then).
+  std::string error = {};
   bool scenario = false;  // no calls: the scenario of the tier cases (logic_cases::play) - events, ticks
   /// Calls made after the others with values as they come from outside (Instance::call): of any
   /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
@@ -66,54 +69,54 @@ inline const char* kPlaces = R"kn(
 struct Places : kern::Blueprint {
   KERN_ENUM(Side, Front, Rear);
   KERN_STRUCT(Wheel) {
-    Float Slip = 0.5;
+    f64 Slip = 0.5;
     Side At = Side::Front;
-    List<Float> Marks = List<Float>{1.0};
+    List<f64> Marks = List<f64>{1.0};
   };
   KERN_STRUCT(Car) {
     Text Name = "car";
-    Float Speed = 3.0;
-    Int Laps = 2;
-    Wheel Spare = Wheel{0.25, Side::Rear, List<Float>{}};
+    f64 Speed = 3.0;
+    i64 Laps = 2;
+    Wheel Spare = Wheel{0.25, Side::Rear, List<f64>{}};
     List<Wheel> Wheels = List<Wheel>{};
-    List<Int> Gears = List<Int>{1, 2};
+    List<i64> Gears = List<i64>{1, 2};
     List<Text> Tags = List<Text>{"new"};
-    List<Bool> Lights = List<Bool>{true};
+    List<bool> Lights = List<bool>{true};
   };
 
   List<Car> Cars = List<Car>{};
-  Car Mine = Car{"mine", 5.0, 1, Wheel{0.125, Side::Front, List<Float>{2.0, 4.0}}, List<Wheel>{Wheel{0.75, Side::Rear, List<Float>{}}}, List<Int>{4}, List<Text>{"a"}, List<Bool>{}};
-  List<Float> Scores = List<Float>{1.0, 2.5};
-  List<Int> Counts = List<Int>{7};
+  Car Mine = Car{"mine", 5.0, 1, Wheel{0.125, Side::Front, List<f64>{2.0, 4.0}}, List<Wheel>{Wheel{0.75, Side::Rear, List<f64>{}}}, List<i64>{4}, List<Text>{"a"}, List<bool>{}};
+  List<f64> Scores = List<f64>{1.0, 2.5};
+  List<i64> Counts = List<i64>{7};
 
-  struct GrowResult { Int cars = 0; Int wheels = 0; };
+  struct GrowResult { i64 cars = 0; i64 wheels = 0; };
   /// A car more, with so many wheels: Add to a list that stands in an entry of a list.
-  GrowResult Grow(Int wheels = 2, Float slip = 0.5) {
+  GrowResult Grow(i64 wheels = 2, f64 slip = 0.5) {
     list_add(n3, Cars, Mine);
     for (auto it4 = flow_for(n4, 1, wheels); it4.next();) {
-      list_add(Cars[n3.index].Wheels, struct_make<Wheel>(math_mul(slip, kern::to<Float>(n4.index)), Side::Rear, list_make<Float, "1">(slip)));
+      list_add(Cars[n3.index].Wheels, struct_make<Wheel>(math_mul<f64>(slip, num_cast<f64, i64>(n4.index)), Side::Rear, list_make<f64, "1">(slip)));
     }
     return {list_length<Car>(Cars), list_length<Wheel>(Cars[n3.index].Wheels)};
   }
 
-  struct ReadResult { Float slip = 0.0; Float speed = 0.0; Int laps = 0; Text name = ""; Float mark = 0.0; Int gear = 0; Text tag = ""; Bool light = false; Side at = Side::Front; Wheel spare = Wheel{0.5, Side::Front, List<Float>{1.0}}; Int wheels = 0; Float score = 0.0; Float mine = 0.0; };
+  struct ReadResult { f64 slip = 0.0; f64 speed = 0.0; i64 laps = 0; Text name = ""; f64 mark = 0.0; i64 gear = 0; Text tag = ""; bool light = false; Side at = Side::Front; Wheel spare = Wheel{0.5, Side::Front, List<f64>{1.0}}; i64 wheels = 0; f64 score = 0.0; f64 mine = 0.0; };
   /// What stands at a place - a number, a text, an enum's value, a struct, an entry of a list of
   /// every kind -, also beside every list on the way to it.
-  KERN_PURE ReadResult Read(Int car = 0, Int wheel = 0, Int at = 0) {
+  KERN_PURE ReadResult Read(i64 car = 0, i64 wheel = 0, i64 at = 0) {
     return {Cars[car].Wheels[wheel].Slip, Cars[car].Speed, Cars[car].Laps, Cars[car].Name, Cars[car].Wheels[wheel].Marks[at], Cars[car].Gears[at], Cars[car].Tags[at], Cars[car].Lights[at],
             Cars[car].Wheels[wheel].At, Cars[car].Spare, list_length<Wheel>(Cars[car].Wheels), Scores[at], Mine.Spare.Marks[at]};
   }
 
-  struct SetResult { Float slip = 0.0; Float speed = 0.0; Int laps = 0; Int gear = 0; Float score = 0.0; Text name = ""; };
+  struct SetResult { f64 slip = 0.0; f64 speed = 0.0; i64 laps = 0; i64 gear = 0; f64 score = 0.0; Text name = ""; };
   /// Set and Add at a place: a field, a field of a field, an entry, a field of an entry of a list
   /// in an entry - and what each step gives.
-  SetResult Set(Int car = 0, Int wheel = 0, Float value = 1.0) {
+  SetResult Set(i64 car = 0, i64 wheel = 0, f64 value = 1.0) {
     n20.value = (Cars[car].Wheels[wheel].Slip = value);
-    Cars[car].Spare.Slip = math_add(Cars[car].Spare.Slip, value);
+    Cars[car].Spare.Slip = math_add<f64>(Cars[car].Spare.Slip, value);
     n23.value = (Cars[car].Name = text_append(Cars[car].Name, "!", ""));
     n24.value = (Cars[car].Speed += value);
     n25.value = (Cars[car].Laps += 3);
-    n26.value = (Cars[car].Gears[wheel] = kern::to<Int>(value));
+    n26.value = (Cars[car].Gears[wheel] = num_cast<i64, f64>(value));
     Cars[car].Gears[wheel] += 1;
     Cars[car].Wheels[wheel].Marks[0] += 0.5;
     Cars[car].Wheels[wheel].At = Side::Front;
@@ -129,10 +132,10 @@ struct Places : kern::Blueprint {
     return {n20.value, n24.value, n25.value, n26.value, n35.value, n23.value};
   }
 
-  struct EditResult { Int index = 0; Bool removed = false; Int marks = 0; Int tags = 0; Text shown = ""; };
+  struct EditResult { i64 index = 0; bool removed = false; i64 marks = 0; i64 tags = 0; Text shown = ""; };
   /// The steps that change a list, on a list at a place - at every index, also beside the lists
   /// on the way.
-  EditResult Edit(Text what = "add", Int car = 0, Int wheel = 0, Int at = 0, Float value = 0.0) {
+  EditResult Edit(Text what = "add", i64 car = 0, i64 wheel = 0, i64 at = 0, f64 value = 0.0) {
     switch (flow_switch_text<"add, insert, remove_at, remove, clear, whole, tags">(what)) {
       case 0: { list_add(n41, Cars[car].Wheels[wheel].Marks, value); } break;
       case 1: { list_insert(Cars[car].Wheels[wheel].Marks, at, value); } break;
@@ -141,35 +144,35 @@ struct Places : kern::Blueprint {
       case 4: { list_clear(Cars[car].Wheels); } break;
       case 5: { Cars[car].Wheels[wheel] = Mine.Spare; } break;
       case 6: {
-        list_add(Cars[car].Tags, kern::to<Text>(value));
+        list_add(Cars[car].Tags, num_text<f64>(value));
         list_add(Mine.Tags, "m");
         list_insert(Mine.Spare.Marks, 0, value);
       } break;
     }
-    return {n41.index, n44.removed, list_length<Float>(Cars[car].Wheels[wheel].Marks), list_length<Text>(Cars[car].Tags), kern::to<Text>(Cars[car].Wheels[wheel].Marks)};
+    return {n41.index, n44.removed, list_length<f64>(Cars[car].Wheels[wheel].Marks), list_length<Text>(Cars[car].Tags), num_text<f64>(list_get<f64>(Cars[car].Wheels[wheel].Marks, 0))};
   }
 
-  struct LocalResult { Float slip = 0.0; Int wheels = 0; Text name = ""; };
+  struct LocalResult { f64 slip = 0.0; i64 wheels = 0; Text name = ""; };
   /// A local variable of a function is a place like any other.
-  LocalResult Local(Float slip = 1.0, Int at = 0) {
-    Car Work = Car{"work", 1.0, 0, Wheel{0.5, Side::Front, List<Float>{1.0}}, List<Wheel>{}, List<Int>{1, 2}, List<Text>{"new"}, List<Bool>{true}};
-    list_add(Work.Wheels, struct_make<Wheel>(slip, Side::Rear, List<Float>{}));
+  LocalResult Local(f64 slip = 1.0, i64 at = 0) {
+    Car Work = Car{"work", 1.0, 0, Wheel{0.5, Side::Front, List<f64>{1.0}}, List<Wheel>{}, List<i64>{1, 2}, List<Text>{"new"}, List<bool>{true}};
+    list_add(Work.Wheels, struct_make<Wheel>(slip, Side::Rear, List<f64>{}));
     Work.Wheels[at].Slip += slip;
     Work.Spare.Marks[0] = slip;
-    Work.Name = text_append(Work.Name, kern::to<Text>(Work.Wheels[at].Slip), "");
+    Work.Name = text_append(Work.Name, num_text<f64>(Work.Wheels[at].Slip), "");
     return {Work.Wheels[at].Slip, list_length<Wheel>(Work.Wheels), Work.Name};
   }
 
-  struct { Int index = 0; } n3;
-  struct : kern::Node<4> { Int index = 0; } n4;
-  struct { Float value = 0.0; } n20;
+  struct { i64 index = 0; } n3;
+  struct : kern::Node<4> { i64 index = 0; } n4;
+  struct { f64 value = 0.0; } n20;
   struct { Text value = ""; } n23;
-  struct { Float value = 0.0; } n24;
-  struct { Int value = 0; } n25;
-  struct { Int value = 0; } n26;
-  struct { Float value = 0.0; } n35;
-  struct { Int index = 0; } n41;
-  struct { Bool removed = false; } n44;
+  struct { f64 value = 0.0; } n24;
+  struct { i64 value = 0; } n25;
+  struct { i64 value = 0; } n26;
+  struct { f64 value = 0.0; } n35;
+  struct { i64 index = 0; } n41;
+  struct { bool removed = false; } n44;
 };
 )kn";
 
@@ -181,9 +184,9 @@ inline const char* kParts = R"kn(
 struct Parts : virtual kern::Library {
   KERN_ENUM(Side, Front, Rear);
   KERN_STRUCT(Wheel) {
-    Float Slip = 0.5;
+    f64 Slip = 0.5;
     Side At = Side::Front;
-    List<Float> Marks = List<Float>{};
+    List<f64> Marks = List<f64>{};
   };
 
   struct flippedResult { Side side = Side::Front; };
@@ -195,41 +198,41 @@ struct Parts : virtual kern::Library {
 inline const char* kWorkshop = R"kn(
 struct Workshop : virtual kern::Library, virtual Parts {
   /// What a library keeps: constants - read, never changed.
-  KERN_CONST Float Step = 0.25;
-  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0, 4.0};
+  KERN_CONST f64 Step = 0.25;
+  KERN_CONST List<f64> Table = List<f64>{1.0, 2.0, 4.0};
 
   /// Changes the wheel the call names.
-  void skid(Wheel& wheel, Float by = 0.5) {
+  void skid(Wheel& wheel, f64 by = 0.5) {
     wheel.Slip += by;
     list_add(wheel.Marks, wheel.Slip);
     wheel.At = Parts::flipped(wheel.At).side;
   }
-  struct wearResult { Float slip = 0.0; Int marks = 0; };
+  struct wearResult { f64 slip = 0.0; i64 marks = 0; };
   KERN_PURE wearResult wear(const Wheel& wheel) {
-    return {wheel.Slip, list_length<Float>(wheel.Marks)};
+    return {wheel.Slip, list_length<f64>(wheel.Marks)};
   }
-  struct twiceResult { Float slip = 0.0; Int passes = 0; };
+  struct twiceResult { f64 slip = 0.0; i64 passes = 0; };
   /// A function of the library that calls its own, and loops.
-  twiceResult twice(Wheel& wheel, Int times = 2) {
-    Int Passes = 0;
+  twiceResult twice(Wheel& wheel, i64 times = 2) {
+    i64 Passes = 0;
     for (auto it10 = flow_for(n10, 1, times); it10.next();) {
       skid(wheel, Step);
       Passes += 1;
     }
     return {wear(wheel).slip, Passes};
   }
-  struct tableResult { Float value = 0.0; Int length = 0; Float step = 0.0; };
-  KERN_PURE tableResult table(Int at = 0) {
-    return {Table[at], list_length<Float>(Table), Step};
+  struct tableResult { f64 value = 0.0; i64 length = 0; f64 step = 0.0; };
+  KERN_PURE tableResult table(i64 at = 0) {
+    return {Table[at], list_length<f64>(Table), Step};
   }
-  void fit(List<Wheel>& wheels, const Wheel& like, Int count = 1) {
+  void fit(List<Wheel>& wheels, const Wheel& like, i64 count = 1) {
     for (auto it20 = flow_for(n20, 1, count); it20.next();) {
       list_add(wheels, like);
     }
   }
 
-  struct : kern::Node<10> { Int index = 0; } n10;
-  struct : kern::Node<20> { Int index = 0; } n20;
+  struct : kern::Node<10> { i64 index = 0; } n10;
+  struct : kern::Node<20> { i64 index = 0; } n20;
 };
 )kn";
 // Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to a field in
@@ -237,18 +240,18 @@ struct Workshop : virtual kern::Library, virtual Parts {
 inline const char* kGround = R"kn(
 struct Ground : virtual kern::Library {
   KERN_STRUCT(Field) {
-    Float Base = 1.0;
-    Float Slope = 0.5;
+    f64 Base = 1.0;
+    f64 Slope = 0.5;
   };
 
-  struct heightResult { Float h = 0.0; };
+  struct heightResult { f64 h = 0.0; };
   /// The height of the field at (x, y): what the engine asks.
-  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {
-    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x - y; }, f.Base, f.Slope, x, y)};
+  KERN_PURE heightResult height(const Field& f, f64 x = 0.0, f64 y = 0.0) {
+    return {kern::formula<f64, f64, f64, f64>([](auto b, auto s, auto x, auto y) { return b + s * x - y; }, f.Base, f.Slope, x, y)};
   }
-  struct highResult { Bool up = false; };
-  KERN_PURE highResult high(Float x = 0.0) {
-    return {math_compare<">">(x, 1.0)};
+  struct highResult { bool up = false; };
+  KERN_PURE highResult high(f64 x = 0.0) {
+    return {math_compare<">", f64>(x, 1.0)};
   }
 };
 )kn";
@@ -261,12 +264,12 @@ struct Site : virtual kern::Blueprint, virtual Ground {
 
   Field Here = Field{2.0, 0.5};
   Twin Pair = Twin{Field{1.0, 1.0}, Field{3.0, -1.0}};
-  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
-  Callback<Float(Float, Float)> Other = Callback<Float(Float, Float)>{};
+  Callback<f64(f64, f64)> Kept = Callback<f64(f64, f64)>{};
+  Callback<f64(f64, f64)> Other = Callback<f64(f64, f64)>{};
 
-  struct MakeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; Callback<Bool(Float)> up = Callback<Bool(Float)>{}; };
+  struct MakeResult { Callback<f64(f64, f64)> c = Callback<f64(f64, f64)>{}; Callback<bool(f64)> up = Callback<bool(f64)>{}; };
   /// Callbacks bound to a variable and to a field in one; one without a place.
-  MakeResult Make(Float base = 0.0) {
+  MakeResult Make(f64 base = 0.0) {
     Here.Base = base;
     Kept = callback<&Ground::height>(Here);
     Other = callback<&Ground::height>(Pair.Second);
@@ -286,15 +289,15 @@ struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
     List<Wheel> Wheels = List<Wheel>{};
   };
 
-  List<Car> Cars = List<Car>{Car{"a", List<Wheel>{Wheel{0.25, Side::Rear, List<Float>{}}}}};
-  Wheel Spare = Wheel{1.0, Side::Front, List<Float>{}};
-  Float Seen = 0.0;
-  KERN_CONST Float Step = 10.0;
+  List<Car> Cars = List<Car>{Car{"a", List<Wheel>{Wheel{0.25, Side::Rear, List<f64>{}}}}};
+  Wheel Spare = Wheel{1.0, Side::Front, List<f64>{}};
+  f64 Seen = 0.0;
+  KERN_CONST f64 Step = 10.0;
 
-  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; Int passes = 0; Int wheels = 0; Side flipped = Side::Front; Float table = 0.0; Float step = 0.0; Float own = 0.0; };
+  struct RunResult { f64 slip = 0.0; i64 marks = 0; Side at = Side::Front; i64 passes = 0; i64 wheels = 0; Side flipped = Side::Front; f64 table = 0.0; f64 step = 0.0; f64 own = 0.0; };
   /// Calls of the libraries' functions: a place of its own as a reference - a variable, an entry
   /// of a list in an entry of a list, also beside the lists -, a value read of one.
-  RunResult Run(Int car = 0, Int wheel = 0, Float by = 1.0) {
+  RunResult Run(i64 car = 0, i64 wheel = 0, f64 by = 1.0) {
     Workshop::skid(Cars[car].Wheels[wheel], by);
     n5 = Workshop::twice(Cars[car].Wheels[wheel], 3);
     Seen = n5.slip;
@@ -313,11 +316,11 @@ struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
 inline const char* kRng = R"kn(
 struct rng : virtual kern::Library {
   KERN_STRUCT(Rng) {
-    Int State = 1;
+    i64 State = 1;
   };
 
-  struct nextResult { Int value = 0; };
-  nextResult next(Rng& rng, Int step = 3) {
+  struct nextResult { i64 value = 0; };
+  nextResult next(Rng& rng, i64 step = 3) {
     rng.State += step;
     return {rng.State};
   }
@@ -326,10 +329,10 @@ struct rng : virtual kern::Library {
 inline const char* kDice = R"kn(
 struct dice : virtual kern::Blueprint, virtual rng {
   Rng rng = Rng{7};
-  Int Last = 0;
+  i64 Last = 0;
 
-  struct rollResult { Int value = 0; Int state = 0; };
-  rollResult roll(Int step = 1) {
+  struct rollResult { i64 value = 0; i64 state = 0; };
+  rollResult roll(i64 step = 1) {
     n5 = rng::next(rng, step);
     Last = n5.value;
     return {Last, rng.State};
@@ -340,46 +343,46 @@ struct dice : virtual kern::Blueprint, virtual rng {
 )kn";
 
 // References: an input of a function that is a place of the caller - changed where it stands
-// (Car& car) or read there (const Car& car), nothing copied. A number, a Bool, a struct, a list;
+// (Car& car) or read there (const Car& car), nothing copied. A number, a bool, a struct, a list;
 // a field and a list entry of what the function was given, handed on to other functions; a local
 // variable and an input by value as the place. An entry beside its list is one of its own: two
 // of them are two, and naming another changes nothing of the one a function has.
 inline const char* kReferences = R"kn(
 struct References : kern::Blueprint {
   KERN_STRUCT(Wheel) {
-    Float Slip = 0.5;
-    List<Float> Marks = List<Float>{};
+    f64 Slip = 0.5;
+    List<f64> Marks = List<f64>{};
   };
   KERN_STRUCT(Car) {
     Text Name = "car";
-    Float Speed = 3.0;
-    Int Laps = 0;
+    f64 Speed = 3.0;
+    i64 Laps = 0;
     List<Wheel> Wheels = List<Wheel>{};
   };
 
-  List<Car> Cars = List<Car>{Car{"a", 1.0, 0, List<Wheel>{Wheel{0.25, List<Float>{}}, Wheel{0.5, List<Float>{1.0}}}}, Car{"b", 2.0, 5, List<Wheel>{}}};
-  Car Mine = Car{"mine", 5.0, 1, List<Wheel>{Wheel{0.75, List<Float>{}}}};
-  Float Total = 0.0;
-  Int Count = 0;
-  List<Float> Scores = List<Float>{1.0, 2.0};
-  List<Bool> Flags = List<Bool>{true, false};
+  List<Car> Cars = List<Car>{Car{"a", 1.0, 0, List<Wheel>{Wheel{0.25, List<f64>{}}, Wheel{0.5, List<f64>{1.0}}}}, Car{"b", 2.0, 5, List<Wheel>{}}};
+  Car Mine = Car{"mine", 5.0, 1, List<Wheel>{Wheel{0.75, List<f64>{}}}};
+  f64 Total = 0.0;
+  i64 Count = 0;
+  List<f64> Scores = List<f64>{1.0, 2.0};
+  List<bool> Flags = List<bool>{true, false};
 
   /// A reference to a number: changed where the caller has it.
-  void Bump(Float& x, Float by = 1.0) {
+  void Bump(f64& x, f64 by = 1.0) {
     x += by;
   }
-  void Tick(Int& n) {
+  void Tick(i64& n) {
     n += 1;
   }
   /// A reference to a struct: its fields are places.
-  void Skid(Wheel& wheel, Float by = 0.5) {
+  void Skid(Wheel& wheel, f64 by = 0.5) {
     wheel.Slip += by;
     list_add(wheel.Marks, wheel.Slip);
     Bump(wheel.Slip, 0.125);
   }
-  struct DriveResult { Float speed = 0.0; Int wheels = 0; };
+  struct DriveResult { f64 speed = 0.0; i64 wheels = 0; };
   /// A reference handed on: a field, an entry of a list in what the function was given.
-  DriveResult Drive(Car& car, Int wheel = 0, Float by = 1.0) {
+  DriveResult Drive(Car& car, i64 wheel = 0, f64 by = 1.0) {
     car.Speed += by;
     Tick(car.Laps);
     car.Name = text_append(car.Name, "+", "");
@@ -387,54 +390,54 @@ struct References : kern::Blueprint {
     Bump(car.Speed, 0.5);
     return {car.Speed, list_length<Wheel>(car.Wheels)};
   }
-  struct WearResult { Float slip = 0.0; Int marks = 0; Text name = ""; };
+  struct WearResult { f64 slip = 0.0; i64 marks = 0; Text name = ""; };
   /// A const reference: read where it stands - also by a function that is read as a value.
-  KERN_PURE WearResult Wear(const Car& car, Int wheel = 0) {
-    return {car.Wheels[wheel].Slip, list_length<Float>(car.Wheels[wheel].Marks), car.Name};
+  KERN_PURE WearResult Wear(const Car& car, i64 wheel = 0) {
+    return {car.Wheels[wheel].Slip, list_length<f64>(car.Wheels[wheel].Marks), car.Name};
   }
   /// A list by reference: the steps that change a list work on it.
-  void Fill(List<Float>& items, Int count = 2, Float value = 1.5) {
+  void Fill(List<f64>& items, i64 count = 2, f64 value = 1.5) {
     for (auto it30 = flow_for(n30, 1, count); it30.next();) {
-      list_add(items, math_mul(value, kern::to<Float>(n30.index)));
+      list_add(items, math_mul<f64>(value, num_cast<f64, i64>(n30.index)));
     }
     items[0] = -1.0;
   }
 
   /// A reference to a Bool: an entry of a list of them is a place like any other.
-  void Toggle(Bool& flag) {
+  void Toggle(bool& flag) {
     flag = logic_not(flag);
   }
   /// Two places at once. Beside a list each is an entry of its own: what goes to one is not in
   /// the other.
-  void Trade(Wheel& a, Wheel& b, Float by = 1.0) {
+  void Trade(Wheel& a, Wheel& b, f64 by = 1.0) {
     a.Slip += by;
-    b.Slip += math_mul(a.Slip, 2.0);
+    b.Slip += math_mul<f64>(a.Slip, 2.0);
     list_add(a.Marks, b.Slip);
   }
-  struct MixResult { Float sum = 0.0; Float slip = 0.0; };
+  struct MixResult { f64 sum = 0.0; f64 slip = 0.0; };
   /// What a function was given stays what it is while other places are named - beside a list
   /// too, and in the same statement, in whatever order it is worked out.
-  MixResult Mix(Wheel& wheel, Int car = 0, Int at = 0, Float by = 1.0) {
+  MixResult Mix(Wheel& wheel, i64 car = 0, i64 at = 0, f64 by = 1.0) {
     wheel.Slip += by;
-    return {math_add(Cars[car].Wheels[at].Slip, wheel.Slip), wheel.Slip};
+    return {math_add<f64>(Cars[car].Wheels[at].Slip, wheel.Slip), wheel.Slip};
   }
-  struct LitResult { Int on = 0; Int found = 0; Bool first = false; Text shown = ""; };
+  struct LitResult { i64 on = 0; i64 found = 0; bool first = false; Text shown = ""; };
   /// A list of Bools: the steps on it, a loop over it, its entries as values.
-  LitResult Lit(Bool add = true, Int at = 0) {
-    Int On = 0;
+  LitResult Lit(bool add = true, i64 at = 0) {
+    i64 On = 0;
     list_add(Flags, add);
     Toggle(Flags[at]);
     Flags[0] = logic_and(Flags[at], add);
-    for (auto it50 = flow_for_each<Bool>(n50, Flags); it50.next();) {
-      On += kern::to<Int>(n50.item);
+    for (auto it50 = flow_for_each<bool>(n50, Flags); it50.next();) {
+      On += num_cast<i64, bool>(n50.item);
     }
-    return {On, list_find<Bool>(Flags, add), Flags[0], kern::to<Text>(Flags[at])};
+    return {On, list_find<bool>(Flags, add), Flags[0], num_text<bool>(Flags[at])};
   }
 
-  struct RunResult { Float speed = 0.0; Int wheels = 0; Float slip = 0.0; Int marks = 0; Text name = ""; Float total = 0.0; Int scores = 0; Float mine = 0.0; Int count = 0; Float sum = 0.0; Float mixed = 0.0; Bool flag = false; };
+  struct RunResult { f64 speed = 0.0; i64 wheels = 0; f64 slip = 0.0; i64 marks = 0; Text name = ""; f64 total = 0.0; i64 scores = 0; f64 mine = 0.0; i64 count = 0; f64 sum = 0.0; f64 mixed = 0.0; bool flag = false; };
   /// Calls with places: an entry of a list (also beside it), a variable, a field, a number in a
   /// list; what a function read as a value reads of a place.
-  RunResult Run(Int car = 0, Int wheel = 0, Float by = 1.0) {
+  RunResult Run(i64 car = 0, i64 wheel = 0, f64 by = 1.0) {
     n40 = Drive(Cars[car], wheel, by);
     Drive(Mine, 0, by);
     Bump(Total, by);
@@ -447,52 +450,52 @@ struct References : kern::Blueprint {
     Toggle(Flags[car]);
     Trade(Cars[car].Wheels[wheel], Cars[wheel].Wheels[car], by);
     n41 = Mix(Cars[car].Wheels[wheel], wheel, car, by);
-    return {n40.speed, n40.wheels, Wear(Cars[car], wheel).slip, Wear(Cars[car], wheel).marks, Wear(Mine, 0).name, Total, list_length<Float>(Scores), Mine.Speed, Count, n41.sum, n41.slip, Flags[wheel]};
+    return {n40.speed, n40.wheels, Wear(Cars[car], wheel).slip, Wear(Cars[car], wheel).marks, Wear(Mine, 0).name, Total, list_length<f64>(Scores), Mine.Speed, Count, n41.sum, n41.slip, Flags[wheel]};
   }
-  struct LocalResult { Float speed = 0.0; Float slip = 0.0; Text name = ""; Float first = 0.0; };
+  struct LocalResult { f64 speed = 0.0; f64 slip = 0.0; Text name = ""; f64 first = 0.0; };
   /// A local variable as the place a call names; an input by value read at a place and handed on
   /// as a const reference.
-  LocalResult Local(Car given = Car{"given", 1.0, 0, List<Wheel>{Wheel{0.5, List<Float>{}}}}, Float by = 1.0) {
+  LocalResult Local(Car given = Car{"given", 1.0, 0, List<Wheel>{Wheel{0.5, List<f64>{}}}}, f64 by = 1.0) {
     Car Work = Car{"work", 0.0, 0, List<Wheel>{}};
     Work = given;
     Drive(Work, 0, by);
     return {Work.Speed, Wear(given, 0).slip, Wear(Work, 0).name, given.Wheels[0].Slip};
   }
 
-  struct : kern::Node<30> { Int index = 0; } n30;
+  struct : kern::Node<30> { i64 index = 0; } n30;
   DriveResult n40;
   MixResult n41;
-  struct : kern::Node<50> { Bool item = false; Int index = 0; } n50;
+  struct : kern::Node<50> { bool item = false; i64 index = 0; } n50;
 };
 )kn";
 
 // Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
 inline const char* kFlow = R"kn(
 struct Flow : kern::Blueprint {
-  Float Heat = 0.0;
-  Int Count = 0;
-  Bool Open = false;
+  f64 Heat = 0.0;
+  i64 Count = 0;
+  bool Open = false;
   Text Log = "";
   Vector Home = Vector{1.0, 2.0, 3.0};
 
-  struct GradeResult { Int grade = 0; Text name = "none"; };
+  struct GradeResult { i64 grade = 0; Text name = "none"; };
   /// Branches that return, an else-if chain, a path that ends without a Return.
-  KERN_PURE GradeResult Grade(Float points = 0.0) {
-    if (math_compare<">=">(points, 90.0)) {
+  KERN_PURE GradeResult Grade(f64 points = 0.0) {
+    if (math_compare<">=", f64>(points, 90.0)) {
       return {1, "top"};
-    } else if (math_compare<">=">(points, 50.0)) {
+    } else if (math_compare<">=", f64>(points, 50.0)) {
       return {2, "pass"};
-    } else if (math_compare<"<">(points, 0.0)) {
+    } else if (math_compare<"<", f64>(points, 0.0)) {
       return {};
     }
-    return {3, text_append("fail ", kern::to<Text>(points), "")};
+    return {3, text_append("fail ", num_text<f64>(points), "")};
   }
 
-  struct FirstAboveResult { Int sum = 0; Int last = -1; };
+  struct FirstAboveResult { i64 sum = 0; i64 last = -1; };
   /// A loop that returns from its middle, an index read after the loop.
-  KERN_PURE FirstAboveResult FirstAbove(Int from = 0, Int to = 9, Float limit = 4.5) {
+  KERN_PURE FirstAboveResult FirstAbove(i64 from = 0, i64 to = 9, f64 limit = 4.5) {
     for (auto it12 = flow_for(n12, from, to); it12.next();) {
-      if (math_compare<">">(kern::to<Float>(n12.index), limit)) {
+      if (math_compare<">", f64>(num_cast<f64, i64>(n12.index), limit)) {
         return {n12.index, n12.index};
       }
     }
@@ -500,15 +503,15 @@ struct Flow : kern::Blueprint {
   }
 
   /// Nested loops, Add with whole numbers and with fractions, a While that counts down.
-  void Fill(Int rows = 2, Int columns = 3) {
+  void Fill(i64 rows = 2, i64 columns = 3) {
     Count = 0;
     for (auto it20 = flow_for(n20, 1, rows); it20.next();) {
       for (auto it21 = flow_for(n21, 1, columns); it21.next();) {
-        Count += math_round(math_mul(kern::to<Float>(n20.index), kern::to<Float>(n21.index)));
+        Count += num_cast<i64, f64>(math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n20.index), num_cast<f64, i64>(n21.index))));
         Heat += 0.25;
       }
     }
-    while (loop(math_compare<">">(Heat, 1.0))) {
+    while (loop(math_compare<">", f64>(Heat, 1.0))) {
       Heat += -1.0;
       Log = text_append(Log, "-", "");
     }
@@ -541,16 +544,16 @@ struct Flow : kern::Blueprint {
       case 4: { go32("toggle"); } break;
       case 5: {
         switch (flow_flip_flop(n33)) {
-          case 0: { Log = text_append(Log, "A", kern::to<Text>(n33.is_a)); } break;
-          case 1: { Log = text_append(Log, "B", kern::to<Text>(n33.is_a)); } break;
+          case 0: { Log = text_append(Log, "A", num_text<bool>(n33.is_a)); } break;
+          case 1: { Log = text_append(Log, "B", num_text<bool>(n33.is_a)); } break;
         }
       } break;
       case 6: { Log = "?"; } break;
     }
   }
 
-  /// Switch on Int with its default, an exec knot, paths that meet again.
-  void Choose(Int which = 0) {
+  /// Switch on i64 with its default, an exec knot, paths that meet again.
+  void Choose(i64 which = 0) {
     flow_reroute();
     switch (flow_switch_int<"3">(which)) {
       case 0: { Log = "zero"; } break;
@@ -569,7 +572,7 @@ struct Flow : kern::Blueprint {
 
   void go31(Text entry) {
     if (flow_do_n(n31, entry, 2)) {
-      Log = text_append(Log, "n", kern::to<Text>(n31.counter));
+      Log = text_append(Log, "n", num_text<i64>(n31.counter));
     }
   }
 
@@ -579,13 +582,13 @@ struct Flow : kern::Blueprint {
     }
   }
 
-  struct : kern::Node<12> { Int index = 0; } n12;
-  struct : kern::Node<20> { Int index = 0; } n20;
-  struct : kern::Node<21> { Int index = 0; } n21;
+  struct : kern::Node<12> { i64 index = 0; } n12;
+  struct : kern::Node<20> { i64 index = 0; } n20;
+  struct : kern::Node<21> { i64 index = 0; } n21;
   kern::Node<30> n30;
-  struct : kern::Node<31> { Int counter = 0; } n31;
+  struct : kern::Node<31> { i64 counter = 0; } n31;
   kern::Node<32> n32;
-  struct : kern::Node<33> { Bool is_a = false; } n33;
+  struct : kern::Node<33> { bool is_a = false; } n33;
 };
 )kn";
 
@@ -593,31 +596,31 @@ struct Flow : kern::Blueprint {
 // read from another body.
 inline const char* kCalls = R"kn(
 struct Calls : kern::Blueprint {
-  Float Total = 0.0;
-  Int Steps = 0;
+  f64 Total = 0.0;
+  i64 Steps = 0;
   Text Trace = "";
-  Bool Flag = false;
+  bool Flag = false;
 
-  struct ScaleResult { Float out = 0.0; Float twice = 0.0; };
+  struct ScaleResult { f64 out = 0.0; f64 twice = 0.0; };
   /// A value two inputs read (it has a name), a formula.
-  KERN_PURE ScaleResult Scale(Float x = 1.0, Float by = 2.0) {
-    const auto n40 = [&] { return math_mul(x, by); };
-    return {n40(), kern::formula([](Float a, Float b) -> Float { return a + b; }, n40(), n40())};
+  KERN_PURE ScaleResult Scale(f64 x = 1.0, f64 by = 2.0) {
+    const auto n40 = [&] { return math_mul<f64>(x, by); };
+    return {n40(), kern::formula<f64, f64>([](auto a, auto b) { return a + b; }, n40(), n40())};
   }
 
-  struct AddUpResult { Float total = 0.0; Int steps = 0; };
+  struct AddUpResult { f64 total = 0.0; i64 steps = 0; };
   /// A function's value in a loop, an Add whose result is read, a Set whose result is read.
-  AddUpResult AddUp(Float amount = 1.0, Int times = 1) {
+  AddUpResult AddUp(f64 amount = 1.0, i64 times = 1) {
     for (auto it42 = flow_for(n42, 1, times); it42.next();) {
       n43.value = (Total += Scale(amount, 1.5).out);
-      n44.value = (Steps = math_floor(n43.value));
-      Trace = text_append(Trace, kern::to<Text>(n44.value), ",");
+      n44.value = (Steps = num_cast<i64, f64>(math_floor<f64>(n43.value)));
+      Trace = text_append(Trace, num_text<i64>(n44.value), ",");
     }
     return {Total, Steps};
   }
 
   /// A step two wires lead to reads what the function was given: the entry's values are kept.
-  void Mark(Float amount = 1.0, Bool twice = false) {
+  void Mark(f64 amount = 1.0, bool twice = false) {
     n50 = {amount, twice};
     {
       go52();
@@ -629,26 +632,26 @@ struct Calls : kern::Blueprint {
     }
   }
 
-  struct BothResult { Float sum = 0.0; Text text = ""; };
+  struct BothResult { f64 sum = 0.0; Text text = ""; };
   /// Functions called as steps: each call keeps its results.
-  BothResult Both(Float a = 1.0, Float b = 2.0) {
+  BothResult Both(f64 a = 1.0, f64 b = 2.0) {
     n61 = AddUp(a, 2);
     n62 = AddUp(b, 1);
-    Flag = math_compare<">">(n61.total, n62.total);
+    Flag = math_compare<">", f64>(n61.total, n62.total);
     Mark(n62.total, Flag);
-    return {math_add(n61.total, n62.total), text_append(kern::to<Text>(n61.steps), "/", kern::to<Text>(n62.steps))};
+    return {math_add<f64>(n61.total, n62.total), text_append(num_text<i64>(n61.steps), "/", num_text<i64>(n62.steps))};
   }
 
   void go52() {
     n52.value = (Total += n50.amount);
-    Trace = text_append(Trace, kern::to<Text>(n52.value), kern::to<Text>(n50.twice));
+    Trace = text_append(Trace, num_text<f64>(n52.value), num_text<bool>(n50.twice));
   }
 
-  struct : kern::Node<42> { Int index = 0; } n42;
-  struct { Float value = 0.0; } n43;
-  struct { Int value = 0; } n44;
-  struct { Float amount = 0.0; Bool twice = false; } n50;
-  struct { Float value = 0.0; } n52;
+  struct : kern::Node<42> { i64 index = 0; } n42;
+  struct { f64 value = 0.0; } n43;
+  struct { i64 value = 0; } n44;
+  struct { f64 amount = 0.0; bool twice = false; } n50;
+  struct { f64 value = 0.0; } n52;
   AddUpResult n61;
   AddUpResult n62;
 };
@@ -657,56 +660,223 @@ struct Calls : kern::Blueprint {
 // Local variables of functions: every call starts with their defaults; two functions have one of
 // the same name; numbers, a text, a list, a struct; a pure function sets its own; a call that is
 // interrupted by another call of the same function has its own back.
+/// The edge values of a number type for kWrap: 0, 1, 2, -1, -2, the ends and beside them; of f32 also a fraction, a
+/// sum that rounds, huge ones (inf), NaN.
+template <class X> std::vector<X> wrap_edges() {
+  using L = std::numeric_limits<X>;
+  if constexpr (std::is_floating_point_v<X>)
+    return {X(0), X(1), X(-1), X(0.1f), X(3.0f), X(16777216.0f), X(1e-30f), L::max(), -L::max(), L::infinity(), L::quiet_NaN()};
+  else if constexpr (std::is_signed_v<X>)
+    return {X(0), X(1), X(2), X(-1), X(-2), L::max(), static_cast<X>(L::max() - 1), L::min(), static_cast<X>(L::min() + 1), static_cast<X>(L::max() / 2 + 1)};
+  else
+    return {X(0), X(1), X(2), L::max(), static_cast<X>(L::max() - 1), static_cast<X>(L::max() / 2), static_cast<X>(L::max() / 2 + 1)};
+}
+/// Add to Variable and the operations on every kind of place of each number type, at the edges: a place of the
+/// class is a number of the language (numbers.h Typed) - Count += x goes round as the Add node does (C++'s own += on
+/// an i64 would be undefined there), f32 rounds every step (numbers_places_compute_as_numbers_h, blueprint_native).
+inline const char* kWrap = R"kn(
+struct Wrap : kern::Blueprint {
+  KERN_STRUCT(Box) { i8 F_i8 = 0; i16 F_i16 = 0; i32 F_i32 = 0; i64 F_i64 = 0; u8 F_u8 = 0; u16 F_u16 = 0; u32 F_u32 = 0; u64 F_u64 = 0; f32 F_f32 = 0.0f; };
+
+  i8 V_i8 = 0;
+  i16 V_i16 = 0;
+  i32 V_i32 = 0;
+  i64 V_i64 = 0;
+  u8 V_u8 = 0;
+  u16 V_u16 = 0;
+  u32 V_u32 = 0;
+  u64 V_u64 = 0;
+  f32 V_f32 = 0.0f;
+  List<i8> L_i8 = List<i8>{0};
+  List<i16> L_i16 = List<i16>{0};
+  List<i32> L_i32 = List<i32>{0};
+  List<i64> L_i64 = List<i64>{0};
+  List<u8> L_u8 = List<u8>{0};
+  List<u16> L_u16 = List<u16>{0};
+  List<u32> L_u32 = List<u32>{0};
+  List<u64> L_u64 = List<u64>{0};
+  List<f32> L_f32 = List<f32>{0.0f};
+  Box Held = Box{0, 0, 0, 0, 0, 0, 0, 0, 0.0f};
+
+  struct Add_i8Result { i8 var = 0; i8 field = 0; i8 local = 0; i8 listed = 0; i8 sum = 0; i8 product = 0; i8 quotient = 0; i8 formula = 0; i8 shifted = 0; };
+  Add_i8Result Add_i8(i8 x = 0, i8 y = 0) {
+    i8 Mine = 0;
+    V_i8 = x;
+    V_i8 += y;
+    Held.F_i8 = x;
+    Held.F_i8 += y;
+    Mine = x;
+    Mine += y;
+    L_i8[0] = x;
+    L_i8[0] += y;
+    return {V_i8, struct_break<Box>(Held).F_i8, Mine, list_get<i8>(L_i8, 0), math_add<i8>(x, y), math_mul<i8>(x, y), math_div<i8>(x, y), kern::formula<i8, i8>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i8, i8>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i16Result { i16 var = 0; i16 field = 0; i16 local = 0; i16 listed = 0; i16 sum = 0; i16 product = 0; i16 quotient = 0; i16 formula = 0; i16 shifted = 0; };
+  Add_i16Result Add_i16(i16 x = 0, i16 y = 0) {
+    i16 Mine = 0;
+    V_i16 = x;
+    V_i16 += y;
+    Held.F_i16 = x;
+    Held.F_i16 += y;
+    Mine = x;
+    Mine += y;
+    L_i16[0] = x;
+    L_i16[0] += y;
+    return {V_i16, struct_break<Box>(Held).F_i16, Mine, list_get<i16>(L_i16, 0), math_add<i16>(x, y), math_mul<i16>(x, y), math_div<i16>(x, y), kern::formula<i16, i16>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i16, i16>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i32Result { i32 var = 0; i32 field = 0; i32 local = 0; i32 listed = 0; i32 sum = 0; i32 product = 0; i32 quotient = 0; i32 formula = 0; i32 shifted = 0; };
+  Add_i32Result Add_i32(i32 x = 0, i32 y = 0) {
+    i32 Mine = 0;
+    V_i32 = x;
+    V_i32 += y;
+    Held.F_i32 = x;
+    Held.F_i32 += y;
+    Mine = x;
+    Mine += y;
+    L_i32[0] = x;
+    L_i32[0] += y;
+    return {V_i32, struct_break<Box>(Held).F_i32, Mine, list_get<i32>(L_i32, 0), math_add<i32>(x, y), math_mul<i32>(x, y), math_div<i32>(x, y), kern::formula<i32, i32>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i32, i32>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i64Result { i64 var = 0; i64 field = 0; i64 local = 0; i64 listed = 0; i64 sum = 0; i64 product = 0; i64 quotient = 0; i64 formula = 0; i64 shifted = 0; };
+  Add_i64Result Add_i64(i64 x = 0, i64 y = 0) {
+    i64 Mine = 0;
+    V_i64 = x;
+    V_i64 += y;
+    Held.F_i64 = x;
+    Held.F_i64 += y;
+    Mine = x;
+    Mine += y;
+    L_i64[0] = x;
+    L_i64[0] += y;
+    return {V_i64, struct_break<Box>(Held).F_i64, Mine, list_get<i64>(L_i64, 0), math_add<i64>(x, y), math_mul<i64>(x, y), math_div<i64>(x, y), kern::formula<i64, i64>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i64, i64>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u8Result { u8 var = 0; u8 field = 0; u8 local = 0; u8 listed = 0; u8 sum = 0; u8 product = 0; u8 quotient = 0; u8 formula = 0; u8 shifted = 0; };
+  Add_u8Result Add_u8(u8 x = 0, u8 y = 0) {
+    u8 Mine = 0;
+    V_u8 = x;
+    V_u8 += y;
+    Held.F_u8 = x;
+    Held.F_u8 += y;
+    Mine = x;
+    Mine += y;
+    L_u8[0] = x;
+    L_u8[0] += y;
+    return {V_u8, struct_break<Box>(Held).F_u8, Mine, list_get<u8>(L_u8, 0), math_add<u8>(x, y), math_mul<u8>(x, y), math_div<u8>(x, y), kern::formula<u8, u8>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u8, u8>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u16Result { u16 var = 0; u16 field = 0; u16 local = 0; u16 listed = 0; u16 sum = 0; u16 product = 0; u16 quotient = 0; u16 formula = 0; u16 shifted = 0; };
+  Add_u16Result Add_u16(u16 x = 0, u16 y = 0) {
+    u16 Mine = 0;
+    V_u16 = x;
+    V_u16 += y;
+    Held.F_u16 = x;
+    Held.F_u16 += y;
+    Mine = x;
+    Mine += y;
+    L_u16[0] = x;
+    L_u16[0] += y;
+    return {V_u16, struct_break<Box>(Held).F_u16, Mine, list_get<u16>(L_u16, 0), math_add<u16>(x, y), math_mul<u16>(x, y), math_div<u16>(x, y), kern::formula<u16, u16>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u16, u16>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u32Result { u32 var = 0; u32 field = 0; u32 local = 0; u32 listed = 0; u32 sum = 0; u32 product = 0; u32 quotient = 0; u32 formula = 0; u32 shifted = 0; };
+  Add_u32Result Add_u32(u32 x = 0, u32 y = 0) {
+    u32 Mine = 0;
+    V_u32 = x;
+    V_u32 += y;
+    Held.F_u32 = x;
+    Held.F_u32 += y;
+    Mine = x;
+    Mine += y;
+    L_u32[0] = x;
+    L_u32[0] += y;
+    return {V_u32, struct_break<Box>(Held).F_u32, Mine, list_get<u32>(L_u32, 0), math_add<u32>(x, y), math_mul<u32>(x, y), math_div<u32>(x, y), kern::formula<u32, u32>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u32, u32>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u64Result { u64 var = 0; u64 field = 0; u64 local = 0; u64 listed = 0; u64 sum = 0; u64 product = 0; u64 quotient = 0; u64 formula = 0; u64 shifted = 0; };
+  Add_u64Result Add_u64(u64 x = 0, u64 y = 0) {
+    u64 Mine = 0;
+    V_u64 = x;
+    V_u64 += y;
+    Held.F_u64 = x;
+    Held.F_u64 += y;
+    Mine = x;
+    Mine += y;
+    L_u64[0] = x;
+    L_u64[0] += y;
+    return {V_u64, struct_break<Box>(Held).F_u64, Mine, list_get<u64>(L_u64, 0), math_add<u64>(x, y), math_mul<u64>(x, y), math_div<u64>(x, y), kern::formula<u64, u64>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u64, u64>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_f32Result { f32 var = 0.0f; f32 field = 0.0f; f32 local = 0.0f; f32 listed = 0.0f; f32 sum = 0.0f; f32 product = 0.0f; f32 quotient = 0.0f; f32 formula = 0.0f; };
+  Add_f32Result Add_f32(f32 x = 0.0f, f32 y = 0.0f) {
+    f32 Mine = 0.0f;
+    V_f32 = x;
+    V_f32 += y;
+    Held.F_f32 = x;
+    Held.F_f32 += y;
+    Mine = x;
+    Mine += y;
+    L_f32[0] = x;
+    L_f32[0] += y;
+    return {V_f32, struct_break<Box>(Held).F_f32, Mine, list_get<f32>(L_f32, 0), math_add<f32>(x, y), math_mul<f32>(x, y), math_div<f32>(x, y), kern::formula<f32, f32>([](auto a, auto b) { return a * b + a - b; }, x, y)};
+  }
+
+};
+)kn";
+
 inline const char* kLocals = R"kn(
 struct Locals : kern::Blueprint {
-  KERN_STRUCT(Hit) { Text Who = ""; Float Damage = 1.0; };
+  KERN_STRUCT(Hit) { Text Who = ""; f64 Damage = 1.0; };
 
-  Int Calls = 0;
-  Float Kept = 0.0;
+  i64 Calls = 0;
+  f64 Kept = 0.0;
 
-  struct SumToResult { Float sum = 0.0; Int steps = 0; };
+  struct SumToResult { f64 sum = 0.0; i64 steps = 0; };
   /// Numbers: Add and a For loop; what a call left is gone with the next.
-  SumToResult SumTo(Int n = 3) {
-    Float Total = 0.5;
-    Int Steps = 0;
+  SumToResult SumTo(i64 n = 3) {
+    f64 Total = 0.5;
+    i64 Steps = 0;
     for (auto it10 = flow_for(n10, 1, n); it10.next();) {
-      Total += kern::to<Float>(n10.index);
+      Total += num_cast<f64, i64>(n10.index);
       Steps += 1;
     }
     Calls += Steps;
     return {Total, Steps};
   }
 
-  struct JoinResult { Text text = ""; Int count = 0; Float damage = 0.0; };
+  struct JoinResult { Text text = ""; i64 count = 0; f64 damage = 0.0; };
   /// Another function's Total is a text; a list (Add to List), a struct (Set Field).
-  JoinResult Join(Text a = "a", Text b = "b", Float d = 2.0) {
+  JoinResult Join(Text a = "a", Text b = "b", f64 d = 2.0) {
     Text Total = "<";
     List<Text> Seen = List<Text>{"x"};
     Hit Last = Hit{"none", 3.0};
     Total = text_append(Total, a, b);
     list_add(Seen, a);
     list_add(Seen, b);
-    Last.Damage = math_add(struct_break<Hit>(Last).Damage, d);
+    Last.Damage = math_add<f64>(struct_break<Hit>(Last).Damage, d);
     Last.Who = Total;
     return {text_append(Total, struct_break<Hit>(Last).Who, ">"), list_length<Text>(Seen), struct_break<Hit>(Last).Damage};
   }
 
-  struct LimitResult { Float out = 0.0; };
+  struct LimitResult { f64 out = 0.0; };
   /// A function read as a value sets its own local variables.
-  KERN_PURE LimitResult Limit(Float x = 0.0) {
-    Float Out = -1.0;
+  KERN_PURE LimitResult Limit(f64 x = 0.0) {
+    f64 Out = -1.0;
     Out = x;
-    if (math_compare<">">(x, 1.0)) {
+    if (math_compare<">", f64>(x, 1.0)) {
       Out = 1.0;
     }
     return {Out};
   }
 
-  struct OuterResult { Float mine = 0.0; Float limited = 0.0; };
+  struct OuterResult { f64 mine = 0.0; f64 limited = 0.0; };
   /// It raises an event whose handler calls it again: this call's Mine is its own afterwards.
-  OuterResult Outer(Float x = 1.0, Bool again = false) {
-    Float Mine = 0.25;
-    Mine += math_mul(x, 10.0);
+  OuterResult Outer(f64 x = 1.0, bool again = false) {
+    f64 Mine = 0.25;
+    Mine += math_mul<f64>(x, 10.0);
     if (again) {
       flow_call<"Again">(Actor{}, Actor{}, 5.0, "");
     }
@@ -714,12 +884,12 @@ struct Locals : kern::Blueprint {
   }
 
   KERN_EVENT(on40, event_custom<"Again">)
-  void on40(Actor actor, Float value, Text text) {
+  void on40(Actor actor, f64 value, Text text) {
     n41 = Outer(value, false);
     Kept = n41.mine;
   }
 
-  struct : kern::Node<10> { Int index = 0; } n10;
+  struct : kern::Node<10> { i64 index = 0; } n10;
   OuterResult n41;
 };
 )kn";
@@ -727,52 +897,52 @@ struct Locals : kern::Blueprint {
 // Every wire between different types, Select and Reroute in every type, typed-in values.
 inline const char* kCasts = R"kn(
 struct Casts : kern::Blueprint {
-  Bool B = false;
-  Int I = 0;
-  Float F = 0.0;
+  bool B = false;
+  i64 I = 0;
+  f64 F = 0.0;
   Vector V = Vector{0.0, 0.0, 0.0};
   Text T = "";
   Actor A = Actor{};
 
-  /// Every wire between pins of different types.
-  void FromFloat(Float x = 0.0) {
-    B = kern::to<Bool>(x);
-    I = kern::to<Int>(x);
+  /// Every conversion between types: a node of its own (no wire converts) - Cast, To Text, Make Vector, Id of Actor.
+  void FromFloat(f64 x = 0.0) {
+    B = num_cast<bool, f64>(x);
+    I = num_cast<i64, f64>(x);
     F = x;
-    V = kern::to<Vector>(x);
-    T = kern::to<Text>(x);
+    V = vector_make(num_cast<f32, f64>(x), num_cast<f32, f64>(x), num_cast<f32, f64>(x));
+    T = num_text<f64>(x);
   }
 
-  void FromInt(Int x = 0) {
-    B = kern::to<Bool>(x);
+  void FromInt(i64 x = 0) {
+    B = num_cast<bool, i64>(x);
     I = x;
-    F = kern::to<Float>(x);
-    V = kern::to<Vector>(x);
-    T = kern::to<Text>(x);
+    F = num_cast<f64, i64>(x);
+    V = vector_make(num_cast<f32, i64>(x), num_cast<f32, i64>(x), num_cast<f32, i64>(x));
+    T = num_text<i64>(x);
   }
 
-  void FromBool(Bool x = false) {
+  void FromBool(bool x = false) {
     B = x;
-    I = kern::to<Int>(x);
-    F = kern::to<Float>(x);
-    T = kern::to<Text>(x);
+    I = num_cast<i64, bool>(x);
+    F = num_cast<f64, bool>(x);
+    T = num_text<bool>(x);
   }
 
   void FromVector(Vector x = Vector{0.0, 0.0, 0.0}) {
     V = x;
-    T = kern::to<Text>(x);
+    T = text_append(num_text<f32>(vector_break(x).x), ", ", text_append(num_text<f32>(vector_break(x).y), ", ", num_text<f32>(vector_break(x).z)));
   }
 
   void FromActor(Actor x = Actor{}) {
     A = x;
-    B = kern::to<Bool>(x);
-    T = kern::to<Text>(x);
+    B = logic_not(actor_equal(x, Actor{}));
+    T = num_text<i64>(actor_id(x));
   }
 
-  struct PickResult { Float number = 0.0; Int whole = 0; Bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{}; };
+  struct PickResult { f64 number = 0.0; i64 whole = 0; bool yes = false; Vector spot = Vector{0.0, 0.0, 0.0}; Text word = ""; Actor who = Actor{}; };
   /// Select and Reroute in every type; the typed-in values of a node.
-  KERN_PURE PickResult Pick(Bool first = true, Actor who = Actor{}) {
-    return {logic_select<Float>(first, 1.5, -2.5), logic_select<Int>(first, 7, -7), logic_select<Bool>(first, true, false),
+  KERN_PURE PickResult Pick(bool first = true, Actor who = Actor{}) {
+    return {logic_select<f64>(first, 1.5, -2.5), logic_select<i64>(first, 7, -7), logic_select<bool>(first, true, false),
             value_reroute<Vector>(logic_select<Vector>(first, Vector{1.0, 2.0, 3.0}, Vector{-1.0, 0.5, 0.25})), value_reroute<Text>(logic_select<Text>(first, "a \"word\"", "tab\tand\\slash")),
             value_reroute<Actor>(logic_select<Actor>(first, who, Actor{}))};
   }
@@ -783,25 +953,25 @@ struct Casts : kern::Blueprint {
 // read a list, For Each (nested, over a list its body changes), lists a function takes and gives.
 inline const char* kLists = R"kn(
 struct Lists : kern::Blueprint {
-  List<Float> Scores = List<Float>{1.0, 2.5};
-  List<Int> Counts = List<Int>{};
+  List<f64> Scores = List<f64>{1.0, 2.5};
+  List<i64> Counts = List<i64>{};
   List<Text> Names = List<Text>{"a", "b", "a"};
-  List<Bool> Flags = List<Bool>{};
+  List<bool> Flags = List<bool>{};
   List<Vector> Points = List<Vector>{Vector{1.0, 2.0, 3.0}};
   List<Actor> Team = List<Actor>{};
-  Float Total = 0.0;
+  f64 Total = 0.0;
   Text Shown = "";
 
-  struct PushResult { Int index = 0; Int length = 0; Text shown = ""; };
+  struct PushResult { i64 index = 0; i64 length = 0; Text shown = ""; };
   /// Add gives the index; a list prints its items.
-  PushResult Push(Float value = 0.0) {
+  PushResult Push(f64 value = 0.0) {
     list_add(n3, Scores, value);
-    return {n3.index, list_length<Float>(Scores), kern::to<Text>(Scores)};
+    return {n3.index, list_length<f64>(Scores), num_text<f64>(list_get<f64>(Scores, 0))};
   }
 
-  struct EditResult { Bool removed = false; Int length = 0; Text shown = ""; };
+  struct EditResult { bool removed = false; i64 length = 0; Text shown = ""; };
   /// The steps that change a list variable, at every index - also far beyond the list.
-  EditResult Edit(Text what = "insert", Int index = 0, Float value = 0.0) {
+  EditResult Edit(Text what = "insert", i64 index = 0, f64 value = 0.0) {
     switch (flow_switch_text<"insert, set, remove_at, remove, clear">(what)) {
       case 0: { list_insert(Scores, index, value); } break;
       case 1: { Scores[index] = value; } break;
@@ -809,41 +979,41 @@ struct Lists : kern::Blueprint {
       case 3: { list_remove(n14, Scores, value); } break;
       case 4: { list_clear(Scores); } break;
     }
-    return {n14.removed, list_length<Float>(Scores), kern::to<Text>(Scores)};
+    return {n14.removed, list_length<f64>(Scores), num_text<f64>(list_get<f64>(Scores, 0))};
   }
 
-  struct SumResult { Float total = 0.0; Int passes = 0; Int last = 0; };
+  struct SumResult { f64 total = 0.0; i64 passes = 0; i64 last = 0; };
   /// For Each, one inside the other; the index read after the loop.
   SumResult Sum() {
     Total = 0.0;
-    for (auto it20 = flow_for_each<Float>(n20, Scores); it20.next();) {
+    for (auto it20 = flow_for_each<f64>(n20, Scores); it20.next();) {
       Total += n20.item;
       for (auto it22 = flow_for_each<Text>(n22, Names); it22.next();) {
-        Shown = text_append(Shown, n22.item, kern::to<Text>(n22.index));
+        Shown = text_append(Shown, n22.item, num_text<i64>(n22.index));
       }
     }
     return {Total, list_length<Text>(Names), n20.index};
   }
 
-  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{}; Int where = 0; Bool has = false; Bool same = false; Bool shorter = false; };
+  struct AtResult { f64 score = 0.0; Text name = ""; i64 count = 0; bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{}; i64 where = 0; bool has = false; bool same = false; bool shorter = false; };
   /// Get Item of every type (beyond the list: its zero), Find, Contains and Lists Equal.
-  KERN_PURE AtResult At(Int index = 0, Text name = "a") {
-    return {list_get<Float>(Scores, index), list_get<Text>(Names, index), list_get<Int>(Counts, index), list_get<Bool>(Flags, index), list_get<Vector>(Points, index),
+  KERN_PURE AtResult At(i64 index = 0, Text name = "a") {
+    return {list_get<f64>(Scores, index), list_get<Text>(Names, index), list_get<i64>(Counts, index), list_get<bool>(Flags, index), list_get<Vector>(Points, index),
             list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name), list_equal<Text>(Names, list_make<Text, "3">(name, "b", "a")),
-            list_equal<Float>(Scores, list_make<Float, "1">(1.0))};
+            list_equal<f64>(Scores, list_make<f64, "1">(1.0))};
   }
 
-  struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
+  struct FillResult { List<i64> counts = List<i64>{}; List<bool> flags = List<bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
   /// Lists of every type filled in a loop; a function gives lists.
-  FillResult Fill(Int n = 3, Int big = 4611686018427387904, Actor who = Actor{}) {
+  FillResult Fill(i64 n = 3, i64 big = 4611686018427387904, Actor who = Actor{}) {
     list_clear(Counts);
     list_clear(Flags);
     list_clear(Points);
     list_clear(Team);
     for (auto it40 = flow_for(n40, 1, n); it40.next();) {
-      list_add(Counts, math_round(math_mul(kern::to<Float>(n40.index), kern::to<Float>(big))));
-      list_add(Flags, math_compare<"==">(math_mod(kern::to<Float>(n40.index), 2.0), 0.0));
-      list_insert(Points, 0, vector_make(kern::to<Float>(n40.index), 0.5, -1.0));
+      list_add(Counts, num_cast<i64, f64>(math_round<f64>(math_mul<f64>(num_cast<f64, i64>(n40.index), num_cast<f64, i64>(big)))));
+      list_add(Flags, math_compare<"==", f64>(math_rem<f64>(num_cast<f64, i64>(n40.index), 2.0), 0.0));
+      list_insert(Points, 0, vector_make(num_cast<f32, i64>(n40.index), 0.5f, -1.0f));
       list_add(Team, who);
     }
     Counts[0] = -7;
@@ -851,32 +1021,32 @@ struct Lists : kern::Blueprint {
     return {Counts, Flags, Points, Team};
   }
 
-  struct TakeResult { Int length = 0; List<Float> twice = List<Float>{}; List<Float> picked = List<Float>{}; };
+  struct TakeResult { i64 length = 0; List<f64> twice = List<f64>{}; List<f64> picked = List<f64>{}; };
   /// A function takes a list (with a default); Set of a list variable; Make List; Select between lists.
-  TakeResult Take(List<Float> values = List<Float>{3.0, 4.0, 3.0}, Bool pick = true) {
+  TakeResult Take(List<f64> values = List<f64>{3.0, 4.0, 3.0}, bool pick = true) {
     Scores = values;
-    return {list_length<Float>(values), list_make<Float, "3">(list_get<Float>(values, 0), list_get<Float>(values, 0), 9.5),
-            logic_select<List<Float>>(pick, Scores, value_reroute<List<Float>>(List<Float>{-1.0}))};
+    return {list_length<f64>(values), list_make<f64, "3">(list_get<f64>(values, 0), list_get<f64>(values, 0), 9.5),
+            logic_select<List<f64>>(pick, Scores, value_reroute<List<f64>>(List<f64>{-1.0}))};
   }
 
-  struct GrowResult { Int passes = 0; Int length = 0; };
+  struct GrowResult { i64 passes = 0; i64 length = 0; };
   /// The loop goes through the list as it was when it started, whatever its body does to the variable.
   GrowResult Grow() {
     Total = 0.0;
-    for (auto it60 = flow_for_each<Float>(n60, Scores); it60.next();) {
-      list_add(Scores, math_add(n60.item, 100.0));
+    for (auto it60 = flow_for_each<f64>(n60, Scores); it60.next();) {
+      list_add(Scores, math_add<f64>(n60.item, 100.0));
       list_remove_at(Scores, 0);
       Total += 1.0;
     }
-    return {kern::to<Int>(Total), list_length<Float>(Scores)};
+    return {num_cast<i64, f64>(Total), list_length<f64>(Scores)};
   }
 
-  struct { Int index = 0; } n3;
-  struct { Bool removed = false; } n14;
-  struct : kern::Node<20> { Float item = 0.0; Int index = 0; } n20;
-  struct : kern::Node<22> { Text item = ""; Int index = 0; } n22;
-  struct : kern::Node<40> { Int index = 0; } n40;
-  struct : kern::Node<60> { Float item = 0.0; Int index = 0; } n60;
+  struct { i64 index = 0; } n3;
+  struct { bool removed = false; } n14;
+  struct : kern::Node<20> { f64 item = 0.0; i64 index = 0; } n20;
+  struct : kern::Node<22> { Text item = ""; i64 index = 0; } n22;
+  struct : kern::Node<40> { i64 index = 0; } n40;
+  struct : kern::Node<60> { f64 item = 0.0; i64 index = 0; } n60;
 };
 )kn";
 
@@ -893,9 +1063,9 @@ struct Enums : kern::Blueprint {
   List<Mode> Seen = List<Mode>{Mode::Closed};
   One Single = One::Only;
   Text Log = "";
-  Int Steps = 0;
+  i64 Steps = 0;
 
-  struct NextResult { Mode state = Mode::Closed; Text name = ""; Int index = 0; };
+  struct NextResult { Mode state = Mode::Closed; Text name = ""; i64 index = 0; };
   /// Switch on an enum, one case for each value; an enum's value set, read, shown as text.
   NextResult Next() {
     switch (flow_switch_enum<Mode>(State)) {
@@ -920,29 +1090,29 @@ struct Enums : kern::Blueprint {
     return {State, enum_name<Mode>(State), enum_index<Mode>(State)};
   }
 
-  struct FromResult { Mode byIndex = Mode::Closed; Bool valid = false; Mode byName = Mode::Closed; Bool found = false; Bool same = false; };
+  struct FromResult { Mode byIndex = Mode::Closed; bool valid = false; Mode byName = Mode::Closed; bool found = false; bool same = false; };
   /// Index to Enum and Text to Enum: what names no value is the first one, and says so.
-  KERN_PURE FromResult From(Int index = 0, Text name = "Open") {
+  KERN_PURE FromResult From(i64 index = 0, Text name = "Open") {
     return {enum_from_index<Mode>(index).value, enum_from_index<Mode>(index).valid, enum_from_name<Mode>(name).value, enum_from_name<Mode>(name).found,
             enum_equal<Mode>(enum_from_index<Mode>(index).value, enum_from_name<Mode>(name).value)};
   }
 
-  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; Bool same = false; Bool all_of_them = false; };
+  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; i64 count = 0; bool has = false; Mode third = Mode::Closed; bool same = false; bool all_of_them = false; };
   /// A function takes an enum's value and a list of them (with defaults) and gives them back;
   /// Select and the list nodes in the enum's type.
-  TakeResult Take(Mode want = Mode::Open, List<Mode> some = List<Mode>{Mode::Closing, Mode::Open}, Bool pick = true) {
+  TakeResult Take(Mode want = Mode::Open, List<Mode> some = List<Mode>{Mode::Closing, Mode::Open}, bool pick = true) {
     Wanted = want;
     Seen = some;
     return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2),
             list_equal<Mode>(Seen, some), list_equal<Mode>(some, enum_values<Mode>())};
   }
 
-  struct WalkResult { Text names = ""; Int last = 0; };
+  struct WalkResult { Text names = ""; i64 last = 0; };
   /// For Each over all values of an enum; an enum with one value has one way on.
   WalkResult Walk() {
     Log = "";
     for (auto it40 = flow_for_each<Mode>(n40, enum_values<Mode>()); it40.next();) {
-      Log = text_append(Log, enum_name<Mode>(n40.item), kern::to<Text>(enum_index<Mode>(n40.item)));
+      Log = text_append(Log, enum_name<Mode>(n40.item), num_text<i64>(enum_index<Mode>(n40.item)));
     }
     switch (flow_switch_enum<One>(Single)) {
       case One::Only: {
@@ -952,7 +1122,7 @@ struct Enums : kern::Blueprint {
     return {Log, n40.index};
   }
 
-  struct : kern::Node<40> { Mode item = Mode::Closed; Int index = 0; } n40;
+  struct : kern::Node<40> { Mode item = Mode::Closed; i64 index = 0; } n40;
 };
 )kn";
 
@@ -965,44 +1135,44 @@ struct Structs : kern::Blueprint {
   /// Where something is aimed.
   KERN_STRUCT(Aim) {
     Vector At = Vector{0.0, 0.0, 1.0};
-    Int Tries = 3;
+    i64 Tries = 3;
   };
   /// What a weapon does.
   KERN_STRUCT(Weapon) {
     Text Name = "Fist";
     Kind Type = Kind::Melee;
-    Float Damage = 10.0;
-    List<Float> Falloff = List<Float>{1.0, 0.5};
+    f64 Damage = 10.0;
+    List<f64> Falloff = List<f64>{1.0, 0.5};
     Aim Sight = Aim{Vector{0.0, 0.0, 1.0}, 3};
     List<Aim> Marks = List<Aim>{};
-    Bool Ready = true;
+    bool Ready = true;
     Actor Owner = Actor{};
     List<Kind> Also = List<Kind>{Kind::Magic};
   };
   KERN_STRUCT(Solo) {
-    Float Only = 0.5;
+    f64 Only = 0.5;
   };
 
-  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}, Aim{Vector{1.0, 0.0, 0.0}, 1}, List<Aim>{}, true, Actor{}, List<Kind>{}};
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<f64>{}, Aim{Vector{1.0, 0.0, 0.0}, 1}, List<Aim>{}, true, Actor{}, List<Kind>{}};
   List<Weapon> Rack = List<Weapon>{};
   Aim Last = Aim{Vector{0.0, 0.0, 1.0}, 3};
   Solo One = Solo{0.5};
   List<Aim> Seen = List<Aim>{Aim{Vector{0.0, 2.0, 0.0}, 7}};
-  Int Count = 0;
+  i64 Count = 0;
   Text Log = "";
 
-  struct ForgeResult { Weapon made = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}; Solo one = Solo{0.5}; };
+  struct ForgeResult { Weapon made = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}; Solo one = Solo{0.5}; };
   /// Make: a struct from a value for each field - a struct and lists inside it.
-  KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{}) {
-    return {struct_make<Weapon>(name, kind, damage, list_make<Float, "2">(damage, math_div(damage, 2.0)), struct_make<Aim>(at, kern::to<Int>(damage)), list_make<Aim, "2">(struct_make<Aim>(at, 1), Last), false, who,
+  KERN_PURE ForgeResult Forge(Text name = "Bow", Kind kind = Kind::Ranged, f64 damage = 12.0, Vector at = Vector{0.0, 1.0, 0.0}, Actor who = Actor{}) {
+    return {struct_make<Weapon>(name, kind, damage, list_make<f64, "2">(damage, math_div<f64>(damage, 2.0)), struct_make<Aim>(at, num_cast<i64, f64>(damage)), list_make<Aim, "2">(struct_make<Aim>(at, 1), Last), false, who,
                                 list_make<Kind, "1">(kind)),
-            struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
+            struct_make<Aim>(vector_scale(at, num_cast<f32, f64>(damage)), 2), struct_make<Solo>(damage)};
   }
 
-  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; Bool same = false; Bool one = false; };
+  struct TakeResult { Text name = ""; Kind type = Kind::Melee; i64 count = 0; bool has = false; i64 at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; f64 only = 0.0; bool same = false; bool one = false; };
   /// A function takes a struct and a list of them (with defaults); Break; the list nodes of a
   /// struct's type - an item from beyond the list is the struct's default.
-  TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
+  TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<f64>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
     Held = w;
     Rack = more;
     One = one;
@@ -1010,36 +1180,36 @@ struct Structs : kern::Blueprint {
             struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only, list_equal<Weapon>(Rack, more), list_equal<Weapon>(more, list_make<Weapon, "1">(w))};
   }
 
-  struct LookupResult { Bool found = false; Text name = ""; Int at = 0; Float damage = 0.0; Bool byKind = false; Int kindAt = 0; Int strong = 0; };
+  struct LookupResult { bool found = false; Text name = ""; i64 at = 0; f64 damage = 0.0; bool byKind = false; i64 kindAt = 0; i64 strong = 0; };
   /// Find Row: a list of structs read as a table - the first row whose field is the value, by a
   /// text, by an enum's value, by a number; not found gives the struct's defaults and -1.
-  KERN_PURE LookupResult Lookup(Text name = "Bow", Kind kind = Kind::Ranged, Float damage = 12.0) {
+  KERN_PURE LookupResult Lookup(Text name = "Bow", Kind kind = Kind::Ranged, f64 damage = 12.0) {
     return {list_find_row<&Weapon::Name>(Rack, name).found, struct_break<Weapon>(list_find_row<&Weapon::Name>(Rack, name).row).Name, list_find_row<&Weapon::Name>(Rack, name).index,
             struct_break<Weapon>(list_find_row<&Weapon::Name>(Rack, name).row).Damage, list_find_row<&Weapon::Type>(Rack, kind).found, list_find_row<&Weapon::Type>(Rack, kind).index,
             list_find_row<&Weapon::Damage>(Rack, damage).index};
   }
 
-  struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Float was = 0.0; Int rack = 0; Int tries = 0; };
+  struct TuneResult { Weapon held = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; f64 was = 0.0; i64 rack = 0; i64 tries = 0; };
   /// Set Field: one field of a struct variable changes, the others stay - a number, a text, an
   /// enum's value, a struct, a list; what the step gives is read.
-  TuneResult Tune(Float damage = 1.0, Text name = "x", Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}, Kind kind = Kind::Magic) {
-    n30.value = (Held.Damage = math_add(struct_break<Weapon>(Held).Damage, damage));
+  TuneResult Tune(f64 damage = 1.0, Text name = "x", Aim sight = Aim{Vector{0.0, 0.0, 1.0}, 3}, Kind kind = Kind::Magic) {
+    n30.value = (Held.Damage = math_add<f64>(struct_break<Weapon>(Held).Damage, damage));
     Held.Name = name;
     Held.Sight = sight;
     Held.Type = kind;
-    Held.Falloff = list_make<Float, "1">(n30.value);
+    Held.Falloff = list_make<f64, "1">(n30.value);
     Held.Marks = Seen;
     Held.Also = list_make<Kind, "2">(kind, struct_break<Weapon>(Held).Type);
     One.Only = n30.value;
-    n38.value = (Last.Tries = kern::to<Int>(damage));
+    n38.value = (Last.Tries = num_cast<i64, f64>(damage));
     list_add(Rack, Held);
     return {Held, n30.value, list_length<Weapon>(Rack), n38.value};
   }
 
-  struct EditResult { Int count = 0; Bool removed = false; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Int index = 0; };
+  struct EditResult { i64 count = 0; bool removed = false; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; i64 index = 0; };
   /// The steps that change a list variable, on a list of structs; Remove Item takes out what
   /// equals the struct - every field of it.
-  EditResult Edit(Text what = "insert", Int at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}) {
+  EditResult Edit(Text what = "insert", i64 at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}) {
     switch (flow_switch_text<"insert, set, remove_at, remove, clear, add">(what)) {
       case 0: { list_insert(Rack, at, w); } break;
       case 1: { Rack[at] = w; } break;
@@ -1051,9 +1221,9 @@ struct Structs : kern::Blueprint {
     return {list_length<Weapon>(Rack), n44.removed, list_get<Weapon>(Rack, 0), n46.index};
   }
 
-  struct WalkResult { Float total = 0.0; Text names = ""; Aim last = Aim{Vector{0.0, 0.0, 1.0}, 3}; Weapon picked = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; };
+  struct WalkResult { f64 total = 0.0; Text names = ""; Aim last = Aim{Vector{0.0, 0.0, 1.0}, 3}; Weapon picked = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; };
   /// For Each over a list of structs; Select and Reroute of a struct's type.
-  WalkResult Walk(Bool pick = true) {
+  WalkResult Walk(bool pick = true) {
     Log = "";
     Count = 0;
     for (auto it60 = flow_for_each<Weapon>(n60, Rack); it60.next();) {
@@ -1064,28 +1234,28 @@ struct Structs : kern::Blueprint {
         Count += struct_break<Aim>(n64.item).Tries;
       }
     }
-    return {kern::to<Float>(Count), Log, Last, logic_select<Weapon>(pick, Held, value_reroute<Weapon>(list_get<Weapon>(Rack, 1)))};
+    return {num_cast<f64, i64>(Count), Log, Last, logic_select<Weapon>(pick, Held, value_reroute<Weapon>(list_get<Weapon>(Rack, 1)))};
   }
 
-  struct { Float value = 0.0; } n30;
-  struct { Int value = 0; } n38;
-  struct { Bool removed = false; } n44;
-  struct { Int index = 0; } n46;
-  struct : kern::Node<60> { Weapon item = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; Int index = 0; } n60;
-  struct : kern::Node<64> { Aim item = Aim{Vector{0.0, 0.0, 1.0}, 3}; Int index = 0; } n64;
+  struct { f64 value = 0.0; } n30;
+  struct { i64 value = 0; } n38;
+  struct { bool removed = false; } n44;
+  struct { i64 index = 0; } n46;
+  struct : kern::Node<60> { Weapon item = Weapon{"Fist", Kind::Melee, 10.0, List<f64>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{}, List<Kind>{Kind::Magic}}; i64 index = 0; } n60;
+  struct : kern::Node<64> { Aim item = Aim{Vector{0.0, 0.0, 1.0}, 3}; i64 index = 0; } n64;
 };
 )kn";
 
 // A Sequence whose first part returns: the function has ended, the second part does not run.
-inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"int","value":0}],
-  "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
-    {"name":"Clamp01","inputs":[{"name":"v","type":"float","value":0.5}],"outputs":[{"name":"out","type":"float","value":-1},{"name":"low","type":"bool","value":false}]},
+inline const char* kFunctions = R"({"variables":[{"name":"Calls","type":"i64","value":0}],
+  "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"f64","value":0}],"outputs":[{"name":"result","type":"f64","value":0}]},
+    {"name":"Clamp01","inputs":[{"name":"v","type":"f64","value":0.5}],"outputs":[{"name":"out","type":"f64","value":-1},{"name":"low","type":"bool","value":false}]},
     {"name":"Label","inputs":[{"name":"who","type":"text","value":"nobody"}],"outputs":[{"name":"text","type":"text","value":""}]}],
-  "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
+  "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","params":{"type":"f64"},"values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
     {"id":10,"type":"func.entry","params":{"function":"Clamp01"}},{"id":11,"type":"var.add","params":{"variable":"Calls"}},{"id":12,"type":"flow.sequence","params":{"count":"2"}},
-    {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"op":"<"},"values":{"b":0}},
+    {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"type":"f64","op":"<"},"values":{"b":0}},
     {"id":15,"type":"func.return","params":{"function":"Clamp01"},"values":{"out":0,"low":true}},
-    {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","values":{"b":1}},
+    {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","params":{"type":"f64"},"values":{"b":1}},
     {"id":30,"type":"func.entry","params":{"function":"Label"}},{"id":31,"type":"text.append","values":{"a":"hello "}},{"id":32,"type":"func.return","params":{"function":"Label"}}],
   "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"result"],
     [10,"then",11,"exec"],[11,"then",12,"exec"],[12,"then0",13,"exec"],[10,"v",14,"a"],[14,"result",13,"condition"],[13,"true",15,"exec"],
@@ -1124,13 +1294,13 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
   const f64 inf = std::numeric_limits<f64>::infinity();
   switch (t) {
     case PinType::boolean: r = {Value::boolean(false), Value::boolean(true)}; break;
-    case PinType::integer:
+    case PinType::i64:
       // (and whole numbers at their ends: 2^53, 2^62, Int's upper end)
       for (i64 v : {i64{0}, i64{1}, i64{-1}, i64{2}, i64{7}, i64{-13}, i64{100}, i64{1000000007}, i64{9007199254740992}, i64{-9007199254740992}, i64{4611686018427387904},
                     std::numeric_limits<i64>::max()})
         r.push_back(Value::integer(v));
       break;
-    case PinType::number:
+    case PinType::f64:
       for (f64 v : {0.0, 1.0, -1.0, 0.5, -2.5, 3.75, 90.0, 1e-9, 123456.789, -0.0, 2.0, 45.0, -180.0, 7.0, 0.3, 1e19, -1e300, inf, -inf, std::numeric_limits<f64>::quiet_NaN()})
         r.push_back(Value::number(v));
       break;
@@ -1153,12 +1323,15 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
     case PinType::enumeration:
       for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
       break;
-    case PinType::int64:
+    case PinType::u64:
       // (64 bits at their ends: the sign bit, beyond 2^53, all ones - and divisors that are 0 and -1)
       for (u64 v : {u64{0}, u64{1}, ~u64{0}, u64{2}, u64{7}, u64{0} - 13, u64{1} << 63, (u64{1} << 63) - 1, (u64{1} << 53) + 1, u64{0x123456789abcdef0}, u64{0xfedcba9876543210}, u64{64}})
-        r.push_back(Value::int64(v));
+        r.push_back(Value::of_number<u64>(v));
       break;
-    default: break;
+    default:
+      // (every other number type: its edge values - number_cases.h)
+      if (logic::is_number(t)) r = number_cases::node_edges(logic::pin_type_name(t));
+      break;
   }
   if (logic::is_list(t)) {
     // lists of the item type's samples: none, one, all of them, some of them twice
@@ -1182,6 +1355,9 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
 
 /// The values a pin of a type of the Blueprint `g` is tried with. A struct: its default, and for
 /// each field two more with that field at other values.
+/// The first (or last) of some samples - none (a type without samples, a case that did not read): no value.
+inline Value first_of(const std::vector<Value>& v) { return v.empty() ? Value() : v.front(); }
+inline Value last_of(const std::vector<Value>& v) { return v.empty() ? Value() : v.back(); }
 inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g) {
   if (logic::is_keyed(t.type)) {
     // a map or a set of the keys' samples: none, one, all of them in the order they came and the other way round (a map:
@@ -1192,10 +1368,10 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
       Value v = Value::zero(t.type);
       std::size_t n = 0;
       for (std::size_t k : picks) {
-        if (keys.empty()) break;
+        if (keys.empty() || values.empty()) break;   // (a type without samples: none)
         v.own_entries().try_emplace(logic::key_of(keys[k % keys.size()]), t.type == PinType::map ? values[n++ % values.size()] : Value{});
       }
-      return logic::fitted(std::move(v), t, g);  // (a map of U8 values holds U8s only - what a C++ caller hands over)
+      return logic::fitted(std::move(v), t, g);  // (a map of u8 values holds U8s only - what a C++ caller hands over)
     };
     std::vector<std::size_t> all, back;
     for (std::size_t k = 0; k < keys.size(); ++k) all.push_back(k);
@@ -1205,10 +1381,6 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
     std::vector<Value> r = samples(t.type, e ? e->values.size() : 0);
-    // (a list of Ints of a width holds its values only - a C++ caller hands over a List<U8>, which holds no -1; one Int of a
-    // width is handed over as an Int, the input holds its low bits)
-    if (t.type == PinType::integer_list && logic::has_width(t))
-      for (Value& v : r) v = logic::fitted(v, t, g);
     return r;
   }
   std::vector<Value> items;
@@ -1227,7 +1399,7 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   if (t.type == PinType::structure) return items;
   auto list = [&](std::vector<std::size_t> picks) {
     std::vector<Value> rows;
-    for (std::size_t k : picks) rows.push_back(items[k % items.size()]);
+    for (std::size_t k : picks) if (!items.empty()) rows.push_back(items[k % items.size()]);   // (a struct without samples: none)
     return Value::structures(std::move(rows));
   };
   std::vector<std::size_t> all;
@@ -1263,7 +1435,7 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<Int> is given)
+    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<i64> is given)
     f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of(held, g).to_json(g, held.of) : p.def, held.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
@@ -1292,13 +1464,13 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     json::Value types;
     if (!json::parse(R"({"enums":[{"name":"Season","values":["Spring","Summer","Autumn","Winter"],"help":"The four seasons."}],
       "structs":[{"name":"Spot","fields":[{"name":"At","type":"vector","value":[0,0.5,-1]},{"name":"Label","type":"text","value":"here"}],"help":"A place."},
-                 {"name":"Day","fields":[{"name":"When","type":"enum","of":"Season","value":1},{"name":"Warmth","type":"float","value":20.5},
-                                         {"name":"Where","type":"struct","of":"Spot","value":{"Label":"home"}},{"name":"Hours","type":"int_list","value":[6,22]},
+                 {"name":"Day","fields":[{"name":"When","type":"enum","of":"Season","value":1},{"name":"Warmth","type":"f64","value":20.5},
+                                         {"name":"Where","type":"struct","of":"Spot","value":{"Label":"home"}},{"name":"Hours","type":"i64_list","value":[6,22]},
                                          {"name":"Stops","type":"struct_list","of":"Spot","value":[{"At":[1,2,3]}]},{"name":"Dry","type":"bool","value":true},
                                          {"name":"Guide","type":"actor","value":0},{"name":"Around","type":"enum_list","of":"Season","value":[0,3]}],"help":"A day of a season."},
-                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]},
-                 {"name":"Wire","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Delta","type":"int","value":-5},{"name":"On","type":"bool","value":true},
-                                          {"name":"Speed","type":"float","value":0.1},{"name":"Rate","type":"float","value":-2.5},{"name":"Key","type":"int64","value":"18446744073709551615"}],
+                 {"name":"Lone","fields":[{"name":"Only","type":"i64","value":4}]},
+                 {"name":"Wire","fields":[{"name":"Magic","type":"i64","value":1447121230},{"name":"Delta","type":"i64","value":-5},{"name":"On","type":"bool","value":true},
+                                          {"name":"Speed","type":"f64","value":0.1},{"name":"Rate","type":"f64","value":-2.5},{"name":"Key","type":"u64","value":"18446744073709551615"}],
                   "help":"A packet of numbers (Bytes of Struct)."}],"nodes":[],"links":[]})",
                      types) ||
         !logic::graph_from_json(types, c.graph))
@@ -1389,53 +1561,53 @@ inline const char* kEnginePlaces = R"kn(
 struct EnginePlaces : kern::Blueprint {
   // ---- types ----
   KERN_STRUCT(MeshData) {
-    List<Float> positions = List<Float>{};
-    List<Float> normals = List<Float>{};
-    List<Float> colors = List<Float>{};
-    List<Float> uvs = List<Float>{};
-    List<Float> extra = List<Float>{};
-    Int extra_size = 0;
-    List<Int> indices = List<Int>{};
+    List<f32> positions = List<f32>{};
+    List<f32> normals = List<f32>{};
+    List<f32> colors = List<f32>{};
+    List<f32> uvs = List<f32>{};
+    List<f32> extra = List<f32>{};
+    u32 extra_size = 0;
+    List<u32> indices = List<u32>{};
   };
   KERN_STRUCT(GeoChunk) {
-    Int x = 0;
-    Int y = 0;
-    Int items = 0;
-    Int triangles = 0;
-    Int hash = 0;
-    Bool welded = false;
-    MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+    i32 x = 0;
+    i32 y = 0;
+    u32 items = 0;
+    u32 triangles = 0;
+    u32 hash = 0;
+    bool welded = false;
+    MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
   };
   KERN_STRUCT(WeldStats) {
-    U32 source_vertices = 0;
-    U32 unique_vertices = 0;
-    Int bytes_before = 0;
-    Int bytes_after = 0;
-    Bool indexed = false;
+    u32 source_vertices = 0;
+    u32 unique_vertices = 0;
+    u64 bytes_before = 0;
+    u64 bytes_after = 0;
+    bool indexed = false;
   };
 
   // ---- variables ----
   Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
-  Int Length = 0;
-  Int At = 0;
-  Int X = 0;
-  Int Items = 0;
-  Float P0 = 0.0;
-  Int Beside = 0;
-  Int Set = 0;
+  i64 Length = 0;
+  i64 At = 0;
+  i32 X = 0;
+  u32 Items = 0;
+  f32 P0 = 0.0f;
+  i32 Beside = 0;
+  i32 Set = 0;
   List<GeoChunk> Chunks = List<GeoChunk>{};
-  Int LengthAfter = 0;
-  Bool Removed = false;
-  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}};
-  Int Before = 0;
-  Int Gone = 0;
-  Int GoneLength = 0;
+  i64 LengthAfter = 0;
+  bool Removed = false;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}};
+  i32 Before = 0;
+  i32 Gone = 0;
+  i64 GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
-  Int AppendedLength = 0;
+  i64 AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
-  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  MeshData Soup = MeshData{List<f32>{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, List<f32>{1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, List<f32>{}, 0, List<u32>{}};
   WeldStats Stats = WeldStats{0, 0, 0, 0, false};
-  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+  MeshData Welded = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
 
   // ---- functions ----
   void Bind() {
@@ -1447,20 +1619,20 @@ struct EnginePlaces : kern::Blueprint {
 
   void Change() {
     engine_building_builder_chunks(n7, Builder);
-    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<Float>{0.1, 2.5}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 2, List<Int>{1, 2}}});
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f32>{0.1f, 2.5f}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 2, List<u32>{1, 2}}});
     At = n3.index;
-    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     n7.result[0].items = 7;
     n5.value = (n7.result[0].x += 3);
     X = n5.value;
-    n7.result[1].mesh.positions = List<Float>{0.3333333333333333, 4.0};
+    n7.result[1].mesh.positions = List<f32>{0.33333334f, 4.0f};
     P0 = n7.result[1].mesh.positions[0];
-    n7.result[1].mesh.positions[1] = 0.1;
+    n7.result[1].mesh.positions[1] = 0.1f;
     Items = n7.result[0].items;
     Removed = list_contains<GeoChunk>(n7.result, First);
     First = list_get<GeoChunk>(n7.result, 1);
-    P0 = math_mul(n7.result[1].mesh.positions[0], 2.0);
-    LengthAfter = list_length<Float>(n7.result[1].mesh.positions);
+    P0 = math_mul<f32>(n7.result[1].mesh.positions[0], 2.0f);
+    LengthAfter = list_length<f32>(n7.result[1].mesh.positions);
     Beside = n7.result[5].x;
     n6.value = (n7.result[5].x = 9);
     Set = n6.value;
@@ -1497,7 +1669,7 @@ struct EnginePlaces : kern::Blueprint {
     engine_building_builder_release(Builder);
     Gone = n8.result[0].x;
     n8.result[0].x = 4;
-    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     GoneLength = list_length<GeoChunk>(n8.result);
     GoneChunks = n8.result;
   }
@@ -1512,17 +1684,17 @@ struct EnginePlaces : kern::Blueprint {
   // ---- what nodes give and keep ----
   struct { Object<kern::BuildingBuilder> result = Object<kern::BuildingBuilder>{}; } n1;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
-  struct { Int index = 0; } n3;
-  struct { Bool removed = false; } n4;
-  struct { Int value = 0; } n5;
-  struct { Int value = 0; } n6;
+  struct { i64 index = 0; } n3;
+  struct { bool removed = false; } n4;
+  struct { i32 value = 0; } n5;
+  struct { i32 value = 0; } n6;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
-  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}; } n13;
 };
 )kn";
 
@@ -1533,10 +1705,10 @@ struct EnginePlaces : kern::Blueprint {
 inline const char* kImplementsWater = R"kn(
 struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
-  Float Time = 0.25;
+  f64 Time = 0.25;
   Object<kern::Program> Program = Object<kern::Program>{};
   Object<kern::UniformCache> Cache = Object<kern::UniformCache>{};
-  Int Frames = 0;
+  i64 Frames = 0;
 
   // ---- functions ----
   struct nameResult { Text result = ""; };
@@ -1546,7 +1718,7 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 
   struct vertexResult { Text result = ""; };
   KERN_OVERRIDE KERN_PURE vertexResult vertex() {
-    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+    return {text_append("vWater = aWater * ", num_text<f64>(Time), ";")};
   }
 
   KERN_OVERRIDE void bind(Object<kern::Program> program = Object<kern::Program>{}) {
@@ -1564,25 +1736,25 @@ inline const char* kImplementsGame = R"kn(
 struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
-    Float time = 0.0;
-    Float dt = 0.0;
-    Int64 index = Int64{0x0};
+    f64 time = 0.0;
+    f32 dt = 0.0f;
+    u64 index = 0;
   };
 
   // ---- variables ----
   Object<kern::Engine> Engine = Object<kern::Engine>{};
-  Int Updates = 0;
-  Float Last = 0.0;
-  Bool Stopped = false;
+  i64 Updates = 0;
+  f64 Last = 0.0;
+  bool Stopped = false;
 
   // ---- functions ----
-  struct startResult { Bool result = false; };
+  struct startResult { bool result = false; };
   KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Engine = engine;
     return {true};
   }
 
-  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {
     Updates += 1;
     Last = frame.time;
   }
@@ -1599,31 +1771,31 @@ inline const char* kImplementsLoop = R"kn(
 struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
-    Int64 id = Int64{0x0};
+    u64 id = 0;
   };
 
   // ---- variables ----
-  net_Address Last = net_Address{Int64{0x0}};
-  Int Bytes = 0;
-  Int Sent = 0;
+  net_Address Last = net_Address{0};
+  u32 Bytes = 0;
+  i64 Sent = 0;
 
   // ---- functions ----
-  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  struct addressResult { net_Address result = net_Address{0}; };
   KERN_OVERRIDE KERN_PURE addressResult address() {
-    return {net_Address{Int64{0x7}}};
+    return {net_Address{7}};
   }
 
-  struct sendResult { Bool result = false; };
-  KERN_OVERRIDE sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+  struct sendResult { bool result = false; };
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0}, List<u8> data = List<u8>{}, u32 bytes = 0) {
     Last = to;
     Bytes = bytes;
-    Sent = list_length<U8>(data);
+    Sent = list_length<u8>(data);
     return {true};
   }
 
-  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
-  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
-    return {Bytes, Last, List<Int>{1, 2, 3}};
+  struct receiveResult { i32 result = 0; net_Address from = net_Address{0}; List<u8> data = List<u8>{}; };
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0}, u32 max_bytes = 0) {
+    return {num_cast<i32, u32>(Bytes), Last, List<u8>{1, 2, 3}};
   }
 };
 )kn";
@@ -1639,9 +1811,12 @@ inline std::vector<Case> cases() {
     all.push_back({name, {}, {}});
     std::string error;
     std::vector<std::string> used;
-    if (!logic::from_cpp(text, all.back().graph, nullptr, &error, logic::library(), before) || !logic::libraries_of(all.back().graph, before, used, &error))
+    if (!logic::from_cpp(text, all.back().graph, nullptr, &error, logic::library(), before) || !logic::libraries_of(all.back().graph, before, used, &error)) {
       std::printf("blueprint_native %s: %s\n", name, error.c_str());
-    for (const std::string& library : used) all.back().libraries.push_back({library, *before(library)});
+      all.back().error = error.empty() ? std::string("does not read") : error;
+    }
+    for (const std::string& library : used)
+      if (const logic::Graph* l = before(library)) all.back().libraries.push_back({library, *l});
     return all.back();
   };
   const Value yes = Value::boolean(true), no = Value::boolean(false);
@@ -1649,7 +1824,19 @@ inline std::vector<Case> cases() {
   auto I = [](i64 v) { return Value::integer(v); };
   auto T = [](const char* v) { return Value::text(v); };
   {
-    Case& c = read("Flow", kFlow);
+    // (the nodes of the numbers - number_cases.h: one function per operation and type and per conversion, with the edge
+    // values; the class gives the interpreter's answers, call for call - and the interpreter numbers.h's:
+    // numbers_nodes_interpreter)
+    all.push_back({"Numbers", {}, {}});
+    json::Value j;
+    std::string error;
+    if (!json::parse(number_cases::numbers_graph_json(), j, &error) || !logic::graph_from_json(j, all.back().graph, &error)) {
+      std::printf("blueprint_native Numbers: %s\n", error.c_str());
+      all.back().error = error.empty() ? std::string("does not read") : error;
+    }
+    for (auto& [fn, args] : number_cases::numbers_calls(all.back().graph)) all.back().calls.push_back({fn, args});
+  }
+  if (Case& c = read("Flow", kFlow); c.error.empty()) {
     for (f64 v : {95.0, 90.0, 89.999, 50.0, 12.5, -3.0, 0.0, std::numeric_limits<f64>::quiet_NaN()}) c.calls.push_back({"Grade", {N(v)}});
     c.calls.push_back({"FirstAbove", {I(0), I(9), N(4.5)}});
     c.calls.push_back({"FirstAbove", {I(3), I(3), N(0)}});
@@ -1663,8 +1850,7 @@ inline std::vector<Case> cases() {
     for (i64 which : {-1, 0, 1, 2, 3, 100}) c.calls.push_back({"Choose", {I(which)}});
     c.calls.push_back({"Grade", {N(51)}});
   }
-  {
-    Case& c = read("Calls", kCalls);
+  if (Case& c = read("Calls", kCalls); c.error.empty()) {
     c.calls.push_back({"Scale", {N(1), N(2)}});
     c.calls.push_back({"Scale", {N(2.5), N(-1.5)}});
     c.calls.push_back({"AddUp", {N(1), I(1)}});
@@ -1678,8 +1864,19 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Both", {N(-1), N(-1)}});
     c.calls.push_back({"Scale", {N(0), N(0)}});
   }
-  {
-    Case& c = read("Locals", kLocals);
+  if (Case& c = read("Wrap", kWrap); c.error.empty()) {
+    // (every pair of the edge values of each type: a place goes round, f32 rounds - the class as the interpreter)
+    auto each = [&](auto t) {
+      using X = typename decltype(t)::type;
+      const std::string fn = "Add_" + std::string(logic::num::kind_name(logic::num::kind_of<X>()));
+      for (X x : wrap_edges<X>())
+        for (X y : wrap_edges<X>()) c.calls.push_back({fn, {Value::of_number<X>(x), Value::of_number<X>(y)}});
+    };
+    each(std::type_identity<i8>{}), each(std::type_identity<i16>{}), each(std::type_identity<i32>{}), each(std::type_identity<i64>{});
+    each(std::type_identity<u8>{}), each(std::type_identity<u16>{}), each(std::type_identity<u32>{}), each(std::type_identity<u64>{});
+    each(std::type_identity<f32>{});
+  }
+  if (Case& c = read("Locals", kLocals); c.error.empty()) {
     for (i64 n : {3, 0, 5, 1}) c.calls.push_back({"SumTo", {I(n)}});
     c.calls.push_back({"Join", {T("a"), T("b"), N(2)}});
     c.calls.push_back({"Join", {T(""), T("zz"), N(-0.5)}});
@@ -1688,18 +1885,16 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Outer", {N(0.01), no}});  // (with the event: the tier case "locals" - a class called directly has no runtime to raise it)
     c.calls.push_back({"SumTo", {I(2)}});
   }
-  {
-    Case& c = read("Casts", kCasts);
-    for (const Value& v : samples(PinType::number)) c.calls.push_back({"FromFloat", {v}});
-    for (const Value& v : samples(PinType::integer)) c.calls.push_back({"FromInt", {v}});
+  if (Case& c = read("Casts", kCasts); c.error.empty()) {
+    for (const Value& v : samples(PinType::f64)) c.calls.push_back({"FromFloat", {v}});
+    for (const Value& v : samples(PinType::i64)) c.calls.push_back({"FromInt", {v}});
     for (const Value& v : samples(PinType::boolean)) c.calls.push_back({"FromBool", {v}});
     for (const Value& v : samples(PinType::vector)) c.calls.push_back({"FromVector", {v}});
     for (const Value& v : samples(PinType::actor)) c.calls.push_back({"FromActor", {v}});
     c.calls.push_back({"Pick", {yes, Value::actor({3, 2})}});
     c.calls.push_back({"Pick", {no, Value::actor({3, 2})}});
   }
-  {
-    Case& c = read("Lists", kLists);
+  if (Case& c = read("Lists", kLists); c.error.empty()) {
     const f64 nan = std::numeric_limits<f64>::quiet_NaN();
     const i64 most = std::numeric_limits<i64>::max();
     c.calls.push_back({"At", {I(0), T("a")}});
@@ -1714,7 +1909,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Sum", {}});
     for (i64 n : {i64{0}, i64{1}, i64{3}, i64{6}}) c.calls.push_back({"Fill", {I(n), I(n == 3 ? 4611686018427387904 : 1000000007), Value::actor(n ? logic::ActorHandle{static_cast<logic::ActorRef>(n * 7), 2} : logic::ActorHandle{})}});
     for (i64 at : {i64{-1}, i64{0}, i64{1}, i64{2}, i64{5}, i64{6}, most}) c.calls.push_back({"At", {I(at), T(at == 1 ? "b" : at == 2 ? "zz" : "a")}});
-    for (const Value& v : samples(PinType::number_list)) {
+    for (const Value& v : samples(PinType::f64_list)) {
       c.calls.push_back({"Take", {v, yes}});
       c.calls.push_back({"Take", {v, no}});
       c.calls.push_back({"Grow", {}});
@@ -1724,8 +1919,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Grow", {}});
     c.calls.push_back({"Sum", {}});
   }
-  {
-    Case& c = read("Enums", kEnums);
+  if (Case& c = read("Enums", kEnums); c.error.empty()) {
     auto E = [](i64 place) { return Value::enumeration(place); };
     for (int k = 0; k < 6; ++k) c.calls.push_back({"Next", {}});
     for (i64 index : {i64{-1}, i64{0}, i64{2}, i64{3}, i64{4}, std::numeric_limits<i64>::max()})
@@ -1739,8 +1933,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Walk", {}});
     c.calls.push_back({"Next", {}});
   }
-  {
-    Case& c = read("Structs", kStructs);
+  if (Case& c = read("Structs", kStructs); c.error.empty()) {
     const logic::Graph& g = c.graph;
     auto E = [](i64 place) { return Value::enumeration(place); };
     const std::vector<Value> weapons = samples({PinType::structure, "Weapon"}, g), racks = samples({PinType::structure_list, "Weapon"}, g), aims = samples({PinType::structure, "Aim"}, g),
@@ -1774,8 +1967,7 @@ inline std::vector<Case> cases() {
     c.outside.push_back({"Tune", {N(2), T("y"), weapons[1], E(1)}});
     c.outside.push_back({"Take", {}});
   }
-  {
-    Case& c = read("Places", kPlaces);
+  if (Case& c = read("Places", kPlaces); c.error.empty()) {
     const i64 most = std::numeric_limits<i64>::max();
     auto read_all = [&] {
       for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, i64{7}, most})
@@ -1808,9 +2000,9 @@ inline std::vector<Case> cases() {
       w.calls.push_back({"twice", {wheel, I(3)}});
     }
     for (i64 at : {i64{0}, i64{2}, i64{3}, i64{-1}}) w.calls.push_back({"table", {I(at)}});
-    w.calls.push_back({"fit", {Value::structures({}), samples({PinType::structure, "Wheel"}, w.graph).front(), I(2)}});
+    w.calls.push_back({"fit", {Value::structures({}), first_of(samples({PinType::structure, "Wheel"}, w.graph)), I(2)}});
     Case& r = read("rng", kRng);
-    r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
+    r.calls.push_back({"next", {first_of(samples({PinType::structure, "Rng"}, r.graph)), I(5)}});
     Case& d = read("dice", kDice);
     for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
     Case& ground = read("Ground", kGround);
@@ -1824,8 +2016,7 @@ inline std::vector<Case> cases() {
       for (i64 wheel : {i64{0}, i64{1}, i64{4}, i64{-1}}) c.calls.push_back({"Run", {I(car), I(wheel), N(static_cast<f64>(wheel % 3) + 0.5)}});
     c.calls.push_back({"Run", {I(0), I(0), N(-2.0)}});
   }
-  {
-    Case& c = read("References", kReferences);
+  if (Case& c = read("References", kReferences); c.error.empty()) {
     const logic::Graph& g = c.graph;
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, most})
@@ -1836,7 +2027,7 @@ inline std::vector<Case> cases() {
       c.calls.push_back({"Lit", {Value::boolean(at != 1), I(at)}});
       c.calls.push_back({"Toggle", {Value::boolean(at == 0)}});
     }
-    c.calls.push_back({"Trade", {samples({PinType::structure, "Wheel"}, g).front(), samples({PinType::structure, "Wheel"}, g).back(), N(0.5)}});
+    c.calls.push_back({"Trade", {first_of(samples({PinType::structure, "Wheel"}, g)), last_of(samples({PinType::structure, "Wheel"}, g)), N(0.5)}});
     // From outside a reference input takes a value, and what the function made of it stands
     // behind the outputs: Bump gives the number, Drive its outputs and then the car.
     c.calls.push_back({"Bump", {N(1.5), N(2.0)}});
@@ -1883,8 +2074,7 @@ inline std::vector<Case> cases() {
       c.on_engine.push_back(run);
     }
   }
-  {
-    Case& c = read("Water", kImplementsWater);
+  if (Case& c = read("Water", kImplementsWater); c.error.empty()) {
     c.calls.push_back({"name", {}});
     c.calls.push_back({"vertex", {}});
     // (the engine's objects it is handed are Objects of their classes, of one world - none is no object; never a number)
@@ -1894,20 +2084,18 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"frame_uniforms", {O(0), O(4)}});
     c.calls.push_back({"vertex", {}});
   }
-  {
-    Case& c = read("Running", kImplementsGame);
+  if (Case& c = read("Running", kImplementsGame); c.error.empty()) {
     const Value engine = Value::object(logic::ObjectRef{2, 2});   // (an Object<kern::Engine>, never a number)
     c.calls.push_back({"start", {engine}});
-    c.calls.push_back({"update", {engine, Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
-    c.calls.push_back({"update", {engine, Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.5), Value::of_number<f32>(0.016f), Value::of_number<u64>(7)})}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.75), Value::of_number<f32>(0.25f), Value::of_number<u64>(8)})}});
     c.calls.push_back({"stop", {engine}});
   }
-  {
-    Case& c = read("Loop", kImplementsLoop);
-    const Value at = Value::structure({Value::int64(9)});
+  if (Case& c = read("Loop", kImplementsLoop); c.error.empty()) {
+    const Value at = Value::structure({Value::of_number<u64>(9)});
     c.calls.push_back({"address", {}});
-    c.calls.push_back({"send", {at, Value::of(std::vector<i64>{4, 5, 6}), I(3)}});
-    c.calls.push_back({"receive", {Value::structure({Value::int64(0)}), I(2)}});
+    c.calls.push_back({"send", {at, Value::of(std::vector<u8>{4, 5, 6}), Value::of_number<u32>(3)}});
+    c.calls.push_back({"receive", {Value::structure({Value::of_number<u64>(0)}), Value::of_number<u32>(2)}});
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
@@ -1985,38 +2173,31 @@ inline std::string c_string(const std::string& s) {
   return r + "\"";
 }
 
-inline const char* builtin_cpp_type(PinType t) {
+inline std::string builtin_cpp_type(PinType t) {
+  // (a number: the C++ type itself)
+  if (t == PinType::boolean) return "bool";
+  // (a number of the class: a place of the language - numbers.h Typed, what the class names f32)
+  if (logic::is_number(t)) return "kern::logic::num::Typed<kern::" + std::string(logic::pin_type_name(t)) + ">";
+  if (t == PinType::boolean_list) return "kern::List<bool>";
+  if (logic::is_list(t) && logic::is_number(logic::element_of(t))) return "kern::List<kern::logic::num::Typed<kern::" + std::string(logic::pin_type_name(logic::element_of(t))) + ">>";
   switch (t) {
-    case PinType::boolean: return "bool";
-    case PinType::integer: return "kern::i64";
-    case PinType::number: return "kern::f64";
     case PinType::vector: return "kern::Vec3";
     case PinType::text: return "kern::logic::Text";
     case PinType::actor: return "kern::logic::ActorHandle";
-    case PinType::int64: return "kern::logic::Int64";
-    case PinType::boolean_list: return "kern::List<bool>";
-    case PinType::integer_list: return "kern::List<kern::logic::Whole>";
-    case PinType::number_list: return "kern::List<kern::f64>";
     case PinType::vector_list: return "kern::List<kern::Vec3>";
     case PinType::text_list: return "kern::List<kern::logic::Text>";
     case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
-    case PinType::int64_list: return "kern::List<kern::logic::Int64>";
     default: return "void";
   }
 }
 /// A pin's type in C++, outside the class `owner` (an enum and a struct are the class's own: Owner::Mode).
 inline std::string cpp_type(PinType t, const std::string& of = {}, const std::string& owner = {}) {
   if (logic::is_keyed(t)) {
-    // a map or a set as the class holds it: Map<Int, Float> - its keys and values of the class's types (an Int: Whole)
+    // a map or a set as the class holds it: Map<i64, f32> - its keys and values of the class's types
     const logic::TypeRef k = logic::key_type({t, of});
-    // (a value of a width: Sized<u8>, as in a List<U8>)
-    auto part = [&](const logic::TypeRef& p) {
-      if (p.type == PinType::integer) return logic::has_width(p) ? "kern::logic::Sized<kern::" + p.of + ">" : std::string("kern::logic::Whole");
-      return cpp_type(p.type, p.of, owner);
-    };
+    auto part = [&](const logic::TypeRef& p) { return cpp_type(p.type, p.of, owner); };
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
-  if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (t == PinType::object) return "kern::logic::Object<" + logic::engine_class_cpp(of) + ">";  // (an object of the engine: Object<kern::App>)
   if (t == PinType::object_list) return "kern::List<kern::logic::Object<" + logic::engine_class_cpp(of) + ">>";
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
@@ -2033,14 +2214,19 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     std::snprintf(b, sizeof b, "%a%s", x, suffix);
     return b;
   };
+  if (logic::is_number(v.type) && v.type != PinType::boolean) {
+    // (a number, bit for bit: its type and its bits - std::bit_cast of the bits)
+    const std::string t = logic::pin_type_name(v.type);
+    const int w = logic::num::width(logic::kind_of(v.type));
+    const std::string holder = w == 8 ? "kern::u8" : w == 16 ? "kern::u16" : w == 32 ? "kern::u32" : "kern::u64";
+    std::snprintf(b, sizeof b, "0x%llxull", static_cast<unsigned long long>(v.bits() & (w == 64 ? ~0ull : ((1ull << w) - 1))));
+    return "std::bit_cast<kern::" + t + ">(static_cast<" + holder + ">(" + b + "))";
+  }
   switch (v.type) {
     case PinType::boolean: return v.b ? "true" : "false";
-    case PinType::integer: std::snprintf(b, sizeof b, "%lldLL", static_cast<long long>(v.i)); return b;
-    case PinType::number: return number(v.n, "");
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu, %uu}", static_cast<unsigned long long>(v.a), static_cast<unsigned>(v.world)); return b;   // (its id and its world, as they are)
-    case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
     case PinType::object:  // (its handle and its world, as they are)
       std::snprintf(b, sizeof b, "{kern::logic::ObjectRef{%lldLL, %uu}}", static_cast<long long>(v.i), static_cast<unsigned>(v.world));
       return cpp_type(PinType::object, of) + b;
@@ -2079,8 +2265,8 @@ inline std::string value_source(const Value& v) {
   };
   switch (v.type) {
     case PinType::boolean: return L + "boolean(" + cpp_value(v) + ")";
-    case PinType::integer: return L + "integer(" + cpp_value(v) + ")";
-    case PinType::number: return L + "number(" + cpp_value(v) + ")";
+    case PinType::i64: return L + "integer(" + cpp_value(v) + ")";
+    case PinType::f64: return L + "number(" + cpp_value(v) + ")";
     case PinType::vector: return L + "vector(" + cpp_value(v) + ")";
     case PinType::text: return L + "text(" + cpp_value(v) + ")";
     case PinType::actor: return L + "actor(kern::logic::ActorHandle{" + std::to_string(v.a) + "u, " + std::to_string(v.world) + "u})";   // (its id and its world, as they are)

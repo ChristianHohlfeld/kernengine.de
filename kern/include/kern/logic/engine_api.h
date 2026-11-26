@@ -43,7 +43,7 @@ struct EnginePin {
   const char* id;     // the pin: the parameter's name in the engine's header ("result": what the function returns)
   PinType type;
   const char* of;     // a struct or an enum (or a list of them): its name
-  const char* shape;  // the value's form, written out: n i b v t, l (Int64), o (an Object of the engine, or none), h (an Object made - never none), e<values>, {fields}, [items], [N items] (N entries: `f32 m[16]`), [?item] (no entry or one: std::optional)
+  const char* shape;  // the value's form, written out: b v t, the numbers n f64, f f32, i i64, l u64, w i32, u u32, s i16, r u16, k i8, y u8, o (an Object of the engine, or none), h (an Object made - never none), e<values>, {fields}, [items], [N items] (N entries: `f32 m[16]`), [?item] (no entry or one: std::optional)
   /// An output list the engine writes through a pointer, with their count beside it (`void render(f32*
   /// out, Count<2> frames)`): the input that is the count - the room the call says it has ("" for any other pin).
   const char* count = "";

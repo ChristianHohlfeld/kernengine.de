@@ -95,14 +95,12 @@ struct Machine {
   Machine& automatic(u32, u32, u32, std::string_view = {}) { return *this; }
 };
 
-/// kern::formula(lambda, values...): a Formula node. The lambda is the formula.
-/// (a place of a fixed width - U8 ... I32 - gives the formula its Int: logic::pinned)
-template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(logic::pinned(values)...)); }
-/// (a formula of whole numbers - [](Int a) -> Int: its value is the double of the Int it gives, held as
-/// that whole number, kern::math::Exact: an Int takes it as it is, everything else as that double)
-template <class F, class... A>
-  requires std::same_as<std::invoke_result_t<F, decltype(logic::pinned(std::declval<A>()))...>, logic::Whole>
-constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(logic::pinned(values)...))}; }
+/// kern::formula<u32, f32>([](auto a, auto s) { return ...; }, a's value, s's value): a Formula node - the types of its
+/// inputs, the formula as the lambda's body. Each input is a logic::num::Typed of its type there, whose operators and
+/// functions are those of numbers.h: the lambda computes what the node computes, bit for bit (logic.h, Formula).
+template <class... T, class F> constexpr auto formula(F&& f, std::type_identity_t<T>... values) {
+  return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+}
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
 /// order of the function's outputs (func_call_on).
@@ -134,17 +132,17 @@ template <class T> auto only(T&& r) {
 }
 template <class Res> struct given { using type = decltype(only(std::declval<Res>())); };
 template <class Res> requires gives_nothing<Res> struct given<Res> { using type = void; };
-template <auto F, class L, class Res, class P, class... A> Callback<typename given<Res>::type(A...)> bound(Res (L::*)(const P&, A...), const P& place) {
-  using R = typename given<Res>::type;
-  return {[](void* p, A... a) -> R {
+template <auto F, class L, class Res, class P, class... A> Callback<num::raw<typename given<Res>::type>(num::raw<A>...)> bound(Res (L::*)(const P&, A...), const P& place) {
+  using R = num::raw<typename given<Res>::type>;
+  return {[](void* p, num::raw<A>... a) -> R {
             if constexpr (std::is_void_v<R>) (the_library<L>.*F)(*static_cast<const P*>(p), a...);
             else return only((the_library<L>.*F)(*static_cast<const P*>(p), a...));
           },
           const_cast<P*>(&place)};
 }
-template <auto F, class L, class Res, class... A> Callback<typename given<Res>::type(A...)> free(Res (L::*)(A...)) {
-  using R = typename given<Res>::type;
-  return {[](void*, A... a) -> R {
+template <auto F, class L, class Res, class... A> Callback<num::raw<typename given<Res>::type>(num::raw<A>...)> free(Res (L::*)(A...)) {
+  using R = num::raw<typename given<Res>::type>;
+  return {[](void*, num::raw<A>... a) -> R {
             if constexpr (std::is_void_v<R>) (the_library<L>.*F)(a...);
             else return only((the_library<L>.*F)(a...));
           },
@@ -156,27 +154,19 @@ template <auto F, class L, class Res, class... A> Callback<typename given<Res>::
 /// The nodes of the core library (src/logic/core_nodes.cpp). kern::Blueprint, below, is these and
 /// the gameplay nodes.
 struct BlueprintCore : logic::PureNodes {
-  /// A whole number as a Blueprint holds it (the functions of nodes.h take and give i64).
-  using Int = logic::Whole;
-  /// Ints of a fixed width (logic::kWidthNames): a place that holds what it is given as C++ stores it
-  /// in a std::uint8_t ... std::int32_t (logic::Sized, nodes.h); read, an Int.
-  using U8 = logic::Sized<u8>;
-  using U16 = logic::Sized<u16>;
-  using U32 = logic::Sized<u32>;
-  using I8 = logic::Sized<i8>;
-  using I16 = logic::Sized<i16>;
-  using I32 = logic::Sized<i32>;
+  // (the numbers are the C++ types themselves - bool, kern::i8 ... kern::u64, kern::f32, kern::f64 - and every operation
+  // on them a function of numbers.h: PureNodes)
   /// A text as a Blueprint's class holds it: one written out in the program is referred to, one
   /// made while running is held (logic::Text, nodes.h).
   using Text = logic::Text;
   /// A list of values of one type: List<Float>, List<Int> ...
   template <class T> using List = kern::List<T>;
   template <class T, std::size_t N> using Fixed = kern::Fixed<T, N>;
-  /// A map of values under their keys and a set of keys, in the order the keys came: Map<Int, Float>, Set<Int>.
+  /// A map of values under their keys and a set of keys, in the order the keys came: Map<Int, f64>, Set<Int>.
   template <class K, class V> using Map = logic::Map<K, V>;
   template <class K> using Set = logic::Set<K>;
-  /// A function of a library the engine calls, with the place it is bound to: Callback<Float(Float, Float)>.
-  template <class S> using Callback = logic::Callback<S>;
+  /// A function of a library the engine calls, with the place it is bound to: Callback<Float(f64, f64)>.
+  template <class S> using Callback = logic::Callback<typename logic::num::raw_signature<S>::type>;   // (the numbers themselves: the engine calls it)
   /// Make Callback: callback<&Terrain_lib::height_at>(self) - the library's function, its first input bound to
   /// the place (a const reference: read when the engine calls); callback<&Lib::fn>() binds none.
   template <auto F, class P> static auto callback(const P& place) { return logic::callbacks::bound<F>(F, place); }
@@ -189,9 +179,9 @@ struct BlueprintCore : logic::PureNodes {
   void debug_print(const Text& text, Bool screen) {
     if (kern_world.host) kern_world.host->print(text.str(), screen);
   }
-  Float time_now() const { return kern_world.host ? kern_world.host->time() : 0.0; }
+  f64 time_now() const { return kern_world.host ? kern_world.host->time() : 0.0; }
   /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{}).
-  template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
+  template <Setting Name> void flow_call(Actor target, Actor actor, f64 value, const Text& text) {
     logic::ActorRef to = 0;
     if (logic::Runtime* there = kern_runtime_of(target, "Call Event", to))
       there->call(Name.view(), to, {{"actor", logic::Value::actor(actor)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
@@ -217,7 +207,7 @@ struct BlueprintCore : logic::PureNodes {
   }
 
   /// Get Variable on Actor: what the variable `Name` of the Blueprint of `target` holds, as a T -
-  /// func_get_on<"MaxStars", Float>(actor_find("Wanted")).
+  /// func_get_on<"MaxStars", f64>(actor_find("Wanted")).
   /// (Which struct or enum it is, T says: the variable's value becomes a T as a value from outside does -
   /// what is no value of T is T's default.)
   template <Setting Name, class T> T func_get_on(Actor target) {
@@ -263,9 +253,9 @@ struct BlueprintCore : logic::PureNodes {
   }
   u32 kern_seed_value = 0;
   bool kern_seeded = false;
-  template <class N> Float math_random(N& n, Float min, Float max) { return logic::random::number(n.memory, kern_seed(), N::id, min, max); }
+  template <class N> f64 math_random(N& n, f64 min, f64 max) { return logic::random::number(n.memory, kern_seed(), N::id, min, max); }
   template <class N> Int math_random_int(N& n, Int min, Int max) { return logic::random::whole_number(n.memory, kern_seed(), N::id, min, max); }
-  template <class N> Bool math_random_bool(N& n, Float chance) { return logic::random::chance(n.memory, kern_seed(), N::id, chance); }
+  template <class N> Bool math_random_bool(N& n, f64 chance) { return logic::random::chance(n.memory, kern_seed(), N::id, chance); }
 
   // ---- state machines ----
   static Machine machine(std::string_view) { return {}; }
@@ -278,14 +268,14 @@ struct BlueprintCore : logic::PureNodes {
   // ---- waiting ----
   // The runtime keeps the waits and runs the node again when one is over (<node>_resume, through
   // the glue); what follows the node is kept in its member until then.
-  void kern_wait(u32 node, Float seconds) {
+  void kern_wait(u32 node, f64 seconds) {
     if (kern_world.runtime) kern_world.runtime->wait(*kern_world.instance, node, seconds, logic::Context::kResume);
   }
   void kern_cancel(u32 node) {
     if (kern_world.runtime) kern_world.runtime->cancel_waits(*kern_world.instance, node);
   }
   /// flow_delay(n, seconds, [this] { ... }): waits, then goes on. A call while it waits is ignored.
-  template <class N, class F> void flow_delay(N& n, Float duration, F&& then) {
+  template <class N, class F> void flow_delay(N& n, f64 duration, F&& then) {
     if (!logic::flow::delay_start(n.memory)) return;
     n.later = [f = std::forward<F>(then)](int) { f(); };
     kern_wait(N::id, duration);
@@ -296,7 +286,7 @@ struct BlueprintCore : logic::PureNodes {
     if (later) later(0);
   }
   /// Retriggerable Delay: every new call starts the wait again.
-  template <class N, class F> void flow_retrigger_delay(N& n, Float duration, F&& then) {
+  template <class N, class F> void flow_retrigger_delay(N& n, f64 duration, F&& then) {
     kern_cancel(N::id);
     n.later = [f = std::forward<F>(then)](int) { f(); };
     kern_wait(N::id, duration);
@@ -307,7 +297,7 @@ struct BlueprintCore : logic::PureNodes {
   }
   /// flow_tween<"smooth">(n, "play", seconds, {{"update", [this] { ... }}, {"finished", [this] { ... }}}):
   /// Update runs every step with n.alpha going 0 to 1, then Finished. "stop" ends it.
-  template <Setting Ease, class N> void flow_tween(N& n, std::string_view entry, Float duration, std::initializer_list<Path> paths) {
+  template <Setting Ease, class N> void flow_tween(N& n, std::string_view entry, f64 duration, std::initializer_list<Path> paths) {
     kern_cancel(N::id);
     if (entry == "stop") {
       logic::flow::tween_stop(n.memory);
@@ -407,6 +397,8 @@ struct BlueprintCore : logic::PureNodes {
   // (the values read the entries where they stand - of a List or of a Fixed: logic::Items)
   template <class T> static Int list_length(logic::Items<T> list) { return static_cast<i64>(list.size()); }
   template <class T> static const T& list_get(logic::Items<T> list, Int index) { return list[index]; }
+  /// List to Text: the items as the interpreter writes a list ([1, 2.5, 3]).
+  template <class T> static Text list_text(logic::Items<T> list) { return Text(logic::to_value(std::vector<T>(list.begin(), list.end())).as_text()); }
   // (an item is sought as C++ compares it: of a list of U8 the number, an Int - logic::Sought)
   template <class T> static Int list_find(logic::Items<T> list, const logic::Sought<T>& item) {
     for (std::size_t k = 0; k < list.size(); ++k)
@@ -456,7 +448,7 @@ struct BlueprintCore : logic::PureNodes {
   // ---- maps and sets ----
   // What they do is logic::map and logic::set (nodes.h) - on the same container the interpreter's
   // nodes use. The values take any map or set - its keys' and values' types are their settings,
-  // map_find<Int, Float>(Cells, 7); the steps change one at a place - the place is their first value.
+  // map_find<Int, f64>(Cells, 7); the steps change one at a place - the place is their first value.
   template <class V> struct MapFound {
     Bool found = false;
     V value{};
@@ -530,8 +522,7 @@ struct BlueprintCore : logic::PureNodes {
   /// Bytes (each the number of the second setting) from its entry `from` on into the entries of the place
   /// (each the number of the first) from `at` on: what std::memcpy between lists of numbers does
   /// (logic::bytes::copy, nodes.h - the interpreter's function). On a list or a list of a fixed length.
-  template <logic::bytes::Code C> using BytesNumber = std::conditional_t<logic::bytes::whole(C), Int, std::conditional_t<logic::bytes::wide(C), Int64, Float>>;
-  // (Items: a list of Ints of any width, Int or U8 ... I32 - its numbers as they are; of Int64s, of Floats)
+  // (Items: a list of numbers of the second setting's type, as they are)
   template <Setting Into, Setting Of, class T, class L>
   static void list_copy_bytes(List<T>& list, Int at, const L& items, Int from, Int count) {
     copy_bytes<Into, Of, T>(list.data(), list.size(), at, logic::items_of(items), from, count);
@@ -549,8 +540,8 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Code kInto = logic::bytes::code_of(Into.view()), kOf = logic::bytes::code_of(Of.view());
     static_assert(kInto != logic::bytes::Code::none && kInto != logic::bytes::Code::boolean && kOf != logic::bytes::Code::none && kOf != logic::bytes::Code::boolean,
                   "Copy Bytes: a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64");
-    static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
-    static_assert(logic::bytes::suits_list(kOf, logic::pin_type_of<S>()), "Copy Bytes: the numbers of Items are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
+    static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are of the first setting's type");
+    static_assert(logic::bytes::suits_list(kOf, logic::pin_type_of<S>()), "Copy Bytes: the numbers of Items are of the second setting's type");
     logic::bytes::copy(to, size, kInto, at, items.first, items.count, kOf, from, count);
   }
 
@@ -585,8 +576,8 @@ struct BlueprintCore : logic::PureNodes {
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
-  /// (Text to Int64: of the text where it stands)
-  static Int64 int64_of_text(const Text& a) { return logic::PureNodes::int64_parse(a.view()); }
+  /// (Text to u64: of the text where it stands)
+  static u64 num_text_to_u64(const Text& a) { return logic::PureNodes::int64_parse(a.view()); }
   static Int text_code_at(const Text& a, Int index) {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
@@ -629,8 +620,8 @@ struct BlueprintCore : logic::PureNodes {
   template <class L> static Text text_of_bytes(const L& bytes, Int at, Int count) { return logic::texts::of_bytes(logic::items_of(read_of(bytes)), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Bytes of Text: its bytes, a List<U8> (one request for memory, as std::vector<u8> of the text's range makes it).
-  static List<logic::Sized<u8>> text_bytes(const Text& a) {
-    List<logic::Sized<u8>> r;
+  static List<logic::num::Typed<u8>> text_bytes(const Text& a) {
+    List<logic::num::Typed<u8>> r;
     logic::texts::insert_bytes(r, 0, a.view());
     return r;
   }
@@ -645,30 +636,38 @@ struct BlueprintCore : logic::PureNodes {
     t.reserve(static_cast<std::size_t>(std::min<i64>(count, logic::texts::kLongest)));
     return t;
   }
-  /// Parse Float, Parse Int: the number at a place of a text as C reads it there (logic::scan).
+  /// Parse f64, Parse Int: the number at a place of a text as C reads it there (logic::scan).
   struct ParsedFloat {
-    Float value = 0.0;
+    f64 value = 0.0;
+    Int end = 0;
+  };
+  struct ParsedFloat32 {
+    f32 value = 0.0f;
     Int end = 0;
   };
   struct ParsedWhole {
-    Int64 value{};
+    i64 value = 0;
+    Int end = 0;
+  };
+  struct ParsedUnsigned {
+    u64 value = 0;
     Int end = 0;
   };
   static ParsedFloat text_parse_float(const Text& a, Int at) {
     const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), false);
     return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
-  static ParsedFloat text_parse_float32(const Text& a, Int at) {
+  static ParsedFloat32 text_parse_float32(const Text& a, Int at) {
     const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), true);
-    return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {static_cast<f32>(r.value), static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
   static ParsedWhole text_parse_int(const Text& a, Int at, Int base) {
     const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), true);
-    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {static_cast<i64>(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
-  static ParsedWhole text_parse_uint(const Text& a, Int at, Int base) {
+  static ParsedUnsigned text_parse_uint(const Text& a, Int at, Int base) {
     const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), false);
-    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {r.bits, static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
   /// Scan Text: text_scan<"%f %f">(n, text, at, x, y) - what sscanf reads (logic::scan), a step: n.count, and
   /// n.v0, n.v1 ... a value for each conversion, of the type the format says (`before`: what stays where the
@@ -683,13 +682,13 @@ struct BlueprintCore : logic::PureNodes {
   template <logic::scan::Kind K, class V> static void scan_before(logic::scan::Slot& s, const V& v) {
     s.kind = K;
     if constexpr (K == logic::scan::Kind::whole) s.whole = static_cast<i64>(Int(v));
-    else if constexpr (K == logic::scan::Kind::whole64) s.bits = Int64(v).bits;
-    else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(Float(v));
+    else if constexpr (K == logic::scan::Kind::whole64) s.bits = static_cast<u64>(v);
+    else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(v);
   }
   template <logic::scan::Kind K, class F, class V> static void scan_after(F& field, logic::scan::Slot& s, const V& before) {
     if constexpr (K == logic::scan::Kind::whole) field = Int(s.whole);
-    else if constexpr (K == logic::scan::Kind::whole64) field = Int64(s.bits);
-    else if constexpr (K == logic::scan::Kind::number) field = Float(s.number);
+    else if constexpr (K == logic::scan::Kind::whole64) field = s.bits;
+    else if constexpr (K == logic::scan::Kind::number) field = s.number;
     else if (s.written) field = Text(std::move(s.text));
     else field = Text(before);
   }
@@ -735,9 +734,11 @@ struct BlueprintCore : logic::PureNodes {
     const logic::format::Arg args[] = {format_arg(values)..., logic::format::Arg{}};
     return logic::format::text_of(Format.view(), args, sizeof...(V), most);
   }
-  static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
-  template <class T> static logic::format::Arg format_arg(logic::Sized<T> v) { return logic::format::arg(static_cast<i64>(v)); }  // (an Int of a fixed width: its Int)
-  static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
+  template <class T>
+    requires(logic::num::Number<logic::num::raw<T>> && !std::is_same_v<T, bool>)
+  static logic::format::Arg format_arg(T v) {
+    return logic::format::arg(logic::num::raw_value(v));   // (a whole number: its bits, as C's varargs; an f32 promoted to a double)
+  }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
   /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
   /// lives until text_format ends; made into a Text first, the view would be of a Text that is gone)
@@ -790,7 +791,9 @@ struct BlueprintCore : logic::PureNodes {
   // Make is the struct from a value for each field, in their order; Break is the struct, read
   // field by field: struct_break<Weapon>(Held).Damage. (A field of a variable is set where it
   // is: Held.Damage = 2.0; - the Set at that place, no function.)
-  template <class S, class... V> static S struct_make(V&&... fields) { return S{std::forward<V>(fields)...}; }
+  // (in parentheses, C++20: a number written out goes into a field of any number type that holds it - the notation has
+  // checked that it does, struct_make<Frame>(1447121230, 0) for a u32 and a u16 - as it does in braces where it stands)
+  template <class S, class... V> static S struct_make(V&&... fields) { return S(std::forward<V>(fields)...); }
   /// list_find_row<&Weapon::Name>(Rack, "Bow"): the first item of a list of structs whose field
   /// is the value - a table's row by its key. Not found: the struct's defaults, index -1.
   template <class S> struct FoundRow {
@@ -816,7 +819,7 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Bytes of Struct cannot be read");
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
-    Fixed<logic::Sized<u8>, kLayout.size> out;   // (the bytes: std::array<u8, N>)
+    Fixed<logic::num::Typed<u8>, kLayout.size> out;   // (the bytes: std::array of the class's u8, N)
     std::size_t k = 0;
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;
@@ -834,19 +837,16 @@ struct BlueprintCore : logic::PureNodes {
     logic::structs::fields(out, [&](auto&... field) { (take_bytes(field, kLayout.fields[k++], byte), ...); });
     return out;
   }
-  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Bool v) { logic::bytes::put(out, f, v ? 1 : 0); }
-  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Int v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
-  template <class B, class T> static void put_bytes(B* out, const logic::bytes::Field& f, logic::Sized<T> v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
-  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, logic::Int64 v) { logic::bytes::put(out, f, v.bits); }
-  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Float v) { logic::bytes::put(out, f, logic::bytes::bits(f.code, v)); }
-  template <class B> static void take_bytes(Bool& to, const logic::bytes::Field& f, B&& byte) { to = logic::bytes::take(f, byte) != 0; }
-  template <class B> static void take_bytes(Int& to, const logic::bytes::Field& f, B&& byte) { to = static_cast<i64>(logic::bytes::take(f, byte)); }
-  // (a field of a width: the layout gives it its own width - the number fits)
-  template <class T, class B> static void take_bytes(logic::Sized<T>& to, const logic::bytes::Field& f, B&& byte) { to = logic::Sized<T>(static_cast<i64>(logic::bytes::take(f, byte))); }
-  template <class B> static void take_bytes(logic::Int64& to, const logic::bytes::Field& f, B&& byte) { to = logic::Int64(logic::bytes::take(f, byte)); }
-  template <class B> static void take_bytes(Float& to, const logic::bytes::Field& f, B&& byte) {
-    const u64 b = logic::bytes::take(f, byte);
-    to = f.code == logic::bytes::Code::f32 ? logic::bytes::single_value(static_cast<u32>(b)) : std::bit_cast<f64>(b);
+  // (a field's own bits: it is of the layout's number type - numbers.h's bits_of)
+  template <class B, class T>
+    requires logic::num::Number<logic::num::raw<T>>
+  static void put_bytes(B* out, const logic::bytes::Field& f, T v) {
+    logic::bytes::put(out, f, logic::num::seen_bits(logic::num::raw_value(v)));  // (a NaN: the one NaN - numbers.h, seen)
+  }
+  template <class B, class T>
+    requires logic::num::Number<logic::num::raw<T>>
+  static void take_bytes(T& to, const logic::bytes::Field& f, B&& byte) {
+    to = logic::num::of_bits<logic::num::raw<T>>(logic::bytes::take(f, byte));
   }
 
   // ---- steps ----
@@ -871,13 +871,13 @@ struct BlueprintCore : logic::PureNodes {
 
   // ---- values with a setting ----
   // (the operator is known when the class is compiled: the same expressions as compare, chosen then)
-  template <Setting Op> static Bool math_compare(Float a, Float b) {
-    if constexpr (Op.view() == "==") return std::fabs(a - b) <= 1e-9;
-    else if constexpr (Op.view() == "!=") return std::fabs(a - b) > 1e-9;
-    else if constexpr (Op.view() == "<") return a < b;
-    else if constexpr (Op.view() == "<=") return a <= b;
-    else if constexpr (Op.view() == ">") return a > b;
-    else return a >= b;
+  template <Setting Op, class P, class T = logic::num::raw<P>> static Bool math_compare(std::type_identity_t<T> a, std::type_identity_t<T> b) {
+    if constexpr (Op.view() == "==") return logic::num::eq(a, b);
+    else if constexpr (Op.view() == "!=") return logic::num::ne(a, b);
+    else if constexpr (Op.view() == "<") return logic::num::lt(a, b);
+    else if constexpr (Op.view() == "<=") return logic::num::le(a, b);
+    else if constexpr (Op.view() == ">") return logic::num::gt(a, b);
+    else return logic::num::ge(a, b);
   }
   /// The setting "Type" of a generic node is the type itself: logic_select<Float>, value_reroute<List<Text>>.
   template <class T> static T logic_select(Bool pick, std::type_identity_t<T> a, std::type_identity_t<T> b) { return pick ? a : b; }
@@ -925,7 +925,7 @@ template <class B> auto implementation(B& blueprint) {
 /// KERN_PROJECT_ENUM(Mode, ...) is an enum of the project: declared like one of the Blueprint's,
 /// and the same in every Blueprint of the level that has it (see EnumType::project, logic.h).
 #define KERN_PROJECT_ENUM(Name, ...) KERN_ENUM(Name, __VA_ARGS__)
-/// KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; }; declares a struct of the
+/// KERN_STRUCT(Weapon) { Text Name = ""; f64 Damage = 10.0; }; declares a struct of the
 /// Blueprint: the type Weapon with these fields, each with its default. It is a plain aggregate -
 /// Weapon{"Knife", 25.0} gives every field in their order - and two of them are equal when all
 /// their fields are (logic::structs::equal, nodes.h).
@@ -935,16 +935,16 @@ template <class B> auto implementation(B& blueprint) {
   struct Name
 /// KERN_PROJECT_STRUCT(Weapon) { ... }; is a struct of the project (see KERN_PROJECT_ENUM).
 #define KERN_PROJECT_STRUCT(Name) KERN_STRUCT(Name)
-/// KERN_CONST Float Gravity = 9.81; is a constant: read like a variable, never changed. (One for
+/// KERN_CONST f64 Gravity = 9.81; is a constant: read like a variable, never changed. (One for
 /// the class, not one in every Blueprint of it - and a library may have it: it keeps nothing.)
 #define KERN_CONST static inline const
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
-/// KERN_OVERRIDE void update(Float dt = 0.0) { ... }: a function of the interface of the engine the Blueprint
+/// KERN_OVERRIDE void update(f64 dt = 0.0) { ... }: a function of the interface of the engine the Blueprint
 /// implements (kern::Implements<kern::App>) - the engine calls it (Function::overrides). A function of an interface's
 /// name without it, and one with it that the interface has not (a typo), are errors of the Blueprint (check).
 #define KERN_OVERRIDE
-/// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:
+/// KERN_EXTERN FnResult Fn(f64 x = 0.0); says what a function of another Blueprint looks like:
 /// it has no body here and is called on an actor (func_call_on<"Fn">).
 #define KERN_EXTERN
 /// KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...); the same, for a function the other

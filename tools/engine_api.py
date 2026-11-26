@@ -121,7 +121,7 @@ def case_text(api, functions):
     made as C++ makes it without arguments; what a free function gives may depend on what the test does not
     hold (the clock, the threads of the jobs), and its inputs here are zeros nobody chose."""
     u = api.u
-    plain = {"Bool": "false", "Int": "0", "Float": "0.0", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""', "Int64": "Int64{0x0}"}
+    plain = {"Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""', **{t: c2b.ZERO[t] for t in c2b.NUMS}}
     zero = lambda bt: plain[bt] if bt in plain else u.zero(bt)
     variables, members, bodies, free, inputs = [], [], [], [], {}
 
@@ -143,7 +143,7 @@ def case_text(api, functions):
         out.append(f"{r}_0 = {at};")
         if bt.startswith("List<"):
             item = bt[5:-1]
-            variables.append(f"  Int {r}_1 = 0;")
+            variables.append(f"  i64 {r}_1 = 0;")
             variables.append(f"  {item} {r}_2 = {zero(item)};")
             variables.append(f"  {bt} {r}_3 = {zero(bt)};")
             out += [f"list_add({at}, {value(item)});", f"{at}[0] = {value(item)};", f"{r}_1 = list_length<{item}>({at});",
@@ -310,7 +310,9 @@ def component_of(path):
     """The part of the engine a header belongs to: kern/include/kern/<part>/ - its sources are kern/src/<part>/ (a
     build links the parts kern/build.sh says)."""
     m = re.search(r"/include/kern/(\w+)/", path or "")
-    assert m and os.path.isdir(os.path.join(KERN, "src", m.group(1))), path
+    assert m, path
+    if not os.path.isdir(os.path.join(KERN, "src", m.group(1))):
+        return "core"   # (a part that is its headers alone - math: its functions are inline, every build has core)
     return m.group(1)
 
 
@@ -557,7 +559,11 @@ class Calls:
     def tag(self, bt, need, ev="ev::", types=""):
         """`ev`, `types`: how the file the tag stands in names engine_values and the tool's own types (E_, S_)."""
         u = self.u
-        if c2b.wire(bt) in SCALAR_TAG:   # (an entry of a fixed width - of a List<U8> - is an Int)
+        if bt in c2b.NUMS and bt != "bool":   # (a number: of the type of the signature - engine_values::Num<T>)
+            return f"{ev}Num<::kern::{bt}>"
+        if bt == "bool":
+            return ev + "Bool"
+        if c2b.wire(bt) in SCALAR_TAG:
             return ev + SCALAR_TAG[c2b.wire(bt)]
         if c2b.object_class(bt):   # (an object of the engine: Object<I>, its ObjectRef)
             return ev + "Handle"
@@ -800,7 +806,7 @@ class Calls:
 
     # (the pins the class has as a C++ type of the language: an input of any other type is a template - it may name a
     # place of the engine, an entry of `b.chunks()` or a field of it: read where the input is taken, input_value)
-    PLAIN = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64", "Actor": "Actor"}
+    PLAIN = {"Vector": "Vector", "Text": "const Text&", "Actor": "Actor", **{t: t for t in c2b.NUMS}}
 
     def templated(self, bt):
         return bt not in self.PLAIN and not (bt.startswith("List<") and bt[5:-1] in self.PLAIN) and not c2b.object_class(bt)
@@ -1119,7 +1125,11 @@ class Calls:
                 "// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).",
                 *adapters, "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
-                "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;", "  using Actor = logic::ActorHandle;",
+                "  // (the number types of the language, by their C++ names - a Blueprint's class names them in its own scope: places",
+                "  // whose operators are those of the language, numbers.h Typed; a function of C++ is handed the number itself)",
+                *[f"  using {t} = ::kern::logic::num::Typed<::kern::{t}>;" for t in ("i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64")],
+                "  using Bool = bool;", "  using Int = i64;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = u64;", "  using Actor = logic::ActorHandle;",
+                "  using U8 = u8;", "  using U16 = u16;", "  using U32 = u32;", "  using I8 = i8;", "  using I16 = i16;", "  using I32 = i32;",
                 "  template <class T> using List = logic::List<T>;", "",
                 "  /// One call of the engine through the host's door: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
                 "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",
@@ -1137,8 +1147,9 @@ class Calls:
         for bt in names:
             q, fields = self.struct_q[bt], u.struct_fields[bt]
             tags = [self.tag(ft, set()) for _, ft, _, _ in fields]
-            bound = ", ".join(f"f{k}" for k in range(len(fields)))
-            parts = lambda way, order: " ".join(f"ev::Direct<{tg}>::{way}(o, {order(f'f{k}', f'x.{c}')});" for k, ((_, _, _, c), tg) in enumerate(zip(fields, tags)))
+            # (the fields bound by place: field_0 ... - no name of a type, f32 or f64, among them)
+            bound = ", ".join(f"field_{k}" for k in range(len(fields)))
+            parts = lambda way, order: " ".join(f"ev::Direct<{tg}>::{way}(o, {order(f'field_{k}', f'x.{c}')});" for k, ((_, _, _, c), tg) in enumerate(zip(fields, tags)))
             lines += [f"struct S_{bt} {{",
                       f"  template <class B> static void from(EngineObjects& o, const B& b, {q}& x) {{ " + (f"const auto& [{bound}] = b; " if fields else "") + parts("from", lambda b, x: f"{b}, {x}") + " }",
                       f"  template <class B> static B make(EngineObjects& o, const {q}& x) {{ B b{{" + ", ".join(f"ev::made<{tg}>(o, x.{c})" for (_, _, _, c), tg in zip(fields, tags)) + "}; " +

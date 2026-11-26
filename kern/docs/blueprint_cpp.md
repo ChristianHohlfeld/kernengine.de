@@ -139,7 +139,7 @@ struct Demo : kern::Blueprint {
   /// The level for a heat.
   KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
     if (math_compare<">">(heat, 10.0)) {
-      return {kern::formula([](Float h, Float s) -> Float { return h * s; }, heat, scale), true};
+      return {kern::formula<f32, f32>([](auto h, auto s) { return h * s; }, heat, scale), true};
     }
     return {0.0, false};
   }
@@ -230,7 +230,7 @@ KERN_LAYOUT(Demo) {
 | Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
-| Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
+| Formel-Knoten | `kern::formula<f32, f32>([](auto a, auto b) { return a * b; }, wertA, wertB)` – die Typen der Eingänge, die Formel als Rumpf (siehe „Formeln“) |
 | Umwandlung an einem Draht (Int → Float …) | `kern::to<Float>(wert)` |
 | ein Wert, den nach diesem Eingang nichts mehr braucht | `std::move(wert)` – der Draht ist derselbe, der Text reicht den Wert weiter, statt ihn zu kopieren (siehe „Übergeben statt kopieren“) |
 | Branch | `if (wert) { ... } else { ... }` |
@@ -256,23 +256,22 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 
 | Pin-Typ | C++ | Literal |
 |---|---|---|
-| Boolean | `Bool` | `true`, `false` |
-| Integer | `Int` | `12`, `-3` |
-| Integer fester Breite – der Typ eines **Platzes** (siehe „Ganze Zahlen fester Breite“) | `U8`, `U16`, `U32`, `I8`, `I16`, `I32` | `200`, `-3` – eine Zahl, die die Breite hält |
-| Float | `Float` | `0.5`, `12.0`, `1e+21` |
+| bool | `bool` | `true`, `false` |
+| ganze Zahl fester Breite (siehe „Zahl-Typen“) | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `12`, `-3`, `200`, `18446744073709551615u` (eine Zahl, die der Typ genau hält; `-9223372036854775807 - 1`) |
+| Fließkommazahl (siehe „Zahl-Typen“) | `f32`, `f64` | `0.5f`, `12.0f` (f32), `0.5`, `1e+21` (f64); unendlich/NaN: `std::numeric_limits<f32>::infinity()`, `::quiet_NaN()` |
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
 | Actor | `Actor` | `Actor{}` (keiner – das einzige Literal: ein Akteur kommt aus seiner Welt, project.md 7.; Same Actor `actor_equal(a, b)`, Id of Actor `actor_id(a)`) |
-| Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
+| Liste eines dieser Typen | `List<bool>`, `List<i64>`, `List<u8>`, `List<f32>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<f32>{1.0f, 2.5f}`, leer: `List<f32>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
-| Int64 – 64 Bit, wie `u64` und `i64` von C++ sie halten (siehe „Int64“) | `Int64`, Liste: `List<Int64>` | `Int64{0x1f}` – die Bits, hexadezimal geschrieben; gelesen wird jede ganze Zahl, die C++ schreibt (`Int64{31}`) |
 | Map – Werte eines Typs unter Schlüsseln, in der Reihenfolge, in der die Schlüssel kamen (siehe „Maps und Sets“) | `Map<Int, Float>`, `Map<Text, Cell>`, `Map<Kind, List<Float>>` | `Map<Int, Float>{{3, 1.5}, {1, 2.0}}` – die Einträge in ihrer Reihenfolge, je `{Schlüssel, Wert}`; leer: `Map<Int, Float>{}` |
 | Set – Schlüssel in der Reihenfolge, in der sie kamen | `Set<Int>`, `Set<Int64>`, `Set<Text>` | `Set<Text>{"a", "b"}`, leer: `Set<Text>{}` |
 | Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5}` – die Einträge bis zum letzten, der nicht null ist: Was nicht dasteht, ist null, wie in C++ (lauter Nullen: `Fixed<Float, 3>{}`); mehr als die Länge ist ein Fehler |
 
-Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
-Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
+Zahlen stehen in der kürzesten Form, die genau denselben Wert ihres Typs wieder ergibt (`std::to_chars`).
+Kein Draht wandelt um: Haben seine Enden verschiedene Typen, ist das ein Fehler des Graphen; eine Umwandlung
+ist ein Knoten (`num_cast<f64, i32>(x)`, To Text `num_text<f32>(x)`). Der Wert
 einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“);
 für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 
@@ -484,77 +483,90 @@ void on1(Actor actor, Float value, Text text) {
   ist. Herausnehmen schiebt die folgenden Einträge nach vorn und baut den Index neu – das kostet so
   viel, wie Einträge hinter dem herausgenommenen stehen.
 
-### Ganze Zahlen fester Breite
+### Zahl-Typen
 
-Ein Platz – eine Variable, ein Feld, ein Ein- oder Ausgang, eine lokale Variable – kann ein Int fester Breite sein:
-`U8`, `U16`, `U32` (0 bis 2^w − 1) und `I8`, `I16`, `I32` (−2^(w−1) bis 2^(w−1) − 1); im Graphen ein Int mit der Breite
-am Platz (`"type":"int","of":"u32"`, Einstellung `u32`), wie die Länge bei `Fixed`. **Über einen Draht fließt ein Int** –
-die Breite hat nur der Platz. Was der Platz bekommt, hält er, wie C++ eine ganze Zahl in einem `std::uint32_t` speichert
-(`static_cast<u32>(x)`): die unteren w Bits des Int, bei Vorzeichen im Zweierkomplement – beim Setzen (`X = n3.item;`,
-`S.a = …`, `return {…}`, Aufruf, von außen) und bei Add to Variable (`E += -4294967297;`: die unteren Bits der Summe).
-Eine Float wird erst zum Int (`kern::to<Int>(x)` – auf null zu, außerhalb das nächste Ende von Int), dann gespeichert;
-`kern::to<U8>` gibt es nicht. Jeder Wert einer Breite ist kleiner als 2^32 und so in einem double genau – Interpreter
-und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen der Funktion des Knotens. Das Produkt zweier
-`U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
-als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
-Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`). Die Schlüssel einer Map haben keine Breite; ihre **Werte**
-können eine haben (`Map<Int, U8>`, `Map<Int, List<U32>>`, im Graphen `"of":"int>int_list:u32"`, Einstellung Value `u32_list`): die Map ist
-der Platz, ein Wert wird gespeichert wie C++ ihn in einer `std::map<…, std::vector<u32>>` speichert – Set at Key, Set Variable auf
-`M[i]`, Add/Insert/Set Length auf der Liste eines Werts (`list_add(M[0], x)`), eine ganze Map beim Setzen und von außen; ihre
-Vorgabe und ein Literal halten nur Werte der Breite (`Map<Int, U8>{{1, 256}}` ist ein Fehler). In der Klasse ist ein solcher Wert
-`logic::Sized<u32>` bzw. `List<Sized<u32>>`; Find gibt ihn als Int.
+Die Sprache hat die Zahl-Typen des C++-Teilsatzes, jeder ein eigener Pin-Typ: `bool`, `i8`, `i16`, `i32`, `i64`,
+`u8`, `u16`, `u32`, `u64`, `f32`, `f64`. Vorgaben im Editor: „Float“ ist `f32` (wie die Engine, Grafik und Physik
+rechnen), „Int“ ist `i64`. Eine Operation rechnet in ihrem Typ, wie C++ es tut – `f32 + f32` rundet auf f32, jeder
+Zwischenwert (`a*b + c` ist nicht das double-Ergebnis einmal gerundet), `u32 * u32` bricht bei 2^32 um. Die eine
+Implementierung steht in `kern/logic/numbers.h` (`kern::logic::num`): Interpreter (PureNodes), Klasse und JIT
+rufen dieselben Funktionen; sin, exp, pow … sind die der Engine (`kern::dm`, musl, mit f-Varianten: nativ wie in
+WebAssembly dieselben Bits), sqrt, floor, fmod sind in IEEE exakt.
 
-**Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
-Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,
-`List<U8>{…}` (Make List mit Typ `u8`), Insert Text Bytes (eine `List<I8>` hält die Bytes 128 … 255 als −128 … −1), eine ganze Liste
-beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Breite (`list_copy_bytes<"u8", …>(B, …)` bei
-`List<U8> B`). Find, Contains und Remove Item vergleichen die Zahl, wie C++ ein `std::uint8_t` mit einem `int` vergleicht
-(`std::find` von 256 in einem `std::vector<u8>` findet nichts): in der Klasse `logic::Sought<T>` (ein Int bei `Sized<T>`).
-Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
-`std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
-Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
-`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Was Bytes gibt – Bytes of Text,
-Bytes of S –, gibt eine `List<U8>` (C++: `std::vector<u8>`, `std::array<u8, N>`). Ein Feld einer Breite hat in
-einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
-(`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
+Die Knoten der Zahlen haben ihren Typ als Einstellung: `math_add<f32>(a, b)`, `math_compare<"<", i64>(a, b)`,
+`math_shift_left<u32>(h, 5)`, `math_sin<f64>(x)` (Radiant, wie C++). Eine Umwandlung ist ein Knoten für jede
+Umwandlung, die C++ kennt (IntegralCast, FloatingCast, IntegralToFloating, FloatingToIntegral, Promotion):
+`num_cast<To, From>(x)` – wie `static_cast<To>(x)`; `num_bit_cast<u32, f32>(x)` wie `std::bit_cast`.
 
-### Int64
+Was C++ offenlässt, legt `numbers.h` fest – auf jeder Plattform gleich; der Konverter meldet eine solche Stelle der
+Quelle als Fehler:
+- ganze Zahlen: `+ - *` brechen im Zweierkomplement an ihrer Breite um (signed-Überlauf ist in C++ UB); `-x` und
+  `abs` der kleinsten signed-Zahl geben sie selbst;
+- `/` und `%` durch 0 geben 0; kleinste signed-Zahl `/ -1` gibt sie selbst, `% -1` gibt 0; sonst auf null zu wie C++;
+- ein Shift geht um die Weite modulo der Breite (wie x86 und WebAssembly); `>>` einer signed-Zahl bringt das Vorzeichen;
+- Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly);
+- `fmin`/`fmax` von 0 und −0: −0 bzw. 0;
+- **ein Platz der Sprache rechnet mit seinem Typ**: in der Klasse ist jede Zahl der Sprache – Variable, Feld eines
+  Structs der Sprache (auch der Spiegel eines Engine-Structs), lokale Variable, Ein- und Ausgang einer Funktion, Eintrag
+  einer Liste, Schlüssel und Wert einer Map, Eingang einer Formel – ein `kern::logic::num::Typed<T>`. Die Klasse nennt sie
+  `i64`, `f32` … (die Namen der Sprache im Bereich der Klasse, `EngineNodesOf` in engine_nodes.gen.h); `Count += n`,
+  `a * b`, `x << n`, `a < b` bleiben der Text und sind die Funktionen aus numbers.h (`Count += n` ist `add(Count, n)`, bricht
+  um wie der Add-Knoten). Ein eingebauter Operator von C++ kommt auf einem Platz nicht vor: zwei Operanden verschiedener
+  Typen (oder ein Fließkomma-Literal anderen Typs: `x + 0.5` bei `f32 x`) nimmt der Compiler nicht an – statt still auf
+  den Operator von C++ auszuweichen, ist es ein Fehler (`= delete`), wie der Leser es ablehnt. Eine Funktion von C++ (ein
+  Knoten der Engine, eine Funktion von PureNodes) bekommt die Zahl selbst – genau als ihren Typ (`Typed<i32>` gibt ein
+  `i32`, nie ein `f64`: das wäre eine Umwandlung, `num_cast`). An der Tür der Engine gibt der Platz seine Zahl an einer
+  Stelle (`engine_values::Direct<Num<T>>`), eine Zahl der Engine wird dort ein Platz; die Kleber nach außen (native_glue,
+  Exporte, Callbacks) ebenso. Ohne Compiler-Schalter (`-fwrapv` ist abgelehnt). Beleg: der Klassen-Fall `Wrap` (jede
+  ganze Zahl und f32, Add to Variable auf Variable, Feld, lokaler Variable und Listen-Eintrag, Add/Multiply/Divide und
+  Formeln an allen Paaren der Ränder; blueprint_native_test unter UBSan ohne Meldung, Klasse == Interpreter) und
+  `numbers_places_compute_as_numbers_h` (Interpreter und JIT == numbers.h, f32 == C++ in f32 ohne höhere Zwischengenauigkeit);
+- **das eine NaN**: welches NaN eine Rechnung gibt (Vorzeichen, Nutzlast), legen IEEE 754 und C++ nicht fest – x86 gibt
+  für `0 * inf` ein negatives, und ein Compiler darf die Operanden von `a + b` tauschen, dann kommt das NaN des anderen
+  durch (GCC mit -O1 tut es). Die Sprache legt es fest: solange gerechnet wird, ist ein NaN „ein NaN“ (kein Schritt zahlt
+  dafür); **wo seine Bits sichtbar werden**, ist es das eine stille NaN `0x7fc00000` (f32) bzw. `0x7ff8000000000000` (f64):
+  Bit Cast (`num_bit_cast`), die Bytes einer Struktur und Copy Bytes, eine Zahl als Text (`nan`), Speichern/Laden (JSON
+  `"nan"`), der Vergleich von Ergebnissen in den Tests (zwei NaN sind gleich, alles andere bitgenau: −0 ≠ 0, ±inf).
+  Eine Funktion in numbers.h (`num::seen`, `seen_bits`, `same_seen`), an genau diesen Übergängen gerufen, im Interpreter,
+  in der Klasse und im JIT (der die Funktion des Knotens ruft) dieselbe. Beleg: `numbers_one_nan_where_its_bits_are_seen`
+  (derselbe Ausdruck mit vertauschten Operanden, NaN beider Vorzeichen, in C++ – gebaut von GCC und clang –, Interpreter
+  und Klasse: an jedem Übergang dieselben Bits).
+Der Rest ist C++: ganze Zahl → schmalere behält die unteren Bits, Zahl → bool ist `!= 0`, ganze Zahl → Fließkomma und
+f64 → f32 die nächste (jenseits von f32: ±inf). Fließkomma ist IEEE 754 wie in C++: `x / 0` ist ±inf, `0 / 0` und
+`sqrt(-1)` NaN. Ein Wert behält beim Rechnen seine Bits (`Value` hält jede Zahl als ihre Bits); gesehen wird ein NaN
+als das eine NaN (oben).
 
-`Int64` sind 64 Bit, wie ein `u64` oder ein `i64` von C++ sie hält: ein Schlüssel aus zwei
-32-Bit-Zahlen, ein Hash, der Zustand eines Zufallsgenerators. Ein `Int` ist eine ganze Zahl, wie
-ein Blueprint sie hält – bis 2^53 genau; ein `Int64` hat alle 64 Bit. **Was die Bits bedeuten, sagt
-der Knoten**, der sie liest – wie in WebAssembly: Int64 Less vergleicht sie als `i64`, Int64 Less
-Unsigned als `u64`; Divide und Remainder gibt es als `i64` und als `u64`, Shift Right mit und ohne
-Vorzeichen.
+**Was sich gegenüber den alten Knoten ändert** (vor den Zahl-Typen: ein Float = f64, ein Int als double):
+Divide und Modulo von Fließkommazahlen durch 0 gaben 0 – jetzt IEEE (inf, NaN); Square Root einer negativen Zahl gab 0
+– jetzt NaN; Log von 0 und Negativem gab 0 – jetzt -inf/NaN; Asin/Acos klemmten auf [-1, 1] – jetzt NaN außerhalb;
+Power gab bei nicht-endlichem Ergebnis 0 – jetzt das Ergebnis von `pow`; Compare `==`/`!=` hatte eine Toleranz 1e-9 –
+jetzt der Vergleich von C++; Sin/Cos/Atan2 rechneten in Grad – jetzt Radiant; Round/Floor gaben ein Int – jetzt den
+Fließkomma-Typ (wie `std::round`); Modulo heißt Remainder (`math.rem`); ein Int war bis 2^53 genau – jetzt i64 mit
+Umbruch; Int64 und die Breite am Platz (`U8` …, `"of":"u32"`) gehen in den Typen auf; kein Draht wandelt mehr um (auch
+nicht Zahl → Text, Zahl → Vector, bool ↔ Zahl).
 
-```cpp
-Int64 State = Int64{0x853c49e6748fea9b};
+Ein Text, ein Level oder ein Projekt mit den alten Typnamen (`"float"`, `"int"`, `"int64"`, `Float`, `Int`, `U8` …)
+wird nicht gelesen – Fehler mit Ort und Grund; keine Rückwärtskompatibilität.
 
-KERN_PURE Int64 Next(Int64 s) {
-  return int64_add(int64_mul(s, Int64{0x5851f42d4c957f2d}), Int64{0x14057b7ef767814f});
-}
-```
+**Das Datenmodell des Subsets** ist eines, unabhängig von der Plattform: das von 64-Bit-Linux (LP64). `int` ≡ i32,
+`unsigned` ≡ u32, `short` ≡ i16, `char` ≡ i8, `long` und `long long` ≡ i64, `unsigned long` und `unsigned long long` ≡ u64,
+`size_t` ≡ u64, `ptrdiff_t` ≡ i64; `long double`, `intptr_t` und `uintptr_t` sind Fehler des Konverters mit Ort. Der Blueprint
+rechnet auf JEDER Plattform so (auch in WebAssembly, wo die Klassen kern::u64 nutzen); die Bezugs-Übersetzung einer
+Subset-Quelle für den Vergleich ist die mit diesem Datenmodell (64 Bit nativ) - eine Subset-Quelle direkt als wasm32 zu
+bauen, ist nicht die Bezugsgröße.
 
-- **Wie C++, für jeden Wert festgelegt:** Add, Subtract und Multiply gehen bei 2^64 herum, Shift
-  Left auch. Wo C++ nichts festlegt, legt der Knoten es fest, in jeder Stufe gleich: Divide und
-  Remainder durch 0 geben 0, das kleinste `i64` durch −1 gibt sich selbst (Remainder 0); ein Shift und
-  ein Rotate gehen um die letzten 6 Bit ihres Betrags; Float to Int64 gibt für „keine Zahl“ 0 und
-  jenseits der Enden das nächste Ende (Unsigned: unter 0 ist 0).
-- **Umwandeln sagt ein Knoten**, keiner still: Int to Int64 (die Bits eines `i64`), Int64 to Int
-  und Int64 to Int Unsigned (die Bits als `i64` bzw. `u64`, so genau, wie ein Int es hält), Int64
-  to Float (Unsigned), Float to Int64 (Unsigned), Bits of Float und Float of Bits (IEEE 754), Int64
-  of Halves, High, Low (je 32 Bit), Count Ones, Leading Zeros, Trailing Zeros, Int64 to Text (als
-  `u64`, als `i64`, hexadezimal) und Text to Int64 (dezimal, `0x`, ein `-` davor: das
-  Zweierkomplement; was keine Zahl ist: 0). Ein Draht von Int64 zu Int, Float oder Text ist ein
-  Fehler.
-- **Im Text** ist ein Int64 `Int64{0x1f}` (die Bits, hexadezimal), im Dokument der Text seiner
-  Bits als `u64` (`"18446744073709551615"` – mehr, als eine Zahl von JSON genau hält). Es kann
-  Schlüssel einer Map und eines Sets sein, und eine `List<Int64>` sortiert nach den Bits als `u64`.
-- **Was sie tun, steht einmal:** `PureNodes::int64_*` in `kern/logic/nodes.h` – der Knoten und die
-  Klasse rufen dieselbe Funktion; in der Klasse ist ein Int64 ein `kern::logic::Int64` (ein `u64`),
-  ein Knoten ein Ausdruck auf ihm, ohne Speicher anzufordern.
-- Ein `u64` oder `i64` eines Programms, das ein Bitmuster ist, ist im Blueprint ein `Int64`; die
-  Knoten der Engine nehmen und geben ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
+**Text eines Werts.** Kein Draht macht einen Text: eine Zahl wird Text durch `num_text<T>(x)` (To Text: eine ganze Zahl
+dezimal, eine Fließkommazahl die kürzeste Dezimalzahl, die sie wieder ergibt – `std::to_chars` –, `inf`, `-inf`, `nan`,
+bool `true`/`false`), eine Liste durch `list_text<T>(l)` (List to Text: `[1, 2.5, 3]`, jedes Element wie sein To Text).
+`kern::to<…>` gibt es nicht mehr. Ein Literal hat seinen Typ wie in C++: `0.5f` f32, `0.5` f64, `7` eine ganze Zahl, die
+in jeden Typ geht, der sie genau hält (`u8 x = 200;`), ein u64 jenseits von i64 mit `u` (`18446744073709551615u`); eine
+Liste nennt ihren Typ (`List<f32>{0.5f}`; `List<i64>{1}` ist keine `List<f64>`).
+
+**An der Tür der Engine** hat ein Pin den Typ der Signatur: `f32` bleibt `f32`, `u32` bleibt `u32`, ein `Vec3` sind drei
+f32 (`engine_values::Num<T>` in `engine_host.h`/`engine_direct.h`) – nichts wird an der Tür umgewandelt. Dieselbe Zahl
+unter anderem Namen (u64 ist auf einer Plattform `unsigned long`, auf einer anderen `unsigned long long`) ist dieselbe;
+`std::size_t` ist in der Sprache `u64` auf jeder Plattform – wo er 32 Bit hat (wasm32), wandelt die Tür, was nie
+abschneidet (keine Größe ist größer als der Speicher).
 
 ### Aufzählungen
 
@@ -1676,67 +1688,45 @@ Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `en
 
 ### Formeln
 
-Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
-anderes bedeuten oder fehlen, sind dort Aufrufe: `/` ist `kern::math::div` (durch 0 ergibt 0), `%`
-ist `kern::math::mod`, `^` ist `kern::math::pow`; die Funktionen und `pi` stehen in `kern::math`.
-Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `shl`, `shr` (die Bits
-einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
-eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
-dieselben Funktionen von `kern::math`.
-`copysign(a, b)` ist der Betrag von `a` mit dem Vorzeichen von `b` – auch dem von −0 (`copysign(1, -0)`
-ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
-dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
-Konverter schreibt `std::copysign` und `copysignf` damit.
-`remainder(a, b)` ist der Rest nach IEEE 754: `a − n · b`, mit `n` der ganzen Zahl, die `a / b` am
-nächsten liegt (von zweien die gerade) – `std::remainder`, exakt (das Ergebnis ist immer eine Zahl, die
-ein `double` hält), also auf jeder Plattform dieselben Bits; ist es 0, hat es das Vorzeichen von `a`.
-Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebracht (`remainder(w, 360)`);
-der Konverter schreibt `std::remainder` und `remainderf` damit.
-Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
-(`Formula::text()`).
+Eine Formel ist ein Ausdruck in C++ über ihre Eingänge, und sie ist **dieselbe Rechnung wie die Knoten, für die
+sie steht**: jede Operation ist die Funktion aus `kern/logic/numbers.h`, die der Knoten dieser Operation ruft
+(`a + b` zweier `u32` die von Add, die bei 2^32 umbricht), in der Reihenfolge, in der sie dasteht, jeder Wert in
+seinem Typ – kein Schritt in einem breiteren. Im Text steht sie als Lambda mit den Typen ihrer Eingänge:
 
-**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
-jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
-bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
-Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
-Funktion liest (`Formula::whole_result()`, unten), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
-und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
-`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
-Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
-Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
-weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
-liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
-Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
-`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
-`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
-und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
-neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
-verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
-Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
-(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
-Formel, an `band` … `mul32` als ganze Zahl, als Int `whole` dieser Zahl).
+`Heat = kern::formula<f32, u32>([](auto h, auto n) { return h * 0.5f + num_cast<f32, u32>(n); }, Heat, Count);`
 
-**Int-Eingänge und Int-Ergebnis, Eingang für Eingang** (`Formula::int_input(k)`, `Formula::whole_result()` – eine
-Regel am Ausdruck, keine Namen). Ein Eingang ist ein `Int`, wo sein Draht von einem Int kommt und die Formel ihn
-nur als ganze Zahl liest: als Argument einer solchen Funktion, als Seite eines Vergleichs (`==` `!=` `<` `<=` `>`
-`>=`), dessen andere Seite ein Eingang, eine geschriebene Zahl, eine solche Funktion oder ein solches `+`/`−`/`×` ist,
-oder durch `+`, `−`, `×` (die nur Eingänge, Zahlen, solche Funktionen und einander bekommen), deren Wert selbst so
-gelesen wird oder der Wert der Formel ist. Unter `/`, `%`, `^`, einer anderen Funktion, `-a`, `!` oder `?:` ist er
-ein Float (Int/Int wäre in C++ ganzzahlige Division; `/` steht ohnehin als `kern::math::div`). Jeder andere Eingang
-ist ein Float wie oben – ein Float-Eingang oder eine geschriebene Zahl macht nur diesen Eingang zum Float:
-`kern::formula([](Int a, Float f) -> Float { return a + f; }, n3.item, 0.25)`.
-Das Ergebnis ist ein `Int`, wo jeder Eingang einer ist und die Wurzel eine solche Funktion ist oder ein `+`/`−`/`×`,
-in dem ein Eingang steht – im zweiten Fall nur, wo alles, was den Wert liest, ein Int ist (jenseits der Enden von Int
-ist das Int sein Ende, das double nicht): `List[kern::to<Int>(kern::formula([](Int i) -> Int { return i - 1.0; }, i))]`.
-Sonst ein `Float`, auch mit Int-Eingängen: `kern::formula([](Int i, Int n) -> Float { return (i < 0.0) != (n < 0.0); }, i, n)`.
-In jeder Stufe derselbe Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double. In der Klasse ist jedes
-Int als double exakt (`normal`), und die Umwandlung erhält die Ordnung – der Vergleich zweier Ints oder eines Ints mit
-einer Zahl in i64 bzw. über das double gibt, was der der doubles gibt (auch an 2^53 und ±(2^63 − 1): `a == 9007199254740993`
-vergleicht mit dem double 2^53); `+`/`−`/`×` sind `logic::Sum` – als Float genau die double-Rechnung, als Int
-`whole` von ihr (ganzzahlig, wo jede Zahl auf dem Weg in ±2^53 liegt). Der Leser lehnt ab: `Int` an einem Eingang,
-den die Formel anders liest (`div(a, 2.0)`, `-a`, `a * sqrt(2.0)`, `a < 3.0 ? a : 1.0`); `-> Int` mit einem Float-Eingang,
-mit einer Wurzel, die kein Int gibt (`a < 3.0`, `sin(a)`, `band(a, 1.0) + 2.0`), oder mit `+`/`−`/`×` an der Wurzel und
-einem Leser, der kein Int ist; eine geschriebene Zahl oder ein `kern::to` an einem Int-Eingang.
+- **Eingänge**: jeder Name, den die Formel liest, ist ein Eingang, vom Typ, den die Einstellung „Types“ des Knotens
+  für ihn nennt (in der Reihenfolge, in der die Namen zuerst vorkommen; im Text die Typen von `kern::formula<…>`,
+  die Parameter des Lambdas sind genau diese Namen). Die Drähte in die Eingänge sind Drähte wie überall: ein Wert
+  des Typs des Eingangs, nichts wandelt.
+- **Typen**: zwei Werte, die sich treffen, haben einen Typ – `a + b` eines `u32` und eines `i64` ist ein Fehler mit
+  Stelle („the values meeting here are a u32 and an i64“); umgewandelt wird nur ausdrücklich, mit
+  `num_cast<To, From>(x)` (der Knoten Cast) oder `num_bit_cast<To, From>(x)` (Bit Cast), dieselbe Schreibweise wie
+  sonst im Text. Was die Formel gibt, hat den Typ ihres Ausdrucks; so ist der Ausgang des Knotens getypt.
+- **Zahlen**: `0.5f` ist ein `f32`, `0.5`, `1e3` ein `f64` – sie treffen nur ihren Typ (`a * 0.5` eines `f32` ist ein
+  Fehler: „with f after it“). Eine ganze Zahl (`7`, `7u`) nimmt den Typ dessen, was sie trifft, und muss eine
+  solche sein (`a + 300` eines `u8` ist ein Fehler, `7u` trifft nur vorzeichenlose, `2` trifft kein `f32`: `2.0f`);
+  allein (`c ? 1 : 0`, `1 << n`) ist sie die von C++: `i32`, über dessen Ende `i64` (`7u`: `u32`, `u64`).
+  `true`, `false`. Eine Operation nur auf geschriebenen Zahlen ist abgelehnt (ihr Wert ist selbst eine Zahl).
+- **Operatoren** binden wie in C++: `+ - * /`, `%` (ganze Zahlen; für Kommazahlen `fmod`), `-` `~` `!` davor, `<< >>`
+  (die Weite eine ganze Zahl jedes Typs), `< <= > >= == !=` (geben ein `bool`), `& | ^` (ganze Zahlen), `&& ||` (bools),
+  `c ? a : b`. Was numbers.h festlegt, wo C++ offenlässt, gilt auch hier (ganze Zahlen brechen um, `/` und `%` durch 0
+  geben 0, ein Shift um seinen Rest; Kommazahlen nach IEEE: `/ 0` ist ±inf).
+- **Funktionen** (die der Knoten): `min max abs clamp(x, lo, hi)`, für Kommazahlen `lerp(a, b, t) sqrt floor ceil
+  trunc round sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 pow hypot copysign fmin fmax fmod` (die
+  Mathematik der Engine, musl, die f-Variante beim `f32`) und `isnan isinf isfinite signbit` (geben ein `bool`).
+
+In der Klasse ist jeder Eingang ein `logic::num::Typed<T>` (numbers.h): seine Operatoren und Funktionen sind die
+von numbers.h, zwei verschiedene Typen treffen sich nicht (der Compiler lehnt `a + b` eines `Typed<u32>` und eines
+`Typed<i64>` ab wie die Formel), eine ganze Zahl nimmt den Typ, den sie trifft, eine Kommazahl nur den eigenen. So
+rechnet das Lambda, was der Knoten rechnet, Bit für Bit – nicht C++s eigene Operatoren, die ein `u8` auf `int`
+heben und einen Überlauf mit Vorzeichen, eine Division durch 0 oder einen Shift um die Breite offenlassen.
+Zurückgelesen wird der Rumpf als Formel in ihrer einen kanonischen Schreibweise (`Formula::text()`): einfache
+Leerzeichen, Klammern nur, wo sie etwas ändern – und um eine andere Operation unter `& | ^ << >>`, um `&&` in `||`
+und um einen Vergleich in einem Vergleich, wie Compiler es verlangen.
+Belegt in `logic_formulas` (jede Operation und jeder Fehler mit Stelle) und `logic_formula_is_its_nodes` (für jeden
+der zehn Zahl-Typen: Formel == ihr Knotenbaum im Interpreter, und `kern::formula` == C++s eigene Rechnung, wo C++ sie
+festlegt), dazu die Fälle `formula_<typ>` und `formula_casts` (logic_cases.h) in allen Stufen.
 
 ## Wo was steht
 
@@ -2352,14 +2342,14 @@ Nichts geschrieben, gespielt, im Text geändert, Undo) und im Browser `kern/test
 
 `tools/cpp_to_blueprint.py --convert <namespace> … --test <ordner>` schreibt zu jeder umgewandelten Quelldatei einen
 Test, der jede geschriebene Funktion mit ihrer Quelle vergleicht – Bit für Bit, im Interpreter und als kompilierte
-Klasse, mit den Zahlen der Sprache. Der Namensraum ist der des Spiels; der Konverter kennt keinen Spiel­namen
+Klasse, gegen die Quelle, wie C++ sie rechnet (ihre eigenen Zahlen: `f32` bleibt `f32`, ein `u32` bricht bei 2^32 um). Der Namensraum ist der des Spiels; der Konverter kennt keinen Spiel­namen
 (`tools/converter_cases/names.sh` prüft es im CI-Job `converter-cases`). Der Rahmen gehört der Engine:
 
 | Datei | was |
 |---|---|
 | `kern/test/test.h` | die Testliste: `KERN_TEST(name) { … }`, `KERN_CHECK(bedingung, "printf-Text", …)`, `kern::test::cases()` |
 | `kern/test/blueprint.h` | ein Blueprint, wie ein Test ihn laufen lässt (`kern::test::BlueprintRun`, `blueprint_of(name)`): aus dem **eingebetteten Projekt** (`kern/tools/embed_project.py`) – die des Programms aus dem Projekt, die einer Welt aus dem Level, das sie hält (ein Name in zwei Levels ist ein Fehler mit beiden Pfaden); die Schleifenwache ist `loopBudget` des Projekts |
-| `kern/test/converted.h` | der Vergleich (`namespace kern::converted`: die Zahlen der Sprache für die Quelle, Ziehen der Argumente, Vergleich der Werte, der Aufrufe der Engine und der Kosten) |
+| `kern/test/converted.h` | der Vergleich (`namespace kern::converted`: Ziehen der Argumente, Vergleich der Werte je Zahl-Typ – `Lang<T>`, der Zahl-Typ eines C++-Typs –, der Aufrufe der Engine und der Kosten; Wächter für das, was C++ offenlässt) |
 | `kern/test/cost.h` | wie oft ein Aufruf Speicher verlangt (die Klasse nicht öfter als ihre Quelle) |
 | `kern/tools/test_memory.cpp` | der Allokator eines Testprogramms: zählt und gibt genullten Speicher – genau einmal in jedes Testprogramm linken |
 | `kern/tools/test_main.cpp` | ein Läufer für alle registrierten Tests (`--name <test> …`); ein Spiel mit eigenem Läufer nimmt `kern::test::cases()` |
@@ -2371,21 +2361,23 @@ beantworten (sonst der Stellvertreter, der jeden Aufruf aufschreibt); `KERN_COST
 Klasse Speicher verlangen. Beispiel eines zweiten Spiels: `kern/games/murmel/tests/convert.sh` (wandelt die App um, baut
 die Vergleichstests und fährt sie gegen Stellvertreter und Engine).
 
-#### Der zweite Durchgang: gegen die Quelle, wie C++ sie rechnet
+#### Ein Weg: gegen die Quelle, wie C++ sie rechnet, unter UBSan
 
-Mit `KERN_TEST_SOURCE_NUMBERS=1` schreibt der Konverter zu jedem Blueprint einen zweiten Test, `test_<x>_source.cpp`. Dort
-steht die Quelle so, wie sie ist: `f32` bleibt `f32`, `1.0f` bleibt `1.0f`, und die Typen sind die der Engine (`kern::Vec3` …).
-Der erste Test bleibt unverändert und entscheidet wie bisher, was geschrieben wird und was wartet. Der zweite ändert daran
-nichts. Ein Stück der Quelle, das dort nicht kompiliert, fehlt nur in diesem Test, und das Protokoll zählt es
-(„not compared with the source's own numbers“). Jede Funktion, die in einem Test abweicht, bekommt eine Zeile
-`off: <funktion>: n of m calls differ; the largest difference d (Aufruf: Stelle: Quelle, Blueprint)`.
-`tools/source_numbers.py <testordner> <ausgabe der tests>` sagt dann je Funktion: geschrieben; verglichen wie bisher:
-gleich/abweichend; verglichen mit der Quelle, wie sie ist: gleich, abweichend in n von m Aufrufen (größte Abweichung) oder
-nicht verglichen. Am Ende stehen die Summen. Gebaut und gefahren werden die Tests mit `tools/converter_cases/compare.sh`
-(Fälle `numbers_*` in `tools/converter_cases/run.sh`, die Probe der CI mit `source_numbers=1`). Solange die Zahl-Typen der
-Sprache nicht die des Teilsatzes sind (Abschnitt „Zahlen“), ist der zweite Durchgang eine Messung und kein Tor.
+Der Test hält die Quelle so, wie sie ist: `f32` bleibt `f32`, `1.0f` bleibt `1.0f`, die Typen sind die der Engine
+(`kern::Vec3` …), `std::sin` ist die Mathematik der Engine (musl unter den Standardnamen). Es gibt keinen zweiten Durchgang
+und keine umgeschriebene Quelle mehr (`widen`, `KERN_TEST_SOURCE_NUMBERS` sind entfallen). Was C++ offenlässt, setzt der
+Test nicht fort: ein Überlauf einer Zahl mit Vorzeichen, eine ganze Zahl durch 0, ein Shift um die Breite oder mehr, ein
+Eintrag neben einer Liste, eine Fließkommazahl jenseits der Enden eines ganzen Typs – solche Aufrufe gehen über die
+Wächter von `converted.h` (`plus`, `quot`, `fits` …), werden gezählt und nicht verglichen. Gebaut werden Tests und Quellen
+unter UBSan (`-fsanitize=undefined`, `tools/converter_cases/compare.sh`): was dennoch durchkommt, steht als
+„runtime error:“ im Protokoll und macht den Vergleich rot. Eine Fließkomma-Division durch 0, ein NaN, ±inf: IEEE 754 legt
+sie fest – verglichen wie jeder Wert (zwei NaN sind gleich, −0 ≠ 0). Jede Funktion, die abweicht, bekommt eine Zeile
+`off: <funktion>: n of m calls differ; the largest difference d (Aufruf: Stelle: Quelle, Blueprint)`;
+`tools/source_numbers.py <testordner> <ausgabe der tests> [--right]` sagt je Funktion: gleich, abweichend in n von m
+Aufrufen oder nicht verglichen, mit den Summen (`--right`: alle gleich, UBSan still). Fälle: `numbers_*` und `hyperbolic`
+in `tools/converter_cases/run.sh`.
 
-## Zahlen (Entwurf – nicht gebaut; Stufe 1 = der zweite Durchgang oben)
+## Zahlen (der Entwurf von 26.11.2026 – gebaut: „Zahl-Typen“, „Formeln“, der Test oben)
 
 Bitgenau heißt: Der Blueprint rechnet, was C++ rechnet. Nichts wird umgedeutet oder gerundet, was die Quelle nicht selbst
 tut. Die Sprache bekommt dafür die Zahl-Typen des Teilsatzes (bool, i8 … i64, u8 … u64, f32, f64) als Pin-Typen. Jede
@@ -2444,7 +2436,8 @@ Heute (26.11.2026):
   deshalb nicht plattformfest, und sie rechnet anders als ihr Blueprint (Ursache 4 der Messung, z. B. slerp, heading_of).
 - Dazu kann clang Aufrufe selbst ändern: Konstanten falten (mit seiner eigenen, korrekt gerundeten Rechnung), `sin`+`cos` zu
   `sincos` zusammenlegen, `pow(x, 2)` zu `x*x` machen. Das hängt vom Compiler ab, nicht von der Quelle.
-- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt.
+- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt (seit 26.11. alle
+  eigene der Engine, siehe unten).
 
 Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter den Namen der Standardbibliothek, für jedes Ziel.**
 - Ein zweiter Satz der musl-Objekte ohne Umbenennung (oder dünne Hüllen `extern "C" float sinf(float x) { return
@@ -2482,6 +2475,28 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   (±0, ±Inf, NaN, Überlaufschwelle 710,4758…/89,4159…, sinh x = x für kleine x, ungerade/gerade bitgleich, asinh(sinh x) = x
   auf 4 ULP): Engine-Test `hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges`; bitgleich nativ und Wasm:
   `math_of_the_standard_library_is_the_engines` (Digest erweitert).
+- **acosh, atanh, log2, log1p, exp2, cbrt, ldexp, remainder** (je f und d, 26.11.2026) sind ebenfalls eigener Code der Engine
+  (musl_math hat keine davon): acosh/atanh in `kern/src/math/hyperbolic.c`, die übrigen in `kern/src/math/elementary.c`. Exakt
+  (0 ULP, wie IEEE sie definiert): **ldexp** auf den Bits (Exponent verschoben; im Subnormalen einmal gerundet, Gleichstand auf
+  gerade; Überlauf ±Inf, unter der halben kleinsten Subnormalen ±0) und **remainder** (Langdivision der Mantissen: Rest und ob der
+  Quotient ungerade ist; Null mit dem Vorzeichen von x). Genau: log2 = k + log(m)/ln 2 (Produkt mit 1/ln 2 als hi + lo exakt nach
+  Dekker, log2(2^k) = k exakt), log1p = log(u) + (y − (u − 1))/u (Fehler der Summe exakt, Fast2Sum; |y| < 2^-29 Reihe), exp2 =
+  exp(f·ln 2)·2^k mit dem exakten ldexp (exp2(k) = 2^k exakt), cbrt = exp(log(m)/3) und ein Newton-Schritt mit exaktem Rest
+  y³ − m (Dekker), acosh nahe 1 mit mitgeführten Fehlern von Wurzel und Summe, atanh über log1p. f-Varianten in f64, einmal gerundet.
+  In der Sprache sind sie getypte Knoten (`f32`/`f64`, `numbers.h`: `num::acosh` … `num::remainder`, `num::ldexp(x, i32 n)`;
+  Knoten Acosh, Atanh, Log 2, Log 1 Plus, Exp 2, Cube Root, IEEE Remainder, Ldexp; in der Formel `acosh atanh log2 log1p exp2
+  cbrt remainder`, ldexp als Knoten `math_ldexp<T>(x, n)`): jeder ruft die `kern::dm`-Funktion, außerhalb des Definitionsbereichs
+  mit dem, was C++ gibt (IEEE: `log2(0)` = −Inf, `log2(-1)` = NaN, `acosh(0.5)` = NaN, `atanh(1)` = Inf, `remainder(x, 0)` = NaN –
+  keine 0 an ihrer Stelle; Test `numbers_against_cpp`, Knoten == `numbers.h` in `numbers_nodes_interpreter` und als Klasse).
+  Der Konverter schreibt `std::log2` … `std::remainder` (und ihre f-Varianten) als diese Funktionen – kein „the engine has no X
+  yet“ mehr –, Konstanten aus ihnen rechnet die Engine (`engine_formula`); Fall `tools/converter_cases/elementary` (f64 und f32,
+  mit den Rändern) gegen die echte Quelle. (Die alten f64-Funktionen `kern::math::acosh` … in `nodes.h` – außerhalb des Bereichs 0
+  wie log – ruft kein Knoten.) Genauigkeit gegen 200 Stellen bzw. exakt (`kern/tests/elementary_reference.py` → `.h`, Python
+  decimal/Fraction mit ausgeschriebener IEEE-Rundung): f64 ≤ 2 ULP (gemessen acosh 1,24, log2 1,19, atanh 1,17, log1p 0,86,
+  exp2 0,66, cbrt 0,50), f32 ≤ 1 ULP (gemessen 0,50), ldexp/remainder 0 ULP; Ränder (±0, ±Inf, NaN, Definitionsgrenzen,
+  Überlauf/Unterlauf von exp2 und ldexp, Subnormale) und Identitäten (log2(2^k) = k und exp2(k) = 2^k für alle k, cbrt(m³) = m,
+  ungerade bitgleich, ldexp hebt sich auf, remainder ungerade/gerade/skaliert): Engine-Test
+  `elementary_functions_of_the_engine_are_accurate_exact_and_right_at_their_edges`; nativ == Wasm über den math_names-Digest.
 - Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
   umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
 
