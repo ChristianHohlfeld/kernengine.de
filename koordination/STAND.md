@@ -63,3 +63,14 @@ Stand der Teile: Exporte (CI grün), Einstieg kern_main + Projekt-Einstellungen 
 
 **Offen:** Akteur-Verweis {WorldId, ActorRef}; Play Project im Editor; 3f; Welt-Einstellungen je Geräteprofil (build_level), add_pawn über spawn; cost-Mehrverbrauch Murmel (punkte/lade/steuerung); SpawnCity auf Engine-Ton/-Eingabe/-Speichern umstellen; Engine-Plan Punkt 4 (Spielspezifisches aus kern/ heraus), 6, 7; Performance-Schritt.
 Nach `work` kommt erst der gemeinsame Stand mit vollem Lauf + ganzer CI grün (auch Spiel-Jobs).
+
+## Nachtrag 26.11. 10:05
+
+**Gemeinsamer Stand work-projekt: Gate ganz grün CI 45767152613 auf cc4c2673** (native, build, determinism, input, converter-cases, e2e, murmel ganz, murmel-web, native-build). Dazugekommen seit 05:20: Vorlagen-Nacharbeit (Welt-Einstellungen je Geräteprofil, add_pawn über Vorlage, Vorlagen-Name in validate + Editor-Auswahl; kein Spiel hält mehr einen Level-Wert), Akteur-Verweis ActorHandle {id, world}, Programm erreicht Akteure seiner Welten, Play Project im Editor (AppHost, AppRuntime), Programm-Blueprints als Klassen (--classes), Konverter: nur lesende Sicht = Wert, ein clang-Lauf je Datei ohne Adressen (setarch weg), Doku-Einstieg kern/README.md.
+
+**Volle Läufe:** Kandidat 6 (50076a01) von mir 08:47 bei Runde 23 abgebrochen — Fehleinschätzung (er hing nicht, lief nur parallel zu 7 langsam). Kandidat 7 (cc4c2673) rechnet seit 08:04, NICHT abbrechen.
+Befund aus k6.log: Runden 9–21 konvertieren dieselben 30 Blueprints (Warten eine Stufe je Runde, Schwingen v3->v2); 317× Wurzelgrund „Game im Test unbekannt (kern::net)". → konverter5 auf work-konverter: 19f8ed89 (reaching_own), 498cabb4 (Aliase in Engine-Klassen), b713e33c (impliziter Konstruktor nur bei berechnetem Feld), a5e92dc9; CI 45783404532 und Proben laufen.
+
+**ENTSCHEIDUNG DES BESITZERS OFFEN — Zahlen:** Murmels App als Programm-Blueprint: Level-Wechsel Frame 348 statt 349, geschafft 770 statt 772 (f32 gewonnen_seit_ in der Quelle gegen 64-Bit-Float der Sprache; mit f64 in der Quelle nativ ebenfalls 348/770 — befund_zahlen.md). Vorschlag Koordinator: eine Zahl-Art (64 Bit), `float` in Subset-Quellen = Konverter-Fehler mit Ort und Grund, Quelle umstellen, erwartete Werte einmal für beide Seiten. Erwartete Werte NICHT geändert (Rechteprüfung verweigert). Murmel-Teil liegt als stash „murmel-programm-wartet" (Worktree w-einstieg2) und Patch murmel_programm.patch im Scratchpad — nicht dauerhaft gesichert.
+
+**Offen:** 3f Rest (Testrahmen, Zeile in main.cpp); Murmel im Editor ganz durchspielen (hängt an der Zahlen-Entscheidung); SpawnCity auf Engine-Ton/-Eingabe/-Speichern; Spielspezifisches aus kern/ (Soldat, Waffen, Micro Duck); cost-Mehrverbrauch Murmel; Performance-Schritt.
