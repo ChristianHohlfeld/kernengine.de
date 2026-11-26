@@ -72,6 +72,14 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   Programm macht (ein GameWorld, das ein Knoten im Host des Programms macht), bekommt dabei das Projekt
   (`GameWorld::set_project`, über `EngineObjects::on_made`): ihre Blueprints finden Bibliotheken erst im Level, dann
   im Projekt (5.). Sie endet spätestens mit den Objekten des Programms. Geprüft: `program_world_has_the_project`.
+- **Ein Level starten und wechseln:** `GameWorld::start_level(path, mode)` (Knoten „Start Level“ an einer Welt des
+  Programms) startet das Level des Projekts mit diesem Pfad (wie `levels` ihn nennt). Das Projekt hält die Texte seiner
+  Levels (`Project::level_texts`, nicht Teil der Datei: `embedded_project()` füllt sie aus dem Bau, der Editor aus den
+  Dateien daneben). Wechseln heißt: „Stop“, dann „Start Level“ des nächsten; was das Programm behält (Punkte, ein
+  Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (eine Welt aus C++
+  bekommt es mit `set_project`), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
+  nicht, der Text ist kein Level. Geprüft: `world_starts_a_level_of_its_project` (zwei Levels, Wechsel, Wert bleibt,
+  auch über den Knoten einer Welt des Programms).
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der
   Level-Graph, dann die Akteure in der Reihenfolge des Levels.

@@ -31,6 +31,23 @@ std::string Project::first_level() const {
   return levels.empty() ? std::string() : levels.front();
 }
 
+const std::string* Project::level_text(std::string_view path, std::string* error) const {
+  bool named = false;
+  std::string all;
+  for (const std::string& l : levels) {
+    named |= l == path;
+    all += (all.empty() ? "" : ", ") + l;
+  }
+  if (!named) {
+    if (error) *error = "the project " + name + " has no level " + std::string(path) + " - its levels: " + (all.empty() ? "none" : all);
+    return nullptr;
+  }
+  for (const auto& [p, text] : level_texts)
+    if (p == path) return &text;
+  if (error) *error = "the level " + std::string(path) + " of the project " + name + " was not loaded with it (Project::level_texts)";
+  return nullptr;
+}
+
 json::Value to_json(const Project& p) {
   json::Value o = json::Value::object();
   o.set("format", "kern-project");

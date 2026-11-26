@@ -28,6 +28,7 @@ inline const Project& embedded_project() {
       fail("the embedded project: %s", error.c_str());
       p = Project{};
     }
+    for (const std::string& path : p.levels) p.level_texts.push_back({path, std::string(embedded_level(path))});   // (its levels, embedded with it)
     return p;
   }();
   return project;

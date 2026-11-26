@@ -14,6 +14,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "kern/app/project.h"
@@ -39,11 +40,18 @@ struct Project {
   std::vector<std::string> levels;          // the project's levels, paths relative to the project file
   std::string start_level;                  // one of `levels` ("": none named - the first, if any)
   std::vector<ProgramBlueprint> blueprints;  // the program's Blueprints and libraries, in their order
+  /// The texts of its levels, by their paths (as `levels` names them): not part of the project file - who loads the
+  /// project gives them (the build's embedded_project(), the editor from the files beside it). A world of the project
+  /// starts one by its path (GameWorld::start_level).
+  std::vector<std::pair<std::string, std::string>> level_texts;
 
   ProgramBlueprint* blueprint(std::string_view name);
   const ProgramBlueprint* blueprint(std::string_view name) const;
   /// The level the editor opens at Play and a program that chooses none starts: start_level, else the first.
   std::string first_level() const;
+  /// The text of the level at `path` (level_texts); null when the project has no level of that path or its text was
+  /// not given - `error` says which ("the project X has no level y.klevel - its levels: a.klevel, b.klevel").
+  const std::string* level_text(std::string_view path, std::string* error = nullptr) const;
 };
 
 json::Value to_json(const Project& project);

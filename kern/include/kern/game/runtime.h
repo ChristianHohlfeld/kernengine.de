@@ -220,6 +220,11 @@ class GameWorld {
   /// Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that
   /// stands in the level and in the project (library_conflicts) keeps it from starting.
   bool start(const Level& level, SimMode mode);
+  /// Starts the level of its project at `path` (as the project's "levels" name it: Project::level_text) - how a
+  /// program starts a world and changes to the next one (stop, then start_level of the next; what the program keeps -
+  /// points, a state - is its own and stays). False, with the reason: the world has no project (set_project), the
+  /// project has no level of that path (its levels named) or not its text, the text is no level (where and why).
+  bool start_level(std::string_view path, SimMode mode);
   /// The project the level belongs to (kern/game/project.h; null: none): its Blueprints' libraries are found in the
   /// level first, then in the project. It must outlive the world's runs.
   void set_project(const Project* project) { project_ = project; }

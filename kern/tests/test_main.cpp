@@ -8318,6 +8318,61 @@ TEST(program_from_the_project) {
 // A world the program makes is a world of its project (kern/docs/project.md 3., 5.): the GameWorld a node makes in
 // the program's host (engine.game_world.make) is given the program's project as it is made - its Blueprints then find
 // libraries in its level, then in the project; a world made in any other host gets none.
+// A world of a project starts a level of it by its path (GameWorld::start_level, kern/docs/project.md 3.): the program
+// starts level A, ends it, starts level B - what it keeps (here: points) is its own and stays. The project holds the
+// texts of its levels (Project::level_texts; embedded_project() fills them); errors say why: no project, a path that is
+// none of its levels (named), a level not loaded, a text that is no level.
+TEST(world_starts_a_level_of_its_project) {
+  game::Level a = game::basic_level(), b = game::basic_level();
+  a.name = "Erstes";
+  b.name = "Zweites";
+  game::Project pr;
+  pr.name = "Zwei";
+  pr.levels = {"a.klevel", "b.klevel", "c.klevel", "kaputt.klevel"};
+  pr.level_texts = {{"a.klevel", game::to_text(a)}, {"b.klevel", game::to_text(b)}, {"kaputt.klevel", "{broken"}};
+  Renderer renderer;
+  game::GameWorld world(renderer);
+  CHECK(!world.start_level("a.klevel", game::SimMode::play) && std::string(last_error()).find("the world has no project") != std::string::npos);
+  world.set_project(&pr);
+  CHECK(world.start_level("a.klevel", game::SimMode::play) && world.running() && world.level().name == "Erstes");
+  int points = 0;
+  for (int k = 0; k < 10; ++k) world.step(1.0f / 60.0f, game::PlayInput{}), points += 1;   // (what the program keeps over the levels)
+  world.stop();
+  CHECK(world.start_level("b.klevel", game::SimMode::play) && world.running() && world.level().name == "Zweites" && points == 10);
+  world.stop();
+  CHECK(!world.start_level("d.klevel", game::SimMode::play) && std::string(last_error()).find("the project Zwei has no level d.klevel - its levels: a.klevel, b.klevel, c.klevel, kaputt.klevel") != std::string::npos);
+  CHECK(!world.start_level("c.klevel", game::SimMode::play) && std::string(last_error()).find("the level c.klevel of the project Zwei was not loaded with it") != std::string::npos);
+  CHECK(!world.start_level("kaputt.klevel", game::SimMode::play) && std::string(last_error()).find("start_level kaputt.klevel:") != std::string::npos);
+  CHECK(!world.running());
+  // ... as a program's Blueprint does it: its node (Start Level) on a world its program made - the world has the
+  // program's project, with its levels' texts
+  struct Cpp final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } cpp;
+  game::Program program;
+  std::string error;
+  CHECK(program.start(pr, cpp, &error));
+  logic::EngineObjects* objects = program.runtime() ? program.runtime()->host().engine_objects() : nullptr;
+  CHECK(objects != nullptr);
+  if (!objects) return;
+  std::vector<logic::Value> out(1);
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::integer(objects->adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  const logic::Value made = out[0];
+  game::GameWorld* mine = objects->get<game::GameWorld>(made.as_int());
+  CHECK(mine && mine->project() == program.project());
+  const auto start = [&](const char* path) {
+    std::vector<logic::Value> given(1);
+    return logic::call_engine(*objects, "engine.game_world.start_level", {made, logic::Value::text(path), logic::Value::enumeration(static_cast<i64>(game::SimMode::play))}, given) &&
+           given[0].b;
+  };
+  CHECK(start("a.klevel") && mine && mine->level().name == "Erstes");
+  CHECK(logic::call_engine(*objects, "engine.game_world.stop", {made}, out));
+  CHECK(start("b.klevel") && mine && mine->level().name == "Zweites");
+  CHECK(!start("d.klevel"));
+  program.end();
+}
+
 TEST(program_world_has_the_project) {
   logic::Graph main;
   std::string error;

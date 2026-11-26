@@ -1232,6 +1232,16 @@ physics::Body GameWorld::create_body(const BodyPlan& plan) {
   return body;
 }
 
+bool GameWorld::start_level(std::string_view path, SimMode mode) {
+  if (!project_) return fail("start_level %.*s: the world has no project (GameWorld::set_project) - a program's world has its program's", static_cast<int>(path.size()), path.data());
+  std::string why;
+  const std::string* text = project_->level_text(path, &why);
+  if (!text) return fail("start_level: %s", why.c_str());
+  Level level;
+  if (!from_text(*text, level, &why)) return fail("start_level %.*s: %s", static_cast<int>(path.size()), path.data(), why.c_str());
+  return start(level, mode);
+}
+
 bool GameWorld::start(const Level& level, SimMode mode) {
   ++session_;
   if (mode == SimMode::none) return fail("choose Simulate or Play");
