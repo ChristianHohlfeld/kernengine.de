@@ -15,6 +15,7 @@
 
 namespace converted_game_equipment_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -94,29 +95,7 @@ enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+namespace logic { using PinType = :: kern :: logic :: PinType; }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -130,18 +109,20 @@ struct Host : converted::EngineObject {
 struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct NativeBlueprint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Instance : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
 namespace audio { using ClipId = u32; }
 namespace audio { using VoiceId = u64; }
-namespace audio { struct PlayParams {
+namespace audio { struct KERN_BLUEPRINT_TYPE PlayParams {
   f32 volume = 1;       // linear gain
   f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
   f32 pan = 0;          // -1 left .. 1 right (2D voices)
@@ -167,7 +148,54 @@ struct Mixer : converted::EngineObject {
   void set_volume(const u64& voice, const double& volume, const double& ramp = 0.03) const;
   void set_position(const u64& voice, const Vec3& position, const Vec3& velocity = {}) const;
 };
-namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { enum class KERN_BLUEPRINT_TYPE Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace audio { struct KERN_BLUEPRINT_TYPE SynthPatch {
+  Wave wave = Wave::square;
+  f32 volume = 0.5;
+  // envelope (seconds): attack, sustain (with optional punch), release
+  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
+  // pitch
+  f32 frequency = 440;          // Hz at the start
+  f32 slide = 0;                // octaves per second
+  f32 slide_accel = 0;          // octaves per second^2
+  f32 min_frequency = 20;       // the slide stops here
+  f32 vibrato_depth = 0;        // semitones
+  f32 vibrato_rate = 6;         // Hz
+  f32 arp_ratio = 1;            // frequency multiplier after arp_time
+  f32 arp_time = 0;             // seconds, 0 = off
+  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
+  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
+  // filters
+  f32 lowpass = 0;              // Hz, 0 = off
+  f32 lowpass_sweep = 0;        // octaves per second
+  f32 resonance = 0;            // 0..0.95
+  f32 highpass = 0;             // Hz, 0 = off
+  // modulation
+  f32 tremolo_depth = 0, tremolo_rate = 0;
+  f32 repeat = 0;               // seconds: restart the pitch envelope
+  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
+  u32 seed = 1;                 // noise
+}; }
+namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
+namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
+namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
+namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -175,12 +203,19 @@ struct Particles : converted::EngineObject {
 struct LightPool : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Engine;
 struct NightWindows : public ShaderExtension {
   using ShaderExtension::ShaderExtension;
 };
-namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
-namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE SimMode : u8 { none, simulate, play, replica }; }
+namespace game { enum class KERN_BLUEPRINT_TYPE GameStatus : u8 { inactive, playing, won, lost }; }
 struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct BitWriter : converted::EngineObject {
@@ -222,60 +257,21 @@ struct Client : converted::EngineObject {
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-struct Input : converted::EngineObject {
+struct EngineObjects : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct Engine : converted::EngineObject {
+namespace logic { namespace bytes { using Code = :: kern :: logic :: bytes :: Code; } }
+struct Chars : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct App : converted::EngineObject {
+struct String : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
-namespace audio { struct SynthPatch {
-  Wave wave = Wave::square;
-  f32 volume = 0.5;
-  // envelope (seconds): attack, sustain (with optional punch), release
-  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
-  // pitch
-  f32 frequency = 440;          // Hz at the start
-  f32 slide = 0;                // octaves per second
-  f32 slide_accel = 0;          // octaves per second^2
-  f32 min_frequency = 20;       // the slide stops here
-  f32 vibrato_depth = 0;        // semitones
-  f32 vibrato_rate = 6;         // Hz
-  f32 arp_ratio = 1;            // frequency multiplier after arp_time
-  f32 arp_time = 0;             // seconds, 0 = off
-  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
-  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
-  // filters
-  f32 lowpass = 0;              // Hz, 0 = off
-  f32 lowpass_sweep = 0;        // octaves per second
-  f32 resonance = 0;            // 0..0.95
-  f32 highpass = 0;             // Hz, 0 = off
-  // modulation
-  f32 tremolo_depth = 0, tremolo_rate = 0;
-  f32 repeat = 0;               // seconds: restart the pitch envelope
-  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
-  u32 seed = 1;                 // noise
-}; }
-namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
-namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
-namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
-namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
-struct SoundBank : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct GameAudio : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
+struct GameWorld;
+struct ShaderExtension;
+struct Renderer;
+namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
+namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 struct InputArbiter : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

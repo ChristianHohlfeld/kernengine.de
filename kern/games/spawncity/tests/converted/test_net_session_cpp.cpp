@@ -14,6 +14,7 @@
 
 namespace converted_net_session_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -35,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Quat {
+struct KERN_BLUEPRINT_TYPE Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
     const Vec3 a = normalize(axis);
@@ -52,11 +53,11 @@ struct Quat {
     return v + t * w + cross(q, t);
   }
 };
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -93,7 +94,7 @@ struct ReadStream : converted::EngineObject {
 struct MeasureStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { struct EndpointConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE EndpointConfig {
   int max_packet_size = 16 * 1024;     // payload bytes (before fragmentation)
   int fragment_above = 1024;           // bigger packets are fragmented
   int fragment_size = 1024;
@@ -110,8 +111,8 @@ namespace net { struct EndpointConfig {
 struct Endpoint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { enum class ChannelType : u8 { reliable_ordered, unreliable_unordered }; }
-namespace net { struct ChannelConfig {
+namespace net { enum class KERN_BLUEPRINT_TYPE ChannelType : u8 { reliable_ordered, unreliable_unordered }; }
+namespace net { struct KERN_BLUEPRINT_TYPE ChannelConfig {
   ChannelType type = ChannelType::reliable_ordered;
   int send_queue_size = 1024;            // messages (reliable: window)
   int receive_queue_size = 1024;
@@ -122,21 +123,16 @@ namespace net { struct ChannelConfig {
   int block_fragment_size = 1024;
   f32 resend_time = 0.1;                // seconds (at least; RTT * 1.25 when known)
 }; }
-namespace net { struct ConnectionConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE ConnectionConfig {
   std::vector<ChannelConfig> channels{ChannelConfig{}, ChannelConfig{ChannelType::unreliable_unordered}};
   int max_packet_size = 8 * 1024;        // message payload per packet
   int max_message_types = 256;
   EndpointConfig endpoint;
 }; }
-namespace net { struct Message {
-  u16 id = 0;                            // reliable: sequence within the channel
-  u16 type = 0;
-  std::vector<u8> data;
-}; }
 struct Connection : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace net { struct Address {
+namespace net { struct KERN_BLUEPRINT_TYPE Address {
   u64 id = 0;  // 0 = none
   
   bool operator==(const Address&) const = default;
@@ -153,9 +149,8 @@ struct LoopbackNetwork : converted::EngineObject {
 struct HostTransport : public Transport {
   using Transport::Transport;
   void set_address(const net::Address& a) const;
-  void advance_time(const double& time) const;
 };
-namespace net { struct ClientServerConfig {
+namespace net { struct KERN_BLUEPRINT_TYPE ClientServerConfig {
   u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
   int max_clients = 16;
   f64 timeout = 6;                           // seconds without packets
@@ -164,7 +159,7 @@ namespace net { struct ClientServerConfig {
   f64 keepalive_interval = 0.1;              // payload packets go out at least this often
   ConnectionConfig connection;
 }; }
-namespace net { enum class ClientState : i8 {
+namespace net { enum class KERN_BLUEPRINT_TYPE ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
   error = -1,           // connection error (desync, bad packets)
@@ -180,12 +175,6 @@ struct Client : converted::EngineObject {
   Client(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed);
   bool connected() const;
   bool send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
-  net::ClientState state() const;
-  void connect(const net::Address& server, const double& time) const;
-  void advance_time(const double& time) const;
-  void receive_packets() const;
-  std::optional<net::Message> receive(const int& channel) const;
-  void send_packets() const;
   Client(const Client&) = default;
   Client(Client&&) = default;
   Client& operator=(const Client&) = default;
@@ -201,11 +190,6 @@ struct Server : converted::EngineObject {
   int max_clients() const;
   bool client_connected(const int& index) const;
   bool send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
-  void advance_time(const double& time) const;
-  void receive_packets() const;
-  std::vector<std::pair<int, bool>> take_events() const;
-  std::optional<net::Message> receive(const int& client, const int& channel) const;
-  void send_packets() const;
   int connected_clients() const;
   Server(const Server&) = default;
   Server(Server&&) = default;
@@ -220,34 +204,12 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set,
-  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
-}; }
-struct EngineValue;
-struct Callable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct EngineValue : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Variable : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct StructField : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct FunctionPin : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { using PinType = :: kern :: logic :: PinType; }
+namespace logic { namespace Graph { using Root = :: kern :: logic :: Graph :: Root; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { namespace ParamDef { using Kind = :: kern :: logic :: ParamDef :: Kind; } }
 struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -256,6 +218,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -270,10 +235,10 @@ namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pi
 namespace seats { struct Row { u8 owner = kNone, pilot = kNone, passenger = kNone; }; }
 namespace seats { struct Table {
  public:
-  Result claim(u8 owner, u8 player, Seat seat);
-  Result release(u8 owner, u8 player, Seat seat);
+  
+  
   /// A player left: his jet's row goes, his passenger seat elsewhere is freed. True: changed.
-  bool drop(u8 player);
+  
   /// The row of `owner`'s jet (all kNone when nobody sits in it).
   
   /// Where `player` sits: the row (owner) and the seat; false when he sits nowhere.
@@ -281,7 +246,7 @@ namespace seats { struct Table {
   const std::vector<Row>& rows() const { return rows_; }
   u32 revision() const { return revision_; }
   /// Replace with the authority's snapshot (validated like JetSeatTable.load).
-  bool load(u32 revision, const std::vector<Row>& rows);
+  
   
 
  private:
@@ -321,25 +286,17 @@ namespace mp { struct NavTimeline {
   std::vector<Snap> snaps_;
 }; }
 namespace mp { constexpr u32 kMaxPlayers = 9; }
-namespace mp { u32 hash_id(const std::string& id); }
-namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& sorted_ids); }
-namespace mp { u32 color_of(const std::string& id); }
 namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
-namespace mp { f64 spawn_protect_ms(); }
-namespace mp { f64 ballot_ms(); }
-namespace mp { f32 voice_radius(); }
-namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now_ms, f64 protected_until_ms, f32 target_hp); }
 namespace mp { struct Score { u8 slot = 0; u16 kills = 0, deaths = 0; }; }
 namespace mp { struct Scoreboard {
  public:
   void clear() { rows_.clear(); }
   void ensure(u8 slot);
-  void remove(u8 slot);
+  
   /// A death: the victim's deaths +1, the killer's kills +1 (not for an accident or suicide).
-  void died(u8 victim, i32 by);
+  
   const std::vector<Score>& rows() const { return rows_; }
-  void set(const std::vector<Score>& rows) { rows_ = rows; }
+  
   
   /// Sorted as the board shows them: most kills first, then fewest deaths.
   
@@ -359,10 +316,6 @@ namespace mp { struct Ballot {
   /// nothing; invalid: no ballot)
   enum class Status : u8 { pending, approved, rejected, cancelled, ignored, invalid } status = Status::pending;
 }; }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now_ms); }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status& did); }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms); }
-namespace mp { bool ballot_stale(const Ballot& b, const std::vector<u8>& current_members, f64 now_ms); }
 namespace mp { struct VoiceStream {
  public:
   /// A decoded frame (8 kHz) at gain `gain`; frames older than the last sequence number are dropped.
@@ -487,33 +440,33 @@ namespace net { struct Session {
   
 
   /// Per frame: networking; `me` is this player's state (sent at 30 Hz).
-  void update(f64 time, f32 dt, const PlayerState& me, bool send_pose = true);
+  
 
   // ---- outgoing ----
-  void send_fx(Fx f);
+  
   /// Our units, all kinds in one snapshot; the others draw and shoot them. More than one message
   /// carries (64) go as numbered parts: a receiver hands on only a snapshot whose every part came,
   /// so a unit is never missing from a list that is shown. False: more than kSwarmMaxUnits (refused,
   /// counted in send_refused).
-  bool send_swarm(const std::vector<SwarmUnit>& units);
-  void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
+  
+  
   /// The host's world (traffic, people: game_worldsync.cpp) to every client, unreliable.
   void send_world(const std::vector<u8>& blob);
   /// The host's world as one client must see it (what is around him: game_worldsync.cpp).
   void send_world_to(u8 slot, const std::vector<u8>& blob);
   /// A shot / blast of ours that reached player `target` (the authority judges it).
-  void request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from);
+  
   /// We went down (by kNobody: an accident).
-  void report_death(u8 by, u8 weapon, u8 zone);
-  void report_respawn();
-  void send_ping(bool on, Vec3 p, u32 color);
-  void send_voice(u32 seq, bool everywhere, const std::vector<u8>& mulaw);
+  
+  
+  
+  
   /// Ask for a rule change (friendly fire); the host starts the vote.
-  bool propose_rule(bool friendly_fire);
-  bool vote(bool approve);
+  
+  
   /// Jet seats (jet_seat_coordinator.mjs): ask the authority to claim / release a seat in
   /// `owner`'s jet (alone the table is local). The answer arrives with the table.
-  void seat_request(bool claim, u8 owner, seats::Seat seat);
+  
   
   
 
@@ -554,7 +507,7 @@ namespace net { struct Session {
   i32 remote_index(u8 slot) const;
   /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
   std::vector<u8> roster() const;
-  u32 color_of(u8 slot) const;
+  
   /// "P1".."P9": the player's place in the roster.
   u32 index_of(u8 slot) const;
   
@@ -580,19 +533,19 @@ namespace net { struct Session {
  private:
   enum class Role : u8 { none, host, client };
   void on_pose(const PlayerState& s);
-  void dispatch(u8 from, u16 type, const std::vector<u8>& data);  // host: from a client (or ourselves)
-  void deliver(u16 type, const std::vector<u8>& data);           // a message from the host to us
+    // host: from a client (or ourselves)
+             // a message from the host to us
   void to_client(u8 slot, int channel, u16 type, const std::vector<u8>& data);
   void to_all(int channel, u16 type, const std::vector<u8>& data, u8 except);
-  void to_host(int channel, u16 type, const std::vector<u8>& data);
-  void judge(u8 shooter, const Hit& h);
-  void begin_ballot(bool value);
+  
+  
+  
   void finish_ballot(mp::Ballot::Status s);
   void send_rules();
   void send_scores();
   void send_anchor(u8 slot);
   void send_seats();
-  void judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat);
+  
   Vec3 focus_of(u8 slot) const;
   f32 hp_of(u8 slot) const;
 
@@ -755,13 +708,13 @@ namespace wire { struct Reader {
     converted::plus_to(at, 4);
     return x.v;
   }
-  f64 get_f64(const std::vector<u8>& b) {
-    if (converted::plus(at, 8) > b.size()) { ok = false; return 0; }
-    F64 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 8);
-    return x.v;
-  }
+  
+
+
+
+
+
+
   Vec3 get_vec3(const std::vector<u8>& b) {
     if (converted::plus(at, 12) > b.size()) { ok = false; return {}; }
     V3 x;
@@ -777,13 +730,13 @@ namespace wire { struct Reader {
     return {x.x, x.y, x.z, x.w};
   }
   /// A list of bytes (put_bytes): empty where it is not all there.
-  std::vector<u8> get_bytes(const std::vector<u8>& b) {
-    const u16 n = get_u16(b);
-    if (!ok || converted::plus(at, n) > b.size()) { ok = false; return {}; }
-    std::vector<u8> v(b.begin() + static_cast<std::ptrdiff_t>(at), b.begin() + static_cast<std::ptrdiff_t>(converted::plus(at, n)));
-    converted::plus_to(at, n);
-    return v;
-  }
+  
+
+
+
+
+
+
   /// Every number was there, and the message has no more.
   
 }; }
@@ -792,33 +745,11 @@ namespace net { enum : u16 {
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
   kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31, kTownMsg = 32,
 }; }
+namespace net { enum : int { kReliable = 0, kUnreliable = 1 }; }
 namespace mp { void Scoreboard::ensure(u8 slot) {
   for (const Score& s : rows_) if (s.slot == slot) return;
   rows_.push_back({slot, 0, 0});
 } }
-namespace mp { void Scoreboard::remove(u8 slot) { converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); } }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { bool Table::drop(u8 player) {
-  std::vector<Row> rows;
-  bool changed = false;
-  seats::jet_seats_cpp_local::g_rules.call("Drop", std::tie(rows, changed), rows_, player);
-  if (!changed) return false;
-  rows_ = rows;
-  ++revision_;
-  return true;
-} }
-namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
-namespace mp { bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return mp::mp_rules_cpp_local::g_rules.flag("Stale", b, current, now); } }
-namespace seats { bool Table::load(u32 revision, const std::vector<Row>& rows) {
-  if (!seats::jet_seats_cpp_local::g_rules.flag("Valid", rows)) return false;
-  rows_ = rows;
-  revision_ = revision;
-  return true;
-} }
-namespace mp { f64 ballot_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("BallotMs"); } }
 namespace mp { namespace mp_rules_cpp_local { f64 fmin2(f64 a, f64 b) { return a < b ? a : b; } } }
 namespace mp { namespace mp_rules_cpp_local { f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); } } }
 namespace mp { bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 received) {
@@ -863,26 +794,6 @@ namespace mp { bool NavTimeline::push(Vec3 p, f32 heading, u8 mode, f64 at) {
   while (snaps_.size() > 10) converted::erase(snaps_, snaps_.begin());
   return true;
 } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
 namespace mp { bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
   if (pts.empty()) return false;
   std::vector<bool> seen(converted::count(pts.size()), false);
@@ -909,75 +820,7 @@ namespace mp { bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, 
   }
   return true;
 } }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace mp { u32 hash_id(const std::string& id) {
-  u32 h = 2166136261u;
-  for (unsigned char c : id) { h ^= c; h *= 16777619u; }
-  return h;
-} }
-namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
-  std::vector<u32> numbers;  // (each id's hash: a whole number the Blueprint takes as it is)
-  for (const std::string& id : ids) numbers.push_back(hash_id(id));
-  std::vector<u32> out;
-  mp::mp_rules_cpp_local::g_rules.call("ColorSlots", std::tie(out), numbers);
-  return out;
-} }
-namespace mp { u32 color_of(const std::string& id) {
-  const std::vector<u32> one = assign_colors({id});
-  return one.empty() ? 0 : converted::at(one, 0);
-} }
-namespace net { constexpr f64 kSeatsEvery = 1.5; }
-namespace net { enum : int { kReliable = 0, kUnreliable = 1 }; }
-namespace net { constexpr f64 kSendInterval = 0.033; }
 namespace net { constexpr f64 kQuietS = 6; }
-namespace net { constexpr f64 kScoresEvery = 2; }
-namespace net { constexpr f64 kRulesEvery = 4; }
 namespace net { net::ClientServerConfig config() {
   net::ClientServerConfig c;
   c.protocol_id = 0x53504157534e3032ull;  // "SPAWSN02": SpawnCity sessions only
@@ -1211,14 +1054,6 @@ namespace net { std::vector<u8> Session::roster() const {
   converted::erase(r, std::unique(r.begin(), r.end()), r.end());
   return r;
 } }
-namespace net { u32 Session::color_of(u8 slot) const {
-  const std::vector<u8> r = roster();
-  std::vector<std::string> ids;
-  for (u8 s : r) ids.push_back(std::to_string(s));
-  const std::vector<u32> c = mp::assign_colors(ids);
-  for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) if (converted::at(r, i) == slot) return converted::at(c, i);
-  return mp::color_of(std::to_string(slot));
-} }
 namespace net { u32 Session::index_of(u8 slot) const {
   // The host is P1 (the oldest), then the clients in slot order.
   std::vector<u8> r = roster();
@@ -1257,28 +1092,6 @@ namespace net { void Session::to_all(int ch, u16 type, const std::vector<u8>& da
   for (int c = 0; c < converted::present(server_)->max_clients(); converted::pre_inc(c))
     if (c != except && converted::present(server_)->client_connected(c))
       if (!converted::present(server_)->send(c, ch, type, data)) refused(type, data.size());
-} }
-namespace net { void Session::to_host(int ch, u16 type, const std::vector<u8>& data) {
-  if (role_ == Role::host) dispatch(kHost, type, data);
-  else if (client_ && converted::present(client_)->connected()) converted::present(client_)->send(ch, type, data);
-} }
-namespace net { void Session::send_fx(Fx f) {
-  if (role_ == Role::none) return;
-  f.owner = self_slot_;
-  to_host(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f));
-} }
-namespace net { bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
-  if (role_ == Role::none) return true;
-  if (units.size() > kSwarmMaxUnits) { refused(kSwarmMsg, converted::times(units.size(), 18)); return false; }
-  // every unit goes: 64 a message, the parts numbered, the last one marked (an empty list is one
-  // empty part - "I have none" is a snapshot too)
-  ++swarm_serial_;
-  const std::size_t parts = std::max<std::size_t>(1, converted::quot((converted::minus(converted::plus(units.size(), kSwarmPerMessage), 1)), kSwarmPerMessage));
-  for (std::size_t k = 0; k < parts; converted::pre_inc(k)) {
-    const std::size_t from = converted::times(k, kSwarmPerMessage), n = std::min(kSwarmPerMessage, converted::minus(units.size(), from));
-    to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, swarm_serial_, static_cast<u8>(k), converted::plus(k, 1) == parts, units, from, n));
-  }
-  return true;
 } }
 namespace net { void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
   i32 at = -1;
@@ -1349,78 +1162,6 @@ namespace net { void Session::destroy_to_all(const std::vector<u8>& blob, bool r
 namespace net { void Session::destroy_to(u8 slot, const std::vector<u8>& blob) {
   if (role_ == Role::host) to_client(slot, kReliable, kDestroyMsg, blob);
 } }
-namespace net { void Session::send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage) {
-  if (role_ == Role::none) return;
-  SwarmHit h{self_slot_, to, id, kind, damage};
-  to_host(kReliable, kSwarmHitMsg, pack_swarm_hit(h));
-} }
-namespace net { void Session::request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from) {
-  if (role_ == Role::none || damage < 1) return;
-  Hit h{target, self_slot_, weapon, zone, clampf(std::round(damage), 1, 100), from};
-  to_host(kReliable, kHitReq, pack_hit(h));
-} }
-namespace net { void Session::report_death(u8 by, u8 weapon, u8 zone) {
-  if (role_ == Role::none) return;
-  std::vector<u8> w;
-  wire::put_u8(w, by);
-  wire::put_u8(w, weapon);
-  wire::put_u8(w, zone);
-  to_host(kReliable, kDeath, w);
-} }
-namespace net { void Session::report_respawn() { if (role_ != Role::none) to_host(kReliable, kRespawn, {}); } }
-namespace net { void Session::send_ping(bool on, Vec3 p, u32 color) {
-  if (role_ == Role::none) return;
-  std::vector<u8> w;
-  wire::put_u8(w, self_slot_);
-  wire::put_u8(w, static_cast<u8>(on));
-  wire::put_vec3(w, p);
-  wire::put_u32(w, color);
-  to_host(kReliable, kPingMsg, w);
-} }
-namespace net { void Session::send_voice(u32 seq, bool all, const std::vector<u8>& d) {
-  if (role_ == Role::none || remotes_.empty()) return;
-  std::vector<u8> w;
-  wire::put_u8(w, self_slot_);
-  wire::put_u32(w, seq);
-  wire::put_u8(w, static_cast<u8>(all));
-  wire::put_bytes(w, d);
-  to_host(kUnreliable, kVoice, w);
-} }
-namespace net { bool Session::propose_rule(bool ff) {
-  if (role_ == Role::none || roster().size() < 2 || ff == friendly_fire_) return false;
-  std::vector<u8> w;
-  wire::put_u8(w, static_cast<u8>(0));
-  wire::put_u8(w, static_cast<u8>(ff));
-  to_host(kReliable, kPropose, w);
-  return true;
-} }
-namespace net { bool Session::vote(bool approve) {
-  if (!remote_ballot_.id || role_ != Role::client) return false;
-  std::vector<u8> w;
-  wire::put_u32(w, remote_ballot_.id);
-  wire::put_u8(w, static_cast<u8>(approve));
-  to_host(kReliable, kVote, w);
-  vote_text_ = approve ? "JA gesendet" : "NEIN gesendet";
-  remote_ballot_ = mp::Ballot{};
-  return true;
-} }
-namespace net { void Session::judge(u8 shooter, const Hit& req) {
-  const std::vector<u8> r = roster();
-  const bool target_known = std::find(r.begin(), r.end(), req.target) != r.end(), shooter_known = std::find(r.begin(), r.end(), shooter) != r.end();
-  f64 until = 0;
-  for (const auto& [s, u] : protected_) if (s == req.target) until = u;
-  const mp::HitVerdict v = mp::judge_hit(target_known, shooter_known, req.target == shooter, friendly_fire_, now_ms(), until, hp_of(req.target));
-  if (v != mp::HitVerdict::applied) return;
-  Hit h = req;
-  h.by = shooter;
-  const std::vector<u8> bytes = pack_hit(h);
-  if (h.target == self_slot_) hits_.push_back(h);
-  else to_client(h.target, kReliable, kHitMsg, bytes);
-  if (shooter != h.target) {
-    if (shooter == self_slot_) confirms_.push_back(h);
-    else to_client(shooter, kReliable, kConfirm, bytes);
-  }
-} }
 namespace net { void Session::send_scores() {
   std::vector<u8> w;
   wire::put_u8(w, static_cast<u8>(scores_.rows().size()));
@@ -1453,20 +1194,6 @@ namespace net { void Session::send_anchor(u8 slot) {
   wire::put_vec3(w, Vec3{c.x, c.y, mine.z});
   to_client(slot, kReliable, kAnchor, w);
 } }
-namespace net { void Session::begin_ballot(bool value) {
-  if (role_ != Role::host || ballot_.id || value == friendly_fire_) return;
-  if (!mp::create_ballot(ballot_, ++ballot_serial_, 0, value, self_slot_, roster(), now_ms())) return;
-  std::vector<u8> w;
-  wire::put_u32(w, ballot_.id);
-  wire::put_u8(w, ballot_.key);
-  wire::put_u8(w, static_cast<u8>(value));
-  wire::put_u8(w, static_cast<u8>(ballot_.members.size()));
-  for (u8 m : ballot_.members) wire::put_u8(w, m);
-  to_all(kReliable, kBallotMsg, w, kNobody);
-  char t[96];
-  std::snprintf(t, sizeof t, "FRIENDLY FIRE: %s - Abstimmung 1/%zu", value ? "EIN" : "AUS", ballot_.members.size());
-  vote_text_ = t;
-} }
 namespace net { void Session::finish_ballot(mp::Ballot::Status s) {
   const u8 result = s == mp::Ballot::Status::approved ? 1 : s == mp::Ballot::Status::rejected ? 2 : 3;
   if (s == mp::Ballot::Status::approved) { friendly_fire_ = ballot_.value; send_rules(); }
@@ -1477,20 +1204,6 @@ namespace net { void Session::finish_ballot(mp::Ballot::Status s) {
   vote_text_ = result == 1 ? "Einstimmig angenommen" : result == 2 ? "Abgelehnt" : "Abstimmung abgelaufen / Spielerwechsel";
   ballot_ = mp::Ballot{};
 } }
-namespace net { void Session::seat_request(bool claim, u8 owner, seats::Seat seat) {
-  // no session: single-player runs locally; the host judges its own requests at once
-  if (role_ == Role::none) { const u8 me = self_slot_; claim ? seats_.claim(owner, me, seat) : seats_.release(owner, me, seat); return; }
-  if (role_ == Role::host) { judge_seat(self_slot_, claim, owner, seat); return; }
-  std::vector<u8> w;
-  wire::put_u8(w, static_cast<u8>(claim));
-  wire::put_u8(w, owner);
-  wire::put_u8(w, static_cast<u8>(seat));
-  to_host(kReliable, kSeatReq, w);
-} }
-namespace net { void Session::judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat) {
-  const seats::Result r = claim ? seats_.claim(owner, from, seat) : seats_.release(owner, from, seat);
-  if (r == seats::Result::ok) send_seats();
-} }
 namespace net { void Session::send_seats() {
   if (role_ != Role::host) return;
   std::vector<u8> w;
@@ -1498,271 +1211,6 @@ namespace net { void Session::send_seats() {
   wire::put_u8(w, static_cast<u8>(seats_.rows().size()));
   for (const seats::Row& r : seats_.rows()) { wire::put_u8(w, r.owner); wire::put_u8(w, r.pilot); wire::put_u8(w, r.passenger); }
   to_all(kReliable, kSeatState, w, kNobody);
-} }
-namespace net { void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
-  switch (type) {
-    case kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
-    case kTownMsg: { if (role_ == Role::host && from != self_slot_ && town_.size() < 512) town_.push_back({from, d}); return; }
-    case kProjMsg: {  // a client's rounds in flight: drawn here, and on to the others
-      if (role_ != Role::host) return;
-      if (proj_.size() < 64) proj_.push_back({from, d});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_bytes(w, d);
-      to_all(kUnreliable, kProjMsg, w, from);
-      return;
-    }
-    case kTossMsg: {  // a client's thrown things: ours to drive, and on to the others
-      if (role_ != Role::host) return;
-      if (toss_.size() < 64) toss_.push_back({from, d});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_bytes(w, d);
-      to_all(kUnreliable, kTossMsg, w, from);
-      return;
-    }
-    case kSeatReq: {
-      wire::Reader r;
-      const u8 claim = r.get_u8(d), owner = r.get_u8(d), seat = r.get_u8(d);
-      if (r.ok && seat <= 1) judge_seat(from, claim != 0, owner, static_cast<seats::Seat>(converted::among({0, 1}, seat)));
-      return;
-    }
-    case kFxMsg: {
-      Fx f;
-      if (!unpack_fx(d, f)) return;
-      f.owner = from;
-      if (from != self_slot_) fx_.push_back(f);
-      to_all(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f), from);
-      return;
-    }
-    case kSwarmMsg: {
-      // the host passes a player's units on to everybody else (the owner is who sent them)
-      u8 owner, serial, part;
-      bool last;
-      std::vector<SwarmUnit> units;
-      if (!unpack_swarm(d, owner, serial, part, last, units)) return;
-      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, serial, part, last, units, 0, units.size()), from);
-      if (from != self_slot_) swarm_part(from, serial, part, last, units);
-      return;
-    }
-    case kSwarmHitMsg: {
-      SwarmHit h;
-      if (!unpack_swarm_hit(d, h)) return;
-      h.from = from;
-      if (h.to == self_slot_) swarm_hits_.push_back(h);
-      else if (h.to != kHost) to_client(h.to, kReliable, kSwarmHitMsg, pack_swarm_hit(h));
-      return;
-    }
-    case kHitReq: {
-      Hit h;
-      if (unpack_hit(d, h)) judge(from, h);
-      return;
-    }
-    case kDeath: {
-      wire::Reader r;
-      Kill k{from, r.get_u8(d), r.get_u8(d), r.get_u8(d)};
-      if (!r.ok) return;
-      const std::vector<u8> ro = roster();
-      if (std::find(ro.begin(), ro.end(), k.by) == ro.end()) k.by = kNobody;
-      scores_.died(k.victim, k.by == kNobody ? -1 : k.by);
-      kills_.push_back(k);
-      std::vector<u8> w;
-      wire::put_u8(w, k.victim);
-      wire::put_u8(w, k.by);
-      wire::put_u8(w, k.weapon);
-      wire::put_u8(w, k.zone);
-      to_all(kReliable, kKillMsg, w, kNobody);
-      send_scores();
-      return;
-    }
-    case kRespawn: {
-      const f64 protect_ms = mp::spawn_protect_ms();
-      const f64 until = now_ms() + protect_ms;
-      bool found = false;
-      for (auto& [s, u] : protected_) if (s == from) { u = until; found = true; }
-      if (!found) protected_.push_back({from, until});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_f32(w, static_cast<f32>(protect_ms));
-      to_all(kReliable, kProtect, w, kNobody);
-      return;
-    }
-    case kPingMsg: {
-      wire::Reader r;
-      r.get_u8(d);
-      PingEvent p{from, r.get_u8(d) != 0, r.get_vec3(d), r.get_u32(d)};
-      if (!r.ok || !sane(p.p)) return;
-      if (from != self_slot_) pings_.push_back(p);
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_u8(w, static_cast<u8>(p.on));
-      wire::put_vec3(w, p.p);
-      wire::put_u32(w, p.color);
-      to_all(kReliable, kPingMsg, w, from);
-      return;
-    }
-    case kVoice: {
-      wire::Reader r;
-      r.get_u8(d);
-      VoiceFrame v{from, r.get_u32(d), r.get_u8(d) != 0, r.get_bytes(d)};
-      if (!r.ok || v.data.size() < 4 || v.data.size() > 800) return;
-      // Only mates in range hear it (proximity_voice.mjs transmit), unless "everywhere".
-      const Vec3 at = focus_of(from);
-      const f32 radius = mp::voice_radius();
-      if (from != self_slot_ && (v.everywhere || converted::wide::length(focus_of(self_slot_) - at) <= radius)) voice_.push_back(v);
-      std::vector<u8> bytes;
-      wire::put_u8(bytes, from);
-      wire::put_u32(bytes, v.seq);
-      wire::put_u8(bytes, static_cast<u8>(v.everywhere));
-      wire::put_bytes(bytes, v.data);
-      for (const Remote& x : remotes_)
-        if (x.state.slot != from && (v.everywhere || converted::wide::length(focus_of(x.state.slot) - at) <= radius)) to_client(x.state.slot, kUnreliable, kVoice, bytes);
-      return;
-    }
-    case kPropose: {
-      wire::Reader r;
-      r.get_u8(d);
-      const bool value = r.get_u8(d) != 0;
-      if (r.ok) begin_ballot(value);
-      return;
-    }
-    case kVote: {
-      wire::Reader r;
-      const u32 id = r.get_u32(d);
-      const bool yes = r.get_u8(d) != 0;
-      if (!r.ok || !ballot_.id || id != ballot_.id) return;
-      const mp::Ballot::Status s = mp::cast_vote(ballot_, from, yes, roster(), now_ms());
-      if (s == mp::Ballot::Status::pending) {
-        char t[96];
-        std::snprintf(t, sizeof t, "FRIENDLY FIRE: %zu/%zu JA", ballot_.yes.size(), ballot_.members.size());
-        vote_text_ = t;
-      } else {
-        finish_ballot(s);
-      }
-      return;
-    }
-    default: return;
-  }
-} }
-namespace net { void Session::deliver(u16 type, const std::vector<u8>& d) {
-  wire::Reader r;
-  switch (type) {
-    case kOriginMsg: {
-      const f64 lon = r.get_f64(d), lat = r.get_f64(d);
-      if (r.ok && role_ == Role::client && std::isfinite(lon) && std::isfinite(lat) && std::fabs(lat) <= 85 && std::fabs(lon) <= 180) { lon_ = lon; lat_ = lat; have_origin_ = true; }
-      return;
-    }
-    case kWelcome: {
-      self_slot_ = r.get_u8(d);
-      lon_ = r.get_f64(d);
-      lat_ = r.get_f64(d);
-      friendly_fire_ = r.get_u8(d) != 0;
-      if (r.ok) have_origin_ = true;
-      return;
-    }
-    case kPoseRelay: {
-      PlayerState s;
-      std::size_t at = 0;
-      if (unpack(d, at, s)) on_pose(s);
-      return;
-    }
-    case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
-    case kSwarmMsg: {
-      u8 owner, serial, part;
-      bool last;
-      std::vector<SwarmUnit> units;
-      if (unpack_swarm(d, owner, serial, part, last, units) && owner != self_slot_) swarm_part(owner, serial, part, last, units);
-      return;
-    }
-    case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
-    case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
-    case kDestroyMsg: { if (role_ == Role::client && destroy_.size() < 64) destroy_.push_back({kHost, d}); return; }
-    case kTownMsg: { if (role_ == Role::client && town_.size() < 512) town_.push_back({kHost, d}); return; }
-    case kProjMsg: {  // (relayed: the shooter's slot first)
-      if (role_ != Role::client) return;
-      const u8 from = r.get_u8(d);
-      std::vector<u8> body = r.get_bytes(d);
-      if (r.ok && from != self_slot_ && proj_.size() < 64) proj_.push_back({from, std::move(body)});
-      return;
-    }
-    case kTossMsg: {  // (relayed: the thrower's slot first)
-      if (role_ != Role::client) return;
-      const u8 from = r.get_u8(d);
-      std::vector<u8> body = r.get_bytes(d);
-      if (r.ok && from != self_slot_ && toss_.size() < 64) toss_.push_back({from, std::move(body)});
-      return;
-    }
-    case kSeatState: {
-      const u32 rev = r.get_u32(d);
-      const u8 n = r.get_u8(d);
-      std::vector<seats::Row> rows;
-      for (u8 i = 0; i < n && r.ok; ++i) { seats::Row q; q.owner = r.get_u8(d); q.pilot = r.get_u8(d); q.passenger = r.get_u8(d); rows.push_back(q); }
-      if (r.ok) seats_.load(rev, rows);
-      return;
-    }
-    case kHitMsg: { Hit h; if (unpack_hit(d, h) && h.target == self_slot_) hits_.push_back(h); return; }
-    case kConfirm: { Hit h; if (unpack_hit(d, h)) confirms_.push_back(h); return; }
-    case kKillMsg: { Kill k{r.get_u8(d), r.get_u8(d), r.get_u8(d), r.get_u8(d)}; if (r.ok) kills_.push_back(k); return; }
-    case kScores: {
-      const u8 n = r.get_u8(d);
-      std::vector<mp::Score> rows;
-      for (u8 i = 0; i < n && r.ok; ++i) { mp::Score s; s.slot = r.get_u8(d); s.kills = r.get_u16(d); s.deaths = r.get_u16(d); rows.push_back(s); }
-      if (r.ok) scores_.set(rows);
-      return;
-    }
-    case kProtect: {
-      const u8 slot = r.get_u8(d);
-      const f32 ms = r.get_f32(d);
-      if (!r.ok) return;
-      bool found = false;
-      for (auto& [s, u] : protected_) if (s == slot) { u = now_ms() + ms; found = true; }
-      if (!found) protected_.push_back({slot, now_ms() + ms});
-      return;
-    }
-    case kAnchor: { const Vec3 p = r.get_vec3(d); if (r.ok && sane(p)) { anchor_ = p; anchor_ready_ = true; } return; }
-    case kPingMsg: {
-      PingEvent p{r.get_u8(d), r.get_u8(d) != 0, r.get_vec3(d), r.get_u32(d)};
-      if (r.ok && p.owner != self_slot_ && sane(p.p)) pings_.push_back(p);
-      return;
-    }
-    case kVoice: {
-      VoiceFrame v{r.get_u8(d), r.get_u32(d), r.get_u8(d) != 0, r.get_bytes(d)};
-      if (r.ok && v.from != self_slot_ && v.data.size() >= 4 && v.data.size() <= 800) voice_.push_back(v);
-      return;
-    }
-    case kRules: {
-      const u8 ff = r.get_u8(d);
-      if (!r.ok) return;
-      friendly_fire_ = ff != 0;
-      if (role_ == Role::client) { const u16 m = r.get_u16(d); if (r.ok) { world_rules_ = m; have_world_rules_ = true; } }
-      return;
-    }
-    case kBallotMsg: {
-      mp::Ballot b;
-      b.id = r.get_u32(d); b.key = r.get_u8(d); b.value = r.get_u8(d) != 0;
-      const u8 n = r.get_u8(d);
-      for (u8 i = 0; i < n && r.ok; ++i) b.members.push_back(r.get_u8(d));
-      if (!r.ok || b.members != roster()) return;  // a different roster: the vote is not ours
-      b.expires_ms = now_ms() + mp::ballot_ms();
-      remote_ballot_ = b;
-      vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt";
-      return;
-    }
-    case kBallotResult: {
-      r.get_u32(d);
-      const u8 res = r.get_u8(d);
-      remote_ballot_ = mp::Ballot{};
-      vote_text_ = res == 1 ? "Angenommen" : res == 2 ? "Abgelehnt" : "Abstimmung abgebrochen";
-      return;
-    }
-    case kLeft: {
-      const u8 slot = r.get_u8(d);
-      converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
-      std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });
-      return;
-    }
-    default: return;
-  }
 } }
 namespace net { void Session::on_pose(const PlayerState& s) {
   if (s.slot == self_slot_) return;
@@ -1792,98 +1240,6 @@ namespace net { void Session::on_pose(const PlayerState& s) {
   } else {
     r.nav.reset();
   }
-} }
-namespace net { void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
-  (void)dt;
-  if (role_ == Role::none) return;
-  time_ = time;
-  me_ = me;
-  me_.slot = self_slot_;
-  me_.t_ms = static_cast<u32>(converted::fits<unsigned int>(time * 1000));
-  if (protected_now(self_slot_, now_ms())) me_.flags |= kProtected;
-  transport_.advance_time(time);
-  const bool tick = time - send_clock_ >= kSendInterval;
-  if (tick) send_clock_ = time;
-  if (role_ == Role::host) {
-    converted::present(server_)->advance_time(time);
-    converted::present(server_)->receive_packets();
-    for (const auto& [index, up] : converted::present(server_)->take_events()) {
-      const u8 slot = static_cast<u8>(index);
-      if (up) {
-        // Welcome: the slot, the map origin (everybody streams the same city) and the rules.
-        std::vector<u8> w;
-        wire::put_u8(w, slot);
-        wire::put_f64(w, lon_);
-        wire::put_f64(w, lat_);
-        wire::put_u8(w, static_cast<u8>(friendly_fire_));
-        converted::present(server_)->send(index, kReliable, kWelcome, w);
-        pending_anchor_.push_back(slot);
-        scores_.ensure(slot);
-        send_scores();
-        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
-      } else {
-        converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
-        std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });  // (the slot's next player starts his own serials)
-        scores_.remove(slot);
-        if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
-        std::vector<u8> w;
-        wire::put_u8(w, slot);
-        to_all(kReliable, kLeft, w, kNobody);
-        send_scores();
-        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);
-      }
-    }
-    for (int c = 0; c < converted::present(server_)->max_clients(); converted::pre_inc(c)) {
-      if (!converted::present(server_)->client_connected(c)) continue;
-      for (int ch : {kReliable, kUnreliable})
-        while (auto m = converted::present(server_)->receive(c, ch)) {
-          if (converted::present(m)->type == kPose) {
-            std::size_t at = 0;
-            PlayerState s;
-            if (unpack(converted::present(m)->data, at, s)) {
-              s.slot = static_cast<u8>(c);
-              if (protected_now(s.slot, now_ms())) s.flags |= kProtected;
-              on_pose(s);
-              // Relay at once (no extra 33 ms): the others' timelines run on the sender's clock.
-              to_all(kUnreliable, kPoseRelay, pack(s), static_cast<u8>(c));
-            }
-          } else {
-            dispatch(static_cast<u8>(c), converted::present(m)->type, converted::present(m)->data);
-          }
-        }
-    }
-    // A joining player gets his anchor once his first pose is in (the group is known then).
-    for (std::size_t i = 0; i < pending_anchor_.size();)
-      if (remote_index(converted::at(pending_anchor_, i)) >= 0) { send_anchor(converted::at(pending_anchor_, i)); converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
-      else converted::pre_inc(i);
-    if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
-    if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
-    if (time - rules_clock_ > kRulesEvery) { rules_clock_ = time; send_rules(); }
-    if (time - seats_clock_ > kSeatsEvery) { seats_clock_ = time; send_seats(); }
-    if (ballot_.id && mp::ballot_stale(ballot_, roster(), now_ms())) finish_ballot(mp::Ballot::Status::cancelled);
-    converted::present(server_)->send_packets();
-  } else {
-    // A client whose way to the host broke - it never came about in time, or the host went quiet
-    // (a tab in the background, a phone that loads) - asks again, once a second, as the original's
-    // peers say hello every second (mqtt_data_relay.mjs HELLO_MS): it does not stay outside for good.
-    if (!connect_pending_ && converted::present(client_)->state() < net::ClientState::disconnected && time - connect_at_ >= kReconnectS) connect_pending_ = true;
-    if (connect_pending_) { converted::present(client_)->connect(server_addr_, time); connect_pending_ = false; connect_at_ = time; ++connects_; }
-    converted::present(client_)->advance_time(time);
-    converted::present(client_)->receive_packets();
-    for (int ch : {kReliable, kUnreliable})
-      while (auto m = converted::present(client_)->receive(ch)) deliver(converted::present(m)->type, converted::present(m)->data);
-    if (converted::present(client_)->connected() && have_origin_ && !ever_in_) { ever_in_ = true; in_since_ = now_ms(); }
-    if (converted::present(client_)->connected() && remote_index(kHost) >= 0) {
-      mates_.clear();
-      for (const Remote& r : remotes_) if (r.state.slot != kHost) mates_.push_back(r.state.slot);
-    }
-    if (converted::present(client_)->connected() && have_origin_ && tick && send_pose) { converted::present(client_)->send(kUnreliable, kPose, pack(me_)); ++sent_poses_; }
-    if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
-    converted::present(client_)->send_packets();
-  }
-  converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
-  // Players who went quiet are gone.
-  converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
 } }
 namespace net { std::string Session::status() const {
   if (role_ == Role::none) return "";
@@ -2434,35 +1790,13 @@ namespace net { using converted::arg; using converted::same; using converted::de
 [[maybe_unused]] static std::string text(const net::Session& s) { return std::string("{") + text(s.role_) + ", " + text(s.transport_) + ", " + text(s.server_) + ", " + text(s.client_) + ", " + text(s.server_addr_) + ", " + text(s.remotes_) + ", " + text(s.hits_) + ", " + text(s.confirms_) + ", " + text(s.kills_) + ", " + text(s.fx_) + ", " + text(s.swarms_) + ", " + text(s.swarm_hits_) + ", " + text(s.world_) + ", " + text(s.pings_) + ", " + text(s.voice_) + ", " + text(s.pending_anchor_) + ", " + text(s.lon_) + ", " + text(s.lat_) + ", " + text(s.time_) + ", " + text(s.send_clock_) + ", " + text(s.scores_clock_) + ", " + text(s.rules_clock_) + ", " + text(s.have_origin_) + ", " + text(s.connect_pending_) + ", " + text(s.anchor_ready_) + ", " + text(s.ever_in_) + ", " + text(s.connect_at_) + ", " + text(s.connects_) + ", " + text(s.in_since_) + ", " + text(s.mates_) + ", " + text(s.anchor_) + ", " + text(s.self_slot_) + ", " + text(s.me_) + ", " + text(s.scores_) + ", " + text(s.friendly_fire_) + ", " + text(s.destroy_) + ", " + text(s.toss_) + ", " + text(s.proj_) + ", " + text(s.town_) + ", " + text(s.swarm_parts_) + ", " + text(s.swarm_serial_) + ", " + text(s.world_rules_) + ", " + text(s.have_world_rules_) + ", " + text(s.protected_) + ", " + text(s.ballot_) + ", " + text(s.remote_ballot_) + ", " + text(s.ballot_serial_) + ", " + text(s.vote_text_) + ", " + text(s.sent_poses_) + ", " + text(s.send_refused_) + ", " + text(s.refused_said_) + ", " + text(s.seats_) + ", " + text(s.seats_clock_) + "}"; }
 [[maybe_unused]] static void take(net::Session& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 53) return; converted::take_as<net::Session::Role>(s.role_, (*v.rows)[0]); converted::take_as<HostTransport>(s.transport_, (*v.rows)[1]); converted::take_as<std::unique_ptr<Server>>(s.server_, (*v.rows)[2]); converted::take_as<std::unique_ptr<Client>>(s.client_, (*v.rows)[3]); converted::take_as<net::Address>(s.server_addr_, (*v.rows)[4]); converted::take_as<std::vector<net::Remote>>(s.remotes_, (*v.rows)[5]); converted::take_as<std::vector<net::Hit>>(s.hits_, (*v.rows)[6]); converted::take_as<std::vector<net::Hit>>(s.confirms_, (*v.rows)[7]); converted::take_as<std::vector<net::Kill>>(s.kills_, (*v.rows)[8]); converted::take_as<std::vector<net::Fx>>(s.fx_, (*v.rows)[9]); converted::take_as<std::vector<net::Swarm>>(s.swarms_, (*v.rows)[10]); converted::take_as<std::vector<net::SwarmHit>>(s.swarm_hits_, (*v.rows)[11]); converted::take_as<std::vector<std::vector<unsigned char>>>(s.world_, (*v.rows)[12]); converted::take_as<std::vector<net::PingEvent>>(s.pings_, (*v.rows)[13]); converted::take_as<std::vector<net::VoiceFrame>>(s.voice_, (*v.rows)[14]); converted::take_as<std::vector<unsigned char>>(s.pending_anchor_, (*v.rows)[15]); converted::take_as<double>(s.lon_, (*v.rows)[16]); converted::take_as<double>(s.lat_, (*v.rows)[17]); converted::take_as<double>(s.time_, (*v.rows)[18]); converted::take_as<double>(s.send_clock_, (*v.rows)[19]); converted::take_as<double>(s.scores_clock_, (*v.rows)[20]); converted::take_as<double>(s.rules_clock_, (*v.rows)[21]); converted::take_as<bool>(s.have_origin_, (*v.rows)[22]); converted::take_as<bool>(s.connect_pending_, (*v.rows)[23]); converted::take_as<bool>(s.anchor_ready_, (*v.rows)[24]); converted::take_as<bool>(s.ever_in_, (*v.rows)[25]); converted::take_as<double>(s.connect_at_, (*v.rows)[26]); converted::take_as<unsigned int>(s.connects_, (*v.rows)[27]); converted::take_as<double>(s.in_since_, (*v.rows)[28]); converted::take_as<std::vector<unsigned char>>(s.mates_, (*v.rows)[29]); converted::take_as<Vec3>(s.anchor_, (*v.rows)[30]); converted::take_as<unsigned char>(s.self_slot_, (*v.rows)[31]); converted::take_as<net::PlayerState>(s.me_, (*v.rows)[32]); converted::take_as<mp::Scoreboard>(s.scores_, (*v.rows)[33]); converted::take_as<bool>(s.friendly_fire_, (*v.rows)[34]); converted::take_as<std::vector<net::Session::Blob>>(s.destroy_, (*v.rows)[35]); converted::take_as<std::vector<net::Session::Blob>>(s.toss_, (*v.rows)[36]); converted::take_as<std::vector<net::Session::Blob>>(s.proj_, (*v.rows)[37]); converted::take_as<std::vector<net::Session::Blob>>(s.town_, (*v.rows)[38]); converted::take_as<std::vector<net::Session::SwarmParts>>(s.swarm_parts_, (*v.rows)[39]); converted::take_as<unsigned char>(s.swarm_serial_, (*v.rows)[40]); converted::take_as<unsigned short>(s.world_rules_, (*v.rows)[41]); converted::take_as<bool>(s.have_world_rules_, (*v.rows)[42]); converted::take_as<std::vector<std::pair<unsigned char, double>>>(s.protected_, (*v.rows)[43]); converted::take_as<mp::Ballot>(s.ballot_, (*v.rows)[44]); converted::take_as<mp::Ballot>(s.remote_ballot_, (*v.rows)[45]); converted::take_as<unsigned int>(s.ballot_serial_, (*v.rows)[46]); converted::take_as<std::string>(s.vote_text_, (*v.rows)[47]); converted::take_as<unsigned int>(s.sent_poses_, (*v.rows)[48]); converted::take_as<unsigned int>(s.send_refused_, (*v.rows)[49]); converted::take_as<unsigned int>(s.refused_said_, (*v.rows)[50]); converted::take_as<seats::Table>(s.seats_, (*v.rows)[51]); converted::take_as<double>(s.seats_clock_, (*v.rows)[52]); }
 }
-[[maybe_unused]] static const bool converted_numbers_kern__net__ClientState = converted::number_enum<net::ClientState>({-3, -2, -1, 0, 1, 2, 3});
-[[maybe_unused]] static net::Message draw_kern__net__Message(converted::Draw& draw) {
-  net::Message s{};
-  s.id = static_cast<unsigned short>(draw.below(40));
-  s.type = static_cast<unsigned short>(draw.below(40));
-  s.data = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-  return s;
-}
-namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const net::Message& s) { return converted::Value::structure({arg(s.id), arg(s.type), arg(s.data)}); }
-[[maybe_unused]] static bool same(const net::Message& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.type, (*got.rows)[1]), ".type") && converted::at_place(same(want.data, (*got.rows)[2]), ".data"); }
-[[maybe_unused]] static bool defined(const net::Message& s) { return defined(s.id) && defined(s.type) && defined(s.data); }
-[[maybe_unused]] static std::string text(const net::Message& s) { return std::string("{") + text(s.id) + ", " + text(s.type) + ", " + text(s.data) + "}"; }
-[[maybe_unused]] static void take(net::Message& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned short>(s.id, (*v.rows)[0]); converted::take_as<unsigned short>(s.type, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[2]); }
-}
 inline void Client::disconnect() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.disconnect", {converted::value_of(*this)}); }
 inline Client::~Client() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {converted::value_of(*this)}); }
 inline Client::Client(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.make", {converted::value_of(transport), converted::value_of(config), converted::value_of(converted::shaped<converted::Whole>(salt_seed))}); converted::take_made(*this, kern_out[0]); }
 inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Client::send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send", {converted::value_of(*this), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline net::ClientState Client::state() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.state", {converted::value_of(*this)}); net::ClientState kern_result = converted::quiet<net::ClientState>(); converted::take_as<net::ClientState>(kern_result, kern_out[0]); return kern_result; }
-inline void Client::connect(const net::Address& server, const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connect", {converted::value_of(*this), converted::value_of(server), converted::value_of(time)}); }
-inline void Client::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
-inline void Client::receive_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.receive_packets", {converted::value_of(*this)}); }
-inline std::optional<net::Message> Client::receive(const int& channel) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.receive", {converted::value_of(*this), converted::value_of(channel)}); std::optional<net::Message> kern_result = converted::quiet<std::optional<net::Message>>(); converted::take_as<std::optional<net::Message>>(kern_result, kern_out[0]); return kern_result; }
-inline void Client::send_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send_packets", {converted::value_of(*this)}); }
 inline Client& Client::operator=(Client&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline void HostTransport::set_address(const net::Address& a) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.set_address", {converted::value_of(*this), converted::value_of(a)}); }
-inline void HostTransport::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
 inline void Server::stop() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.stop", {converted::value_of(*this)}); }
 inline Server::~Server() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {converted::value_of(*this)}); }
 inline Server::Server(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.make", {converted::value_of(transport), converted::value_of(config), converted::value_of(converted::shaped<converted::Whole>(salt_seed))}); converted::take_made(*this, kern_out[0]); }
@@ -2471,11 +1805,6 @@ inline bool Server::running() const { const std::vector<converted::Value> kern_o
 inline int Server::max_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.max_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
 inline bool Server::client_connected(const int& index) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.client_connected", {converted::value_of(*this), converted::value_of(index)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Server::send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline void Server::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
-inline void Server::receive_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.receive_packets", {converted::value_of(*this)}); }
-inline std::vector<std::pair<int, bool>> Server::take_events() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.take_events", {converted::value_of(*this)}); std::vector<std::pair<int, bool>> kern_result = converted::quiet<std::vector<std::pair<int, bool>>>(); converted::take_as<std::vector<std::pair<int, bool>>>(kern_result, kern_out[0]); return kern_result; }
-inline std::optional<net::Message> Server::receive(const int& client, const int& channel) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.receive", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel)}); std::optional<net::Message> kern_result = converted::quiet<std::optional<net::Message>>(); converted::take_as<std::optional<net::Message>>(kern_result, kern_out[0]); return kern_result; }
-inline void Server::send_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send_packets", {converted::value_of(*this)}); }
 inline int Server::connected_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.connected_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
 inline Server& Server::operator=(Server&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 struct Out_unpack_swarm { bool Result; unsigned char owner; unsigned char serial; unsigned char part; bool last; std::vector<net::SwarmUnit> units; };
@@ -2514,23 +1843,9 @@ struct Out_Session_swarm_part { net::Session Self; std::vector<net::SwarmUnit> u
 [[maybe_unused]] static bool same(const Out_Session_swarm_part& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.units, (*got.rows)[1]), ".units"); }
 [[maybe_unused]] static bool defined(const Out_Session_swarm_part& s) { return defined(s.Self) && defined(s.units); }
 [[maybe_unused]] static std::string text(const Out_Session_swarm_part& s) { return std::string("{") + text(s.Self) + ", " + text(s.units) + "}"; }
-struct Out_Session_send_swarm { net::Session Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Session_send_swarm& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
-[[maybe_unused]] static bool defined(const Out_Session_send_swarm& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_Session_send_swarm& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_Session_propose_rule { net::Session Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Session_propose_rule& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
-[[maybe_unused]] static bool defined(const Out_Session_propose_rule& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_Session_propose_rule& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_Session_vote { net::Session Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Session_vote& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
-[[maybe_unused]] static bool defined(const Out_Session_vote& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_Session_vote& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 KERN_TEST(converted_net_session_cpp) {
-  converted::Blueprint bp("net_session_cpp", {"JetSeats", "Multiplayer"});
-  seats::jet_seats_cpp_local::g_rules.bind(bp.source_logic());
-  mp::mp_rules_cpp_local::g_rules.bind(bp.source_logic());
+  converted::Blueprint bp("net_session_cpp");
   {  // config
     converted::Tally tally("config");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -3066,28 +2381,6 @@ KERN_TEST(converted_net_session_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Session::color_of
-    converted::Tally tally("Session_color_of");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.color_of(std::move(a1)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // Session::index_of
     converted::Tally tally("Session_index_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -3202,52 +2495,6 @@ KERN_TEST(converted_net_session_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Session::send_seats
-    converted::Tally tally("Session_send_seats");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_seats(); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::judge_seat
-    converted::Tally tally("Session_judge_seat");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] seats::Seat& a4) { converted::counted([&] { return a0.judge_seat(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      bool a2 = draw.flag();
-      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
-      seats::Seat a4 = converted::enum_value<seats::Seat>(draw.below(2));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // Session::swarm_part
     converted::Tally tally("Session_swarm_part");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -3272,207 +2519,6 @@ KERN_TEST(converted_net_session_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
-    }
-  }
-  {  // Session::judge
-    converted::Tally tally("Session_judge");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] net::Hit& a2) { converted::counted([&] { return a0.judge(std::move(a1), a2); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      net::Hit a2 = draw_net__Hit(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::send_scores
-    converted::Tally tally("Session_send_scores");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_scores(); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::begin_ballot
-    converted::Tally tally("Session_begin_ballot");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { converted::counted([&] { return a0.begin_ballot(std::move(a1)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      bool a1 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::send_rules
-    converted::Tally tally("Session_send_rules");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_rules(); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::finish_ballot
-    converted::Tally tally("Session_finish_ballot");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] mp::Ballot::Status& a1) { converted::counted([&] { return a0.finish_ballot(std::move(a1)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      mp::Ballot::Status a1 = converted::enum_value<mp::Ballot::Status>(draw.below(6));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::dispatch
-    converted::Tally tally("Session_dispatch");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.dispatch(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
-      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::to_host
-    converted::Tally tally("Session_to_host");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] int& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.to_host(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      int a1 = static_cast<int>(draw.whole());
-      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
-      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::send_fx
-    converted::Tally tally("Session_send_fx");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] net::Fx& a1) { converted::counted([&] { return a0.send_fx(std::move(a1)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      net::Fx a1 = draw_net__Fx(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::send_swarm
-    converted::Tally tally("Session_send_swarm");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<net::SwarmUnit>& a1) { auto r = converted::counted([&] { return a0.send_swarm(a1); }); return Out_Session_send_swarm{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      std::vector<net::SwarmUnit> a1 = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // Session::town_to_host
@@ -3699,85 +2745,10 @@ KERN_TEST(converted_net_session_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Session::send_swarm_hit
-    converted::Tally tally("Session_send_swarm_hit");
+  {  // Session::send_scores
+    converted::Tally tally("Session_send_scores");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] net::SwarmKind& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.send_swarm_hit(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
-      net::SwarmKind a3 = converted::enum_value<net::SwarmKind>(draw.below(8));
-      double a4 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::request_hit
-    converted::Tally tally("Session_request_hit");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] double& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] unsigned char& a4, [[maybe_unused]] Vec3& a5) { converted::counted([&] { return a0.request_hit(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      double a2 = draw.number();
-      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
-      unsigned char a4 = static_cast<unsigned char>(draw.below(40));
-      Vec3 a5 = draw.vector();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::report_death
-    converted::Tally tally("Session_report_death");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] unsigned char& a3) { converted::counted([&] { return a0.report_death(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
-      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
-      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::report_respawn
-    converted::Tally tally("Session_report_respawn");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.report_respawn(); }); return std::move(a0); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_scores(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -3795,96 +2766,25 @@ KERN_TEST(converted_net_session_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Session::send_ping
-    converted::Tally tally("Session_send_ping");
+  {  // Session::send_rules
+    converted::Tally tally("Session_send_rules");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] unsigned int& a3) { converted::counted([&] { return a0.send_ping(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_rules(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
-      bool a1 = draw.flag();
-      Vec3 a2 = draw.vector();
-      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::send_voice
-    converted::Tally tally("Session_send_voice");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.send_voice(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
-      bool a2 = draw.flag();
-      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::propose_rule
-    converted::Tally tally("Session_propose_rule");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { auto r = converted::counted([&] { return a0.propose_rule(std::move(a1)); }); return Out_Session_propose_rule{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      bool a1 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // Session::vote
-    converted::Tally tally("Session_vote");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { auto r = converted::counted([&] { return a0.vote(std::move(a1)); }); return Out_Session_vote{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      bool a1 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // Session::set_world_rules
@@ -3931,23 +2831,42 @@ KERN_TEST(converted_net_session_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // Session::seat_request
-    converted::Tally tally("Session_seat_request");
+  {  // Session::finish_ballot
+    converted::Tally tally("Session_finish_ballot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] seats::Seat& a3) { converted::counted([&] { return a0.seat_request(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] mp::Ballot::Status& a1) { converted::counted([&] { return a0.finish_ballot(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
-      bool a1 = draw.flag();
-      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
-      seats::Seat a3 = converted::enum_value<seats::Seat>(draw.below(2));
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      mp::Ballot::Status a1 = converted::enum_value<mp::Ballot::Status>(draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_seats
+    converted::Tally tally("Session_send_seats");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_seats(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
@@ -3970,54 +2889,6 @@ KERN_TEST(converted_net_session_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::deliver
-    converted::Tally tally("Session_deliver");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned short& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { converted::counted([&] { return a0.deliver(std::move(a1), a2); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      unsigned short a1 = static_cast<unsigned short>(draw.below(40));
-      std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Session::update
-    converted::Tally tally("Session_update");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] net::PlayerState& a3, [[maybe_unused]] bool& a4) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), a3, std::move(a4)); }); return std::move(a0); };
-    for (int i = 0; tally.more(i); ++i) {
-      net::Session a0 = draw_net__Session(draw);
-      double a1 = draw.number();
-      double a2 = draw.number();
-      net::PlayerState a3 = draw_net__PlayerState(draw);
-      bool a4 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

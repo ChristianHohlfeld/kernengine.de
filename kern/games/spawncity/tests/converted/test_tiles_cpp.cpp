@@ -16,6 +16,7 @@
 
 namespace converted_tiles_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -37,7 +38,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -45,8 +46,8 @@ struct Vec4 {
   
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
 constexpr f32 kPi = 3.14159265358979323846;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 struct Rng {
@@ -70,7 +71,7 @@ struct Rng {
 
 
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -81,18 +82,13 @@ struct GeoProjector {
 
 
 
-  void project(f64 lon, f64 lat, f64& x, f64& y) const {
-    x = (lon - lon0) * kRad * kEarthRadius * cos_lat;
-    y = (lat - lat0) * kRad * kEarthRadius;
-  }
+  
+
+
+
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
-namespace mvt { struct Value {
-  enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
-  std::string s;
-  f64 n = 0;
-  bool b = false;
-}; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 namespace mvt { struct Feature {
   u64 id = 0;
   GeomType type = GeomType::unknown;
@@ -100,31 +96,7 @@ namespace mvt { struct Feature {
   /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
   std::vector<std::vector<Vec2>> parts;
 }; }
-namespace mvt { struct Layer {
-  std::string name;
-  u32 extent = 4096;
-  std::vector<std::string> keys;
-  std::vector<Value> values;
-  std::vector<Feature> features;
-  /// The value of a tag on a feature: its index in `values` (-1 when absent).
-  i32 tag(const Feature& f, std::string_view key) const;
-  std::string_view text(const Feature& f, std::string_view key) const;
-  f64 number(const Feature& f, std::string_view key, f64 fallback) const;
-}; }
-namespace mvt { struct Tile {
-  std::vector<Layer> layers;
-  /// The layer of that name: its index in `layers` (-1 when the tile has none).
-  i32 layer(std::string_view name) const;
-}; }
 namespace mvt { f64 ring_area(const std::vector<Vec2>& ring); }
-constexpr i32 kTileZoom = 14;
-struct TileKey {
-  i32 z = kTileZoom, x = 0, y = 0;
-  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
-  
-};
-TileKey tile_at(f64 lon, f64 lat, i32 z = kTileZoom);
-void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat);
 void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat);
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
 f32 road_width(RoadClass c);
@@ -158,48 +130,14 @@ struct MapFeatures {
 };
 void furnish(MapFeatures& out, const Vec4& square, const std::vector<std::vector<Vec2>>& apron);
 std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Vec4& rect);
-void extract(const mvt::Tile& tile, const TileKey& key, const GeoProjector& proj, MapFeatures& out);
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out);
 void training_level(MapFeatures& out);
-namespace mvt { i32 Tile::layer(std::string_view name) const {
-  for (std::size_t i = 0; i < layers.size(); converted::pre_inc(i))
-    if (converted::at(layers, i).name == name) return static_cast<i32>(i);
-  return -1;
-} }
-namespace mvt { i32 Layer::tag(const Feature& f, std::string_view key) const {
-  for (const auto& [k, v] : f.tags)
-    if (k < keys.size() && v < values.size() && converted::at(keys, k) == key) return static_cast<i32>(v);
-  return -1;
-} }
-namespace mvt { f64 Layer::number(const Feature& f, std::string_view key, f64 fallback) const {
-  const i32 v = tag(f, key);
-  return v >= 0 && converted::at(values, static_cast<std::size_t>(v)).kind == Value::Kind::number ? converted::at(values, static_cast<std::size_t>(v)).n : fallback;
-} }
-namespace mvt { std::string_view Layer::text(const Feature& f, std::string_view key) const {
-  const i32 v = tag(f, key);
-  return v >= 0 && converted::at(values, static_cast<std::size_t>(v)).kind == Value::Kind::string ? std::string_view(converted::at(values, static_cast<std::size_t>(v)).s) : std::string_view();
-} }
 namespace mvt { f64 ring_area(const std::vector<Vec2>& ring) {
   f64 a = 0;
   const std::size_t n = ring.size();
   for (std::size_t i = 0, j = n ? converted::minus(n, 1) : 0; i < n; j = converted::post_inc(i)) a += static_cast<f64>(converted::at(ring, j).x) * converted::at(ring, i).y - static_cast<f64>(converted::at(ring, i).x) * converted::at(ring, j).y;
   return a * 0.5;
 } }
-constexpr f64 kPiD = 3.14159265358979323846;
-TileKey tile_at(f64 lon, f64 lat, i32 z) {
-  const f64 n = ldexp_bp(1.0, z);
-  const f64 lr = lat * kPiD / 180;
-  TileKey t;
-  t.z = z;
-  t.x = static_cast<i32>(converted::fits<int>(std::floor((lon + 180) / 360 * n)));
-  t.y = static_cast<i32>(converted::fits<int>(std::floor((1 - asinh_bp(kern::math::tan(lr)) / kPiD) / 2 * n)));
-  return t;
-}
-void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
-  const f64 n = ldexp_bp(1.0, t.z);
-  lon = (t.x + fx) / n * 360 - 180;
-  lat = kern::math::atan(sinh_bp(kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / kPiD;
-}
 void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat) {
   lon = p.lon0 + x / (GeoProjector::kEarthRadius * p.cos_lat) / GeoProjector::kRad;
   lat = p.lat0 + y / GeoProjector::kEarthRadius / GeoProjector::kRad;
@@ -245,17 +183,17 @@ void polygons(const mvt::Feature& f, std::vector<std::vector<std::vector<Vec2>>>
 }
 struct Projector {
   f64 x0, x1, y0, ym, y1, inv_extent;
-  Projector(const TileKey& key, const GeoProjector& proj, f64 extent) : inv_extent(1.0 / extent) {
-    f64 lon, lat, x;
-    tile_lonlat(key, 0, 0, lon, lat);
-    proj.project(lon, lat, x, y0);
-    x0 = x;
-    tile_lonlat(key, 1, 0.5, lon, lat);
-    proj.project(lon, lat, x, ym);
-    x1 = x;
-    tile_lonlat(key, 1, 1, lon, lat);
-    proj.project(lon, lat, x, y1);
-  }
+  
+
+
+
+
+
+
+
+
+
+
   Vec2 operator()(Vec2 t) const {
     const f64 fx = t.x * inv_extent, fy = t.y * inv_extent;
     // Lagrange through (0, y0), (0.5, ym), (1, y1).
@@ -293,126 +231,6 @@ std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
 u32 hash_u32(u64 v) {
   v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
   return static_cast<u32>(v);
-}
-void extract(const mvt::Tile& tile, const TileKey& key, const GeoProjector& proj, MapFeatures& out) {
-  std::vector<std::vector<std::vector<Vec2>>> polys;
-  std::vector<std::vector<Vec2>> apron;
-  if (const i32 at = tile.layer("building"); at >= 0) {
-    const mvt::Layer& l = converted::at(tile.layers, static_cast<std::size_t>(at));
-    const Projector P(key, proj, static_cast<f64>(l.extent));
-    for (const mvt::Feature& f : l.features) {
-      if (f.type != mvt::GeomType::polygon) continue;
-      const i32 hide = l.tag(f, "hide_3d");
-      if (hide >= 0 && converted::at(l.values, static_cast<std::size_t>(hide)).kind == mvt::Value::Kind::boolean && converted::at(l.values, static_cast<std::size_t>(hide)).b) continue;
-      f32 top = static_cast<f32>(l.number(f, "render_height", -1));
-      if (!(top > 0)) top = 8;  // SpawnCity's default (real_world_bootstrap.mjs:443)
-      const f32 base = static_cast<f32>(std::fmax(0.0, l.number(f, "render_min_height", 0)));
-      polygons(f, polys);
-      u32 n = 0;
-      for (auto& poly : polys) {
-        MapFeatures::Building b;
-        b.base = base;
-        b.top = std::fmax(top, base + 1.0);
-        b.seed = hash_u32(converted::plus_bits(converted::plus_bits(converted::plus_bits(converted::times_bits(f.id, 31), (n++)), converted::times_bits(static_cast<u64>(key.x), 7919)), converted::times_bits(static_cast<u64>(key.y), 104729)));
-        const f32 ext = static_cast<f32>(l.extent);
-        if (!poly.empty()) {
-          // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
-          bool over = false;
-          for (Vec2 q : converted::at(poly, 0)) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
-          if (over) { std::vector<Vec2> m; for (Vec2 q : converted::at(poly, 0)) m.push_back(P(q)); apron.push_back(std::move(m)); }
-        }
-        for (auto& ring : poly) {
-          const std::vector<Vec2> clipped = clip_to_tile(ring, ext);
-          if (clipped.size() < 3) { if (b.rings.empty()) break; continue; }  // the outline outside: the house is the other tile's
-          std::vector<Vec2> m;
-          m.reserve(converted::count(clipped.size()));
-          for (Vec2 p : clipped) m.push_back(P(p));
-          b.rings.push_back(std::move(m));
-        }
-        if (!b.rings.empty()) out.buildings.push_back(std::move(b));
-      }
-    }
-  }
-  if (const i32 at = tile.layer("transportation"); at >= 0) {
-    const mvt::Layer& l = converted::at(tile.layers, static_cast<std::size_t>(at));
-    const Projector P(key, proj, static_cast<f64>(l.extent));
-    for (const mvt::Feature& f : l.features) {
-      if (f.type != mvt::GeomType::line) continue;
-      RoadClass c;
-      if (!parse_road(l.text(f, "class"), c)) continue;
-      const std::string_view brunnel = l.text(f, "brunnel");
-      if (brunnel == "tunnel") continue;
-      for (const auto& part : f.parts) {
-        if (part.size() < 2) continue;
-        MapFeatures::Road r;
-        r.cls = c;
-        r.bridge = brunnel == "bridge";
-        for (Vec2 p : part) r.points.push_back(P(p));
-        out.roads.push_back(std::move(r));
-      }
-    }
-  }
-  if (const i32 at = tile.layer("waterway"); at >= 0) {
-    const mvt::Layer& l = converted::at(tile.layers, static_cast<std::size_t>(at));
-    const Projector P(key, proj, static_cast<f64>(l.extent));
-    for (const mvt::Feature& f : l.features) {
-      if (f.type != mvt::GeomType::line) continue;
-      const std::string_view cls = l.text(f, "class");
-      const RoadClass c = cls == "river" ? RoadClass::river : cls == "canal" ? RoadClass::canal : RoadClass::stream;
-      if (l.text(f, "brunnel") == "tunnel") continue;
-      for (const auto& part : f.parts) {
-        if (part.size() < 2) continue;
-        MapFeatures::Road r;
-        r.cls = c;
-        for (Vec2 p : part) r.points.push_back(P(p));
-        out.roads.push_back(std::move(r));
-      }
-    }
-  }
-  auto areas = [&](const char* layer, auto kind_of) {
-    const i32 at = tile.layer(layer);
-    if (at < 0) return;
-    const mvt::Layer& l = converted::at(tile.layers, static_cast<std::size_t>(at));
-    const Projector P(key, proj, static_cast<f64>(l.extent));
-    for (const mvt::Feature& f : l.features) {
-      if (f.type != mvt::GeomType::polygon) continue;
-      AreaKind kind;
-      if (!kind_of(l, f, kind)) continue;
-      polygons(f, polys);
-      for (auto& poly : polys) {
-        MapFeatures::Area a;
-        a.kind = kind;
-        for (auto& ring : poly) {
-          std::vector<Vec2> m;
-          for (Vec2 p : ring) m.push_back(P(p));
-          a.rings.push_back(std::move(m));
-        }
-        out.areas.push_back(std::move(a));
-      }
-    }
-  };
-  areas("water", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::water; return true; });
-  areas("park", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::park; return true; });
-  areas("landcover", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "wood") k = AreaKind::wood;
-    else if (c == "grass") k = AreaKind::grass;
-    else if (c == "sand") k = AreaKind::sand;
-    else return false;
-    return true;
-  });
-  areas("landuse", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "pitch" || c == "playground") k = AreaKind::pitch;
-    else if (c == "cemetery" || c == "garden") k = AreaKind::grass;
-    else return false;
-    return true;
-  });
-  {
-    const Projector P(key, proj, 1.0);
-    const Vec2 a = P({0, 0}), b = P({1, 1});
-    furnish(out, {std::fmin(a.x, b.x), std::fmin(a.y, b.y), std::fmax(a.x, b.x), std::fmax(a.y, b.y)}, apron);
-  }
 }
 struct FurnishIndex {
   static constexpr f32 kCell = 20;
@@ -687,18 +505,6 @@ std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Ve
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static TileKey draw_TileKey(converted::Draw& draw) {
-  TileKey s{};
-  s.z = static_cast<int>(draw.whole());
-  s.x = static_cast<int>(draw.whole());
-  s.y = static_cast<int>(draw.whole());
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const TileKey& s) { return converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
-[[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.z, (*got.rows)[0]), ".z") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y"); }
-[[maybe_unused]] static bool defined(const TileKey& s) { return defined(s.z) && defined(s.x) && defined(s.y); }
-[[maybe_unused]] static std::string text(const TileKey& s) { return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
-[[maybe_unused]] static void take(TileKey& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.z, (*v.rows)[0]); converted::take_as<int>(s.x, (*v.rows)[1]); converted::take_as<int>(s.y, (*v.rows)[2]); }
 [[maybe_unused]] static GeoProjector draw_kern__GeoProjector(converted::Draw& draw) {
   GeoProjector s{};
   s.lon0 = draw.number();
@@ -727,7 +533,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 [[maybe_unused]] static void take(mvt::Feature& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); converted::take_as<mvt::GeomType>(s.type, (*v.rows)[1]); converted::take_as<std::vector<std::pair<unsigned int, unsigned int>>>(s.tags, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.parts, (*v.rows)[3]); }
 }
 [[maybe_unused]] static Projector draw_Projector(converted::Draw& draw) {
-  Projector s = Projector(draw_TileKey(draw), draw_kern__GeoProjector(draw), draw.number());
+  Projector s{};
   s.x0 = draw.number();
   s.x1 = draw.number();
   s.y0 = draw.number();
@@ -858,53 +664,6 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 [[maybe_unused]] static bool defined(const MapFeatures& s) { return defined(s.buildings) && defined(s.roads) && defined(s.areas) && defined(s.trees) && defined(s.lamps) && defined(s.procedural); }
 [[maybe_unused]] static std::string text(const MapFeatures& s) { return std::string("{") + text(s.buildings) + ", " + text(s.roads) + ", " + text(s.areas) + ", " + text(s.trees) + ", " + text(s.lamps) + ", " + text(s.procedural) + "}"; }
 [[maybe_unused]] static void take(MapFeatures& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<MapFeatures::Building>>(s.buildings, (*v.rows)[0]); converted::take_as<std::vector<MapFeatures::Road>>(s.roads, (*v.rows)[1]); converted::take_as<std::vector<MapFeatures::Area>>(s.areas, (*v.rows)[2]); converted::take_as<std::vector<MapFeatures::Spot>>(s.trees, (*v.rows)[3]); converted::take_as<std::vector<MapFeatures::Spot>>(s.lamps, (*v.rows)[4]); converted::take_as<bool>(s.procedural, (*v.rows)[5]); }
-[[maybe_unused]] static mvt::Value draw_mvt__Value(converted::Draw& draw) {
-  mvt::Value s{};
-  s.kind = converted::enum_value<mvt::Value::Kind>(draw.below(4));
-  s.s = draw.said_word({"building", "hide_3d", "render_height", "render_min_height", "transportation", "class", "brunnel", "tunnel", "bridge", "waterway", "river", "canal", "water", "park", "landcover", "wood", "grass", "sand", "landuse", "pitch", "playground", "cemetery", "garden"});
-  s.n = draw.number();
-  s.b = draw.flag();
-  return s;
-}
-namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const mvt::Value& s) { return converted::Value::structure({arg(s.kind), arg(s.s), arg(s.n), arg(s.b)}); }
-[[maybe_unused]] static bool same(const mvt::Value& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.s, (*got.rows)[1]), ".s") && converted::at_place(same(want.n, (*got.rows)[2]), ".n") && converted::at_place(same(want.b, (*got.rows)[3]), ".b"); }
-[[maybe_unused]] static bool defined(const mvt::Value& s) { return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
-[[maybe_unused]] static std::string text(const mvt::Value& s) { return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
-[[maybe_unused]] static void take(mvt::Value& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<mvt::Value::Kind>(s.kind, (*v.rows)[0]); converted::take_as<std::string>(s.s, (*v.rows)[1]); converted::take_as<double>(s.n, (*v.rows)[2]); converted::take_as<bool>(s.b, (*v.rows)[3]); }
-}
-[[maybe_unused]] static mvt::Layer draw_mvt__Layer(converted::Draw& draw) {
-  mvt::Layer s{};
-  s.name = draw.said_word({"building", "hide_3d", "render_height", "render_min_height", "transportation", "class", "brunnel", "tunnel", "bridge", "waterway", "river", "canal", "water", "park", "landcover", "wood", "grass", "sand", "landuse", "pitch", "playground", "cemetery", "garden"});
-  s.extent = static_cast<unsigned int>(draw.below(40));
-  s.keys = draw_list(draw, [&]() -> std::string { return draw.said_word({"building", "hide_3d", "render_height", "render_min_height", "transportation", "class", "brunnel", "tunnel", "bridge", "waterway", "river", "canal", "water", "park", "landcover", "wood", "grass", "sand", "landuse", "pitch", "playground", "cemetery", "garden"}); });
-  s.values = draw_list(draw, [&]() -> mvt::Value { return draw_mvt__Value(draw); });
-  s.features = draw_list(draw, [&]() -> mvt::Feature { return draw_mvt__Feature(draw); });
-  return s;
-}
-namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const mvt::Layer& s) { return converted::Value::structure({arg(s.name), arg(s.extent), arg(s.keys), arg(s.values), arg(s.features)}); }
-[[maybe_unused]] static bool same(const mvt::Layer& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.extent, (*got.rows)[1]), ".extent") && converted::at_place(same(want.keys, (*got.rows)[2]), ".keys") && converted::at_place(same(want.values, (*got.rows)[3]), ".values") && converted::at_place(same(want.features, (*got.rows)[4]), ".features"); }
-[[maybe_unused]] static bool defined(const mvt::Layer& s) { return defined(s.name) && defined(s.extent) && defined(s.keys) && defined(s.values) && defined(s.features); }
-[[maybe_unused]] static std::string text(const mvt::Layer& s) { return std::string("{") + text(s.name) + ", " + text(s.extent) + ", " + text(s.keys) + ", " + text(s.values) + ", " + text(s.features) + "}"; }
-[[maybe_unused]] static void take(mvt::Layer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<unsigned int>(s.extent, (*v.rows)[1]); converted::take_as<std::vector<std::string>>(s.keys, (*v.rows)[2]); converted::take_as<std::vector<mvt::Value>>(s.values, (*v.rows)[3]); converted::take_as<std::vector<mvt::Feature>>(s.features, (*v.rows)[4]); }
-}
-[[maybe_unused]] static mvt::Tile draw_mvt__Tile(converted::Draw& draw) {
-  mvt::Tile s{};
-  s.layers = draw_list(draw, [&]() -> mvt::Layer { return draw_mvt__Layer(draw); });
-  return s;
-}
-namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const mvt::Tile& s) { return converted::Value::structure({arg(s.layers)}); }
-[[maybe_unused]] static bool same(const mvt::Tile& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.layers, (*got.rows)[0]), ".layers"); }
-[[maybe_unused]] static bool defined(const mvt::Tile& s) { return defined(s.layers); }
-[[maybe_unused]] static std::string text(const mvt::Tile& s) { return std::string("{") + text(s.layers) + "}"; }
-[[maybe_unused]] static void take(mvt::Tile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mvt::Layer>>(s.layers, (*v.rows)[0]); }
-}
-struct Out_tile_lonlat { double lon; double lat; };
-[[maybe_unused]] static bool same(const Out_tile_lonlat& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.lon, (*got.rows)[0]), ".lon") && converted::at_place(same(want.lat, (*got.rows)[1]), ".lat"); }
-[[maybe_unused]] static bool defined(const Out_tile_lonlat& s) { return defined(s.lon) && defined(s.lat); }
-[[maybe_unused]] static std::string text(const Out_tile_lonlat& s) { return std::string("{") + text(s.lon) + ", " + text(s.lat) + "}"; }
 struct Out_unproject { double lon; double lat; };
 [[maybe_unused]] static bool same(const Out_unproject& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.lon, (*got.rows)[0]), ".lon") && converted::at_place(same(want.lat, (*got.rows)[1]), ".lat"); }
 [[maybe_unused]] static bool defined(const Out_unproject& s) { return defined(s.lon) && defined(s.lat); }
@@ -920,54 +679,6 @@ struct Out_clip_pass { std::vector<Vec2> a; std::vector<Vec2> b; };
 
 KERN_TEST(converted_tiles_cpp) {
   converted::Blueprint bp("tiles_cpp");
-  {  // tile_at
-    converted::Tally tally("tile_at");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return converted_tiles_cpp::tile_at(std::move(a0), std::move(a1), std::move(a2)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      double a0 = draw.number();
-      double a1 = draw.number();
-      int a2 = static_cast<int>(draw.whole());
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // tile_lonlat
-    converted::Tally tally("tile_lonlat");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return converted_tiles_cpp::tile_lonlat(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_tile_lonlat{std::move(a3), std::move(a4)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      TileKey a0 = draw_TileKey(draw);
-      double a1 = draw.number();
-      double a2 = draw.number();
-      double a3 = draw.number();
-      double a4 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
-    }
-  }
   {  // unproject
     converted::Tally tally("unproject");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1093,29 +804,6 @@ KERN_TEST(converted_tiles_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Projector::Projector
-    converted::Tally tally("Projector_new");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey& a0, [[maybe_unused]] GeoProjector& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return Projector(a0, a1, std::move(a2)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      TileKey a0 = draw_TileKey(draw);
-      GeoProjector a1 = draw_kern__GeoProjector(draw);
-      double a2 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
@@ -1259,27 +947,6 @@ KERN_TEST(converted_tiles_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // FurnishIndex::cell
-    converted::Tally tally("FurnishIndex_cell");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return FurnishIndex::cell(std::move(a0)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      double a0 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // FurnishIndex::key
     converted::Tally tally("FurnishIndex_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1297,6 +964,27 @@ KERN_TEST(converted_tiles_cpp) {
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FurnishIndex::cell
+    converted::Tally tally("FurnishIndex_cell");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return FurnishIndex::cell(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
@@ -1352,16 +1040,16 @@ KERN_TEST(converted_tiles_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // FurnishIndex::off_roads
-    converted::Tally tally("FurnishIndex_off_roads");
+  {  // FurnishIndex::built
+    converted::Tally tally("FurnishIndex_built");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FurnishIndex& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return a0.off_roads(std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] FurnishIndex& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] std::vector<MapFeatures::Building>& a2, [[maybe_unused]] std::vector<std::vector<Vec2>>& a3) { return converted::counted([&] { return a0.built(std::move(a1), a2, a3); }); };
     for (int i = 0; tally.more(i); ++i) {
       FurnishIndex a0 = draw_FurnishIndex(draw);
       Vec2 a1 = draw.vector2();
-      double a2 = draw.number();
-      double a3 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      std::vector<MapFeatures::Building> a2 = draw_list(draw, [&]() -> MapFeatures::Building { return draw_MapFeatures__Building(draw); });
+      std::vector<std::vector<Vec2>> a3 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1376,16 +1064,16 @@ KERN_TEST(converted_tiles_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // FurnishIndex::built
-    converted::Tally tally("FurnishIndex_built");
+  {  // FurnishIndex::off_roads
+    converted::Tally tally("FurnishIndex_off_roads");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FurnishIndex& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] std::vector<MapFeatures::Building>& a2, [[maybe_unused]] std::vector<std::vector<Vec2>>& a3) { return converted::counted([&] { return a0.built(std::move(a1), a2, a3); }); };
+    const auto run = [&]([[maybe_unused]] FurnishIndex& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return a0.off_roads(std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       FurnishIndex a0 = draw_FurnishIndex(draw);
       Vec2 a1 = draw.vector2();
-      std::vector<MapFeatures::Building> a2 = draw_list(draw, [&]() -> MapFeatures::Building { return draw_MapFeatures__Building(draw); });
-      std::vector<std::vector<Vec2>> a3 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1416,30 +1104,6 @@ KERN_TEST(converted_tiles_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // extract
-    converted::Tally tally("extract");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] mvt::Tile& a0, [[maybe_unused]] TileKey& a1, [[maybe_unused]] GeoProjector& a2, [[maybe_unused]] MapFeatures& a3) { converted::counted([&] { return converted_tiles_cpp::extract(a0, a1, a2, a3); }); return std::move(a3); };
-    for (int i = 0; tally.more(i); ++i) {
-      mvt::Tile a0 = draw_mvt__Tile(draw);
-      TileKey a1 = draw_TileKey(draw);
-      GeoProjector a2 = draw_kern__GeoProjector(draw);
-      MapFeatures a3 = draw_MapFeatures(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
