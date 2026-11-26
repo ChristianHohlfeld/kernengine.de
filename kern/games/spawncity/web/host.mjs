@@ -10,19 +10,14 @@
 //     functions, fed from the game's audio state and events); Kern's mixer (KernAudio from
 //     kern/web/studio/game.mjs) only carries the other players' voices then (?audio=kern: Kern's own)
 //   * draws the HUD from the game's JSON and the touch controls with Kern's TouchOverlay
-//   * multiplayer (?mp=host|join&room=NAME[&relay=wss://...]): moves the game's datagrams with
-//     Kern's KernNet (BroadcastChannel between tabs, or the Kern relay between machines)
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {readGamepad} from "../../../web/kern.mjs";
-import {KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
 import {KernAudio} from "../../../web/audio.mjs";
 import {startKernJobs} from "../../../web/jobs.mjs";
-import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
-import {GapsHud} from "./gaps_hud.mjs";
-import {installSpawnCityLife} from "./life.mjs";
 import {mountOriginalView, OriginalView, fingerForGame} from "./view.mjs";
 // the mode binders register themselves (view_modes.mjs)
 import {VIEW_MODES} from "./view_modes.mjs";
@@ -383,16 +378,20 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     audio.connect = async () => { if (netActive) return kernConnect(); };
   }
 
-  // ---- multiplayer, voice, pings, big map (web/mp_host.mjs) --------------------------------
-  const mpPage = new MpPage({e, kern, command, params, canvas, statusEl});
-  mpPage.connect(KernNet);
+  // ---- the small game (26.11.2026: a drone over the city, BLUEPRINTS.md "Herausgenommen am 26.11."): no multiplayer,
+  // voice, pings or big map (web/mp_host.mjs is gone with them) - the page's buttons of what the game has not are
+  // hidden here (the original's view, web/view/, stays as it is)
+  const mpPage = null;
+  {
+    const gone = document.createElement("style");
+    gone.textContent = "#driveModeButton,#playerModeButton,#lanVsButton,#droneWeaponToggle,[data-drone-weapon],#soloLogbook,#mobileGameplayMultiplayer{display:none!important}";
+    document.head.appendChild(gone);
+  }
 
   // ---- HUD ----------------------------------------------------------------------------------
   const hud = new SpawnCityHud(hudEl);
   // Menus, settings, start place, equipment (ui.mjs): DOM only, the game decides.
   const ui = installSpawnCityUi({command, params, canvas, statusEl});
-  // Street life (life.mjs): speech, speech bubbles, banners - the game decides, the page speaks.
-  const life = installSpawnCityLife({root: hudEl, muted: params.get("mute") === "1"});
   const view = originalView ? new OriginalView({command, ui, mp: mpPage}) : null;
   if (originalView) installOriginalMenus({command, ui, mp: mpPage});
   let frames = 0, last = null;
@@ -427,7 +426,6 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     canvas.width = w; canvas.height = hh;
     e.kern_app_resize(w, hh);
   };
-  const gapsHud = new GapsHud(hudEl, command);  // impact bursts, police dispatch (gaps_hud.mjs)
   // ?perf=1: where a frame's time goes, on the player's own device (screenshot it). Frame time from
   // rAF (p50 / p95 / max of the last 2 s, frames over 50 ms), the game's own CPU slots, the GPU
   // time of the frame (timer query, when the browser has it), the city's slowest streaming step,
@@ -467,7 +465,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     jobs?.pump();
     audio?.pump();
     try { last = JSON.parse(str(e.sc_hud(lenAt))); } catch { /* keep the last one */ }
-    if (last) { hud.update(last, tiles); mpPage?.update(last); gapsHud.update(last); }
+    if (last) hud.update(last, tiles);
     // vs_combat_presentation.mjs playExplosion: in a multiplayer round the phone buzzes when you
     // go down ([70, 35, 120]) and when a mate does ([65]); the pad never rumbles in SpawnCity.
     if (last?.net) {
@@ -485,7 +483,6 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
     netActive = !!last?.net;
     if (originalAudio && audio && netActive && !audio.node) audio.connect();
     if (!voiceExempt && audio) voiceExempt = exemptVoice(audio);
-    life.update(last);
     // in the headset the page is not seen: its DOM only every 8th frame (style and layout work
     // must not cost the headset frames)
     if (app.inXR && (++xrDomSkip % 8) !== 0) return;
@@ -496,171 +493,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // in VR the XR session drives the frame (and this page's work with it, xrFrame below)
   const tick = () => { if (!app.inXR) work(); requestAnimationFrame(tick); };
 
-  // ---- VR (WebXR: Meta Quest browser, the installed app): the game in the headset, the
-  // controllers as the pad - left stick move, right stick turn, triggers fire / aim, A B X Y,
-  // grips LB / RB, stick clicks L3 / R3 (the Xbox scheme the game already has)
-  const xrPad = frame => {
-    let L = null, R = null;
-    for (const src of frame.session.inputSources) {
-      if (!src.gamepad) continue;
-      if (src.handedness === "left") L = src.gamepad; else if (src.handedness === "right") R = src.gamepad;
-    }
-    if (!L && !R) return false;
-    const b = (g, i) => !!g?.buttons[i]?.pressed, v = (g, i) => g?.buttons[i]?.value ?? 0, ax = (g, i) => g?.axes[i] ?? 0;
-    let bits = 0;
-    const set = (bit, on) => { if (on) bits |= 1 << bit; };
-    set(0, b(R, 4)); set(1, b(R, 5)); set(2, b(L, 4)); set(3, b(L, 5));   // A B X Y
-    set(4, b(L, 1)); set(5, b(R, 1));                                     // LB RB (grips)
-    set(10, b(L, 3)); set(11, b(R, 3));                                   // L3 R3
-    // (no START chord in the headset: a page menu would open where nobody can see it)
-    const lx = ax(L, 2), ly = ax(L, 3), rx = ax(R, 2), ry = ax(R, 3);
-    const active = bits !== 0 || [lx, ly, rx, ry].some(a => Math.abs(a) > 0.22) || v(L, 0) > 0.1 || v(R, 0) > 0.1;
-    e.sc_gamepad(1, lx, -ly, rx, -ry, v(L, 0), v(R, 0), bits >>> 0, active ? 1 : 0);
-    // the game's rumble (a landed blow, a pick in the menu, RESET): the controller's haptics
-    const pulse = last?.vr?.pulse;
-    if (pulse) for (const [g, k] of [[L, 0], [R, 1]]) {
-      const a = +pulse[k] || 0;
-      if (a > 0.01) try { g?.hapticActuators?.[0]?.pulse?.(Math.min(1, a), 30 + a * 60); } catch { /* no haptics */ }
-    }
-    return true;
-  };
-  // the HUD in the headset (the page's HUD is not visible in an immersive session): a 512 x 384
-  // panel on the left wrist (game_look.cpp look_vr_hud), drawn here every 100 ms - health, weapon,
-  // stars; Y opens the menu there (game_vr.cpp): MULTI, drone / on foot, the locomotion, RESET, out
-  let vrHud = null;
-  const vrHudDraw = () => {
-    const gl = app.kern.gl;
-    if (!vrHud) {
-      const c = document.createElement("canvas"); c.width = 512; c.height = 384;
-      const tex = gl.createTexture();
-      const slot = app.kern.reserveObject(tex);
-      const id = e.kern_texture_external(slot);
-      vrHud = {c, g: c.getContext("2d"), tex, id, at: 0, key: ""};
-      command(`vr hud ${id}`);
-    }
-    const h = last || {}, vr = h.vr || {};
-    // the page's actions the menu asked for
-    if (vr.action === "multi") { try { mpPage?.toggleMulti ? mpPage.toggleMulti(h) : mpPage?.goMulti?.(); } catch (err) { console.warn("[spawncity] VR multi", err); } }
-    else if (vr.action === "exit") app.exitXR();
-    else if (vr.action === "radio") { try { if (!globalThis.__scRadioAny && h.mode !== "car") globalThis.__scRadioAny = true; else globalThis.__arondightCarRadio?.next?.(1); } catch { /* no radio */ } }
-    else if (vr.action === "radio_off") { try { const r = globalThis.__arondightCarRadio; if (r?.on) r.toggleOff(); } catch { /* no radio */ } }
-    // a page menu is never open in the headset (nobody sees it there - the game would stand still)
-    if (h.ui?.paused && ui?.started && !ui?.titleShown?.()) { try { ui.closeAll?.(); } catch { /* none */ } }
-    const now = performance.now();
-    const key = `${vr.menu}|${vr.page}|${vr.hover}|${vr.arms}|${vr.smooth}|${vr.level}|${vr.tunnel}|${vr.day}|${vr.sound}|${vr.music}|${vr.rocket}|${vr.cam}|${vr.reset}|${h.mode}|${h.weapon}|${h.mp?.players?.length || 0}|${globalThis.__arondightCarRadio?.station?.name || ""}`;
-    if (now - vrHud.at < 100 && key === vrHud.key) return;
-    vrHud.at = now; vrHud.key = key;
-    const g = vrHud.g;
-    g.clearRect(0, 0, 512, 384);
-    const panel = (y0, y1) => { g.fillStyle = "rgba(8,12,18,0.82)"; g.beginPath(); g.roundRect?.(4, y0, 504, y1 - y0, 22); g.fill(); g.strokeStyle = "rgba(127,240,197,0.85)"; g.lineWidth = 3; g.stroke(); };
-    g.textBaseline = "middle";
-    if (vr.menu) {
-      panel(4, 380);
-      const page = vr.page | 0;
-      g.font = "900 28px Inter, system-ui, sans-serif"; g.fillStyle = "#7ff0c5"; g.fillText(page ? "EINSTELLUNGEN" : "MENÜ", 24, 36);
-      g.font = "700 16px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(page ? "zeigen + Abzug · B zurück" : "zeigen + Abzug · Y / B schließt · Y halten = RESET", page ? 250 : 120, 38);
-      const players = Array.isArray(h.mp?.players) ? h.mp.players.length : 0;
-      const radio = globalThis.__arondightCarRadio, station = radio?.station?.name;
-      const onoff = v => (v ? "AN" : "AUS");
-      // the rows (game_vr.cpp kMenuTop 66, kMenuRow 31 - the same order)
-      const items = page ? ["‹ ZURÜCK", `LAUFEN: ${vr.arms ? "MIT DEN ARMEN" : "STICKS"}`, `DREHEN: ${vr.smooth ? "WEICH" : "30°-SCHRITTE"}`, `HORIZONT: ${vr.level ? "HALTEN" : "FREI (Cockpit)"}`,
-        `KOMFORT-TUNNEL: ${onoff(vr.tunnel)}`, `IMMER TAG: ${onoff(vr.day)}`, `TON: ${onoff(vr.sound)}`, `MUSIK: ${onoff(vr.music)}`, "RADIO AUS", h.net ? `🎤 MIKROFON: ${onoff(vr.mic)}` : "🎤 MIKROFON (nur Multiplayer)"]
-        : [h.net ? `MULTI · ${players}P – verlassen` : "SOLO ▸ MULTI starten", h.mode === "drone" ? "ZU FUSS" : "DROHNE",
-          h.mode === "car" || h.mode === "jet" ? "AUSSTEIGEN" : "EINSTEIGEN (nächstes Fahrzeug)", "LUFTSCHLAG (wohin du schaust)",
-          `📻 RADIO${station && (h.mode === "car" || globalThis.__scRadioAny) && radio?.on ? ` · ${String(station).slice(0, 16)}` : " · nächster Sender"}`,
-          h.mode === "foot" ? "EMP" : `KAMERA: ${vr.cam || ""}`, "EINSTELLUNGEN ›", "RESET", "VR BEENDEN"];
-      items.forEach((t, i) => {
-        const y = 66 + i * 31;  // game_vr.cpp kMenuRow
-        if (i === vr.hover) { g.fillStyle = "rgba(127,240,197,0.3)"; g.fillRect(14, y + 2, 484, 28); }
-        g.font = "800 21px Inter, system-ui, sans-serif"; g.fillStyle = !page && i === 8 ? "#ff9a8a" : !page && i === 7 ? "#ffcf3a" : "#eef0f2"; g.fillText(t, 28, y + 16);
-      });
-    } else {
-      // the watch: health, weapon, stars - nothing else in the way; in a vehicle its controls below
-      const hints = {
-        drone: ["L: Gas ↕ · Drehen ↔   R: Neigen", "Abzug R: Feuer · B: Waffe · A: Start/Landen"],
-        car: ["L: Lenken · Abzug R: Gas · L: Bremse", "B: Handbremse · X: Aussteigen · Radio im Menü"],
-        jet: ["L: Schub ↕ · Seite ↔   R: Nicken · Rollen", `Abzug R: ${vr.rocket ? "RAKETE" : "MG"} · L: Rakete · Griff L: VTOL · R: Bombe`],
-      }[h.mode];
-      panel(4, hints ? 214 : 140);
-      if (vr.reset > 0) {  // Y held: the RESET ring fills
-        g.strokeStyle = "#ffcf3a"; g.lineWidth = 8; g.beginPath(); g.arc(452, 58, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * vr.reset); g.stroke();
-        g.font = "800 14px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a"; g.fillText("RESET", 430, 106);
-      }
-      if (hints) {
-        g.font = "700 20px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2";
-        hints.forEach((t, i) => g.fillText(t, 24, 158 + i * 32));
-      }
-      g.font = "900 40px Inter, system-ui, sans-serif";
-      const hp = Math.max(0, Math.round(h.health >= 0 ? h.health : 100));
-      g.fillStyle = hp > 35 ? "#7ff0c5" : "#ff6b5a"; g.fillText(`♥ ${hp}`, 24, 50);
-      g.fillStyle = "#eef0f2"; g.font = "800 30px Inter, system-ui, sans-serif";
-      g.fillText(String(h.weapon || h.mode || "").toUpperCase().slice(0, 16), 190, 50);
-      const stars = h.wanted?.stars ?? h.stars ?? 0;
-      g.font = "900 30px Inter, system-ui, sans-serif"; g.fillStyle = "#ffcf3a";
-      g.fillText("★".repeat(Math.max(0, Math.min(5, stars))), 24, 106);
-      g.font = "700 18px Inter, system-ui, sans-serif"; g.fillStyle = "#eef0f2aa"; g.fillText(h.mode === "foot" ? (/sniper/i.test(String(h.weapon)) ? "L-Abzug = Zielfernrohr · R-Stick ↕ Waffe" : "Y Menü · R-Stick ↕ / B Waffe · X einsteigen") : "Y Menü · L-Stick drücken = Kamera", 150, 108);
-    }
-    gl.bindTexture(gl.TEXTURE_2D, vrHud.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vrHud.c);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-  };
-  // the controllers' pointing rays in the room (game_vr.cpp): the gun in the right hand
-  const xrHands = frame => {
-    const space = app.xrSpace;
-    const seen = [false, false];
-    if (space) for (const src of frame.session.inputSources) {
-      const side = src.handedness === "left" ? 0 : src.handedness === "right" ? 1 : -1;
-      if (side < 0 || !src.targetRaySpace) continue;
-      const pose = frame.getPose(src.targetRaySpace, space);
-      if (!pose) continue;
-      const p = pose.transform.position, q = pose.transform.orientation;
-      e.sc_vr_hand(side, 1, p.x, p.y, p.z, q.x, q.y, q.z, q.w);
-      seen[side] = true;
-    }
-    for (let i = 0; i < 2; ++i) if (!seen[i]) e.sc_vr_hand(i, 0, 0, 0, 0, 0, 0, 0, 1);
-  };
-  const xrFrame = frame => { try { xrHands(frame); } catch (err) { console.warn("[spawncity] VR hands", err); } work(); xrPad(frame); try { vrHudDraw(); } catch (err) { console.warn("[spawncity] VR HUD", err); } };
-  const vrSupported = navigator.xr?.isSessionSupported ? navigator.xr.isSessionSupported("immersive-vr").catch(() => false) : Promise.resolve(false);
-  const enterVR = async () => {
-    if (!(await vrSupported) || app.inXR) return false;
-    command("vr 1");
-    const ok = await app.enterXR({onFrame: xrFrame, onEnd: () => command("vr 0")}).catch(err => { console.warn("[spawncity] VR", err); return false; });
-    if (!ok) command("vr 0");
-    return ok;
-  };
-  vrSupported.then(yes => {
-    if (!yes) return;
-    // a VR button on the title and in the game (top right), and ?vr=1 enters at the first gesture
-    const b = document.createElement("button");
-    b.id = "scVrButton"; b.type = "button"; b.textContent = headset ? "▶ IN VR SPIELEN" : "VR";
-    b.title = "In die VR-Brille (WebXR)";
-    // in a headset the way in is the first thing you see: big, in the middle at the bottom
-    b.style.cssText = headset
-      ? "position:fixed;z-index:2147481000;left:50%;transform:translateX(-50%);bottom:12%;min-width:320px;height:72px;padding:0 28px;border-radius:16px;border:3px solid #7ff0c5;background:#0d1118f0;color:#eafff7;font:900 26px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer;box-shadow:0 0 0 6px #7ff0c533,0 10px 30px #000a"
-      : "position:fixed;z-index:2147481000;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 52px);min-width:58px;height:40px;border-radius:10px;border:2px solid #7ff0c5;background:#0d1118e0;color:#eafff7;font:900 14px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer";
-    // VR from the title: start the game first (the world loads behind the headset's view)
-    b.addEventListener("click", ev => {
-      ev.stopPropagation(); ev.preventDefault();
-      const st = document.getElementById("scStart");
-      if (st && !document.body.classList.contains("solo-flight") && !st.disabled) st.click();
-      // in a session the microphone is asked for now, on the page (a headset cannot show the
-      // browser's question once inside): later the voice chat opens it without a question
-      if (document.body.classList.contains("sc-mp-on")) globalThis.__scMicPrime?.();
-      enterVR();
-    });
-    // only on the title (never as an overlay in the game, never in the headset)
-    const syncVr = () => { const want = app.inXR || document.body.classList.contains("solo-flight") ? "none" : ""; if (b.style.display !== want) b.style.display = want; };
-    syncVr();
-    setInterval(syncVr, 500);
-    b.addEventListener("pointerdown", ev => ev.stopPropagation(), true);
-    document.body.appendChild(b);
-    if (params.get("vr") === "1") addEventListener("pointerdown", () => enterVR(), {once: true, capture: true});
-  });
-  window.SpawnCityVR = {enter: enterVR, exit: () => app.exitXR(), get active() { return app.inXR; }};
+  // (VR - the headset's controllers and its wrist menu - is out of the small game: BLUEPRINTS.md "Herausgenommen am 26.11.")
 
   // ---- minimap (the game sends streets, police and players around the player, 4 Hz) -------
   const mapCanvas = (originalView && document.querySelector("#worldLookHud .world-mini-canvas")) || hudEl.querySelector(".sc-map"), mctx = mapCanvas?.getContext("2d");

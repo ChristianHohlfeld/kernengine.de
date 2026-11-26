@@ -1,16 +1,13 @@
-// Input check of SpawnCity on Kern with a real mouse and keyboard, a synthetic gamepad and a
-// synthetic finger (Playwright + Chromium): aim with the right button and fire with the left, in
-// both orders; the locked mouse looks around; the keyboard walks; the pad the game reads is the
-// pad the big map reads; a finger switches to the touch layout and is let go when the browser's
-// own list of touches is empty.
+// Input check of SpawnCity on Kern (the small game: a drone over the city) with a real mouse and keyboard, a synthetic
+// gamepad and a synthetic finger (Playwright + Chromium): the click captures the mouse; R arms the drone, Space climbs;
+// the locked mouse turns it (the right stick's yaw); the pad is the device the game reads (its Y the next camera); a
+// finger switches to the touch layout and is let go when the browser's own list of touches is empty.
 //   node input_check.mjs <url>      e.g. http://127.0.0.1:8765/drone_simulator.html?offline=1&autostart=1
 //
-// What it guards (kern/web/kern.mjs BrowserInput and readGamepad, the one input reader of every
-// Kern host, by way of kern/web/app.mjs): the browser reports a second mouse button pressed while
-// one is held as a pointermove that names it (chorded buttons), and its own synthetic moves do
-// not carry the held buttons - neither may let go of the aiming right button or swallow the shot;
-// the locked pointer's movement and the lock itself reach the game; so do the keys, the device in
-// use, the gamepad and the fingers' ground truth.
+// What it guards (kern/web/kern.mjs BrowserInput and readGamepad, the one input reader of every Kern host, by way of
+// kern/web/app.mjs): the locked pointer's movement and the lock itself reach the game; so do the keys, the device in
+// use, the gamepad and the fingers' ground truth. (Until 26.11.2026 it also aimed and fired on foot and opened the big
+// map: out of the small game with them - BLUEPRINTS.md, "Herausgenommen am 26.11.".)
 import {createRequire} from "node:module";
 
 const {chromium} = await import("playwright").catch(() => createRequire(import.meta.url)("playwright"));
@@ -45,46 +42,26 @@ await p.mouse.down();  // the capture click: never fires
 await p.mouse.up();
 check(await until(h => h.ctl.locked), "a click captures the mouse");
 
-// the locked mouse looks around (the document's mousemove under the lock), the keyboard walks
-// (headless Chromium reports a locked pointer's moves as a jump and its way back - no net
+// the drone: R arms it once the flight controller has calibrated, Space climbs (the keys reach the game)
+check(await until(h => h.drone && !h.drone.calibrating, 60000), "the flight controller has calibrated");
+await p.keyboard.press("KeyR");
+check(await until(h => h.drone?.armed, 30000), "R arms the drone");
+const alt0 = (await hud()).alt;
+await p.keyboard.down("Space");
+const climbed = await until(h => h.alt > alt0 + 1.5, 30000);
+await p.keyboard.up("Space");
+check(climbed, "holding Space climbs");
+// the locked mouse turns it (headless Chromium reports a locked pointer's moves as a jump and its way back - no net
 // movement -, so the moves are given to the document as the events a real mouse sends)
 const yaw = () => p.evaluate(() => { const c = JSON.parse(window.SpawnCity.command("camera")); return Math.atan2(c.target[1] - c.eye[1], c.target[0] - c.eye[0]); });
-const yaw0 = await yaw();
-await p.evaluate(() => { for (let i = 0; i < 12; ++i) document.dispatchEvent(new MouseEvent("mousemove", {movementX: 25, movementY: 0, bubbles: true})); });
+const y0 = await yaw();
 let turned = false;
-for (let i = 0; i < 20 && !turned; ++i) { await p.waitForTimeout(700); turned = Math.abs(await yaw() - yaw0) > 0.05; }
-check(turned, "moving the locked mouse turns the view");
-const eye = () => p.evaluate(() => JSON.parse(window.SpawnCity.command("camera")).eye);
-const from = await eye();
-await p.keyboard.down("KeyW");
-let walked = false;
-for (let i = 0; i < 40 && !walked; ++i) { await p.waitForTimeout(700); const to = await eye(); walked = Math.hypot(to[0] - from[0], to[1] - from[1]) > 0.5; }
-await p.keyboard.up("KeyW");
-check(walked, "holding W walks");
-await p.waitForTimeout(1500);
-const still = await eye();
-await p.waitForTimeout(2500);
-const later = await eye();
-check(Math.hypot(later[0] - still[0], later[1] - still[1]) < 0.3, "letting go of W stops");
-
-await p.mouse.down({button: "right"});
-check(await until(h => h.ctl.rmb && h.aiming), "the right button aims");
-await p.mouse.down();
-check(await until(h => h.ctl.lmb && h.ctl.trigger && h.aiming), "the left button fires while the right one aims");
-await p.waitForTimeout(3000);
-check(await until(h => h.ctl.rmb && h.aiming && h.ctl.trigger, 1), "both stay held (no synthetic move lets go of them)");
-await p.mouse.up();
-check(await until(h => !h.ctl.trigger && h.aiming), "letting go of the left button keeps aiming");
-await p.mouse.up({button: "right"});
-check(await until(h => !h.aiming && !h.ctl.rmb), "letting go of the right button stops aiming");
-
-await p.mouse.down();
-check(await until(h => h.ctl.trigger && !h.aiming), "the left button fires from the hip");
-await p.mouse.down({button: "right"});
-check(await until(h => h.ctl.trigger && h.aiming), "the right button aims while the left one fires");
-await p.mouse.up({button: "right"});
-await p.mouse.up();
-check(await until(h => !h.ctl.trigger && !h.aiming && !h.ctl.lmb && !h.ctl.rmb), "nothing is held afterwards");
+for (let i = 0; i < 40 && !turned; ++i) {
+  await p.evaluate(() => document.dispatchEvent(new MouseEvent("mousemove", {movementX: 60, movementY: 0, bubbles: true})));
+  await p.waitForTimeout(150);
+  turned = Math.abs(Math.atan2(Math.sin(await yaw() - y0), Math.cos(await yaw() - y0))) > 0.2;
+}
+check(turned, "moving the locked mouse turns the drone");
 
 // ---- the device in use, the gamepad, the fingers -------------------------------------------------
 check((await hud()).ctl.device === "desktop", "the mouse makes it a desktop");
@@ -97,22 +74,12 @@ await p.evaluate(() => {
   navigator.getGamepads = () => [other, pad];
 });
 const pad = (i, on) => p.evaluate(([i, on]) => window.__padSet(i, on), [i, on]);
-const weapon = (await hud()).weapon;
+const cam = (await hud()).drone.cam;
 await pad(3, true);
-check(await until(h => h.ctl.pad && h.weapon !== weapon), "the pad's Y: the next weapon, and the pad is the device in use");
+check(await until(h => h.ctl.pad && h.drone.cam !== cam), "the pad's Y: the next camera, and the pad is the device the game reads");
 await pad(3, false);
-await p.waitForTimeout(1500);
-await pad(8, true);
-const mapOpen = async want => { for (let i = 0; i < 40; ++i) { if ((await p.locator("#mpMap").count() === 1) === want) return true; await p.waitForTimeout(700); } return false; };
-check(await mapOpen(true), "the pad's VIEW held: the big map opens");
-await pad(8, false);
-await p.waitForTimeout(1500);
-await pad(1, true);
-check(await mapOpen(false), "the pad's B closes the map (the map reads the same pad)");
-await pad(1, false);
 await p.evaluate(() => { navigator.getGamepads = () => []; });
-await p.keyboard.press("KeyZ");
-check(await until(h => !h.ctl.pad), "a key ends the pad's turn");
+check(await until(h => !h.ctl.pad), "the pad gone: the game reads none");
 
 // a finger: the touch layout (the finger that brings it up is not a control's yet); the next one on
 // the left stick is held; nothing left on the glass: the game lets go

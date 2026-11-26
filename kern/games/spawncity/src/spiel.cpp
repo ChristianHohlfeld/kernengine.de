@@ -530,8 +530,8 @@ std::string SpawnCity::hud_json() {
                 placed_ ? "true" : "false", paused_ ? "true" : "false", settings_.version(), resets_, moves_, lat_, lon_, settings_.on(Opt::view_minimap_north) ? "true" : "false",
                 settings_.on(Opt::audio_on) ? "true" : "false", settings_.on(Opt::music_on) ? "true" : "false");
   s += b;
-  std::snprintf(b, sizeof b, ",\"ctl\":{\"device\":\"%s\",\"pad\":%s,\"locked\":%s,\"hint\":\"%s\",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"view\":{\"eye\":[%.2f,%.2f,%.2f]}}",
-                touch_mode_ ? "touch" : "desktop", pad.connected ? "true" : "false", locked_ ? "true" : "false", json_escape(controls::hint_line("drone", "", false)).c_str(),
+  std::snprintf(b, sizeof b, ",\"ctl\":{\"device\":\"%s\",\"pad\":%s,\"locked\":%s,\"fingers\":%s,\"hint\":\"%s\",\"sticks\":[%.3f,%.3f,%.3f,%.3f],\"view\":{\"eye\":[%.2f,%.2f,%.2f]}}",
+                touch_mode_ ? "touch" : "desktop", pad.connected ? "true" : "false", locked_ ? "true" : "false", touch_.any() ? "true" : "false", json_escape(controls::hint_line("drone", "", false)).c_str(),
                 sticks_.roll, sticks_.pitch, sticks_.yaw, sticks_.body_pitch, cam_.eye.x, cam_.eye.y, cam_.eye.z);
   s += b;
   // JSON allows no raw control characters: outside strings none are ever written, so every one becomes a space.
@@ -626,6 +626,12 @@ std::string SpawnCity::command(const std::string& cmd) {
     }
     touch_.set_dom_rects(std::move(rects));
     return "ok";
+  }
+  if (cmd == "touch release") { touch_.release_all(); return "ok"; }   // the page is hidden, or no finger is left on the glass
+  if (cmd == "camera") {
+    char b[200];
+    std::snprintf(b, sizeof b, "{\"eye\":[%.3f,%.3f,%.3f],\"target\":[%.3f,%.3f,%.3f],\"fov\":%.3f}", cam_.eye.x, cam_.eye.y, cam_.eye.z, cam_.target.x, cam_.target.y, cam_.target.z, cam_.fov);
+    return b;
   }
   if (cmd == "audio frame") return audio_frame();
   if (starts("audio web ")) { web_audio_ = cmd.substr(10) != "0"; return web_audio_ ? "web" : "kern"; }
