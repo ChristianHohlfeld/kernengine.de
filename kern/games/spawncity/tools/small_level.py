@@ -2,7 +2,9 @@
 """Makes level/spawncity.klevel and level/spawncity.kproject the small game's (26.11.2026, BLUEPRINTS.md "Herausgenommen
 am 26.11."): a drone over the real city. Out of the level go the rule actors of what is out of the game (all but
 Controls and Settings), the player with its head (the drone flies in a simulated world), the vehicle templates but the
-drone, and every Blueprint of the folder "Source" written from a source that is no longer the game's; out of the project
+drone, every Blueprint of the folder "Source" written from a source that is no longer the game's, and the copies of the
+engine's libraries a former converter wrote into the level (engine_*: the engine has them - kern/logic/engine_libraries.h;
+neither a level nor a project holds one, tools/cpp_to_blueprint.py place_blueprints); out of the project
 go its program Blueprints of those parts (person_hit, qr_code, combat_audio). Nothing else changes (the files are
 written as the converter writes them: the level indent 1, the project indent 2, UTF-8). Running it again changes
 nothing.
@@ -14,7 +16,7 @@ import sys
 
 RULES = {"Controls", "Settings"}
 TEMPLATES = {"Drone"}
-# the sources of the small game (src/) and the firmware, as the converter names their Blueprints; and the engine's
+# the sources of the small game (src/) and the firmware, as the converter names their Blueprints
 SOURCE = {"Arondight45_DroneFC_Core", "Arondight45_FirmwareRuntime", "Arondight45_HardwareSensors", "Arondight45_StateControl",
           "blueprint_call", "city_jobs", "city_jobs_cpp", "city_stream", "city_stream_cpp", "common", "controls", "controls_cpp",
           "drone", "drone_cpp", "drone_art", "drone_art_cpp", "main_cpp", "mvt", "mvt_cpp", "rigid_spec",
@@ -30,7 +32,7 @@ def keep(actor):
     if folder == "Vehicles":
         return name in TEMPLATES
     if folder == "Source":
-        return name in SOURCE or name.startswith("engine_")
+        return name in SOURCE
     return name not in ("Player", "Head")
 
 
