@@ -5109,6 +5109,9 @@ TEST(logic_native_blueprints) {
   std::set<std::string> used;
   std::size_t calls = 0;
   for (const blueprint_native::Case& c : blueprint_native::cases()) {
+    if (!c.error.empty()) std::printf("%s does not read: %s\n", c.name.c_str(), c.error.c_str());
+    CHECK(c.error.empty());
+    if (!c.error.empty()) continue;
     CHECK(no_errors(logic::check(c.graph)));
     std::string why, text;
     const bool ready = logic::native_ready(c.graph, &why);

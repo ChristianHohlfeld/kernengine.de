@@ -35,6 +35,8 @@ struct Case {
   std::string name;
   logic::Graph graph;
   std::vector<Call> calls;
+  /// What went wrong reading the case's text (logic_native_blueprints fails with it; the case has no calls then).
+  std::string error = {};
   bool scenario = false;  // no calls: the scenario of the tier cases (logic_cases::play) - events, ticks
   /// Calls made after the others with values as they come from outside (Instance::call): of any
   /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
@@ -1186,6 +1188,9 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
 
 /// The values a pin of a type of the Blueprint `g` is tried with. A struct: its default, and for
 /// each field two more with that field at other values.
+/// The first (or last) of some samples - none (a type without samples, a case that did not read): no value.
+inline Value first_of(const std::vector<Value>& v) { return v.empty() ? Value() : v.front(); }
+inline Value last_of(const std::vector<Value>& v) { return v.empty() ? Value() : v.back(); }
 inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g) {
   if (logic::is_keyed(t.type)) {
     // a map or a set of the keys' samples: none, one, all of them in the order they came and the other way round (a map:
@@ -1639,9 +1644,12 @@ inline std::vector<Case> cases() {
     all.push_back({name, {}, {}});
     std::string error;
     std::vector<std::string> used;
-    if (!logic::from_cpp(text, all.back().graph, nullptr, &error, logic::library(), before) || !logic::libraries_of(all.back().graph, before, used, &error))
+    if (!logic::from_cpp(text, all.back().graph, nullptr, &error, logic::library(), before) || !logic::libraries_of(all.back().graph, before, used, &error)) {
       std::printf("blueprint_native %s: %s\n", name, error.c_str());
-    for (const std::string& library : used) all.back().libraries.push_back({library, *before(library)});
+      all.back().error = error.empty() ? std::string("does not read") : error;
+    }
+    for (const std::string& library : used)
+      if (const logic::Graph* l = before(library)) all.back().libraries.push_back({library, *l});
     return all.back();
   };
   const Value yes = Value::boolean(true), no = Value::boolean(false);
@@ -1655,11 +1663,13 @@ inline std::vector<Case> cases() {
     all.push_back({"Numbers", {}, {}});
     json::Value j;
     std::string error;
-    if (!json::parse(number_cases::numbers_graph_json(), j, &error) || !logic::graph_from_json(j, all.back().graph, &error)) std::printf("blueprint_native Numbers: %s\n", error.c_str());
+    if (!json::parse(number_cases::numbers_graph_json(), j, &error) || !logic::graph_from_json(j, all.back().graph, &error)) {
+      std::printf("blueprint_native Numbers: %s\n", error.c_str());
+      all.back().error = error.empty() ? std::string("does not read") : error;
+    }
     for (auto& [fn, args] : number_cases::numbers_calls(all.back().graph)) all.back().calls.push_back({fn, args});
   }
-  {
-    Case& c = read("Flow", kFlow);
+  if (Case& c = read("Flow", kFlow); c.error.empty()) {
     for (f64 v : {95.0, 90.0, 89.999, 50.0, 12.5, -3.0, 0.0, std::numeric_limits<f64>::quiet_NaN()}) c.calls.push_back({"Grade", {N(v)}});
     c.calls.push_back({"FirstAbove", {I(0), I(9), N(4.5)}});
     c.calls.push_back({"FirstAbove", {I(3), I(3), N(0)}});
@@ -1673,8 +1683,7 @@ inline std::vector<Case> cases() {
     for (i64 which : {-1, 0, 1, 2, 3, 100}) c.calls.push_back({"Choose", {I(which)}});
     c.calls.push_back({"Grade", {N(51)}});
   }
-  {
-    Case& c = read("Calls", kCalls);
+  if (Case& c = read("Calls", kCalls); c.error.empty()) {
     c.calls.push_back({"Scale", {N(1), N(2)}});
     c.calls.push_back({"Scale", {N(2.5), N(-1.5)}});
     c.calls.push_back({"AddUp", {N(1), I(1)}});
@@ -1688,8 +1697,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Both", {N(-1), N(-1)}});
     c.calls.push_back({"Scale", {N(0), N(0)}});
   }
-  {
-    Case& c = read("Locals", kLocals);
+  if (Case& c = read("Locals", kLocals); c.error.empty()) {
     for (i64 n : {3, 0, 5, 1}) c.calls.push_back({"SumTo", {I(n)}});
     c.calls.push_back({"Join", {T("a"), T("b"), N(2)}});
     c.calls.push_back({"Join", {T(""), T("zz"), N(-0.5)}});
@@ -1698,8 +1706,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Outer", {N(0.01), no}});  // (with the event: the tier case "locals" - a class called directly has no runtime to raise it)
     c.calls.push_back({"SumTo", {I(2)}});
   }
-  {
-    Case& c = read("Casts", kCasts);
+  if (Case& c = read("Casts", kCasts); c.error.empty()) {
     for (const Value& v : samples(PinType::f64)) c.calls.push_back({"FromFloat", {v}});
     for (const Value& v : samples(PinType::i64)) c.calls.push_back({"FromInt", {v}});
     for (const Value& v : samples(PinType::boolean)) c.calls.push_back({"FromBool", {v}});
@@ -1708,8 +1715,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Pick", {yes, Value::actor({3, 2})}});
     c.calls.push_back({"Pick", {no, Value::actor({3, 2})}});
   }
-  {
-    Case& c = read("Lists", kLists);
+  if (Case& c = read("Lists", kLists); c.error.empty()) {
     const f64 nan = std::numeric_limits<f64>::quiet_NaN();
     const i64 most = std::numeric_limits<i64>::max();
     c.calls.push_back({"At", {I(0), T("a")}});
@@ -1734,8 +1740,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Grow", {}});
     c.calls.push_back({"Sum", {}});
   }
-  {
-    Case& c = read("Enums", kEnums);
+  if (Case& c = read("Enums", kEnums); c.error.empty()) {
     auto E = [](i64 place) { return Value::enumeration(place); };
     for (int k = 0; k < 6; ++k) c.calls.push_back({"Next", {}});
     for (i64 index : {i64{-1}, i64{0}, i64{2}, i64{3}, i64{4}, std::numeric_limits<i64>::max()})
@@ -1749,8 +1754,7 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Walk", {}});
     c.calls.push_back({"Next", {}});
   }
-  {
-    Case& c = read("Structs", kStructs);
+  if (Case& c = read("Structs", kStructs); c.error.empty()) {
     const logic::Graph& g = c.graph;
     auto E = [](i64 place) { return Value::enumeration(place); };
     const std::vector<Value> weapons = samples({PinType::structure, "Weapon"}, g), racks = samples({PinType::structure_list, "Weapon"}, g), aims = samples({PinType::structure, "Aim"}, g),
@@ -1784,8 +1788,7 @@ inline std::vector<Case> cases() {
     c.outside.push_back({"Tune", {N(2), T("y"), weapons[1], E(1)}});
     c.outside.push_back({"Take", {}});
   }
-  {
-    Case& c = read("Places", kPlaces);
+  if (Case& c = read("Places", kPlaces); c.error.empty()) {
     const i64 most = std::numeric_limits<i64>::max();
     auto read_all = [&] {
       for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, i64{7}, most})
@@ -1818,9 +1821,9 @@ inline std::vector<Case> cases() {
       w.calls.push_back({"twice", {wheel, I(3)}});
     }
     for (i64 at : {i64{0}, i64{2}, i64{3}, i64{-1}}) w.calls.push_back({"table", {I(at)}});
-    w.calls.push_back({"fit", {Value::structures({}), samples({PinType::structure, "Wheel"}, w.graph).front(), I(2)}});
+    w.calls.push_back({"fit", {Value::structures({}), first_of(samples({PinType::structure, "Wheel"}, w.graph)), I(2)}});
     Case& r = read("rng", kRng);
-    r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
+    r.calls.push_back({"next", {first_of(samples({PinType::structure, "Rng"}, r.graph)), I(5)}});
     Case& d = read("dice", kDice);
     for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
     Case& ground = read("Ground", kGround);
@@ -1834,8 +1837,7 @@ inline std::vector<Case> cases() {
       for (i64 wheel : {i64{0}, i64{1}, i64{4}, i64{-1}}) c.calls.push_back({"Run", {I(car), I(wheel), N(static_cast<f64>(wheel % 3) + 0.5)}});
     c.calls.push_back({"Run", {I(0), I(0), N(-2.0)}});
   }
-  {
-    Case& c = read("References", kReferences);
+  if (Case& c = read("References", kReferences); c.error.empty()) {
     const logic::Graph& g = c.graph;
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, most})
@@ -1846,7 +1848,7 @@ inline std::vector<Case> cases() {
       c.calls.push_back({"Lit", {Value::boolean(at != 1), I(at)}});
       c.calls.push_back({"Toggle", {Value::boolean(at == 0)}});
     }
-    c.calls.push_back({"Trade", {samples({PinType::structure, "Wheel"}, g).front(), samples({PinType::structure, "Wheel"}, g).back(), N(0.5)}});
+    c.calls.push_back({"Trade", {first_of(samples({PinType::structure, "Wheel"}, g)), last_of(samples({PinType::structure, "Wheel"}, g)), N(0.5)}});
     // From outside a reference input takes a value, and what the function made of it stands
     // behind the outputs: Bump gives the number, Drive its outputs and then the car.
     c.calls.push_back({"Bump", {N(1.5), N(2.0)}});
@@ -1893,8 +1895,7 @@ inline std::vector<Case> cases() {
       c.on_engine.push_back(run);
     }
   }
-  {
-    Case& c = read("Water", kImplementsWater);
+  if (Case& c = read("Water", kImplementsWater); c.error.empty()) {
     c.calls.push_back({"name", {}});
     c.calls.push_back({"vertex", {}});
     // (the engine's objects it is handed are Objects of their classes, of one world - none is no object; never a number)
@@ -1904,16 +1905,14 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"frame_uniforms", {O(0), O(4)}});
     c.calls.push_back({"vertex", {}});
   }
-  {
-    Case& c = read("Running", kImplementsGame);
+  if (Case& c = read("Running", kImplementsGame); c.error.empty()) {
     const Value engine = Value::object(logic::ObjectRef{2, 2});   // (an Object<kern::Engine>, never a number)
     c.calls.push_back({"start", {engine}});
     c.calls.push_back({"update", {engine, Value::structure({N(1.5), N(0.016), Value::of_number<u64>(7)})}});
     c.calls.push_back({"update", {engine, Value::structure({N(1.75), N(0.25), Value::of_number<u64>(8)})}});
     c.calls.push_back({"stop", {engine}});
   }
-  {
-    Case& c = read("Loop", kImplementsLoop);
+  if (Case& c = read("Loop", kImplementsLoop); c.error.empty()) {
     const Value at = Value::structure({Value::of_number<u64>(9)});
     c.calls.push_back({"address", {}});
     c.calls.push_back({"send", {at, Value::of(std::vector<i64>{4, 5, 6}), I(3)}});
