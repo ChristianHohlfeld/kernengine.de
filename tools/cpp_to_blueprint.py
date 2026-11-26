@@ -1671,6 +1671,7 @@ class Function:
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
         self.result_fixed = None   # the same for what it gives
+        self.export_len = None   # an export that gives a text, bytes or floats by a pointer: its parameter for the length (out_len - the glue's, no input)
         self.result = None    # type, None: no result
         self.text = None
         self.wait = None
@@ -4142,6 +4143,7 @@ class Emit:
                     re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
                 # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
                 self.export_len_param = p["id"]
+                f.export_len = p["id"]
                 continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
@@ -15656,6 +15658,8 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):
                         continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
+                    if p["id"] == f.export_len:
+                        continue   # (the length of what an export gives by a pointer: the call's own place, out_len_ - see `give`)
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
                         if re.match(r"const\s+void$", entry):
@@ -15688,7 +15692,7 @@ class TestWriter:
                     decl_lines.append("converted_pointed_lists = {" + ", ".join([*(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists),
                                                                                   *(f"{{reinterpret_cast<const unsigned char*>({x}.data), reinterpret_cast<const unsigned char*>({x}.data + {x}.size)}}" for x in spans)]) + "};")
                 ret = qtype(d).split("(")[0].strip()
-                if f.value is not None:
+                if f.value is not None and f.export_len is None:
                     self.result_ok(ret)
                 if owner and not f.state:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
@@ -15701,6 +15705,9 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):   # (the logic the source's ActorBlueprints are bound to: converted::Blueprint)
                         handed.append("bp.source_logic()")
+                        continue
+                    if p["id"] == f.export_len:
+                        handed.append("&out_len_")
                         continue
                     if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
                         handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
@@ -15739,6 +15746,15 @@ class TestWriter:
                     fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
                     give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
+                elif f.export_len is not None:
+                    # an export that gives a text, bytes or floats by a pointer and its length (export_text, export_bytes,
+                    # export_floats): what it gives is the piece the two say - as the host reads it, and as the Blueprint gives it
+                    if [src_ for _, _, src_ in f.out_fields] != ["result"]:
+                        raise Wait("an export that gives a piece by a pointer and changes what it is handed")
+                    length = next(p for p in params if p["id"] == f.export_len)
+                    piece = "std::string" if re.match(r"(?:const\s+)?char\s*\*", ret) else "std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(given_)>>>"
+                    give = (f"{self.spell(re.sub(r'\s*\*\s*$', '', qtype(length)))} out_len_ = 0; const auto* given_ = {counted}; "
+                            f"return given_ ? {piece}(given_, given_ + out_len_) : {piece}();")
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_] if src_ == 'state' else f'std::move({parts[src_]})'};"   # (run's values are the test's: handed back moved, as they are)

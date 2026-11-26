@@ -74,6 +74,9 @@
 #             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
 #             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
 #             List<Blast> is needed").
+#   pieces.cpp exports that give a text and bytes by a pointer and their length (`export_text<&f>(x, out_len)`,
+#             export_bytes): the test calls the source with a place for the length and compares the piece the two say -
+#             written and compared (before: "the test has no values of unsigned int *").
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -238,6 +241,12 @@ logged chain "each round says why it is needed" '^round 2: 2 Blueprints - what C
 if grep -q '^round 4' "$top/chain/convert.log"; then echo "FAIL chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fail=1
 else echo "ok   chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fi
 
+convert pieces
+logged pieces "case_label (export_text with out_len) is written" '^ +case_label \([0-9]+\): written$'
+logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes \([0-9]+\): written$'
+logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
+tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
+
 convert blasts
 logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
 logged blasts "both are compared" '^2 functions of the Blueprints are compared'
@@ -322,6 +331,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
