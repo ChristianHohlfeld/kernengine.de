@@ -70,6 +70,11 @@
 #             caller does not include: its test holds the pieces with the headers of their files - written and compared
 #             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
 #             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   worldrules.cpp + worldmix.cpp  the program's C++ binds an ActorBlueprint to a world it runs (bind(GameWorld&), kern/docs/
+#             blueprint_cpp.md "An einen Actor einer Welt gebunden"): in the Blueprint of the program's one object (Runner) a
+#             variable Actor, set by bind with GameWorld actor named, which every call and read goes to; the tests bind the
+#             source's ActorBlueprint to the test's world (kern::test::BlueprintRun). worldmix: one bound to a world and to a
+#             logic waits, with the reason. worldrules.klevel: the actor Lamps (PoleRadius, Twice).
 #   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
 #             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
 #             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
@@ -283,6 +288,24 @@ convert far far_b far_rules
 logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
 logged far "all three are compared" '^3 functions of the Blueprints are compared'
 
+convert worldrules worldmix
+check worldrules "the Blueprint of an actor of a world (ActorBlueprint bound to a world) is a variable Actor of the program's Blueprint" yes '^  Actor worldrules_g_lamps = Actor\{\};'
+check worldrules "bind(world): the Actor of the world's actor of its name (GameWorld actor named)" yes 'worldrules_g_lamps = actor_named;'
+check worldrules "... of that world" yes 'actor_named = engine_game_world_actor_named\(world[_0-9]*, "Lamps"\);'
+check worldrules "... and what it gives: Has Blueprint of it" yes 'return \{func_has_blueprint\(worldrules_g_lamps\)\};'
+check worldrules "a call goes to that Actor (Call on Actor)" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, '
+check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", Float>\(worldrules_g_lamps\)'
+check worldrules "no call names the actor by its name in the program's logic" no 'actor_find\("Lamps"\)'
+logged worldrules "bind, radius, twice, Runner::start, Runner::pole and Runner::lit are written" '^Runner/worldrules_cpp +6 / +6 functions'
+logged worldrules "one bound to a world and to a logic waits, with the reason" '^ +radius \([0-9]+\): the Blueprint of an actor \(g_both\) bound to a world and to a logic'
+tested worldrules "the source's ActorBlueprint is bound to the test's world" 'worldrules::g_lamps\.bind\(bp\.source_world\(\)\);'
+# (built and run: the source - its ActorBlueprint bound to the test's world - and the Blueprint, in the interpreter and as its class)
+if INCLUDES="-I$top/worldrules/src" "$here/compare.sh" "$top/worldrules/cases.kproject" "$top/worldrules/cases.klevel" "$top/worldrules/pt/converted" "$top/worldrules/built" > "$top/worldrules/compare.build" 2>&1 &&
+   ! grep -q "does not compile" "$top/worldrules/compare.build" && grep -qE '^ok +converted_Runner__worldrules_cpp' "$top/worldrules/built/compare.log" &&
+   [ "$(grep -oE 'converted::Tally tally\("(bind|radius|twice|start|pole|lit)"\)' "$top/worldrules"/pt/converted/test_*.cpp | sort -u | wc -l)" = 6 ]
+then echo "ok   worldrules: the tests compare the six, the source and the Blueprint in the interpreter and as its class"
+else echo "FAIL worldrules: the tests compare the six: $(grep -m3 -E 'does not compile|FAIL|differ' "$top/worldrules/compare.build" "$top/worldrules/built/compare.log" 2>/dev/null | cut -c1-300)"; fail=1; fi
+
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
 if grep -q 'has no constructor of its own' "$top/look/convert.log"; then echo "FAIL look: nothing waits for a constructor written down"; fail=1; else echo "ok   look: nothing waits for a constructor written down"; fi
@@ -367,6 +390,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far worldrules look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

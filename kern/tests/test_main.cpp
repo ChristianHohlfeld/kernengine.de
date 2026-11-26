@@ -9256,6 +9256,74 @@ TEST(program_reaches_actors_of_its_worlds) {
   program.end();
 }
 
+TEST(cpp_reaches_actors_of_its_worlds) {
+  // The program's C++ binds an ActorBlueprint to the actor of its name in a world it runs (bind(world): the Actor of it -
+  // its id and that world, kern/docs/project.md 7) and reaches that actor's Blueprint there, as a program's Blueprint
+  // that holds the Actor does: called, its variable read, Has Blueprint - in that world alone. A world that stops, or
+  // starts again (a new world), is reached no more: the zeros, and the reason said. (The Blueprint of the program that
+  // does the same - the converter's - is compared with this C++ in the interpreter and as its class:
+  // tools/converter_cases worldrules.)
+  game::Level l = game::basic_level();
+  game::Actor door;
+  door.name = "Door";
+  door.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "  Float Speed = 2.5;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit(Int by = 0) {\n"
+                        "    Hits += by;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  cpp_reaches_actors_of_its_worlds (Door): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  static_assert(logic::WorldOfActors<game::GameWorld>);
+  static_assert(!logic::WorldOfActors<logic::Runtime>);
+  {
+    Renderer renderer;
+    game::GameWorld wa(renderer), wb(renderer);
+    logic::ActorBlueprint rules{"Door"}, other{"Door"}, nobody{"Nobody"};
+    // bound before the world runs: no Actor, the reason, the zeros
+    CHECK(!rules.bind(wa) && rules.handle() == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Door\": the world does not run");
+    CHECK(rules.number("Hit", i64{1}) == 0);
+    CHECK(wa.start(l, game::SimMode::play) && wb.start(l, game::SimMode::play));
+    wa.step(1.0f / 60, game::PlayInput{});
+    wb.step(1.0f / 60, game::PlayInput{});
+    const auto hits = [](game::GameWorld& w) { const logic::Instance* i = w.logic_runtime() ? w.logic_runtime()->find(w.find_actor("Door")) : nullptr; return i ? i->get("Hits").as_int() : -1; };
+    // bound to world A: the Actor of A's door (the same id as B's, another world)
+    CHECK(rules.bind(wa) && other.bind(wb));
+    CHECK(rules.handle() == wa.actor_named("Door") && rules.handle().id == door_id && other.handle().id == door_id && rules.handle().world != other.handle().world);
+    CHECK(!nobody.bind(wa) && nobody.handle() == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Nobody\": the world has no actor of that name");
+    CHECK(nobody.number("Hit", i64{1}) == 0 && hits(wa) == 0);
+    i64 got = 0;
+    rules.call("Hit", std::tie(got), i64{2});
+    CHECK(got == 2 && hits(wa) == 2 && hits(wb) == 0);
+    CHECK(rules.number("Hit", i64{3}) == 5 && rules.get<i64>("Hits") == 5 && rules.get<f64>("Speed") == 2.5 && other.get<i64>("Hits") == 0);
+    CHECK(other.number("Hit", i64{1}) == 1 && hits(wa) == 5 && hits(wb) == 1);
+    // ... bound to the world's logic instead: the actor of its name there, as before (no world in between)
+    CHECK(other.bind(*wa.logic_runtime()) && other.handle() == logic::ActorHandle{} && other.get<i64>("Hits") == 5);
+    // world A stops: its Actor reaches nothing, the reason is said
+    wa.stop();
+    clear_error();
+    CHECK(rules.number("Hit", i64{1}) == 0 && rules.get<i64>("Hits") == 0);
+    CHECK(std::string(last_error()) == "the program's C++: Get Variable on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) +
+                                           " - its world does not run any more (the GameWorld was stopped) (kern/docs/project.md 7)");
+    // started again it is a new world: the Actor of the one before names nothing in it - until it is bound again
+    CHECK(wa.start(l, game::SimMode::play));
+    wa.step(1.0f / 60, game::PlayInput{});
+    CHECK(rules.number("Hit", i64{1}) == 0 && hits(wa) == 0);
+    CHECK(std::string(last_error()).find("Call on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) + " - its world ended and runs again as world " +
+                                         std::to_string(wa.world_id()) + ", a new one") != std::string::npos);
+    CHECK(rules.bind(wa) && rules.number("Hit", i64{4}) == 4 && hits(wa) == 4);
+    wa.stop();
+    wb.stop();
+  }
+}
+
 TEST(world_starts_a_level_of_its_project) {
   game::Level a = game::basic_level(), b = game::basic_level();
   a.name = "Erstes";

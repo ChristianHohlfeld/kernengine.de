@@ -42,6 +42,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "kern/logic/actor_blueprint.h"
 #include "kern/logic/engine_api.h"
 #include "kern/core/map.h"
 #include "kern/logic/nodes.h"
@@ -624,6 +625,19 @@ inline void take_made(EngineObject& object, const Value& handle) {
   object.kern_owned = true;
 }
 inline Value arg(const EngineObject* object) { return Value::object(ref_of(object)); }
+/// An ActorBlueprint of the source bound to a world: the Actor it holds (ActorBlueprint::handle) - in the Blueprint a
+/// variable of the type Actor (kern/docs/blueprint_cpp.md, "Aufrufe aus C++").
+inline Value arg(const kern::logic::ActorBlueprint& b) { return Value::actor(b.handle()); }
+inline bool same(const kern::logic::ActorBlueprint& want, const Value& got) { return got.type == kern::logic::PinType::actor && got.as_actor() == want.handle(); }
+inline bool defined(const kern::logic::ActorBlueprint&) { return true; }
+inline std::string text(const kern::logic::ActorBlueprint& b) { return Value::actor(b.handle()).as_text(); }
+/// An Actor of the engine's own type, where the source does not spell it itself (what a stand-in of the engine gives:
+/// GameWorld::actor_named) - as the Blueprint's Actor: its id and its world.
+inline Value arg(const kern::logic::ActorHandle& a) { return Value::actor(a); }
+inline bool same(const kern::logic::ActorHandle& want, const Value& got) { return got.type == kern::logic::PinType::actor && got.as_actor() == want; }
+inline bool defined(const kern::logic::ActorHandle&) { return true; }
+inline std::string text(const kern::logic::ActorHandle& a) { return Value::actor(a).as_text(); }
+inline void take(kern::logic::ActorHandle& to, const Value& v) { to = v.as_actor(); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 Value arg(const std::unique_ptr<T>& object) { return arg(static_cast<const EngineObject*>(object.get())); }
@@ -1791,6 +1805,12 @@ struct ActorsStarted {
   }
 };
 
+/// The run of the actors' Blueprints for the source of the test that runs (Blueprint::source_world): its ActorBlueprints bound
+/// to a world are bound there again before each call (bind_source_world) - a call of the source may have bound one elsewhere.
+inline BlueprintRun* g_source_world = nullptr;
+inline void bind_source_world(kern::logic::ActorBlueprint& b) {
+  if (g_source_world) b.bind(*g_source_world);
+}
 /// A converted source file's Blueprint, in the interpreter and as its compiled class. (`actors`: the
 /// actors whose Blueprints it calls on them - see ActorsStarted.)
 struct Blueprint {
@@ -1857,6 +1877,17 @@ struct Blueprint {
   /// The logic the source's ActorBlueprints are bound to (kern::logic::ActorBlueprint::bind): the runtime of
   /// its own in which the actors' Blueprints run - where it calls none, one in which none has a Blueprint.
   kern::logic::Runtime& source_logic() { return source ? source->rt : no_logic(); }
+  /// The world the source's ActorBlueprints bound to a world are bound to (ActorBlueprint::bind(world)): the run of the
+  /// actors' Blueprints for the source, whose actors are of the test's world - as the Blueprint's are (the same Actor).
+  ~Blueprint() {
+    if (source && g_source_world == source.get()) g_source_world = nullptr;
+  }
+  BlueprintRun& source_world() {
+    g_source_world = source.get();
+    if (source) return *source;
+    static BlueprintRun none(nullptr, nullptr);   // (where it calls none: a world of no actors - bound there, it answers with the zeros)
+    return none;
+  }
   /// Before the source's call: the actors' Blueprints as they started.
   void before_source() { source_actors.restore(); }
   /// What the Blueprint asked the engine's stand-in.
