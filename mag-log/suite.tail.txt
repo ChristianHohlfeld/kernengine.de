@@ -1,0 +1,80 @@
+  280 |     Bool set_visible_2 = false;
+      |          ^
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/tests/test_rules.cpp:6:
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints.h:117:
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1072:10: warning: unused variable 'a_36' [-Wunused-variable]
+ 1072 |     Mat4 a_36 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1073:10: warning: unused variable 'a_37' [-Wunused-variable]
+ 1073 |     Mat4 a_37 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1074:10: warning: unused variable 'a_38' [-Wunused-variable]
+ 1074 |     Mat4 a_38 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1086:10: warning: unused variable 'a_49' [-Wunused-variable]
+ 1086 |     Mat4 a_49 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1087:10: warning: unused variable 'a_50' [-Wunused-variable]
+ 1087 |     Mat4 a_50 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1088:10: warning: unused variable 'a_51' [-Wunused-variable]
+ 1088 |     Mat4 a_51 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1117:10: warning: unused variable 'a_75' [-Wunused-variable]
+ 1117 |     Mat4 a_75 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1118:10: warning: unused variable 'a_76' [-Wunused-variable]
+ 1118 |     Mat4 a_76 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1119:10: warning: unused variable 'a_77' [-Wunused-variable]
+ 1119 |     Mat4 a_77 = Mat4{Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+      |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1480:10: warning: variable 'set_visible' set but not used [-Wunused-but-set-variable]
+ 1480 |     Bool set_visible = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1481:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+ 1481 |     Bool update_instances = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_e78ae7f2f76810bd.h:1482:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+ 1482 |     Bool set_visible_2 = false;
+      |          ^
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/tests/test_rules.cpp:6:
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints.h:118:
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_6ce93309bc63e980.h:47:10: warning: variable 'hull_mesh' set but not used [-Wunused-but-set-variable]
+   47 |     Bool hull_mesh = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_6ce93309bc63e980.h:770:10: warning: variable 'set_visible' set but not used [-Wunused-but-set-variable]
+  770 |     Bool set_visible = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_6ce93309bc63e980.h:771:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+  771 |     Bool update_instances = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_6ce93309bc63e980.h:772:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+  772 |     Bool set_visible_2 = false;
+      |          ^
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/tests/test_rules.cpp:6:
+In file included from /dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints.h:119:
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_8283ff6ee4fde0c3.h:137:10: warning: variable 'set_visible' set but not used [-Wunused-but-set-variable]
+  137 |     Bool set_visible = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_8283ff6ee4fde0c3.h:138:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+  138 |     Bool update_instances = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_8283ff6ee4fde0c3.h:139:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+  139 |     Bool set_visible_2 = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-8-voll-120047-6503/kern/games/spawncity/src/level_blueprints/kern_blueprint_8283ff6ee4fde0c3.h:166:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+  166 |     Bool remove = false;
+      |          ^
+42 warnings and 20 errors generated.
+42 warnings and 20 errors generated.
+42 warnings and 20 errors generated.
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+42 warnings and 20 errors generated.
+42 warnings and 20 errors generated.
+42 warnings and 20 errors generated.
+42 warnings and 20 errors generated.
+
+real	8m30,086s
+user	213m41,934s
+sys	7m41,097s
