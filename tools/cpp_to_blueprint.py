@@ -15058,7 +15058,7 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
-                if (scope or "").startswith(ENGINE + "::") and scope in self.tree.records:
+                if (scope or "").startswith(ENGINE + "::") and scope.rstrip(":") in self.tree.records:
                     continue   # (a name a class of the engine gives inside itself - `using Object = kern::net::Simulator;` of a node's
                                # description - is that class's: the test reaches the engine as the engine, never through a copy of it)
                 if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
