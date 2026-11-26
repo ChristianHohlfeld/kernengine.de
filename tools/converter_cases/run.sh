@@ -42,6 +42,9 @@
 #             function gives, a field of a struct, a list of pointers, unique_ptr<...>::get(), nullptr, `if (p)`, two
 #             compared, a function of the engine called on one - written and compared, and no Handle of Object; its classes
 #             compile (a struct of the program with an Object field is held as that Object - before: as an Actor).
+#   localobj.cpp an object of the engine made as a local (`kern::Earcut ec; ec.triangulate(...)`): the Object its make
+#             gives, released where its block ends - written, compared, its class compiles (before: "an object of the
+#             engine as another type (Object<kern::Earcut> where Int is wanted)").
 #   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
 #             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
 #             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
@@ -78,8 +81,9 @@ top="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($top)" >&2 || trap 'rm -rf "$top"' EXIT
 fail=0
 classes() {   # classes <case> <what>: the case's Blueprints as classes (tools/blueprint_cpp.sh --project), compiled
-  python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(p,'w'))" "$top/$1/cases.klevel"
-  if "$root/tools/blueprint_cpp.sh" --project "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/classes.cpp" > "$top/$1/classes.log" 2>&1 &&
+  # (of a copy of the level, written with format and version as a level is read - the case's own stays as the converter wrote it)
+  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(sys.argv[2],'w'))" "$top/$1/cases.klevel" "$top/$1/classes.klevel"
+  if "$root/tools/blueprint_cpp.sh" --project "$top/$1/cases.kproject" "$top/$1/classes.klevel" "$top/$1/classes.cpp" > "$top/$1/classes.log" 2>&1 &&
      "${CLANGXX:-clang++}" -std=c++20 -fsyntax-only -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" "$top/$1/classes.cpp" > "$top/$1/classes.err" 2>&1
   then echo "ok   $1: $2"; else echo "FAIL $1: $2: $(grep -m1 'error' "$top/$1/classes.log" "$top/$1/classes.err" | cut -c1-300)"; fail=1; fi
 }
@@ -164,6 +168,12 @@ check objects "a function of the engine on an Object" yes 'engine_mixer_sample_r
 check objects "no Object becomes a number (Handle of Object)" no 'object_handle'
 logged objects "all nine are written and compared" '^9 functions of the Blueprints are compared'
 classes objects "the classes compile: a struct's field that is an Object is held as an Object (Held<Rig>), never as an Actor"
+
+convert localobj
+logged localobj "an object of the engine made as a local (kern::Earcut ec;) is written: an Object, never an Int" '^ +triangles \([0-9]+\): written'
+check localobj "the local holds the Object its class's make gives" yes 'Object<kern::Earcut> ec'
+logged localobj "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+classes localobj "the classes compile"
 
 convert actors
 check actors "an Actor as an input" yes 'void add\(Actor a = Actor\{\}\)'

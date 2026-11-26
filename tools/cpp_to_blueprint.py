@@ -5839,7 +5839,7 @@ class Emit:
                     continue
                 name = self.local(v, self.whole64() if wide_init else kept)
                 if made is not None:
-                    out += self.take_pre() + [f"{name} = {self.ex(init, 'Int')};"]
+                    out += self.take_pre() + [f"{name} = {self.ex(init, object_type(made))};"]   # (the Object <class>.make gives)
                     self.scopes[-1].append((name, made))
                     continue
                 made_here = self.made_default(init, self.types[v["id"]]) if init is not None else None
@@ -9727,7 +9727,7 @@ class Emit:
         if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
             return cached[2]
         u, bt = self.u, f["outs"][0][1]
-        handle = self.ex(kids(b)[0], "Int")   # (the object: its handle - also where C++ points at it)
+        handle = self.ex(kids(b)[0], object_type(q))   # (the object: an Object of its class - also where C++ points at it)
         u.engine_calls[fd["id"]] = f
         self.f.asks_engine = True
         self.f.effect(f"it binds a place of the engine ({f['type']})")
