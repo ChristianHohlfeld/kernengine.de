@@ -9,4 +9,11 @@ kern="$(cd "$here/../.." && pwd)"
 gen="${MURMEL_GEN:-$(cd "$kern/.." && pwd)/generated/murmel}"
 mkdir -p "$gen"
 python3 "$kern/tools/embed_project.py" "$here/murmel.kproject" "$gen/murmel_project.cpp"
-"$kern/build.sh" --app --game "$here/web/murmel.wasm" -I"$here/src" "$here/src/murmel.cpp" "$here/src/main.cpp" "$gen/murmel_project.cpp"
+# (die Blueprints der Levels als ihre C++-Klassen: sie laufen im Spiel kompiliert - tools/blueprint_cpp.sh)
+classes=()
+for level in "$here"/levels/*.klevel; do
+  c="$gen/$(basename "$level" .klevel)_blueprints.cpp"
+  "$kern/../tools/blueprint_cpp.sh" "$level" "$c"
+  classes+=("$c")
+done
+"$kern/build.sh" --app --game "$here/web/murmel.wasm" -I"$here/src" "$here/src/murmel.cpp" "$here/src/main.cpp" "$gen/murmel_project.cpp" "${classes[@]}"

@@ -40,6 +40,11 @@ std::string anzeige(int level, f32 punkte, u32 muenzen, u32 alle, bool fertig, c
   return text;
 }
 
+Murmel& spiel() {
+  static Murmel s;
+  return s;
+}
+
 f32 Murmel::punkte() const {
   if (!welt_ || fertig_) return vorher_;   // (fertig: die Punkte des letzten Levels sind schon in vorher_)
   return vorher_ + welt_->hud().score;

@@ -30,6 +30,7 @@ struct Lauf {
   f32 punkte = 0;
   u32 toene = 0;
   std::string text;
+  std::string stufen;               // wie die Blueprints der Welt laufen (am Ende, im Level 2)
 };
 
 bool unten[static_cast<u32>(Key::count)] = {};
@@ -92,6 +93,8 @@ Lauf spiele(murmel::Murmel& spiel, int frames, bool zeigen) {
       if (zeigen) std::printf("%s\n", z);
     }
   }
+  if (game::GameWorld* w = const_cast<game::GameWorld*>(spiel.welt()); w && w->logic_runtime())
+    for (const game::BlueprintRunning& b : game::blueprints_running(*w->logic_runtime())) l.stufen += b.name + ": " + b.tier + "; ";
   l.punkte = spiel.punkte();
   l.toene = spiel.toene();
   l.text = spiel.text();
@@ -112,7 +115,7 @@ void pruefe(bool ok, const char* was) {
 
 int main(int argc, char** argv) {
   const bool zeigen = argc > 1 && std::strcmp(argv[1], "--spur") == 0;
-  static murmel::Murmel spiel;
+  murmel::Murmel& spiel = murmel::spiel();
   pruefe(run(spiel, game::embedded_project().settings) == 0, "kern::run nimmt die App");
   const int frames = 60 * 45;
   const Lauf a = spiele(spiel, frames, zeigen);
@@ -123,6 +126,9 @@ int main(int argc, char** argv) {
   pruefe(a.punkte == MURMEL_PUNKTE, "die erwarteten Punkte (6 Muenzen und das Sprungfeld)");
   pruefe(a.toene == MURMEL_TOENE, "die erwarteten Toene");
   pruefe(a.text.find("Geschafft!") == 0, "die Anzeige sagt: Geschafft!");
+  // die Blueprints der Welt laufen in der Stufe, die der Bau sagt: ohne ihre Klassen im Interpreter, mit ihnen als C++
+  std::printf("Stufen: %s\n", a.stufen.c_str());
+  pruefe(a.stufen == std::string("Level: ") + MURMEL_STUFE + "; Sprungfeld: " + MURMEL_STUFE + "; ", "die Blueprints laufen als " MURMEL_STUFE);
   // ein zweiter Lauf derselben App (die App-Laufzeit startet sie neu): dieselbe Spur, Zeile für Zeile
   const Lauf b = spiele(spiel, frames, false);
   pruefe(a.spur == b.spur && a.wechsel == b.wechsel && a.geschafft == b.geschafft, "der zweite Lauf ist derselbe");

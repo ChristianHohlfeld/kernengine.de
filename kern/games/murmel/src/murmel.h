@@ -62,4 +62,7 @@ class Murmel final : public kern::App {
   std::string text_;
 };
 
+/// Das eine Objekt des Spiels (der Einstieg gibt es der Engine).
+Murmel& spiel();
+
 }  // namespace murmel
