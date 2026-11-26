@@ -10828,6 +10828,10 @@ class Emit:
                 return f"kern::math::sign({args[0]})"
             if name in ("ldexp", "ldexpf") and len(args) == 2:
                 return f"({args[0]} * kern::math::pow(2.0, {args[1]}))"
+            if name in ("tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf"):
+                # (the engine has not this function yet - kern/third_party/musl_math: a program's mathematics is the engine's, and
+                # a formula of exp is another function; it waits, with the place, until the engine has it)
+                raise Wait(f"std::{name}: the engine has no {name} yet (kern/third_party/musl_math) - a formula of exp and log would be another function than C++'s")
             if name in ("tanh", "tanhf"):
                 return f"kern::math::div(kern::math::exp(2.0 * {args[0]}) - 1.0, kern::math::exp(2.0 * {args[0]}) + 1.0)"
             if name in ("sinh", "sinhf"):

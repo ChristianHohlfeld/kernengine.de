@@ -45,9 +45,12 @@ fi
 python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(p,'w'))" "$level"
 python3 "$kern/tools/embed_project.py" "$project" "$o/project.cpp" > /dev/null
 # (with the header of the classes the program calls - level_blueprints.h, the converter's --classes - where there are such
-# classes; else without it)
-"$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1 ||
+# classes; else without it, and the header empty: a source of the program that includes it compiles, and what it would call of
+# such a class is not there - said by the link below)
+if ! "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1; then
   "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" > /dev/null
+  printf '#pragma once\n// (no Blueprint the program calls as its class in this project - tools/converter_cases/compare.sh)\n' > "$o/level_blueprints.h"
+fi
 own=("$o/project.cpp" "$o/level_blueprints.cpp" "$tests"/test_*.cpp "$@")
 export cxx o
 printf '%s\n' "${own[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
