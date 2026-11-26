@@ -1,0 +1,80 @@
+      |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_a07671107dfde229.h:1952:11: warning: unused variable 'now_ms_2' [-Wunused-variable]
+ 1952 |     Float now_ms_2 = 0.0;
+      |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_a07671107dfde229.h:1956:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 1956 |     Bool remove = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_a07671107dfde229.h:2056:10: warning: unused variable 'a' [-Wunused-variable]
+ 2056 |     Vec4 a = Vec4{0.0, 0.0, 0.0, 0.0};
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_a07671107dfde229.h:2082:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 2082 |     Bool remove = false;
+      |          ^
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:7:
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints.h:48:
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_85cb416bf3203e5e.h:234:10: warning: variable 'actor_matrix' set but not used [-Wunused-but-set-variable]
+  234 |     Bool actor_matrix = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_85cb416bf3203e5e.h:275:10: warning: variable 'teleport' set but not used [-Wunused-but-set-variable]
+  275 |     Bool teleport = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_85cb416bf3203e5e.h:276:10: warning: variable 'set_actor_velocity' set but not used [-Wunused-but-set-variable]
+  276 |     Bool set_actor_velocity = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_85cb416bf3203e5e.h:343:11: warning: unused variable 'arg_number_2' [-Wunused-variable]
+  343 |     Float arg_number_2 = 0.0;
+      |           ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/src/level_blueprints/kern_blueprint_85cb416bf3203e5e.h:631:10: warning: variable 'prepare' set but not used [-Wunused-but-set-variable]
+  631 |     Bool prepare = false;
+      |          ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:23:18: error: no member named 'bind_settings' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   23 |   KERN_CHECK(set.bind_settings(table).Result, "its table has one row per setting");
+      |              ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:34:18: error: no member named 'Settings_set_2' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   34 |   KERN_CHECK(set.Settings_set_2(s, table, "mouse.sensitivity", "999").Result && get(Opt::mouse_sensitivity) == 300, "clamped to 300");
+      |              ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:35:18: error: no member named 'Settings_set_2' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   35 |   KERN_CHECK(set.Settings_set_2(s, table, "mouse.sensitivity", "47").Result && get(Opt::mouse_sensitivity) == 45, "snapped to the 5 %% step (%g)", static_cast<double>(get(Opt::mouse_sensitivity)));
+      |              ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:37:18: error: no member named 'Settings_set_2' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   37 |   KERN_CHECK(set.Settings_set_2(s, table, "world.people", "false").Result && !on(Opt::world_people), "toggle off");
+      |              ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:38:19: error: no member named 'Settings_set_2' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   38 |   KERN_CHECK(!set.Settings_set_2(s, table, "no.such", "1").Result && !set.Settings_set_2(s, table, "car.maxKmh", "fast").Result, "unknown key / no number");
+      |               ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:38:75: error: no member named 'Settings_set_2' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   38 |   KERN_CHECK(!set.Settings_set_2(s, table, "no.such", "1").Result && !set.Settings_set_2(s, table, "car.maxKmh", "fast").Result, "unknown key / no number");
+      |                                                                       ~~~ ^
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/include/kern/test/test.h:41:11: note: expanded from macro 'KERN_CHECK'
+   41 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/kandidat-10-223348/kern/games/spawncity/tests/test_settings.cpp:39:7: error: no member named 'Settings_reset_section' in 'kern_blueprint_5e40f615a90ed411::settings_cpp'
+   39 |   set.Settings_reset_section(s, table, "maus");
+      |   ~~~ ^
+34 warnings and 7 errors generated.
+34 warnings generated.
+15 warnings generated.
+34 warnings generated.
+34 warnings generated.
+3 warnings generated.
+27 warnings generated.
+
+real	3m48,155s
+user	76m10,873s
+sys	1m56,313s

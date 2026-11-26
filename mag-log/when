@@ -1,2 +1,5 @@
 kandidat-10-223348: voll auf 5486b432 (origin/work-kandidat-10), 37 Kerne, Start 2026-11-26 22:33:58
 werkzeuge: clang=/usr/bin/clang++-18 (Ubuntu clang version 18.1.3 (1ubuntu1)) c++=/usr/bin/c++ (c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0) python=Python 3.12.3 PATH=/home/chris/.local/bin:/home/chris/bin:/home/chris/bin:/home/chris/.local/bin:/home/chris/.grok/bin:/home/chris/.local/bin:/home/chris/.opencode/bin:/home/chris/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+convert rc=0 22:40:11
+suite rc=123 22:44:04
+engine rc=0 23:16:07
