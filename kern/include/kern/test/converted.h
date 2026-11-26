@@ -560,16 +560,21 @@ template <class T> std::unique_ptr<T> quiet_static() {
   return made_static<T>();
 }
 /// One of the few objects of an engine class a test keeps, as the Object it is in the Blueprint (its handle and world).
+/// One object for each Object (its handle and its world): an object the stand-in hands out (of its world) is never the
+/// one a test drew of the same handle (of the test's world) - a pointer the source keeps stays what it was.
 template <class T> T* engine_object(kern::logic::ObjectRef ref) {
-  static T* const kept = [] {
-    g_keeping = true;
-    T* k = new T[8];
-    g_keeping = false;
-    return k;
-  }();
-  T* object = &kept[static_cast<unsigned long long>(ref.handle) % 8];
-  object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(ref.handle) % 8);
-  object->kern_world = object->kern_handle ? ref.world : 0;
+  static std::map<std::pair<long long, kern::logic::WorldId>, T*> kept;
+  const std::pair<long long, kern::logic::WorldId> key{static_cast<long long>(ref.handle), ref.handle ? ref.world : 0};
+  // (the test's own objects: no make of the source - g_keeping -, and no memory the function asks for - cost::counting)
+  const bool keeping = g_keeping, counting = kern::test::cost::counting;
+  g_keeping = true;
+  kern::test::cost::counting = false;
+  T*& object = kept[key];
+  if (!object) object = new T;
+  g_keeping = keeping;
+  kern::test::cost::counting = counting;
+  object->kern_handle = key.first;
+  object->kern_world = key.second;
   return object;
 }
 /// ... one the test draws: of the test's world (kTestWorld).
