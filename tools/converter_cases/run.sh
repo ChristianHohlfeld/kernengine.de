@@ -79,6 +79,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 here="$root/tools/converter_cases"
 top="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($top)" >&2 || trap 'rm -rf "$top"' EXIT
+. "$root/kern/tools/run_dir.sh"   # (the tool of blueprint_cpp.sh and the engine of compare.sh: built once in this run, kept in none)
 fail=0
 classes() {   # classes <case> <what>: the case's Blueprints as classes (tools/blueprint_cpp.sh --project), compiled
   # (of a copy of the level, written with format and version as a level is read - the case's own stays as the converter wrote it)

@@ -108,7 +108,7 @@ kern/build.sh /tmp/logic_test.wasm kern/tests/logic_wasm_test.cpp -Ikern/tests
 | `WASI_SDK` | `/opt/wasi-sdk` | installation directory of wasi-sdk |
 | `KERN_BUILD` | `release` | `debug` compiles with `-O1 -g` without LTO; otherwise `-O3 -flto=thin -DNDEBUG` |
 | `KERN_JOBS` | all cores (`nproc`) | number of parallel compiler and ThinLTO jobs |
-| `KERN_OBJ_CACHE` | `$TMPDIR/kern-obj` (or `/tmp/kern-obj`) | object cache |
+| `KERN_RUN_DIR` | new for each run (`kern/tools/run_dir.sh`) | the run's folder: the objects, in this run only |
 
 A note on `KERN_BUILD=debug`: the link step passes `-Wl,--strip-debug` in every mode, so the finished
 module contains no debug information even in debug mode. The mode affects optimization and LTO.
@@ -160,22 +160,16 @@ cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
 
 At the end the script reports `built <out> (<n> bytes)`.
 
-### Parallel Compilation and the Object Cache
+### Parallel Compilation, Without a Cache
 
-Each source is compiled into its own object, in parallel (`KERN_JOBS`), and ThinLTO links them. So
-that a rebuild only compiles what has changed, and so that the Studio and the example games share the
-engine's objects, there is a cache:
-
-- **Box3D and musl:** one cache folder each, under a key derived from the options and the compiler
-  version (`box3d-<key>`, `musl-math-<key>`); an object is recompiled if it is missing or older than
-  its source or the newest header.
-- **C++:** folder `cpp-<flags_key>`; each object is named `<name>-<key>.o`, where the key is built
-  from the hash of **all** headers and included data files (`*.h`, `*.inl`, `*.inc` under `include`,
-  `src`, Box3D's `include` and `third_party/microduck`), the source path and the source contents. Consequence: **every header change recompiles all C++ sources** –
-  simple and safe, as the comment in the script puts it.
-- **ThinLTO:** cache in `$KERN_OBJ_CACHE/thinlto`.
-
-CI keeps the cache between runs (see Section 2.10).
+Each source is compiled into its own object, in parallel (`KERN_JOBS`), and ThinLTO links them.
+**Nothing is cached beyond one run** (the owner's rule): an object from an earlier run cannot make a
+test pass. The objects stand in the folder of the run (`kern/tools/run_dir.sh`, `KERN_RUN_DIR`): the
+first script of a run makes it new and removes it when it ends; what it calls gets it through the
+environment. So a run that builds the Studio and the example games compiles the engine once. A CI job
+sets `KERN_RUN_DIR` to a folder of its fresh runner. The key inside the folder (a hash of the options,
+the compiler, the source and all headers of the engine, of the `-I` folders and of the sources' folders)
+only tells apart the builds of the same run.
 
 ---
 
@@ -243,7 +237,7 @@ kern/tests/run.sh micro_duck                 # only tests whose name contains "m
 ### What the Script Does
 
 1. **Box3D** is compiled once **without** sanitizers (`-O2 -g -DBOX3D_DISABLE_SIMD
-   -ffp-contract=off`) and cached – third-party code on the scalar path, as in WebAssembly.
+   -ffp-contract=off`) – third-party code on the scalar path, as in WebAssembly.
 2. **musl** is likewise compiled once (`-O2 -g -ffp-contract=off -fno-math-errno`).
 3. **All of Kern's C++ code** (`kern/src/**/*.cpp`, `gl_stub.cpp`, `test_main.cpp`) is compiled with
    **AddressSanitizer and UndefinedBehaviorSanitizer**:
@@ -260,7 +254,7 @@ kern/tests/run.sh micro_duck                 # only tests whose name contains "m
    Section 2.7).
 
 Environment variables: `CXX`/`CC` (default `c++`/`cc`), `KERN_TEST_OUT` (output folder, default
-`$TMPDIR/kern-tests`), `KERN_JOBS`.
+`$KERN_RUN_DIR/kern-tests`; everything is compiled anew in every run), `KERN_JOBS`.
 
 ### The Test Program
 
@@ -469,9 +463,8 @@ x86 and WebAssembly do.
 ### Job `build` (ubuntu-24.04, 30 min)
 
 1. Checkout, Node 22.
-2. **wasi-sdk 25** from the cache (key `wasi-sdk-25.0-v2`), otherwise downloaded to `/home/runner/wasi-sdk`.
-3. **Object cache** `/home/runner/kern-obj` (`KERN_OBJ_CACHE`), key `kern-obj-<sha>`, restored with
-   the prefix `kern-obj-` – that is, from the most recent earlier run.
+2. **wasi-sdk 25**: downloaded to `/home/runner/wasi-sdk` (in every run).
+3. **No object cache:** the objects stand in `KERN_RUN_DIR` (`/home/runner/kern-run`) and live only in this job.
 4. **Build:**
 
    ```sh
@@ -524,7 +517,7 @@ not cancel a push in progress; only the most recent waiting one follows. The sit
 1. Downloads the `site` artifact and restores from it `generated/studio.html`,
    `generated/kern_studio.wasm` and the app files (`manifest.webmanifest`, `sw.js`, `build.json`,
    `icons`, `microduck`) – exactly as they are published.
-2. Playwright 1.56.0 from the cache or via `npm install` into `/tmp/e2e`, then
+2. Playwright 1.56.0 via `npm install` into `/tmp/e2e` (in every run), then
    `playwright install --with-deps chromium`.
 3. Starts `python3 -m http.server 8771 --bind 127.0.0.1` and runs
    `NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771`.
@@ -581,7 +574,7 @@ on the developer page and from next to the page otherwise.
 | Abort with `runtime error:` / `AddressSanitizer` | UBSan/ASan found a bug | the report names file and line; reproduce it in isolation with a filter (`run.sh <name>`) |
 | `first differing tick: N`, or the `diff` against the fingerprint fails | the simulation computes in a platform-dependent way or was changed | see Section 2.9 |
 | Logic test `runs in "interpreter"` instead of `compiled (WebAssembly)` | JIT unavailable or module not compilable | check the JIT output; the engine falls back to the interpreter (`logic JIT failed …` in the console) |
-| Every small header edit rebuilds everything | intended: header hash in the cache key | – |
+| Every small header edit rebuilds everything | there is no cache: every run builds everything once | – |
 | Browser test hangs at `openStudio` | page not served or module missing; the test waits up to 90 s for `KernStudio.frames() > 5` | start the server in the repository root, build `generated/` |
 | Playwright import fails | package not found | `npm install playwright` (CI: 1.56.0) and set `NODE_PATH`, as in CI |
 | Lehrer: **Start** reports a loading error | `kern_lehrer.wasm` is missing (`generated/` on the developer page, next to the page otherwise) | `kern/build.sh --lehrer generated/kern_lehrer.wasm` |

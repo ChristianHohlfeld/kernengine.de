@@ -419,11 +419,10 @@ Compiler (etwa `-DMEIN_SCHALTER` oder `-Imein/include`). Mehrere Quelldateien si
 | `WASI_SDK` | Installationsordner von wasi-sdk (Standard `/opt/wasi-sdk`) |
 | `KERN_BUILD=debug` | `-O1 -g` statt `-O3` mit ThinLTO |
 | `KERN_JOBS` | parallele Compiler-Aufrufe (Standard: alle Kerne) |
-| `KERN_OBJ_CACHE` | Objekt-Cache (Standard `$TMPDIR/kern-obj`) |
+| `KERN_RUN_DIR` | Ordner des Laufs (neu je Lauf: kein Zwischenspeicher - `kern/tools/run_dir.sh`) |
 
-Jede Quelle wird zu einem eigenen Objekt kompiliert und unter einem Hash aus Flags, Quelle und allen
-Headern zwischengespeichert. Ein erneuter Build übersetzt nur, was sich geändert hat, und Studio und die
-Beispielspiele teilen sich die Objekte der Engine. Das Modul ist ein WASI-„Reactor" mit konservativem
+Jede Quelle wird zu einem eigenen Objekt kompiliert, im Ordner des Laufs - nichts bleibt von einem Lauf
+zum nächsten; innerhalb eines Laufs teilen sich Studio und die Beispielspiele die Objekte der Engine. Das Modul ist ein WASI-„Reactor" mit konservativem
 Feature-Satz, damit es in jedem WebGL2-fähigen Browser ab Safari 15 läuft. Ausführlich:
 [Kapitel 2](02-bauen-und-testen.md).
 

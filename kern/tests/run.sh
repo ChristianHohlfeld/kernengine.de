@@ -2,12 +2,14 @@
 # Builds and runs the Kern unit tests natively (host compiler, sanitizers on).
 #   kern/tests/run.sh            (CXX / CC override the compilers, default c++ / cc)
 #
-# Box3D is compiled once without sanitizers (third-party C code, scalar path as
-# in WebAssembly) and cached; all Kern C++ is built with ASan and UBSan.
+# Box3D is compiled without sanitizers (third-party C code, scalar path as in
+# WebAssembly); all Kern C++ is built with ASan and UBSan. Everything is compiled
+# in every run - nothing is kept from one run to the next (kern/tools/run_dir.sh).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(dirname "$here")"
-out="${KERN_TEST_OUT:-${TMPDIR:-/tmp}/kern-tests}"
+. "$root/tools/run_dir.sh"   # (no cache: the folder of this run, or KERN_TEST_OUT - compiled anew either way)
+out="${KERN_TEST_OUT:-$KERN_RUN_DIR/kern-tests}"
 mkdir -p "$out/box3d"
 cc="${CC:-cc}"
 objects=()
@@ -15,10 +17,8 @@ pids=()
 for c in "$root"/third_party/box3d/src/*.c; do
   o="$out/box3d/$(basename "$c" .c).o"
   objects+=("$o")
-  if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ -n "$(find "$root/third_party/box3d" -name '*.h' -newer "$o" -o -name '*.inl' -newer "$o" | head -1)" ]; then
-    "$cc" -std=c17 -O2 -g -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$root/third_party/box3d/include" -I"$root/third_party/box3d/src" -c "$c" -o "$o" &
-    pids+=($!)
-  fi
+  "$cc" -std=c17 -O2 -g -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$root/third_party/box3d/include" -I"$root/third_party/box3d/src" -c "$c" -o "$o" &
+  pids+=($!)
 done
 for p in "${pids[@]}"; do wait "$p"; done
 # The deterministic libm (kern/core/dmath.h).
@@ -26,9 +26,7 @@ mkdir -p "$out/musl_math"
 for c in "$root"/third_party/musl_math/src/*.c; do
   o="$out/musl_math/$(basename "$c" .c).o"
   objects+=("$o")
-  if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ -n "$(find "$root/third_party/musl_math" -name '*.h' -newer "$o" | head -1)" ]; then
-    "$cc" -std=c17 -O2 -g -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o"
-  fi
+  "$cc" -std=c17 -O2 -g -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o"
 done
 sources=()
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/src" -name '*.cpp' | sort)

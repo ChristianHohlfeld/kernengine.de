@@ -3,7 +3,7 @@ name: CI
 # One pipeline: the site is built once and published as soon as it is built;
 # native and browser tests run in parallel and do not hold the deployment up.
 #   native  unit tests with ASan / UBSan
-#   build   Kern Studio + example games (parallel ThinLTO, object cache kept between runs)
+#   build   Kern Studio + example games (parallel ThinLTO; nothing kept between runs - each job builds anew)
 #   e2e     the browser test against the built Studio
 #   input   the browser test of the input of every host (the reader's contract, the example
 #           games, SpawnCity)
@@ -34,6 +34,9 @@ concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ (inputs.probe || inputs.beleg) && github.run_id || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  KERN_RUN_DIR: /home/runner/kern-run   # (the folder of a job's run - kern/tools/run_dir.sh: a fresh runner, nothing from another run; no cache)
+
 jobs:
   # A probe (workflow_dispatch with "probe"): the converter over the named sources on a runner of its own, as mag's "probe" does it - what it
   # converts, what waits and why, and whether the tests it writes compile. It writes into a copy; the level of the state stays as it is.
@@ -43,15 +46,8 @@ jobs:
     timeout-minutes: 340   # (the whole program on 4 cores takes hours: a probe of all sources is allowed to)
     steps:
       - uses: actions/checkout@v4
-      - name: wasi-sdk 25 (cached; the probe "all_program" builds for the browser too)
+      - name: Install wasi-sdk 25 (the probe "all_program" builds for the browser too)
         if: ${{ inputs.probe == 'all_program' }}
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/wasi-sdk
-          key: wasi-sdk-25.0-v2
-      - name: Install wasi-sdk 25
-        if: ${{ inputs.probe == 'all_program' && steps.sdk.outputs.cache-hit != 'true' }}
         run: |
           set -euo pipefail
           mkdir -p /home/runner/wasi-sdk
@@ -82,7 +78,7 @@ jobs:
           python3 ../../../tools/engine_api.py --check "$W/texts"; echo "engine_api --check rc=$?"
           if [ "$KERN_TEST_SOURCE_NUMBERS" = 1 ] && [ $rc = 0 ]; then   # (the tests it wrote, built and run: both passes, function by function)
             game_sources=(); for f in src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || game_sources+=("$PWD/$f"); done
-            CASES_OBJ="$W/engine" KERN_JOBS=4 CLANGXX=clang++ INCLUDES="-I$PWD/src" ../../../tools/converter_cases/compare.sh "$W/pt/l.kproject" "$W/pt/l.klevel" "$W/pt/converted" "$W/built" "${game_sources[@]}"; echo "compare rc=$?"
+            KERN_JOBS=4 CLANGXX=clang++ INCLUDES="-I$PWD/src" ../../../tools/converter_cases/compare.sh "$W/pt/l.kproject" "$W/pt/l.klevel" "$W/pt/converted" "$W/built" "${game_sources[@]}"; echo "compare rc=$?"
             grep -E "^(ok|FAIL) +converted_|^[0-9]+ tests," "$W/built/compare.log" | tail -n 80
             grep -E "interp && native \||problems.empty\(\) \|" "$W/built/compare.log" | cut -c1-400 | head -n 20   # (a Blueprint that does not run in the test: why)
             python3 ../../../tools/source_numbers.py "$W/pt/converted" "$W/built/compare.log" | tee "$W/texts/numbers.txt"
@@ -216,31 +212,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      KERN_OBJ_CACHE: /home/runner/kern-obj
+      KERN_RUN_DIR: /home/runner/kern-run   # (the folder of this job's run - kern/tools/run_dir.sh; a fresh runner: nothing from another run)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: wasi-sdk 25 (cached)
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/wasi-sdk
-          key: wasi-sdk-25.0-v2
       - name: Install wasi-sdk 25
-        if: steps.sdk.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           mkdir -p /home/runner/wasi-sdk
           curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
           tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
-      - name: Object cache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/kern-obj
-          key: kern-obj-${{ github.sha }}
-          restore-keys: kern-obj-
       - name: Build Kern Studio and the example games
         shell: bash
         run: |
@@ -400,13 +383,6 @@ jobs:
         with:
           name: native-export
           path: generated
-      - name: Playwright (cached)
-        uses: actions/cache@v4
-        with:
-          path: |
-            /tmp/e2e
-            ~/.cache/ms-playwright
-          key: playwright-1.56.0
       - name: Browser end-to-end test
         run: |
           set -euo pipefail
@@ -414,7 +390,7 @@ jobs:
           # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
           cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # The browser itself (from Playwright's CDN, in every run - no cache) is what the test needs. Its system
           # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
           # within three minutes, the test runs with what the runner image has.
           /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
@@ -456,13 +432,6 @@ jobs:
         with:
           name: native-export
           path: generated
-      - name: Playwright (cached)
-        uses: actions/cache@v4
-        with:
-          path: |
-            /tmp/e2e
-            ~/.cache/ms-playwright
-          key: playwright-1.56.0
       - name: SpawnCity's level file in the editor
         run: |
           set -euo pipefail
@@ -470,7 +439,7 @@ jobs:
           # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
           cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # The browser itself (from Playwright's CDN, in every run - no cache) is what the test needs. Its system
           # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
           # within three minutes, the test runs with what the runner image has.
           /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
@@ -493,18 +462,11 @@ jobs:
         with:
           name: site
           path: _site
-      - name: Playwright (cached)
-        uses: actions/cache@v4
-        with:
-          path: |
-            /tmp/e2e
-            ~/.cache/ms-playwright
-          key: playwright-1.56.0
       - name: Input test
         run: |
           set -euo pipefail
           [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # The browser itself (from Playwright's CDN, in every run - no cache) is what the test needs. Its system
           # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
           # within three minutes, the test runs with what the runner image has.
           /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
@@ -540,33 +502,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      KERN_OBJ_CACHE: /home/runner/kern-obj
+      KERN_RUN_DIR: /home/runner/kern-run   # (the folder of this job's run - kern/tools/run_dir.sh; a fresh runner: nothing from another run)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: wasi-sdk 25 (cached)
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/wasi-sdk
-          key: wasi-sdk-25.0-v2
       - name: Install wasi-sdk 25
-        if: steps.sdk.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           mkdir -p /home/runner/wasi-sdk
           curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
           tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
-      - name: Object cache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/kern-obj
-          key: kern-obj-murmel-${{ github.sha }}
-          restore-keys: |
-            kern-obj-murmel-
-            kern-obj-
       - name: Murmel und Kern Studio bauen
         run: |
           set -euo pipefail
@@ -575,13 +522,6 @@ jobs:
           tools/build_studio.sh
           # the export of a project with its App: one page for itself (kern/docs/app.md 7.)
           tools/export_game.sh kern/games/murmel/murmel.kproject generated/murmel.html -Ikern/games/murmel/src kern/games/murmel/src/murmel.cpp kern/games/murmel/src/main.cpp
-      - name: Playwright (cached)
-        uses: actions/cache@v4
-        with:
-          path: |
-            /tmp/e2e
-            ~/.cache/ms-playwright
-          key: playwright-1.56.0
       - name: Murmel e2e
         run: |
           set -euo pipefail

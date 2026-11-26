@@ -2,10 +2,11 @@
 # The engine's native build, proven on a minimal project of its own (kern/docs/app.md 7.): kern/tools/build_native.sh
 # with --project, then with --classes (the level's and the program's Blueprints as their classes) - each program runs
 # kern/tests/native_build/mini.cpp.
-#   kern/tests/native_build/run.sh        (CXX / CC, KERN_NATIVE_CACHE as build_native.sh)
+#   kern/tests/native_build/run.sh        (CXX / CC as build_native.sh; the engine in the folder of this run, kern/tools/run_dir.sh)
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 kern="$(cd "$here/../.." && pwd)"
+. "$kern/tools/run_dir.sh"   # (the engine built once for the programs of this run - kept in none)
 out="${TMPDIR:-/tmp}/kern-native-build"
 "$kern/tools/build_native.sh" --project "$here/mini.kproject" -o "$out/mini" -DMINI_TIER='"interpreter"' "$here/mini.cpp"
 "$out/mini"

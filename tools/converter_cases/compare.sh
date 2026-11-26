@@ -9,13 +9,14 @@
 # more -I switches (the program's folders). Each test and each source is compiled on its own: one that does not compile is
 # said and left out (a source whose functions are then missing: linked without them, said). What the tests print goes to
 # <out folder>/compare.log (the program: tests.bin - no name of a header, the folder is on the include path); the status is the build's - the tests' own verdict is read from the log (tools/source_numbers.py).
-# The engine's objects are kept in $CASES_OBJ (default $TMPDIR/kern-cases-obj), keyed by their source, the switches and every
-# header of the engine.
+# The engine's objects stand in the folder of this run (kern/tools/run_dir.sh - nothing is kept from one run to the next),
+# keyed by their source, the switches and every header of the engine.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 kern="$root/kern"
 project="$1" level="$2" tests="$3" o="$4"; shift 4
-out="${CASES_OBJ:-${TMPDIR:-/tmp}/kern-cases-obj}"
+. "$kern/tools/run_dir.sh"
+out="$KERN_RUN_DIR/kern-cases-obj"
 cxx="${CXX:-${CLANGXX:-clang++}}"
 cc="${CC:-$(dirname "$(command -v "$cxx")")/$(basename "$cxx" | sed 's/clang++/clang/; s/g++/gcc/')}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$o/obj"
@@ -31,7 +32,7 @@ for c in "$kern"/third_party/musl_math/src/*.c; do
   x="$out/musl/$(basename "$c" .c).o"; objects+=("$x")
   [ -f "$x" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $x")
 done
-headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
+headers="$(find "$kern/include" "$kern/src" -name '*.h' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-12)"
 while IFS= read -r f; do
   x="$out/obj/$(echo "$f" | sed "s|$kern/||; s|/|_|g")-$( { echo "$headers ${flags[*]} $cxx"; cat "$f"; } | sha256sum | cut -c1-12).o"
   objects+=("$x")

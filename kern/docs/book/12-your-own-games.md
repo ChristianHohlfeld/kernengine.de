@@ -402,11 +402,10 @@ flags (such as `-DMY_SWITCH` or `-Imy/include`). Multiple source files are allow
 | `WASI_SDK` | installation folder of wasi-sdk (default `/opt/wasi-sdk`) |
 | `KERN_BUILD=debug` | `-O1 -g` instead of `-O3` with ThinLTO |
 | `KERN_JOBS` | parallel compiler invocations (default: all cores) |
-| `KERN_OBJ_CACHE` | object cache (default `$TMPDIR/kern-obj`) |
+| `KERN_RUN_DIR` | the folder of the run (new for each run: no cache - `kern/tools/run_dir.sh`) |
 
-Each source is compiled into its own object and cached under a hash of the flags, the source and all
-headers. A rebuild only recompiles what has changed, and Studio and the example games share the
-engine's objects. The module is a WASI "reactor" with a conservative feature set, so that it runs in
+Each source is compiled into its own object, in the folder of the run - nothing is kept from one run to
+the next; within one run Studio and the example games share the engine's objects. The module is a WASI "reactor" with a conservative feature set, so that it runs in
 every WebGL2-capable browser from Safari 15 onward. In detail:
 [Chapter 2](02-building-and-testing.md).
 

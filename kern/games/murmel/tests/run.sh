@@ -4,11 +4,12 @@
 # C++-Klassen (--classes, wie ein Spiel sie einkompiliert) - derselbe Lauf, dieselben erwarteten Werte, und beide Läufe
 # Zeile für Zeile gleich (--ergebnis).
 #
-#   kern/games/murmel/tests/run.sh [--spur]        (CXX / CC: die Compiler; KERN_NATIVE_CACHE: die Objekte der Engine)
+#   kern/games/murmel/tests/run.sh [--spur]        (CXX / CC: die Compiler; die Engine im Ordner dieses Laufs, kern/tools/run_dir.sh)
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game="$(dirname "$here")"
 kern="$(cd "$game/../.." && pwd)"
+. "$kern/tools/run_dir.sh"   # (die Engine einmal für beide Programme dieses Laufs - in keinem anderen)
 out="${TMPDIR:-/tmp}/murmel-test"
 # Die erwarteten Werte des Laufs (tests/erwartet.txt: Name Wert je Zeile).
 defs=()

@@ -1,8 +1,9 @@
-# Die Engine als Objekte für die nativen Programme von Murmel (ohne Studio und Lehrer), zwischengespeichert in
-# $MURMEL_OBJ (Vorgabe /tmp/murmel-obj): von tests/run.sh und tests/convert.sh mit `source` genommen. Danach stehen
+# Die Engine als Objekte für die nativen Programme von Murmel (ohne Studio und Lehrer), im Ordner dieses Laufs
+# (kern/tools/run_dir.sh - kein Zwischenspeicher über den Lauf hinaus): von tests/run.sh und tests/convert.sh mit `source` genommen. Danach stehen
 # bereit: $out, $cxx, $cc, flags (die Schalter der C++-Übersetzung) und engine (die Objekte der Engine, mit
 # $out/box3d/*.o und $out/musl/*.o zu linken). Braucht: $kern.
-out="${MURMEL_OBJ:-${TMPDIR:-/tmp}/murmel-obj}"
+. "$kern/tools/run_dir.sh"
+out="$KERN_RUN_DIR/murmel-obj"
 cxx="${CXX:-c++}" cc="${CC:-cc}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$out/gen"
 jobs=()
@@ -18,7 +19,7 @@ done
 read -r -a mathflags <<< "$(kern_math_flags "$cxx")"
 flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include")
 # (ein Objekt je Quelle, unter dem Hash von Quelle, Flags und allen Headern der Engine: ein geänderter Header baut neu)
-headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
+headers="$(find "$kern/include" "$kern/src" -name '*.h' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-12)"
 engine=()
 while IFS= read -r f; do
   o="$out/obj/$(echo "$f" | sed "s|$kern/||; s|/|_|g")-$( { echo "$headers ${flags[*]} $cxx"; cat "$f"; } | sha256sum | cut -c1-12).o"

@@ -20,33 +20,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
-      KERN_OBJ_CACHE: /home/runner/kern-obj
+      KERN_RUN_DIR: /home/runner/kern-run   # (the folder of this job's run - kern/tools/run_dir.sh; a fresh runner: nothing from another run)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: wasi-sdk 25 (cached)
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/wasi-sdk
-          key: wasi-sdk-25.0-v2
       - name: Install wasi-sdk 25
-        if: steps.sdk.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           mkdir -p /home/runner/wasi-sdk
           curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
           tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
-      - name: Object cache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/kern-obj
-          key: sc-obj-${{ github.sha }}
-          restore-keys: |
-            sc-obj-
-            kern-obj-
       - name: Native tests (ASan/UBSan)
         run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
       - name: Build the game

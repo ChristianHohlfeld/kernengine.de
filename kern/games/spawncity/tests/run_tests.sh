@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Builds and runs SpawnCity's native unit tests (host compiler, no GL, sanitizers on).
 #   kern/games/spawncity/tests/run_tests.sh [name-filter | --name <whole name>...]
-# CXX / CC override the compilers (default c++ / cc). Objects are cached in
-# $SC_TEST_OUT (default $TMPDIR/spawncity-tests); Kern itself is not modified.
+# CXX / CC override the compilers (default c++ / cc). Nothing is kept from one run to the next: the objects stand in
+# the folder of this run (kern/tools/run_dir.sh) - or in $SC_TEST_OUT, a folder of the same run only (the CI: its
+# build job hands its objects to the jobs of the tests of the same commit); Kern itself is not modified.
 # SC_TEST_RELEASE=1 builds them as the game is built (-O2, no sanitizers; objects in
 # $SC_TEST_OUT-release): for the times a test prints, e.g. `SC_TEST_RELEASE=1 run_tests.sh details_blueprint`.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game="$(dirname "$here")"
 kern="$(cd "$game/../.." && pwd)"
-out="${SC_TEST_OUT:-${TMPDIR:-/tmp}/spawncity-tests}"
+. "$kern/tools/run_dir.sh"   # (no cache: the folder of this run only)
+out="${SC_TEST_OUT:-$KERN_RUN_DIR/spawncity-tests}"
 build=(-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined) link=(-fsanitize=address,undefined)
 if [ "${SC_TEST_RELEASE:-}" = 1 ]; then build=(-O2) link=() out="$out-release"; fi
 # The compiler: clang - the compiler that builds the game (emscripten is clang). Where C++ leaves a meaning

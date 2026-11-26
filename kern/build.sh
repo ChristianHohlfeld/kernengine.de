@@ -27,10 +27,10 @@
 # exported kern_* / game functions. No Emscripten runtime is involved.
 #
 # Every source compiles to its own object in parallel (KERN_JOBS, default: all
-# cores) and ThinLTO links them. Objects are cached in $KERN_OBJ_CACHE (default:
-# $TMPDIR/kern-obj) under a hash of the flags, the source and all headers, so a
-# rebuild only compiles what changed and the Studio and example games share the
-# engine's objects (CI keeps the cache between runs).
+# cores) and ThinLTO links them. Nothing is kept from one run to the next: the
+# objects stand in the folder of this run (kern/tools/run_dir.sh, KERN_RUN_DIR),
+# keyed by the flags, the source and the headers - so within one run (a CI job
+# that builds the Studio and the example games) the engine is compiled once.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -59,7 +59,8 @@ CC="$WASI_SDK/bin/clang"
 mode="${KERN_BUILD:-release}"
 if [ "$mode" = debug ]; then opt=(-O1 -g); lto=(); else opt=(-O3 -flto=thin -DNDEBUG); lto=(-flto=thin); fi
 jobs="${KERN_JOBS:-$(nproc)}"
-cache_root="${KERN_OBJ_CACHE:-${TMPDIR:-/tmp}/kern-obj}"
+. "$here/tools/run_dir.sh"   # (no cache: the folder of this run only)
+cache_root="$KERN_RUN_DIR/kern-obj"
 
 # Conservative feature set: runs on every WebGL2-capable browser (Safari 15+).
 features=(-mcpu=mvp -msign-ext -mbulk-memory -mnontrapping-fptoint -mmutable-globals)
