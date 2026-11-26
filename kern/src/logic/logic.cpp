@@ -365,7 +365,7 @@ std::string Value::as_text() const {
     case PinType::number: return number_text(n);
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
-    case PinType::actor: return a ? "actor " + std::to_string(a) + " of world " + std::to_string(world) : "none";
+    case PinType::actor: return a ? "actor " + std::to_string(a) : "none";  // (its id: the number of its world is the process's, no text of a Blueprint depends on it)
     case PinType::object: return i ? "object " + std::to_string(i) + " of world " + std::to_string(world) : "no object";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
     case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)

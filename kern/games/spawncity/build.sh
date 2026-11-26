@@ -82,6 +82,7 @@ web = root / "kern/web"
 html = (here / "web/index.html").read_text()
 sources = {
     "kern": (web / "kern.mjs").read_text(),
+    "kern_audio": (web / "audio.mjs").read_text(),
     "app": (web / "app.mjs").read_text(),
     "game": (web / "studio/game.mjs").read_text(),
     "mp_host": (here / "web/mp_host.mjs").read_text(),

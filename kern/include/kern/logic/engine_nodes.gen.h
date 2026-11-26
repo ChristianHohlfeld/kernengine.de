@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "kern/app/app.h"
+#include "kern/app/storage.h"
 #include "kern/audio/audio.h"
 #include "kern/audio/synth.h"
 #include "kern/core/base.h"
@@ -35,6 +36,7 @@
 #include "kern/gfx/program.h"
 #include "kern/gfx/renderer.h"
 #include "kern/gfx/shader.h"
+#include "kern/input/actions.h"
 #include "kern/net/client_server.h"
 #include "kern/net/connection.h"
 #include "kern/net/reliable.h"
@@ -81,6 +83,7 @@ struct S_BuildingStyle;
 struct S_Camera;
 struct S_ExtensionAttribute;
 struct S_Frame;
+struct S_Gamepad;
 struct S_GeoChunk;
 struct S_Lighting;
 struct S_Mat4;
@@ -267,6 +270,22 @@ struct S_Frame {
     ev::Field<D, ev::Float, C, B, decltype(kern::Frame::dt), decltype(B::dt), &kern::Frame::dt, &B::dt> dt;
     ev::Field<D, ev::Int64, C, B, decltype(kern::Frame::index), decltype(B::index), &kern::Frame::index, &B::index> index;
     explicit Fields(D* kern_d) : time(kern_d), dt(kern_d), index(kern_d) { (void)kern_d; }
+  };
+};
+struct S_Gamepad {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::Gamepad& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; ev::Direct<ev::Bool>::from(o, f0, x.connected); ev::Direct<ev::Float>::from(o, f1, x.lx); ev::Direct<ev::Float>::from(o, f2, x.ly); ev::Direct<ev::Float>::from(o, f3, x.rx); ev::Direct<ev::Float>::from(o, f4, x.ry); ev::Direct<ev::Float>::from(o, f5, x.lt); ev::Direct<ev::Float>::from(o, f6, x.rt); ev::Direct<ev::Int>::from(o, f7, x.buttons); }
+  template <class B> static B make(EngineObjects& o, const kern::Gamepad& x) { B b{ev::made<ev::Bool>(o, x.connected), ev::made<ev::Float>(o, x.lx), ev::made<ev::Float>(o, x.ly), ev::made<ev::Float>(o, x.rx), ev::made<ev::Float>(o, x.ry), ev::made<ev::Float>(o, x.lt), ev::made<ev::Float>(o, x.rt), ev::made<ev::Int>(o, x.buttons)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Bool>::pass(o, x.connected); ev::Direct<ev::Float>::pass(o, x.lx); ev::Direct<ev::Float>::pass(o, x.ly); ev::Direct<ev::Float>::pass(o, x.rx); ev::Direct<ev::Float>::pass(o, x.ry); ev::Direct<ev::Float>::pass(o, x.lt); ev::Direct<ev::Float>::pass(o, x.rt); ev::Direct<ev::Int>::pass(o, x.buttons); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Bool, C, B, decltype(kern::Gamepad::connected), decltype(B::connected), &kern::Gamepad::connected, &B::connected> connected;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::lx), decltype(B::lx), &kern::Gamepad::lx, &B::lx> lx;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::ly), decltype(B::ly), &kern::Gamepad::ly, &B::ly> ly;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::rx), decltype(B::rx), &kern::Gamepad::rx, &B::rx> rx;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::ry), decltype(B::ry), &kern::Gamepad::ry, &B::ry> ry;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::lt), decltype(B::lt), &kern::Gamepad::lt, &B::lt> lt;
+    ev::Field<D, ev::Float, C, B, decltype(kern::Gamepad::rt), decltype(B::rt), &kern::Gamepad::rt, &B::rt> rt;
+    ev::Field<D, ev::Int, C, B, decltype(kern::Gamepad::buttons), decltype(B::buttons), &kern::Gamepad::buttons, &B::buttons> buttons;
+    explicit Fields(D* kern_d) : connected(kern_d), lx(kern_d), ly(kern_d), rx(kern_d), ry(kern_d), lt(kern_d), rt(kern_d), buttons(kern_d) { (void)kern_d; }
   };
 };
 struct S_GeoChunk {
@@ -603,15 +622,16 @@ struct S_Sphere {
   };
 };
 struct S_Touch {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::Touch& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Vector>::from(o, f1, x.start); ev::Direct<ev::Vector>::from(o, f2, x.position); ev::Direct<ev::Vector>::from(o, f3, x.previous); }
-  template <class B> static B make(EngineObjects& o, const kern::Touch& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Vector>(o, x.start), ev::made<ev::Vector>(o, x.position), ev::made<ev::Vector>(o, x.previous)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Vector>::pass(o, x.start); ev::Direct<ev::Vector>::pass(o, x.position); ev::Direct<ev::Vector>::pass(o, x.previous); }
+  template <class B> static void from(EngineObjects& o, const B& b, kern::Touch& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Vector>::from(o, f1, x.start); ev::Direct<ev::Vector>::from(o, f2, x.position); ev::Direct<ev::Vector>::from(o, f3, x.previous); ev::Direct<ev::Bool>::from(o, f4, x.began); }
+  template <class B> static B make(EngineObjects& o, const kern::Touch& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Vector>(o, x.start), ev::made<ev::Vector>(o, x.position), ev::made<ev::Vector>(o, x.previous), ev::made<ev::Bool>(o, x.began)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Vector>::pass(o, x.start); ev::Direct<ev::Vector>::pass(o, x.position); ev::Direct<ev::Vector>::pass(o, x.previous); ev::Direct<ev::Bool>::pass(o, x.began); }
   template <class D, class C, class B> struct Fields {
     ev::Field<D, ev::Int, C, B, decltype(kern::Touch::id), decltype(B::id), &kern::Touch::id, &B::id> id;
     ev::Field<D, ev::Vector, C, B, decltype(kern::Touch::start), decltype(B::start), &kern::Touch::start, &B::start> start;
     ev::Field<D, ev::Vector, C, B, decltype(kern::Touch::position), decltype(B::position), &kern::Touch::position, &B::position> position;
     ev::Field<D, ev::Vector, C, B, decltype(kern::Touch::previous), decltype(B::previous), &kern::Touch::previous, &B::previous> previous;
-    explicit Fields(D* kern_d) : id(kern_d), start(kern_d), position(kern_d), previous(kern_d) { (void)kern_d; }
+    ev::Field<D, ev::Bool, C, B, decltype(kern::Touch::began), decltype(B::began), &kern::Touch::began, &B::began> began;
+    explicit Fields(D* kern_d) : id(kern_d), start(kern_d), position(kern_d), previous(kern_d), began(kern_d) { (void)kern_d; }
   };
 };
 struct S_Vec4 {
@@ -1999,6 +2019,58 @@ template <> struct InterfaceOf<kern::App> {
   template <class B> using adapter = ClassImplements_App<B>;
 };
 
+// kern::StorageHost that a Blueprint's class is (kern::Implements<kern::StorageHost>: kern::logic::implementation)
+template <class B> class ClassImplements_StorageHost final : public kern::StorageHost {
+ public:
+  explicit ClassImplements_StorageHost(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_read = requires { requires std::is_same_v<typename MemberOf<decltype(&X::read)>::type, X>; };
+  template <class X> static constexpr bool kern_has_write = requires { requires std::is_same_v<typename MemberOf<decltype(&X::write)>::type, X>; };
+  template <class X> static constexpr bool kern_has_remove = requires { requires std::is_same_v<typename MemberOf<decltype(&X::remove)>::type, X>; };
+  decltype(std::declval<kern::StorageHost&>().read(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(), std::declval<bool&>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>())) read(std::basic_string_view<char, std::char_traits<char> > kern_p0, std::basic_string<char, std::char_traits<char>, std::allocator<char> >& kern_p1, bool& kern_p2, std::basic_string<char, std::char_traits<char>, std::allocator<char> >& kern_p3) override {
+    static_assert(kern_has_read<B>, "a Blueprint that implements StorageHost has its function read");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_g0, kern_g1, kern_g2, kern_g3] = b_.read(::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string_view<char, std::char_traits<char> > const&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(kern_o, kern_p1), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Bool, bool&>(kern_o, kern_p2), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(kern_o, kern_p3));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_g1, kern_p1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_g2, kern_p2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_g3, kern_p3);
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::StorageHost&>().read(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(), std::declval<bool&>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_g0, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::StorageHost&>().write(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>())) write(std::basic_string_view<char, std::char_traits<char> > kern_p0, std::basic_string_view<char, std::char_traits<char> > kern_p1, std::basic_string<char, std::char_traits<char>, std::allocator<char> >& kern_p2) override {
+    static_assert(kern_has_write<B>, "a Blueprint that implements StorageHost has its function write");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_g0, kern_g1] = b_.write(::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string_view<char, std::char_traits<char> > const&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string_view<char, std::char_traits<char> > const&>(kern_o, kern_p1), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(kern_o, kern_p2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_g1, kern_p2);
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::StorageHost&>().write(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_g0, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::StorageHost&>().remove(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>())) remove(std::basic_string_view<char, std::char_traits<char> > kern_p0, std::basic_string<char, std::char_traits<char>, std::allocator<char> >& kern_p1) override {
+    static_assert(kern_has_remove<B>, "a Blueprint that implements StorageHost has its function remove");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_g0, kern_g1] = b_.remove(::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string_view<char, std::char_traits<char> > const&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Text, std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(kern_o, kern_p1));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_g1, kern_p1);
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::StorageHost&>().remove(std::declval<std::basic_string_view<char, std::char_traits<char> >>(), std::declval<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_g0, kern_r);
+      return kern_r;
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<kern::StorageHost> {
+  template <class B> using adapter = ClassImplements_StorageHost<B>;
+};
+
 // kern::game::FixedStep that a Blueprint's class is (kern::Implements<kern::game::FixedStep>: kern::logic::implementation)
 template <class B> class ClassImplements_game_FixedStep final : public kern::game::FixedStep {
  public:
@@ -2361,6 +2433,19 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Bool>(this->kern_engine("engine.input.focused", {to_value(input)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
+  /// The gamepad (the first connected one, standard mapping) and the buttons pressed down this frame (bits).
+  using kern_given_engine_input_gamepad = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Gamepad>, decltype(std::declval<kern::Input&>().gamepad())>;
+  kern_given_engine_input_gamepad engine_input_gamepad(::kern::logic::Object<::kern::Input> input) const {
+    using kern_G = kern_given_engine_input_gamepad;
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, input.ref, "input");
+      if (!kern_self) { this->kern_engine_failed("engine.input.gamepad"); return kern_G(*kern_o); }
+      decltype(auto) kern_r = kern_self->gamepad();
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
+    }
+    return kern_G(this->kern_engine("engine.input.gamepad", {to_value(input)}, {PinType::structure})[0]);
+  }
   /// ---- platform side ----
   template <class T1> void engine_input_key(::kern::logic::Object<::kern::Input> input, const T1& k, Bool down) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -2443,6 +2528,17 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.input.set_focus", {to_value(input), to_value(focused)}, {});
   }
+  template <class T1> void engine_input_set_gamepad(::kern::logic::Object<::kern::Input> input, const T1& pad) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, input.ref, "input");
+      if (!kern_self) { this->kern_engine_failed("engine.input.set_gamepad"); return; }
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Gamepad>, std::remove_cvref_t<kern::Gamepad const&>>(*kern_o, ::kern::logic::engine_values::input_value(pad));
+      kern_self->set_gamepad(kern_a0);
+      return;
+    }
+    this->kern_engine("engine.input.set_gamepad", {to_value(input), to_value(::kern::logic::engine_values::input_value(pad))}, {});
+  }
   /// clears per-frame edges and deltas
   void engine_input_end_frame(::kern::logic::Object<::kern::Input> input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -2498,7 +2594,378 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<::kern::logic::Object<::kern::Input>>(this->kern_engine("engine.engine.input_2", {to_value(engine)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::Input>>()));
   }
-  /// Text shown by the host page in its status overlay (empty hides it).
+  /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
+  void engine_engine_mixer(::kern::logic::Object<::kern::Engine> engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.mixer"); return; }
+      decltype(auto) kern_r = kern_self->mixer();
+      (void)::kern::logic::engine_values::handle_of<kern::audio::Mixer>(*kern_o, std::forward<decltype(kern_r)>(kern_r));
+      return;
+    }
+    this->kern_engine("engine.engine.mixer", {to_value(engine)}, {PinType::object});
+  }
+  template <class KernNode> void engine_engine_mixer(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.mixer"); return; }
+      decltype(auto) kern_r = kern_self->mixer();
+      kern_n.result = ::kern::logic::engine_values::object_as<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::audio::Mixer>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.mixer", {to_value(engine)}, {PinType::object});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The project's input actions (kern/docs/app.md 4.): `action` held, `action_pressed` pressed down this frame (a key, a pad button, a mouse button or a finger of its touch zone), `axis` -1..1 (keys -1/+1, the pad's stick past its deadzone, the touch stick - the largest wins). A name the project has none of: false / 0, last_error names it and the names there are, the log says it once a name.
+  Bool engine_engine_action(::kern::logic::Object<::kern::Engine> engine, const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.action"); return Bool{}; }
+      const ::kern::logic::engine_values::Chars kern_a0(name);
+      decltype(auto) kern_r = kern_self->action(kern_a0.c_str());
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
+    }
+    return from_value<Bool>(this->kern_engine("engine.engine.action", {to_value(engine), to_value(name)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+  }
+  Bool engine_engine_action_pressed(::kern::logic::Object<::kern::Engine> engine, const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.action_pressed"); return Bool{}; }
+      const ::kern::logic::engine_values::Chars kern_a0(name);
+      decltype(auto) kern_r = kern_self->action_pressed(kern_a0.c_str());
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
+    }
+    return from_value<Bool>(this->kern_engine("engine.engine.action_pressed", {to_value(engine), to_value(name)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+  }
+  Float engine_engine_axis(::kern::logic::Object<::kern::Engine> engine, const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.axis"); return Float{}; }
+      const ::kern::logic::engine_values::Chars kern_a0(name);
+      decltype(auto) kern_r = kern_self->axis(kern_a0.c_str());
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
+    }
+    return from_value<Float>(this->kern_engine("engine.engine.axis", {to_value(engine), to_value(name)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+  }
+  /// Saving and loading (kern/docs/app.md 5.): named slots of named values (a slot and a key: 1..64 of A-Z a-z 0-9 _ - .). A save writes the slot to the host at once; false: last_error says why (a name, a value that is none, the host, a slot that is no kern-save). A load gives the value, or `fallback` when there is none - or, with the reason in last_error, when it is of another type or the slot cannot be read.
+  void engine_engine_save_int(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Int64 value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.save_int"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::i64>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_int(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.save_int", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_save_int(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Int64 value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.save_int"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::i64>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_int(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.save_int", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_save_float(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Float value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.save_float"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_float(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.save_float", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_save_float(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Float value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.save_float"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_float(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.save_float", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_save_bool(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Bool value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.save_bool"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_bool(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.save_bool", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_save_bool(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Bool value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.save_bool"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, value, kern_a2);
+      decltype(auto) kern_r = kern_self->save_bool(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.save_bool", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_save_text(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, const Text& value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.save_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      const ::kern::logic::engine_values::Chars kern_a2(value);
+      decltype(auto) kern_r = kern_self->save_text(kern_a0.c_str(), kern_a1.c_str(), kern_a2.c_str());
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.save_text", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_save_text(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, const Text& value) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.save_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      const ::kern::logic::engine_values::Chars kern_a2(value);
+      decltype(auto) kern_r = kern_self->save_text(kern_a0.c_str(), kern_a1.c_str(), kern_a2.c_str());
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.save_text", {to_value(engine), to_value(slot), to_value(key), to_value(value)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_load_int(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Int64 fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.load_int"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::i64>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_int(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.load_int", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::int64});
+  }
+  template <class KernNode> void engine_engine_load_int(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Int64 fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.load_int"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::i64>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_int(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.load_int", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::int64});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_load_float(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Float fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.load_float"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_float(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.load_float", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::number});
+  }
+  template <class KernNode> void engine_engine_load_float(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Float fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.load_float"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_float(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.load_float", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::number});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  void engine_engine_load_bool(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Bool fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.load_bool"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_bool(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.load_bool", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_load_bool(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, Bool fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.load_bool"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, fallback, kern_a2);
+      decltype(auto) kern_r = kern_self->load_bool(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.load_bool", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// (the text lives until the next load_text)
+  void engine_engine_load_text(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, const Text& fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.load_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      const ::kern::logic::engine_values::Chars kern_a2(fallback);
+      decltype(auto) kern_r = kern_self->load_text(kern_a0.c_str(), kern_a1.c_str(), kern_a2.c_str());
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.load_text", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::text});
+  }
+  template <class KernNode> void engine_engine_load_text(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key, const Text& fallback) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.load_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      const ::kern::logic::engine_values::Chars kern_a2(fallback);
+      decltype(auto) kern_r = kern_self->load_text(kern_a0.c_str(), kern_a1.c_str(), kern_a2.c_str());
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.load_text", {to_value(engine), to_value(slot), to_value(key), to_value(fallback)}, {PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// Whether the slot holds a value of that key.
+  void engine_engine_saved(::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.saved"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      decltype(auto) kern_r = kern_self->saved(kern_a0.c_str(), kern_a1.c_str());
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.saved", {to_value(engine), to_value(slot), to_value(key)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_saved(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot, const Text& key) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.saved"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      const ::kern::logic::engine_values::Chars kern_a1(key);
+      decltype(auto) kern_r = kern_self->saved(kern_a0.c_str(), kern_a1.c_str());
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.saved", {to_value(engine), to_value(slot), to_value(key)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// Removes the whole slot from the host.
+  void engine_engine_erase_saved(::kern::logic::Object<::kern::Engine> engine, const Text& slot) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.erase_saved"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      decltype(auto) kern_r = kern_self->erase_saved(kern_a0.c_str());
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.erase_saved", {to_value(engine), to_value(slot)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_erase_saved(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& slot) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.erase_saved"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(slot);
+      decltype(auto) kern_r = kern_self->erase_saved(kern_a0.c_str());
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.erase_saved", {to_value(engine), to_value(slot)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The host of the slots (default: the platform's, kern/app/storage.h - natively the folder of the launch parameter saves=<folder>, else kern-saves). The slots read so far are read again from it.
+  void engine_engine_set_storage(::kern::logic::Object<::kern::Engine> engine, ::kern::logic::Object<::kern::StorageHost> host) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.set_storage"); return; }
+      kern::StorageHost* const kern_a0 = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, host.ref, "host");
+      if (!kern_a0) { this->kern_engine_failed("engine.engine.set_storage"); return; }
+      kern_self->set_storage(*kern_a0);
+      return;
+    }
+    this->kern_engine("engine.engine.set_storage", {to_value(engine), to_value(host)}, {});
+  }
+  /// The status line (kern/docs/app.md 6.): a text widget "status" at the top left that stays until it changes (empty: gone) - the widgets' one way for a lasting line (loading, an error before the first frame).
   void engine_engine_set_status(::kern::logic::Object<::kern::Engine> engine, const Text& text) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -2509,6 +2976,162 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.engine.set_status", {to_value(engine), to_value(text)}, {});
+  }
+  /// Widgets, immediate mode (kern/docs/app.md 6.): named in every frame they are seen; x, y 0..1 in the view (0,0 top left), the widget hung by the same point of itself. An id: 1..64 characters, once a frame; a widget that is none (an id, a place not finite) is not shown and last_error says why.
+  void engine_engine_ui_text(::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& text, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_text"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(text);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      kern_self->ui_text(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_text", {to_value(engine), to_value(id), to_value(text), to_value(x), to_value(y)}, {});
+  }
+  /// A bar: `value` 0..1, `width` a share of the view's width.
+  void engine_engine_ui_bar(::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& label, Float value, Float x, Float y, Float width) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_bar"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, value, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a3);
+      auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a4);
+      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, width, kern_a5);
+      kern_self->ui_bar(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_bar", {to_value(engine), to_value(id), to_value(label), to_value(value), to_value(x), to_value(y), to_value(width)}, {});
+  }
+  /// A button: true in the frame after it was clicked or tapped.
+  void engine_engine_ui_button(::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& label, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_button"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_button(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.ui_button", {to_value(engine), to_value(id), to_value(label), to_value(x), to_value(y)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_engine_ui_button(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& label, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.ui_button"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(label);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_button(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.ui_button", {to_value(engine), to_value(id), to_value(label), to_value(x), to_value(y)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// A menu: `items` one a line ('\n'); the index chosen in the frame after the choice, else -1.
+  void engine_engine_ui_menu(::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& items, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_menu"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(items);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_menu(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.engine.ui_menu", {to_value(engine), to_value(id), to_value(items), to_value(x), to_value(y)}, {PinType::integer});
+  }
+  template <class KernNode> void engine_engine_ui_menu(KernNode& kern_n, ::kern::logic::Object<::kern::Engine> engine, const Text& id, const Text& items, Float x, Float y) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.engine.ui_menu"); return; }
+      const ::kern::logic::engine_values::Chars kern_a0(id);
+      const ::kern::logic::engine_values::Chars kern_a1(items);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a3);
+      decltype(auto) kern_r = kern_self->ui_menu(kern_a0.c_str(), kern_a1.c_str(), std::move(kern_a2), std::move(kern_a3));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.engine.ui_menu", {to_value(engine), to_value(id), to_value(items), to_value(x), to_value(y)}, {PinType::integer});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The widgets as the page got them last (JSON) - natively, what a test reads.
+  Text engine_engine_ui_json(::kern::logic::Object<::kern::Engine> engine) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_json"); return Text{}; }
+      decltype(auto) kern_r = kern_self->ui_json();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.engine.ui_json", {to_value(engine)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  /// ---- platform side (the app runtime) ---- An event of the page for the next frame: a button (index 0) or a menu's entry.
+  void engine_engine_ui_event(::kern::logic::Object<::kern::Engine> engine, const Text& id, Int index) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_event"); return; }
+      const std::string_view kern_a0 = id.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index, kern_a1);
+      kern_self->ui_event(kern_a0, std::move(kern_a1));
+      return;
+    }
+    this->kern_engine("engine.engine.ui_event", {to_value(engine), to_value(id), to_value(index)}, {});
+  }
+  void engine_engine_ui_begin(::kern::logic::Object<::kern::Engine> engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_begin"); return; }
+      kern_self->ui_begin();
+      return;
+    }
+    this->kern_engine("engine.engine.ui_begin", {to_value(engine)}, {});
+  }
+  /// The frame's widgets to the page, when they changed.
+  void engine_engine_ui_end(::kern::logic::Object<::kern::Engine> engine) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, engine.ref, "engine");
+      if (!kern_self) { this->kern_engine_failed("engine.engine.ui_end"); return; }
+      kern_self->ui_end();
+      return;
+    }
+    this->kern_engine("engine.engine.ui_end", {to_value(engine)}, {});
   }
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
   void engine_engine_request_pointer_lock(::kern::logic::Object<::kern::Engine> engine, Bool lock) {
@@ -3133,6 +3756,142 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.app.stop", {to_value(app), to_value(engine)}, {});
+  }
+  /// The slot's text. False with `why` when the host cannot read; true with `found` false when there is none.
+  void engine_storage_host_read(::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& text, Bool found, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { this->kern_engine_failed("engine.storage_host.read"); return; }
+      const std::string_view kern_a0 = slot.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, text, kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, found, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a3);
+      decltype(auto) kern_r = kern_self->read(kern_a0, kern_a1, kern_a2, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a3);
+      return;
+    }
+    this->kern_engine("engine.storage_host.read", {to_value(storage_host), to_value(slot), to_value(text), to_value(found), to_value(why)}, {PinType::boolean, PinType::text, PinType::boolean, PinType::text});
+  }
+  template <class KernNode> void engine_storage_host_read(KernNode& kern_n, ::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& text, Bool found, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.text); ::kern::logic::engine_values::none(kern_n.found); ::kern::logic::engine_values::none(kern_n.why); this->kern_engine_failed("engine.storage_host.read"); return; }
+      const std::string_view kern_a0 = slot.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, text, kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, found, kern_a2);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a3);
+      decltype(auto) kern_r = kern_self->read(kern_a0, kern_a1, kern_a2, kern_a3);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.text = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.text)>>(*kern_o, kern_a1);
+      kern_n.found = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.found)>>(*kern_o, kern_a2);
+      kern_n.why = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.why)>>(*kern_o, kern_a3);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.storage_host.read", {to_value(storage_host), to_value(slot), to_value(text), to_value(found), to_value(why)}, {PinType::boolean, PinType::text, PinType::boolean, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.text = from_value<std::remove_cvref_t<decltype(kern_n.text)>>(kern_out[1]);
+    kern_n.found = from_value<std::remove_cvref_t<decltype(kern_n.found)>>(kern_out[2]);
+    kern_n.why = from_value<std::remove_cvref_t<decltype(kern_n.why)>>(kern_out[3]);
+  }
+  /// Writes the slot's text (replacing it). False with `why` (full, not allowed, no such folder ...).
+  void engine_storage_host_write(::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& text, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { this->kern_engine_failed("engine.storage_host.write"); return; }
+      const std::string_view kern_a0 = slot.view();
+      const std::string_view kern_a1 = text.view();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a2);
+      decltype(auto) kern_r = kern_self->write(kern_a0, kern_a1, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.storage_host.write", {to_value(storage_host), to_value(slot), to_value(text), to_value(why)}, {PinType::boolean, PinType::text});
+  }
+  template <class KernNode> void engine_storage_host_write(KernNode& kern_n, ::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& text, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.why); this->kern_engine_failed("engine.storage_host.write"); return; }
+      const std::string_view kern_a0 = slot.view();
+      const std::string_view kern_a1 = text.view();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a2);
+      decltype(auto) kern_r = kern_self->write(kern_a0, kern_a1, kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.why = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.why)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.storage_host.write", {to_value(storage_host), to_value(slot), to_value(text), to_value(why)}, {PinType::boolean, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.why = from_value<std::remove_cvref_t<decltype(kern_n.why)>>(kern_out[1]);
+  }
+  /// Removes the slot (none: true).
+  void engine_storage_host_remove(::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { this->kern_engine_failed("engine.storage_host.remove"); return; }
+      const std::string_view kern_a0 = slot.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a1);
+      decltype(auto) kern_r = kern_self->remove(kern_a0, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a1);
+      return;
+    }
+    this->kern_engine("engine.storage_host.remove", {to_value(storage_host), to_value(slot), to_value(why)}, {PinType::boolean, PinType::text});
+  }
+  template <class KernNode> void engine_storage_host_remove(KernNode& kern_n, ::kern::logic::Object<::kern::StorageHost> storage_host, const Text& slot, const Text& why) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::StorageHost>(*kern_o, storage_host.ref, "storage_host");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.why); this->kern_engine_failed("engine.storage_host.remove"); return; }
+      const std::string_view kern_a0 = slot.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, why, kern_a1);
+      decltype(auto) kern_r = kern_self->remove(kern_a0, kern_a1);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.why = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.why)>>(*kern_o, kern_a1);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.storage_host.remove", {to_value(storage_host), to_value(slot), to_value(why)}, {PinType::boolean, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.why = from_value<std::remove_cvref_t<decltype(kern_n.why)>>(kern_out[1]);
+  }
+  /// The platform's host: in WebAssembly the page's (kern_env storage_*: localStorage), natively files `<dir>/<slot>.kern-save` (the folder is made when the first slot is written).
+  ::kern::logic::Object<::kern::StorageHost> engine_platform_storage(const Text& dir) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, dir, kern_a0);
+      decltype(auto) kern_r = kern::platform_storage(std::move(kern_a0));
+      return ::kern::logic::engine_values::object_as<::kern::logic::Object<::kern::StorageHost>>(*kern_o, ::kern::logic::engine_values::handle_of<kern::StorageHost>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+    }
+    return from_value<::kern::logic::Object<::kern::StorageHost>>(this->kern_engine("engine.platform_storage", {to_value(dir)}, {PinType::object})[0].converted(pin_type_of<::kern::logic::Object<::kern::StorageHost>>()));
+  }
+  /// A slot's and a value's name: 1..64 of A-Z a-z 0-9 _ - .
+  Bool engine_storage_name_ok(const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = name.view();
+      decltype(auto) kern_r = kern::storage_name_ok(kern_a0);
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
+    }
+    return from_value<Bool>(this->kern_engine("engine.storage_name_ok", {to_value(name)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   template <class T1> Text engine_audio_bus_name(const T1& b) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10632,6 +11391,45 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.build_standard_shader", {to_value(::kern::logic::engine_values::input_value(extensions))}, {PinType::structure})[0]);
+  }
+  /// The names in the project file (keys: "a".."z", "digit0".."digit9", "left", "right", "up", "down", "space", "enter", "escape", "tab", "backspace", "shiftLeft", "shiftRight", "controlLeft", "controlRight", "altLeft", "altRight"; pad buttons: "a", "b", "x", "y", "lb", "rb", "lt", "rt", "back", "start", "ls", "rs", "up", "down", "left", "right", "home"; pad axes: "leftX", "leftY", "rightX", "rightY", "triggers"; touch: "left", "right", "anywhere", "stickX", "stickY").
+  template <class T1> Text engine_key_name(const T1& k) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
+      decltype(auto) kern_r = kern::key_name(std::move(kern_a0));
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
+    }
+    return from_value<Text>(this->kern_engine("engine.key_name", {to_value(::kern::logic::engine_values::input_value(k))}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  template <class T1> void engine_parse_key(const Text& name, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = name.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      decltype(auto) kern_r = kern::parse_key(kern_a0, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::pass(*kern_o, kern_a1);
+      return;
+    }
+    this->kern_engine("engine.parse_key", {to_value(name), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
+  }
+  template <class KernNode, class T1> void engine_parse_key(KernNode& kern_n, const Text& name, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = name.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      decltype(auto) kern_r = kern::parse_key(kern_a0, kern_a1);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.parse_key", {to_value(name), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
   template <class T1> Text engine_net_client_state_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

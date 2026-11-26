@@ -18,7 +18,7 @@ cp -r "$here/web/." "$out/"
 rm -f "$out/index.html"
 [ -f "$out/spawncity.wasm" ] || { echo "spawncity.wasm missing (run build.sh first)" >&2; exit 1; }
 # Kern's web modules next to it (the page's modules import them from the repository layout)
-cp "$kern/web/app.mjs" "$kern/web/kern.mjs" "$kern/web/jobs.mjs" "$out/kern/web/"
+cp "$kern/web/app.mjs" "$kern/web/kern.mjs" "$kern/web/audio.mjs" "$kern/web/jobs.mjs" "$out/kern/web/"
 cp "$kern/web/studio/game.mjs" "$out/kern/web/studio/"
 sed -i 's#"\.\./\.\./\.\./web/#"./kern/web/#g' "$out"/*.mjs
 grep -l '\.\./\.\./\.\./' "$out"/*.mjs && { echo "a repository path is left in the modules above" >&2; exit 1; }

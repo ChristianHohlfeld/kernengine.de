@@ -101,7 +101,7 @@ std::string engine_shown(const Value& v) {
     case PinType::number: std::snprintf(b, sizeof b, "%.17g", v.n); return b;
     case PinType::vector: std::snprintf(b, sizeof b, "(%.9g, %.9g, %.9g)", static_cast<f64>(v.v.x), static_cast<f64>(v.v.y), static_cast<f64>(v.v.z)); return b;
     case PinType::text: return "\"" + v.s + "\"";
-    case PinType::actor: std::snprintf(b, sizeof b, "actor %u of world %u", v.a, v.world); return b;
+    case PinType::actor: std::snprintf(b, sizeof b, "actor %u", v.a); return b;
     case PinType::object: std::snprintf(b, sizeof b, "object %lld of world %u", static_cast<long long>(v.i), v.world); return b;
     case PinType::int64: std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;  // (its 64 bits)
     case PinType::map:

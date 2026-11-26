@@ -65,14 +65,33 @@ struct Reader {
   std::string* error;
   const char* where = nullptr;   // what it reads ("world", "controller" ...): the start of every message it gives
   bool ok = true;
+  std::vector<std::string_view> keys = {};   // every key it read or knows, in that order (done: no other may stand there)
 
   bool fail(const std::string& what) {
     if (ok && error) *error = where ? std::string(where) + "." + what : what;
     ok = false;
     return false;
   }
+  /// The member `key` (null: none) - a key of this object.
+  const json::Value* find(const char* key) {
+    known(key);
+    return v.find(key);
+  }
+  /// A key of this object that it reads by other means (a nested object, a list).
+  void known(std::string_view key) {
+    for (std::string_view k : keys)
+      if (k == key) return;
+    keys.push_back(key);
+  }
+  /// The end of the object: false when it failed, or a member is none of its keys (kern/docs/app.md 2.: the message
+  /// names the key and the keys there are).
+  bool done() {
+    if (!ok) return false;
+    if (const std::string e = json::unknown_key(v, keys); !e.empty()) return fail(e);
+    return true;
+  }
   void number(const char* key, f32& out, f64 lo = -1e9, f64 hi = 1e9) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_number() || !std::isfinite(x->as_number())) { fail(std::string(key) + " must be a number"); return; }
     out = static_cast<f32>(std::clamp(x->as_number(), lo, hi));
@@ -83,25 +102,25 @@ struct Reader {
     out = static_cast<i32>(std::lround(f));
   }
   void uinteger(const char* key, u32& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_number() || x->as_number() < 0 || x->as_number() > 4294967295.0) { fail(std::string(key) + " must be an unsigned integer"); return; }
     out = static_cast<u32>(x->as_number());
   }
   void boolean(const char* key, bool& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_bool()) { fail(std::string(key) + " must be true or false"); return; }
     out = x->as_bool();
   }
   void string(const char* key, std::string& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_string()) { fail(std::string(key) + " must be a string"); return; }
     out = x->as_string();
   }
   void vector(const char* key, Vec3& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_array() || x->size() != 3) { fail(std::string(key) + " must be [x, y, z]"); return; }
     for (int i = 0; i < 3; ++i) {
@@ -112,7 +131,7 @@ struct Reader {
   }
   template <std::size_t N>
   void numbers(const char* key, f32 (&out)[N], f64 lo, f64 hi) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_array() || x->size() != N) { fail(std::string(key) + " must be an array of " + std::to_string(N) + " numbers"); return; }
     for (std::size_t i = 0; i < N; ++i) {
@@ -122,13 +141,13 @@ struct Reader {
     }
   }
   void color(const char* key, Vec3& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_string() || !parse_hex_color(x->as_string(), out)) fail(std::string(key) + " must be a #rrggbb colour");
   }
   template <typename E, std::size_t N>
   void enumeration(const char* key, const char* const (&names)[N], E& out) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_string() || !parse_enum(x->as_string(), names, out)) {
       // (which value, and the ones there are)
@@ -138,7 +157,7 @@ struct Reader {
     }
   }
   void flags(const char* key, bool (&out)[3]) {
-    const json::Value* x = v.find(key);
+    const json::Value* x = find(key);
     if (!x) return;
     if (!x->is_array() || x->size() != 3) { fail(std::string(key) + " must be [x, y, z] booleans"); return; }
     for (int i = 0; i < 3; ++i) out[i] = (*x)[static_cast<std::size_t>(i)].truthy();
@@ -183,7 +202,7 @@ bool read_material(const json::Value& v, MaterialDesc& m, std::string* error) {
   r.boolean("doubleSided", m.double_sided);
   r.string("texture", m.texture);
   r.number("tiling", m.tiling, 0.001, 1000);
-  return r.ok;
+  return r.done();
 }
 
 }  // namespace
@@ -678,20 +697,22 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
   r.boolean("hidden", a.hidden);
   r.boolean("locked", a.locked);
   r.boolean("template", a.is_template);
-  if (const json::Value* t = v.find("transform")) {
+  if (const json::Value* t = r.find("transform")) {
     Reader tr{*t, error, "transform"};
     tr.vector("position", a.transform.position);
     tr.vector("rotation", a.transform.rotation);
     tr.vector("scale", a.transform.scale);
-    if (!tr.ok) return false;
+    if (!tr.done()) return false;
   }
-  if (const json::Value* tags = v.find("tags"); tags && tags->is_array())
+  if (const json::Value* tags = r.find("tags"); tags && tags->is_array())
     for (const json::Value& t : tags->items())
       if (t.is_string()) a.tags.push_back(t.as_string());
-  const json::Value* comps = v.find("components");
+  const json::Value* comps = r.find("components");
   if (comps && comps->is_object()) {
     const json::Value& c = *comps;
-    if (const json::Value* x = c.find("mesh")) {
+    // (the components there are: a key under "components" that is none of them is an error, kern/docs/app.md 2.)
+    Reader cr{c, error, "components"};
+    if (const json::Value* x = cr.find("mesh")) {
       MeshComponent m;
       Reader mr{*x, error, "mesh"};
       mr.enumeration("shape", kShapeNames, m.shape);
@@ -699,25 +720,26 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       mr.number("radius", m.radius, 0.001, 1e5);
       mr.number("height", m.height, 0.001, 1e5);
       mr.integer("segments", m.segments, 3, 128);
-      if (x->find("asset")) mr.string("asset", m.asset);
+      mr.string("asset", m.asset);
+      mr.known("material");
       mr.boolean("collision", m.collision);
       mr.number("friction", m.friction, 0, 10);
       mr.number("restitution", m.restitution, 0, 1);
       mr.number("rollingResistance", m.rolling_resistance, 0, 10);
       mr.string("surface", m.surface);
-      if (!mr.ok || !read_material((*x)["material"], m.material, error)) return false;
+      if (!mr.done() || !read_material((*x)["material"], m.material, error)) return false;
       a.mesh = m;
     }
-    if (const json::Value* x = c.find("light")) {
+    if (const json::Value* x = cr.find("light")) {
       LightComponent l;
       Reader lr{*x, error, "light"};
       lr.color("color", l.color);
       lr.number("intensity", l.intensity, 0, 1e5);
       lr.number("range", l.range, 0.1, 1e4);
-      if (!lr.ok) return false;
+      if (!lr.done()) return false;
       a.light = l;
     }
-    if (const json::Value* x = c.find("body")) {
+    if (const json::Value* x = cr.find("body")) {
       BodyComponent b;
       Reader br{*x, error, "body"};
       br.enumeration("motion", kMotionNames, b.motion);
@@ -736,10 +758,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       br.number("impactThreshold", b.impact_threshold, 0, 1e4);
       br.vector("centerOfMass", b.center_of_mass);
       br.numbers("inertia", b.inertia, -1e9, 1e9);
-      if (!br.ok) return false;
+      if (!br.done()) return false;
       a.body = b;
     }
-    if (const json::Value* list = c.find("colliders"); list && list->is_array())
+    if (const json::Value* list = cr.find("colliders"); list && list->is_array())
       for (const json::Value& x : list->items()) {
         ColliderComponent k;
         Reader kr{x, error, "colliders"};
@@ -749,7 +771,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
         kr.vector("size", k.size);
         kr.number("radius", k.radius, 0.001, 1e5);
         kr.number("length", k.length, 0, 1e5);
-        if (const json::Value* pts = x.find("points"); pts && pts->is_array())
+        if (const json::Value* pts = kr.find("points"); pts && pts->is_array())
           for (const json::Value& q : pts->items()) {
             Vec3 p;
             if (q.is_array() && q.size() == 3) { p = {static_cast<f32>(q[0].as_number()), static_cast<f32>(q[1].as_number()), static_cast<f32>(q[2].as_number())}; k.points.push_back(p); }
@@ -764,10 +786,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
         kr.uinteger("mask", k.mask);
         kr.integer("group", k.group, -32768, 32767);
         kr.string("impactSound", k.impact_sound);
-        if (!kr.ok) return false;
+        if (!kr.done()) return false;
         a.colliders.push_back(k);
       }
-    if (const json::Value* list = c.find("joints"); list && list->is_array())
+    if (const json::Value* list = cr.find("joints"); list && list->is_array())
       for (const json::Value& x : list->items()) {
         JointComponent j;
         Reader jr{x, error, "joints"};
@@ -795,10 +817,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
         jr.number("servoDamping", j.servo_damping, 0, 1e9);
         jr.number("servoFriction", j.servo_friction, 0, 1e9);
         jr.number("reference", j.reference, -360, 360);
-        if (!jr.ok) return false;
+        if (!jr.done()) return false;
         a.joints.push_back(j);
       }
-    if (const json::Value* x = c.find("controller")) {
+    if (const json::Value* x = cr.find("controller")) {
       ControllerComponent k;
       Reader kr{*x, error, "controller"};
       kr.enumeration("mode", kControlNames, k.mode);
@@ -828,10 +850,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       kr.number("eyeHeight", k.eye_height, 0.2, 10);
       kr.number("lookSensitivity", k.look_sensitivity, 0.05, 10);
       kr.boolean("headBob", k.head_bob);
-      if (!kr.ok) return false;
+      if (!kr.done()) return false;
       a.controller = k;
     }
-    if (const json::Value* x = c.find("weapon")) {
+    if (const json::Value* x = cr.find("weapon")) {
       WeaponComponent k;
       Reader wr{*x, error, "weapon"};
       wr.enumeration("kind", kWeaponNames, k.kind);
@@ -851,10 +873,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       wr.number("aimFov", k.aim_fov, 5, 120);
       wr.string("fireSound", k.fire_sound);
       wr.string("reloadSound", k.reload_sound);
-      if (!wr.ok) return false;
+      if (!wr.done()) return false;
       a.weapon = k;
     }
-    if (const json::Value* x = c.find("health")) {
+    if (const json::Value* x = cr.find("health")) {
       HealthComponent k;
       Reader hr{*x, error, "health"};
       hr.number("maxHealth", k.max_health, 1, 1e7);
@@ -868,10 +890,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       hr.string("deathSound", k.death_sound);
       hr.number("explodeRadius", k.explode_radius, 0, 1000);
       hr.number("explodeDamage", k.explode_damage, 0, 1e6);
-      if (!hr.ok) return false;
+      if (!hr.done()) return false;
       a.health = k;
     }
-    if (const json::Value* x = c.find("pickup")) {
+    if (const json::Value* x = cr.find("pickup")) {
       PickupComponent p;
       Reader pr{*x, error, "pickup"};
       pr.number("points", p.points, -1e6, 1e6);
@@ -880,10 +902,10 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       pr.string("sound", p.sound);
       pr.number("heal", p.heal, 0, 1e6);
       pr.integer("ammo", p.ammo, 0, 100000);
-      if (!pr.ok) return false;
+      if (!pr.done()) return false;
       a.pickup = p;
     }
-    if (const json::Value* x = c.find("trigger")) {
+    if (const json::Value* x = cr.find("trigger")) {
       TriggerComponent t;
       Reader tr{*x, error, "trigger"};
       tr.enumeration("action", kTriggerNames, t.action);
@@ -892,27 +914,27 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       tr.string("sound", t.sound);
       tr.number("strength", t.strength, 0, 1e5);
       tr.uinteger("target", t.target);
-      if (!tr.ok) return false;
+      if (!tr.done()) return false;
       a.trigger = t;
     }
-    if (const json::Value* x = c.find("rotator")) {
+    if (const json::Value* x = cr.find("rotator")) {
       RotatorComponent t;
       Reader tr{*x, error, "rotator"};
       tr.vector("rate", t.rate);
-      if (!tr.ok) return false;
+      if (!tr.done()) return false;
       a.rotator = t;
     }
-    if (const json::Value* x = c.find("mover")) {
+    if (const json::Value* x = cr.find("mover")) {
       MoverComponent m;
       Reader mr{*x, error, "mover"};
       mr.vector("offset", m.offset);
       mr.number("period", m.period, 0.05, 1e5);
       mr.number("phase", m.phase, 0, 1);
       mr.enumeration("mode", kMoverNames, m.mode);
-      if (!mr.ok) return false;
+      if (!mr.done()) return false;
       a.mover = m;
     }
-    if (const json::Value* x = c.find("city")) {
+    if (const json::Value* x = cr.find("city")) {
       CityComponent k;
       Reader kr{*x, error, "city"};
       kr.uinteger("seed", k.seed);
@@ -923,11 +945,11 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       kr.boolean("trees", k.trees);
       kr.integer("traffic", k.traffic, 0, 200);
       kr.boolean("nightWindows", k.night_windows);
-      if (!kr.ok) return false;
+      if (!kr.done()) return false;
       if (k.street > k.pitch * 0.5f) k.street = k.pitch * 0.5f;
       a.city = k;
     }
-    if (const json::Value* x = c.find("audio")) {
+    if (const json::Value* x = cr.find("audio")) {
       AudioComponent k;
       Reader kr{*x, error, "audio"};
       kr.string("sound", k.sound);
@@ -938,16 +960,16 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       kr.boolean("spatial", k.spatial);
       kr.number("minDistance", k.min_distance, 0.01, 1e5);
       kr.number("maxDistance", k.max_distance, 0.02, 1e5);
-      if (const json::Value* ro = x->find("rolloff"); ro && (!ro->is_string() || !audio::parse_rolloff(ro->as_string(), k.rolloff))) kr.fail("rolloff: unknown value");
-      if (const json::Value* bu = x->find("bus"); bu && (!bu->is_string() || !audio::parse_bus(bu->as_string(), k.bus) || k.bus == audio::Bus::master)) kr.fail("bus: unknown value");
+      if (const json::Value* ro = kr.find("rolloff"); ro && (!ro->is_string() || !audio::parse_rolloff(ro->as_string(), k.rolloff))) kr.fail("rolloff: unknown value");
+      if (const json::Value* bu = kr.find("bus"); bu && (!bu->is_string() || !audio::parse_bus(bu->as_string(), k.bus) || k.bus == audio::Bus::master)) kr.fail("bus: unknown value");
       kr.number("doppler", k.doppler, 0, 4);
       kr.number("pitchBySpeed", k.pitch_by_speed, -10, 10);
       kr.number("delay", k.delay, 0, 1e5);
-      if (!kr.ok) return false;
+      if (!kr.done()) return false;
       if (k.max_distance <= k.min_distance) k.max_distance = k.min_distance + 0.01f;
       a.audio = k;
     }
-    if (const json::Value* x = c.find("logic")) {
+    if (const json::Value* x = cr.find("logic")) {
       logic::Graph g;
       std::map<std::string, std::string> marks;
       if (!logic::graph_from_level_json(*x, g, error, &marks)) {
@@ -958,8 +980,9 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
       logic::cpp_names(g);  // (levels from before a Blueprint's names had to be C++ names)
       a.logic = std::move(g);
     }
+    if (!cr.done()) return false;
   }
-  return r.ok;
+  return r.done();
 }
 
 std::vector<std::string> channel_names(const WorldSettings& w) {
@@ -1074,7 +1097,7 @@ bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error)
   r.number("reverb", w.reverb, 0, 1);
   r.number("doppler", w.doppler, 0, 4);
   if (w.time_of_day >= 1) w.time_of_day = 0;
-  return r.ok;
+  return r.done();
 }
 
 json::Value to_json(const Level& level) {
@@ -1210,15 +1233,16 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   // (a level is a world: the project's settings stand in the project file, kern/game/project.h)
   if (doc.has("project")) { if (error) *error = "project: a level holds only its world - the settings belong in the project file (.kproject, kern/game/project.h)"; return false; }
   if (!world_from_json(doc["world"], l.world, error)) return false;
-  if (const json::Value* c = doc.find("camera")) {
+  for (const char* k : {"format", "version", "world", "logic", "actors", "textures", "sounds", "motions"}) r.known(k);
+  if (const json::Value* c = r.find("camera")) {
     Reader cr{*c, error, "camera"};
     cr.vector("position", l.camera.position);
     cr.number("yaw", l.camera.yaw, -1e4, 1e4);
     cr.number("pitch", l.camera.pitch, -90, 90);
-    if (!cr.ok) return false;
+    if (!cr.done()) return false;
   }
   r.uinteger("nextId", l.next_id);
-  if (!r.ok) return false;
+  if (!r.done()) return false;
   if (const json::Value* g = doc.find("logic"); g && !g->is_null()) {
     if (!logic::graph_from_level_json(*g, l.logic, error)) return false;
     if (const std::string e = world_export(l.logic); !e.empty()) { if (error) *error = "logic: " + e; return false; }
@@ -1253,8 +1277,16 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       seen.insert(p->id);
     }
   }
+  // (an entry of a list: its keys too - "textures[2].sorce: unknown key - one of ...")
+  auto entry_keys = [error](const json::Value& v, const char* list, std::size_t i, std::initializer_list<std::string_view> known) {
+    const std::string e = json::unknown_key(v, known);
+    if (!e.empty() && error) *error = std::string(list) + "[" + std::to_string(i) + "]." + e;
+    return e.empty();
+  };
   if (const json::Value* tex = doc.find("textures"); tex && tex->is_array())
-    for (const json::Value& v : tex->items()) {
+    for (std::size_t i = 0; i < tex->size(); ++i) {
+      const json::Value& v = (*tex)[i];
+      if (!entry_keys(v, "textures", i, {"id", "name", "src", "width", "height"})) return false;
       TextureAsset t;
       t.id = v["id"].as_string();
       t.name = v["name"].as_string();
@@ -1265,7 +1297,9 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       l.textures.push_back(std::move(t));
     }
   if (const json::Value* snd = doc.find("sounds"); snd && snd->is_array())
-    for (const json::Value& v : snd->items()) {
+    for (std::size_t i = 0; i < snd->size(); ++i) {
+      const json::Value& v = (*snd)[i];
+      if (!entry_keys(v, "sounds", i, {"id", "name", "duration", "src"})) return false;
       SoundAsset s;
       s.id = v["id"].as_string();
       s.name = v["name"].as_string();
@@ -1275,7 +1309,11 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       l.sounds.push_back(std::move(s));
     }
   if (const json::Value* list = doc.find("motions"); list && list->is_array())
-    for (const json::Value& v : list->items()) {
+    for (std::size_t i = 0; i < list->size(); ++i) {
+      const json::Value& v = (*list)[i];
+      if (!entry_keys(v, "motions", i, {"name", "duration", "keys", "onnx"})) return false;
+      for (std::size_t j = 0; j < v["keys"].size(); ++j)
+        if (!entry_keys(v["keys"][j], ("motions[" + std::to_string(i) + "].keys").c_str(), j, {"time", "joints"})) return false;
       MotionAsset m;
       m.name = v["name"].as_string();
       if (!motion_name_ok(m.name) || l.motion(m.name)) continue;

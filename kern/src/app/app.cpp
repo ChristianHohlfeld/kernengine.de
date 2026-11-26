@@ -1,16 +1,13 @@
-// Application runtime: Input bookkeeping and the C ABI the platform layer
-// (kern/web/app.mjs) drives. The App and the project's settings are what the program's kern_main() handed over with
-// kern::run (kern/docs/project.md 4.).
+// The application framework's own objects: Input bookkeeping and the Engine's host calls (pointer lock,
+// launch parameters). The app runtime - the App's start, frames and stop, and the C ABI the platform layer
+// (kern/web/app.mjs) drives - is kern/src/app/runtime.cpp.
 #include "kern/app/app.h"
-#include "kern/app/run.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
-#include "kern/api/c_api.h"
-#include "kern/app/project.h"
 
 namespace kern {
 
@@ -42,6 +39,7 @@ void Input::touch(i32 id, i32 phase, Vec2 position) {
     if (!slot) return;
     slot->id = id;
     slot->start = slot->position = slot->previous = position;
+    slot->began = true;
   } else if (slot) {
     slot->position = position;
     if (phase == 2) slot->id = -1;
@@ -63,12 +61,112 @@ void Input::set_focus(bool focused) {
   }
 }
 
+void Input::set_gamepad(const Gamepad& pad) {
+  const Gamepad p = pad.connected ? pad : Gamepad{};
+  pad_pressed_ |= p.buttons & ~pad_.buttons;
+  pad_ = p;
+}
+
 void Input::end_frame() {
+  pad_pressed_ = 0;
   for (u8& s : keys_) s &= kDown;
   pressed_buttons_ = 0;
   pointer_delta_ = {};
   wheel_ = 0;
-  for (Touch& t : touches_) t.previous = t.position;
+  for (Touch& t : touches_) { t.previous = t.position; t.began = false; }
+}
+
+// ---- input actions (kern/docs/app.md 4.) ----
+
+namespace {
+bool key_held(const Input& in, const std::vector<Key>& keys) {
+  for (Key k : keys)
+    if (in.down(k)) return true;
+  return false;
+}
+}  // namespace
+
+const ActionBinding* Engine::find_action(const char* name) const {
+  if (const ActionBinding* a = actions_.action(name ? name : "")) return a;
+  std::string names;
+  for (const ActionBinding& a : actions_.actions) names += (names.empty() ? "" : ", ") + a.name;
+  fail("the project has no action \"%s\" (its actions: %s)", name ? name : "", names.empty() ? "none" : names.c_str());
+  for (const std::string& n : unknown_actions_)
+    if (n == (name ? name : "")) return nullptr;
+  unknown_actions_.push_back(name ? name : "");
+  log(LogLevel::error, "%s", last_error());
+  return nullptr;
+}
+
+const AxisBinding* Engine::find_axis(const char* name) const {
+  if (const AxisBinding* a = actions_.axis(name ? name : "")) return a;
+  std::string names;
+  for (const AxisBinding& a : actions_.axes) names += (names.empty() ? "" : ", ") + a.name;
+  fail("the project has no axis \"%s\" (its axes: %s)", name ? name : "", names.empty() ? "none" : names.c_str());
+  for (const std::string& n : unknown_actions_)
+    if (n == (name ? name : "")) return nullptr;
+  unknown_actions_.push_back(name ? name : "");
+  log(LogLevel::error, "%s", last_error());
+  return nullptr;
+}
+
+bool Engine::touch_in(TouchZone zone, bool pressed) const {
+  if (zone == TouchZone::none) return false;
+  const f32 half = static_cast<f32>(width()) * 0.5f;
+  for (u32 i = 0; i < kMaxTouches; ++i) {
+    const Touch& t = input_.touches()[i];
+    if (t.id < 0 || (pressed && !t.began)) continue;
+    if (zone == TouchZone::anywhere || (zone == TouchZone::left) == (t.start.x < half)) return true;
+  }
+  return false;
+}
+
+bool Engine::action(const char* name) const {
+  const ActionBinding* a = find_action(name);
+  if (!a) return false;
+  if (key_held(input_, a->keys)) return true;
+  for (PadButton b : a->pad)
+    if (input_.pad_down(b)) return true;
+  for (u32 b : a->mouse)
+    if (input_.button(b)) return true;
+  return touch_in(a->touch, false);
+}
+
+bool Engine::action_pressed(const char* name) const {
+  const ActionBinding* a = find_action(name);
+  if (!a) return false;
+  for (Key k : a->keys)
+    if (input_.pressed(k)) return true;
+  for (PadButton b : a->pad)
+    if (input_.pad_pressed(b)) return true;
+  for (u32 b : a->mouse)
+    if (input_.button_pressed(b)) return true;
+  return touch_in(a->touch, true);
+}
+
+f32 Engine::axis(const char* name) const {
+  const AxisBinding* a = find_axis(name);
+  if (!a) return 0;
+  f32 best = static_cast<f32>(key_held(input_, a->positive)) - static_cast<f32>(key_held(input_, a->negative));
+  auto take = [&best](f32 v) { if (std::fabs(v) > std::fabs(best)) best = v; };
+  const Gamepad& g = input_.gamepad();
+  if (a->pad != PadAxis::none && g.connected) {
+    const f32 raw = a->pad == PadAxis::left_x ? g.lx : a->pad == PadAxis::left_y ? g.ly : a->pad == PadAxis::right_x ? g.rx : a->pad == PadAxis::right_y ? g.ry : g.rt - g.lt;
+    const f32 m = std::fabs(raw);
+    if (m > a->deadzone) take(std::copysign(std::fmin(1.0f, (m - a->deadzone) / (1.0f - a->deadzone)), raw));
+  }
+  if (a->touch != TouchAxis::none) {
+    // the touch stick: a finger that began on the left half; one radius (an eighth of the shorter side) is 1
+    const f32 radius = static_cast<f32>(max_of(1, min_of(width(), height()))) * kTouchStickShare;
+    for (u32 i = 0; i < kMaxTouches; ++i) {
+      const Touch& t = input_.touches()[i];
+      if (t.id < 0 || t.start.x >= static_cast<f32>(width()) * 0.5f) continue;
+      const f32 d = a->touch == TouchAxis::stick_x ? t.position.x - t.start.x : t.start.y - t.position.y;
+      take(clamp(d / radius, -1.0f, 1.0f));
+      break;
+    }
+  }
+  return clamp(best, -1.0f, 1.0f);
 }
 
 }  // namespace kern
@@ -76,22 +174,13 @@ void Input::end_frame() {
 #if defined(__wasm__)
 #define KERN_ENV(name) __attribute__((import_module("kern_env"), import_name(#name)))
 extern "C" {
-KERN_ENV(status) void kern_env_status(const char* text, kern::u32 length);
 KERN_ENV(pointer_lock) void kern_env_pointer_lock(kern::i32 lock);
 }
 #else
-static void kern_env_status(const char* text, kern::u32 length) { std::printf("[status] %.*s\n", static_cast<int>(length), text); }
 static void kern_env_pointer_lock(kern::i32) {}
 #endif
 
 namespace kern {
-
-void Engine::set_status(const char* text) {
-  static char last[512] = {};
-  if (std::strncmp(last, text, sizeof last - 1) == 0) return;
-  std::snprintf(last, sizeof last, "%s", text);
-  kern_env_status(text, static_cast<u32>(std::strlen(text)));
-}
 
 void Engine::request_pointer_lock(bool lock) { kern_env_pointer_lock(lock ? 1 : 0); }
 
@@ -145,246 +234,3 @@ f64 Engine::arg_number(const char* key, f64 fallback) const {
 
 }  // namespace kern
 
-using namespace kern;
-
-namespace {
-App* g_app = nullptr;
-Engine* g_engine = nullptr;
-f64 g_start_ms = -1, g_last_ms = -1;
-u64 g_frame = 0;
-bool g_running = false;
-}  // namespace
-
-namespace kern {
-/// The renderer the project's settings start: the device profile the launch argument profile=<name> names, else the
-/// project's. A name the project has no profile of: an error in the log with the names it has, and the project's.
-RendererOptions start_renderer(const ProjectSettings& p, const Engine& e) {
-  const std::string want = e.arg("profile", "");
-  if (want.empty()) return p.renderer;
-  if (const DeviceProfile* d = p.profile(want)) return d->renderer;
-  std::string names;
-  for (const DeviceProfile& d : p.profiles) names += (names.empty() ? "" : ", ") + d.name;
-  log(LogLevel::error, "the launch argument profile=%s names no device profile of the project (it has: %s) - the renderer starts with the project's",
-      want.c_str(), names.empty() ? "none" : names.c_str());
-  return p.renderer;
-}
-/// Between the renderer's init and App::start: the heap grown once - one block taken and given back stays in the
-/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece.
-void reserve_heap(const ProjectSettings& p) {
-  if (p.heap_reserve_mb > 0)
-    if (void* reserve = std::malloc(static_cast<std::size_t>(p.heap_reserve_mb) << 20)) std::free(reserve);
-}
-namespace {
-/// The project's settings the program's kern_main() handed over with its App (kern::run).
-ProjectSettings g_settings;
-}  // namespace
-
-int run(App& app, const ProjectSettings& settings) {
-  if (g_app) {
-    log(LogLevel::error, "kern::run: the program has given its App already - kern_main hands over one App, once");
-    return 1;
-  }
-  g_app = &app;
-  g_settings = settings;
-  return 0;
-}
-}  // namespace kern
-
-Engine& engine_instance() {
-  static Engine engine(c_api_renderer());
-  return engine;
-}
-
-/// Launch parameters, before kern_app_start ("k=v&k2=v2", URL-encoded).
-KERN_EXPORT(kern_app_set_args) void kern_app_set_args(const char* text, u32 length) { engine_instance().set_args(text, length); }
-
-KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
-  if (g_running) return 1;
-  if (!g_app) { fail("no App: the program's kern_main() hands the engine its App with kern::run (kern/docs/project.md 4.)"); return 0; }
-  Engine& engine = engine_instance();
-  g_engine = &engine;
-  const ProjectSettings& project = g_settings;
-  RendererOptions options = start_renderer(project, engine);
-  options.width = width;
-  options.height = height;
-  if (!engine.renderer().init(options, g_app->extensions())) return 0;
-  reserve_heap(project);
-  if (!g_app->start(engine)) return 0;
-  g_running = true;
-  g_start_ms = g_last_ms = -1;
-  g_frame = 0;
-  return 1;
-}
-
-/// One display frame: update + render. Returns 0 when rendering failed.
-KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
-  if (!g_running) return 0;
-  g_engine->set_xr(false);
-  if (g_start_ms < 0) g_start_ms = g_last_ms = now_ms;
-  Frame frame;
-  frame.time = (now_ms - g_start_ms) / 1000.0;
-  frame.dt = static_cast<f32>(clamp((now_ms - g_last_ms) / 1000.0, 0.0, 0.1));
-  frame.index = g_frame++;
-  g_last_ms = now_ms;
-  g_app->update(*g_engine, frame);
-  g_engine->input().end_frame();
-  if (g_engine->renderer().lost()) return 1;
-  RenderParams params;
-  params.clear_color = g_engine->clear_color();
-  params.page_hidden = page_hidden != 0;
-  RenderStats stats;
-  if (g_engine->stereo() && g_engine->renderer().width() >= 4) {
-    // side by side: each half the camera's own view, the eye shifted half the eye distance along
-    // the camera's right (parallel eyes, the same fov over half the width)
-    Camera cam = g_engine->renderer().camera();
-    const Camera anchor = cam;
-    const Vec3 f = normalize(anchor.target - anchor.eye, {0, 1, 0});
-    const Vec3 r = normalize(cross(f, anchor.up), {1, 0, 0});
-    const i32 w = g_engine->renderer().width(), h = g_engine->renderer().height(), half = w / 2;
-    bool ok = true;
-    for (int e = 0; e < 2; ++e) {
-      const f32 side = (e == 0) != g_engine->stereo_cross() ? -0.5f : 0.5f;
-      cam = anchor;
-      cam.eye = anchor.eye + r * (side * g_engine->stereo_ipd());
-      cam.target = anchor.target + r * (side * g_engine->stereo_ipd());
-      params.has_viewport = true;
-      params.viewport = {e == 0 ? 0 : half, 0, e == 0 ? half : w - half, h};
-      g_engine->renderer().set_camera(cam);
-      ok = g_engine->renderer().render(params, stats) && ok;
-    }
-    g_engine->renderer().set_camera(anchor);
-    return ok ? 1 : 0;
-  }
-  return g_engine->renderer().render(params, stats) ? 1 : 0;
-}
-
-/// One WebXR frame: update once, then every eye. `views` holds `count` x 27 floats: the eye's
-/// projection (16, column-major), its position (3) and orientation (quaternion x y z w) in the
-/// reference space (WebXR: y up, -z forward, metres; "local": the origin where the head started),
-/// and its viewport in the layer's framebuffer (x y w h). The app's camera after the update is
-/// the anchor: the reference space's origin sits at the camera's eye, its forward along the
-/// camera's heading (the app turns the player, the head looks around); Kern is z up.
-KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, const f32* views) {
-  if (!g_running || count < 1 || count > 4 || !views) return 0;
-  if (g_start_ms < 0) g_start_ms = g_last_ms = now_ms;
-  Frame frame;
-  frame.time = (now_ms - g_start_ms) / 1000.0;
-  frame.dt = static_cast<f32>(clamp((now_ms - g_last_ms) / 1000.0, 0.0, 0.1));
-  frame.index = g_frame++;
-  g_last_ms = now_ms;
-  // the head's yaw in the room, before the update (the app may turn its body with it)
-  {
-    Quat q{views[19], views[20], views[21], views[22]};
-    const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-    if (ql > 1e-6f) {
-      q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
-      const Vec3 hf = q.rotate({0, 0, -1});
-      if (hf.x * hf.x + hf.z * hf.z > 1e-6f) g_engine->set_xr_head_yaw(std::atan2(-hf.x, -hf.z) * (180.0f / kPi));
-    }
-  }
-  g_app->update(*g_engine, frame);
-  g_engine->input().end_frame();
-  if (g_engine->renderer().lost()) return 1;
-  Camera cam = g_engine->renderer().camera();
-  const Camera anchor = cam;
-  Vec3 f = anchor.target - anchor.eye;
-  f.z = 0;
-  f = normalize(f, {0, 1, 0});
-  Vec3 up{0, 0, 1};
-  if (g_engine->xr_hold_room()) f = normalize(Vec3{g_engine->xr_room_forward().x, g_engine->xr_room_forward().y, 0}, f);
-  else if (g_engine->xr_follow_head()) {
-    // the body faces where the head does: the room is the body's heading less the head's yaw
-    const f32 a = -g_engine->xr_head_yaw() * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
-    f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
-  } else if (g_engine->xr_full_room()) {
-    // the craft is the rest frame: the room pitches and rolls with the camera
-    const Vec3 ff = normalize(anchor.target - anchor.eye, f);
-    const Vec3 rr = normalize(cross(ff, anchor.up), Vec3{f.y, -f.x, 0});
-    f = ff;
-    up = cross(rr, ff);
-  }
-  g_engine->set_xr_room_forward(f);
-  g_engine->set_xr_room_up(up);
-
-  const Vec3 r = normalize(cross(f, up), Vec3{f.y, -f.x, 0});
-  const f32 vig = g_engine->xr_vignette();
-  const u32 vig_mesh = g_engine->xr_vignette_mesh();
-  if (vig_mesh) g_engine->renderer().set_visible(vig_mesh, vig > 0.01f);
-  // a WebXR vector (x right, y up, -z forward) in the world
-  auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
-  bool ok = true;
-  for (i32 i = 0; i < count; ++i) {
-    const f32* v = views + i * 27;
-    Quat q{v[19], v[20], v[21], v[22]};
-    const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-    if (!(ql > 1e-6f)) continue;
-    q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
-    const Vec3 eye = anchor.eye + world({v[16], v[17], v[18]});
-    cam = anchor;
-    cam.eye = eye;
-    cam.target = eye + world(q.rotate({0, 0, -1}));
-    cam.up = world(q.rotate({0, 1, 0}));
-    cam.has_projection = true;
-    std::memcpy(cam.projection.m, v, 16 * sizeof(f32));
-    RenderParams params;
-    params.clear_color = g_engine->clear_color();
-    params.has_viewport = true;
-    params.reuse_shadow = i > 0;  // one sun shadow map per XR frame, not per eye
-    if (vig_mesh && vig > 0.01f) {
-      // the comfort tunnel before this eye: the hole's half-angle 60 deg .. 26 deg
-      const Vec3 er = world(q.rotate({1, 0, 0})), eu = world(q.rotate({0, 1, 0})), ef = world(q.rotate({0, 0, -1}));
-      const f32 d = std::fmax(0.3f, cam.near * 1.5f), half = (60.0f - 34.0f * std::fmin(vig, 1.0f)) * (kPi / 180.0f), sc = d * std::tan(half);
-      const Vec3 c = eye + ef * d;
-      const f32 m[16] = {er.x * sc, er.y * sc, er.z * sc, 0, ef.x, ef.y, ef.z, 0, eu.x * sc, eu.y * sc, eu.z * sc, 0, c.x, c.y, c.z, 1};
-      g_engine->renderer().update_instances(vig_mesh, {m, 16}, {});
-    }
-    params.viewport = {static_cast<i32>(v[23]), static_cast<i32>(v[24]), static_cast<i32>(v[25]), static_cast<i32>(v[26])};
-    RenderStats stats;
-    g_engine->renderer().set_camera(cam);
-    ok = g_engine->renderer().render(params, stats) && ok;
-    if (i == 0) { g_engine->set_xr(true); g_engine->set_xr_eye(cam.eye); g_engine->set_xr_forward(normalize(cam.target - cam.eye, {1, 0, 0})); }
-  }
-  if (g_engine->xr_scope() && g_engine->xr_scope_fbo() && g_engine->xr_scope_size() > 0) {
-    // the scope's own picture after the eyes (their shadow map reused; the lens shows it next frame);
-    // the comfort tunnel is the eyes', not the scope's
-    if (vig_mesh) g_engine->renderer().set_visible(vig_mesh, false);
-    cam = g_engine->xr_scope_camera();
-    cam.has_projection = false;
-    RenderParams sp;
-    sp.clear_color = g_engine->clear_color();
-    sp.has_viewport = true;
-    sp.reuse_shadow = true;
-    sp.framebuffer = g_engine->xr_scope_fbo();
-    sp.viewport = {0, 0, g_engine->xr_scope_size(), g_engine->xr_scope_size()};
-    RenderStats ss;
-    g_engine->renderer().set_camera(cam);
-    if (!g_engine->renderer().render(sp, ss)) g_engine->set_xr_scope(false);
-  }
-  g_engine->renderer().set_camera(anchor);
-  return ok ? 1 : 0;
-}
-
-KERN_EXPORT(kern_app_resize) i32 kern_app_resize(i32 width, i32 height) {
-  if (!g_running) return 0;
-  if (!g_engine->renderer().resize(width, height)) return 0;
-  g_app->resized(*g_engine);
-  return 1;
-}
-
-KERN_EXPORT(kern_app_key) void kern_app_key(u32 key, i32 down) {
-  if (g_engine && key < static_cast<u32>(Key::count)) g_engine->input().key(static_cast<Key>(key), down != 0);
-}
-KERN_EXPORT(kern_app_pointer) void kern_app_pointer(f32 x, f32 y, f32 dx, f32 dy, u32 buttons) {
-  if (!g_engine) return;
-  g_engine->input().pointer_move({x, y}, {dx, dy});
-  g_engine->input().pointer_buttons(buttons);
-}
-KERN_EXPORT(kern_app_wheel) void kern_app_wheel(f32 dy) { if (g_engine) g_engine->input().add_wheel(dy); }
-KERN_EXPORT(kern_app_touch) void kern_app_touch(i32 id, i32 phase, f32 x, f32 y) { if (g_engine) g_engine->input().touch(id, phase, {x, y}); }
-KERN_EXPORT(kern_app_focus) void kern_app_focus(i32 focused) { if (g_engine) g_engine->input().set_focus(focused != 0); }
-KERN_EXPORT(kern_app_stop) void kern_app_stop() {
-  if (!g_running) return;
-  g_app->stop(*g_engine);
-  g_engine->renderer().shutdown();
-  g_running = false;
-}

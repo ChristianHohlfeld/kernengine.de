@@ -808,7 +808,8 @@ inline const std::vector<Case>& cases() {
         {"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"sum","type":"float","value":0}],"locals":[{"name":"Mine","type":"int","value":0}]},
         {"name":"Forever","inputs":[],"outputs":[]}]})"},
       // Get Variable on Actor and Has Blueprint, on a Blueprint (here its own: the Level's) and on an actor
-      // that has none: a number, a whole number read as a decimal one, a variable it does not have, one of a
+      // that has none (Ghost, an actor of the host's world without a Blueprint - found by its name: no number becomes an
+      // actor): a number, a whole number read as a decimal one, a variable it does not have, one of a
       // type that does not become the one read (a list as a number: the zero), an enum's value and a list
       // of structs - each as the reader's own type. Engine Object of Blueprint on the Level, which implements
       // nothing: no object (Is Valid Object false, Handle of Object 0), and the host is told why - in every tier.
@@ -820,7 +821,7 @@ inline const std::vector<Case>& cases() {
        R"({"name":"RMode","type":"enum","of":"Kind","value":0},{"name":"RRows","type":"struct_list","of":"Row","value":[]},)"
        R"({"name":"IsApp","type":"bool","value":true},{"name":"AppHandle","type":"int","value":7},{"name":"Same","type":"bool","value":false}],)"
        R"("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Has"}},{"id":3,"type":"func.has_blueprint","values":{"target":0}},)"
-       R"({"id":4,"type":"var.set","params":{"variable":"HasNone"}},{"id":5,"type":"func.has_blueprint","values":{"target":99}},)"
+       R"({"id":4,"type":"var.set","params":{"variable":"HasNone"}},{"id":5,"type":"func.has_blueprint"},{"id":26,"type":"actor.find","values":{"name":"Ghost"}},)"
        R"({"id":6,"type":"var.set","params":{"variable":"RSpeed"}},{"id":7,"type":"func.get_on","params":{"variable":"Speed","type":"float"},"values":{"this":0}},)"
        R"({"id":8,"type":"var.set","params":{"variable":"RLaps"}},{"id":9,"type":"func.get_on","params":{"variable":"Laps","type":"float"},"values":{"this":0}},)"
        R"({"id":10,"type":"var.set","params":{"variable":"RNone"}},{"id":11,"type":"func.get_on","params":{"variable":"Missing","type":"float"},"values":{"this":0}},)"
@@ -831,7 +832,7 @@ inline const std::vector<Case>& cases() {
        R"({"id":19,"type":"var.set","params":{"variable":"IsApp"}},{"id":20,"type":"object.valid"},{"id":21,"type":"func.engine_object","params":{"interface":"App"},"values":{"target":0}},)"
        R"({"id":22,"type":"var.set","params":{"variable":"AppHandle"}},{"id":23,"type":"object.handle"},)"
        R"({"id":24,"type":"var.set","params":{"variable":"Same"}},{"id":25,"type":"object.equal"}],)"
-       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"],[4,"then",6,"exec"],[7,"value",6,"value"],[6,"then",8,"exec"],)"
+       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"],[26,"actor",5,"target"],[4,"then",6,"exec"],[7,"value",6,"value"],[6,"then",8,"exec"],)"
        R"([9,"value",8,"value"],[8,"then",10,"exec"],[11,"value",10,"value"],[10,"then",12,"exec"],[13,"value",12,"value"],[12,"then",14,"exec"],[15,"value",14,"value"],)"
        R"([14,"then",16,"exec"],[17,"value",16,"value"],[16,"then",18,"exec"],[18,"then",19,"exec"],[21,"result",20,"object"],[20,"result",19,"value"],)"
        R"([19,"then",22,"exec"],[21,"result",23,"object"],[23,"result",22,"value"],[22,"then",24,"exec"],[21,"result",25,"a"],[21,"result",25,"b"],[25,"result",24,"value"]]})"},
@@ -1253,6 +1254,8 @@ struct Host : kern::logic::Host {
   void print(const std::string& text, bool) override { log += "print " + text + "\n"; }
   void error(const std::string& text) override { log += "error " + text.substr(0, 40) + "\n"; }
   kern::u32 random() override { seed = seed * 1664525u + 1013904223u; return seed; }
+  /// "Ghost": an actor of its world that has no Blueprint (on_actor) - the same in every tier (NativeTestHost).
+  kern::logic::ActorRef find_actor(std::string_view name) override { return name == "Ghost" ? 99 : 0; }
 };
 
 inline kern::logic::Graph parse(const Case& c) {

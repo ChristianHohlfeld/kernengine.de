@@ -121,6 +121,16 @@ jobs:
       - name: Native unit tests (ASan/UBSan)
         run: CXX=g++ CC=gcc kern/tests/run.sh
 
+  # The engine's native build on a minimal project of its own (kern/tools/build_native.sh, kern/docs/app.md 7.).
+  native-build:
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: build_native.sh on kern/tests/native_build
+        run: CXX=clang++ CC=clang kern/tests/native_build/run.sh
+
   # The game's own suite, next to the engine's (each builds the engine for itself: side by side they
   # take as long as the longer one). It holds the converted Blueprints' comparison with their source.
   # The game's suite, split so that every job stays within 45 minutes. One job builds (ASan/UBSan, ~27 min on 4 cores:
@@ -542,6 +552,8 @@ jobs:
           export WASI_SDK=/home/runner/wasi-sdk
           kern/games/murmel/build.sh
           tools/build_studio.sh
+          # the export of a project with its App: one page for itself (kern/docs/app.md 7.)
+          tools/export_game.sh kern/games/murmel/murmel.kproject generated/murmel.html -Ikern/games/murmel/src kern/games/murmel/src/murmel.cpp kern/games/murmel/src/main.cpp
       - name: Playwright (cached)
         uses: actions/cache@v4
         with:

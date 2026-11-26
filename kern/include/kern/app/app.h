@@ -18,26 +18,31 @@
 #include <utility>
 #include <vector>
 
+#include "kern/app/storage.h"
+#include "kern/audio/audio.h"
+#include "kern/core/json.h"
 #include "kern/gfx/renderer.h"
+#include "kern/input/actions.h"
 
 namespace kern {
 
 namespace game { struct Project; }
-
-/// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
-enum class KERN_BLUEPRINT_TYPE Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
 
 constexpr u32 kMaxTouches = 10;
 
 struct KERN_BLUEPRINT_TYPE Touch {
   i32 id = -1;  // < 0: slot unused
   Vec2 start, position, previous;
+  bool began = false;  // it touched down this frame
+};
+
+/// A gamepad in the browser's standard mapping (kern/docs/app.md 4.): sticks -1..1 (right and up are +1), the
+/// triggers 0..1, the buttons as bits (bit i = PadButton i).
+struct KERN_BLUEPRINT_TYPE Gamepad {
+  bool connected = false;
+  f32 lx = 0, ly = 0, rx = 0, ry = 0;
+  f32 lt = 0, rt = 0;
+  u32 buttons = 0;
 };
 
 class Input {
@@ -55,6 +60,10 @@ class Input {
   const Touch* touches() const { return touches_; }
   u32 touch_count() const;
   bool focused() const { return focused_; }
+  /// The gamepad (the first connected one, standard mapping) and the buttons pressed down this frame (bits).
+  const Gamepad& gamepad() const { return pad_; }
+  bool pad_down(PadButton b) const { return pad_.buttons & (1u << static_cast<u32>(b)); }
+  bool pad_pressed(PadButton b) const { return pad_pressed_ & (1u << static_cast<u32>(b)); }
 
   // ---- platform side ----
   void key(Key k, bool down);
@@ -63,6 +72,7 @@ class Input {
   void add_wheel(f32 dy) { wheel_ += dy; }
   void touch(i32 id, i32 phase, Vec2 position);  // phase 0 start, 1 move, 2 end/cancel
   void set_focus(bool focused);
+  void set_gamepad(const Gamepad& pad);
   void end_frame();  // clears per-frame edges and deltas
 
  private:
@@ -74,6 +84,8 @@ class Input {
   f32 wheel_ = 0;
   Touch touches_[kMaxTouches];
   bool focused_ = true;
+  Gamepad pad_;
+  u32 pad_pressed_ = 0;
 };
 
 struct KERN_BLUEPRINT_TYPE Frame {
@@ -95,8 +107,60 @@ class Engine {
   const game::Project* project() const { return project_; }
   /// Program side (kern/game/program.h, while its App runs): the project of the program.
   void set_project(const game::Project* project) { project_ = project; }
-  /// Text shown by the host page in its status overlay (empty hides it).
+  /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime
+  /// makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
+  audio::Mixer& mixer() { return mixer_; }
+  /// The project's input actions (kern/docs/app.md 4.): `action` held, `action_pressed` pressed down this frame (a key,
+  /// a pad button, a mouse button or a finger of its touch zone), `axis` -1..1 (keys -1/+1, the pad's stick past its
+  /// deadzone, the touch stick - the largest wins). A name the project has none of: false / 0, last_error names it and
+  /// the names there are, the log says it once a name.
+  bool action(const char* name) const;
+  bool action_pressed(const char* name) const;
+  f32 axis(const char* name) const;
+  /// The actions the app runtime gives the engine (the project's settings "input").
+  void set_actions(const InputActions& actions) { actions_ = actions; }
+  const InputActions& actions() const { return actions_; }
+  /// Saving and loading (kern/docs/app.md 5.): named slots of named values (a slot and a key: 1..64 of A-Z a-z 0-9
+  /// _ - .). A save writes the slot to the host at once; false: last_error says why (a name, a value that is none, the
+  /// host, a slot that is no kern-save). A load gives the value, or `fallback` when there is none - or, with the
+  /// reason in last_error, when it is of another type or the slot cannot be read.
+  bool save_int(const char* slot, const char* key, i64 value);
+  bool save_float(const char* slot, const char* key, f64 value);
+  bool save_bool(const char* slot, const char* key, bool value);
+  bool save_text(const char* slot, const char* key, const char* value);
+  i64 load_int(const char* slot, const char* key, i64 fallback);
+  f64 load_float(const char* slot, const char* key, f64 fallback);
+  bool load_bool(const char* slot, const char* key, bool fallback);
+  /// (the text lives until the next load_text)
+  const char* load_text(const char* slot, const char* key, const char* fallback);
+  /// Whether the slot holds a value of that key.
+  bool saved(const char* slot, const char* key);
+  /// Removes the whole slot from the host.
+  bool erase_saved(const char* slot);
+  /// The host of the slots (default: the platform's, kern/app/storage.h - natively the folder of the launch parameter
+  /// saves=<folder>, else kern-saves). The slots read so far are read again from it.
+  void set_storage(StorageHost& host);
+  /// The status line (kern/docs/app.md 6.): a text widget "status" at the top left that stays until it changes
+  /// (empty: gone) - the widgets' one way for a lasting line (loading, an error before the first frame).
   void set_status(const char* text);
+  /// Widgets, immediate mode (kern/docs/app.md 6.): named in every frame they are seen; x, y 0..1 in the view (0,0
+  /// top left), the widget hung by the same point of itself. An id: 1..64 characters, once a frame; a widget that is
+  /// none (an id, a place not finite) is not shown and last_error says why.
+  void ui_text(const char* id, const char* text, f32 x, f32 y);
+  /// A bar: `value` 0..1, `width` a share of the view's width.
+  void ui_bar(const char* id, const char* label, f32 value, f32 x, f32 y, f32 width);
+  /// A button: true in the frame after it was clicked or tapped.
+  bool ui_button(const char* id, const char* label, f32 x, f32 y);
+  /// A menu: `items` one a line ('\n'); the index chosen in the frame after the choice, else -1.
+  i32 ui_menu(const char* id, const char* items, f32 x, f32 y);
+  /// The widgets as the page got them last (JSON) - natively, what a test reads.
+  const std::string& ui_json() const { return ui_sent_; }
+  // ---- platform side (the app runtime) ----
+  /// An event of the page for the next frame: a button (index 0) or a menu's entry.
+  void ui_event(std::string_view id, i32 index);
+  void ui_begin();
+  /// The frame's widgets to the page, when they changed.
+  void ui_end();
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
   void request_pointer_lock(bool lock);
   /// Launch parameter `key` from the host (the page's query string by default), or `fallback`.
@@ -171,6 +235,34 @@ class Engine {
   Renderer& renderer_;
   const game::Project* project_ = nullptr;
   Input input_;
+  audio::Mixer mixer_;
+  InputActions actions_;
+  struct Slot {
+    std::string name;
+    json::Value values;     // key -> {"int": "..."} / {"float": x} / {"bool": b} / {"text": "..."}
+    std::string broken;     // the host's text is no kern-save (why): not read, not written over
+  };
+  struct Widget {
+    std::string kind, id, text;
+    f32 value = 0, x = 0, y = 0, width = 0;
+  };
+  std::string status_;
+  std::vector<Widget> widgets_;
+  std::vector<std::pair<std::string, i32>> ui_pending_, ui_events_;
+  std::string ui_sent_;
+  mutable std::vector<std::string> ui_said_;
+  bool ui_add(Widget w);
+  i32 ui_event_of(const std::string& id) const;
+  StorageHost* storage_ = nullptr;
+  std::vector<Slot> slots_;
+  std::string loaded_text_;
+  Slot* slot(const char* name, const char* key, bool for_write);
+  bool store(Slot& s, const char* key, json::Value value);
+  const json::Value* stored(const char* slot, const char* key, const char* type);
+  mutable std::vector<std::string> unknown_actions_;   // (said once each)
+  const ActionBinding* find_action(const char* name) const;
+  const AxisBinding* find_axis(const char* name) const;
+  bool touch_in(TouchZone zone, bool pressed) const;
   Vec4 clear_color_{0.045f, 0.07f, 0.12f, 1};
   bool xr_ = false;
   Vec3 xr_eye_, xr_forward_{1, 0, 0};

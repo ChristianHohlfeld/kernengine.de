@@ -3,9 +3,68 @@
   "version": 1,
   "name": "Murmel",
   "settings": {
-    "renderer": { "shadows": true }
+    "renderer": {
+      "shadows": true
+    },
+    "input": {
+      "actions": [
+        {
+          "name": "jump",
+          "keys": [
+            "space"
+          ],
+          "pad": [
+            "a"
+          ],
+          "touch": "right"
+        },
+        {
+          "name": "again",
+          "keys": [
+            "enter"
+          ],
+          "pad": [
+            "start"
+          ],
+          "touch": "anywhere"
+        }
+      ],
+      "axes": [
+        {
+          "name": "moveX",
+          "negative": [
+            "left",
+            "a"
+          ],
+          "positive": [
+            "right",
+            "d"
+          ],
+          "pad": "leftX",
+          "deadzone": 0.2,
+          "touch": "stickX"
+        },
+        {
+          "name": "moveY",
+          "negative": [
+            "down",
+            "s"
+          ],
+          "positive": [
+            "up",
+            "w"
+          ],
+          "pad": "leftY",
+          "deadzone": 0.2,
+          "touch": "stickY"
+        }
+      ]
+    }
   },
-  "levels": ["levels/wiese.klevel", "levels/bruecke.klevel"],
+  "levels": [
+    "levels/wiese.klevel",
+    "levels/bruecke.klevel"
+  ],
   "startLevel": "levels/wiese.klevel",
   "blueprints": []
 }

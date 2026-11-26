@@ -1370,6 +1370,56 @@ TEST(level_errors_say_where_and_which_values) {
   CHECK(error.find("actor \"Ball\": controller.mode: unknown value \"rollin\" - one of hovercar, rolling, character") == 0);
 }
 
+// A key the reader of a level or a project does not know is an error with its place and the keys there are
+// (kern/docs/app.md 2.) - in every object they read, not only under "components"; nothing is passed over in silence.
+TEST(level_and_project_refuse_unknown_keys) {
+  game::Level l = game::basic_level();
+  game::Actor pad;
+  pad.name = "Pad";
+  pad.mesh = game::MeshComponent{};
+  pad.colliders.push_back({});
+  l.add(pad);
+  const std::string text = game::to_text(l, -1);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));   // (what the writer writes, the reader knows)
+  const auto refused = [&](const std::string& from, const std::string& to) {
+    std::string t = text;
+    const std::size_t at = t.find(from);
+    CHECK(at != std::string::npos);
+    if (at != std::string::npos) t.replace(at, from.size(), to);
+    game::Level b;
+    std::string why;
+    CHECK(!game::from_text(t, b, &why));
+    return why;
+  };
+  // the component's name, one letter off (the case of the second game: "collider" for "colliders")
+  std::string e = refused("\"colliders\":", "\"collider\":");
+  CHECK(e.find("actor \"") == 0 && e.find("\": components.collider: unknown key - one of mesh, light, body, colliders, joints, controller") != std::string::npos);
+  CHECK(refused("\"radius\":", "\"radios\":").find("mesh.radios: unknown key - one of shape, size, radius") != std::string::npos);
+  CHECK(refused("\"roughness\":", "\"ruffness\":").find("ruffness: unknown key - one of color, roughness") != std::string::npos);
+  CHECK(refused("\"sensor\":", "\"sensr\":").find("colliders.sensr: unknown key - one of shape, center") != std::string::npos);
+  CHECK(refused("\"transform\":{\"position\":", "\"transform\":{\"positon\":").find("transform.positon: unknown key - one of position, rotation, scale") != std::string::npos);
+  CHECK(refused("\"name\":\"Pad\"", "\"name\":\"Pad\",\"colour\":1").find("actor \"Pad\": colour: unknown key - one of id, name, parent, folder") == 0);
+  CHECK(refused("\"gravity\":", "\"gravty\":").find("world.gravty: unknown key - one of channels, gravity, substeps") == 0);
+  CHECK(refused("\"yaw\":", "\"jaw\":") .find("camera.jaw: unknown key - one of position, yaw, pitch") == 0);
+  CHECK(refused("\"nextId\":", "\"nextID\":").find("nextID: unknown key - one of name, format, version, world, logic, actors, textures, sounds, motions, camera, nextId") == 0);
+  CHECK(refused("\"textures\":[]", "\"textures\":[{\"id\":\"t\",\"sorce\":\"\"}]") == "textures[0].sorce: unknown key - one of id, name, src, width, height");
+  // the project: its own keys, the settings, the renderer and its parts, a profile, a Blueprint's entry
+  const auto project = [](const std::string& body) {
+    game::Project p;
+    std::string why;
+    CHECK(!game::from_text("{\"format\":\"kern-project\"," + body + "}", p, &why));
+    return why;
+  };
+  CHECK(project("\"start\":\"a\"") == "start: unknown key - one of format, version, name, settings, levels, startLevel, blueprints");
+  CHECK(project("\"settings\":{\"heapReserve\":1}") == "settings: heapReserve: unknown key - one of renderer, profiles, heapReserveMb, loopBudget, input");
+  CHECK(project("\"settings\":{\"renderer\":{\"shadw\":1}}") == "settings: renderer.shadw: unknown key - one of shadows, shadow, bloom, ao, grade");
+  CHECK(project("\"settings\":{\"renderer\":{\"ao\":{\"radios\":1}}}") == "settings: renderer.ao.radios: unknown key - one of enabled, quality, halfResolution, radius, power, adaptive");
+  CHECK(project("\"settings\":{\"profiles\":[{\"name\":\"m\",\"renderer\":{\"bloom\":{\"on\":true}}}]}") == "settings: profiles[0].renderer.bloom.on: unknown key - one of enabled, forced");
+  CHECK(project("\"blueprints\":[{\"name\":\"A\",\"logik\":{}}]") == "blueprints[0] \"A\": logik: unknown key - one of name, folder, logic");
+}
+
 // A project that does not read says where and why.
 TEST(game_project_errors) {
   const auto why = [](const std::string& text) {
@@ -3184,7 +3234,7 @@ TEST(logic_lists) {
     CHECK(v.converted(PinType::text).s == v.as_text() && v.converted(v.type) == v);
   }
   CHECK(!logic::convertible(PinType::integer_list, PinType::number_list) && a.converted(PinType::integer_list).size() == 0);
-  CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[actor 4, none]" && every[0].as_text() == "[true, false]");
+  CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[none, none]" && every[0].as_text() == "[true, false]");
 
   // The nodes. The steps change a list variable; For Each goes through the list as it was when
   // the loop started, whatever its body does to the variable.
@@ -9262,6 +9312,277 @@ TEST(run_the_program_of_a_project) {
   kern_app_stop();
 }
 
+// The app runtime says why an App does not start (kern/docs/app.md 1.): no App, or the App's start() gave false - with
+// the reason the App gave (kern::fail), or that it named none; an error from before the start is never the reason.
+// A test makes its own app runtime (kern::AppRuntime): the process's one is the platform's.
+TEST(app_runtime_start_says_why) {
+  struct Refuses final : App {
+    const char* why = nullptr;
+    int starts = 0, stops = 0;
+    bool start(Engine&) override { ++starts; return why ? fail("%s", why) : false; }
+    void update(Engine&, const Frame&) override {}
+    void stop(Engine&) override { ++stops; }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(!rt.start(64, 48) && std::string(last_error()).find("no App: the program's kern_main()") == 0);
+  CHECK(rt.give(app) == 0 && rt.give(app) == 1);   // (one App, once)
+  fail("an earlier error");
+  CHECK(!rt.start(64, 48) && !rt.running() && app.starts == 1);
+  CHECK(std::string(last_error()) == "the App did not start: its start() gave false and named no reason (an App says why with kern::fail)");
+  app.why = "the level levels/a.klevel: world.gravty: unknown key";
+  CHECK(!rt.start(64, 48) && std::string(last_error()) == "the App did not start: the level levels/a.klevel: world.gravty: unknown key");
+  CHECK(!rt.frame(0, false) && app.stops == 0);   // (not running: no frame, no stop)
+  rt.stop();
+  CHECK(app.stops == 0);
+  struct Starts final : App {
+    int frames = 0;
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame& f) override { frames += f.index == static_cast<u64>(frames); }
+  } good;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(good) == 0 && rt2.start(64, 48) && rt2.running());
+  CHECK(rt2.frame(0, false) && rt2.frame(16, false) && good.frames == 2);
+  rt2.stop();
+  CHECK(!rt2.running());
+}
+
+// The app's sound (kern/docs/app.md 3.): the App plays on engine.mixer() - ready at its start, at the device's rate -
+// and the app runtime hands the mix out (kern_app_audio); a rate outside the mixer's, a rate after the start and too
+// many frames a call are refused with the reason. The mixer ends with the app (its clips go), its rate stays.
+TEST(app_runtime_plays_its_mixer) {
+  struct Tone final : App {
+    u32 rate = 0;
+    bool start(Engine& e) override {
+      rate = e.mixer().sample_rate();
+      std::vector<f32> wave(4800);
+      for (std::size_t i = 0; i < wave.size(); ++i) wave[i] = 0.5f * std::sin(static_cast<f32>(i) * 0.05f);
+      const audio::ClipId clip = e.mixer().adopt_clip(std::move(wave), 1, "tone", true);
+      audio::PlayParams p;
+      p.loop = true;
+      return clip && e.mixer().play(clip, p) != 0;
+    }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0);
+  CHECK(!rt.audio_init(4000) && std::string(last_error()).find("8000 to 192000") != std::string::npos);
+  CHECK(rt.audio(256).size == 0);   // (not running: nothing)
+  CHECK(rt.audio_init(44100) && rt.start(64, 48) && app.rate == 44100);
+  CHECK(!rt.audio_init(48000) && std::string(last_error()).find("before kern_app_start") != std::string::npos);
+  const Span<const f32> pcm = rt.audio(512);
+  f32 peak = 0;
+  for (f32 x : pcm) peak = std::fmax(peak, std::fabs(x));
+  CHECK(pcm.size == 1024 && peak > 0.05f);
+  CHECK(rt.audio(AppRuntime::kMaxAudioFrames + 1).size == 0 && std::string(last_error()).find("at most 8192") != std::string::npos);
+  rt.stop();
+  CHECK(rt.engine().mixer().sample_rate() == 44100 && rt.engine().mixer().clip_count() == 0);
+  // without a rate from the device: 48000 Hz
+  Tone other;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(other) == 0 && rt2.start(64, 48) && other.rate == 48000);
+  rt2.stop();
+}
+
+// Input actions (kern/docs/app.md 4.): the project names actions and axes and binds keys, pad buttons and sticks,
+// mouse buttons and touch to them; the engine answers by the name. Read and written with the project's settings,
+// every error with its place and the names there are.
+TEST(input_actions_of_the_project) {
+  const char* text = R"({"input": {
+    "actions": [{"name": "jump", "keys": ["space"], "pad": ["a"], "mouse": [0], "touch": "right"}],
+    "axes": [{"name": "moveX", "negative": ["left", "a"], "positive": ["right", "d"], "pad": "leftX", "deadzone": 0.2, "touch": "stickX"},
+             {"name": "moveY", "negative": ["down"], "positive": ["up"], "pad": "leftY", "touch": "stickY"}]}})";
+  json::Value v;
+  CHECK(json::parse(text, v));
+  ProjectSettings ps;
+  std::string error;
+  CHECK(project_from_json(v, ps, &error) && ps.input.actions.size() == 1 && ps.input.axes.size() == 2);
+  ProjectSettings back;
+  CHECK(project_from_json(project_to_json(ps), back, &error) && json::stringify(input_to_json(back.input)) == json::stringify(input_to_json(ps.input)));
+  const auto refused = [](const char* t) {
+    json::Value x;
+    ProjectSettings p;
+    std::string why;
+    CHECK(json::parse(t, x) && !project_from_json(x, p, &why));
+    return why;
+  };
+  CHECK(refused(R"({"input": {"action": []}})") == "settings: input.action: unknown key - one of actions, axes");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "keys": ["spcae"]}]}})").find("settings: input.actions[0].keys[0]: unknown name \"spcae\" - one of a, b, c") == 0);
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "pad": ["z"]}]}})").find("input.actions[0].pad[0]: unknown name \"z\" - one of a, b, x, y, lb") != std::string::npos);
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "pad": "left"}]}})").find("input.axes[0].pad: unknown name \"left\" - one of none, leftX, leftY") != std::string::npos);
+  CHECK(refused(R"({"input": {"actions": [{"name": "go"}], "axes": [{"name": "go"}]}})") == "settings: input.axes[0] \"go\": the name stands twice (actions and axes share their names)");
+  CHECK(refused(R"({"input": {"actions": [{"keys": []}]}})") == "settings: input.actions[0]: has no name");
+  CHECK(refused(R"({"input": {"axes": [{"name": "a", "deadzone": 1}]}})") == "settings: input.axes[0].deadzone: from 0 to under 1");
+  CHECK(refused(R"({"input": {"actions": [{"name": "a", "mouse": [3]}]}})").find("mouse[0]: a mouse button is 0 (left)") != std::string::npos);
+  // the engine answers by the name
+  struct Still final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app, ps) == 0 && rt.start(200, 100));
+  Engine& e = rt.engine();
+  Input& in = e.input();
+  CHECK(!e.action("jump") && e.axis("moveX") == 0);
+  in.key(Key::space, true);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.key(Key::space, false);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::right, true);
+  CHECK(e.axis("moveX") == 0);   // (both: none)
+  in.key(Key::a, false);
+  in.key(Key::right, false);
+  // the pad: a button, a stick past its deadzone (scaled back), the largest of all wins
+  Gamepad g;
+  g.connected = true;
+  g.lx = 0.1f;
+  g.buttons = 1u << static_cast<u32>(PadButton::a);
+  in.set_gamepad(g);
+  CHECK(e.action("jump") && e.action_pressed("jump") && e.axis("moveX") == 0);
+  g.lx = 0.6f;
+  in.set_gamepad(g);
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-5f);
+  in.key(Key::a, true);
+  CHECK(e.axis("moveX") == -1);
+  in.key(Key::a, false);
+  in.set_gamepad({});
+  in.end_frame();
+  CHECK(!e.action("jump"));
+  // the mouse
+  in.pointer_buttons(1);
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.pointer_buttons(0);
+  in.end_frame();
+  // touch: a finger on the right half holds "jump"; one on the left half is the stick (an eighth of 100 px = 1)
+  in.touch(1, 0, {150, 50});
+  CHECK(e.action("jump") && e.action_pressed("jump"));
+  in.end_frame();
+  CHECK(e.action("jump") && !e.action_pressed("jump"));
+  in.touch(1, 2, {150, 50});
+  CHECK(!e.action("jump"));
+  in.touch(2, 0, {40, 50});
+  in.touch(2, 1, {46.25f, 43.75f});
+  CHECK(!e.action("jump"));
+  CHECK_NEAR(e.axis("moveX"), 0.5f, 1e-4f);
+  CHECK_NEAR(e.axis("moveY"), 0.5f, 1e-4f);
+  in.touch(2, 2, {46, 44});
+  // a name the project has not: false / 0, and the reason with the names there are
+  CHECK(!e.action("jmup") && std::string(last_error()) == "the project has no action \"jmup\" (its actions: jump)");
+  CHECK(e.axis("moveZ") == 0 && std::string(last_error()) == "the project has no axis \"moveZ\" (its axes: moveX, moveY)");
+  rt.stop();
+}
+
+// Saving and loading (kern/docs/app.md 5.): named slots of named values of the language, written through to the host
+// at once; every error says why - a name, a value that is none, a host that refuses, a slot that is no kern-save,
+// a value of another type. A missing value is the fallback, not an error.
+TEST(app_storage_slots) {
+  struct Memory final : StorageHost {
+    std::map<std::string, std::string> slots;
+    bool refuse = false;
+    bool read(std::string_view slot, std::string& text, bool& found, std::string&) override {
+      auto it = slots.find(std::string(slot));
+      found = it != slots.end();
+      if (found) text = it->second;
+      return true;
+    }
+    bool write(std::string_view slot, std::string_view text, std::string& why) override {
+      if (refuse) { why = "the quota is used up"; return false; }
+      slots[std::string(slot)] = std::string(text);
+      return true;
+    }
+    bool remove(std::string_view slot, std::string&) override { slots.erase(std::string(slot)); return true; }
+  } host;
+  Renderer r;
+  Engine e(r);
+  e.set_storage(host);
+  CHECK(e.load_int("game", "best", 7) == 7 && !e.saved("game", "best"));   // (none: the fallback)
+  CHECK(e.save_int("game", "best", 9007199254740993LL) && e.save_float("game", "volume", 0.25) && e.save_bool("game", "music", true) && e.save_text("game", "name", "Ada"));
+  // read again from the host (a new start of the app)
+  Engine again(r);
+  again.set_storage(host);
+  CHECK(again.load_int("game", "best", 0) == 9007199254740993LL);   // (64 bits, exactly)
+  CHECK(again.load_float("game", "volume", 1) == 0.25 && again.load_bool("game", "music", false) && std::string(again.load_text("game", "name", "")) == "Ada");
+  CHECK(again.saved("game", "name") && !again.saved("game", "other"));
+  CHECK(host.slots["game"].find("\"format\": \"kern-save\"") != std::string::npos);
+  // another type than it holds: the fallback, and why
+  CHECK(again.load_int("game", "name", -1) == -1 && std::string(last_error()) == "save slot game: name holds a text, not an int");
+  // names, values
+  CHECK(!e.save_int("my game", "best", 1) && std::string(last_error()).find("save slot \"my game\": a slot's name is 1 to 64") == 0);
+  CHECK(!e.save_int("game", "", 1) && std::string(last_error()).find("the key \"\"") != std::string::npos);
+  CHECK(!e.save_float("game", "volume", std::nan("")) && std::string(last_error()).find("volume is not a number that can be kept") != std::string::npos);
+  // the host refuses: false, why, and the slot keeps what the host holds
+  host.refuse = true;
+  CHECK(!e.save_int("game", "best", 1) && std::string(last_error()) == "save slot game: the host cannot write it: the quota is used up");
+  CHECK(e.load_int("game", "best", 0) == 9007199254740993LL);
+  host.refuse = false;
+  // a slot that is no kern-save is neither read nor written over, until it is erased
+  host.slots["old"] = "{\"best\": 3}";
+  CHECK(e.load_int("old", "best", 5) == 5 && std::string(last_error()).find("save slot old: it is no kern-save") == 0);
+  CHECK(!e.save_int("old", "best", 4) && std::string(last_error()).find("not written over until it is erased") != std::string::npos && host.slots["old"] == "{\"best\": 3}");
+  CHECK(e.erase_saved("old") && !host.slots.count("old") && e.save_int("old", "best", 4) && e.load_int("old", "best", 0) == 4);
+  // natively, the platform's host keeps a slot in a file of the folder saves=<folder>
+  Engine native(r);
+  const std::string dir = std::string(std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp") + "/kern-saves-test";
+  const std::string args = "saves=" + dir;
+  native.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native.erase_saved("t") && native.save_int("t", "n", 3));
+  Engine native2(r);
+  native2.set_args(args.c_str(), static_cast<u32>(args.size()));
+  CHECK(native2.load_int("t", "n", 0) == 3 && native2.erase_saved("t") && native2.load_int("t", "n", 0) == 0);
+}
+
+// Widgets (kern/docs/app.md 6.), immediate mode: what the App names in a frame is the list the page gets after it
+// (only when it changed); a button's or a menu's event from the page answers in the next frame; the status line is
+// the one widget that stays; a widget that is none is not shown and says why.
+TEST(app_ui_widgets) {
+  struct Hud final : App {
+    int frame = 0;
+    bool clicked = false;
+    i32 chosen = -2;
+    bool start(Engine& e) override { e.set_status("loading"); return true; }
+    void update(Engine& e, const Frame&) override {
+      ++frame;
+      if (frame == 2) e.set_status("");
+      e.ui_text("score", "Points 3", 0, 0);
+      e.ui_bar("coins", "Coins", 1.5f, 1, 0, 0.25f);
+      clicked = e.ui_button("again", "Again", 0.5f, 0.5f);
+      chosen = e.ui_menu("menu", "Play\nQuit", 0.5f, 0.7f);
+      if (frame == 3) e.ui_text("score", "twice", 0, 1);
+      if (frame == 4) e.ui_text("", "no id", 0, 0);
+      if (frame == 5) e.ui_text("bad", "nowhere", std::nanf(""), 0);
+    }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(rt.give(app) == 0 && rt.start(64, 48));
+  Engine& e = rt.engine();
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true}])");   // (the status of the start)
+  CHECK(rt.frame(0, false));
+  CHECK(e.ui_json() == R"([{"kind":"text","id":"status","text":"loading","x":0,"y":0,"status":true},{"kind":"text","id":"score","x":0,"y":0,"text":"Points 3"},)"
+                       R"({"kind":"bar","id":"coins","x":1,"y":0,"label":"Coins","value":1,"width":0.25},{"kind":"button","id":"again","x":0.5,"y":0.5,"label":"Again"},)"
+                       R"({"kind":"menu","id":"menu","x":0.5,"y":0.699999988079071,"items":["Play","Quit"]}])");
+  CHECK(!app.clicked && app.chosen == -1);
+  // the page's events: in the next frame, once
+  e.ui_event("again", 0);
+  e.ui_event("menu", 1);
+  CHECK(rt.frame(16, false) && app.clicked && app.chosen == 1 && e.ui_json().find("\"status\"") == std::string::npos);   // (status "" : gone)
+  CHECK(rt.frame(32, false) && !app.clicked && app.chosen == -1);
+  CHECK(std::string(last_error()) == "the widget text \"score\": the id stands twice in this frame - it is not shown");
+  CHECK(rt.frame(48, false) && std::string(last_error()) == "the widget text \"\": an id is 1 to 64 characters - it is not shown");
+  CHECK(rt.frame(64, false) && std::string(last_error()) == "the widget text \"bad\": its place, value or width is not a finite number - it is not shown");
+  // an entry the menu has not: no choice
+  e.ui_event("menu", 7);
+  CHECK(rt.frame(80, false) && app.chosen == -1);
+  rt.stop();
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).
@@ -13389,15 +13710,13 @@ TEST(micro_duck_blueprint_nodes_drive_and_sense) {
   // The level's Logic drives the duck: autonomy off, walk forward; its camera sees the cube ahead.
   GameFixture f;
   game::Level l = game::basic_level();
-  game::ActorId cube = 0;
-  for (game::Actor& a : l.actors) if (a.name == "Cube") { a.transform.position = {6, 0, 0.5f}; cube = a.id; }
+  for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {6, 0, 0.5f};
   const game::ActorId duck = add_duck(l, {0, 0, 0}, true);
   l.logic = logic_graph(R"({"variables":[{"name":"Sees","type":"bool","value":false},{"name":"Dist","type":"float","value":-1}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"walker.autonomous","values":{"enable":false}},{"id":3,"type":"walker.move","values":{"forward":0.3}},
       {"id":4,"type":"event.tick"},{"id":5,"type":"var.set","params":{"variable":"Sees"}},{"id":6,"type":"walker.sees"},
-      {"id":7,"type":"var.set","params":{"variable":"Dist"}},{"id":8,"type":"walker.tof"}],
-    "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"visible",5,"value"],[5,"then",7,"exec"],[8,"distance",7,"value"]]})");
-  for (logic::Node& n : l.logic.nodes) if (n.type == "walker.sees") n.set_value("other", json::Value(static_cast<f64>(cube)));
+      {"id":7,"type":"var.set","params":{"variable":"Dist"}},{"id":8,"type":"walker.tof"},{"id":9,"type":"actor.find","values":{"name":"Cube"}}],
+    "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"visible",5,"value"],[5,"then",7,"exec"],[8,"distance",7,"value"],[9,"actor",6,"other"]]})");
   f.world->sync(l);
   CHECK(f.world->start(l, game::SimMode::simulate));
   Mat4 m;

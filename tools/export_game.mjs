@@ -27,7 +27,7 @@ try {
 }
 const title = givenTitle || level.world?.title || level.name || "Kern game";
 const html = buildGameHtml({
-  sources: {kern: readFileSync(resolve(web, "kern.mjs"), "utf8"), game: readFileSync(resolve(web, "studio/game.mjs"), "utf8")},
+  sources: {kern: readFileSync(resolve(web, "kern.mjs"), "utf8"), audio: readFileSync(resolve(web, "audio.mjs"), "utf8"), game: readFileSync(resolve(web, "studio/game.mjs"), "utf8")},
   wasmBase64: readFileSync(wasmPath).toString("base64"),
   levelText,
   title,
