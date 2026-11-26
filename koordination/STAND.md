@@ -163,3 +163,8 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - konverter9 lokal: Kleinspiel nur noch 4 wartend (SpawnCity::start an spiel.cpp:74 logic->budget) → Engine: GameWorld::start_logic setzt loopBudget aus dem Projekt; Zeile entfällt im Spiel. Noch nicht gepusht.
 - work-zahlen e5d4061b (Merge work-projekt 486a6900 fertig), CI 45902650621 läuft.
 - work-spiel a71d4ec2 (mit Leser-Fix), Probe 45901148156 success.
+
+## Nachtrag 27.11. 00:20
+- work-projekt 4114a9d8 = + Leser-Fix (Gate 45904779045 läuft). work-zahlen 6b69a590 „bereit zum Mischen" (CI 45905588340: native, converter-cases 179/0, murmel 349/772, murmel-web grün; rot nur SpawnCity-bedingt).
+- NEU: Zweig work-final 674bfa96 (Worktree /home/claude/w-final) = work-projekt 4114a9d8 + work-zahlen 6b69a590, Merge ohne Konflikt, CI 45908491637. DAS ist der Stand für main.
+- Aufträge: zahlen8 auf work-final (NaN-Vergleich elementweise, placelib/worldrules portieren, alte kern::math-f64 raus, ActorBlueprint::argument getypt, Klangvorschau); konverter9 pusht work-konverter und mischt selbst in work-final; kleinspiel4 mischt work-final in work-spiel, stellt Spiel auf getypte Sprache um.
