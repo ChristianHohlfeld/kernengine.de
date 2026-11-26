@@ -1,0 +1,80 @@
+  game_net: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  look_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  net_session_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  drone_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_controls_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_details_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_swarm_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_vehicle_damage_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  terrain: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  tiles_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  city_jobs_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  terrain_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_destruction_sync: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_destruction_sync_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_traffic_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  road_graph_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_marks: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_traffic_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  destruction_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_world: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  lamps_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  life_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  people_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_marks_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_world_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  life_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  interiors_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  Game: the project - it exports sc_tile_data, sc_tile_failed, sc_offline, sc_dem_data and 10 more - exports belong to the program
+
+1631 of 1839 functions of the program are written as Blueprints (19069 of 30424 lines), and 29 of the engine's headers that they call: 150 Blueprints - 66 of source files, 3 of states, 81 of headers and of shapes
+1588 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 8 give nothing
+
+what the others wait for: functions (lines)
+    16 (  1058)   it calls Game::explosion(), which waits
+     1 (   472)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'report' in namespace 'converted_Game__game_worldsync_cpp::wanted' - that went with Blueprint: expected class name)
+    10 (   465)   it calls Session::send_fx(), which waits
+     9 (   460)   it calls Game::command(), which waits
+     4 (   333)   it calls Session::color_of(), which waits
+     6 (   326)   it calls Game::spawn_unseen(), which waits
+     2 (   311)   it calls Game::ctl_command(), which waits
+     1 (   306)   it calls slab(), which waits
+     2 (   256)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'aim_ellipse' in namespace 'converted_Game__game_controls_cpp::controls'; did you mean 'sc::controls::aim_ellipse'? - that went with g_rules: excess elements in struct initializer)
+     1 (   236)   it calls Interiors::update(), which waits
+     1 (   226)   it calls Game::hit_remotes(), which waits
+     2 (   225)   an object of the engine as another type (Object<kern::Mesh> where Int is wanted)
+     6 (   217)   an object of the engine as another type (Object<kern::Earcut> where Int is wanted)
+     2 (   200)   it calls Game::air_strike(), which waits
+     1 (   196)   it calls Session::propose_rule(), which waits
+     3 (   179)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'stars' in namespace 'converted_Game__game_town_cpp::wanted'; did you mean 'sc::wanted::stars'? - that went with Blueprint: expected class name)
+     1 (   171)   it calls CityStream::merge_damage(), which waits
+     1 (   170)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'controls'; did you mean 'sc::controls'?)
+     1 (   158)   the engine's type WorldSettings, which is not one for Blueprints (its header does not mark it KERN_BLUEPRINT_TYPE)
+     1 (   157)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'stars' in namespace 'converted_Game__game_controls_cpp::wanted' - that went with Blueprint: expected class name)
+     2 (   146)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'stars' in namespace 'converted_Game__game_town_cpp::wanted' - that went with Blueprint: expected class name)
+     1 (   145)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'spawn_protect_ms' in namespace 'converted_net_session_cpp::mp'; did you mean 'sc::mp::spawn_protect_ms'? - that went with Blueprint: expected class name)
+     1 (   136)   it calls Game::ctl_strike_confirm(), which waits
+     1 (   136)   it calls Game::combat_hud(), which waits
+     2 (   125)   it calls Game::look_blast(), which waits
+     3 (   124)   it calls Session::seat_request(), which waits
+     1 (   124)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: non-const lvalue reference to type 'CarHit' cannot bind to a value of unrelated type 'town::PersonHit')
+     1 (   121)   it calls Game::take_fixed_step(), which waits
+     2 (   121)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'melee_hit' - that went with Blueprint: expected class name)
+     2 (   120)   it calls Game::traffic_far_step(), which waits
+     1 (   120)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'load' in 'converted_net_session_cpp::seats::Table' - that went with Blueprint: expected class name)
+     1 (   116)   it calls Game::drone_attack(), which waits
+     1 (   115)   it calls Game::ui_reset(), which waits
+     1 (   111)   it calls Game::spawn_police_drones(), which waits
+     1 (   111)   it calls CityStream::begin_cells(), which waits
+     3 (   110)   it calls Game::hit_scan(), which waits
+     2 (   105)   it calls Game::damage_player_vehicle(), which waits
+     2 (   104)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'cooldown' in namespace 'converted_Game__game_guided_cpp::guided'; did you mean 'sc::guided::cooldown'? - that went with Blueprint: expected class name)
+     1 (   104)   it calls Session::send_swarm(), which waits
+     1 (   103)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'get' in 'converted_Game__game_gaps_cpp::seats::Table' - that went with Blueprint: expected class name)
+
+real	103m18,759s
+user	1138m16,017s
+sys	55m22,743s
