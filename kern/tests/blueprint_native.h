@@ -1163,6 +1163,11 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
     // lists of the item type's samples: none, one, all of them, some of them twice
     const std::vector<Value> items = samples(logic::element_of(t), count);
     auto list = [&](std::vector<std::size_t> picks) {
+      if (t == PinType::object_list) {  // (objects are no JSON: the references themselves)
+        std::vector<logic::ObjectRef> refs;
+        for (std::size_t k : picks) refs.push_back(items[k % items.size()].as_object());
+        return Value::of(std::move(refs));
+      }
       json::Value a = json::Value::array();
       for (std::size_t k : picks) a.push(items[k % items.size()].to_json());
       return Value::from_json(a, t);
@@ -2006,6 +2011,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
   }
   if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (t == PinType::object) return "kern::logic::Object<" + logic::engine_class_cpp(of) + ">";  // (an object of the engine: Object<kern::App>)
+  if (t == PinType::object_list) return "kern::List<kern::logic::Object<" + logic::engine_class_cpp(of) + ">>";
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
@@ -2072,6 +2078,11 @@ inline std::string value_source(const Value& v) {
     case PinType::text: return L + "text(" + cpp_value(v) + ")";
     case PinType::actor: return L + "actor(" + std::to_string(v.a) + "u)";
     case PinType::object: return L + "object(kern::logic::ObjectRef{" + std::to_string(v.i) + "LL, " + std::to_string(v.world) + "u})";
+    case PinType::object_list: {
+      std::string r = L + "of(std::vector<kern::logic::ObjectRef>{";
+      for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + std::string("kern::logic::ObjectRef{") + std::to_string(v.item(k).i) + "LL, " + std::to_string(v.item(k).world) + "u}";
+      return r + "})";
+    }
     case PinType::enumeration: return L + "enumeration(" + std::to_string(v.i) + ")";
     case PinType::structure: return v.rows ? rows("structure") : L + "zero(kern::logic::PinType::structure)";
     case PinType::structure_list: return rows("structures");

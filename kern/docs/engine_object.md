@@ -14,9 +14,9 @@ gegangen“ – `func.engine_object` gab bei vier verschiedenen Ursachen still `
 
 | | |
 |---|---|
-| Pin-Typ | `object`, mit `of` = die Klasse oder Schnittstelle der Engine (jeder Pin nennt seine; es gibt keinen „Objekt irgendeiner Klasse“) |
+| Pin-Typ | `object` (Liste: `object_list`), mit `of` = die Klasse oder Schnittstelle der Engine (jeder Pin nennt seine; es gibt keinen „Objekt irgendeiner Klasse“) |
 | Name von `of` | die eine Regel der Engine-Namen in Blueprints: der C++-Name unter `kern::`, `::` wird `_` – `kern::App` ist `App`, `kern::physics::World` ist `physics_World`, `kern::logic::NodeType` ist `logic_NodeType` (dieselbe Regel wie für Structs der Engine und `implements`) |
-| C++-Text | `Object<kern::App>` – der echte C++-Typ der Engine als Argument, kein Text |
+| C++-Text | `Object<kern::App>`, `List<Object<kern::ShaderExtension>>` – der echte C++-Typ der Engine als Argument, kein Text |
 | Wert | `logic::ObjectRef { i64 handle; u32 world; }` – das Handle in den Objekten **einer** Welt und die Nummer dieser Welt |
 | kein Objekt | `Object<I>{}` (Handle 0, Welt 0): die Vorgabe jeder Variablen dieses Typs – nie das Ergebnis eines Fehlers |
 
@@ -51,7 +51,9 @@ nachschlagen. Der Wert hat dafür das Feld `Value::world` (für `object` gesetzt
 - Gebaut: Pin-Typ, Wert, Prüfung der Drähte, JSON, C++-Text lesen und schreiben, Klasse (`kern::logic::Object<I>`,
   `kern/logic/logic.h`; `func_engine_object<I>` in `kern/logic/blueprint.h`), Interpreter, Editor (Pin-Farbe, Name, nur passende Drähte), `func.engine_object` mit Gründen, die drei Knoten.
   Tests: `engine_object_of_a_blueprint` (Knoten, vier Gründe, C++-Text), `object_refs_know_their_world` (Drähte, Welt, Variable), Tierfall `on_actor` (jede Stufe).
-- Offen: Listen von Objekten (`List<Object<I>>`, z. B. `App::extensions`) – heute `List<Int>` über `object_handle`.
+- Listen: `List<Object<I>>` (`object_list`, Typtext `object<App>_list`, Einträge `ObjectRef`); die Knoten der Listen nehmen
+  Objekte jeder Schnittstelle als „Type“ (Make List, Get, Add, Sort – sortiert nach Welt, dann Handle). Geschrieben
+  steht eine Liste nur ohne Objekte (`List<Object<kern::App>>{}`); ihre Objekte gibt die Engine.
 - Offen (eigener Schritt, groß): die Tabelle der Engine (`tools/engine_api.py`) beschreibt ihre Objekte noch als `Int`
   (Form `h`/`i`). Wenn sie `Object<Klasse>` schreibt, entfällt `object_handle`, und der Konverter schreibt einen Zeiger
   der Engine als `Object<…>` statt `Int`. Bis dahin ist `object_handle` der eine, ausdrückliche Übergang.

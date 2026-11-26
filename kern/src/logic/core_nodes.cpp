@@ -634,6 +634,7 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
     case PinType::int64: f(std::type_identity<Int64>{}); break;
+    case PinType::object: f(std::type_identity<ObjectRef>{}); break;
     case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
     case PinType::structure: f(std::type_identity<Value>{}); break;  // (a struct is the value that holds its fields)
     default: break;
@@ -932,6 +933,7 @@ void add_lists(Library& lib) {
           case PinType::boolean: return a.b < b.b;
           case PinType::text: return a.s < b.s;
           case PinType::int64: return static_cast<u64>(a.i) < static_cast<u64>(b.i);  // (by the bits as a u64 - logic::Int64's <)
+          case PinType::object: return a.as_object() < b.as_object();  // (by world, then handle - logic::ObjectRef's <)
           default: return false;
         }
       };

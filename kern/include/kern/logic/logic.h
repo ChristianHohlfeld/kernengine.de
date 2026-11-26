@@ -44,6 +44,7 @@
 #pragma once
 
 #include <cmath>
+#include <compare>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -70,28 +71,27 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// that reads them (Compare Int64 <, <u; Int64 Math /s, /u), as in WebAssembly. `map`: values of
 /// one type, each under a key of its own, in the order the keys came; `set`: keys in the order
 /// they came - of what types says the name beside it (keyed_of).
+/// `object`: an object of the engine (kern/docs/engine_object.md), Object<I> - TypeRef::of names its class or
+/// interface by the rule of the engine's names in Blueprints (kern::App: "App", kern::physics::World:
+/// "physics_World"); its value is an ObjectRef - a handle in the objects of one world and that world, never a number.
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64, object,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list, object_list,
   map, set,
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback,
-  /// An object of the engine (kern/docs/engine_object.md): Object<I> - TypeRef::of names its class or interface
-  /// by the rule of the engine's names in Blueprints (kern::App: "App", kern::physics::World: "physics_World").
-  /// Its value is an ObjectRef: a handle in the objects of one world and that world - never a number.
-  object, count
+  callback, count
 };
-constexpr u8 kValueTypes = 9;  // boolean ... int64
+constexpr u8 kValueTypes = 10;  // boolean ... object
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
-constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::int64_list; }
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::object_list; }
 /// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
 constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::set; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::int64 ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::object ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
-                                                     "map",       "set",      "callback",   "object"};
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",      "object",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list", "object_list",
+                                                     "map",       "set",      "callback"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -177,6 +177,11 @@ struct ObjectRef {
   WorldId world = 0;
   constexpr bool valid() const { return handle != 0 && world != 0; }
   friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+  /// (an order for Sort List: by world, then by handle - the same in every tier)
+  friend constexpr auto operator<=>(ObjectRef a, ObjectRef b) {
+    if (a.world != b.world) return a.world <=> b.world;
+    return a.handle <=> b.handle;
+  }
 };
 /// An object of the engine of the class I in a Blueprint's class: Object<kern::App> (I is the engine's C++ type, a
 /// tag only - nothing of it is used). Object<I>{} is none; no number becomes one (kern/docs/engine_object.md).
@@ -192,6 +197,7 @@ template <class I> struct Object {
   ObjectRef ref;
   constexpr bool valid() const { return ref.valid(); }
   friend constexpr bool operator==(const Object&, const Object&) = default;
+  friend constexpr auto operator<=>(const Object& a, const Object& b) { return a.ref <=> b.ref; }
 };
 
 /// The key of an entry of a map or a set, as the interpreter holds it: a whole number (Int, the
@@ -221,7 +227,8 @@ struct Int64 {
 };
 
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>>;
+using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
+                             std::vector<ObjectRef>>;
 /// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
 template <class T> constexpr PinType list_type_of() = delete;
 template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
@@ -231,6 +238,7 @@ template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list
 template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
 template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
+template <> constexpr PinType list_type_of<ObjectRef>() { return PinType::object_list; }
 
 /// What a Callback value calls: a function of a library, with the place it is bound to. Only the engine
 /// calls it (logic::call_back) - a Blueprint does not call, compare or convert a Callback.

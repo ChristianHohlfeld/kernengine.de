@@ -48,12 +48,12 @@ const LG_STRUCT_COLOR = "#3f6fd6";
 let lgStructNames = new Set();  // the structs of the Blueprint that is shown (lgNormalize)
 const lgBuiltin = t => t in LG_TYPE_NAMES;
 const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
-const lgColor = t => LG_TYPE_COLORS[t] || (lgIsObject(t) ? LG_OBJECT_COLOR : lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
-const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsObject(t) ? (lgObjectOf(t) ? lgObjectOf(t) + " Object" : "Object") : lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
+const lgColor = t => LG_TYPE_COLORS[t] || (lgIsObject(lgIsList(t) ? lgItemType(t) : t) ? LG_OBJECT_COLOR : lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
+const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsObject(t) ? (lgObjectOf(t) ? lgObjectOf(t) + " Object" : "Object") : lgIsList(t) && lgIsObject(lgItemType(t)) ? lgObjectOf(lgItemType(t)) + " Object List" : lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
 const lgTyped = x => {
   if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
   if (x && x.type === "callback") { x.type = "callback<" + (x.of || "()") + ">"; return; }  // (a Callback: "callback<float(float,float)>" - only its own signature fits it)
-  if (x && x.type === "object") { x.type = "object<" + (x.of || "") + ">"; return; }  // (an object of the engine: "object<App>" - kern/docs/engine_object.md)
+  if (x && (x.type === "object" || x.type === "object_list")) { x.type = "object<" + (x.of || "") + ">" + (x.type === "object_list" ? "_list" : ""); return; }  // (an object of the engine: "object<App>" - kern/docs/engine_object.md)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
   if (x?.of && (x.type === "int" || x.type === "int_list") && LG_WIDTHS.includes(x.of)) x.type = x.type === "int" ? x.of : x.of + "_list";  // (an Int of a fixed width: "u32", "u8_list")
 };
