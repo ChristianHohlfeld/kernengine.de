@@ -1159,7 +1159,10 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
       for (u64 v : {u64{0}, u64{1}, ~u64{0}, u64{2}, u64{7}, u64{0} - 13, u64{1} << 63, (u64{1} << 63) - 1, (u64{1} << 53) + 1, u64{0x123456789abcdef0}, u64{0xfedcba9876543210}, u64{64}})
         r.push_back(Value::of_number<u64>(v));
       break;
-    default: break;
+    default:
+      // (every other number type: its edge values - number_cases.h)
+      if (logic::is_number(t)) r = number_cases::node_edges(logic::pin_type_name(t));
+      break;
   }
   if (logic::is_list(t)) {
     // lists of the item type's samples: none, one, all of them, some of them twice
@@ -1193,7 +1196,7 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
       Value v = Value::zero(t.type);
       std::size_t n = 0;
       for (std::size_t k : picks) {
-        if (keys.empty()) break;
+        if (keys.empty() || values.empty()) break;   // (a type without samples: none)
         v.own_entries().try_emplace(logic::key_of(keys[k % keys.size()]), t.type == PinType::map ? values[n++ % values.size()] : Value{});
       }
       return logic::fitted(std::move(v), t, g);  // (a map of u8 values holds U8s only - what a C++ caller hands over)
@@ -1224,7 +1227,7 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   if (t.type == PinType::structure) return items;
   auto list = [&](std::vector<std::size_t> picks) {
     std::vector<Value> rows;
-    for (std::size_t k : picks) rows.push_back(items[k % items.size()]);
+    for (std::size_t k : picks) if (!items.empty()) rows.push_back(items[k % items.size()]);   // (a struct without samples: none)
     return Value::structures(std::move(rows));
   };
   std::vector<std::size_t> all;
