@@ -49,3 +49,17 @@ Offen: Zahlen nur 64 Bit vs. Geschwindigkeit (Performance-Schritt, mit Messung);
 6. Bewiesen heißt: CI-Lauf mit Nummer. „Gepusht" ist nicht „bewiesen".
 
 Stand der Teile: Exporte (CI grün), Einstieg kern_main + Projekt-Einstellungen + Exporte am Programm (CI 45722359527 grün), Object<I>/Implements als Typ/KERN_PLACE/Blätter (CI 45717868592 grün bis auf Spiel-Jobs), Engine-Bibliotheken aus der Engine (lokal grün, CI offen), Pure-Regel + converter-cases (Probe 45725044600 rc=0). Kandidat 4b gescheitert (Pure sc_gamepad) — behoben auf work-test2.
+
+## Nachtrag 26.11. 05:20
+
+**Gemeinsamer Stand = work-projekt.** Gate ganz grün: CI 45747202997 auf 6d81d0a1 (native 56363/0 + nativer Fall, build, determinism, input, converter-cases, e2e, murmel-web). Enthält: Projekt über den Levels (.kproject, Editor), Einstieg kern_main/kern::run, Engine-Bibliotheken aus der Engine, Object<I> als einziger Weg (ab 551c00d0), Exporte {ptr,len} am Programm, Konverter mit --project, Murmel (kern/games/murmel).
+
+**Mischbereit mit eigener grüner CI (Agent projekt mischt ein):**
+- work-vorlagen 894def26 (CI 45749486609): Vorlagen + GameWorld::spawn (spawn_copy weg), set_property mit Grund, set_material_color, SoundBank::request_world, SpawnCity-Fahrzeuge als Vorlagen (Spiel erst im vollen Lauf belegt).
+- work-grundlagen 12b2821d (CI 45749980165): AppRuntime, Ton (engine.mixer), Eingabe-Aktionen, Speichern/Laden, Widgets, build_native.sh, unbekannte Schlüssel = Fehler.
+- work-test2 68b3f294 (CI 45752401389): Testrahmen in kern/include/kern/test/, kein Spielname im Konverter, Murmel-Vergleichstests ganz grün.
+
+**Kandidat 5 (voll, mag, Stand ac68a5ca): gescheitert**, convert rc=1 nach 110 min, 1595 geschrieben, 294 warten. Fatal: Span<const float> bekommt float[3] (MeshData_push_extra, terrain_cpp). 91 Kompilierfehler in Vergleichstests (Engine-Typen fehlen im Test). → Agent konverter4 (work-konverter). Protokoll k5.log im Scratchpad.
+
+**Offen:** Akteur-Verweis {WorldId, ActorRef}; Play Project im Editor; 3f; Welt-Einstellungen je Geräteprofil (build_level), add_pawn über spawn; cost-Mehrverbrauch Murmel (punkte/lade/steuerung); SpawnCity auf Engine-Ton/-Eingabe/-Speichern umstellen; Engine-Plan Punkt 4 (Spielspezifisches aus kern/ heraus), 6, 7; Performance-Schritt.
+Nach `work` kommt erst der gemeinsame Stand mit vollem Lauf + ganzer CI grün (auch Spiel-Jobs).
