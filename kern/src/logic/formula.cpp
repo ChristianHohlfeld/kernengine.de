@@ -441,7 +441,7 @@ struct FormulaParser {
       }
     }
     if (!typed) {
-      if (term(op).code == kSelect) {
+      if (term(op).code == kSelect || f.constant_) {
         for (int x : operands) if (!settle_alone(x)) return false;
         k = term(*operands.begin()).kind;
         for (int x : operands) if (term(x).kind != k) return same(op, operands, k);
@@ -473,7 +473,7 @@ struct FormulaParser {
     for (int child : {n.a, n.b, n.c})
       if (child >= 0 && !type(child)) return false;
     const int a = n.a, b = n.b, c = n.c;
-    if (n.code != kConst && n.code != kInput && n.code != kSelect) {
+    if (n.code != kConst && n.code != kInput && n.code != kSelect && !f.constant_) {
       // (what an operation gives of numbers written out only is a number written out itself)
       bool all = true;
       for (int child : {a, b, c}) all = all && (child < 0 || term(child).code == kConst);
@@ -493,7 +493,8 @@ struct FormulaParser {
         if (!same(t, {a, b}, k) || !whole(t, k, n.code == kRem ? "%" : n.code == kBitAnd ? "&" : n.code == kBitOr ? "|" : "^")) return false;
         break;
       case kNeg: case kBitNot: case kNot:
-        if (term(a).loose || (term(a).code == kConst)) { fail_at(n.at, "an operation of a number written out: write the number it gives"); return false; }
+        if (f.constant_ && term(a).loose && !settle_alone(a)) return false;
+        if (!f.constant_ && (term(a).loose || term(a).code == kConst)) { fail_at(n.at, "an operation of a number written out: write the number it gives"); return false; }
         k = term(a).kind;
         if (n.code == kNeg && !arithmetic(t, k)) return false;
         if (n.code == kBitNot && !whole(t, k, "~")) return false;
@@ -537,7 +538,8 @@ struct FormulaParser {
         const FormulaFunction* fn = function_of(n.code);
         if (!fn) return false;
         if (fn->args == 1) {
-          if (term(a).loose || term(a).code == kConst) { fail_at(n.at, "a function of numbers written out only: write the number it gives"); return false; }
+          if (f.constant_ && term(a).loose && !settle_alone(a)) return false;
+          if (!f.constant_ && (term(a).loose || term(a).code == kConst)) { fail_at(n.at, "a function of numbers written out only: write the number it gives"); return false; }
           k = term(a).kind;
         } else if (!(fn->args == 2 ? same(t, {a, b}, k) : same(t, {a, b, c}, k))) {
           return false;
@@ -700,7 +702,10 @@ std::string Formula::types_text() const {
   return r;
 }
 
-Formula::Formula(std::string_view text, std::string_view types) {
+Formula::Formula(std::string_view text, std::string_view types) : Formula(text, types, false) {}
+Formula Formula::constant(std::string_view text) { return Formula(text, "", true); }
+
+Formula::Formula(std::string_view text, std::string_view types, bool constant) : constant_(constant) {
   // the types of the inputs: one number type each, apart by spaces
   for (std::size_t at = 0; at < types.size();) {
     while (at < types.size() && (types[at] == ' ' || types[at] == ',')) ++at;
@@ -720,7 +725,8 @@ Formula::Formula(std::string_view text, std::string_view types) {
   root_ = p.ternary();
   p.space();
   if (error_.empty() && p.at < text.size()) p.fail(std::string("unexpected \"") + text[p.at] + "\"");
-  if (error_.empty() && inputs_.empty()) error_ = "a formula reads at least one input (a number alone is the node Number)";
+  if (error_.empty() && constant_ && !inputs_.empty()) error_ = "a constant formula reads no input";
+  if (error_.empty() && inputs_.empty() && !constant_) error_ = "a formula reads at least one input (a number alone is the node Number)";
   if (error_.empty() && types_.size() != inputs_.size()) {
     std::string names;
     for (const std::string& in : inputs_) names += (names.empty() ? "" : ", ") + in;

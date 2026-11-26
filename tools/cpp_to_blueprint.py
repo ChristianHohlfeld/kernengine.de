@@ -342,7 +342,9 @@ def engine_formula(text):
     if text not in _FORMULAS:
         r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), "--formula", text], capture_output=True, text=True)
         try:
-            _FORMULAS[text] = float.fromhex(r.stdout.strip()) if r.returncode == 0 else None
+            # (its type and its value: "f64 0x1.2p-1", "i32 7" - the value of a floating one with every bit)
+            kind, _, value = r.stdout.strip().partition(" ")
+            _FORMULAS[text] = (float.fromhex(value) if kind in ("f32", "f64") else int(value)) if r.returncode == 0 else None
         except ValueError:
             _FORMULAS[text] = None
     if _FORMULAS[text] is None:

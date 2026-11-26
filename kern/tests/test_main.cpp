@@ -32,6 +32,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
+#include "size_edges.h"
 #include "kern/logic/blueprint_class.h"
 #include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
@@ -2391,7 +2392,9 @@ template <class T> void formula_is_its_nodes(const FormulaAndNodes& c, std::span
         inst->set("C", logic::Value::of_number(x));
         rt.call("Go");
         const u64 f = inst->get("F").bits(), n = inst->get("N").bits();
-        if (f != n) {
+        // (a NaN is a NaN: which one - its sign, its payload - C++ leaves to the machine and the compiler, numbers.h)
+        const bool both_nan = logic::num::Floating<T> && std::isnan(inst->get("F").as<T>()) && std::isnan(inst->get("N").as<T>());
+        if (f != n && !both_nan) {
           std::printf("formula \"%s\" of %s, %s %s %s: the formula %llx, its nodes %llx\n", c.formula, t.c_str(), logic::number_as_text(logic::Value::of_number(a)).c_str(),
                       logic::number_as_text(logic::Value::of_number(b)).c_str(), logic::number_as_text(logic::Value::of_number(x)).c_str(), (unsigned long long)f, (unsigned long long)n);
           CHECK((false));
@@ -2406,6 +2409,15 @@ template <class T> void formula_is_its_nodes(const FormulaAndNodes& c, std::span
 // node against its node tree (Add, Multiply ... of the type); in C++, kern::formula (what a Blueprint's class runs) against C++'s
 // own arithmetic of the type - where C++ defines it (unsigned whole numbers, and signed ones without overflow; floating ones
 // with -ffp-contract=off, each step rounded to the type).
+// std::size_t at its edges (size_edges.h): the class's functions give what C++'s own u64 arithmetic gives, and that is kWant
+// - the same text logic_wasm_test.mjs asks of the WebAssembly build.
+TEST(numbers_size_t_edges) {
+  static_assert(sizeof(std::size_t) == 8, "the subset's data model is LP64");
+  const std::string cls = size_edges::of_the_class(), cpp = size_edges::of_cpp();
+  if (cls != size_edges::kWant || cpp != size_edges::kWant) std::printf("class:\n%sC++:\n%s", cls.c_str(), cpp.c_str());
+  CHECK(cls == cpp && cpp == size_edges::kWant);
+}
+
 TEST(logic_formula_is_its_nodes) {
   const FormulaAndNodes cases[] = {
       {"a * b + c", R"({"id":10,"type":"math.add","params":{"type":"$T"}},{"id":11,"type":"math.mul","params":{"type":"$T"}})",
@@ -2459,10 +2471,12 @@ TEST(logic_formula_is_its_nodes) {
           if constexpr (std::is_floating_point_v<T>) {
             T r = a * b;
             r = r + c;
-            CHECK((logic::num::bits_of(kern::formula<T, T, T>([](auto x, auto y, auto z) { return x * y + z; }, a, b, c)) == logic::num::bits_of(r)));
+            const T fr = kern::formula<T, T, T>([](auto x, auto y, auto z) { return x * y + z; }, a, b, c);
+            CHECK(((std::isnan(fr) && std::isnan(r)) || logic::num::bits_of(fr) == logic::num::bits_of(r)));
             T q = a - b;
             q = q / c;
-            CHECK((logic::num::bits_of(kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x - y) / z; }, a, b, c)) == logic::num::bits_of(q)));
+            const T fq = kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x - y) / z; }, a, b, c);
+            CHECK(((std::isnan(fq) && std::isnan(q)) || logic::num::bits_of(fq) == logic::num::bits_of(q)));
           } else {
             // (C++ computes a narrow one as an int and puts it back, a wide one in two's complement where it is unsigned: the same low bits)
             const T r = static_cast<T>(static_cast<U>(static_cast<U>(a) * static_cast<U>(b)) + static_cast<U>(c));
@@ -6290,7 +6304,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Heat = kern::formula<f64>([](auto a) { return a * 0.5f; }, Heat);"), "this number is an f32, and it meets an f64");
   refused(in_event("    Count = kern::formula<i64>([](auto a) { return a; }, Heat);"), "this is f64, the input is i64");
   refused(in_event("    Heat = kern::formula<i64>([](auto a) { return a + 1; }, Count);"), "this is i64, the input is f64");
-  refused(in_event("    Open = kern::formula<bool>([](auto a) { return a + 1; }, Open);"), "a bool has no arithmetic");
+  refused(in_event("    Heat = kern::formula<bool>([](auto a) { return a + 1; }, true);"), "1 is a whole number, and it meets a bool");
   // (a list of a fixed length written out on an input says the input's length: Fixed<f64, 3> for a field of three)
   for (const char* wrong : {"Fixed<f64, 4>{1.5}", "Fixed<f64, 2>{1.5}"})
     refused("  KERN_STRUCT(Trio) { Fixed<f64, 3> m = Fixed<f64, 3>{}; i64 k = 0; };\n  Trio P = Trio{Fixed<f64, 3>{}, 0};\n" +

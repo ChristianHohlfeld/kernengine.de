@@ -338,12 +338,6 @@ template <Number T> struct Typed {
   friend constexpr Typed operator^(Typed a, Typed b) requires Integer<T> { return bit_xor(a.v, b.v); }
   friend constexpr Typed operator&&(Typed a, Typed b) requires std::same_as<T, bool> { return a.v && b.v; }
   friend constexpr Typed operator||(Typed a, Typed b) requires std::same_as<T, bool> { return a.v || b.v; }
-  template <Integer N> friend constexpr Typed operator<<(Typed a, Typed<N> n) requires Integer<T> { return shl(a.v, n.v); }
-  template <Integer N> friend constexpr Typed operator>>(Typed a, Typed<N> n) requires Integer<T> { return shr(a.v, n.v); }
-  template <class L> requires(std::is_integral_v<L> && !std::same_as<L, bool>)
-  friend constexpr Typed operator<<(Typed a, L n) requires Integer<T> { return shl(a.v, n); }
-  template <class L> requires(std::is_integral_v<L> && !std::same_as<L, bool>)
-  friend constexpr Typed operator>>(Typed a, L n) requires Integer<T> { return shr(a.v, n); }
   friend constexpr Typed<bool> operator==(Typed a, Typed b) { return eq(a.v, b.v); }
   friend constexpr Typed<bool> operator!=(Typed a, Typed b) { return ne(a.v, b.v); }
   friend constexpr Typed<bool> operator<(Typed a, Typed b) requires Arithmetic<T> { return lt(a.v, b.v); }
@@ -369,6 +363,19 @@ template <Number T> struct Typed {
 #undef KERN_TYPED_2
 #undef KERN_TYPED_IS
 };
+// (a shift: of the type of the value shifted, the amount a whole number of any type. The value is a Typed itself - or a
+// whole number written out, which is then C++'s own type, an i32 for 1 in 1 << n, and takes no type from the amount)
+namespace detail {
+template <class L> using written = std::conditional_t<std::is_signed_v<L>, std::conditional_t<sizeof(L) <= 4, i32, i64>, std::conditional_t<sizeof(L) <= 4, u32, u64>>;
+template <class L> concept Written = std::is_integral_v<L> && !std::same_as<L, bool>;
+}  // namespace detail
+template <Integer T, Integer N> constexpr Typed<T> operator<<(Typed<T> a, Typed<N> n) { return shl(a.v, n.v); }
+template <Integer T, Integer N> constexpr Typed<T> operator>>(Typed<T> a, Typed<N> n) { return shr(a.v, n.v); }
+template <Integer T, detail::Written L> constexpr Typed<T> operator<<(Typed<T> a, L n) { return shl(a.v, n); }
+template <Integer T, detail::Written L> constexpr Typed<T> operator>>(Typed<T> a, L n) { return shr(a.v, n); }
+template <detail::Written L, Integer N> constexpr Typed<detail::written<L>> operator<<(L a, Typed<N> n) { return shl(static_cast<detail::written<L>>(a), n.v); }
+template <detail::Written L, Integer N> constexpr Typed<detail::written<L>> operator>>(L a, Typed<N> n) { return shr(static_cast<detail::written<L>>(a), n.v); }
+
 /// What a formula gives in C++: the number of a Typed, a number written out as it is.
 template <class R> constexpr auto untyped(R r) {
   if constexpr (requires { r.v; }) return r.v;

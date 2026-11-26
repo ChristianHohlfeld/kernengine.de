@@ -6,6 +6,7 @@
 
 #include "kern/api/c_api.h"
 #include "logic_cases.h"
+#include "size_edges.h"
 
 namespace {
 struct Run {
@@ -67,3 +68,11 @@ KERN_EXPORT(logic_test_bench_run) double logic_test_bench_run() {
 }
 
 KERN_EXPORT(logic_test_bench_value) double logic_test_bench_value() { return g_run.inst->get("Acc").as_number(); }
+
+/// std::size_t at its edges in WebAssembly (size_edges.h): what the class's functions give, what C++'s own u64 arithmetic
+/// gives, and what both give natively (kWant, checked by kern_tests) - three lines the test compares.
+KERN_EXPORT(logic_test_size_edges) const char* logic_test_size_edges(int which) {
+  static std::string text;
+  text = which == 0 ? size_edges::of_the_class() : which == 1 ? size_edges::of_cpp() : std::string(size_edges::kWant);
+  return text.c_str();
+}

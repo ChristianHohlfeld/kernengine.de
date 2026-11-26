@@ -865,6 +865,9 @@ class Formula {
   std::string text() const;
   /// The types written the one way ("u32 f32").
   std::string types_text() const;
+  /// A formula without inputs, operations of numbers written out allowed: what the language computes for it (the
+  /// converter asks it for a value it folds - tools/blueprint_cpp.sh --formula "tan(0.5)").
+  static Formula constant(std::string_view text);
 
  private:
   friend struct FormulaParser;
@@ -881,6 +884,8 @@ class Formula {
     u32 at = 0;                       // (where it is in the text)
   };
   std::string print(int term, int outer) const;
+  Formula(std::string_view text, std::string_view types, bool constant);
+  bool constant_ = false;
   std::vector<Term> tree_;
   int root_ = -1;
   std::vector<Op> code_;

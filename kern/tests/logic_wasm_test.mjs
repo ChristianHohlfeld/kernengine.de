@@ -22,6 +22,12 @@ for (let i = 0; i < x.logic_test_count(); i++) {
   if (compiled !== interpreted) { console.log(`FAIL ${name}: JIT results differ\n--- interpreter\n${interpreted}--- JIT\n${compiled}`); failures++; }
   else console.log(`ok   ${name}: identical in the interpreter and as compiled WebAssembly`);
 }
+// std::size_t at its edges (size_edges.h): the class in WebAssembly == C++ in WebAssembly == the class natively (kWant)
+{
+  const cls = text(x.logic_test_size_edges(0)), cpp = text(x.logic_test_size_edges(1)), native = text(x.logic_test_size_edges(2));
+  if (cls !== cpp || cls !== native) { console.log(`FAIL size_t at its edges differ\n--- class (wasm)\n${cls}--- C++ (wasm)\n${cpp}--- natively\n${native}`); failures++; }
+  else console.log("ok   size_t at its edges: the class in WebAssembly gives what C++ and the native build give");
+}
 // Speed: one million loop iterations with arithmetic and a variable.
 x.logic_test_bench_prepare(0);
 const ti = x.logic_test_bench_run(), vi = x.logic_test_bench_value();
