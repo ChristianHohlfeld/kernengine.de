@@ -5103,36 +5103,34 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Float>(this->kern_engine("engine.game_world.sim_time", {to_value(game_world)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
-  /// ---- players (multiplayer) ---- Adds a player pawn: a copy of `source` (0 = the level's player actor) with its children, placed next to the spawn. `id` forces the root's id (network clients mirror the server); children follow with consecutive ids. Returns the pawn's root actor (0 on failure).
-  void engine_game_world_add_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, Int source, Int id) {
+  /// ---- players (multiplayer) ---- Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn makes one - the one way of copying (kern/docs/runtime_actors.md) -, placed next to the level's player start. `id` forces the root's id (a network client mirrors its server); children follow with consecutive ids. The level's own player (world.player) is an actor of the level, never a copy. Returns the pawn's root actor (0, with the reason: the world does not run, no such template, it has no controller, the ids are taken).
+  void engine_game_world_add_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.add_pawn"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
+      const std::string_view kern_a0 = template_name.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_r = kern_self->add_pawn(std::move(kern_a0), std::move(kern_a1));
+      decltype(auto) kern_r = kern_self->add_pawn(kern_a0, std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(source), to_value(id)}, {PinType::integer});
+    this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(template_name), to_value(id)}, {PinType::integer});
   }
-  template <class KernNode> void engine_game_world_add_pawn(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, Int source, Int id) {
+  template <class KernNode> void engine_game_world_add_pawn(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.add_pawn"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
+      const std::string_view kern_a0 = template_name.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_r = kern_self->add_pawn(std::move(kern_a0), std::move(kern_a1));
+      decltype(auto) kern_r = kern_self->add_pawn(kern_a0, std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(source), to_value(id)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.add_pawn", {to_value(game_world), to_value(template_name), to_value(id)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_game_world_remove_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, Int pawn) {
@@ -5162,7 +5160,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.remove_pawn", {to_value(game_world), to_value(pawn)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  /// The actor a pawn was copied from (the pawn itself for the level's own player).
+  /// The template a pawn was copied from (the pawn itself for the level's own player).
   Int engine_game_world_pawn_source(::kern::logic::Object<::kern::game::GameWorld> game_world, Int pawn) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();

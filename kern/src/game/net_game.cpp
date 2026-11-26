@@ -31,10 +31,19 @@ struct RefuseMsg {
 
 struct PawnMsg {
   i32 slot = 0;  // 255 = the host's own pawn
-  u32 actor = 0, source = 0;
+  u32 actor = 0;
+  std::string template_name;  // the template the pawn is a copy of ("": the level's own player)
   template <class S>
-  bool serialize(S& s) { return net::serialize_int(s, slot, 0, 255) && net::serialize_u32(s, actor) && net::serialize_u32(s, source); }
+  bool serialize(S& s) { return net::serialize_int(s, slot, 0, 255) && net::serialize_u32(s, actor) && net::serialize_string(s, template_name, 200); }
 };
+
+/// The template a pawn is a copy of ("": the level's own player).
+std::string pawn_template(const GameWorld& w, ActorId pawn) {
+  const ActorId source = w.pawn_source(pawn);
+  if (!source || source == pawn) return {};
+  const Actor* t = w.templates().find(source);
+  return t ? t->name : std::string();
+}
 
 struct ActorMsg {
   u32 actor = 0;
@@ -320,9 +329,9 @@ void NetGame::server_update(f64 time, f32 dt, const PlayInput& input) {
       w.tick_hz = settings_.tick_hz;
       server_->send(slot, kReliable, kWelcome, w);
       // Existing pawns (the host's and other clients'), then this client's own.
-      if (world_.player()) server_->send(slot, kReliable, kPawn, PawnMsg{255, static_cast<u32>(world_.player()), static_cast<u32>(world_.pawn_source(world_.player()))});
+      if (world_.player()) server_->send(slot, kReliable, kPawn, PawnMsg{255, static_cast<u32>(world_.player()), pawn_template(world_, world_.player())});
       for (std::size_t i = 0; i < remotes_.size(); ++i)
-        if (remotes_[i]->active && remotes_[i]->pawn) server_->send(slot, kReliable, kPawn, PawnMsg{static_cast<i32>(i), static_cast<u32>(remotes_[i]->pawn), static_cast<u32>(world_.pawn_source(remotes_[i]->pawn))});
+        if (remotes_[i]->active && remotes_[i]->pawn) server_->send(slot, kReliable, kPawn, PawnMsg{static_cast<i32>(i), static_cast<u32>(remotes_[i]->pawn), pawn_template(world_, remotes_[i]->pawn)});
       // What logic changed so far: spawned actors, then property changes (in order).
       {
         std::vector<GameWorld::PropertyChange> props;
@@ -332,8 +341,11 @@ void NetGame::server_update(f64 time, f32 dt, const PlayInput& input) {
         for (const auto& p : props) server_->send(slot, kReliable, kProperty, PropertyMsg{static_cast<u32>(p.actor), p.path, json::stringify(p.value)});
       }
       for (ActorId dead : world_.dead_actors()) server_->send(slot, kReliable, kAlive, ActorMsg{static_cast<u32>(dead), false});
-      r.pawn = world_.add_pawn(0);
-      if (r.pawn) server_->broadcast(kReliable, kPawn, PawnMsg{slot, static_cast<u32>(r.pawn), static_cast<u32>(world_.pawn_source(r.pawn))});
+      // (the level names the template of a joining player's pawn: world.pawnTemplate; none - a level for one player)
+      r.pawn = world_.level().world.pawn_template.empty() ? 0 : world_.add_pawn(world_.level().world.pawn_template);
+      if (!r.pawn) log(LogLevel::error, "net: player %d joined without a pawn: %s", slot,
+                       world_.level().world.pawn_template.empty() ? "the level names no template for joining players (world.pawnTemplate)" : last_error());
+      if (r.pawn) server_->broadcast(kReliable, kPawn, PawnMsg{slot, static_cast<u32>(r.pawn), pawn_template(world_, r.pawn)});
     } else {
       if (r.pawn) {
         world_.remove_pawn(r.pawn);
@@ -503,7 +515,7 @@ void NetGame::client_update(f64 time, f32 dt, const PlayInput& input) {
         case kPawn: {
           PawnMsg p;
           if (!net::read(*m, p) || !welcomed_) break;
-          world_.add_pawn(static_cast<ActorId>(p.source), static_cast<ActorId>(p.actor));
+          if (!p.template_name.empty()) world_.add_pawn(p.template_name, static_cast<ActorId>(p.actor));   // (empty: the level's player, known)
           if (p.slot == local_slot_) world_.set_local_pawn(static_cast<ActorId>(p.actor));
           break;
         }

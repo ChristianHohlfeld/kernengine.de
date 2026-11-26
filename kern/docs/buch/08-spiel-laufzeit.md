@@ -722,8 +722,9 @@ Fall über 3,5 m/s spielen `builtin:land`, Sprünge und Boost ihre Sounds.
 ### Possession und Pawns
 
 Ein **Pawn** ist der Steuerungszustand eines Spielers (lokal und jeder entfernte): Actor-IDs, letzte
-Eingabe, Blickrichtung, Spawn-Pose, Boost, Character Mover, Soldatenzustand. `add_pawn(source, id)`
-legt einen weiteren Spieler an – eine Kopie des Spieler-Actors mit seinen Kindern, auf einem Ring um
+Eingabe, Blickrichtung, Spawn-Pose, Boost, Character Mover, Soldatenzustand. `add_pawn(vorlage, id)`
+legt einen weiteren Spieler an – eine Kopie einer Vorlage des Levels (mit Player Controller; die eines
+beitretenden Spielers ist `world.pawnTemplate`), gemacht wie `spawn` sie macht, mit ihren Kindern, auf einem Ring um
 den ursprünglichen Start (Winkel n · 2,39996 rad, Radius 3,5 + 1,2 · √n m), mit Bodies, Gelenken,
 Kampfwerten und Logik; `remove_pawn` entfernt sie wieder (der Level-eigene Spieler bleibt).
 `set_pawn_input`, `set_local_pawn`, `pawns`, `pawn_source` gehören dazu – das Netz nutzt sie

@@ -1321,7 +1321,7 @@ struct Engine : kern::Blueprint {
     R188 = engine_game_world_interior_view(In28);
     R189 = engine_game_world_camera_pitch(In28);
     R190 = engine_game_world_sim_time(In28);
-    engine_game_world_add_pawn(n45, In28, 0, 0);
+    engine_game_world_add_pawn(n45, In28, "", 0);
     R191_0 = n45.result;
     engine_game_world_remove_pawn(n46, In28, 0);
     R192_0 = n46.result;

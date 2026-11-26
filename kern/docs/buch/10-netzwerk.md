@@ -267,7 +267,8 @@ Respawn-Zeit, Treffer- und Schadenszähler, Kopftreffer, Kill, tot, Schadensrich
 2. **Verbindungswechsel:** Ein neuer Client bekommt das Willkommen, dann die bestehenden Pawns (der
    des Hosts und die anderer Clients), dann alles, was Logik bisher geändert hat (erst die
    Spawns, dann die Eigenschaften, in Reihenfolge), dann die toten Actors. Danach legt der Server
-   seinen Pawn an (`GameWorld::add_pawn`) und kündigt ihn allen an. Ein gegangener Client verliert
+   seinen Pawn an (`GameWorld::add_pawn` der Vorlage `world.pawnTemplate` des Levels; ein Level ohne sie ist für
+   einen Spieler: der Beitritt steht als Fehler im Log) und kündigt ihn allen mit dem Namen der Vorlage an. Ein gegangener Client verliert
    seinen Pawn (`remove_pawn`, `kUnpawn` an alle).
 3. **Eingaben:** Je Client gewinnt die neueste; ältere oder doppelte Ticks werden verworfen. Sprung,
    Nachladen und Feuer zählen, wenn sie in **irgendeiner** der neu angekommenen redundanten Eingaben
@@ -304,7 +305,7 @@ Für jeden Client baut `server_send_snapshots` einen eigenen Snapshot:
 2. **Zuverlässiges:**
    - `kWelcome`: Prüfsumme vergleichen – ein anderes Level wird mit „the server plays a different
      level“ abgewiesen und getrennt. Sonst `world.start_replica(level)`.
-   - `kPawn`: `add_pawn(source, actor)` mit **der ID des Servers**; ist es der eigene Slot, wird er
+   - `kPawn`: `add_pawn(vorlage, actor)` mit **der ID des Servers** (keine Vorlage: der eigene Spieler des Levels, bekannt); ist es der eigene Slot, wird er
      der lokale Pawn.
    - `kUnpawn`, `kAlive`, `kSpawn` (mit der ID des Servers), `kProperty` (`set_property`).
 3. **Unzuverlässiges:**

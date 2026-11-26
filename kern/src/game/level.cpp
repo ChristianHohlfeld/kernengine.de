@@ -1025,6 +1025,7 @@ json::Value world_to_json(const WorldSettings& w) {
   o.set("timeLimit", num(w.time_limit));
   o.set("scoreTarget", num(w.score_target));
   o.set("player", w.player);
+  o.set("pawnTemplate", w.pawn_template);
   if (w.observer) o.set("observer", true);
   o.set("masterVolume", num(w.master_volume));
   o.set("music", w.music);
@@ -1084,6 +1085,7 @@ bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error)
   r.number("timeLimit", w.time_limit, 0, 1e6);
   r.number("scoreTarget", w.score_target, 0, 1e9);
   r.uinteger("player", w.player);
+  r.string("pawnTemplate", w.pawn_template);
   r.boolean("observer", w.observer);
   r.number("masterVolume", w.master_volume, 0, 4);
   r.string("music", w.music);
@@ -1397,6 +1399,14 @@ std::vector<Issue> validate(const Level& level) {
   for (const char* ref : {level.world.music.c_str(), level.world.ambience.c_str()})
     if (!sound_reference_ok(level, ref)) out.push_back({false, 0, std::string("world sound \"") + ref + "\" does not exist (it is silent)"});
   if (players > 1) out.push_back({false, 0, "more than one actor has a player controller; the first one is possessed"});
+  if (!level.world.pawn_template.empty()) {
+    const Actor* t = nullptr;
+    std::string names;
+    for (const Actor& a : level.actors)
+      if (a.is_template) { names += (names.empty() ? "" : ", ") + a.name; if (a.name == level.world.pawn_template) t = &a; }
+    if (!t) out.push_back({true, 0, "world.pawnTemplate \"" + level.world.pawn_template + "\" is no template of the level (its templates: " + (names.empty() ? std::string("none") : names) + ")"});
+    else if (!t->controller) out.push_back({true, t->id, "world.pawnTemplate \"" + t->name + "\": the template has no player controller"});
+  }
   if (level.world.player && template_of(level, level.world.player))
     out.push_back({true, level.world.player, "world.player is a template or a part of one (a template is not in the world)"});
   if (level.world.goal == GameGoal::reach_goal) {

@@ -269,12 +269,14 @@ class GameWorld {
   f32 sim_time() const { return sim_time_; }
 
   // ---- players (multiplayer) ----
-  /// Adds a player pawn: a copy of `source` (0 = the level's player actor) with its children,
-  /// placed next to the spawn. `id` forces the root's id (network clients mirror the server);
-  /// children follow with consecutive ids. Returns the pawn's root actor (0 on failure).
-  ActorId add_pawn(ActorId source = 0, ActorId id = 0);
+  /// Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn
+  /// makes one - the one way of copying (kern/docs/runtime_actors.md) -, placed next to the level's player start.
+  /// `id` forces the root's id (a network client mirrors its server); children follow with consecutive ids. The
+  /// level's own player (world.player) is an actor of the level, never a copy. Returns the pawn's root actor (0, with
+  /// the reason: the world does not run, no such template, it has no controller, the ids are taken).
+  ActorId add_pawn(std::string_view template_name, ActorId id = 0);
   bool remove_pawn(ActorId pawn);
-  /// The actor a pawn was copied from (the pawn itself for the level's own player).
+  /// The template a pawn was copied from (the pawn itself for the level's own player).
   ActorId pawn_source(ActorId pawn) const;
   /// Input of a remote player's pawn (used in the next fixed steps).
   void set_pawn_input(ActorId pawn, const PlayInput& input);
@@ -766,6 +768,13 @@ class GameWorld {
   std::vector<PropertyChange> prop_changes_, prop_log_;
   std::vector<SpawnChange> spawn_changes_, spawn_log_;
   Level templates_;   // the level's templates and their children (start: not in level_)
+  /// The template of that name (null with the reason: the level's templates named).
+  const Actor* find_template(std::string_view name) const;
+  /// A copy of the template `src` with its children at `at` (root's id `id`, 0: the next free): actors, presentation,
+  /// bodies, joints - what spawn and add_pawn share; empty with the reason (the ids are taken).
+  std::vector<ActorId> place_copy(const Actor& src, const Transform& at, ActorId id);
+  /// The copies' Blueprints, and their Begin Play now (in the running step's budget).
+  void begin_copies(const std::vector<ActorId>& created);
   std::unordered_map<ActorId, std::pair<Vec3, Quat>> replica_poses_;
 };
 

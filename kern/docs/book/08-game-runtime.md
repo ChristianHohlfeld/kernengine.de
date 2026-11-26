@@ -711,8 +711,9 @@ free fall above 3.5 m/s play `builtin:land`; jumps and boost play their sounds.
 ### Possession and pawns
 
 A **pawn** is a player's control state (the local one and every remote one): actor IDs, last input,
-view direction, spawn pose, boost, character mover, soldier state. `add_pawn(source, id)` creates
-another player – a copy of the player actor with its children, on a ring around the original start
+view direction, spawn pose, boost, character mover, soldier state. `add_pawn(template, id)` creates
+another player – a copy of a template of the level (with a player controller; a joining player's is
+`world.pawnTemplate`), made as `spawn` makes one, with its children, on a ring around the original start
 (angle n · 2.39996 rad, radius 3.5 + 1.2 · √n m), with bodies, joints, combat values and logic;
 `remove_pawn` removes it again (the level's own player stays). `set_pawn_input`, `set_local_pawn`,
 `pawns`, `pawn_source` belong to this – the network uses them ([Chapter 10](10-networking.md)).

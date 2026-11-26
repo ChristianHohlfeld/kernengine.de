@@ -3741,6 +3741,9 @@ TEST(world_spawn_errors) {
   // No template of that name: the level's templates are named.
   CHECK(f.world->spawn("Barrel", {}) == 0);
   CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  // A player's pawn is a copy of a template too (add_pawn: the one way of copying) - with a player controller.
+  CHECK(f.world->add_pawn("Barrel") == 0 && std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  CHECK(f.world->add_pawn("Crate") == 0 && std::string(last_error()) == "add pawn: the template \"Crate\" has no player controller");
   // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
   CHECK(f.world->spawn("", {}) == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
   // An actor of the world is no template.
@@ -3784,6 +3787,14 @@ TEST(world_spawn_errors) {
       if (a.name == "Crate") { a.controller = game::ControllerComponent{}; x.world.player = a.id; }
     CHECK(game::default_player(x) == 0);   // (a template's controller is no player of the world)
     CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
+  }
+  {
+    // world.pawnTemplate names a template with a player controller.
+    game::Level x = template_level();
+    x.world.pawn_template = "Barrel";
+    CHECK(first_error(x) == "world.pawnTemplate \"Barrel\" is no template of the level (its templates: Crate, Coin)");
+    x.world.pawn_template = "Crate";
+    CHECK(first_error(x) == "world.pawnTemplate \"Crate\": the template has no player controller");
   }
   {
     // "template" in the file must be true or false.
@@ -10168,6 +10179,7 @@ TEST(net_game_soldier_replication) {
   for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {40, 40, 0.5f};
   add_soldier(l, {0, 0, 0.8f});
   const game::ActorId dummy = add_dummy(l, {12, 0, 0.725f});
+  game_cases::add_pawn_template(l, "Soldier");   // (the joining players' pawns: world.pawnTemplate)
   net::LoopbackNetwork hub(5);
   hub.simulator().settings.latency_ms = 40;
   hub.simulator().settings.jitter_ms = 5;
@@ -10256,6 +10268,7 @@ TEST(net_game_replicates_logic_changes) {
   crate.body = game::BodyComponent{};
   crate.is_template = true;   // (the copies are in the world, the template is not: kern/docs/runtime_actors.md)
   l.add(crate);
+  game_cases::add_pawn_template(l, "Soldier");   // (the joining players' pawns: world.pawnTemplate)
   l.logic = logic_graph(R"({"nodes":[{"id":1,"type":"game.input","params":{"action":"interact"}},
       {"id":2,"type":"actor.find","values":{"name":"Door"}},{"id":3,"type":"actor.set_location","values":{"location":[10,0,4.5]}},
       {"id":4,"type":"actor.set_color","values":{"color":[1,0,0]}},{"id":5,"type":"actor.spawn","params":{"template":"Crate"},"values":{"location":[2,2,3]}}],
@@ -10353,6 +10366,9 @@ TEST(net_game_server_and_clients) {
   crate.body = game::BodyComponent{};
   const game::ActorId crate_id = l.add(crate).id;
   l.world.goal = game::GameGoal::collect_all;
+  game_cases::add_pawn_template(l, "Ball");   // (the joining players' pawns: copies of a template, world.pawnTemplate)
+  game::ActorId ball_template = 0;
+  for (const game::Actor& a : l.actors) if (a.is_template && a.name == "Ball") ball_template = a.id;
 
   net::LoopbackNetwork hub(11);
   hub.simulator().settings.latency_ms = 30;
@@ -10383,7 +10399,7 @@ TEST(net_game_server_and_clients) {
   CHECK(w1.pawns().size() == 3 && w2.pawns().size() == 3);  // everyone sees everyone
   const game::ActorId p1 = w1.player(), p2 = w2.player();
   CHECK(p1 != ball_id && p2 != ball_id && p1 != p2);
-  CHECK(w1.pawn_source(p1) == ball_id);
+  CHECK(ball_template && w1.pawn_source(p1) == ball_template);   // (the template it is a copy of)
   // Client 1 rolls forward (+X, its camera looks along the ball's facing).
   forward1.move_y = 1;
   Mat4 m0;

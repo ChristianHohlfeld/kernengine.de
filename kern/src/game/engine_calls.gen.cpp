@@ -634,11 +634,11 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  std::string a0;
+  ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 2, a1);
-  decltype(auto) r = self->add_pawn(std::move(a0), std::move(a1));
+  decltype(auto) r = self->add_pawn(a0, std::move(a1));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
 }

@@ -76,6 +76,8 @@ wird, keine laufende Welt).
 - Gebaut: siehe Tests `world_templates_spawn`, `world_spawn_errors`, `world_set_property_says_why`, `sound_bank_request_world`
   (kern/tests/test_main.cpp); Murmel setzt seine Münzen aus der Vorlage „Muenze“ (Level-Graph, Begin Play); SpawnCity
   setzt seine Fahrzeuge (Vorlagen Drone, Jet, Car, Bus, Parachute) in `Game::start`.
-- Offen: der typisierte Akteur-Verweis (Zweig work-projekt); Komponenten zur Laufzeit hinzufügen/entfernen (nicht
-  nötig, solange Vorlagen sie tragen); `add_pawn` (Mitspieler) kopiert weiterhin den Spieler-Akteur der Welt – eine
-  Vorlage „Spieler“ wäre der gleiche Weg, ist aber eine eigene Entscheidung (Besitz beim Start).
+- Mitspieler: `GameWorld::add_pawn(vorlage, id)` macht den Pawn eines weiteren Spielers aus einer Vorlage mit Player
+  Controller, auf demselben Weg wie `spawn` (`place_copy`), auf einem Ring um den Start des Spielers des Levels. Die
+  Vorlage beitretender Spieler nennt das Level: `world.pawnTemplate` (`validate`: eine Vorlage mit Player Controller);
+  ohne sie ist ein Level für einen Spieler. `world.player` selbst bleibt ein Akteur des Levels.
+- Offen: Komponenten zur Laufzeit hinzufügen/entfernen (nicht nötig, solange Vorlagen sie tragen).
