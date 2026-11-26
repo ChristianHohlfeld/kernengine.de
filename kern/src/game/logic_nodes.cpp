@@ -135,9 +135,9 @@ void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float
     }
 }
 Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view template_name, Vector location, Vector rotation, Vector scale) {
-  const ActorId id = w.spawn(template_name, Transform{location, rotation, scale});
-  if (!id) host.error(std::string("Spawn Actor: ") + last_error());
-  return actor_of(w, id);
+  const Actor made = w.spawn(template_name, Transform{location, rotation, scale});
+  if (!made.id) host.error(std::string("Spawn Actor: ") + last_error());
+  return made;
 }
 void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(w, self, target, __func__)); }
 void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled) { w.set_alive(or_self(w, self, target, __func__), enabled); }

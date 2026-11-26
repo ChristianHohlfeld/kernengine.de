@@ -1,4 +1,4 @@
 #include "actors.h"
-namespace sc {
+namespace cases {
 Crowd& crowd() { static Crowd c; return c; }
 }

@@ -21,11 +21,12 @@ namespace {
 logic::Value act(logic::WorldId world, ActorId id) { return logic::Value::actor(id ? logic::ActorHandle{static_cast<logic::ActorRef>(id), world} : logic::ActorHandle{}); }
 }  // namespace
 
-logic::WorldId GameWorld::world_id() const { return logic_host_ ? logic_host_->world() : 0; }
+logic::WorldId GameWorld::world_id() const { return world_id_; }
 
 void GameWorld::start_logic() {
   logic_.reset();
   logic_host_.reset();
+  world_id_ = logic::new_world();   // (a new world at every start: an actor of the level before names nothing in this one)
   prop_changes_.clear();
   prop_log_.clear();
   spawn_changes_.clear();
@@ -348,19 +349,19 @@ void GameWorld::begin_copies(const std::vector<ActorId>& created) {
   logic_->begin_added();   // (the copy's Begin Play, now - also when a graph spawns it)
 }
 
-ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
+logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id) {
   const std::string name(template_name);
-  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return 0; }
+  if (!running()) { fail("spawn \"%s\": the world does not run", name.c_str()); return {}; }
   const Actor* src = find_template(template_name);
-  if (!src) return 0;
-  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return 0; }
+  if (!src) return {};
+  if (!finite(at.position) || !finite(at.rotation) || !finite(at.scale)) { fail("spawn \"%s\": the transform is not finite", name.c_str()); return {}; }
   for (int i = 0; i < 3; ++i)
-    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return 0; }
+    if (std::fabs(at.scale[i]) < 1e-4f) { fail("spawn \"%s\": the scale must not be zero", name.c_str()); return {}; }
   const std::vector<ActorId> created = place_copy(*src, at, id);
   if (created.empty()) {
     const std::string why = last_error();
     fail("spawn %s", why.c_str());
-    return 0;
+    return {};
   }
   if (mode_ != SimMode::replica) {
     for (ActorId aid : created) init_combat(aid);
@@ -369,7 +370,7 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
     if (spawn_log_.size() < 4096) spawn_log_.push_back(c);
     begin_copies(created);
   }
-  return created[0];
+  return {created[0], world_id_};   // (the root, an Actor of this world: kern/docs/project.md 7)
 }
 
 void GameWorld::destroy_actor(ActorId id) {

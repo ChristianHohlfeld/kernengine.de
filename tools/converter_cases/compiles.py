@@ -9,7 +9,7 @@ spec = importlib.util.spec_from_file_location("cpp_to_blueprint", os.path.join(r
 c2b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(c2b)
 w = object.__new__(c2b.TestWriter)
-w.test_dir, w.source_dir, w.path, w.flags = os.path.join(root, "kern", "games", "spawncity", "tests", "converted"), "src", os.path.join(root, "x.cpp"), []
+w.test_dir, w.source_dir, w.path, w.flags = os.path.join(root, "tools", "converter_cases"), "src", os.path.join(root, "x.cpp"), []
 text = "\n".join(f"int f{i}() {{ return undeclared_{i}; }}" for i in range(30))   # (30 errors, one a line: clang stops at 20)
 errors = w.compiles(text, "too_many")
 said = [m for _, m in errors]

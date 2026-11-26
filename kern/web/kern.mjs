@@ -275,7 +275,7 @@ export class KernModule {
     this.timer = null;
     this.drawBufferLists = new Map();
     this.heightSampler = null;  // (x, y) => ground height, used by the geometry builders
-    this.statusSink = null;     // (text) => void, kern::Engine::set_status
+    this.uiSink = null;         // (json) => void, the app's widgets after a frame they changed in (kern/docs/app.md 6.)
     this.pointerLockSink = null;  // (lock) => void, kern::Engine::request_pointer_lock
   }
 
@@ -352,6 +352,12 @@ export class KernModule {
     this.exports._initialize?.();
   }
 
+  /** The localStorage key of an app's save slot: the page's folder keeps two games of one site apart. */
+  storageKey(slot) {
+    const path = String(globalThis.location?.pathname ?? "/").replace(/[^/]*$/, "");
+    return "kern-save:" + path + ":" + slot;
+  }
+
   imports() {
     const self = this;
     const gl = () => self.gl;
@@ -360,8 +366,35 @@ export class KernModule {
     const env = {
       now: () => performance.now(),
       terrain_height: (x, y) => (self.heightSampler ? Number(self.heightSampler(x, y)) : 0),
-      status: (ptr, length) => self.statusSink?.(self.string(ptr, length)),
+      ui: (ptr, length) => self.uiSink?.(self.string(ptr, length)),
       pointer_lock: lock => self.pointerLockSink?.(lock !== 0),
+      // the app's save slots (kern/docs/app.md 5., kern/app/storage.h): the page's localStorage under
+      // "kern-save:<the page's folder>:<slot>" - two games on one site keep apart by their path
+      storage_get: (ptr, length) => {
+        try {
+          const text = globalThis.localStorage?.getItem(self.storageKey(self.string(ptr, length)));
+          if (text == null) { self.storageText = null; return -1; }
+          self.storageText = self.encoder.encode(text);
+          return self.storageText.length;
+        } catch (error) { self.storageError = String(error?.message || error); return -2; }
+      },
+      storage_take: (out, capacity) => { if (self.storageText) self.u8.set(self.storageText.subarray(0, capacity), out); self.storageText = null; },
+      storage_set: (ptr, length, text, textLength) => {
+        try {
+          if (!globalThis.localStorage) throw Error("this page has no localStorage");
+          globalThis.localStorage.setItem(self.storageKey(self.string(ptr, length)), self.string(text, textLength));
+          return 1;
+        } catch (error) { self.storageError = String(error?.message || error); return 0; }
+      },
+      storage_remove: (ptr, length) => {
+        try { globalThis.localStorage?.removeItem(self.storageKey(self.string(ptr, length))); return 1; } catch (error) { self.storageError = String(error?.message || error); return 0; }
+      },
+      storage_error: (out, capacity) => {
+        const b = self.encoder.encode(self.storageError || "the page's storage refused it");
+        const n = Math.min(b.length, capacity);
+        self.u8.set(b.subarray(0, n), out);
+        return n;
+      },
       // Kern Logic JIT: the engine hands over a WebAssembly module generated from a graph;
       // the browser compiles it to machine code, it links against the engine's memory and node
       // functions, and its run function goes into the engine's function table (direct calls).

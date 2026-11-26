@@ -22,57 +22,12 @@
 
 #include "blueprint_native.h"
 #include "kern/app/app.h"
-#include "cost.h"
-#include "rule_blueprint.h"
+#include "kern/test/blueprint.h"
 #include "rules.h"
-#include "test_util.h"
+#include "kern/test/test.h"
 
-namespace sct {
-std::vector<Case>& cases() { static std::vector<Case> c; return c; }
-int failures = 0, checks = 0;
-}  // namespace sct
-
-// The allocator says every piece of memory it is asked for (cost.h): with the sanitizers, their
-// allocator through its hook; without them, operator new itself.
-#if defined(SC_ASAN)
-// (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
-extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
-// (and what it gives is zeroed: what C++ leaves open in an object that nothing sets is then the zero the
-// Blueprint starts from, one of the values C++ allows - converted.h, zero_stack)
-static void asked_for_memory(const volatile void* p, std::size_t size) {
-  sc::cost::asked();
-  if (p != nullptr) std::memset(const_cast<void*>(p), 0, size);
-}
-static void gave_memory_back(const volatile void*) {}
-static void count_memory() { __sanitizer_install_malloc_and_free_hooks(asked_for_memory, gave_memory_back); }
-// What the C runtime asks for itself when a function's static registers how it ends (__cxa_atexit keeps its list
-// in blocks and asks for a new one whenever the last is full - which call meets that depends on how many statics
-// the whole process has registered before, not on the function) is not memory the function asks for: operator new
-// does not see it either. So the registration runs with the count off.
-#include <dlfcn.h>
-extern "C" int __cxa_atexit(void (*end)(void*), void* object, void* dso) {
-  using Register = int (*)(void (*)(void*), void*, void*);
-  static const Register next = reinterpret_cast<Register>(dlsym(RTLD_NEXT, "__cxa_atexit"));
-  const bool counted = sc::cost::counting;
-  sc::cost::counting = false;
-  const int r = next(end, object, dso);
-  sc::cost::counting = counted;
-  return r;
-}
-#else
-#include <new>
-void* operator new(std::size_t size) {
-  sc::cost::asked();
-  if (void* p = std::calloc(1, size ? size : 1)) return p;   // (zeroed: see the sanitizers' hook above)
-  std::abort();
-}
-void* operator new[](std::size_t size) { return operator new(size); }
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete[](void* p) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
-static void count_memory() {}
-#endif
+// (The registry of the tests is the engine's - kern/test/test.h -, and so is the allocator the comparison counts with:
+// kern/tools/test_memory.cpp, linked by run_tests.sh.)
 
 // The calls of the native test of the rules' Blueprint: every function with many values, then a
 // chase - crimes, out of sight, the escape.
@@ -82,7 +37,7 @@ static blueprint_native::Case wanted_case() {
   blueprint_native::Case c;
   c.name = "Wanted";
   std::string error;
-  if (!sc::rules::actor_graph("Wanted", c.graph, error)) std::printf("the level has no Wanted Blueprint: %s\n", error.c_str());
+  if (!kern::test::read_blueprint("Wanted", c.graph, error)) std::printf("the level has no Wanted Blueprint: %s\n", error.c_str());
   const double numbers[] = {0, 3.9, 4, 8.5, 9, 15, 22, 30, 35, 60, -2, 0.016, 6, 38, 1e6};
   for (const kern::logic::Function& f : c.graph.functions) {
     if (!f.pure) continue;
@@ -129,7 +84,7 @@ static blueprint_native::Case rule_case(const char* actor) {
   blueprint_native::Case c;
   c.name = actor;
   std::string error;
-  if (!sc::rules::actor_graph(actor, c.graph, error)) std::printf("the level has no %s Blueprint: %s\n", actor, error.c_str());
+  if (!kern::test::read_blueprint(actor, c.graph, error)) std::printf("the level has no %s Blueprint: %s\n", actor, error.c_str());
   for (const kern::logic::Function& f : c.graph.functions) {
     std::vector<std::vector<Value>> samples;
     for (const kern::logic::FunctionPin& p : f.inputs) samples.push_back(blueprint_native::samples(kern::logic::TypeRef{p.type, p.of}, c.graph));
@@ -225,11 +180,11 @@ int main(int argc, char** argv) {
   if (by_name) for (int k = 2; k < argc; ++k) names.emplace_back(argv[k]);
   for (const std::string& n : names) {
     bool known = false;
-    for (const sct::Case& c : sct::cases()) known = known || n == c.name;
-    if (!known) { std::printf("FAIL %s (no test has this name)\n", n.c_str()); ++sct::failures; }
+    for (const kern::test::Case& c : kern::test::cases()) known = known || n == c.name;
+    if (!known) { std::printf("FAIL %s (no test has this name)\n", n.c_str()); ++kern::test::failures; }
   }
-  std::vector<const sct::Case*> todo;
-  for (const sct::Case& c : sct::cases()) {
+  std::vector<const kern::test::Case*> todo;
+  for (const kern::test::Case& c : kern::test::cases()) {
     if (only && !std::strstr(c.name, only)) continue;
     if (by_name) {
       bool named = false;
@@ -246,13 +201,12 @@ int main(int argc, char** argv) {
       std::printf("FAIL SC_TEST_SHARD=%s (k/n with 1 <= k <= n)\n", shard);
       return 1;
     }
-    std::vector<const sct::Case*> mine;
+    std::vector<const kern::test::Case*> mine;
     for (std::size_t i = 0; i < todo.size(); ++i)
       if (static_cast<int>(i % static_cast<std::size_t>(n)) == k - 1) mine.push_back(todo[i]);
     todo = std::move(mine);
   }
   int ran = 0;
-  count_memory();
   // Every test in a process of its own: one that crashes (a sanitizer's report, a signal) or leaks is that
   // test's FAIL, and the tests after it still run - a run shows every test's result, not the first crash's.
   // (Lines go out as they are written: what a crashing test printed before is in the log.)
@@ -264,7 +218,7 @@ int main(int argc, char** argv) {
   int jobs = jobs_of("SC_TEST_JOBS") > 0 ? jobs_of("SC_TEST_JOBS") : jobs_of("KERN_JOBS") > 0 ? jobs_of("KERN_JOBS") : static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
   if (jobs < 1 || todo.size() <= 1) jobs = 1;
   struct Run {
-    const sct::Case* c = nullptr;
+    const kern::test::Case* c = nullptr;
     pid_t child = -1;
     int counts_fd = -1;
     std::FILE* out = nullptr;   // (the test's lines, when tests run at once)
@@ -292,10 +246,10 @@ int main(int argc, char** argv) {
       }
       // (the test's own counts: the child begins with what the tests before it added up - without this each test
       // gave the sum so far once more, the sum doubled from test to test, and one failure failed every test after it)
-      sct::checks = 0;
-      sct::failures = 0;
+      kern::test::checks = 0;
+      kern::test::failures = 0;
       r.c->fn();
-      int counts[2] = {sct::checks, sct::failures};
+      int counts[2] = {kern::test::checks, kern::test::failures};
       std::fflush(stdout);
       if (write(pipe_fd[1], counts, sizeof counts) != static_cast<ssize_t>(sizeof counts)) _exit(97);
       close(pipe_fd[1]);
@@ -334,12 +288,12 @@ int main(int argc, char** argv) {
       std::fflush(stdout);
     }
     ++ran;
-    const sct::Case& c = *r.c;
-    sct::checks += r.counts[0];
-    sct::failures += r.counts[1];
+    const kern::test::Case& c = *r.c;
+    kern::test::checks += r.counts[0];
+    kern::test::failures += r.counts[1];
     const int status = r.status;
     if (r.child < 0 || r.got != sizeof r.counts || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-      ++sct::failures;
+      ++kern::test::failures;
       if (r.child < 0) std::printf("FAIL %s (no process)\n", c.name);
       else if (WIFSIGNALED(status)) std::printf("FAIL %s (crashed: signal %d; %.1f s, CPU %.1f s)\n", c.name, WTERMSIG(status), r.seconds, r.cpu);
       else std::printf("FAIL %s (ended with %d; %.1f s, CPU %.1f s)\n", c.name, WIFEXITED(status) ? WEXITSTATUS(status) : -1, r.seconds, r.cpu);
@@ -372,6 +326,6 @@ int main(int argc, char** argv) {
     }
     while (shown < next && runs[shown].ended) said(runs[shown++]);
   }
-  std::printf("%d tests, %d checks, %d failures (CPU of the tests %.1f s, %d at once)\n", ran, sct::checks, sct::failures, cpu_all, jobs);
-  return sct::failures ? 1 : 0;
+  std::printf("%d tests, %d checks, %d failures (CPU of the tests %.1f s, %d at once)\n", ran, kern::test::checks, kern::test::failures, cpu_all, jobs);
+  return kern::test::failures ? 1 : 0;
 }

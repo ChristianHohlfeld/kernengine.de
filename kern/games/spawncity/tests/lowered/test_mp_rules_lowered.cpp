@@ -94,7 +94,7 @@ class PoseTimeline {
   bool push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source_ms, f64 received_ms);
   PoseSample sample(f64 now_ms) const;
   bool empty() const { return snaps_.empty(); }
-  Vec3 last_position() const { return snaps_.empty() ? Vec3{} : ::sc::converted::back(snaps_).p; }
+  Vec3 last_position() const { return snaps_.empty() ? Vec3{} : ::kern::converted::back(snaps_).p; }
   f64 clock_offset_ms() const { return offset_; }
   f64 delay_ms() const { return delay_; }
 
@@ -317,7 +317,7 @@ f32 num(const char* function, const std::vector<Value>& args) { return static_ca
 Vec2 pair(const char* function, const std::vector<Value>& args) {
   std::vector<Value> r;
   if (!g_rules.call(function, args, r) || r.size() < 2) return {};
-  return {static_cast<f32>(::sc::converted::at(r, 0).as_number()), static_cast<f32>(::sc::converted::at(r, 1).as_number())};
+  return {static_cast<f32>(::kern::converted::at(r, 0).as_number()), static_cast<f32>(::kern::converted::at(r, 1).as_number())};
 }
 }  // namespace
 
@@ -354,21 +354,21 @@ bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 rece
   if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
   q = qnormalize(q);
   if (!snaps_.empty()) {
-    const Snap& prev = ::sc::converted::back(snaps_);
+    const Snap& prev = ::kern::converted::back(snaps_);
     if (received <= prev.received || source <= prev.source) return false;
   }
   // Measured velocity from the last snapshot, blended with the sender's (blendVelocity).
   Vec3 measured;
   bool has_measured = false;
   if (!snaps_.empty()) {
-    const f64 dt = (source - ::sc::converted::back(snaps_).source) / 1000;
-    if (dt > 0.001 && dt < 1) { measured = (p - ::sc::converted::back(snaps_).p) * static_cast<f32>(1 / dt); has_measured = true; }
+    const f64 dt = (source - ::kern::converted::back(snaps_).source) / 1000;
+    if (dt > 0.001 && dt < 1) { measured = (p - ::kern::converted::back(snaps_).p) * static_cast<f32>(1 / dt); has_measured = true; }
   }
   Vec3 target = has_v && has_measured ? v * 0.7f + measured * 0.3f : has_v ? v : has_measured ? measured : Vec3{};
-  Vec3 vel = snaps_.empty() ? target : ::sc::converted::back(snaps_).v + (target - ::sc::converted::back(snaps_).v) * 0.35f;
+  Vec3 vel = snaps_.empty() ? target : ::kern::converted::back(snaps_).v + (target - ::kern::converted::back(snaps_).v) * 0.35f;
   // Clock offset: the floor of (received - source) over the window, rising slowly (8 %).
   offsets_.push_back(received - source);
-  while ((::sc::lowered::tick(), offsets_.size() > kMaxSnapshots)) ::sc::converted::erase(offsets_, offsets_.begin());
+  while ((::sc::lowered::tick(), offsets_.size() > kMaxSnapshots)) ::kern::converted::erase(offsets_, offsets_.begin());
   const f64 floor = *std::min_element(offsets_.begin(), offsets_.end());
   if (!have_offset_) { offset_ = floor; have_offset_ = true; }
   else if (floor < offset_) offset_ = floor;
@@ -376,29 +376,29 @@ bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 rece
   // the jitter buffer: the latest snapshots' lateness over the fastest (offset_), the gap between
   // two snapshots; the delay covers the latest of them (no snapshot missing when it is due)
   lags_.push_back(std::max(0.0, received - source - offset_));
-  while ((::sc::lowered::tick(), lags_.size() > kMaxSnapshots)) ::sc::converted::erase(lags_, lags_.begin());
+  while ((::sc::lowered::tick(), lags_.size() > kMaxSnapshots)) ::kern::converted::erase(lags_, lags_.begin());
   const f64 late = *std::max_element(lags_.begin(), lags_.end());
-  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - ::sc::converted::back(snaps_).source);
+  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - ::kern::converted::back(snaps_).source);
   const f64 want = clampd(late + gap + 15, kInterpolationDelayMs, 320);
   delay_ += want > delay_ ? std::min(want - delay_, 40.0) : std::max(want - delay_, -3.0);
   snaps_.push_back({p, q, vel, received, source});
-  while ((::sc::lowered::tick(), snaps_.size() > kMaxSnapshots)) ::sc::converted::erase(snaps_, snaps_.begin());
+  while ((::sc::lowered::tick(), snaps_.size() > kMaxSnapshots)) ::kern::converted::erase(snaps_, snaps_.begin());
   return true;
 }
 
 PoseSample PoseTimeline::sample(f64 now) const {
   PoseSample out;
   if (snaps_.empty()) return out;
-  const Snap& latest = ::sc::converted::back(snaps_);
+  const Snap& latest = ::kern::converted::back(snaps_);
   out.valid = true;
   out.age_ms = now > latest.received ? now - latest.received : 0;
   out.stale = out.age_ms > kStaleHoldMs;
   const f64 target = now - offset_ - delay_;
-  const Snap* left = &::sc::converted::at(snaps_, 0);
+  const Snap* left = &::kern::converted::at(snaps_, 0);
   const Snap* right = nullptr;
   for (std::size_t i = 1; i < snaps_.size(); ++i) { ::sc::lowered::tick();
-    if (::sc::converted::at(snaps_, i).source >= target) { right = &::sc::converted::at(snaps_, i); break; }
-    left = &::sc::converted::at(snaps_, i);
+    if (::kern::converted::at(snaps_, i).source >= target) { right = &::kern::converted::at(snaps_, i); break; }
+    left = &::kern::converted::at(snaps_, i);
   }
   if (right) {
     const f64 span = std::max(0.001, right->source - left->source);
@@ -426,28 +426,28 @@ PoseSample PoseTimeline::sample(f64 now) const {
 }
 
 bool NavTimeline::push(Vec3 p, f32 heading, u8 mode, f64 at) {
-  if (!snaps_.empty() && at <= ::sc::converted::back(snaps_).at) return false;
-  if (!snaps_.empty() && (::sc::converted::back(snaps_).mode != mode || kern::length(::sc::converted::back(snaps_).p - p) > kTeleportM)) reset();
+  if (!snaps_.empty() && at <= ::kern::converted::back(snaps_).at) return false;
+  if (!snaps_.empty() && (::kern::converted::back(snaps_).mode != mode || kern::length(::kern::converted::back(snaps_).p - p) > kTeleportM)) reset();
   snaps_.push_back({p, wrap_pi(heading), mode, at});
-  while ((::sc::lowered::tick(), snaps_.size() > 10)) ::sc::converted::erase(snaps_, snaps_.begin());
+  while ((::sc::lowered::tick(), snaps_.size() > 10)) ::kern::converted::erase(snaps_, snaps_.begin());
   return true;
 }
 
 bool NavTimeline::sample(f64 now, Vec3& p, f32& heading) const {
   if (snaps_.empty()) return false;
   const f64 at = now - kInterpolationDelayMs;
-  if (at <= ::sc::converted::at(snaps_, 0).at) { p = ::sc::converted::at(snaps_, 0).p; heading = ::sc::converted::at(snaps_, 0).heading; return true; }
+  if (at <= ::kern::converted::at(snaps_, 0).at) { p = ::kern::converted::at(snaps_, 0).p; heading = ::kern::converted::at(snaps_, 0).heading; return true; }
   for (std::size_t i = 1; i < snaps_.size(); ++i) { ::sc::lowered::tick();
-    const Snap& b = ::sc::converted::at(snaps_, i);
+    const Snap& b = ::kern::converted::at(snaps_, i);
     if (at > b.at) continue;
-    const Snap& a = ::sc::converted::at(snaps_, i - 1);
+    const Snap& a = ::kern::converted::at(snaps_, i - 1);
     const f32 t = static_cast<f32>(clampd((at - a.at) / (b.at - a.at), 0, 1));
     p = a.p + (b.p - a.p) * t;
     heading = wrap_pi(a.heading + wrap_pi(b.heading - a.heading) * t);
     return true;
   }
-  p = ::sc::converted::back(snaps_).p;  // no blind prediction: hold
-  heading = ::sc::converted::back(snaps_).heading;
+  p = ::kern::converted::back(snaps_).p;  // no blind prediction: hold
+  heading = ::kern::converted::back(snaps_).heading;
   return true;
 }
 
@@ -465,23 +465,23 @@ std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
   std::vector<Value> r;
   std::vector<u32> out;
   if (!g_rules.call("ColorSlots", {Value::of(std::move(numbers))}, r) || r.empty()) return out;
-  for (std::size_t k = 0; (::sc::lowered::tick(), k < ::sc::converted::at(r, 0).size()); ++k) out.push_back(static_cast<u32>(::sc::converted::at(r, 0).item(k).i));
+  for (std::size_t k = 0; (::sc::lowered::tick(), k < ::kern::converted::at(r, 0).size()); ++k) out.push_back(static_cast<u32>(::kern::converted::at(r, 0).item(k).i));
   return out;
 }
 u32 color_of(const std::string& id) {
   const std::vector<u32> one = assign_colors({id});
-  return one.empty() ? 0 : ::sc::converted::at(one, 0);
+  return one.empty() ? 0 : ::kern::converted::at(one, 0);
 }
 
 // ---- combat -------------------------------------------------------------------------------------
 
 std::string weapon_label(Weapon w) {
   std::vector<Value> r;
-  return g_rules.call("WeaponLabel", {rules::of_enum(w)}, r) && !r.empty() ? ::sc::converted::at(r, 0).as_text() : std::string();
+  return g_rules.call("WeaponLabel", {rules::of_enum(w)}, r) && !r.empty() ? ::kern::converted::at(r, 0).as_text() : std::string();
 }
 std::string zone_name(Zone z) {
   std::vector<Value> r;
-  return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? ::sc::converted::at(r, 0).as_text() : std::string();
+  return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? ::kern::converted::at(r, 0).as_text() : std::string();
 }
 f32 round_damage(Weapon w, Zone z) { return num("RoundDamage", {rules::of_enum(w), rules::of_enum(z)}); }
 f32 blast_damage(f32 damage) { return num("BlastDamage", {rules::number(damage)}); }
@@ -493,7 +493,7 @@ HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bo
                     r) ||
       r.empty())
     return HitVerdict::unknown_player;
-  return static_cast<HitVerdict>(::sc::converted::at(r, 0).i);
+  return static_cast<HitVerdict>(::kern::converted::at(r, 0).i);
 }
 
 f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {rules::number(hp), rules::number(now), rules::number(last_hurt), rules::number(dt)}); }
@@ -507,7 +507,7 @@ void Scoreboard::ensure(u8 slot) {
   for (const Score& s : rows_) if (s.slot == slot) return;
   rows_.push_back({slot, 0, 0});
 }
-void Scoreboard::remove(u8 slot) { ::sc::converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); }
+void Scoreboard::remove(u8 slot) { ::kern::converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); }
 void Scoreboard::died(u8 victim, i32 by) {
   ensure(victim);
   for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
@@ -531,15 +531,15 @@ bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
   std::vector<bool> seen(pts.size(), false);
   std::vector<Vec2> best;
   for (std::size_t i = 0; i < pts.size(); ++i) { ::sc::lowered::tick();
-    if (::sc::converted::at(seen, i)) continue;
+    if (::kern::converted::at(seen, i)) continue;
     std::vector<std::size_t> queue{i};
-    ::sc::converted::at(seen, i) = true;
+    ::kern::converted::at(seen, i) = true;
     std::vector<Vec2> comp;
     for (std::size_t k = 0; k < queue.size(); ++k) { ::sc::lowered::tick();
-      const Vec2 a = ::sc::converted::at(pts, ::sc::converted::at(queue, k));
+      const Vec2 a = ::kern::converted::at(pts, ::kern::converted::at(queue, k));
       comp.push_back(a);
       for (std::size_t b = 0; (::sc::lowered::tick(), b < pts.size()); ++b)
-        if (!::sc::converted::at(seen, b) && std::hypot(a.x - ::sc::converted::at(pts, b).x, a.y - ::sc::converted::at(pts, b).y) <= link) { ::sc::converted::at(seen, b) = true; queue.push_back(b); }
+        if (!::kern::converted::at(seen, b) && std::hypot(a.x - ::kern::converted::at(pts, b).x, a.y - ::kern::converted::at(pts, b).y) <= link) { ::kern::converted::at(seen, b) = true; queue.push_back(b); }
     }
     if (comp.size() > best.size()) best = comp;
   }
@@ -582,7 +582,7 @@ bool take(const Value& v, Ballot& b) {
 /// A roster as the vote compares it: in order, each player once.
 void roster(std::vector<u8>& members) {
   std::sort(members.begin(), members.end());
-  ::sc::converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+  ::kern::converted::erase(members, std::unique(members.begin(), members.end()), members.end());
 }
 }  // namespace
 
@@ -592,8 +592,8 @@ bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u
   b.status = Ballot::Status::invalid;
   std::vector<Value> r;
   if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), rules::number(now)}, r) || r.size() < 2) return false;
-  take(::sc::converted::at(r, 1), b);
-  return ::sc::converted::at(r, 0).b;
+  take(::kern::converted::at(r, 1), b);
+  return ::kern::converted::at(r, 0).b;
 }
 
 Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status* did) {
@@ -601,8 +601,8 @@ Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> curr
   std::vector<Value> r;
   if (did) *did = b.status;
   if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && r.size() >= 2) {
-    take(::sc::converted::at(r, 0), b);
-    if (did) *did = static_cast<Ballot::Status>(::sc::converted::at(r, 1).i);
+    take(::kern::converted::at(r, 0), b);
+    if (did) *did = static_cast<Ballot::Status>(::kern::converted::at(r, 1).i);
   }
   return b.status;
 }
@@ -611,7 +611,7 @@ bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { re
 
 std::string ballot_name(Ballot::Status s) {
   std::vector<Value> r;
-  return g_rules.call("BallotName", {rules::of_enum(s)}, r) && !r.empty() ? ::sc::converted::at(r, 0).as_text() : std::string();
+  return g_rules.call("BallotName", {rules::of_enum(s)}, r) && !r.empty() ? ::kern::converted::at(r, 0).as_text() : std::string();
 }
 
 // ---- voice ----------------------------------------------------------------------------------------
@@ -648,12 +648,12 @@ bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (queue_.empty()) { lead_ = min_lead; pos_ = 0; }
   else if (queued > max_lead + kVoiceFrame) {
     // Too far behind: drop the oldest audio (a burst after a stall would only add delay).
-    while (!queue_.empty() && queued > max_lead) { ::sc::lowered::tick(); queued -= static_cast<f64>(::sc::converted::front(queue_).pcm.size()) - pos_; pos_ = 0; ::sc::converted::erase(queue_, queue_.begin()); }
+    while (!queue_.empty() && queued > max_lead) { ::sc::lowered::tick(); queued -= static_cast<f64>(::kern::converted::front(queue_).pcm.size()) - pos_; pos_ = 0; ::kern::converted::erase(queue_, queue_.begin()); }
   }
   Chunk c;
   c.gain = gain;
-  c.pcm.resize(::sc::converted::count(mulaw.size()));
-  for (std::size_t i = 0; (::sc::lowered::tick(), i < mulaw.size()); ++i) ::sc::converted::at(c.pcm, i) = decode_mulaw(::sc::converted::at(mulaw, i));
+  c.pcm.resize(::kern::converted::count(mulaw.size()));
+  for (std::size_t i = 0; (::sc::lowered::tick(), i < mulaw.size()); ++i) ::kern::converted::at(c.pcm, i) = decode_mulaw(::kern::converted::at(mulaw, i));
   queue_.push_back(std::move(c));
   return true;
 }
@@ -663,15 +663,15 @@ bool VoiceStream::render(f32* out, u32 frames, u32 rate) {
   const f64 step = static_cast<f64>(kVoiceRate) / rate;
   for (u32 i = 0; i < frames && !queue_.empty(); ++i) { ::sc::lowered::tick();
     if (lead_ > 0) { lead_ -= step; continue; }
-    const Chunk& c = ::sc::converted::front(queue_);
+    const Chunk& c = ::kern::converted::front(queue_);
     const std::size_t k = static_cast<std::size_t>(::sc::lowered::fits<unsigned long>(pos_));
     const f32 frac = static_cast<f32>(pos_ - static_cast<f64>(k));
-    const f32 a = ::sc::converted::at(c.pcm, k), b = k + 1 < c.pcm.size() ? ::sc::converted::at(c.pcm, k + 1) : (queue_.size() > 1 ? ::sc::converted::at(::sc::converted::at(queue_, 1).pcm, 0) : a);
+    const f32 a = ::kern::converted::at(c.pcm, k), b = k + 1 < c.pcm.size() ? ::kern::converted::at(c.pcm, k + 1) : (queue_.size() > 1 ? ::kern::converted::at(::kern::converted::at(queue_, 1).pcm, 0) : a);
     const f32 s = (a + (b - a) * frac) * c.gain;
     ::sc::lowered::entry(out, 2 * i) += s;
     ::sc::lowered::entry(out, 2 * i + 1) += s;
     pos_ += step;
-    if (pos_ >= static_cast<f64>(c.pcm.size())) { pos_ -= static_cast<f64>(c.pcm.size()); ::sc::converted::erase(queue_, queue_.begin()); }
+    if (pos_ >= static_cast<f64>(c.pcm.size())) { pos_ -= static_cast<f64>(c.pcm.size()); ::kern::converted::erase(queue_, queue_.begin()); }
   }
   return !queue_.empty();
 }
@@ -683,11 +683,11 @@ void VoiceCapture::push(const f32* samples, u32 count, u32 rate) {
   for (; i < count; i += stride) { ::sc::lowered::tick();
     pending_.push_back(::sc::lowered::entry(samples, static_cast<u32>(::sc::lowered::fits<unsigned int>(i))));
     if (pending_.size() == kVoiceFrame) {
-      std::vector<u8> f(::sc::converted::count(kVoiceFrame));
-      for (u32 k = 0; (::sc::lowered::tick(), k < kVoiceFrame); ++k) ::sc::converted::at(f, k) = encode_mulaw(::sc::converted::at(pending_, k));
+      std::vector<u8> f(::kern::converted::count(kVoiceFrame));
+      for (u32 k = 0; (::sc::lowered::tick(), k < kVoiceFrame); ++k) ::kern::converted::at(f, k) = encode_mulaw(::kern::converted::at(pending_, k));
       frames_.push_back(std::move(f));
       pending_.clear();
-      if (frames_.size() > 8) ::sc::converted::erase(frames_, frames_.begin());
+      if (frames_.size() > 8) ::kern::converted::erase(frames_, frames_.begin());
     }
   }
   phase_ = i - count;
@@ -695,8 +695,8 @@ void VoiceCapture::push(const f32* samples, u32 count, u32 rate) {
 
 bool VoiceCapture::take(std::vector<u8>& frame) {
   if (frames_.empty()) return false;
-  frame = std::move(::sc::converted::front(frames_));
-  ::sc::converted::erase(frames_, frames_.begin());
+  frame = std::move(::kern::converted::front(frames_));
+  ::kern::converted::erase(frames_, frames_.begin());
   return true;
 }
 
@@ -705,26 +705,26 @@ bool VoiceCapture::take(std::vector<u8>& frame) {
 namespace {
 struct Along { f32 along = 0, distance = 1e30f; };
 Along project_on(const std::vector<Vec2>& pts, Vec2 pos, std::vector<f32>& cum) {
-  cum.assign(::sc::converted::count(1), 0);
-  for (std::size_t i = 0; (::sc::lowered::tick(), i + 1 < pts.size()); ++i) cum.push_back(::sc::converted::back(cum) + std::hypot(::sc::converted::at(pts, i + 1).x - ::sc::converted::at(pts, i).x, ::sc::converted::at(pts, i + 1).y - ::sc::converted::at(pts, i).y));
+  cum.assign(::kern::converted::count(1), 0);
+  for (std::size_t i = 0; (::sc::lowered::tick(), i + 1 < pts.size()); ++i) cum.push_back(::kern::converted::back(cum) + std::hypot(::kern::converted::at(pts, i + 1).x - ::kern::converted::at(pts, i).x, ::kern::converted::at(pts, i + 1).y - ::kern::converted::at(pts, i).y));
   Along best;
   for (std::size_t i = 0; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-    const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
+    const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
     if (len < 0.001f) continue;
-    const Vec2 a = ::sc::converted::at(pts, i), b = ::sc::converted::at(pts, i + 1);
+    const Vec2 a = ::kern::converted::at(pts, i), b = ::kern::converted::at(pts, i + 1);
     const f32 t = clampf(((pos.x - a.x) * (b.x - a.x) + (pos.y - a.y) * (b.y - a.y)) / (len * len), 0, 1);
     const f32 d = std::hypot(pos.x - (a.x + (b.x - a.x) * t), pos.y - (a.y + (b.y - a.y) * t));
-    if (d < best.distance) { best.distance = d; best.along = ::sc::converted::at(cum, i) + len * t; }
+    if (d < best.distance) { best.distance = d; best.along = ::kern::converted::at(cum, i) + len * t; }
   }
   return best;
 }
 Vec2 point_at(const std::vector<Vec2>& pts, const std::vector<f32>& cum, f32 d) {
-  d = clampf(d, 0, ::sc::converted::back(cum));
+  d = clampf(d, 0, ::kern::converted::back(cum));
   std::size_t i = 0;
-  while ((::sc::lowered::tick(), i + 2 < cum.size() && ::sc::converted::at(cum, i + 1) < d)) ++i;
-  const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
-  const f32 t = len > 1e-6f ? clampf((d - ::sc::converted::at(cum, i)) / len, 0, 1) : 0;
-  return {::sc::converted::at(pts, i).x + (::sc::converted::at(pts, i + 1).x - ::sc::converted::at(pts, i).x) * t, ::sc::converted::at(pts, i).y + (::sc::converted::at(pts, i + 1).y - ::sc::converted::at(pts, i).y) * t};
+  while ((::sc::lowered::tick(), i + 2 < cum.size() && ::kern::converted::at(cum, i + 1) < d)) ++i;
+  const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
+  const f32 t = len > 1e-6f ? clampf((d - ::kern::converted::at(cum, i)) / len, 0, 1) : 0;
+  return {::kern::converted::at(pts, i).x + (::kern::converted::at(pts, i + 1).x - ::kern::converted::at(pts, i).x) * t, ::kern::converted::at(pts, i).y + (::kern::converted::at(pts, i + 1).y - ::kern::converted::at(pts, i).y) * t};
 }
 }  // namespace
 
@@ -733,7 +733,7 @@ std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& pts, Vec2 pos, u3
   if (pts.size() < 2) return out;
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  const f32 total = ::sc::converted::back(cum);
+  const f32 total = ::kern::converted::back(cum);
   if (total < 0.01f) return out;
   const u32 n = std::min<u32>(count, 8);
   const f32 step = clampf(spacing, 2, 500), first = clampf(start, 1, 500);
@@ -741,10 +741,10 @@ std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& pts, Vec2 pos, u3
     const f32 at = a.along + first + static_cast<f32>(j) * step;
     if (at > total + 0.001f) break;
     for (std::size_t i = 0; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-      const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
-      if (at > ::sc::converted::at(cum, i + 1) + 0.0001f || len < 0.001f) continue;
-      const f32 t = clampf((at - ::sc::converted::at(cum, i)) / len, 0, 1);
-      const Vec2 p0 = ::sc::converted::at(pts, i), p1 = ::sc::converted::at(pts, i + 1);
+      const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
+      if (at > ::kern::converted::at(cum, i + 1) + 0.0001f || len < 0.001f) continue;
+      const f32 t = clampf((at - ::kern::converted::at(cum, i)) / len, 0, 1);
+      const Vec2 p0 = ::kern::converted::at(pts, i), p1 = ::kern::converted::at(pts, i + 1);
       out.push_back({{p0.x + (p1.x - p0.x) * t, p0.y + (p1.y - p0.y) * t}, std::atan2(p1.x - p0.x, p1.y - p0.y), total - at});
       break;
     }
@@ -757,14 +757,14 @@ Turn upcoming_turn(const std::vector<Vec2>& pts, Vec2 pos, f32 scan, f32 window,
   if (pts.size() < 3) return out;
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  if (::sc::converted::back(cum) < 2) return out;
+  if (::kern::converted::back(cum) < 2) return out;
   scan = clampf(scan, 5, 1000);
   window = clampf(window, 3, 80);
   min_angle = clampf(min_angle, 15, 160);
   for (std::size_t i = 1; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-    const f32 away = ::sc::converted::at(cum, i) - a.along;
+    const f32 away = ::kern::converted::at(cum, i) - a.along;
     if (away < 1 || away > scan) continue;
-    const Vec2 c = ::sc::converted::at(pts, i), prev = point_at(pts, cum, ::sc::converted::at(cum, i) - window), next = point_at(pts, cum, ::sc::converted::at(cum, i) + window);
+    const Vec2 c = ::kern::converted::at(pts, i), prev = point_at(pts, cum, ::kern::converted::at(cum, i) - window), next = point_at(pts, cum, ::kern::converted::at(cum, i) + window);
     const f32 bx = c.x - prev.x, by = c.y - prev.y, ax = next.x - c.x, ay = next.y - c.y;
     if (std::hypot(bx, by) < 2 || std::hypot(ax, ay) < 2) continue;
     const f32 angle = std::atan2(bx * ay - by * ax, bx * ax + by * ay) / kDeg;
@@ -778,15 +778,15 @@ Turn upcoming_turn(const std::vector<Vec2>& pts, Vec2 pos, f32 scan, f32 window,
 }
 
 f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
-  if (pts.size() < 2) return pts.empty() ? 0 : std::hypot(::sc::converted::at(pts, 0).x - pos.x, ::sc::converted::at(pts, 0).y - pos.y);
+  if (pts.size() < 2) return pts.empty() ? 0 : std::hypot(::kern::converted::at(pts, 0).x - pos.x, ::kern::converted::at(pts, 0).y - pos.y);
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  return ::sc::converted::back(cum) - a.along + a.distance;
+  return ::kern::converted::back(cum) - a.along + a.distance;
 }
 
 std::string bearing_arrow(f32 b) {
   std::vector<Value> r;
-  return g_rules.call("BearingArrow", {rules::number(b)}, r) && !r.empty() ? ::sc::converted::at(r, 0).as_text() : std::string();
+  return g_rules.call("BearingArrow", {rules::number(b)}, r) && !r.empty() ? ::kern::converted::at(r, 0).as_text() : std::string();
 }
 
 MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
@@ -795,11 +795,11 @@ MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
   std::vector<Value> r;
   if (!g_rules.call("LocateMapPeer", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), rules::number(ix), rules::number(it), rules::number(ib)}, r) || r.size() < 6)
     return out;
-  out.valid = ::sc::converted::at(r, 0).b;
-  out.p = {static_cast<f32>(::sc::converted::at(r, 1).as_number()), static_cast<f32>(::sc::converted::at(r, 2).as_number())};
-  out.offmap = ::sc::converted::at(r, 3).b;
-  out.rotation_deg = static_cast<f32>(::sc::converted::at(r, 4).as_number());
-  out.arrow = ::sc::converted::at(r, 5).as_text();
+  out.valid = ::kern::converted::at(r, 0).b;
+  out.p = {static_cast<f32>(::kern::converted::at(r, 1).as_number()), static_cast<f32>(::kern::converted::at(r, 2).as_number())};
+  out.offmap = ::kern::converted::at(r, 3).b;
+  out.rotation_deg = static_cast<f32>(::kern::converted::at(r, 4).as_number());
+  out.arrow = ::kern::converted::at(r, 5).as_text();
   return out;
 }
 
@@ -831,8 +831,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
     if (q.owner == owner) { q.p = p; q.color = color; q.at_ms = now; return; }
   pings_.push_back({owner, p, color, now});
 }
-void PingBoard::clear(u8 owner) { ::sc::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { ::sc::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {rules::number(now - q.at_ms)}); }), pings_.end()); }
+void PingBoard::clear(u8 owner) { ::kern::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
+void PingBoard::expire(f64 now) { ::kern::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {rules::number(now - q.at_ms)}); }), pings_.end()); }
 
 f32 PingBoard::fade(const Ping& p, f64 now_ms) { return num("PingFade", {rules::number(now_ms - p.at_ms)}); }
 
@@ -905,7 +905,7 @@ class PoseTimeline {
   bool push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source_ms, f64 received_ms);
   PoseSample sample(f64 now_ms) const;
   bool empty() const { return snaps_.empty(); }
-  Vec3 last_position() const { return snaps_.empty() ? Vec3{} : ::sc::converted::back(snaps_).p; }
+  Vec3 last_position() const { return snaps_.empty() ? Vec3{} : ::kern::converted::back(snaps_).p; }
   f64 clock_offset_ms() const { return offset_; }
   f64 delay_ms() const { return delay_; }
 
@@ -1166,21 +1166,21 @@ bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 rece
   if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
   q = qnormalize(q);
   if (!snaps_.empty()) {
-    const Snap& prev = ::sc::converted::back(snaps_);
+    const Snap& prev = ::kern::converted::back(snaps_);
     if (received <= prev.received || source <= prev.source) return false;
   }
   // Measured velocity from the last snapshot, blended with the sender's (blendVelocity).
   Vec3 measured;
   bool has_measured = false;
   if (!snaps_.empty()) {
-    const f64 dt = (source - ::sc::converted::back(snaps_).source) / 1000;
-    if (dt > 0.001 && dt < 1) { measured = (p - ::sc::converted::back(snaps_).p) * static_cast<f32>(1 / dt); has_measured = true; }
+    const f64 dt = (source - ::kern::converted::back(snaps_).source) / 1000;
+    if (dt > 0.001 && dt < 1) { measured = (p - ::kern::converted::back(snaps_).p) * static_cast<f32>(1 / dt); has_measured = true; }
   }
   Vec3 target = has_v && has_measured ? v * 0.7f + measured * 0.3f : has_v ? v : has_measured ? measured : Vec3{};
-  Vec3 vel = snaps_.empty() ? target : ::sc::converted::back(snaps_).v + (target - ::sc::converted::back(snaps_).v) * 0.35f;
+  Vec3 vel = snaps_.empty() ? target : ::kern::converted::back(snaps_).v + (target - ::kern::converted::back(snaps_).v) * 0.35f;
   // Clock offset: the floor of (received - source) over the window, rising slowly (8 %).
   offsets_.push_back(received - source);
-  while ((::sc::lowered::tick(), offsets_.size() > kMaxSnapshots)) ::sc::converted::erase(offsets_, offsets_.begin());
+  while ((::sc::lowered::tick(), offsets_.size() > kMaxSnapshots)) ::kern::converted::erase(offsets_, offsets_.begin());
   const f64 floor = *std::min_element(offsets_.begin(), offsets_.end());
   if (!have_offset_) { offset_ = floor; have_offset_ = true; }
   else if (floor < offset_) offset_ = floor;
@@ -1188,20 +1188,20 @@ bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 rece
   // the jitter buffer: the latest snapshots' lateness over the fastest (offset_), the gap between
   // two snapshots; the delay covers the latest of them (no snapshot missing when it is due)
   lags_.push_back(std::max(0.0, received - source - offset_));
-  while ((::sc::lowered::tick(), lags_.size() > kMaxSnapshots)) ::sc::converted::erase(lags_, lags_.begin());
+  while ((::sc::lowered::tick(), lags_.size() > kMaxSnapshots)) ::kern::converted::erase(lags_, lags_.begin());
   const f64 late = *std::max_element(lags_.begin(), lags_.end());
-  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - ::sc::converted::back(snaps_).source);
+  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - ::kern::converted::back(snaps_).source);
   const f64 want = clampd(late + gap + 15, kInterpolationDelayMs, 320);
   delay_ += want > delay_ ? std::min(want - delay_, 40.0) : std::max(want - delay_, -3.0);
   snaps_.push_back({p, q, vel, received, source});
-  while ((::sc::lowered::tick(), snaps_.size() > kMaxSnapshots)) ::sc::converted::erase(snaps_, snaps_.begin());
+  while ((::sc::lowered::tick(), snaps_.size() > kMaxSnapshots)) ::kern::converted::erase(snaps_, snaps_.begin());
   return true;
 }
 
 PoseSample PoseTimeline::sample(f64 now) const {
   PoseSample out;
   if (snaps_.empty()) return out;
-  const Snap& latest = ::sc::converted::back(snaps_);
+  const Snap& latest = ::kern::converted::back(snaps_);
   out.valid = true;
   out.age_ms = now > latest.received ? now - latest.received : 0;
   out.stale = out.age_ms > kStaleHoldMs;
@@ -1210,12 +1210,12 @@ PoseSample PoseTimeline::sample(f64 now) const {
   constexpr std::size_t no_right = static_cast<std::size_t>(-1);
   std::size_t left_at = 0, right_at = no_right;
   for (std::size_t i = 1; i < snaps_.size(); ++i) { ::sc::lowered::tick();
-    if (::sc::converted::at(snaps_, i).source >= target) { right_at = i; break; }
+    if (::kern::converted::at(snaps_, i).source >= target) { right_at = i; break; }
     left_at = i;
   }
   if (right_at != no_right) {
-    const Snap& left = ::sc::converted::at(snaps_, left_at);
-    const Snap& right = ::sc::converted::at(snaps_, right_at);
+    const Snap& left = ::kern::converted::at(snaps_, left_at);
+    const Snap& right = ::kern::converted::at(snaps_, right_at);
     const f64 span = std::max(0.001, right.source - left.source);
     const f32 a = static_cast<f32>(clampd((target - left.source) / span, 0, 1));
     // Hermite through both snapshots with their velocities (Glenn Fiedler, "Snapshot
@@ -1241,28 +1241,28 @@ PoseSample PoseTimeline::sample(f64 now) const {
 }
 
 bool NavTimeline::push(Vec3 p, f32 heading, u8 mode, f64 at) {
-  if (!snaps_.empty() && at <= ::sc::converted::back(snaps_).at) return false;
-  if (!snaps_.empty() && (::sc::converted::back(snaps_).mode != mode || kern::length(::sc::converted::back(snaps_).p - p) > kTeleportM)) reset();
+  if (!snaps_.empty() && at <= ::kern::converted::back(snaps_).at) return false;
+  if (!snaps_.empty() && (::kern::converted::back(snaps_).mode != mode || kern::length(::kern::converted::back(snaps_).p - p) > kTeleportM)) reset();
   snaps_.push_back({p, wrap_pi(heading), mode, at});
-  while ((::sc::lowered::tick(), snaps_.size() > 10)) ::sc::converted::erase(snaps_, snaps_.begin());
+  while ((::sc::lowered::tick(), snaps_.size() > 10)) ::kern::converted::erase(snaps_, snaps_.begin());
   return true;
 }
 
 bool NavTimeline::sample(f64 now, Vec3& p, f32& heading) const {
   if (snaps_.empty()) return false;
   const f64 at = now - kInterpolationDelayMs;
-  if (at <= ::sc::converted::at(snaps_, 0).at) { p = ::sc::converted::at(snaps_, 0).p; heading = ::sc::converted::at(snaps_, 0).heading; return true; }
+  if (at <= ::kern::converted::at(snaps_, 0).at) { p = ::kern::converted::at(snaps_, 0).p; heading = ::kern::converted::at(snaps_, 0).heading; return true; }
   for (std::size_t i = 1; i < snaps_.size(); ++i) { ::sc::lowered::tick();
-    const Snap& b = ::sc::converted::at(snaps_, i);
+    const Snap& b = ::kern::converted::at(snaps_, i);
     if (at > b.at) continue;
-    const Snap& a = ::sc::converted::at(snaps_, i - 1);
+    const Snap& a = ::kern::converted::at(snaps_, i - 1);
     const f32 t = static_cast<f32>(clampd((at - a.at) / (b.at - a.at), 0, 1));
     p = a.p + (b.p - a.p) * t;
     heading = wrap_pi(a.heading + wrap_pi(b.heading - a.heading) * t);
     return true;
   }
-  p = ::sc::converted::back(snaps_).p;  // no blind prediction: hold
-  heading = ::sc::converted::back(snaps_).heading;
+  p = ::kern::converted::back(snaps_).p;  // no blind prediction: hold
+  heading = ::kern::converted::back(snaps_).heading;
   return true;
 }
 
@@ -1283,7 +1283,7 @@ std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
 }
 u32 color_of(const std::string& id) {
   const std::vector<u32> one = assign_colors({id});
-  return one.empty() ? 0 : ::sc::converted::at(one, 0);
+  return one.empty() ? 0 : ::kern::converted::at(one, 0);
 }
 
 // ---- combat -------------------------------------------------------------------------------------
@@ -1332,7 +1332,7 @@ void Scoreboard::ensure(u8 slot) {
   for (const Score& s : rows_) if (s.slot == slot) return;
   rows_.push_back({slot, 0, 0});
 }
-void Scoreboard::remove(u8 slot) { ::sc::converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); }
+void Scoreboard::remove(u8 slot) { ::kern::converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); }
 void Scoreboard::died(u8 victim, i32 by) {
   ensure(victim);
   for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
@@ -1356,15 +1356,15 @@ bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
   std::vector<bool> seen(pts.size(), false);
   std::vector<Vec2> best;
   for (std::size_t i = 0; i < pts.size(); ++i) { ::sc::lowered::tick();
-    if (::sc::converted::at(seen, i)) continue;
+    if (::kern::converted::at(seen, i)) continue;
     std::vector<std::size_t> queue{i};
-    ::sc::converted::at(seen, i) = true;
+    ::kern::converted::at(seen, i) = true;
     std::vector<Vec2> comp;
     for (std::size_t k = 0; k < queue.size(); ++k) { ::sc::lowered::tick();
-      const Vec2 a = ::sc::converted::at(pts, ::sc::converted::at(queue, k));
+      const Vec2 a = ::kern::converted::at(pts, ::kern::converted::at(queue, k));
       comp.push_back(a);
       for (std::size_t b = 0; (::sc::lowered::tick(), b < pts.size()); ++b)
-        if (!::sc::converted::at(seen, b) && std::hypot(a.x - ::sc::converted::at(pts, b).x, a.y - ::sc::converted::at(pts, b).y) <= link) { ::sc::converted::at(seen, b) = true; queue.push_back(b); }
+        if (!::kern::converted::at(seen, b) && std::hypot(a.x - ::kern::converted::at(pts, b).x, a.y - ::kern::converted::at(pts, b).y) <= link) { ::kern::converted::at(seen, b) = true; queue.push_back(b); }
     }
     if (comp.size() > best.size()) best = comp;
   }
@@ -1389,7 +1389,7 @@ namespace {
 /// A roster as the vote compares it: in order, each player once.
 void roster(std::vector<u8>& members) {
   std::stable_sort(members.begin(), members.end());
-  ::sc::converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+  ::kern::converted::erase(members, std::unique(members.begin(), members.end()), members.end());
 }
 }  // namespace
 
@@ -1458,12 +1458,12 @@ bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (queue_.empty()) { lead_ = min_lead; pos_ = 0; }
   else if (queued > max_lead + kVoiceFrame) {
     // Too far behind: drop the oldest audio (a burst after a stall would only add delay).
-    while (!queue_.empty() && queued > max_lead) { ::sc::lowered::tick(); queued -= static_cast<f64>(::sc::converted::front(queue_).pcm.size()) - pos_; pos_ = 0; ::sc::converted::erase(queue_, queue_.begin()); }
+    while (!queue_.empty() && queued > max_lead) { ::sc::lowered::tick(); queued -= static_cast<f64>(::kern::converted::front(queue_).pcm.size()) - pos_; pos_ = 0; ::kern::converted::erase(queue_, queue_.begin()); }
   }
   Chunk c;
   c.gain = gain;
-  c.pcm.resize(::sc::converted::count(mulaw.size()));
-  for (std::size_t i = 0; (::sc::lowered::tick(), i < mulaw.size()); ++i) ::sc::converted::at(c.pcm, i) = decode_mulaw(::sc::converted::at(mulaw, i));
+  c.pcm.resize(::kern::converted::count(mulaw.size()));
+  for (std::size_t i = 0; (::sc::lowered::tick(), i < mulaw.size()); ++i) ::kern::converted::at(c.pcm, i) = decode_mulaw(::kern::converted::at(mulaw, i));
   queue_.push_back(std::move(c));
   return true;
 }
@@ -1473,15 +1473,15 @@ bool VoiceStream::render(std::vector<f32>& out, u32 frames, u32 rate) {
   const f64 step = static_cast<f64>(kVoiceRate) / rate;
   for (u32 i = 0; i < frames && !queue_.empty(); ++i) { ::sc::lowered::tick();
     if (lead_ > 0) { lead_ -= step; continue; }
-    const Chunk& c = ::sc::converted::front(queue_);
+    const Chunk& c = ::kern::converted::front(queue_);
     const std::size_t k = static_cast<std::size_t>(::sc::lowered::fits<unsigned long>(pos_));
     const f32 frac = static_cast<f32>(pos_ - static_cast<f64>(k));
-    const f32 a = ::sc::converted::at(c.pcm, k), b = k + 1 < c.pcm.size() ? ::sc::converted::at(c.pcm, k + 1) : (queue_.size() > 1 ? ::sc::converted::at(::sc::converted::at(queue_, 1).pcm, 0) : a);
+    const f32 a = ::kern::converted::at(c.pcm, k), b = k + 1 < c.pcm.size() ? ::kern::converted::at(c.pcm, k + 1) : (queue_.size() > 1 ? ::kern::converted::at(::kern::converted::at(queue_, 1).pcm, 0) : a);
     const f32 s = (a + (b - a) * frac) * c.gain;
-    ::sc::converted::at(out, 2 * i) += s;
-    ::sc::converted::at(out, 2 * i + 1) += s;
+    ::kern::converted::at(out, 2 * i) += s;
+    ::kern::converted::at(out, 2 * i + 1) += s;
     pos_ += step;
-    if (pos_ >= static_cast<f64>(c.pcm.size())) { pos_ -= static_cast<f64>(c.pcm.size()); ::sc::converted::erase(queue_, queue_.begin()); }
+    if (pos_ >= static_cast<f64>(c.pcm.size())) { pos_ -= static_cast<f64>(c.pcm.size()); ::kern::converted::erase(queue_, queue_.begin()); }
   }
   return !queue_.empty();
 }
@@ -1492,13 +1492,13 @@ void VoiceCapture::push(kern::Span<const f32> samples, u32 rate) {
   const f64 stride = static_cast<f64>(rate) / kVoiceRate;
   f64 i = phase_;
   for (; i < count; i += stride) { ::sc::lowered::tick();
-    pending_.push_back(::sc::converted::at(samples, static_cast<u32>(::sc::lowered::fits<unsigned int>(i))));
+    pending_.push_back(::kern::converted::at(samples, static_cast<u32>(::sc::lowered::fits<unsigned int>(i))));
     if (pending_.size() == kVoiceFrame) {
-      std::vector<u8> f(::sc::converted::count(kVoiceFrame));
-      for (u32 k = 0; (::sc::lowered::tick(), k < kVoiceFrame); ++k) ::sc::converted::at(f, k) = encode_mulaw(::sc::converted::at(pending_, k));
+      std::vector<u8> f(::kern::converted::count(kVoiceFrame));
+      for (u32 k = 0; (::sc::lowered::tick(), k < kVoiceFrame); ++k) ::kern::converted::at(f, k) = encode_mulaw(::kern::converted::at(pending_, k));
       frames_.push_back(std::move(f));
       pending_.clear();
-      if (frames_.size() > 8) ::sc::converted::erase(frames_, frames_.begin());
+      if (frames_.size() > 8) ::kern::converted::erase(frames_, frames_.begin());
     }
   }
   phase_ = i - count;
@@ -1506,8 +1506,8 @@ void VoiceCapture::push(kern::Span<const f32> samples, u32 rate) {
 
 bool VoiceCapture::take(std::vector<u8>& frame) {
   if (frames_.empty()) return false;
-  frame = std::move(::sc::converted::front(frames_));
-  ::sc::converted::erase(frames_, frames_.begin());
+  frame = std::move(::kern::converted::front(frames_));
+  ::kern::converted::erase(frames_, frames_.begin());
   return true;
 }
 
@@ -1516,26 +1516,26 @@ bool VoiceCapture::take(std::vector<u8>& frame) {
 namespace {
 struct Along { f32 along = 0, distance = 1e30f; };
 Along project_on(const std::vector<Vec2>& pts, Vec2 pos, std::vector<f32>& cum) {
-  cum.assign(::sc::converted::count(1), 0);
-  for (std::size_t i = 0; (::sc::lowered::tick(), i + 1 < pts.size()); ++i) cum.push_back(::sc::converted::back(cum) + std::hypot(::sc::converted::at(pts, i + 1).x - ::sc::converted::at(pts, i).x, ::sc::converted::at(pts, i + 1).y - ::sc::converted::at(pts, i).y));
+  cum.assign(::kern::converted::count(1), 0);
+  for (std::size_t i = 0; (::sc::lowered::tick(), i + 1 < pts.size()); ++i) cum.push_back(::kern::converted::back(cum) + std::hypot(::kern::converted::at(pts, i + 1).x - ::kern::converted::at(pts, i).x, ::kern::converted::at(pts, i + 1).y - ::kern::converted::at(pts, i).y));
   Along best;
   for (std::size_t i = 0; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-    const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
+    const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
     if (len < 0.001f) continue;
-    const Vec2 a = ::sc::converted::at(pts, i), b = ::sc::converted::at(pts, i + 1);
+    const Vec2 a = ::kern::converted::at(pts, i), b = ::kern::converted::at(pts, i + 1);
     const f32 t = clampf(((pos.x - a.x) * (b.x - a.x) + (pos.y - a.y) * (b.y - a.y)) / (len * len), 0, 1);
     const f32 d = std::hypot(pos.x - (a.x + (b.x - a.x) * t), pos.y - (a.y + (b.y - a.y) * t));
-    if (d < best.distance) { best.distance = d; best.along = ::sc::converted::at(cum, i) + len * t; }
+    if (d < best.distance) { best.distance = d; best.along = ::kern::converted::at(cum, i) + len * t; }
   }
   return best;
 }
 Vec2 point_at(const std::vector<Vec2>& pts, const std::vector<f32>& cum, f32 d) {
-  d = clampf(d, 0, ::sc::converted::back(cum));
+  d = clampf(d, 0, ::kern::converted::back(cum));
   std::size_t i = 0;
-  while ((::sc::lowered::tick(), i + 2 < cum.size() && ::sc::converted::at(cum, i + 1) < d)) ++i;
-  const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
-  const f32 t = len > 1e-6f ? clampf((d - ::sc::converted::at(cum, i)) / len, 0, 1) : 0;
-  return {::sc::converted::at(pts, i).x + (::sc::converted::at(pts, i + 1).x - ::sc::converted::at(pts, i).x) * t, ::sc::converted::at(pts, i).y + (::sc::converted::at(pts, i + 1).y - ::sc::converted::at(pts, i).y) * t};
+  while ((::sc::lowered::tick(), i + 2 < cum.size() && ::kern::converted::at(cum, i + 1) < d)) ++i;
+  const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
+  const f32 t = len > 1e-6f ? clampf((d - ::kern::converted::at(cum, i)) / len, 0, 1) : 0;
+  return {::kern::converted::at(pts, i).x + (::kern::converted::at(pts, i + 1).x - ::kern::converted::at(pts, i).x) * t, ::kern::converted::at(pts, i).y + (::kern::converted::at(pts, i + 1).y - ::kern::converted::at(pts, i).y) * t};
 }
 }  // namespace
 
@@ -1544,7 +1544,7 @@ std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& pts, Vec2 pos, u3
   if (pts.size() < 2) return out;
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  const f32 total = ::sc::converted::back(cum);
+  const f32 total = ::kern::converted::back(cum);
   if (total < 0.01f) return out;
   const u32 n = std::min<u32>(count, 8);
   const f32 step = clampf(spacing, 2, 500), first = clampf(start, 1, 500);
@@ -1552,10 +1552,10 @@ std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& pts, Vec2 pos, u3
     const f32 at = a.along + first + static_cast<f32>(j) * step;
     if (at > total + 0.001f) break;
     for (std::size_t i = 0; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-      const f32 len = ::sc::converted::at(cum, i + 1) - ::sc::converted::at(cum, i);
-      if (at > ::sc::converted::at(cum, i + 1) + 0.0001f || len < 0.001f) continue;
-      const f32 t = clampf((at - ::sc::converted::at(cum, i)) / len, 0, 1);
-      const Vec2 p0 = ::sc::converted::at(pts, i), p1 = ::sc::converted::at(pts, i + 1);
+      const f32 len = ::kern::converted::at(cum, i + 1) - ::kern::converted::at(cum, i);
+      if (at > ::kern::converted::at(cum, i + 1) + 0.0001f || len < 0.001f) continue;
+      const f32 t = clampf((at - ::kern::converted::at(cum, i)) / len, 0, 1);
+      const Vec2 p0 = ::kern::converted::at(pts, i), p1 = ::kern::converted::at(pts, i + 1);
       out.push_back({{p0.x + (p1.x - p0.x) * t, p0.y + (p1.y - p0.y) * t}, std::atan2(p1.x - p0.x, p1.y - p0.y), total - at});
       break;
     }
@@ -1568,14 +1568,14 @@ Turn upcoming_turn(const std::vector<Vec2>& pts, Vec2 pos, f32 scan, f32 window,
   if (pts.size() < 3) return out;
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  if (::sc::converted::back(cum) < 2) return out;
+  if (::kern::converted::back(cum) < 2) return out;
   scan = clampf(scan, 5, 1000);
   window = clampf(window, 3, 80);
   min_angle = clampf(min_angle, 15, 160);
   for (std::size_t i = 1; i + 1 < pts.size(); ++i) { ::sc::lowered::tick();
-    const f32 away = ::sc::converted::at(cum, i) - a.along;
+    const f32 away = ::kern::converted::at(cum, i) - a.along;
     if (away < 1 || away > scan) continue;
-    const Vec2 c = ::sc::converted::at(pts, i), prev = point_at(pts, cum, ::sc::converted::at(cum, i) - window), next = point_at(pts, cum, ::sc::converted::at(cum, i) + window);
+    const Vec2 c = ::kern::converted::at(pts, i), prev = point_at(pts, cum, ::kern::converted::at(cum, i) - window), next = point_at(pts, cum, ::kern::converted::at(cum, i) + window);
     const f32 bx = c.x - prev.x, by = c.y - prev.y, ax = next.x - c.x, ay = next.y - c.y;
     if (std::hypot(bx, by) < 2 || std::hypot(ax, ay) < 2) continue;
     const f32 angle = std::atan2(bx * ay - by * ax, bx * ax + by * ay) / kDeg;
@@ -1589,10 +1589,10 @@ Turn upcoming_turn(const std::vector<Vec2>& pts, Vec2 pos, f32 scan, f32 window,
 }
 
 f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
-  if (pts.size() < 2) return pts.empty() ? 0 : std::hypot(::sc::converted::at(pts, 0).x - pos.x, ::sc::converted::at(pts, 0).y - pos.y);
+  if (pts.size() < 2) return pts.empty() ? 0 : std::hypot(::kern::converted::at(pts, 0).x - pos.x, ::kern::converted::at(pts, 0).y - pos.y);
   std::vector<f32> cum;
   const Along a = project_on(pts, pos, cum);
-  return ::sc::converted::back(cum) - a.along + a.distance;
+  return ::kern::converted::back(cum) - a.along + a.distance;
 }
 
 std::string bearing_arrow(f32 b) {
@@ -1646,8 +1646,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
     if (q.owner == owner) { q.p = p; q.color = color; q.at_ms = now; return; }
   pings_.push_back({owner, p, color, now});
 }
-void PingBoard::clear(u8 owner) { ::sc::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { ::sc::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", now - q.at_ms); }), pings_.end()); }
+void PingBoard::clear(u8 owner) { ::kern::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
+void PingBoard::expire(f64 now) { ::kern::converted::erase(pings_, std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", now - q.at_ms); }), pings_.end()); }
 
 f32 PingBoard::fade(const Ping& p, f64 now_ms) { return static_cast<f32>(g_rules.number("PingFade", now_ms - p.at_ms)); }
 
@@ -1701,14 +1701,14 @@ template <> struct Values<::sc_new_mp_rules::sc::mp::Turn::Dir> { static constex
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_mp_rules_cpp) {
+KERN_TEST(lowered_mp_rules_cpp) {
   ::sc::lowered::World world({"Multiplayer"});
   ::sc_new_mp_rules::sc::mp::g_rules.bind(world.logic(false));
   ::sc_old_mp_rules::sc::mp::bind(world.instance(true, "Multiplayer"));
   ::sc_new_mp_rules::sc::mp::bind(world.logic(false));
   {  // PoseTimeline::sample(f64)  ->  PoseTimeline::sample(f64)
     ::sc::lowered::Tally tally("PoseTimeline::sample(f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1758,7 +1758,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // assign_colors(const std::vector<std::string> &)  ->  assign_colors(const std::vector<std::string> &)
     ::sc::lowered::Tally tally("assign_colors(const std::vector<std::string> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1803,7 +1803,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // weapon_label(Weapon)  ->  weapon_label(Weapon)
     ::sc::lowered::Tally tally("weapon_label(Weapon)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1848,7 +1848,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // zone_name(Zone)  ->  zone_name(Zone)
     ::sc::lowered::Tally tally("zone_name(Zone)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1893,7 +1893,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // round_damage(Weapon, Zone)  ->  round_damage(Weapon, Zone)
     ::sc::lowered::Tally tally("round_damage(Weapon, Zone)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1941,7 +1941,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // blast_damage(f32)  ->  blast_damage(f32)
     ::sc::lowered::Tally tally("blast_damage(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -1986,7 +1986,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // judge_hit(bool, bool, bool, bool, f64, f64, f32)  ->  judge_hit(bool, bool, bool, bool, f64, f64, f32)
     ::sc::lowered::Tally tally("judge_hit(bool, bool, bool, bool, f64, f64, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2049,7 +2049,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // regen(f32, f64, f64, f32)  ->  regen(f32, f64, f64, f32)
     ::sc::lowered::Tally tally("regen(f32, f64, f64, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2103,7 +2103,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // respawn_offset(Rng &)  ->  respawn_offset(Rng &)
     ::sc::lowered::Tally tally("respawn_offset(Rng &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2149,7 +2149,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // spawn_ring_offset(u32)  ->  spawn_ring_offset(u32)
     ::sc::lowered::Tally tally("spawn_ring_offset(u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2194,7 +2194,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // roster(std::vector<u8> &)  ->  roster(std::vector<u8> &)
     ::sc::lowered::Tally tally("roster(std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2237,7 +2237,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // create_ballot(Ballot &, u32, u8, bool, u8, std::vector<u8>, f64)  ->  create_ballot(Ballot &, u32, u8, bool, u8, std::vector<u8>, f64)
     ::sc::lowered::Tally tally("create_ballot(Ballot &, u32, u8, bool, u8, std::vector<u8>, f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2301,7 +2301,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // cast_vote(Ballot &, u8, bool, std::vector<u8>, f64, Ballot::Status *)  ->  cast_vote(Ballot &, u8, bool, std::vector<u8>, f64, Ballot::Status &)
     ::sc::lowered::Tally tally("cast_vote(Ballot &, u8, bool, std::vector<u8>, f64, Ballot::Status *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2364,7 +2364,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // ballot_stale(const Ballot &, const std::vector<u8> &, f64)  ->  ballot_stale(const Ballot &, const std::vector<u8> &, f64)
     ::sc::lowered::Tally tally("ballot_stale(const Ballot &, const std::vector<u8> &, f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2415,7 +2415,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // ballot_name(Ballot::Status)  ->  ballot_name(Ballot::Status)
     ::sc::lowered::Tally tally("ballot_name(Ballot::Status)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2460,7 +2460,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // voice_gain(f32, bool)  ->  voice_gain(f32, bool)
     ::sc::lowered::Tally tally("voice_gain(f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2508,7 +2508,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // VoiceStream::render(f32 *, u32, u32)  ->  VoiceStream::render(std::vector<f32> &, u32, u32)
     ::sc::lowered::Tally tally("VoiceStream::render(f32 *, u32, u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2566,7 +2566,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // VoiceCapture::push(const f32 *, u32, u32)  ->  VoiceCapture::push(kern::Span<const f32>, u32)
     ::sc::lowered::Tally tally("VoiceCapture::push(const f32 *, u32, u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2617,7 +2617,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // bearing_arrow(f32)  ->  bearing_arrow(f32)
     ::sc::lowered::Tally tally("bearing_arrow(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2662,7 +2662,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)  ->  locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)
     ::sc::lowered::Tally tally("locate_map_peer(kern::Vec2, f32, f32, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2722,7 +2722,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // safe_mobile_marker_point(kern::Vec2, f32, f32, bool)  ->  safe_mobile_marker_point(kern::Vec2, f32, f32, bool)
     ::sc::lowered::Tally tally("safe_mobile_marker_point(kern::Vec2, f32, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2776,7 +2776,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // format_distance(f32)  ->  format_distance(f32)
     ::sc::lowered::Tally tally("format_distance(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2821,7 +2821,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // PingBoard::toggle(u8, kern::Vec3, u32, f64)  ->  PingBoard::toggle(u8, kern::Vec3, u32, f64)
     ::sc::lowered::Tally tally("PingBoard::toggle(u8, kern::Vec3, u32, f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2880,7 +2880,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // PingBoard::expire(f64)  ->  PingBoard::expire(f64)
     ::sc::lowered::Tally tally("PingBoard::expire(f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2927,7 +2927,7 @@ SC_TEST(lowered_mp_rules_cpp) {
   }
   {  // PingBoard::fade(const Ping &, f64)  ->  PingBoard::fade(const Ping &, f64)
     ::sc::lowered::Tally tally("PingBoard::fade(const Ping &, f64)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kSpawnProtectMs, ::sc_new_mp_rules::sc::mp::kSpawnProtectMs);
       ::sc::lowered::draw_pair(draw, ::sc_old_mp_rules::sc::mp::kRegenDelayMs, ::sc_new_mp_rules::sc::mp::kRegenDelayMs);
@@ -2973,7 +2973,7 @@ SC_TEST(lowered_mp_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_mp_rules::sc::mp::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_mp_rules::sc::mp::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_mp_rules::sc::mp::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

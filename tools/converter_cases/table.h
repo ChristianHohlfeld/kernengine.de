@@ -1,6 +1,6 @@
 #pragma once
 #include "kern/math/math.h"
-namespace sc {
+namespace cases {
 namespace weapons {
 enum class Id : kern::u8 { mp, glock };
 struct Spec { const char* name; kern::f32 interval_ms; kern::f32 range_m; };

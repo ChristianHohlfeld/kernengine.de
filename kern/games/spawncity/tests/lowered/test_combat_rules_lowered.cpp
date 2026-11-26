@@ -357,13 +357,13 @@ bool bind_military(kern::logic::Instance* blueprint) {
 
 MilEvent MilitaryClock::update(f32 now, i32 stars, f32 heat, bool enabled) {
   std::vector<Value> r;
-  if (!g_military.call("Update", {Value::structure({B(active), N(since5), N(alert_at), N(next_reinforce)}), N(now), I(stars), N(heat), B(enabled)}, r) || r.size() < 2 || ::sc::converted::at(r, 0).fields() < 4)
+  if (!g_military.call("Update", {Value::structure({B(active), N(since5), N(alert_at), N(next_reinforce)}), N(now), I(stars), N(heat), B(enabled)}, r) || r.size() < 2 || ::kern::converted::at(r, 0).fields() < 4)
     return MilEvent::none;
-  active = ::sc::converted::at(r, 0).field(0)->b;
-  since5 = f(*::sc::converted::at(r, 0).field(1));
-  alert_at = f(*::sc::converted::at(r, 0).field(2));
-  next_reinforce = f(*::sc::converted::at(r, 0).field(3));
-  return static_cast<MilEvent>(::sc::converted::at(r, 1).i);
+  active = ::kern::converted::at(r, 0).field(0)->b;
+  since5 = f(*::kern::converted::at(r, 0).field(1));
+  alert_at = f(*::kern::converted::at(r, 0).field(2));
+  next_reinforce = f(*::kern::converted::at(r, 0).field(3));
+  return static_cast<MilEvent>(::kern::converted::at(r, 1).i);
 }
 f32 heli_hit_chance(f32 d, f32 speed) { return num(g_military, "HeliHitChance", {N(d), N(speed)}); }
 f32 soldier_hit_chance(f32 d, f32 speed) { return num(g_military, "SoldierHitChance", {N(d), N(speed)}); }
@@ -401,7 +401,7 @@ f32 agent_random(u32 seed) { return static_cast<f32>((seed * 2246822519u) >> 8) 
 
 Temper temper_of(u32 seed) {
   std::vector<Value> r;
-  return g_military.call("TemperOf", {N(agent_random(seed))}, r) && !r.empty() ? static_cast<Temper>(::sc::converted::at(r, 0).i) : Temper::fearful;
+  return g_military.call("TemperOf", {N(agent_random(seed))}, r) && !r.empty() ? static_cast<Temper>(::kern::converted::at(r, 0).i) : Temper::fearful;
 }
 
 Arms arms_of(u32 seed) {
@@ -409,7 +409,7 @@ Arms arms_of(u32 seed) {
   u32 h = (static_cast<u32>(::sc::lowered::fits<unsigned int>(static_cast<f64>(agent_random(seed)) * 4294967296.0)) ^ 0x9e3779b9u) * 2654435761u;
   h ^= h >> 15;
   std::vector<Value> r;
-  return g_military.call("ArmsOf", {rules::of_enum(temper_of(seed)), rules::number(static_cast<f64>(h % 10000) / 10000.0)}, r) && !r.empty() ? static_cast<Arms>(::sc::converted::at(r, 0).i) : Arms::fists;
+  return g_military.call("ArmsOf", {rules::of_enum(temper_of(seed)), rules::number(static_cast<f64>(h % 10000) / 10000.0)}, r) && !r.empty() ? static_cast<Arms>(::kern::converted::at(r, 0).i) : Arms::fists;
 }
 
 // ---------------------------------------------------------------- "Zombies"
@@ -444,16 +444,16 @@ void take(const Value& v, ZombieRounds& z) {
 ZombieEvent ZombieRounds::update(f32 now, bool night, i32 alive) {
   std::vector<Value> r;
   if (!g_zombies.call("Update", {to_value(*this), N(now), B(night), I(alive)}, r) || r.size() < 2) return ZombieEvent::none;
-  take(::sc::converted::at(r, 0), *this);
-  return static_cast<ZombieEvent>(::sc::converted::at(r, 1).i);
+  take(::kern::converted::at(r, 0), *this);
+  return static_cast<ZombieEvent>(::kern::converted::at(r, 1).i);
 }
 void ZombieRounds::spawned(f32 now) {
   std::vector<Value> r;
-  if (g_zombies.call("Spawned", {to_value(*this), N(now)}, r) && !r.empty()) take(::sc::converted::at(r, 0), *this);
+  if (g_zombies.call("Spawned", {to_value(*this), N(now)}, r) && !r.empty()) take(::kern::converted::at(r, 0), *this);
 }
 void ZombieRounds::next_round(f32 now) {
   std::vector<Value> r;
-  if (g_zombies.call("NextRound", {to_value(*this), N(now)}, r) && !r.empty()) take(::sc::converted::at(r, 0), *this);
+  if (g_zombies.call("NextRound", {to_value(*this), N(now)}, r) && !r.empty()) take(::kern::converted::at(r, 0), *this);
 }
 f32 ZombieRounds::hp() const { return num(g_zombies, "Hp", {I(round)}); }
 f32 ZombieRounds::speed(f32 r_fast, f32 r_speed) const { return num(g_zombies, "Speed", {I(round), N(r_fast), N(r_speed)}); }
@@ -469,29 +469,29 @@ bool bind_sandbox(kern::logic::Instance* blueprint) {
   kComboS = static_cast<f32>(g_sandbox.variable("ComboS"));
   const Value table = blueprint->get("Enemies");
   if (table.size() < 3) return false;  // (a row for each EnemyType)
-  g_enemy_texts.reserve(::sc::converted::count(table.size()));
+  g_enemy_texts.reserve(::kern::converted::count(table.size()));
   for (std::size_t i = 0; i < table.size(); ++i) { ::sc::lowered::tick();
     const Value row = table.item(i);
     if (row.fields() < 12) { g_enemy_texts.clear(); g_enemies.clear(); return false; }
     g_enemy_texts.push_back({row.field(0)->as_text()});
-    g_enemies.push_back({::sc::converted::back(g_enemy_texts).name.c_str(), f(*row.field(1)), f(*row.field(2)), f(*row.field(3)), f(*row.field(4)), whole(*row.field(5)), f(*row.field(6)), f(*row.field(7)),
+    g_enemies.push_back({::kern::converted::back(g_enemy_texts).name.c_str(), f(*row.field(1)), f(*row.field(2)), f(*row.field(3)), f(*row.field(4)), whole(*row.field(5)), f(*row.field(6)), f(*row.field(7)),
                          whole(*row.field(8)), f(*row.field(9)), vec(*row.field(10)), vec(*row.field(11))});
   }
   return true;
 }
 
-const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? ::sc::converted::at(g_enemies, static_cast<std::size_t>(t)) : kNoEnemy; }
+const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? ::kern::converted::at(g_enemies, static_cast<std::size_t>(t)) : kNoEnemy; }
 
 bool choose_enemy(i32 stars, f32 r, i32 heavies, EnemyType& out) {
   std::vector<Value> v;
   if (!g_sandbox.call("ChooseEnemy", {I(stars), N(r), I(heavies)}, v) || v.empty()) return false;
-  out = static_cast<EnemyType>(::sc::converted::at(v, 0).i);
+  out = static_cast<EnemyType>(::kern::converted::at(v, 0).i);
   return true;
 }
 f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving) { return num(g_sandbox, "EnemyHitChance", {N(s.acc), N(d), N(moving)}); }
 i32 enemy_budget(i32 stars) {
   std::vector<Value> v;
-  return g_sandbox.call("Budget", {I(stars)}, v) && !v.empty() ? whole(::sc::converted::at(v, 0)) : 0;
+  return g_sandbox.call("Budget", {I(stars)}, v) && !v.empty() ? whole(::kern::converted::at(v, 0)) : 0;
 }
 
 namespace {
@@ -508,12 +508,12 @@ void take(const Value& v, Chaos& c) {
 i32 Chaos::award(i32 points, f32 now) {
   std::vector<Value> r;
   if (!g_sandbox.call("Award", {to_value(*this), I(points), N(now)}, r) || r.size() < 2) return 0;
-  take(::sc::converted::at(r, 0), *this);
-  return whole(::sc::converted::at(r, 1));
+  take(::kern::converted::at(r, 0), *this);
+  return whole(::kern::converted::at(r, 1));
 }
 void Chaos::tick(f32 dt, f32 now) {
   std::vector<Value> r;
-  if (g_sandbox.call("Tick", {to_value(*this), N(dt), N(now)}, r) && !r.empty()) take(::sc::converted::at(r, 0), *this);
+  if (g_sandbox.call("Tick", {to_value(*this), N(dt), N(now)}, r) && !r.empty()) take(::kern::converted::at(r, 0), *this);
 }
 
 // ---------------------------------------------------------------- "Fun"
@@ -529,19 +529,19 @@ bool bind_fun(kern::logic::Instance* blueprint) {
   kMomentumTarget = static_cast<i32>(::sc::lowered::fits<int>(g_fun.variable("MomentumTarget")));
   const Value table = blueprint->get("Contracts");
   if (table.size() == 0) return false;
-  g_contract_texts.reserve(::sc::converted::count(table.size()));
+  g_contract_texts.reserve(::kern::converted::count(table.size()));
   for (std::size_t i = 0; i < table.size(); ++i) { ::sc::lowered::tick();
     const Value row = table.item(i);
     if (row.fields() < 5) { g_contract_texts.clear(); g_contracts.clear(); return false; }
     g_contract_texts.push_back({row.field(0)->as_text(), row.field(1)->as_text(), row.field(2)->as_text()});
-    const ContractText& t = ::sc::converted::back(g_contract_texts);
+    const ContractText& t = ::kern::converted::back(g_contract_texts);
     g_contracts.push_back({t.id.c_str(), t.name.c_str(), t.hint.c_str(), whole(*row.field(3)), whole(*row.field(4))});
   }
   kContracts = static_cast<i32>(g_contracts.size());
   return true;
 }
 
-const Contract& contract(i32 index) { return kContracts > 0 ? ::sc::converted::at(g_contracts, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(index, kContracts)), kContracts)), kContracts))) : kNoContract; }
+const Contract& contract(i32 index) { return kContracts > 0 ? ::kern::converted::at(g_contracts, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(index, kContracts)), kContracts)), kContracts))) : kNoContract; }
 
 namespace {
 Value to_value(const Fun& s) {
@@ -575,8 +575,8 @@ void take(const Value& v, Fun& s) {
 std::string Fun::apply(FunEvent e, f32 now, i32 stars_now, f32 amount) {
   std::vector<Value> r;
   if (!g_fun.call("Apply", {to_value(*this), rules::of_enum(e), N(now), I(stars_now), N(amount)}, r) || r.size() < 2) return {};
-  take(::sc::converted::at(r, 0), *this);
-  return ::sc::converted::at(r, 1).as_text();
+  take(::kern::converted::at(r, 0), *this);
+  return ::kern::converted::at(r, 1).as_text();
 }
 f32 Fun::multiplier(f32 now) const { return num(g_fun, "Multiplier", {to_value(*this), N(now)}); }
 f32 Fun::police_damage_scale() const { return num(g_fun, "PoliceDamageScale", {I(mercy)}); }
@@ -593,24 +593,24 @@ bool bind_race(kern::logic::Instance* blueprint) {
   kCourseScale = static_cast<f32>(g_race.variable("CourseScale"));
   const std::size_t n = blueprint->get("Gates").size();
   if (n < 2) return false;
-  g_gate_names.reserve(::sc::converted::count(n));
+  g_gate_names.reserve(::kern::converted::count(n));
   for (std::size_t i = 0; i < n; ++i) { ::sc::lowered::tick();  // (each gate as it stands in the world: the Blueprint's GateAt)
     std::vector<Value> r;
-    if (!g_race.call("GateAt", {I(static_cast<i64>(i))}, r) || r.empty() || ::sc::converted::at(r, 0).fields() < 5) { g_gate_names.clear(); g_gates.clear(); return false; }
-    g_gate_names.push_back(::sc::converted::at(r, 0).field(0)->as_text());
-    g_gates.push_back({::sc::converted::back(g_gate_names).c_str(), vec(*::sc::converted::at(r, 0).field(1)), f(*::sc::converted::at(r, 0).field(2)), f(*::sc::converted::at(r, 0).field(3)), ::sc::converted::at(r, 0).field(4)->b});
+    if (!g_race.call("GateAt", {I(static_cast<i64>(i))}, r) || r.empty() || ::kern::converted::at(r, 0).fields() < 5) { g_gate_names.clear(); g_gates.clear(); return false; }
+    g_gate_names.push_back(::kern::converted::at(r, 0).field(0)->as_text());
+    g_gates.push_back({::kern::converted::back(g_gate_names).c_str(), vec(*::kern::converted::at(r, 0).field(1)), f(*::kern::converted::at(r, 0).field(2)), f(*::kern::converted::at(r, 0).field(3)), ::kern::converted::at(r, 0).field(4)->b});
   }
   kGates = static_cast<i32>(g_gates.size());
   return true;
 }
 
-const Gate& gate(i32 i) { return kGates > 0 ? ::sc::converted::at(g_gates, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(i, kGates)), kGates)), kGates))) : kNoGate; }
+const Gate& gate(i32 i) { return kGates > 0 ? ::kern::converted::at(g_gates, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(i, kGates)), kGates)), kGates))) : kNoGate; }
 
 void gate_axes(i32 i, Vec2& normal, Vec2& right) {
   std::vector<Value> r;
   if (!g_race.call("GateAxes", {I(i)}, r) || r.size() < 2) { normal = {1, 0}; right = {0, 1}; return; }
-  normal = {static_cast<f32>(::sc::converted::at(r, 0).v.x), static_cast<f32>(::sc::converted::at(r, 0).v.y)};
-  right = {static_cast<f32>(::sc::converted::at(r, 1).v.x), static_cast<f32>(::sc::converted::at(r, 1).v.y)};
+  normal = {static_cast<f32>(::kern::converted::at(r, 0).v.x), static_cast<f32>(::kern::converted::at(r, 0).v.y)};
+  right = {static_cast<f32>(::kern::converted::at(r, 1).v.x), static_cast<f32>(::kern::converted::at(r, 1).v.y)};
 }
 
 void Race::reset() { *this = Race{}; }
@@ -623,9 +623,9 @@ i32 Race::update(Vec3 p, f32 t) {
                                                 Value::vector(prev)}),
                               Value::vector(p), N(t)},
                    r) ||
-      r.size() < 2 || ::sc::converted::at(r, 0).fields() < 12)
+      r.size() < 2 || ::kern::converted::at(r, 0).fields() < 12)
     return -1;
-  const Value& v = ::sc::converted::at(r, 0);
+  const Value& v = ::kern::converted::at(r, 0);
   started = v.field(0)->b;
   finished = v.field(1)->b;
   lap = whole(*v.field(2));
@@ -638,7 +638,7 @@ i32 Race::update(Vec3 p, f32 t) {
   last_pass = f(*v.field(9));
   have_prev = v.field(10)->b;
   prev = vec(*v.field(11));
-  return whole(::sc::converted::at(r, 1));
+  return whole(::kern::converted::at(r, 1));
 }
 
 // (how a time is written: "01:15.500")
@@ -1166,7 +1166,7 @@ bool bind_sandbox(kern::logic::Runtime& logic) {
   return true;
 }
 
-const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? ::sc::converted::at(g_enemies, static_cast<std::size_t>(t)) : kNoEnemy; }
+const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? ::kern::converted::at(g_enemies, static_cast<std::size_t>(t)) : kNoEnemy; }
 
 EnemyType choose_enemy(i32 stars, f32 r, i32 heavies) {
   EnemyType type = EnemyType::cop;
@@ -1227,7 +1227,7 @@ bool bind_fun(kern::logic::Runtime& logic) {
   return true;
 }
 
-const Contract& contract(i32 index) { return kContracts > 0 ? ::sc::converted::at(g_contracts, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(index, kContracts)), kContracts)), kContracts))) : kNoContract; }
+const Contract& contract(i32 index) { return kContracts > 0 ? ::kern::converted::at(g_contracts, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(index, kContracts)), kContracts)), kContracts))) : kNoContract; }
 
 namespace {
 /// The Run of the Blueprint "Fun", as it takes and gives it.
@@ -1299,7 +1299,7 @@ bool bind_race(kern::logic::Runtime& logic) {
   return true;
 }
 
-const Gate& gate(i32 i) { return kGates > 0 ? ::sc::converted::at(g_gates, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(i, kGates)), kGates)), kGates))) : kNoGate; }
+const Gate& gate(i32 i) { return kGates > 0 ? ::kern::converted::at(g_gates, static_cast<std::size_t>(::sc::lowered::rem((::sc::lowered::plus((::sc::lowered::rem(i, kGates)), kGates)), kGates))) : kNoGate; }
 
 void gate_axes(i32 i, Vec2& normal, Vec2& right) {
   Vec3 n, r;
@@ -1409,21 +1409,21 @@ template <> struct Values<::sc_new_combat_rules::sc::combat::FunEvent> { static 
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_combat_rules_cpp) {
+KERN_TEST(lowered_combat_rules_cpp) {
   ::sc::lowered::World world({"Fun", "Military", "Race", "Sandbox", "Zombies"});
   ::sc_new_combat_rules::sc::combat::g_military.bind(world.logic(false));
   ::sc_new_combat_rules::sc::combat::g_zombies.bind(world.logic(false));
   ::sc_new_combat_rules::sc::combat::g_sandbox.bind(world.logic(false));
   ::sc_new_combat_rules::sc::combat::g_fun.bind(world.logic(false));
   ::sc_new_combat_rules::sc::combat::g_race.bind(world.logic(false));
-  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_military(world.instance(true, "Military")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_military(world.logic(false)); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_military(kern::logic::Instance *) and bind_military(kern::logic::Runtime &) give other results"); }
-  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_zombies(world.instance(true, "Zombies")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_zombies(world.logic(false)); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_zombies(kern::logic::Instance *) and bind_zombies(kern::logic::Runtime &) give other results"); }
-  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_sandbox(world.instance(true, "Sandbox")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_sandbox(world.logic(false)); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_sandbox(kern::logic::Instance *) and bind_sandbox(kern::logic::Runtime &) give other results"); }
-  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_fun(world.instance(true, "Fun")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_fun(world.logic(false)); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_fun(kern::logic::Instance *) and bind_fun(kern::logic::Runtime &) give other results"); }
-  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_race(world.instance(true, "Race")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_race(world.logic(false)); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_race(kern::logic::Instance *) and bind_race(kern::logic::Runtime &) give other results"); }
+  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_military(world.instance(true, "Military")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_military(world.logic(false)); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_military(kern::logic::Instance *) and bind_military(kern::logic::Runtime &) give other results"); }
+  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_zombies(world.instance(true, "Zombies")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_zombies(world.logic(false)); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_zombies(kern::logic::Instance *) and bind_zombies(kern::logic::Runtime &) give other results"); }
+  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_sandbox(world.instance(true, "Sandbox")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_sandbox(world.logic(false)); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_sandbox(kern::logic::Instance *) and bind_sandbox(kern::logic::Runtime &) give other results"); }
+  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_fun(world.instance(true, "Fun")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_fun(world.logic(false)); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_fun(kern::logic::Instance *) and bind_fun(kern::logic::Runtime &) give other results"); }
+  { const auto o_bound = ::sc_old_combat_rules::sc::combat::bind_race(world.instance(true, "Race")); const auto n_bound = ::sc_new_combat_rules::sc::combat::bind_race(world.logic(false)); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_race(kern::logic::Instance *) and bind_race(kern::logic::Runtime &) give other results"); }
   {  // MilitaryClock::update(f32, i32, f32, bool)  ->  MilitaryClock::update(f32, i32, f32, bool)
     ::sc::lowered::Tally tally("MilitaryClock::update(f32, i32, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -1593,7 +1593,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // heli_hit_chance(f32, f32)  ->  heli_hit_chance(f32, f32)
     ::sc::lowered::Tally tally("heli_hit_chance(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -1752,7 +1752,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // soldier_hit_chance(f32, f32)  ->  soldier_hit_chance(f32, f32)
     ::sc::lowered::Tally tally("soldier_hit_chance(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -1911,7 +1911,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // tank_aim_error(f32, f32)  ->  tank_aim_error(f32, f32)
     ::sc::lowered::Tally tally("tank_aim_error(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2070,7 +2070,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // gangster_hit_chance(f32, f32)  ->  gangster_hit_chance(f32, f32)
     ::sc::lowered::Tally tally("gangster_hit_chance(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2229,7 +2229,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // strike_launch_time(f32)  ->  strike_launch_time(f32)
     ::sc::lowered::Tally tally("strike_launch_time(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2385,7 +2385,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // flak_burst_damage(f32)  ->  flak_burst_damage(f32)
     ::sc::lowered::Tally tally("flak_burst_damage(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2541,7 +2541,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // flak_cell(i64, i64, u32 &)  ->  flak_cell(i64, i64, u32 &)
     ::sc::lowered::Tally tally("flak_cell(i64, i64, u32 &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2704,7 +2704,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // temper_of(u32)  ->  temper_of(u32)
     ::sc::lowered::Tally tally("temper_of(u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -2860,7 +2860,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // arms_of(u32)  ->  arms_of(u32)
     ::sc::lowered::Tally tally("arms_of(u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3016,7 +3016,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // take(const Value &, ZombieRounds &)  ->  take(const Rounds &, ZombieRounds &)
     ::sc::lowered::Tally tally("take(const Value &, ZombieRounds &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3173,7 +3173,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // ZombieRounds::update(f32, bool, i32)  ->  ZombieRounds::update(f32, bool, i32)
     ::sc::lowered::Tally tally("ZombieRounds::update(f32, bool, i32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3340,7 +3340,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // ZombieRounds::spawned(f32)  ->  ZombieRounds::spawned(f32)
     ::sc::lowered::Tally tally("ZombieRounds::spawned(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3498,7 +3498,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // ZombieRounds::next_round(f32)  ->  ZombieRounds::next_round(f32)
     ::sc::lowered::Tally tally("ZombieRounds::next_round(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3656,7 +3656,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // ZombieRounds::hp()  ->  ZombieRounds::hp()
     ::sc::lowered::Tally tally("ZombieRounds::hp()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3814,7 +3814,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // ZombieRounds::speed(f32, f32)  ->  ZombieRounds::speed(f32, f32)
     ::sc::lowered::Tally tally("ZombieRounds::speed(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -3978,7 +3978,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // choose_enemy(i32, f32, i32, EnemyType &)  ->  choose_enemy(i32, f32, i32)
     ::sc::lowered::Tally tally("choose_enemy(i32, f32, i32, EnemyType &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4141,7 +4141,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // enemy_hit_chance(const EnemySpec &, f32, f32)  ->  enemy_hit_chance(const EnemySpec &, f32, f32)
     ::sc::lowered::Tally tally("enemy_hit_chance(const EnemySpec &, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4303,7 +4303,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // enemy_budget(i32)  ->  enemy_budget(i32)
     ::sc::lowered::Tally tally("enemy_budget(i32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4459,7 +4459,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // take(const Value &, Chaos &)  ->  take(const ChaosRun &, Chaos &)
     ::sc::lowered::Tally tally("take(const Value &, Chaos &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4616,7 +4616,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Chaos::award(i32, f32)  ->  Chaos::award(i32, f32)
     ::sc::lowered::Tally tally("Chaos::award(i32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4780,7 +4780,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Chaos::tick(f32, f32)  ->  Chaos::tick(f32, f32)
     ::sc::lowered::Tally tally("Chaos::tick(f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -4941,7 +4941,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // take(const Value &, Fun &)  ->  take(const FunRun &, Fun &)
     ::sc::lowered::Tally tally("take(const Value &, Fun &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5098,7 +5098,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Fun::apply(FunEvent, f32, i32, f32)  ->  Fun::apply(FunEvent, f32, i32, f32)
     ::sc::lowered::Tally tally("Fun::apply(FunEvent, f32, i32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5268,7 +5268,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Fun::multiplier(f32)  ->  Fun::multiplier(f32)
     ::sc::lowered::Tally tally("Fun::multiplier(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5429,7 +5429,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Fun::police_damage_scale()  ->  Fun::police_damage_scale()
     ::sc::lowered::Tally tally("Fun::police_damage_scale()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5587,7 +5587,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // gate_axes(i32, Vec2 &, Vec2 &)  ->  gate_axes(i32, Vec2 &, Vec2 &)
     ::sc::lowered::Tally tally("gate_axes(i32, Vec2 &, Vec2 &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5748,7 +5748,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Race::crossed(i32, kern::Vec3, kern::Vec3)  ->  Race::crossed(i32, kern::Vec3, kern::Vec3)
     ::sc::lowered::Tally tally("Race::crossed(i32, kern::Vec3, kern::Vec3)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -5910,7 +5910,7 @@ SC_TEST(lowered_combat_rules_cpp) {
   }
   {  // Race::update(kern::Vec3, f32)  ->  Race::update(kern::Vec3, f32)
     ::sc::lowered::Tally tally("Race::update(kern::Vec3, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHoldS, ::sc_new_combat_rules::sc::combat::kTriggerHoldS);
@@ -6072,11 +6072,11 @@ SC_TEST(lowered_combat_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_combat_rules::sc::combat::g_military.bind(no_logic());   // (the test's logic is gone with it)
-  ::sc_new_combat_rules::sc::combat::g_zombies.bind(no_logic());   // (the test's logic is gone with it)
-  ::sc_new_combat_rules::sc::combat::g_sandbox.bind(no_logic());   // (the test's logic is gone with it)
-  ::sc_new_combat_rules::sc::combat::g_fun.bind(no_logic());   // (the test's logic is gone with it)
-  ::sc_new_combat_rules::sc::combat::g_race.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_rules::sc::combat::g_military.bind(kern::test::no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_rules::sc::combat::g_zombies.bind(kern::test::no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_rules::sc::combat::g_sandbox.bind(kern::test::no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_rules::sc::combat::g_fun.bind(kern::test::no_logic());   // (the test's logic is gone with it)
+  ::sc_new_combat_rules::sc::combat::g_race.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_combat_rules::sc::combat::bind_military(nullptr);   // (the test's logic is gone with it)
   ::sc_old_combat_rules::sc::combat::bind_zombies(nullptr);   // (the test's logic is gone with it)
   ::sc_old_combat_rules::sc::combat::bind_sandbox(nullptr);   // (the test's logic is gone with it)

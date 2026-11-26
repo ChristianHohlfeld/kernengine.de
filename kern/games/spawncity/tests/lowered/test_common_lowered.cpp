@@ -277,10 +277,10 @@ template <> struct Fields<::sc_new_common::sc::Rng> { static auto of(::sc_new_co
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_common_cpp) {
+KERN_TEST(lowered_common_cpp) {
   {  // Rng::Rng(u32)  ->  Rng::seeded(u32)
     ::sc::lowered::Tally tally("Rng::Rng(u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<::sc_old_common::sc::Rng> o_obj;
       std::optional<::sc_new_common::sc::Rng> n_obj;

@@ -1,5 +1,5 @@
 #include "nodekind.h"
-namespace sc {
+namespace cases {
 bool is_event(kern::logic::NodeKind k) { return k == kern::logic::NodeKind::event; }
 void register_mine() {
   static bool done = false;

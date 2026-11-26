@@ -90,6 +90,14 @@ template <> struct Direct<Bool> {
   template <class B> static B make(EngineObjects&, bool c) { return B(c); }
   static void pass(EngineObjects&, bool) {}
 };
+template <> struct Direct<Actor> {
+  template <class C> static void from(EngineObjects&, ActorHandle b, C& c) {
+    static_assert(std::is_same_v<C, ActorHandle>, "an Actor pin of something else than a kern::logic::ActorHandle");
+    c = b;
+  }
+  template <class B> static B make(EngineObjects&, ActorHandle c) { return c; }
+  static void pass(EngineObjects&, ActorHandle) {}
+};
 template <> struct Direct<Int> {
   template <class B, class C> static void from(EngineObjects&, const B& b, C& c) {
     static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");

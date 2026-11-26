@@ -344,8 +344,7 @@ class GameWorld {
   // ---- logic (Kern Logic graphs: the level's and the actors') ----
   /// The running graphs (Play and Simulate on the authority; null otherwise).
   logic::Runtime* logic_runtime() { return logic_.get(); }
-  /// The world of this world's actors and its objects of the engine while it runs (0: it does not run): what an
-  /// Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of
+  /// The world of this world's actors and its objects of the engine (0: it never ran): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of
   /// the level before names nothing in the next.
   logic::WorldId world_id() const;
   /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
@@ -379,7 +378,7 @@ class GameWorld {
   /// ones (root, then its children as in the level): the same calls give the same ids. `id` forces the root's id (a
   /// replica mirrors its server). 0 with the reason (last_error): the world does not run, no template of that name
   /// (the level's templates are named), the ids are taken.
-  ActorId spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
+  logic::ActorHandle spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
   /// The level's templates and their children while the world runs (they are not in level()).
   const Level& templates() const { return templates_; }
   bool teleport(ActorId id, Vec3 position, const Vec3* rotation_deg = nullptr);
@@ -762,6 +761,7 @@ class GameWorld {
   std::unique_ptr<LogicHost> logic_host_;
   std::unique_ptr<logic::Runtime> logic_;
   u32 logic_seed_ = 0x9e3779b9u;
+  logic::WorldId world_id_ = 0;   // (world_id: new at every start)
   bool logic_events_ = false;
   bool starting_replica_ = false;
   std::map<std::pair<ActorId, ActorId>, int> overlaps_;  // (sensor, visitor) -> shapes inside       // start() for a network replica: no logic           // the level has graphs: shapes report sensor / hit events

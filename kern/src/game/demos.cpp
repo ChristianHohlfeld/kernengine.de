@@ -269,7 +269,7 @@ Level micro_duck_level() {
   ball.mesh = round_mesh(Shape::sphere, 0.06f * S, 0.12f * S, {0.95f, 0.8f, 0.15f}, 0.4f);
   ball.mesh->rolling_resistance = 0.03f;  // a rubber ball on a wooden floor rolls out
   ball.body = body(Motion::dynamic, 0.05f * S * S * S);
-  const ActorId ball_id = l.add(ball).id;
+  l.add(ball);
 
   // Two crumpled socks on the floor: the duck sees them with its head camera, walks up, picks one
   // up, carries it off and spits it out - Kern's play network decides it (docs/lehrer.md, "Spielen").
@@ -311,14 +311,13 @@ Level micro_duck_level() {
   char text[2048];
   std::snprintf(text, sizeof text, R"({"variables":[{"name":"BallSeen","type":"bool","value":false}],
     "nodes":[{"id":1,"type":"event.every","x":0,"y":0,"params":{"seconds":"0.25"}},{"id":2,"type":"flow.branch","x":608,"y":0},
-      {"id":3,"type":"walker.sees","x":-32,"y":192,"values":{"other":%u}},{"id":4,"type":"var.get","x":32,"y":384,"params":{"variable":"BallSeen"}},
+      {"id":3,"type":"walker.sees","x":-32,"y":192},{"id":10,"type":"actor.find","x":-320,"y":192,"values":{"name":"Ball"}},{"id":4,"type":"var.get","x":32,"y":384,"params":{"variable":"BallSeen"}},
       {"id":5,"type":"logic.not","x":288,"y":384},{"id":6,"type":"logic.and","x":416,"y":224},
       {"id":7,"type":"walker.quack","x":896,"y":-64},{"id":8,"type":"var.set","x":1152,"y":-64,"params":{"variable":"BallSeen"}},
       {"id":9,"type":"var.set","x":896,"y":160,"params":{"variable":"BallSeen"}}],
     "comments":[{"id":20,"x":-64,"y":-112,"w":1472,"h":592,"text":"Demo, not something the robot does by itself: chirp when the ball comes into the head camera's picture"}],
     "links":[[1,"then",2,"exec"],[3,"visible",6,"a"],[4,"value",5,"a"],[5,"result",6,"b"],[6,"result",2,"condition"],
-      [2,"true",7,"exec"],[7,"then",8,"exec"],[3,"visible",8,"value"],[2,"false",9,"exec"],[3,"visible",9,"value"]]})",
-                static_cast<unsigned>(ball_id));
+      [2,"true",7,"exec"],[7,"then",8,"exec"],[3,"visible",8,"value"],[2,"false",9,"exec"],[3,"visible",9,"value"],[10,"actor",3,"other"]]})");   // (the ball: an actor of its world, found by its name - kern/docs/project.md 7)
   json::Value j;
   logic::Graph g;
   if (json::parse(text, j) && logic::graph_from_json(j, g)) l.logic = std::move(g);

@@ -1,5 +1,5 @@
 #include "pad.h"
-namespace sc {
+namespace cases {
 Holder& holder() { static Holder h; return h; }
 void take_pad(kern::i32 connected, kern::f32 lx, kern::u32 buttons) {
   PadState& p = holder().pad;

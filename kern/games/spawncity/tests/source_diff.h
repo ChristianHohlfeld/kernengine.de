@@ -5,7 +5,7 @@
 // test of such a change holds the file twice - its old text (the commit the change started from) and
 // its new text, each in a namespace of its own (sc_old, sc_new), compiled as the game compiles them:
 // the program's own numbers. Every function the change touched is called in both with the same drawn
-// state and the same drawn arguments (the draws of the converted tests: converted::Draw), and what the
+// state and the same drawn arguments (the draws of the converted tests: kern::converted::Draw), and what the
 // two give and leave must be the same, bit for bit: what the call returns, every parameter it may
 // change, its object, the variables of the file (or the state they became - see source_diff.py) and the
 // Blueprints of the actors it calls. There is no margin: 0.0 and -0.0 are two results, so are two NaNs
@@ -14,7 +14,7 @@
 // What C++ leaves open - an entry outside a list, a whole number divided by zero or shifted by its
 // width or more, a signed whole number that leaves its type, a number made a whole number of a type
 // that does not hold it, a list of more entries than a test builds - goes through the guards of the
-// converted tests (converted::at, count ...) and the few here; a call that meets one has no result in
+// converted tests (kern::converted::at, count ...) and the few here; a call that meets one has no result in
 // C++ to compare with, and is counted, not compared (as in the converted tests).
 #pragma once
 
@@ -33,14 +33,16 @@
 #include <utility>
 #include <vector>
 
-#include "converted.h"
+#include "blueprint_call.h"   // (the game's numbers and rules::kLoopBudget: src/)
+#include "common.h"
+#include "kern/test/converted.h"
 #include "kern/core/fields.h"
 #include "kern/core/map.h"
 #include "kern/core/json.h"
 
 namespace sc::lowered {
 
-using converted::Draw;
+using kern::converted::Draw;
 
 // ---- what a value is made of ----
 /// The fields of a class of the changed file, as the test names them (it specializes this for each).
@@ -148,7 +150,7 @@ template <class T> void draw(Draw& d, T& x) {
       x.clear();
       for (u32 n = d.below(5); n > 0; --n) x.push_back(d.flag());
     } else {
-      x = converted::draw_list(d, [&] { return drawn<E>(d); });
+      x = kern::converted::draw_list(d, [&] { return drawn<E>(d); });
     }
   } else if constexpr (is_array<U>::value || std::is_array_v<U>) {
     for (auto& e : x) draw(d, e);
@@ -375,9 +377,9 @@ template <class A, class B> bool same(const A& a, const B& b) {
       if (a.members()[k].first != b.members()[k].first || !same(a.members()[k].second, b.members()[k].second)) return false;
     return true;
   } else if constexpr (std::is_same_v<X, kern::logic::Value> && !std::is_same_v<Y, kern::logic::Value>) {
-    return converted::same_value(a, as_value(b));   // (a value of the Blueprint and the struct the new one holds)
+    return kern::converted::same_value(a, as_value(b));   // (a value of the Blueprint and the struct the new one holds)
   } else if constexpr (std::is_same_v<X, kern::logic::Value> && std::is_same_v<Y, kern::logic::Value>) {
-    return converted::same_value(a, b);
+    return kern::converted::same_value(a, b);
   } else if constexpr (std::is_floating_point_v<X>) {
     static_assert(std::is_same_v<X, Y>, "a number of another type");
     if constexpr (sizeof(X) == 4) return std::bit_cast<u32>(a) == std::bit_cast<u32>(b);
@@ -505,7 +507,7 @@ template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
   using R = decltype(a / b);
   if constexpr (std::is_integral_v<R>) {
     if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<R>(b) == static_cast<R>(-1))) {
-      converted::g_open = true;
+      kern::converted::g_open = true;
       return 0;
     }
   }
@@ -514,7 +516,7 @@ template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
 template <class A, class B> constexpr auto rem(A a, B b) -> decltype(a % b) {
   using R = decltype(a % b);
   if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<R>(b) == static_cast<R>(-1))) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return 0;
   }
   return a % b;
@@ -522,7 +524,7 @@ template <class A, class B> constexpr auto rem(A a, B b) -> decltype(a % b) {
 template <class A, class B> constexpr auto shl(A a, B b) -> decltype(a << b) {
   using R = decltype(a << b);
   if (static_cast<long long>(b) < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * CHAR_BIT) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return 0;
   }
   return a << b;
@@ -530,7 +532,7 @@ template <class A, class B> constexpr auto shl(A a, B b) -> decltype(a << b) {
 template <class A, class B> constexpr auto shr(A a, B b) -> decltype(a >> b) {
   using R = decltype(a >> b);
   if (static_cast<long long>(b) < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * CHAR_BIT) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return 0;
   }
   return a >> b;
@@ -543,19 +545,19 @@ template <class A, class B> A& shr_to(A& a, B b) { return a = static_cast<A>(shr
 template <class A, class B> constexpr auto plus(A a, B b) -> decltype(a + b) {
   using R = decltype(a + b);
   R r{};
-  if (__builtin_add_overflow(static_cast<R>(a), static_cast<R>(b), &r)) converted::g_open = true;
+  if (__builtin_add_overflow(static_cast<R>(a), static_cast<R>(b), &r)) kern::converted::g_open = true;
   return r;
 }
 template <class A, class B> constexpr auto minus(A a, B b) -> decltype(a - b) {
   using R = decltype(a - b);
   R r{};
-  if (__builtin_sub_overflow(static_cast<R>(a), static_cast<R>(b), &r)) converted::g_open = true;
+  if (__builtin_sub_overflow(static_cast<R>(a), static_cast<R>(b), &r)) kern::converted::g_open = true;
   return r;
 }
 template <class A, class B> constexpr auto times(A a, B b) -> decltype(a * b) {
   using R = decltype(a * b);
   R r{};
-  if (__builtin_mul_overflow(static_cast<R>(a), static_cast<R>(b), &r)) converted::g_open = true;
+  if (__builtin_mul_overflow(static_cast<R>(a), static_cast<R>(b), &r)) kern::converted::g_open = true;
   return r;
 }
 template <class A, class B> A& plus_to(A& a, B b) { return a = static_cast<A>(plus(a, b)); }
@@ -573,7 +575,7 @@ template <class T, class F> constexpr F fits(F x) {
   constexpr long double lo = std::is_signed_v<T> ? static_cast<long double>(std::numeric_limits<T>::min()) : 0.0L;
   const long double v = static_cast<long double>(x);
   if (!(v > lo - 1.0L && v < hi)) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return F{0};
   }
   return x;
@@ -582,7 +584,7 @@ template <class T, class F> constexpr F fits(F x) {
 /// A whole number made a value of an enum whose type is not fixed: one outside the range of its values marks the call.
 template <long long Lo, long long Hi, class N> constexpr N enum_fits(N x) {
   if (static_cast<long long>(x) < Lo || static_cast<long long>(x) > Hi) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return N{0};
   }
   return x;
@@ -597,7 +599,7 @@ struct Place {
 };
 template <class L> Place at_place(L&& list, long long k) {
   using U = std::remove_cvref_t<L>;
-  const long long n = static_cast<long long>(converted::entries(list));
+  const long long n = static_cast<long long>(kern::converted::entries(list));
   if (k < 0 || k > n) return {};
   if constexpr (is_span<U>::value) return {list.data + k, static_cast<std::size_t>(n - k) * sizeof(list.data[0]), true};
   else if constexpr (std::is_array_v<U>) return {&list[0] + k, static_cast<std::size_t>(n - k) * sizeof(list[0]), true};
@@ -611,14 +613,14 @@ inline std::vector<Region>& regions();
 inline Place pointer_place(const void* p);
 inline void* copy(Place to, Place from, std::size_t n) {
   if (!to.there || !from.there || n > to.room || n > from.room) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return const_cast<void*>(to.at);
   }
   return n ? std::memcpy(const_cast<void*>(to.at), from.at, n) : const_cast<void*>(to.at);
 }
 inline void* move(Place to, Place from, std::size_t n) {
   if (!to.there || !from.there || n > to.room || n > from.room) {
-    converted::g_open = true;
+    kern::converted::g_open = true;
     return const_cast<void*>(to.at);
   }
   return n ? std::memmove(const_cast<void*>(to.at), from.at, n) : const_cast<void*>(to.at);
@@ -658,7 +660,7 @@ template <class P, class I> P& entry(P* p, I k) {
     const long long at = static_cast<long long>((a - r->begin) / static_cast<long long>(sizeof(P))) + static_cast<long long>(k);
     const long long n = static_cast<long long>((r->end - r->begin) / static_cast<long long>(sizeof(P)));
     if (at < 0 || at >= n) {
-      converted::open_read();   // (marks the call - and gives it up when it goes on so: a loop to a length that is not there)
+      kern::converted::open_read();   // (marks the call - and gives it up when it goes on so: a loop to a length that is not there)
       static std::remove_const_t<P> none{};
       none = std::remove_const_t<P>{};
       return none;
@@ -693,11 +695,11 @@ template <class T> kern::logic::Value as_value(const T& x) {
 /// The logic each side's Blueprints of actors run in (the level's actors the file's ActorBlueprints name), and
 /// those actors' variables as they started: before every call both start there; after it they must be the same.
 struct World {
-  RuleBlueprint old_side, new_side;
-  converted::ActorsStarted old_actors, new_actors;
+  kern::test::BlueprintRun old_side, new_side;
+  kern::converted::ActorsStarted old_actors, new_actors;
   explicit World(const std::vector<std::string>& actors) : old_side(nullptr, nullptr, false, actors), new_side(nullptr, nullptr, false, actors) {
     old_side.rt.budget = new_side.rt.budget = sc::rules::kLoopBudget;
-    SC_CHECK(old_side.problems.empty() && new_side.problems.empty(), "the actors: %s%s", old_side.problems.c_str(), new_side.problems.c_str());
+    KERN_CHECK(old_side.problems.empty() && new_side.problems.empty(), "the actors: %s%s", old_side.problems.c_str(), new_side.problems.c_str());
     old_actors.keep(old_side, actors);
     new_actors.keep(new_side, actors);
   }
@@ -706,7 +708,7 @@ struct World {
   kern::logic::Instance* instance(bool old, const char* actor) {
     kern::logic::Runtime& rt = logic(old);
     kern::logic::Instance* i = rt.find(rt.host().find_actor(actor));
-    SC_CHECK(i != nullptr, "the actor %s has no running Blueprint", actor);
+    KERN_CHECK(i != nullptr, "the actor %s has no running Blueprint", actor);
     return i;
   }
   void before() {
@@ -714,10 +716,10 @@ struct World {
     new_actors.restore();
   }
   bool same_after() const {
-    const std::vector<converted::Value> a = old_actors.now(), b = new_actors.now();
+    const std::vector<kern::converted::Value> a = old_actors.now(), b = new_actors.now();
     if (a.size() != b.size()) return false;
     for (std::size_t k = 0; k < a.size(); ++k)
-      if (!converted::same_value(a[k], b[k])) return false;
+      if (!kern::converted::same_value(a[k], b[k])) return false;
     return true;
   }
 };
@@ -728,42 +730,42 @@ inline constexpr long kRounds = 500000000;
 inline std::chrono::steady_clock::time_point g_call_began;
 inline void tick() {
   // (and one that runs longer than a minute: looked at every million rounds)
-  if (((++g_rounds > kRounds) || ((g_rounds & 0xFFFFF) == 0 && std::chrono::steady_clock::now() - g_call_began > std::chrono::seconds(60))) && converted::g_can_bail) {
-    converted::g_can_bail = false;
-    converted::g_open = true;
-    std::longjmp(converted::g_bail, 1);
+  if (((++g_rounds > kRounds) || ((g_rounds & 0xFFFFF) == 0 && std::chrono::steady_clock::now() - g_call_began > std::chrono::seconds(60))) && kern::converted::g_can_bail) {
+    kern::converted::g_can_bail = false;
+    kern::converted::g_open = true;
+    std::longjmp(kern::converted::g_bail, 1);
   }
 }
 
 /// One side's call: run with the guards armed. False: C++ leaves open what it gives (a guard marked it, or
-/// it read outside a list so long that it was given up - converted::open_read). `asks`: how often it asked
+/// it read outside a list so long that it was given up - kern::converted::open_read). `asks`: how often it asked
 /// for memory.
 /// From where the last two calls asked for memory - the old side's, then the new side's (cost.h): shown where
 /// the new asks more often (Tally::take), so that a count that differs says at once from where.
-inline cost::Trace g_trace_before, g_trace_last;
+inline kern::test::cost::Trace g_trace_before, g_trace_last;
 template <class F> bool run(F&& f, long& asks) {
-  converted::g_open = false;
-  converted::g_open_reads = 0;
+  kern::converted::g_open = false;
+  kern::converted::g_open_reads = 0;
   g_rounds = 0;
   g_call_began = std::chrono::steady_clock::now();
-  if (setjmp(converted::g_bail) != 0) {
-    cost::end();
-    converted::may_bail(false);
+  if (setjmp(kern::converted::g_bail) != 0) {
+    kern::test::cost::end();
+    kern::converted::may_bail(false);
     asks = 0;
     return false;
   }
-  converted::g_can_bail = true;
-  converted::may_bail(true);
-  cost::tracing = true;
-  cost::begin();
+  kern::converted::g_can_bail = true;
+  kern::converted::may_bail(true);
+  kern::test::cost::tracing = true;
+  kern::test::cost::begin();
   f();
-  asks = cost::end();
-  cost::tracing = false;
+  asks = kern::test::cost::end();
+  kern::test::cost::tracing = false;
   g_trace_before = g_trace_last;
-  g_trace_last = cost::now;
-  converted::g_can_bail = false;
-  converted::may_bail(false);
-  return !converted::g_open;
+  g_trace_last = kern::test::cost::now;
+  kern::converted::g_can_bail = false;
+  kern::converted::may_bail(false);
+  return !kern::converted::g_open;
 }
 
 /// The comparison of one function over its calls: up to kCalls compared ones (what C++ leaves open is drawn
@@ -777,7 +779,7 @@ struct Tally {
   explicit Tally(std::string f) : function(std::move(f)) {}
   /// Another call? Up to kCalls compared ones; of a function whose calls take long, as many as two seconds have room
   /// for, but twenty at least - and of one whose calls take seconds each (a 256-bit number raised to a power, limb by
-  /// limb), five at least and as many more as twenty seconds have room for (as the converted tests: converted::Tally).
+  /// limb), five at least and as many more as twenty seconds have room for (as the converted tests: kern::converted::Tally).
   bool more(int tried) const {
     ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
     if (compared >= kCalls || tried >= kCalls * 20) return false;
@@ -798,20 +800,20 @@ struct Tally {
     if (new_asks > old_asks) {
       if (costlier == 0) {   // (the first such call: from where each side asked)
         std::printf("  %s, call %d: the new asks for memory %ld time(s), the old %ld\n", function.c_str(), call, new_asks, old_asks);
-        cost::print("the old", g_trace_before, old_asks);
-        cost::print("the new", g_trace_last, new_asks);
+        kern::test::cost::print("the old", g_trace_before, old_asks);
+        kern::test::cost::print("the new", g_trace_last, new_asks);
       }
       ++costlier;
       if (new_asks - old_asks > most_new - with_old) most_new = new_asks, with_old = old_asks;
     }
   }
   ~Tally() {
-    SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
-    SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
+    KERN_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
+    KERN_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
     const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
     if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s)\n", function.c_str(), compared, seconds());
-    SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    KERN_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
     std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };
@@ -952,7 +954,7 @@ struct Builds {
     const char* how = std::getenv("SC_LOWERED_BUILDS");
     const std::string h = how ? how : "";
     writing = h.rfind("write:", 0) == 0;
-    SC_CHECK(writing || h.rfind("check:", 0) == 0, "%s: SC_LOWERED_BUILDS is write:<file> or check:<file> (run_tests.sh sets it), not '%s'", function.c_str(), h.c_str());
+    KERN_CHECK(writing || h.rfind("check:", 0) == 0, "%s: SC_LOWERED_BUILDS is write:<file> or check:<file> (run_tests.sh sets it), not '%s'", function.c_str(), h.c_str());
     file = h.size() > 6 ? h.substr(6) : "";
     if (!writing) read();
   }
@@ -998,7 +1000,7 @@ struct Builds {
       }
       return;
     }
-    SC_CHECK(false, "%s: the old program wrote nothing for it (%s)", function.c_str(), file.c_str());
+    KERN_CHECK(false, "%s: the old program wrote nothing for it (%s)", function.c_str(), file.c_str());
   }
   bool more(int tried) {
     ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
@@ -1033,7 +1035,7 @@ struct Builds {
     for (const char* e : ended) {
       bool known = false;
       for (const char* f : names) known = known || std::string_view(e) == f;
-      SC_CHECK(known, "%s: %s is no field of the object", function.c_str(), e);
+      KERN_CHECK(known, "%s: %s is no field of the object", function.c_str(), e);
     }
     Bytes rest;
     std::size_t k = 0;
@@ -1053,7 +1055,7 @@ struct Builds {
          if constexpr (std::is_default_constructible_v<F>) {
            if (!writing) ends = bytes_of(f).b == bytes_of(F{}).b;
          } else {
-           SC_CHECK(false, "%s: %s ends on purpose, but the test cannot make an ended one to compare with", function.c_str(), n);
+           KERN_CHECK(false, "%s: %s ends on purpose, but the test cannot make an ended one to compare with", function.c_str(), n);
          }
          Bytes said;
          said.num<unsigned char>(ends ? 1 : 0);
@@ -1105,7 +1107,7 @@ struct Builds {
       text(rec, function);
       text(rec, field);
       FILE* f = std::fopen(file.c_str(), "ab");
-      SC_CHECK(f != nullptr, "%s: cannot write %s", function.c_str(), file.c_str());
+      KERN_CHECK(f != nullptr, "%s: cannot write %s", function.c_str(), file.c_str());
       if (f != nullptr) {
         std::fwrite(rec.data(), 1, rec.size(), f);
         std::fclose(f);
@@ -1113,10 +1115,10 @@ struct Builds {
       std::printf("  %s: %zu calls written by the old program (%d where C++ says what they give)\n", function.c_str(), old.size(), defined_old);
       return;
     }
-    SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
-    SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
+    KERN_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
+    KERN_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    KERN_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
     std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };

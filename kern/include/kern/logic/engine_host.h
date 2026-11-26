@@ -326,6 +326,9 @@ struct Float {};
 struct Vector {};
 struct Text {};
 struct Int64 {};
+/// An actor (kern::logic::ActorHandle: its id and its world - kern/docs/project.md 7); whose world it must be, the
+/// function of the engine that takes it says (GameWorld: its own).
+struct Actor {};
 /// An enum: E has `using type = <the enum>` and `values[]`, its values in the order of the Blueprint's enum.
 template <class E> struct Enum {};
 /// A struct: S has `to(objects, value)` and `from(objects, Value, value&)`, field by field.
@@ -428,6 +431,16 @@ template <> struct Conv<Text> {
   template <class C> static Value to(EngineObjects&, const C& c) {
     if constexpr (std::is_pointer_v<C>) return Value::text(c ? std::string(c) : std::string());
     else return Value::text(std::string(c));
+  }
+};
+template <> struct Conv<Actor> {
+  template <class C> static void from(EngineObjects&, const Value& v, C& c) {
+    static_assert(std::is_same_v<C, ActorHandle>, "an Actor pin of something else than a kern::logic::ActorHandle");
+    c = v.as_actor();   // (no number becomes one: a value of another type is none)
+  }
+  template <class C> static Value to(EngineObjects&, const C& c) {
+    static_assert(std::is_same_v<C, ActorHandle>, "an Actor pin of something else than a kern::logic::ActorHandle");
+    return Value::actor(c);
   }
 };
 template <> struct Conv<Int64> {

@@ -16,7 +16,8 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 import {runKernApp} from "../../../web/app.mjs";
 import {readGamepad} from "../../../web/kern.mjs";
-import {KernAudio, KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {KernNet, TouchOverlay, TOUCH_STYLE} from "../../../web/studio/game.mjs";
+import {KernAudio} from "../../../web/audio.mjs";
 import {startKernJobs} from "../../../web/jobs.mjs";
 import {MpPage} from "./mp_host.mjs";
 import {installSpawnCityUi} from "./ui.mjs";
@@ -70,7 +71,9 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   // (kern.mjs BrowserInput, by way of the App host); what it does with them is set further down.
   const pageInput = {key: null, look: null, lock: null, device: null, fingersGone: null, visibility: null};
   try {
-    app = await runKernApp({canvas, url, base64, args, maxPixelRatio: mobile ? 1.5 : 2,
+    // (audio: false - the game still mixes in its own exports sc_audio_init/sc_audio_render, below; the engine's way,
+    // engine.mixer() heard by the app runtime, kern/docs/app.md 3., replaces them when the game fills that mixer)
+    app = await runKernApp({canvas, url, base64, args, maxPixelRatio: mobile ? 1.5 : 2, audio: false,
       onStatus: text => { statusEl.textContent = text; statusEl.hidden = !text; },
       onKey: (ev, down) => pageInput.key?.(ev, down), onLook: (dx, dy) => pageInput.look?.(dx, dy), onLock: locked => pageInput.lock?.(locked),
       onDevice: (kind, ev) => pageInput.device?.(kind, ev), onFingersGone: () => pageInput.fingersGone?.(), onVisibility: hidden => pageInput.visibility?.(hidden)});

@@ -1,4 +1,4 @@
 #include "objects.h"
-namespace sc {
+namespace cases {
 Board& board() { static Board b; return b; }
 }

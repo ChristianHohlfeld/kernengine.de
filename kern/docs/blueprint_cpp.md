@@ -2265,3 +2265,26 @@ Blueprint angewendet, ändert nichts; eine eingefügte, geänderte oder gelösch
 übrigen Knoten, wo sie sind), `studio_logic_cpp_view` (ein Blueprint, im Editor als C++ aus dem
 Nichts geschrieben, gespielt, im Text geändert, Undo) und im Browser `kern/tests/e2e/blueprint_e2e.mjs`
 (Schritt 1b: mit Maus und Tastatur).
+
+### Quelle gegen Blueprint: die Vergleichstests des Konverters
+
+`tools/cpp_to_blueprint.py --convert <namespace> … --test <ordner>` schreibt zu jeder umgewandelten Quelldatei einen
+Test, der jede geschriebene Funktion mit ihrer Quelle vergleicht – Bit für Bit, im Interpreter und als kompilierte
+Klasse, mit den Zahlen der Sprache. Der Namensraum ist der des Spiels; der Konverter kennt keinen Spiel­namen
+(`tools/converter_cases/names.sh` prüft es im CI-Job `converter-cases`). Der Rahmen gehört der Engine:
+
+| Datei | was |
+|---|---|
+| `kern/test/test.h` | die Testliste: `KERN_TEST(name) { … }`, `KERN_CHECK(bedingung, "printf-Text", …)`, `kern::test::cases()` |
+| `kern/test/blueprint.h` | ein Blueprint, wie ein Test ihn laufen lässt (`kern::test::BlueprintRun`, `blueprint_of(name)`): aus dem **eingebetteten Projekt** (`kern/tools/embed_project.py`) – die des Programms aus dem Projekt, die einer Welt aus dem Level, das sie hält (ein Name in zwei Levels ist ein Fehler mit beiden Pfaden); die Schleifenwache ist `loopBudget` des Projekts |
+| `kern/test/converted.h` | der Vergleich (`namespace kern::converted`: die Zahlen der Sprache für die Quelle, Ziehen der Argumente, Vergleich der Werte, der Aufrufe der Engine und der Kosten) |
+| `kern/test/cost.h` | wie oft ein Aufruf Speicher verlangt (die Klasse nicht öfter als ihre Quelle) |
+| `kern/tools/test_memory.cpp` | der Allokator eines Testprogramms: zählt und gibt genullten Speicher – genau einmal in jedes Testprogramm linken |
+| `kern/tools/test_main.cpp` | ein Läufer für alle registrierten Tests (`--name <test> …`); ein Spiel mit eigenem Läufer nimmt `kern::test::cases()` |
+
+Was das Spiel gibt, ist nur sein eingebettetes Projekt (mit seinen Levels) und die Klassen seiner Blueprints
+(`tools/blueprint_cpp.sh`) – kein Header aus einem Spielordner. Ein Testprogramm: die Tests, Engine, Projekt, Klassen,
+`test_memory.cpp` und ein Läufer. Umgebung: `KERN_TEST_ENGINE=real` lässt die Engine selbst die Aufrufe der Engine
+beantworten (sonst der Stellvertreter, der jeden Aufruf aufschreibt); `KERN_COST_WHERE=<funktion>` zeigt, wo Quelle und
+Klasse Speicher verlangen. Beispiel eines zweiten Spiels: `kern/games/murmel/tests/convert.sh` (wandelt die App um, baut
+die Vergleichstests und fährt sie gegen Stellvertreter und Engine).

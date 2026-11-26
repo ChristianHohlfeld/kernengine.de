@@ -163,7 +163,7 @@ bool Game::start(kern::Engine& e) {
   // always had (their ids follow it): the drone, the jet, the cars and buses, the police cruisers, the parachute.
   std::string missing;   // (why a vehicle is not there: GameWorld::spawn says it)
   auto spawn = [&](const char* name, Vec3 at) {
-    const ActorId id = world_->spawn(name, kern::game::Transform{at, {0, 0, 0}, {1, 1, 1}});
+    const ActorId id = world_->spawn(name, kern::game::Transform{at, {0, 0, 0}, {1, 1, 1}}).id;
     if (!id && missing.empty()) missing = kern::last_error();
     return id;
   };

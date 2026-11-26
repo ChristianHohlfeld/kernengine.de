@@ -161,7 +161,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
         auto it = cells.find(cell(::sc::lowered::plus(cx, dx), ::sc::lowered::plus(cy, dy)));
         if (it == cells.end()) continue;
         for (i32 i : it->second)
-          if (std::hypot(::sc::converted::at(nodes, i).p.x - p.x, ::sc::converted::at(nodes, i).p.y - p.y) < kMerge) return i;
+          if (std::hypot(::kern::converted::at(nodes, i).p.x - p.x, ::kern::converted::at(nodes, i).p.y - p.y) < kMerge) return i;
       }
     nodes.push_back({p, {}});
     cells[cell(cx, cy)].push_back(static_cast<i32>(nodes.size() - 1));
@@ -170,18 +170,18 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   for (const Lane& l : lanes) { ::sc::lowered::tick();
     if (!l.alive || l.points.size() < 2) continue;
     for (std::size_t i = 0; i < l.points.size(); ++i) { ::sc::lowered::tick();
-      const Vec2 p = ::sc::converted::at(l.points, i);
+      const Vec2 p = ::kern::converted::at(l.points, i);
       auto arm = [&](Vec2 q) {
         const f32 d = std::hypot(q.x - p.x, q.y - p.y);
         if (d < 0.5f) return;
-        Node& n = ::sc::converted::at(nodes, node_at(p));
+        Node& n = ::kern::converted::at(nodes, node_at(p));
         const Vec2 dir{(q.x - p.x) / d, (q.y - p.y) / d};
         for (const Arm& a : n.arms)
           if (a.dir.x * dir.x + a.dir.y * dir.y > 0.97f) return;  // the same street again (tile border)
         n.arms.push_back({dir, l.width});
       };
-      if (i > 0) arm(::sc::converted::at(l.points, i - 1));
-      if (i + 1 < l.points.size()) arm(::sc::converted::at(l.points, i + 1));
+      if (i > 0) arm(::kern::converted::at(l.points, i - 1));
+      if (i + 1 < l.points.size()) arm(::kern::converted::at(l.points, i + 1));
     }
   }
   // Streets that cross without a shared vertex (a tile cut, the stand-in town's straight streets
@@ -192,10 +192,10 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     std::vector<Seg> segs;
     std::unordered_map<u64, std::vector<u32>> buckets;
     for (u32 li = 0; li < lanes.size(); ++li) { ::sc::lowered::tick();
-      const Lane& l = ::sc::converted::at(lanes, li);
+      const Lane& l = ::kern::converted::at(lanes, li);
       if (!l.alive || l.points.size() < 2) continue;
       for (std::size_t i = 0; i + 1 < l.points.size(); ++i) { ::sc::lowered::tick();
-        const Seg s{::sc::converted::at(l.points, i), ::sc::converted::at(l.points, i + 1), l.width, li};
+        const Seg s{::kern::converted::at(l.points, i), ::kern::converted::at(l.points, i + 1), l.width, li};
         const u32 si = static_cast<u32>(segs.size());
         segs.push_back(s);
         const i32 x0 = static_cast<i32>(::sc::lowered::fits<int>(std::floor(std::fmin(s.a.x, s.b.x) / kCell))), x1 = static_cast<i32>(::sc::lowered::fits<int>(std::floor(std::fmax(s.a.x, s.b.x) / kCell)));
@@ -208,8 +208,8 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
       (void)key;
       for (std::size_t m = 0; (::sc::lowered::tick(), m < list.size()); ++m)
         for (std::size_t n = m + 1; n < list.size(); ++n) { ::sc::lowered::tick();
-          const Seg& s = ::sc::converted::at(segs, ::sc::converted::at(list, m));
-          const Seg& t = ::sc::converted::at(segs, ::sc::converted::at(list, n));
+          const Seg& s = ::kern::converted::at(segs, ::kern::converted::at(list, m));
+          const Seg& t = ::kern::converted::at(segs, ::kern::converted::at(list, n));
           if (s.lane == t.lane) continue;
           const Vec2 r = s.b - s.a, q = t.b - t.a;
           const f32 den = r.x * q.y - r.y * q.x;
@@ -225,8 +225,8 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
               if (d < 0.5f) continue;
               const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
               bool dup = false;
-              for (const Arm& a : ::sc::converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
-              if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+              for (const Arm& a : ::kern::converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
+              if (!dup) ::kern::converted::at(nodes, ni).arms.push_back({dir, g->width});
             }
         }
     }
@@ -295,7 +295,7 @@ void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
       auto it = grid_.find(cell(x, y));
       if (it == grid_.end()) continue;
       for (i32 j : it->second)
-        if (std::hypot(::sc::converted::at(junctions_, j).p.x - p.x, ::sc::converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
+        if (std::hypot(::kern::converted::at(junctions_, j).p.x - p.x, ::kern::converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
     }
 }
 
@@ -315,17 +315,17 @@ i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
   std::vector<Value> r;
   if (!g_rules.call("Light", {rules::number(lights_time >= 0 ? lights_time : now), rules::number(j.offset), rules::number(heading.x * j.axis.x + heading.y * j.axis.y)}, r) || r.empty()) return -1;
-  return static_cast<i32>(::sc::converted::at(r, 0).i);
+  return static_cast<i32>(::kern::converted::at(r, 0).i);
 }
 
 TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
   Pursuit out;
   const i32 n = static_cast<i32>(lane.points.size());
-  if (n < 2) { out.target = n ? ::sc::converted::at(lane.points, 0) : pos; out.passed = true; return out; }
+  if (n < 2) { out.target = n ? ::kern::converted::at(lane.points, 0) : pos; out.passed = true; return out; }
   dir = dir < 0 ? -1 : 1;
   i32 i = std::clamp(index, 0, ::sc::lowered::minus(n, 1));
   if (::sc::lowered::minus(i, dir) < 0 || ::sc::lowered::minus(i, dir) >= n) i += dir;  // (the lane's first point in this direction: the stretch after it)
-  Vec2 a = ::sc::converted::at(lane.points, ::sc::lowered::minus(i, dir)), b = ::sc::converted::at(lane.points, i);
+  Vec2 a = ::kern::converted::at(lane.points, ::sc::lowered::minus(i, dir)), b = ::kern::converted::at(lane.points, i);
   auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = std::hypot(d.x, d.y); if (l > 1e-3f) t = d * (1.0f / l); return l; };
   Vec2 t{1, 0};
   f32 len = along(a, b, t);
@@ -336,14 +336,14 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   Vec2 cur = a + t * s;
   f32 left = len - s, want = std::fmax(0.0f, look);
   out.end = left;
-  for (i32 k = i; (::sc::lowered::tick(), ::sc::lowered::plus(k, dir) >= 0 && ::sc::lowered::plus(k, dir) < n); k += dir) out.end += std::hypot(::sc::converted::at(lane.points, ::sc::lowered::plus(k, dir)).x - ::sc::converted::at(lane.points, k).x, ::sc::converted::at(lane.points, ::sc::lowered::plus(k, dir)).y - ::sc::converted::at(lane.points, k).y);
+  for (i32 k = i; (::sc::lowered::tick(), ::sc::lowered::plus(k, dir) >= 0 && ::sc::lowered::plus(k, dir) < n); k += dir) out.end += std::hypot(::kern::converted::at(lane.points, ::sc::lowered::plus(k, dir)).x - ::kern::converted::at(lane.points, k).x, ::kern::converted::at(lane.points, ::sc::lowered::plus(k, dir)).y - ::kern::converted::at(lane.points, k).y);
   while (want > left) { ::sc::lowered::tick();
     if (::sc::lowered::plus(i, dir) < 0 || ::sc::lowered::plus(i, dir) >= n) { want = left; break; }  // the lane ends here
     want -= left;
     cur = b;
     a = b;
     i += dir;
-    b = ::sc::converted::at(lane.points, i);
+    b = ::kern::converted::at(lane.points, i);
     left = along(a, b, t);
   }
   out.tangent = t;
@@ -357,14 +357,14 @@ f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::v
   f32 gap = 1e9f;
   i32 who = -1;
   for (std::size_t i = 0; i < all.size(); ++i) { ::sc::lowered::tick();
-    const Vehicle& o = ::sc::converted::at(all, i);
+    const Vehicle& o = ::kern::converted::at(all, i);
     if (!o.there || static_cast<i32>(i) == self) continue;
     const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
     if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
     const f32 along = dx * fwd.x + dy * fwd.y;
     if (along < g_laws.ahead_min || along > far) continue;
     if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
-    const f32 g = along - ::sc::converted::at(bodies, o.bus ? 1 : 0);
+    const f32 g = along - ::kern::converted::at(bodies, o.bus ? 1 : 0);
     if (g < gap) { gap = g; who = static_cast<i32>(i); }
   }
   if (limiter) *limiter = who;
@@ -386,7 +386,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     };
     bool by_player = player_on_foot && in_lane(player);
     bool yielding = by_player;
-    for (std::size_t i = 0; (::sc::lowered::tick(), i < people.size() && !yielding); ++i) yielding = in_lane(::sc::converted::at(people, i));
+    for (std::size_t i = 0; (::sc::lowered::tick(), i < people.size() && !yielding); ++i) yielding = in_lane(::kern::converted::at(people, i));
     Blocked& b = blocked_[car];
     if (yielding) {
       lim = 0;
@@ -396,8 +396,8 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       // (how much later the next honk comes: a number 0..1 from the car and the second)
       const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(::sc::lowered::fits<unsigned int>(now))) % 700) / 700;
       if (std::vector<Value> r; g_rules.call("Honk", {Value::boolean(by_player), rules::number(b.since), rules::number(b.next_honk), rules::number(now), rules::number(roll)}, r) && r.size() >= 2) {
-        view.honk = ::sc::converted::at(r, 0).b;
-        b.next_honk = static_cast<f32>(::sc::converted::at(r, 1).as_number());
+        view.honk = ::kern::converted::at(r, 0).b;
+        b.next_honk = static_cast<f32>(::kern::converted::at(r, 1).as_number());
       }
     } else b.since = -1;
   }
@@ -406,7 +406,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   near(pos + fwd * 25.0f, 34, cand);
   f32 best = 1e9f;
   for (i32 ji : cand) { ::sc::lowered::tick();
-    Junction& j = ::sc::converted::at(junctions_, ji);
+    Junction& j = ::kern::converted::at(junctions_, ji);
     const Vec2 d{j.p.x - pos.x, j.p.y - pos.y};
     const f32 along = d.x * fwd.x + d.y * fwd.y, lateral = std::fabs(-d.x * fwd.y + d.y * fwd.x);
     const f32 dist = std::hypot(d.x, d.y);
@@ -423,7 +423,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   }
   if (view.junction < 0) blocked_[car].wait_since = -1;
   if (view.junction >= 0) {
-    Junction& j = ::sc::converted::at(junctions_, view.junction);
+    Junction& j = ::kern::converted::at(junctions_, view.junction);
     const f32 stop = std::fmax(0.0f, view.distance - g_laws.stop_line);  // the stop line before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
@@ -431,7 +431,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     else if (view.distance < g_laws.first_come) {
       // Unsignalled: wait while someone else holds the junction (and is still in it).
       if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < g_laws.claim_s) {
-        const Vec3 c = ::sc::converted::at(cars, j.claim);
+        const Vec3 c = ::kern::converted::at(cars, j.claim);
         if (c.z > -1e8f && std::hypot(c.x - j.p.x, c.y - j.p.y) < j.radius + 3) must_stop = true;
       }
       // Right before left: a car close to the edge on the right goes first (after 4 s of waiting
@@ -439,8 +439,8 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       Blocked& b = blocked_[car];
       if (!must_stop && (b.wait_since < 0 || now - b.wait_since < g_laws.patience_s))
         for (std::size_t k = 0; k < cars.size(); ++k) { ::sc::lowered::tick();
-          if (static_cast<i32>(k) == car || ::sc::converted::at(cars, k).z < -1e8f) continue;
-          const Vec2 o{::sc::converted::at(cars, k).x - j.p.x, ::sc::converted::at(cars, k).y - j.p.y};
+          if (static_cast<i32>(k) == car || ::kern::converted::at(cars, k).z < -1e8f) continue;
+          const Vec2 o{::kern::converted::at(cars, k).x - j.p.x, ::kern::converted::at(cars, k).y - j.p.y};
           const f32 od = std::hypot(o.x, o.y);
           if (od < j.radius || od > j.radius + 10 || od > view.distance + j.radius + 2) continue;
           const Vec2 me{pos.x - j.p.x, pos.y - j.p.y};
@@ -599,7 +599,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
         auto it = cells.find(cell(::sc::lowered::plus(cx, dx), ::sc::lowered::plus(cy, dy)));
         if (it == cells.end()) continue;
         for (i32 i : it->second)
-          if (std::hypot(::sc::converted::at(nodes, i).p.x - p.x, ::sc::converted::at(nodes, i).p.y - p.y) < kMerge) return i;
+          if (std::hypot(::kern::converted::at(nodes, i).p.x - p.x, ::kern::converted::at(nodes, i).p.y - p.y) < kMerge) return i;
       }
     nodes.push_back({p, {}});
     cells[cell(cx, cy)].push_back(static_cast<i32>(nodes.size() - 1));
@@ -608,18 +608,18 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   for (const Lane& l : lanes) { ::sc::lowered::tick();
     if (!l.alive || l.points.size() < 2) continue;
     for (std::size_t i = 0; i < l.points.size(); ++i) { ::sc::lowered::tick();
-      const Vec2 p = ::sc::converted::at(l.points, i);
+      const Vec2 p = ::kern::converted::at(l.points, i);
       auto arm = [&](Vec2 q) {
         const f32 d = std::hypot(q.x - p.x, q.y - p.y);
         if (d < 0.5f) return;
-        Node& n = ::sc::converted::at(nodes, node_at(p));
+        Node& n = ::kern::converted::at(nodes, node_at(p));
         const Vec2 dir{(q.x - p.x) / d, (q.y - p.y) / d};
         for (const Arm& a : n.arms)
           if (a.dir.x * dir.x + a.dir.y * dir.y > 0.97f) return;  // the same street again (tile border)
         n.arms.push_back({dir, l.width});
       };
-      if (i > 0) arm(::sc::converted::at(l.points, i - 1));
-      if (i + 1 < l.points.size()) arm(::sc::converted::at(l.points, i + 1));
+      if (i > 0) arm(::kern::converted::at(l.points, i - 1));
+      if (i + 1 < l.points.size()) arm(::kern::converted::at(l.points, i + 1));
     }
   }
   // Streets that cross without a shared vertex (a tile cut, the stand-in town's straight streets
@@ -630,10 +630,10 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     std::vector<Seg> segs;
     kern::Map<u64, std::vector<u32>> buckets;
     for (u32 li = 0; li < lanes.size(); ++li) { ::sc::lowered::tick();
-      const Lane& l = ::sc::converted::at(lanes, li);
+      const Lane& l = ::kern::converted::at(lanes, li);
       if (!l.alive || l.points.size() < 2) continue;
       for (std::size_t i = 0; i + 1 < l.points.size(); ++i) { ::sc::lowered::tick();
-        const Seg s{::sc::converted::at(l.points, i), ::sc::converted::at(l.points, i + 1), l.width, li};
+        const Seg s{::kern::converted::at(l.points, i), ::kern::converted::at(l.points, i + 1), l.width, li};
         const u32 si = static_cast<u32>(segs.size());
         segs.push_back(s);
         const i32 x0 = static_cast<i32>(::sc::lowered::fits<int>(std::floor(std::fmin(s.a.x, s.b.x) / kCell))), x1 = static_cast<i32>(::sc::lowered::fits<int>(std::floor(std::fmax(s.a.x, s.b.x) / kCell)));
@@ -646,8 +646,8 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
       (void)key;
       for (std::size_t m = 0; (::sc::lowered::tick(), m < list.size()); ++m)
         for (std::size_t n = m + 1; n < list.size(); ++n) { ::sc::lowered::tick();
-          const Seg& s = ::sc::converted::at(segs, ::sc::converted::at(list, m));
-          const Seg& t = ::sc::converted::at(segs, ::sc::converted::at(list, n));
+          const Seg& s = ::kern::converted::at(segs, ::kern::converted::at(list, m));
+          const Seg& t = ::kern::converted::at(segs, ::kern::converted::at(list, n));
           if (s.lane == t.lane) continue;
           const Vec2 r = s.b - s.a, q = t.b - t.a;
           const f32 den = r.x * q.y - r.y * q.x;
@@ -657,15 +657,15 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
           if (u < 0 || u > 1 || v < 0 || v > 1) continue;
           const Vec2 p = s.a + r * u;
           const i32 ni = node_at(p);
-          for (const u32 gi : {::sc::converted::at(list, m), ::sc::converted::at(list, n)}) { ::sc::lowered::tick();  // (the two segments, by their place in segs)
-            const Seg& g = ::sc::converted::at(segs, gi);
+          for (const u32 gi : {::kern::converted::at(list, m), ::kern::converted::at(list, n)}) { ::sc::lowered::tick();  // (the two segments, by their place in segs)
+            const Seg& g = ::kern::converted::at(segs, gi);
             for (const Vec2 end : {g.a, g.b}) { ::sc::lowered::tick();
               const f32 d = std::hypot(end.x - p.x, end.y - p.y);
               if (d < 0.5f) continue;
               const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
               bool dup = false;
-              for (const Arm& a : ::sc::converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
-              if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+              for (const Arm& a : ::kern::converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
+              if (!dup) ::kern::converted::at(nodes, ni).arms.push_back({dir, g.width});
             }
           }
         }
@@ -696,13 +696,13 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
     // street: not on its own arm, not on the one crossing it).
     for (std::size_t ai = 0; ai < j.arms.size(); ++ai) { ::sc::lowered::tick();
-      Arm& a = ::sc::converted::at(j.arms, ai);
+      Arm& a = ::kern::converted::at(j.arms, ai);
       const f32 aa = std::atan2(a.dir.y, a.dir.x);
       f32 best = 6.2831853f;
       std::size_t next = j.arms.size();  // the next arm round the junction: its place in j.arms (none: j.arms.size())
       for (std::size_t bi = 0; bi < j.arms.size(); ++bi) { ::sc::lowered::tick();
         if (bi == ai) continue;
-        const Arm& b = ::sc::converted::at(j.arms, bi);
+        const Arm& b = ::kern::converted::at(j.arms, bi);
         f32 d = std::atan2(b.dir.y, b.dir.x) - aa;
         while ((::sc::lowered::tick(), d <= 1e-4f)) d += 6.2831853f;
         if (d < best) { best = d; next = bi; }
@@ -715,7 +715,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
         continue;
       }
       const f32 s = std::sin(half);
-      const f32 r = (std::fmax(a.width, ::sc::converted::at(j.arms, next).width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
+      const f32 r = (std::fmax(a.width, ::kern::converted::at(j.arms, next).width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
       if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
       a.pole = Vec2{std::cos(aa + half), std::sin(aa + half)} * r;
       a.has_pole = true;
@@ -737,7 +737,7 @@ void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
       auto it = grid_.find(cell(x, y));
       if (it == grid_.end()) continue;
       for (i32 j : it->second)
-        if (std::hypot(::sc::converted::at(junctions_, j).p.x - p.x, ::sc::converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
+        if (std::hypot(::kern::converted::at(junctions_, j).p.x - p.x, ::kern::converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
     }
 }
 
@@ -762,11 +762,11 @@ i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
 TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
   Pursuit out;
   const i32 n = static_cast<i32>(lane.points.size());
-  if (n < 2) { out.target = n ? ::sc::converted::at(lane.points, 0) : pos; out.passed = true; return out; }
+  if (n < 2) { out.target = n ? ::kern::converted::at(lane.points, 0) : pos; out.passed = true; return out; }
   dir = dir < 0 ? -1 : 1;
   i32 i = std::clamp(index, 0, ::sc::lowered::minus(n, 1));
   if (::sc::lowered::minus(i, dir) < 0 || ::sc::lowered::minus(i, dir) >= n) i += dir;  // (the lane's first point in this direction: the stretch after it)
-  Vec2 a = ::sc::converted::at(lane.points, ::sc::lowered::minus(i, dir)), b = ::sc::converted::at(lane.points, i);
+  Vec2 a = ::kern::converted::at(lane.points, ::sc::lowered::minus(i, dir)), b = ::kern::converted::at(lane.points, i);
   auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = std::hypot(d.x, d.y); if (l > 1e-3f) t = d * (1.0f / l); return l; };
   Vec2 t{1, 0};
   f32 len = along(a, b, t);
@@ -777,14 +777,14 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   Vec2 cur = a + t * s;
   f32 left = len - s, want = std::fmax(0.0f, look);
   out.end = left;
-  for (i32 k = i; (::sc::lowered::tick(), ::sc::lowered::plus(k, dir) >= 0 && ::sc::lowered::plus(k, dir) < n); k += dir) out.end += std::hypot(::sc::converted::at(lane.points, ::sc::lowered::plus(k, dir)).x - ::sc::converted::at(lane.points, k).x, ::sc::converted::at(lane.points, ::sc::lowered::plus(k, dir)).y - ::sc::converted::at(lane.points, k).y);
+  for (i32 k = i; (::sc::lowered::tick(), ::sc::lowered::plus(k, dir) >= 0 && ::sc::lowered::plus(k, dir) < n); k += dir) out.end += std::hypot(::kern::converted::at(lane.points, ::sc::lowered::plus(k, dir)).x - ::kern::converted::at(lane.points, k).x, ::kern::converted::at(lane.points, ::sc::lowered::plus(k, dir)).y - ::kern::converted::at(lane.points, k).y);
   while (want > left) { ::sc::lowered::tick();
     if (::sc::lowered::plus(i, dir) < 0 || ::sc::lowered::plus(i, dir) >= n) { want = left; break; }  // the lane ends here
     want -= left;
     cur = b;
     a = b;
     i += dir;
-    b = ::sc::converted::at(lane.points, i);
+    b = ::kern::converted::at(lane.points, i);
     left = along(a, b, t);
   }
   out.tangent = t;
@@ -798,14 +798,14 @@ f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::v
   f32 gap = 1e9f;
   i32 who = -1;
   for (std::size_t i = 0; i < all.size(); ++i) { ::sc::lowered::tick();
-    const Vehicle& o = ::sc::converted::at(all, i);
+    const Vehicle& o = ::kern::converted::at(all, i);
     if (!o.there || static_cast<i32>(i) == self) continue;
     const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
     if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
     const f32 along = dx * fwd.x + dy * fwd.y;
     if (along < laws_.ahead_min || along > far) continue;
     if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
-    const f32 g = along - ::sc::converted::at(bodies, o.bus ? 1 : 0);
+    const f32 g = along - ::kern::converted::at(bodies, o.bus ? 1 : 0);
     if (g < gap) { gap = g; who = static_cast<i32>(i); }
   }
   limiter = who;
@@ -827,7 +827,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     };
     bool by_player = player_on_foot && in_lane(player);
     bool yielding = by_player;
-    for (std::size_t i = 0; (::sc::lowered::tick(), i < people.size() && !yielding); ++i) yielding = in_lane(::sc::converted::at(people, i));
+    for (std::size_t i = 0; (::sc::lowered::tick(), i < people.size() && !yielding); ++i) yielding = in_lane(::kern::converted::at(people, i));
     Blocked& b = blocked_[car];
     if (yielding) {
       lim = 0;
@@ -846,7 +846,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   near(pos + fwd * 25.0f, 34, cand);
   f32 best = 1e9f;
   for (i32 ji : cand) { ::sc::lowered::tick();
-    Junction& j = ::sc::converted::at(junctions_, ji);
+    Junction& j = ::kern::converted::at(junctions_, ji);
     const Vec2 d{j.p.x - pos.x, j.p.y - pos.y};
     const f32 along = d.x * fwd.x + d.y * fwd.y, lateral = std::fabs(-d.x * fwd.y + d.y * fwd.x);
     const f32 dist = std::hypot(d.x, d.y);
@@ -863,7 +863,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   }
   if (view.junction < 0) blocked_[car].wait_since = -1;
   if (view.junction >= 0) {
-    Junction& j = ::sc::converted::at(junctions_, view.junction);
+    Junction& j = ::kern::converted::at(junctions_, view.junction);
     const f32 stop = std::fmax(0.0f, view.distance - laws_.stop_line);  // the stop line before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
@@ -871,7 +871,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     else if (view.distance < laws_.first_come) {
       // Unsignalled: wait while someone else holds the junction (and is still in it).
       if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < laws_.claim_s) {
-        const Vec3 c = ::sc::converted::at(cars, j.claim);
+        const Vec3 c = ::kern::converted::at(cars, j.claim);
         if (c.z > -1e8f && std::hypot(c.x - j.p.x, c.y - j.p.y) < j.radius + 3) must_stop = true;
       }
       // Right before left: a car close to the edge on the right goes first (after 4 s of waiting
@@ -879,8 +879,8 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       Blocked& b = blocked_[car];
       if (!must_stop && (b.wait_since < 0 || now - b.wait_since < laws_.patience_s))
         for (std::size_t k = 0; k < cars.size(); ++k) { ::sc::lowered::tick();
-          if (static_cast<i32>(k) == car || ::sc::converted::at(cars, k).z < -1e8f) continue;
-          const Vec2 o{::sc::converted::at(cars, k).x - j.p.x, ::sc::converted::at(cars, k).y - j.p.y};
+          if (static_cast<i32>(k) == car || ::kern::converted::at(cars, k).z < -1e8f) continue;
+          const Vec2 o{::kern::converted::at(cars, k).x - j.p.x, ::kern::converted::at(cars, k).y - j.p.y};
           const f32 od = std::hypot(o.x, o.y);
           if (od < j.radius || od > j.radius + 10 || od > view.distance + j.radius + 2) continue;
           const Vec2 me{pos.x - j.p.x, pos.y - j.p.y};
@@ -939,14 +939,14 @@ template <> struct Values<::sc::AreaKind> { static constexpr long long all[] = {
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_world_traffic_cpp) {
+KERN_TEST(lowered_world_traffic_cpp) {
   ::sc::lowered::World world({"Traffic"});
   ::sc_new_world_traffic::sc::g_rules.bind(world.logic(false));
   ::sc_old_world_traffic::sc::TrafficRules::bind(world.instance(true, "Traffic"));
   ::sc_new_world_traffic::sc::TrafficRules::bind(world.logic(false));
   {  // TrafficRules::rebuild(const std::vector<Lane> &)  ->  TrafficRules::rebuild(const std::vector<Lane> &)
     ::sc::lowered::Tally tally("TrafficRules::rebuild(const std::vector<Lane> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
       ::sc_old_world_traffic::sc::TrafficRules o_self{};
@@ -970,7 +970,7 @@ SC_TEST(lowered_world_traffic_cpp) {
   }
   {  // TrafficRules::light(const Junction &, kern::Vec2, f32)  ->  TrafficRules::light(const Junction &, kern::Vec2, f32)
     ::sc::lowered::Tally tally("TrafficRules::light(const Junction &, kern::Vec2, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
       ::sc_old_world_traffic::sc::TrafficRules o_self{};
@@ -1003,7 +1003,7 @@ SC_TEST(lowered_world_traffic_cpp) {
   }
   {  // TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 *)  ->  TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 &)
     ::sc::lowered::Tally tally("TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
       ::sc_new_world_traffic::sc::TrafficRules n_self{};
@@ -1044,7 +1044,7 @@ SC_TEST(lowered_world_traffic_cpp) {
   }
   {  // TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)  ->  TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)
     ::sc::lowered::Tally tally("TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
       ::sc_old_world_traffic::sc::TrafficRules o_self{};
@@ -1100,7 +1100,7 @@ SC_TEST(lowered_world_traffic_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_world_traffic::sc::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_world_traffic::sc::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_world_traffic::sc::TrafficRules::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

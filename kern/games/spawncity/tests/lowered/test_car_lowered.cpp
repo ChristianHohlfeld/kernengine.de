@@ -109,7 +109,7 @@ class Car {
   /// into a tyre is a hit on the car).
   u64 hit_user = 0;
   /// One wheel body of the rig (valid while rigged): for whoever must know it (a ray's ignore).
-  kern::physics::Body wheel_body(int i) const { return ::sc::converted::at(rig_, i).body; }
+  kern::physics::Body wheel_body(int i) const { return ::kern::converted::at(rig_, i).body; }
   static RigidSpec rigid_spec(const CarSpec& s);
   /// Height of the chassis centre above flat ground at rest.
   static f32 ground_offset(const CarSpec& s) { return s.radius - s.attach_z - s.sag; }
@@ -121,7 +121,7 @@ class Car {
   /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
   void reapply(kern::physics::World& world, kern::physics::Body body) const;
   const CarSpec& spec() const { return s_; }
-  const WheelState& wheel(int i) const { return ::sc::converted::at(w_, i); }
+  const WheelState& wheel(int i) const { return ::kern::converted::at(w_, i); }
   f32 steer_angle() const { return steer_; }
   f32 forward_speed() const { return vf_; }
   i32 gear() const { return gear_; }
@@ -187,7 +187,7 @@ CarSpec CarSpec::bus() {
   s.half = {4, 1.17f, 1.2f};
   s.mass = 9200; s.com_z = -0.52f; s.com_x = 0;
   s.radius = 0.46f; s.wheel_width = 0.3f; s.wheel_mass = 85; s.attach_z = -1.1f;
-  ::sc::converted::at(s.wheels, 0) = {2.6f, 1.08f, true}; ::sc::converted::at(s.wheels, 1) = {2.6f, -1.08f, true}; ::sc::converted::at(s.wheels, 2) = {-2.55f, 1.08f, false}; ::sc::converted::at(s.wheels, 3) = {-2.55f, -1.08f, false};
+  ::kern::converted::at(s.wheels, 0) = {2.6f, 1.08f, true}; ::kern::converted::at(s.wheels, 1) = {2.6f, -1.08f, true}; ::kern::converted::at(s.wheels, 2) = {-2.55f, 1.08f, false}; ::kern::converted::at(s.wheels, 3) = {-2.55f, -1.08f, false};
   s.susp_lower = -0.18f; s.susp_upper = 0.14f; s.sag = 0.08f;
   s.torque_front = 0; s.torque_rear = 4200; s.power = 230000;
   s.steer_lag = 0.06f; s.steer_damp_speed = 20; s.drag_area = 6.2f; s.rolling_resistance = 0.008f; s.wheel_inertia = 14;
@@ -261,17 +261,17 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
   const BodyState st = read_body(world, chassis);
   const f32 r = s.radius, volume = 4.0f / 3.0f * kPi * r * r * r;
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Vec3 local{::sc::converted::at(s.wheels, i).x, ::sc::converted::at(s.wheels, i).y, s.attach_z};
+    const Vec3 local{::kern::converted::at(s.wheels, i).x, ::kern::converted::at(s.wheels, i).y, s.attach_z};
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::dynamic;
     // (the hub where the spring holds it under the standing car - `sag` up its travel -, or where
     // it was: a car put down at its ride height has its tyres on the ground, not in it)
-    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(::sc::converted::at(w_, i).has_travel ? ::sc::converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
+    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(::kern::converted::at(w_, i).has_travel ? ::kern::converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
     bs.rotation = st.rotation;
     bs.linear_velocity = st.velocity;
     bs.angular_damping = 0.05f;
     bs.linear_damping = 0.02f;
-    Rig& g = ::sc::converted::at(rig_, i);
+    Rig& g = ::kern::converted::at(rig_, i);
     g.body = world.create_body(bs);
     // Two shapes, one sphere: the tyre on the ground has no solver friction (its grip is the tyre
     // model's: rubber x surface, slip, load); against everything else (other cars, props) the
@@ -311,7 +311,7 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
     js.enable_motor = true;
     js.motor_speed = 0;
     js.max_motor_torque = s.mass * 40;
-    if (::sc::converted::at(s.wheels, i).front) {
+    if (::kern::converted::at(s.wheels, i).front) {
       js.enable_steering = true;
       js.steering_hertz = 9;
       js.steering_damping_ratio = 0.95f;
@@ -364,9 +364,9 @@ void Car::detach() {
 void Car::place(kern::physics::World& world, const BodyState& st) {
   // the wheels back under the chassis, moving with it (placeWheels: a teleport, a reset)
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Rig& g = ::sc::converted::at(rig_, i);
+    const Rig& g = ::kern::converted::at(rig_, i);
     if (!g.body.valid() || !world.body_valid(g.body)) continue;
-    const Vec3 local{::sc::converted::at(s_.wheels, i).x, ::sc::converted::at(s_.wheels, i).y, s_.attach_z + clampf(::sc::converted::at(w_, i).has_travel ? ::sc::converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
+    const Vec3 local{::kern::converted::at(s_.wheels, i).x, ::kern::converted::at(s_.wheels, i).y, s_.attach_z + clampf(::kern::converted::at(w_, i).has_travel ? ::kern::converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
     const Vec3 arm = st.rotation.rotate(local);
     world.set_pose(g.body, {st.position + arm, st.rotation});
     world.set_linear_velocity(g.body, st.velocity + kern::cross(st.angular, arm));
@@ -378,7 +378,7 @@ void Car::place(kern::physics::World& world, const BodyState& st) {
 bool Car::ensure_rig(kern::physics::World& world, kern::physics::Body chassis, f32 dt) {
   if (world.body_type(chassis) != kern::physics::BodyType::dynamic) { detach(); return false; }  // moved by somebody else: no wheels to drive
   bool whole = rig_world_ == &world && rig_chassis_ == chassis;
-  for (int i = 0; (::sc::lowered::tick(), whole && i < 4); ::sc::lowered::pre_inc(i)) whole = ::sc::converted::at(rig_, i).body.valid() && world.body_valid(::sc::converted::at(rig_, i).body) && world.joint_valid(::sc::converted::at(rig_, i).joint);
+  for (int i = 0; (::sc::lowered::tick(), whole && i < 4); ::sc::lowered::pre_inc(i)) whole = ::kern::converted::at(rig_, i).body.valid() && world.body_valid(::kern::converted::at(rig_, i).body) && world.joint_valid(::kern::converted::at(rig_, i).joint);
   const BodyState st = read_body(world, chassis);
   if (!whole) {
     attach(world, chassis);
@@ -394,8 +394,8 @@ bool Car::ensure_rig(kern::physics::World& world, kern::physics::Body chassis, f
 
 void Car::push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on) {
   if (on < 0) world.apply_force_to_center(body, f);
-  else world.apply_force(::sc::converted::at(rig_, on).body, f, p);
-  if (n_applied_ < 6) ::sc::converted::at(applied_, ::sc::lowered::post_inc(n_applied_)) = {to_local(q, p - origin), to_local(q, f), on};
+  else world.apply_force(::kern::converted::at(rig_, on).body, f, p);
+  if (n_applied_ < 6) ::kern::converted::at(applied_, ::sc::lowered::post_inc(n_applied_)) = {to_local(q, p - origin), to_local(q, f), on};
 }
 
 void Car::reapply(kern::physics::World& world, kern::physics::Body body) const {
@@ -405,10 +405,10 @@ void Car::reapply(kern::physics::World& world, kern::physics::Body body) const {
   // wheels under it again)
   if (has_last_ && kern::length(st.position - last_pos_) > kern::length(st.velocity) / 60 * 2 + 0.6f) return;
   for (i32 i = 0; i < n_applied_; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Applied& a = ::sc::converted::at(applied_, i);
+    const Applied& a = ::kern::converted::at(applied_, i);
     const Vec3 f = st.rotation.rotate(a.f);
     if (a.on < 0) world.apply_force_to_center(body, f);
-    else if (::sc::converted::at(rig_, a.on).body.valid() && world.body_valid(::sc::converted::at(rig_, a.on).body)) world.apply_force(::sc::converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
+    else if (::kern::converted::at(rig_, a.on).body.valid() && world.body_valid(::kern::converted::at(rig_, a.on).body)) world.apply_force(::kern::converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
   }
 }
 
@@ -448,10 +448,10 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   // suspension's own spring + damper force at that travel: what presses the tyre on the ground)
   Vec3 patch[4], hub[4], normal[4];
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    WheelState& w = ::sc::converted::at(w_, i);
-    const Vec3 attach = st.position + q.rotate(Vec3{::sc::converted::at(spec.wheels, i).x, ::sc::converted::at(spec.wheels, i).y, spec.attach_z});
-    ::sc::converted::at(hub, i) = world.pose(::sc::converted::at(rig_, i).body).position;
-    const f32 travel = kern::dot(::sc::converted::at(hub, i) - attach, up);
+    WheelState& w = ::kern::converted::at(w_, i);
+    const Vec3 attach = st.position + q.rotate(Vec3{::kern::converted::at(spec.wheels, i).x, ::kern::converted::at(spec.wheels, i).y, spec.attach_z});
+    ::kern::converted::at(hub, i) = world.pose(::kern::converted::at(rig_, i).body).position;
+    const f32 travel = kern::dot(::kern::converted::at(hub, i) - attach, up);
     const f32 rate = w.has_travel ? clampf((travel - w.travel) / std::fmax(dt, 1e-4f), -3, 3) : 0;
     w.travel = travel;
     w.has_travel = true;
@@ -459,9 +459,9 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     N = N > 0 ? N + spec.wheel_mass * kG : 0;
     w.load = N;
     w.contact = N > 0;
-    w.hub = ::sc::converted::at(hub, i);
-    ::sc::converted::at(normal, i) = up;
-    ::sc::converted::at(patch, i) = ::sc::converted::at(hub, i) - up * r;
+    w.hub = ::kern::converted::at(hub, i);
+    ::kern::converted::at(normal, i) = up;
+    ::kern::converted::at(patch, i) = ::kern::converted::at(hub, i) - up * r;
   }
 
   // ---- steering: equilibrium of hand torque + assist against the aligning torque
@@ -469,22 +469,22 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   Front fronts[2];
   int nf = 0;
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    if (!::sc::converted::at(spec.wheels, i).front) continue;
-    WheelState& w = ::sc::converted::at(w_, i);
-    const Vec3 pv = point_velocity(::sc::converted::at(patch, i));
+    if (!::kern::converted::at(spec.wheels, i).front) continue;
+    WheelState& w = ::kern::converted::at(w_, i);
+    const Vec3 pv = point_velocity(::kern::converted::at(patch, i));
     if (w.load_f < 0) w.load_f = mq * kG;
     w.load_f += (std::fmax(0.0f, w.load) - w.load_f) * std::fmin(1.0f, dt / 0.1f);
     const f32 N = w.load_f;
-    ::sc::converted::at(fronts, ::sc::lowered::post_inc(nf)) = {kern::dot(pv, forward), kern::dot(pv, left), N, spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity) * N,
+    ::kern::converted::at(fronts, ::sc::lowered::post_inc(nf)) = {kern::dot(pv, forward), kern::dot(pv, left), N, spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity) * N,
                     w.kappa};
   }
   auto align_at = [&](f32 d) {
     f32 M = 0, tf[2];
     for (int i = 0; i < nf; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-      const Front& f = ::sc::converted::at(fronts, i);
+      const Front& f = ::kern::converted::at(fronts, i);
       const f32 ca = std::cos(d), sa = std::sin(d), vx = f.pf * ca + f.pl * sa, vy = -f.pf * sa + f.pl * ca, ta = vy / std::fmax(std::fabs(vx), kVReg);
       tyre(f.kappa, ta, f.muN, tf);
-      M += (kCasterTrail + kPneumaticTrail * std::fmax(0.0f, 1 - std::fabs(ta) / (kTrailCollapse * kAlphaPeak))) * ::sc::converted::at(tf, 1) + f.N * kSteerJacking * std::sin(d);
+      M += (kCasterTrail + kPneumaticTrail * std::fmax(0.0f, 1 - std::fabs(ta) / (kTrailCollapse * kAlphaPeak))) * ::kern::converted::at(tf, 1) + f.N * kSteerJacking * std::sin(d);
     }
     return M;
   };
@@ -519,17 +519,17 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
 
   // ---- tyres
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    WheelState& w = ::sc::converted::at(w_, i);
-    const bool front = ::sc::converted::at(spec.wheels, i).front;
+    WheelState& w = ::kern::converted::at(w_, i);
+    const bool front = ::kern::converted::at(spec.wheels, i).front;
     const f32 N = w.load;
     const f32 mu = spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity), muN = mu * N;
-    if (front) world.set_wheel_steering(::sc::converted::at(rig_, i).joint, steer_);
-    const f32 sa_ = front ? world.wheel_steering(::sc::converted::at(rig_, i).joint) : 0, ca = std::cos(sa_), sa = std::sin(sa_);
-    const Vec3 n = ::sc::converted::at(normal, i);
+    if (front) world.set_wheel_steering(::kern::converted::at(rig_, i).joint, steer_);
+    const f32 sa_ = front ? world.wheel_steering(::kern::converted::at(rig_, i).joint) : 0, ca = std::cos(sa_), sa = std::sin(sa_);
+    const Vec3 n = ::kern::converted::at(normal, i);
     Vec3 fw = forward * ca + left * sa;
     fw = kern::normalize(fw - n * kern::dot(fw, n));
     const Vec3 lw = kern::cross(n, fw);
-    const Vec3 pv = point_velocity(::sc::converted::at(patch, i));
+    const Vec3 pv = point_velocity(::kern::converted::at(patch, i));
     const f32 vx = kern::dot(pv, fw), vy = kern::dot(pv, lw), V = std::fmax(std::fabs(vx), kVReg), tan_a = vy / V;
     const f32 drive_t = front ? spec.torque_front : spec.torque_rear, share = drive_t / drive_sum;
     f32 brake_t = (mode == brake ? spec.brake * std::fabs(pedal) : 0) + (drive_t > 0 && mode == coast ? spec.coast : 0) + spec.wheel_mass * 0.15f;
@@ -549,16 +549,16 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
       const f32 sgn = sign0(om != 0 ? om : vx);
       if (mode == brake && sgn * kap < -kAbsSlip) Tb *= clampf(1 - (-sgn * kap - kAbsSlip) / 0.12f, 0.12f, 1);
       tyre(kap, tan_a, muN, tf);
-      const f32 fx0 = ::sc::converted::at(tf, 0);
+      const f32 fx0 = ::kern::converted::at(tf, 0);
       tyre(kap + 0.02f / V * r, tan_a, muN, tf2);
-      const f32 J = -(::sc::converted::at(tf2, 0) - fx0) / 0.02f * r;
+      const f32 J = -(::kern::converted::at(tf2, 0) - fx0) / 0.02f * r;
       f32 wn = om + h * (Td - fx0 * r) / (I - h * std::fmin(0.0f, J));
       const f32 db = h * Tb / I;
       wn = std::fabs(wn) <= db ? 0 : wn - sign0(wn) * db;
       om = wn;
       tyre((om * r - vx) / V, tan_a, muN, tf);
-      fx_sum += ::sc::converted::at(tf, 0);
-      fy_sum += ::sc::converted::at(tf, 1);
+      fx_sum += ::kern::converted::at(tf, 0);
+      fy_sum += ::kern::converted::at(tf, 1);
     }
     w.omega = om;
     w.angle = std::fmod(w.angle + om * dt, 2 * kPi);
@@ -575,7 +575,7 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     w.kappa = (om * r - vx) / V;
     w.alpha = std::atan(tan_a);
     // the tyre's force on the wheel at the contact patch; the joints carry it into the chassis
-    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, ::sc::converted::at(patch, i), i);
+    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, ::kern::converted::at(patch, i), i);
   }
   if (spec.drag_area > 0 && speed > 0.5f) push(world, body, q, st.position, st.velocity * (-0.5f * 1.2f * spec.drag_area * speed), st.position, -1);
   if (pedal != 0 || input.steer != 0 || handbrake || speed > 0.05f) world.set_awake(body, true);
@@ -696,7 +696,7 @@ class Car {
   /// into a tyre is a hit on the car).
   u64 hit_user = 0;
   /// One wheel body of the rig (valid while rigged): for whoever must know it (a ray's ignore).
-  kern::physics::Body wheel_body(int i) const { return ::sc::converted::at(rig_, i).body; }
+  kern::physics::Body wheel_body(int i) const { return ::kern::converted::at(rig_, i).body; }
   static RigidSpec rigid_spec(const CarSpec& s);
   /// Height of the chassis centre above flat ground at rest.
   static f32 ground_offset(const CarSpec& s) { return s.radius - s.attach_z - s.sag; }
@@ -708,7 +708,7 @@ class Car {
   /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
   void reapply(kern::physics::World& world, kern::physics::Body body) const;
   const CarSpec& spec() const { return s_; }
-  const WheelState& wheel(int i) const { return ::sc::converted::at(w_, i); }
+  const WheelState& wheel(int i) const { return ::kern::converted::at(w_, i); }
   f32 steer_angle() const { return steer_; }
   f32 forward_speed() const { return vf_; }
   i32 gear() const { return gear_; }
@@ -762,14 +762,14 @@ constexpr f32 kAsphaltMu = 1.0f;  // terrain_craters.mjs groundSurfaceAt: asphal
 void tyre(f32 kappa, f32 tan_a, f32 muN, std::array<f32, 2>& out) {
   const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = std::hypot(sx, sy);
   if (s < 1e-6f || !(muN > 0)) {
-    ::sc::converted::at(out, 0) = 0;
-    ::sc::converted::at(out, 1) = 0;
+    ::kern::converted::at(out, 0) = 0;
+    ::kern::converted::at(out, 1) = 0;
     return;
   }
   const f32 g = s < 1 ? s * (2 - s) : 1 - (1 - kSlideGrip) * std::fmin(1.0f, (s - 1) / 2.5f);
   const f32 F = muN * g;
-  ::sc::converted::at(out, 0) = F * sx / s;
-  ::sc::converted::at(out, 1) = -F * sy / s;
+  ::kern::converted::at(out, 0) = F * sx / s;
+  ::kern::converted::at(out, 1) = -F * sy / s;
 }
 f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); }
 }  // namespace
@@ -780,7 +780,7 @@ CarSpec CarSpec::bus() {
   s.half = {4, 1.17f, 1.2f};
   s.mass = 9200; s.com_z = -0.52f; s.com_x = 0;
   s.radius = 0.46f; s.wheel_width = 0.3f; s.wheel_mass = 85; s.attach_z = -1.1f;
-  ::sc::converted::at(s.wheels, 0) = {2.6f, 1.08f, true}; ::sc::converted::at(s.wheels, 1) = {2.6f, -1.08f, true}; ::sc::converted::at(s.wheels, 2) = {-2.55f, 1.08f, false}; ::sc::converted::at(s.wheels, 3) = {-2.55f, -1.08f, false};
+  ::kern::converted::at(s.wheels, 0) = {2.6f, 1.08f, true}; ::kern::converted::at(s.wheels, 1) = {2.6f, -1.08f, true}; ::kern::converted::at(s.wheels, 2) = {-2.55f, 1.08f, false}; ::kern::converted::at(s.wheels, 3) = {-2.55f, -1.08f, false};
   s.susp_lower = -0.18f; s.susp_upper = 0.14f; s.sag = 0.08f;
   s.torque_front = 0; s.torque_rear = 4200; s.power = 230000;
   s.steer_lag = 0.06f; s.steer_damp_speed = 20; s.drag_area = 6.2f; s.rolling_resistance = 0.008f; s.wheel_inertia = 14;
@@ -854,17 +854,17 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
   const BodyState st = read_body(world, chassis);
   const f32 r = s.radius, volume = 4.0f / 3.0f * kPi * r * r * r;
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Vec3 local{::sc::converted::at(s.wheels, i).x, ::sc::converted::at(s.wheels, i).y, s.attach_z};
+    const Vec3 local{::kern::converted::at(s.wheels, i).x, ::kern::converted::at(s.wheels, i).y, s.attach_z};
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::dynamic;
     // (the hub where the spring holds it under the standing car - `sag` up its travel -, or where
     // it was: a car put down at its ride height has its tyres on the ground, not in it)
-    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(::sc::converted::at(w_, i).has_travel ? ::sc::converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
+    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(::kern::converted::at(w_, i).has_travel ? ::kern::converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
     bs.rotation = st.rotation;
     bs.linear_velocity = st.velocity;
     bs.angular_damping = 0.05f;
     bs.linear_damping = 0.02f;
-    Rig& g = ::sc::converted::at(rig_, i);
+    Rig& g = ::kern::converted::at(rig_, i);
     g.body = world.create_body(bs);
     // Two shapes, one sphere: the tyre on the ground has no solver friction (its grip is the tyre
     // model's: rubber x surface, slip, load); against everything else (other cars, props) the
@@ -904,7 +904,7 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
     js.enable_motor = true;
     js.motor_speed = 0;
     js.max_motor_torque = s.mass * 40;
-    if (::sc::converted::at(s.wheels, i).front) {
+    if (::kern::converted::at(s.wheels, i).front) {
       js.enable_steering = true;
       js.steering_hertz = 9;
       js.steering_damping_ratio = 0.95f;
@@ -957,9 +957,9 @@ void Car::detach() {
 void Car::place(kern::physics::World& world, const BodyState& st) {
   // the wheels back under the chassis, moving with it (placeWheels: a teleport, a reset)
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Rig& g = ::sc::converted::at(rig_, i);
+    const Rig& g = ::kern::converted::at(rig_, i);
     if (!g.body.valid() || !world.body_valid(g.body)) continue;
-    const Vec3 local{::sc::converted::at(s_.wheels, i).x, ::sc::converted::at(s_.wheels, i).y, s_.attach_z + clampf(::sc::converted::at(w_, i).has_travel ? ::sc::converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
+    const Vec3 local{::kern::converted::at(s_.wheels, i).x, ::kern::converted::at(s_.wheels, i).y, s_.attach_z + clampf(::kern::converted::at(w_, i).has_travel ? ::kern::converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
     const Vec3 arm = st.rotation.rotate(local);
     world.set_pose(g.body, {st.position + arm, st.rotation});
     world.set_linear_velocity(g.body, st.velocity + kern::cross(st.angular, arm));
@@ -971,7 +971,7 @@ void Car::place(kern::physics::World& world, const BodyState& st) {
 bool Car::ensure_rig(kern::physics::World& world, kern::physics::Body chassis, f32 dt) {
   if (world.body_type(chassis) != kern::physics::BodyType::dynamic) { detach(); return false; }  // moved by somebody else: no wheels to drive
   bool whole = rig_world_ == &world && rig_chassis_ == chassis;
-  for (int i = 0; (::sc::lowered::tick(), whole && i < 4); ::sc::lowered::pre_inc(i)) whole = ::sc::converted::at(rig_, i).body.valid() && world.body_valid(::sc::converted::at(rig_, i).body) && world.joint_valid(::sc::converted::at(rig_, i).joint);
+  for (int i = 0; (::sc::lowered::tick(), whole && i < 4); ::sc::lowered::pre_inc(i)) whole = ::kern::converted::at(rig_, i).body.valid() && world.body_valid(::kern::converted::at(rig_, i).body) && world.joint_valid(::kern::converted::at(rig_, i).joint);
   const BodyState st = read_body(world, chassis);
   if (!whole) {
     attach(world, chassis);
@@ -987,8 +987,8 @@ bool Car::ensure_rig(kern::physics::World& world, kern::physics::Body chassis, f
 
 void Car::push(kern::physics::World& world, kern::physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on) {
   if (on < 0) world.apply_force_to_center(body, f);
-  else world.apply_force(::sc::converted::at(rig_, on).body, f, p);
-  if (n_applied_ < 6) ::sc::converted::at(applied_, ::sc::lowered::post_inc(n_applied_)) = {to_local(q, p - origin), to_local(q, f), on};
+  else world.apply_force(::kern::converted::at(rig_, on).body, f, p);
+  if (n_applied_ < 6) ::kern::converted::at(applied_, ::sc::lowered::post_inc(n_applied_)) = {to_local(q, p - origin), to_local(q, f), on};
 }
 
 void Car::reapply(kern::physics::World& world, kern::physics::Body body) const {
@@ -998,10 +998,10 @@ void Car::reapply(kern::physics::World& world, kern::physics::Body body) const {
   // wheels under it again)
   if (has_last_ && kern::length(st.position - last_pos_) > kern::length(st.velocity) / 60 * 2 + 0.6f) return;
   for (i32 i = 0; i < n_applied_; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    const Applied& a = ::sc::converted::at(applied_, i);
+    const Applied& a = ::kern::converted::at(applied_, i);
     const Vec3 f = st.rotation.rotate(a.f);
     if (a.on < 0) world.apply_force_to_center(body, f);
-    else if (::sc::converted::at(rig_, a.on).body.valid() && world.body_valid(::sc::converted::at(rig_, a.on).body)) world.apply_force(::sc::converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
+    else if (::kern::converted::at(rig_, a.on).body.valid() && world.body_valid(::kern::converted::at(rig_, a.on).body)) world.apply_force(::kern::converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
   }
 }
 
@@ -1041,10 +1041,10 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   // suspension's own spring + damper force at that travel: what presses the tyre on the ground)
   Vec3 patch[4], hub[4], normal[4];
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    WheelState& w = ::sc::converted::at(w_, i);
-    const Vec3 attach = st.position + q.rotate(Vec3{::sc::converted::at(spec.wheels, i).x, ::sc::converted::at(spec.wheels, i).y, spec.attach_z});
-    ::sc::converted::at(hub, i) = world.pose(::sc::converted::at(rig_, i).body).position;
-    const f32 travel = kern::dot(::sc::converted::at(hub, i) - attach, up);
+    WheelState& w = ::kern::converted::at(w_, i);
+    const Vec3 attach = st.position + q.rotate(Vec3{::kern::converted::at(spec.wheels, i).x, ::kern::converted::at(spec.wheels, i).y, spec.attach_z});
+    ::kern::converted::at(hub, i) = world.pose(::kern::converted::at(rig_, i).body).position;
+    const f32 travel = kern::dot(::kern::converted::at(hub, i) - attach, up);
     const f32 rate = w.has_travel ? clampf((travel - w.travel) / std::fmax(dt, 1e-4f), -3, 3) : 0;
     w.travel = travel;
     w.has_travel = true;
@@ -1052,9 +1052,9 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     N = N > 0 ? N + spec.wheel_mass * kG : 0;
     w.load = N;
     w.contact = N > 0;
-    w.hub = ::sc::converted::at(hub, i);
-    ::sc::converted::at(normal, i) = up;
-    ::sc::converted::at(patch, i) = ::sc::converted::at(hub, i) - up * r;
+    w.hub = ::kern::converted::at(hub, i);
+    ::kern::converted::at(normal, i) = up;
+    ::kern::converted::at(patch, i) = ::kern::converted::at(hub, i) - up * r;
   }
 
   // ---- steering: equilibrium of hand torque + assist against the aligning torque
@@ -1062,23 +1062,23 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   Front fronts[2];
   int nf = 0;
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    if (!::sc::converted::at(spec.wheels, i).front) continue;
-    WheelState& w = ::sc::converted::at(w_, i);
-    const Vec3 pv = point_velocity(::sc::converted::at(patch, i));
+    if (!::kern::converted::at(spec.wheels, i).front) continue;
+    WheelState& w = ::kern::converted::at(w_, i);
+    const Vec3 pv = point_velocity(::kern::converted::at(patch, i));
     if (w.load_f < 0) w.load_f = mq * kG;
     w.load_f += (std::fmax(0.0f, w.load) - w.load_f) * std::fmin(1.0f, dt / 0.1f);
     const f32 N = w.load_f;
-    ::sc::converted::at(fronts, ::sc::lowered::post_inc(nf)) = {kern::dot(pv, forward), kern::dot(pv, left), N, spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity) * N,
+    ::kern::converted::at(fronts, ::sc::lowered::post_inc(nf)) = {kern::dot(pv, forward), kern::dot(pv, left), N, spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity) * N,
                     w.kappa};
   }
   auto align_at = [&](f32 d) {
     f32 M = 0;
     std::array<f32, 2> tf;
     for (int i = 0; i < nf; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-      const Front& f = ::sc::converted::at(fronts, i);
+      const Front& f = ::kern::converted::at(fronts, i);
       const f32 ca = std::cos(d), sa = std::sin(d), vx = f.pf * ca + f.pl * sa, vy = -f.pf * sa + f.pl * ca, ta = vy / std::fmax(std::fabs(vx), kVReg);
       tyre(f.kappa, ta, f.muN, tf);
-      M += (kCasterTrail + kPneumaticTrail * std::fmax(0.0f, 1 - std::fabs(ta) / (kTrailCollapse * kAlphaPeak))) * ::sc::converted::at(tf, 1) + f.N * kSteerJacking * std::sin(d);
+      M += (kCasterTrail + kPneumaticTrail * std::fmax(0.0f, 1 - std::fabs(ta) / (kTrailCollapse * kAlphaPeak))) * ::kern::converted::at(tf, 1) + f.N * kSteerJacking * std::sin(d);
     }
     return M;
   };
@@ -1113,17 +1113,17 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
 
   // ---- tyres
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    WheelState& w = ::sc::converted::at(w_, i);
-    const bool front = ::sc::converted::at(spec.wheels, i).front;
+    WheelState& w = ::kern::converted::at(w_, i);
+    const bool front = ::kern::converted::at(spec.wheels, i).front;
     const f32 N = w.load;
     const f32 mu = spec.friction * kAsphaltMu * std::pow(clampf(N / (mq * kG), 0.2f, 3), -kLoadSensitivity), muN = mu * N;
-    if (front) world.set_wheel_steering(::sc::converted::at(rig_, i).joint, steer_);
-    const f32 sa_ = front ? world.wheel_steering(::sc::converted::at(rig_, i).joint) : 0, ca = std::cos(sa_), sa = std::sin(sa_);
-    const Vec3 n = ::sc::converted::at(normal, i);
+    if (front) world.set_wheel_steering(::kern::converted::at(rig_, i).joint, steer_);
+    const f32 sa_ = front ? world.wheel_steering(::kern::converted::at(rig_, i).joint) : 0, ca = std::cos(sa_), sa = std::sin(sa_);
+    const Vec3 n = ::kern::converted::at(normal, i);
     Vec3 fw = forward * ca + left * sa;
     fw = kern::normalize(fw - n * kern::dot(fw, n));
     const Vec3 lw = kern::cross(n, fw);
-    const Vec3 pv = point_velocity(::sc::converted::at(patch, i));
+    const Vec3 pv = point_velocity(::kern::converted::at(patch, i));
     const f32 vx = kern::dot(pv, fw), vy = kern::dot(pv, lw), V = std::fmax(std::fabs(vx), kVReg), tan_a = vy / V;
     const f32 drive_t = front ? spec.torque_front : spec.torque_rear, share = drive_t / drive_sum;
     f32 brake_t = (mode == brake ? spec.brake * std::fabs(pedal) : 0) + (drive_t > 0 && mode == coast ? spec.coast : 0) + spec.wheel_mass * 0.15f;
@@ -1144,16 +1144,16 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
       const f32 sgn = sign0(om != 0 ? om : vx);
       if (mode == brake && sgn * kap < -kAbsSlip) Tb *= clampf(1 - (-sgn * kap - kAbsSlip) / 0.12f, 0.12f, 1);
       tyre(kap, tan_a, muN, tf);
-      const f32 fx0 = ::sc::converted::at(tf, 0);
+      const f32 fx0 = ::kern::converted::at(tf, 0);
       tyre(kap + 0.02f / V * r, tan_a, muN, tf2);
-      const f32 J = -(::sc::converted::at(tf2, 0) - fx0) / 0.02f * r;
+      const f32 J = -(::kern::converted::at(tf2, 0) - fx0) / 0.02f * r;
       f32 wn = om + h * (Td - fx0 * r) / (I - h * std::fmin(0.0f, J));
       const f32 db = h * Tb / I;
       wn = std::fabs(wn) <= db ? 0 : wn - sign0(wn) * db;
       om = wn;
       tyre((om * r - vx) / V, tan_a, muN, tf);
-      fx_sum += ::sc::converted::at(tf, 0);
-      fy_sum += ::sc::converted::at(tf, 1);
+      fx_sum += ::kern::converted::at(tf, 0);
+      fy_sum += ::kern::converted::at(tf, 1);
     }
     w.omega = om;
     w.angle = std::fmod(w.angle + om * dt, 2 * kPi);
@@ -1170,7 +1170,7 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     w.kappa = (om * r - vx) / V;
     w.alpha = std::atan(tan_a);
     // the tyre's force on the wheel at the contact patch; the joints carry it into the chassis
-    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, ::sc::converted::at(patch, i), i);
+    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, ::kern::converted::at(patch, i), i);
   }
   if (spec.drag_area > 0 && speed > 0.5f) push(world, body, q, st.position, st.velocity * (-0.5f * 1.2f * spec.drag_area * speed), st.position, -1);
   if (pedal != 0 || input.steer != 0 || handbrake || speed > 0.05f) world.set_awake(body, true);
@@ -1239,10 +1239,10 @@ template <> struct Values<::kern::physics::ShapeKind> { static constexpr long lo
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_car_cpp) {
+KERN_TEST(lowered_car_cpp) {
   {  // tyre(f32, f32, f32, f32 *)  ->  tyre(f32, f32, f32, std::array<f32, 2> &)
     ::sc::lowered::Tally tally("tyre(f32, f32, f32, f32 *)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1267,7 +1267,7 @@ SC_TEST(lowered_car_cpp) {
   }
   {  // Car::rigid_spec(const CarSpec &)  ->  Car::rigid_spec(const CarSpec &)
     ::sc::lowered::Tally tally("Car::rigid_spec(const CarSpec &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_car::sc::CarSpec &> o0;
       ::sc::lowered::Arg<const ::sc_new_car::sc::CarSpec &> n0;
@@ -1284,7 +1284,7 @@ SC_TEST(lowered_car_cpp) {
   }
   {  // Car::step(kern::physics::World &, kern::physics::Body, f32, const CarInput &)  ->  Car::step(kern::physics::World &, kern::physics::Body, f32, const CarInput &)
     ::sc::lowered::Tally tally("Car::step(kern::physics::World &, kern::physics::Body, f32, const CarInput &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_car::sc::Car o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

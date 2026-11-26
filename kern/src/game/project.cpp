@@ -77,6 +77,8 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
   if (!doc.is_object()) return fail(error, "a project must be a JSON object");
   if (doc["format"].as_string() != "kern-project") return fail(error, "format: not a Kern project (format must be \"kern-project\")");
   if (doc["version"].as_number(0) > 1) return fail(error, "version: the project was written by a newer Kern Studio");
+  // (a key none of the project's: an error with the keys there are, kern/docs/app.md 2.)
+  if (const std::string e = json::unknown_key(doc, {"format", "version", "name", "settings", "levels", "startLevel", "blueprints"}); !e.empty()) return fail(error, e);
   Project p;
   if (doc["name"].is_string()) p.name = doc["name"].as_string();
   if (const json::Value* s = doc.find("settings")) {
@@ -121,6 +123,7 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
         if (!f->is_string()) return fail(error, place(i, bp.name) + ": folder: must be a name (a text)");
         bp.folder = f->as_string();
       }
+      if (const std::string e = json::unknown_key(b, {"name", "folder", "logic"}); !e.empty()) return fail(error, place(i, bp.name) + ": " + e);
       for (std::size_t j = 0; j < p.blueprints.size(); ++j)
         if (p.blueprints[j].name == bp.name)
           return fail(error, place(i, bp.name) + ": the name stands twice (also blueprints[" + std::to_string(j) + "])");

@@ -234,7 +234,7 @@ def case_text(api, functions):
 
 
 # ---- the calls: every node on the real function (kern/logic/engine_host.h) ----
-SCALAR_TAG = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "Text", "Int64": "Int64"}
+SCALAR_TAG = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "Text", "Int64": "Int64", "Actor": "Actor"}
 
 
 def demangled(names):
@@ -800,7 +800,7 @@ class Calls:
 
     # (the pins the class has as a C++ type of the language: an input of any other type is a template - it may name a
     # place of the engine, an entry of `b.chunks()` or a field of it: read where the input is taken, input_value)
-    PLAIN = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
+    PLAIN = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64", "Actor": "Actor"}
 
     def templated(self, bt):
         return bt not in self.PLAIN and not (bt.startswith("List<") and bt[5:-1] in self.PLAIN) and not c2b.object_class(bt)
@@ -1119,7 +1119,7 @@ class Calls:
                 "// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).",
                 *adapters, "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
-                "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
+                "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;", "  using Actor = logic::ActorHandle;",
                 "  template <class T> using List = logic::List<T>;", "",
                 "  /// One call of the engine through the host's door: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
                 "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",

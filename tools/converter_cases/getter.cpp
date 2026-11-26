@@ -1,5 +1,5 @@
 #include "getter.h"
-namespace sc {
+namespace cases {
 Holder& holder() { static Holder h; return h; }
 void take_pad(kern::i32 connected, kern::f32 lx, kern::u32 buttons) {
   PadState& p = holder().pad;
@@ -10,7 +10,7 @@ void take_pad(kern::i32 connected, kern::f32 lx, kern::u32 buttons) {
 }
 kern::f32 doubled(kern::f32 x) { kern::f32 y = x; y *= 2; return y; }
 }
-namespace sc {
+namespace cases {
 Other& other() { static Other o; return o; }
 void Other::look() { seen = holder().pad.lx; }
 }

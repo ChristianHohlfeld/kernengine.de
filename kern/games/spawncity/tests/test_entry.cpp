@@ -10,13 +10,13 @@
 #include "kern/game/project.h"
 #include "kern/logic/logic.h"
 #include "rules.h"
-#include "test_util.h"
+#include "kern/test/test.h"
 
-SC_TEST(entry_fixed_step_of_the_world) {
+KERN_TEST(entry_fixed_step_of_the_world) {
   kern::game::Level l;
   std::string error;
-  SC_CHECK(kern::game::from_text(sc::rules::level_text(), l, &error), "the level file reads: %s", error.c_str());
-  SC_CHECK(l.logic.empty(), "the level file has no graph of its own (the fixed step is the world's)");
+  KERN_CHECK(kern::game::from_text(sc::rules::level_text(), l, &error), "the level file reads: %s", error.c_str());
+  KERN_CHECK(l.logic.empty(), "the level file has no graph of its own (the fixed step is the world's)");
   const kern::logic::Library& lib = kern::logic::library();
   std::size_t unknown = 0;
   std::string which;
@@ -28,7 +28,7 @@ SC_TEST(entry_fixed_step_of_the_world) {
         which = a.name + " (" + n.type + ")";
       }
   }
-  SC_CHECK(unknown == 0, "every node of the level's Blueprints is of a type the engine knows (%zu are not, e.g. %s)", unknown, which.c_str());
+  KERN_CHECK(unknown == 0, "every node of the level's Blueprints is of a type the engine knows (%zu are not, e.g. %s)", unknown, which.c_str());
 }
 
 // The player and the vehicles are the level's data (tools/level_templates.cpp wrote them; kern/docs/runtime_actors.md):

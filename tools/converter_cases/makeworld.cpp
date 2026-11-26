@@ -1,4 +1,4 @@
 #include "makeworld.h"
-namespace sc {
+namespace cases {
 Maker& maker() { static Maker m; return m; }
 }

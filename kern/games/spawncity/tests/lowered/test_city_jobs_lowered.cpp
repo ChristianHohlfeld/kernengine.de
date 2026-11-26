@@ -80,11 +80,11 @@ namespace {
 
 struct Writer {
   std::vector<u8>& b;
-  template <class T> void put(T v) { const std::size_t n = b.size(); b.resize(::sc::converted::count(n + sizeof(T))); ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::value_place(v), sizeof(T)); }
+  template <class T> void put(T v) { const std::size_t n = b.size(); b.resize(::kern::converted::count(n + sizeof(T))); ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::value_place(v), sizeof(T)); }
   template <class T> void array(const std::vector<T>& v) {
     put<u32>(static_cast<u32>(v.size()));
     const std::size_t n = b.size();
-    b.resize(::sc::converted::count(n + v.size() * sizeof(T)));
+    b.resize(::kern::converted::count(n + v.size() * sizeof(T)));
     if (!v.empty()) ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::at_place(v, 0), v.size() * sizeof(T));
   }
   void points(const std::vector<Vec2>& v) {
@@ -107,15 +107,15 @@ struct Reader {
   template <class T> void array(std::vector<T>& v) {
     const u32 n = get<u32>();
     if (!ok || static_cast<std::size_t>(end - p) < static_cast<std::size_t>(n) * sizeof(T)) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
+    v.resize(::kern::converted::count(n));
     if (n) ::sc::lowered::copy(::sc::lowered::at_place(v, 0), ::sc::lowered::pointer_place(p), n * sizeof(T));
     p += n * sizeof(T);
   }
   void points(std::vector<Vec2>& v) {
     const u32 n = get<u32>();
     if (!ok || static_cast<std::size_t>(end - p) < static_cast<std::size_t>(n) * 8) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
-    for (u32 i = 0; i < n; ++i) { ::sc::lowered::tick(); ::sc::converted::at(v, i).x = get<f32>(); ::sc::converted::at(v, i).y = get<f32>(); }
+    v.resize(::kern::converted::count(n));
+    for (u32 i = 0; i < n; ++i) { ::sc::lowered::tick(); ::kern::converted::at(v, i).x = get<f32>(); ::kern::converted::at(v, i).y = get<f32>(); }
   }
 };
 
@@ -169,9 +169,9 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
   o.cornice = r.get<u8>() != 0;
   o.wall_records = r.get<u8>() != 0;
   auto rgb = [&] { kern::Rgb c; c.r = r.get<f64>(); c.g = r.get<f64>(); c.b = r.get<f64>(); return c; };
-  o.style.walls.resize(::sc::converted::count(r.get<u32>()));
+  o.style.walls.resize(::kern::converted::count(r.get<u32>()));
   for (auto& c : o.style.walls) c = rgb();
-  o.style.roofs.resize(::sc::converted::count(r.get<u32>()));
+  o.style.roofs.resize(::kern::converted::count(r.get<u32>()));
   for (auto& c : o.style.roofs) c = rgb();
   o.style.trim = rgb();
   o.style.trim_mix = r.get<f64>();
@@ -199,7 +199,7 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
 
 std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, const u8* mvt, std::size_t length) {
   std::vector<u8> b;
-  b.reserve(::sc::converted::count(length + 28));
+  b.reserve(::kern::converted::count(length + 28));
   Writer w{b};
   w.put<i32>(key.z); w.put<i32>(key.x); w.put<i32>(key.y);
   w.put<f64>(lon0); w.put<f64>(lat0);
@@ -211,26 +211,26 @@ bool read_features(const std::vector<u8>& output, MapFeatures& f) {
   Reader r{output.data(), output.data() + output.size()};
   if (r.get<u8>() != 1) return false;
   f.procedural = r.get<u8>() != 0;
-  f.buildings.resize(::sc::converted::count(r.get<u32>()));
+  f.buildings.resize(::kern::converted::count(r.get<u32>()));
   for (auto& b : f.buildings) { ::sc::lowered::tick();
     b.base = r.get<f32>(); b.top = r.get<f32>(); b.seed = r.get<u32>();
-    b.rings.resize(::sc::converted::count(r.get<u32>()));
+    b.rings.resize(::kern::converted::count(r.get<u32>()));
     for (auto& ring : b.rings) r.points(ring);
     if (!r.ok) return false;
   }
-  f.roads.resize(::sc::converted::count(r.get<u32>()));
+  f.roads.resize(::kern::converted::count(r.get<u32>()));
   for (auto& rd : f.roads) { ::sc::lowered::tick(); rd.cls = static_cast<RoadClass>(r.get<u8>()); rd.bridge = r.get<u8>() != 0; r.points(rd.points); if (!r.ok) return false; }
-  f.areas.resize(::sc::converted::count(r.get<u32>()));
+  f.areas.resize(::kern::converted::count(r.get<u32>()));
   for (auto& a : f.areas) { ::sc::lowered::tick();
     a.kind = static_cast<AreaKind>(r.get<u8>());
-    a.rings.resize(::sc::converted::count(r.get<u32>()));
+    a.rings.resize(::kern::converted::count(r.get<u32>()));
     for (auto& ring : a.rings) r.points(ring);
     if (!r.ok) return false;
   }
   for (auto* list : {&f.trees, &f.lamps}) { ::sc::lowered::tick();
     const u32 n = r.get<u32>();
     if (!r.ok || n > 200000) return false;
-    list->resize(::sc::converted::count(n));
+    list->resize(::kern::converted::count(n));
     for (auto& sp : *list) { ::sc::lowered::tick(); sp.p.x = r.get<f32>(); sp.p.y = r.get<f32>(); sp.a = r.get<f32>(); }
   }
   return r.ok;
@@ -254,7 +254,7 @@ std::vector<u8> buildings_input(const kern::FootprintStream& footprints, const k
 
 bool read_chunks(const std::vector<u8>& output, std::vector<kern::GeoChunk>& out) {
   Reader r{output.data(), output.data() + output.size()};
-  out.resize(::sc::converted::count(r.get<u32>()));
+  out.resize(::kern::converted::count(r.get<u32>()));
   for (auto& c : out) { ::sc::lowered::tick();
     c.x = r.get<i32>(); c.y = r.get<i32>(); c.items = r.get<u32>(); c.triangles = r.get<u32>();
     c.mesh.extra_size = r.get<u32>();
@@ -341,19 +341,19 @@ namespace {
 void put_array_f32(std::vector<u8>& b, const std::vector<f32>& v) {
   wire::put_u32(b, static_cast<u32>(v.size()));
   const std::size_t n = b.size();
-  b.resize(::sc::converted::count(n + v.size() * sizeof(f32)));
+  b.resize(::kern::converted::count(n + v.size() * sizeof(f32)));
   if (!v.empty()) ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::at_place(v, 0), v.size() * sizeof(f32));
 }
 void put_array_u32(std::vector<u8>& b, const std::vector<u32>& v) {
   wire::put_u32(b, static_cast<u32>(v.size()));
   const std::size_t n = b.size();
-  b.resize(::sc::converted::count(n + v.size() * sizeof(u32)));
+  b.resize(::kern::converted::count(n + v.size() * sizeof(u32)));
   if (!v.empty()) ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::at_place(v, 0), v.size() * sizeof(u32));
 }
 void put_array_f64(std::vector<u8>& b, const std::vector<f64>& v) {
   wire::put_u32(b, static_cast<u32>(v.size()));
   const std::size_t n = b.size();
-  b.resize(::sc::converted::count(n + v.size() * sizeof(f64)));
+  b.resize(::kern::converted::count(n + v.size() * sizeof(f64)));
   if (!v.empty()) ::sc::lowered::copy(::sc::lowered::at_place(b, n), ::sc::lowered::at_place(v, 0), v.size() * sizeof(f64));
 }
 void put_points(std::vector<u8>& b, const std::vector<Vec2>& v) {
@@ -375,7 +375,7 @@ struct Reader {
   bool ok = true;
   u8 get_u8(kern::Span<const u8> b) {
     if (b.size < p + 1) { ok = false; return 0; }
-    const u8 v = ::sc::converted::at(b, p);
+    const u8 v = ::kern::converted::at(b, p);
     p += 1;
     return v;
   }
@@ -405,35 +405,35 @@ struct Reader {
   void array_f32(kern::Span<const u8> b, std::vector<f32>& v) {
     const u32 n = get_u32(b);
     if (!ok || b.size - p < static_cast<std::size_t>(n) * sizeof(f32)) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
+    v.resize(::kern::converted::count(n));
     if (n) ::sc::lowered::copy(::sc::lowered::at_place(v, 0), ::sc::lowered::at_place(b, p), n * sizeof(f32));
     p += n * sizeof(f32);
   }
   void array_u32(kern::Span<const u8> b, std::vector<u32>& v) {
     const u32 n = get_u32(b);
     if (!ok || b.size - p < static_cast<std::size_t>(n) * sizeof(u32)) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
+    v.resize(::kern::converted::count(n));
     if (n) ::sc::lowered::copy(::sc::lowered::at_place(v, 0), ::sc::lowered::at_place(b, p), n * sizeof(u32));
     p += n * sizeof(u32);
   }
   void array_f64(kern::Span<const u8> b, std::vector<f64>& v) {
     const u32 n = get_u32(b);
     if (!ok || b.size - p < static_cast<std::size_t>(n) * sizeof(f64)) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
+    v.resize(::kern::converted::count(n));
     if (n) ::sc::lowered::copy(::sc::lowered::at_place(v, 0), ::sc::lowered::at_place(b, p), n * sizeof(f64));
     p += n * sizeof(f64);
   }
   void points(kern::Span<const u8> b, std::vector<Vec2>& v) {
     const u32 n = get_u32(b);
     if (!ok || b.size - p < static_cast<std::size_t>(n) * 8) { ok = false; return; }
-    v.resize(::sc::converted::count(n));
-    for (u32 i = 0; i < n; ++i) { ::sc::lowered::tick(); ::sc::converted::at(v, i).x = get_f32(b); ::sc::converted::at(v, i).y = get_f32(b); }
+    v.resize(::kern::converted::count(n));
+    for (u32 i = 0; i < n; ++i) { ::sc::lowered::tick(); ::kern::converted::at(v, i).x = get_f32(b); ::kern::converted::at(v, i).y = get_f32(b); }
   }
   /// False: a broken count (the reader may still be ok).
   bool spots(kern::Span<const u8> b, std::vector<MapFeatures::Spot>& v) {
     const u32 n = get_u32(b);
     if (!ok || n > 200000) return false;
-    v.resize(::sc::converted::count(n));
+    v.resize(::kern::converted::count(n));
     for (auto& sp : v) { ::sc::lowered::tick(); sp.p.x = get_f32(b); sp.p.y = get_f32(b); sp.a = get_f32(b); }
     return true;
   }
@@ -494,9 +494,9 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
   o.cornice = r.get_u8(in) != 0;
   o.wall_records = r.get_u8(in) != 0;
   auto rgb = [&] { kern::Rgb c; c.r = r.get_f64(in); c.g = r.get_f64(in); c.b = r.get_f64(in); return c; };
-  o.style.walls.resize(::sc::converted::count(r.get_u32(in)));
+  o.style.walls.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& c : o.style.walls) c = rgb();
-  o.style.roofs.resize(::sc::converted::count(r.get_u32(in)));
+  o.style.roofs.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& c : o.style.roofs) c = rgb();
   o.style.trim = rgb();
   o.style.trim_mix = r.get_f64(in);
@@ -523,7 +523,7 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
 
 std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, kern::Span<const u8> mvt) {
   std::vector<u8> b;
-  b.reserve(::sc::converted::count(mvt.size + 28));
+  b.reserve(::kern::converted::count(mvt.size + 28));
   put_i32(b, key.z); put_i32(b, key.x); put_i32(b, key.y);
   wire::put_f64(b, lon0); wire::put_f64(b, lat0);
   b.insert(b.end(), mvt.begin(), mvt.end());
@@ -535,19 +535,19 @@ bool read_features(const std::vector<u8>& output, MapFeatures& f) {
   Reader r;
   if (r.get_u8(in) != 1) return false;
   f.procedural = r.get_u8(in) != 0;
-  f.buildings.resize(::sc::converted::count(r.get_u32(in)));
+  f.buildings.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& b : f.buildings) { ::sc::lowered::tick();
     b.base = r.get_f32(in); b.top = r.get_f32(in); b.seed = r.get_u32(in);
-    b.rings.resize(::sc::converted::count(r.get_u32(in)));
+    b.rings.resize(::kern::converted::count(r.get_u32(in)));
     for (auto& ring : b.rings) r.points(in, ring);
     if (!r.ok) return false;
   }
-  f.roads.resize(::sc::converted::count(r.get_u32(in)));
+  f.roads.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& rd : f.roads) { ::sc::lowered::tick(); rd.cls = static_cast<RoadClass>(r.get_u8(in)); rd.bridge = r.get_u8(in) != 0; r.points(in, rd.points); if (!r.ok) return false; }
-  f.areas.resize(::sc::converted::count(r.get_u32(in)));
+  f.areas.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& a : f.areas) { ::sc::lowered::tick();
     a.kind = static_cast<AreaKind>(r.get_u8(in));
-    a.rings.resize(::sc::converted::count(r.get_u32(in)));
+    a.rings.resize(::kern::converted::count(r.get_u32(in)));
     for (auto& ring : a.rings) r.points(in, ring);
     if (!r.ok) return false;
   }
@@ -573,7 +573,7 @@ std::vector<u8> buildings_input(const kern::FootprintStream& footprints, const k
 bool read_chunks(const std::vector<u8>& output, std::vector<kern::GeoChunk>& out) {
   const kern::Span<const u8> in(output);
   Reader r;
-  out.resize(::sc::converted::count(r.get_u32(in)));
+  out.resize(::kern::converted::count(r.get_u32(in)));
   for (auto& c : out) { ::sc::lowered::tick();
     read_one_chunk(in, r, c);
     if (!r.ok) return false;
@@ -585,7 +585,7 @@ u32 chunk_count(const std::vector<u8>& output) {
   // (the count the job put first: its four bytes as they lie in memory - little-endian, as on every
   // target of the engine)
   if (output.size() < 4) return 0;
-  return u32{::sc::converted::at(output, 0)} | u32{::sc::converted::at(output, 1)} << 8 | u32{::sc::converted::at(output, 2)} << 16 | u32{::sc::converted::at(output, 3)} << 24;
+  return u32{::kern::converted::at(output, 0)} | u32{::kern::converted::at(output, 1)} << 8 | u32{::kern::converted::at(output, 2)} << 16 | u32{::kern::converted::at(output, 3)} << 24;
 }
 
 bool read_chunk(const std::vector<u8>& output, std::size_t& at, kern::GeoChunk& c) {
@@ -637,10 +637,10 @@ template <> struct Values<::sc::AreaKind> { static constexpr long long all[] = {
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_city_jobs_cpp) {
+KERN_TEST(lowered_city_jobs_cpp) {
   {  // run_tile(kern::Span<const u8>, std::vector<u8> &)  ->  run_tile(kern::Span<const u8>, std::vector<u8> &)
     ::sc::lowered::Tally tally("run_tile(kern::Span<const u8>, std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<kern::Span<const u8>> o0;
       ::sc::lowered::Arg<kern::Span<const u8>> n0;
@@ -658,7 +658,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // run_buildings(kern::Span<const u8>, std::vector<u8> &)  ->  run_buildings(kern::Span<const u8>, std::vector<u8> &)
     ::sc::lowered::Tally tally("run_buildings(kern::Span<const u8>, std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<kern::Span<const u8>> o0;
       ::sc::lowered::Arg<kern::Span<const u8>> n0;
@@ -676,7 +676,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // tile_input(const TileKey &, f64, f64, const u8 *, std::size_t)  ->  tile_input(const TileKey &, f64, f64, kern::Span<const u8>)
     ::sc::lowered::Tally tally("tile_input(const TileKey &, f64, f64, const u8 *, std::size_t)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_base_fb6cf4c28186::TileKey &> o0;
       ::sc::lowered::Arg<const ::sc::TileKey &> n0;
@@ -703,7 +703,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // read_features(const std::vector<u8> &, MapFeatures &)  ->  read_features(const std::vector<u8> &, MapFeatures &)
     ::sc::lowered::Tally tally("read_features(const std::vector<u8> &, MapFeatures &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -724,7 +724,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // buildings_input(const kern::FootprintStream &, const kern::BuildingOptions &)  ->  buildings_input(const kern::FootprintStream &, const kern::BuildingOptions &)
     ::sc::lowered::Tally tally("buildings_input(const kern::FootprintStream &, const kern::BuildingOptions &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const kern::FootprintStream &> o0;
       ::sc::lowered::Arg<const kern::FootprintStream &> n0;
@@ -744,7 +744,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // read_chunks(const std::vector<u8> &, std::vector<kern::GeoChunk> &)  ->  read_chunks(const std::vector<u8> &, std::vector<kern::GeoChunk> &)
     ::sc::lowered::Tally tally("read_chunks(const std::vector<u8> &, std::vector<kern::GeoChunk> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -765,7 +765,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // chunk_count(const std::vector<u8> &)  ->  chunk_count(const std::vector<u8> &)
     ::sc::lowered::Tally tally("chunk_count(const std::vector<u8> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;
@@ -782,7 +782,7 @@ SC_TEST(lowered_city_jobs_cpp) {
   }
   {  // read_chunk(const std::vector<u8> &, std::size_t &, kern::GeoChunk &)  ->  read_chunk(const std::vector<u8> &, std::size_t &, kern::GeoChunk &)
     ::sc::lowered::Tally tally("read_chunk(const std::vector<u8> &, std::size_t &, kern::GeoChunk &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<u8> &> o0;
       ::sc::lowered::Arg<const std::vector<u8> &> n0;

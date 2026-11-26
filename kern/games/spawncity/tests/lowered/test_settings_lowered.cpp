@@ -99,7 +99,7 @@ class Settings {
  public:
   /// Every setting at its default (as the table bound at this moment has it).
   Settings();
-  f32 get(Opt o) const { return ::sc::converted::at(v_, static_cast<u32>(o)); }
+  f32 get(Opt o) const { return ::kern::converted::at(v_, static_cast<u32>(o)); }
   bool on(Opt o) const { return get(o) > 0.5f; }
   /// Clamped and snapped to the step; false for an unknown key or a non-number.
   bool set(std::string_view key, std::string_view value);
@@ -167,12 +167,12 @@ bool bind_settings(kern::logic::Instance* blueprint) {
   if (!blueprint) return false;
   const Value table = blueprint->get("Options");
   if (table.size() != kCount) return false;
-  g_texts.reserve(::sc::converted::count(kCount));  // (the specs point into the texts: they do not move again)
+  g_texts.reserve(::kern::converted::count(kCount));  // (the specs point into the texts: they do not move again)
   for (u32 i = 0; i < kCount; ++i) { ::sc::lowered::tick();
     const Value row = table.item(i);
     if (row.fields() < 10) { g_texts.clear(); g_specs.clear(); g_rows.clear(); return false; }
     g_texts.push_back({row.field(0)->as_text(), row.field(1)->as_text(), row.field(2)->as_text(), row.field(3)->as_text()});
-    const Row& t = ::sc::converted::back(g_texts);
+    const Row& t = ::kern::converted::back(g_texts);
     g_specs.push_back({t.key.c_str(), t.section.c_str(), t.label.c_str(), t.help.c_str(), static_cast<f32>(row.field(4)->as_number()),
                        static_cast<f32>(row.field(5)->as_number()), static_cast<f32>(row.field(6)->as_number()), static_cast<f32>(row.field(7)->as_number()),
                        row.field(8)->b, row.field(9)->b});
@@ -181,30 +181,30 @@ bool bind_settings(kern::logic::Instance* blueprint) {
   return true;
 }
 
-const OptSpec& opt_spec(Opt o) { return static_cast<u32>(o) < g_specs.size() ? ::sc::converted::at(g_specs, static_cast<u32>(o)) : kNone; }
+const OptSpec& opt_spec(Opt o) { return static_cast<u32>(o) < g_specs.size() ? ::kern::converted::at(g_specs, static_cast<u32>(o)) : kNone; }
 
 bool find_opt(std::string_view key, Opt& out) {
   for (u32 i = 0; (::sc::lowered::tick(), i < g_specs.size()); ++i)
-    if (key == ::sc::converted::at(g_specs, i).key) { out = static_cast<Opt>(i); return true; }
+    if (key == ::kern::converted::at(g_specs, i).key) { out = static_cast<Opt>(i); return true; }
   return false;
 }
 
 Settings::Settings() {
-  for (u32 i = 0; (::sc::lowered::tick(), i < kCount); ++i) ::sc::converted::at(v_, i) = opt_spec(static_cast<Opt>(i)).def;
+  for (u32 i = 0; (::sc::lowered::tick(), i < kCount); ++i) ::kern::converted::at(v_, i) = opt_spec(static_cast<Opt>(i)).def;
 }
 
 void Settings::set(Opt o, f32 value) {
   const u32 i = static_cast<u32>(o);
   if (i >= g_rows.size() || !std::isfinite(value)) return;
-  const f32 v = static_cast<f32>(g_rules.number("Snap", {::sc::converted::at(g_rows, i), rules::number(value)}));
-  if (v != ::sc::converted::at(v_, i)) { ::sc::converted::at(v_, i) = v; ++version_; }
+  const f32 v = static_cast<f32>(g_rules.number("Snap", {::kern::converted::at(g_rows, i), rules::number(value)}));
+  if (v != ::kern::converted::at(v_, i)) { ::kern::converted::at(v_, i) = v; ++version_; }
 }
 
 bool Settings::set(std::string_view key, std::string_view value) {
   Opt o;
   if (!find_opt(key, o)) return false;
-  if (std::vector<Value> word; g_rules.call("Word", {Value::text(std::string(value))}, word) && word.size() >= 2 && ::sc::converted::at(word, 0).b) {
-    set(o, static_cast<f32>(::sc::converted::at(word, 1).as_number()));
+  if (std::vector<Value> word; g_rules.call("Word", {Value::text(std::string(value))}, word) && word.size() >= 2 && ::kern::converted::at(word, 0).b) {
+    set(o, static_cast<f32>(::kern::converted::at(word, 1).as_number()));
     return true;
   }
   const std::string text(value);
@@ -217,7 +217,7 @@ bool Settings::set(std::string_view key, std::string_view value) {
 
 void Settings::reset_section(std::string_view section) {
   for (u32 i = 0; (::sc::lowered::tick(), i < g_rows.size()); ++i)
-    if (g_rules.flag("InSection", {::sc::converted::at(g_rows, i), Value::text(std::string(section))})) set(static_cast<Opt>(i), ::sc::converted::at(g_specs, i).def);
+    if (g_rules.flag("InSection", {::kern::converted::at(g_rows, i), Value::text(std::string(section))})) set(static_cast<Opt>(i), ::kern::converted::at(g_specs, i).def);
 }
 
 std::string Settings::values_json() const {
@@ -225,9 +225,9 @@ std::string Settings::values_json() const {
   for (u32 i = 0; i < g_specs.size(); ++i) { ::sc::lowered::tick();
     if (i) o += ',';
     o += '"';
-    o += ::sc::converted::at(g_specs, i).key;
+    o += ::kern::converted::at(g_specs, i).key;
     o += "\":";
-    o += num(::sc::converted::at(v_, i));
+    o += num(::kern::converted::at(v_, i));
   }
   return o + "}";
 }
@@ -235,7 +235,7 @@ std::string Settings::values_json() const {
 std::string Settings::schema_json() const {
   std::string o = "[";
   for (u32 i = 0; i < g_specs.size(); ++i) { ::sc::lowered::tick();
-    const OptSpec& s = ::sc::converted::at(g_specs, i);
+    const OptSpec& s = ::kern::converted::at(g_specs, i);
     if (i) o += ',';
     o += "{\"key\":\"";
     escape_into(o, s.key);
@@ -246,7 +246,7 @@ std::string Settings::schema_json() const {
     o += "\",\"help\":\"";
     escape_into(o, s.help);
     o += "\",\"min\":" + num(s.min) + ",\"max\":" + num(s.max) + ",\"step\":" + num(s.step) + ",\"def\":" + num(s.def);
-    o += std::string(",\"toggle\":") + (s.toggle ? "true" : "false") + ",\"live\":" + (s.live ? "true" : "false") + ",\"value\":" + num(::sc::converted::at(v_, i)) + "}";
+    o += std::string(",\"toggle\":") + (s.toggle ? "true" : "false") + ",\"live\":" + (s.live ? "true" : "false") + ",\"value\":" + num(::kern::converted::at(v_, i)) + "}";
   }
   return o + "]";
 }
@@ -344,7 +344,7 @@ class Settings {
   Settings() = default;
   /// Every setting at its default (as the table has it).
   explicit Settings(const SettingsTable& table);
-  f32 get(Opt o) const { return ::sc::converted::at(v_, static_cast<u32>(o)); }
+  f32 get(Opt o) const { return ::kern::converted::at(v_, static_cast<u32>(o)); }
   bool on(Opt o) const { return get(o) > 0.5f; }
   /// Clamped and snapped to the step; false for an unknown key or a non-number.
   bool set(const SettingsTable& table, std::string_view key, std::string_view value);
@@ -413,24 +413,24 @@ bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table) {
 }
 
 const OptSpec& opt_spec(const SettingsTable& table, Opt o) {
-  return static_cast<u32>(o) < table.specs.size() ? ::sc::converted::at(table.specs, static_cast<u32>(o)) : kNone;
+  return static_cast<u32>(o) < table.specs.size() ? ::kern::converted::at(table.specs, static_cast<u32>(o)) : kNone;
 }
 
 bool find_opt(const SettingsTable& table, std::string_view key, Opt& out) {
   for (u32 i = 0; (::sc::lowered::tick(), i < table.specs.size()); ++i)
-    if (key == ::sc::converted::at(table.specs, i).key) { out = static_cast<Opt>(i); return true; }
+    if (key == ::kern::converted::at(table.specs, i).key) { out = static_cast<Opt>(i); return true; }
   return false;
 }
 
 Settings::Settings(const SettingsTable& table) {
-  for (u32 i = 0; (::sc::lowered::tick(), i < kCount); ++i) ::sc::converted::at(v_, i) = opt_spec(table, static_cast<Opt>(i)).def;
+  for (u32 i = 0; (::sc::lowered::tick(), i < kCount); ++i) ::kern::converted::at(v_, i) = opt_spec(table, static_cast<Opt>(i)).def;
 }
 
 void Settings::set(const SettingsTable& table, Opt o, f32 value) {
   const u32 i = static_cast<u32>(o);
   if (i >= table.rows.size() || !std::isfinite(value)) return;
-  const f32 v = static_cast<f32>(g_rules.number("Snap", ::sc::converted::at(table.rows, i), rules::decimal(value)));
-  if (v != ::sc::converted::at(v_, i)) { ::sc::converted::at(v_, i) = v; ++version_; }
+  const f32 v = static_cast<f32>(g_rules.number("Snap", ::kern::converted::at(table.rows, i), rules::decimal(value)));
+  if (v != ::kern::converted::at(v_, i)) { ::kern::converted::at(v_, i) = v; ++version_; }
 }
 
 bool Settings::set(const SettingsTable& table, std::string_view key, std::string_view value) {
@@ -453,7 +453,7 @@ bool Settings::set(const SettingsTable& table, std::string_view key, std::string
 
 void Settings::reset_section(const SettingsTable& table, std::string_view section) {
   for (u32 i = 0; (::sc::lowered::tick(), i < table.rows.size()); ++i)
-    if (g_rules.flag("InSection", ::sc::converted::at(table.rows, i), section)) set(table, static_cast<Opt>(i), ::sc::converted::at(table.specs, i).def);
+    if (g_rules.flag("InSection", ::kern::converted::at(table.rows, i), section)) set(table, static_cast<Opt>(i), ::kern::converted::at(table.specs, i).def);
 }
 
 std::string Settings::values_json(const SettingsTable& table) const {
@@ -461,9 +461,9 @@ std::string Settings::values_json(const SettingsTable& table) const {
   for (u32 i = 0; i < table.specs.size(); ++i) { ::sc::lowered::tick();
     if (i) o += ',';
     o += '"';
-    o += ::sc::converted::at(table.specs, i).key;
+    o += ::kern::converted::at(table.specs, i).key;
     o += "\":";
-    o += num(::sc::converted::at(v_, i));
+    o += num(::kern::converted::at(v_, i));
   }
   return o + "}";
 }
@@ -471,7 +471,7 @@ std::string Settings::values_json(const SettingsTable& table) const {
 std::string Settings::schema_json(const SettingsTable& table) const {
   std::string o = "[";
   for (u32 i = 0; i < table.specs.size(); ++i) { ::sc::lowered::tick();
-    const OptSpec& s = ::sc::converted::at(table.specs, i);
+    const OptSpec& s = ::kern::converted::at(table.specs, i);
     if (i) o += ',';
     o += "{\"key\":\"";
     escape_into(o, s.key);
@@ -482,7 +482,7 @@ std::string Settings::schema_json(const SettingsTable& table) const {
     o += "\",\"help\":\"";
     escape_into(o, s.help);
     o += "\",\"min\":" + num(s.min) + ",\"max\":" + num(s.max) + ",\"step\":" + num(s.step) + ",\"def\":" + num(s.def);
-    o += std::string(",\"toggle\":") + (s.toggle ? "true" : "false") + ",\"live\":" + (s.live ? "true" : "false") + ",\"value\":" + num(::sc::converted::at(v_, i)) + "}";
+    o += std::string(",\"toggle\":") + (s.toggle ? "true" : "false") + ",\"live\":" + (s.live ? "true" : "false") + ",\"value\":" + num(::kern::converted::at(v_, i)) + "}";
   }
   return o + "]";
 }
@@ -515,16 +515,16 @@ template <> struct Values<::kern::logic::PinType> { static constexpr long long a
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_settings_cpp) {
+KERN_TEST(lowered_settings_cpp) {
   ::sc::lowered::World world({"Settings"});
   ::sc_new_settings::sc::g_rules.bind(world.logic(false));
   ::sc::lowered::Arg<::sc_new_settings::sc::SettingsTable &> b0_1;
-  { const auto o_bound = ::sc_old_settings::sc::bind_settings(world.instance(true, "Settings")); const auto n_bound = ::sc_new_settings::sc::bind_settings(world.logic(false), b0_1.get()); SC_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_settings(kern::logic::Instance *) and bind_settings(kern::logic::Runtime &, SettingsTable &) give other results"); }
-  SC_CHECK(::sc::lowered::same(::sc_old_settings::sc::g_rows, b0_1.v.rows), "bind_settings(kern::logic::Runtime &, SettingsTable &): rows is not what bind_settings(kern::logic::Instance *) left in g_rows");
-  SC_CHECK(::sc::lowered::same(::sc_old_settings::sc::g_specs, b0_1.v.specs), "bind_settings(kern::logic::Runtime &, SettingsTable &): specs is not what bind_settings(kern::logic::Instance *) left in g_specs");
+  { const auto o_bound = ::sc_old_settings::sc::bind_settings(world.instance(true, "Settings")); const auto n_bound = ::sc_new_settings::sc::bind_settings(world.logic(false), b0_1.get()); KERN_CHECK(::sc::lowered::same(o_bound, n_bound), "bind_settings(kern::logic::Instance *) and bind_settings(kern::logic::Runtime &, SettingsTable &) give other results"); }
+  KERN_CHECK(::sc::lowered::same(::sc_old_settings::sc::g_rows, b0_1.v.rows), "bind_settings(kern::logic::Runtime &, SettingsTable &): rows is not what bind_settings(kern::logic::Instance *) left in g_rows");
+  KERN_CHECK(::sc::lowered::same(::sc_old_settings::sc::g_specs, b0_1.v.specs), "bind_settings(kern::logic::Runtime &, SettingsTable &): specs is not what bind_settings(kern::logic::Instance *) left in g_specs");
   {  // opt_spec(Opt)  ->  opt_spec(const SettingsTable &, Opt)
     ::sc::lowered::Tally tally("opt_spec(Opt)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc::lowered::Arg<const ::sc_new_settings::sc::SettingsTable &> n0;
@@ -549,7 +549,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // find_opt(std::string_view, Opt &)  ->  find_opt(const SettingsTable &, std::string_view, Opt &)
     ::sc::lowered::Tally tally("find_opt(std::string_view, Opt &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc::lowered::Arg<const ::sc_new_settings::sc::SettingsTable &> n0;
@@ -578,7 +578,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::Settings()  ->  Settings::Settings(const SettingsTable &)
     ::sc::lowered::Tally tally("Settings::Settings()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       std::optional<::sc_old_settings::sc::Settings> o_obj;
@@ -600,7 +600,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::set(Opt, f32)  ->  Settings::set(const SettingsTable &, Opt, f32)
     ::sc::lowered::Tally tally("Settings::set(Opt, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc_old_settings::sc::Settings o_self{};
@@ -630,7 +630,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::set(std::string_view, std::string_view)  ->  Settings::set(const SettingsTable &, std::string_view, std::string_view)
     ::sc::lowered::Tally tally("Settings::set(std::string_view, std::string_view)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc_old_settings::sc::Settings o_self{};
@@ -663,7 +663,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::reset_section(std::string_view)  ->  Settings::reset_section(const SettingsTable &, std::string_view)
     ::sc::lowered::Tally tally("Settings::reset_section(std::string_view)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc_old_settings::sc::Settings o_self{};
@@ -690,7 +690,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::values_json()  ->  Settings::values_json(const SettingsTable &)
     ::sc::lowered::Tally tally("Settings::values_json()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc_old_settings::sc::Settings o_self{};
@@ -717,7 +717,7 @@ SC_TEST(lowered_settings_cpp) {
   }
   {  // Settings::schema_json()  ->  Settings::schema_json(const SettingsTable &)
     ::sc::lowered::Tally tally("Settings::schema_json()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_settings::sc::g_texts);
       ::sc_old_settings::sc::Settings o_self{};
@@ -742,7 +742,7 @@ SC_TEST(lowered_settings_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_settings::sc::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_settings::sc::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_settings::sc::bind_settings(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc
