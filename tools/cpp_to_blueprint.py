@@ -12527,6 +12527,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 # engine's own. What the Blueprint gives is compared with what C++ gives: where the language computes otherwise than the
 # source (a Float of 64 bit for an f32), the comparison says so. The first pass (with the numbers of the language) stays.
 SOURCE_NUMBERS = os.environ.get("KERN_TEST_SOURCE_NUMBERS") == "1"
+# What is written does not hang on this pass: the test that decides what waits is the first one (with the numbers of the
+# language), as without the variable. With the variable each Blueprint gets one more test, test_<name>_source.cpp, made
+# after that decision with HONEST on: a piece of the source that does not compile there is left out of it and counted
+# (said in the run's last lines), it does not make a function wait.
+HONEST = [False]
 SOURCE_PRELUDE = """// the source's own numbers (KERN_TEST_SOURCE_NUMBERS=1): what C++ computes, compared with the Blueprint
 using kern::f32; using kern::f64;
 using kern::u8; using kern::u16; using kern::u32; using kern::u64;
@@ -12615,7 +12620,7 @@ class TestWriter:
         """A piece of C++ as the Blueprint language computes it: number literals without the f that
         makes them 32-bit, float as double, the functions of numbers those of kern::math. In the pass of the
         source's own numbers (KERN_TEST_SOURCE_NUMBERS=1: SOURCE_NUMBERS) the piece stays as the source has it."""
-        if SOURCE_NUMBERS:
+        if HONEST[0]:
             return text
         return cls.in_code(text, cls.widen_code)
 
@@ -13359,7 +13364,7 @@ class TestWriter:
         if count_per(c) is not None:
             return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
-            return "double"
+            return ("float" if c == "float" else c) if HONEST[0] else "double"   # (the second pass: the source's own numbers)
         if c in NUMBER:
             return c
         if c in ("kern::Vec3", "kern::Vec2") or self.u.find_type(c) in ("kern::Vec3", "kern::Vec2"):
@@ -13508,7 +13513,7 @@ class TestWriter:
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
-            return "draw.number()"
+            return "static_cast<float>(draw.number())" if HONEST[0] and c == "float" else "draw.number()"   # (an f32 of the source: an f32 value)
         if c == "bool":
             return "draw.flag()"
         if c in NUMBER:
@@ -15055,7 +15060,7 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
-                if (scope or "").startswith(ENGINE + "::") and scope in self.tree.records:
+                if (scope or "").startswith(ENGINE + "::") and scope.rstrip(":") in self.tree.records:
                     continue   # (a name a class of the engine gives inside itself - `using Object = kern::net::Simulator;` of a node's
                                # description - is that class's: the test reaches the engine as the engine, never through a copy of it)
                 if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
@@ -15390,7 +15395,7 @@ class TestWriter:
     def write(self):
         u, tree = self.u, self.tree
         src = tree.said(tree.text(self.path))
-        stem = u.job.replace("/", "__")   # (the test is the Blueprint's - or a part's (Game/game_net_cpp: Game__game_net_cpp): named like it)
+        stem = u.job.replace("/", "__") + ("_source" if HONEST[0] else "")   # (the test is the Blueprint's - or a part's (Game/game_net_cpp: Game__game_net_cpp): named like it; the second pass's: <name>_source)
         skipped = []
         G = self.setup()
         unguarded = self.unguarded
@@ -15757,7 +15762,7 @@ class TestWriter:
         # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
         # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
         # the real engine in the test)
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::)(\w+)")
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -15790,13 +15795,15 @@ class TestWriter:
                 return first
             add(None, "\n".join([
                 f"// Generated by tools/cpp_to_blueprint.py from {os.path.basename(self.path)} - do not edit. The Blueprint \"{u.name}\" of the level is this",
-                "// file's C++, converted. Here the source of every converted function stands once more, compiled with the numbers",
-                "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (kern/test/converted.h).",
+                *(["// file's C++, converted. Here the source of every converted function stands once more, as it is - with the",
+                   "// source's own numbers (f32 stays f32: KERN_TEST_SOURCE_NUMBERS=1); the Blueprint must give exactly what C++ gives."] if HONEST[0] else
+                  ["// file's C++, converted. Here the source of every converted function stands once more, compiled with the numbers",
+                   "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (kern/test/converted.h)."]),
                 *system, *own, '#include "kern/test/converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
                 f"namespace {ns} {{", "namespace converted = ::kern::converted;",
                 "[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
-                SOURCE_PRELUDE if SOURCE_NUMBERS else WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
+                SOURCE_PRELUDE if HONEST[0] else WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
                 '#pragma GCC diagnostic ignored "-Wunused-variable"', '#pragma GCC diagnostic ignored "-Wnarrowing"', '#pragma GCC diagnostic ignored "-Wunused-but-set-variable"',
@@ -15930,7 +15937,7 @@ class TestWriter:
                         piece = key
                 if piece is None:
                     done = [case_of[key[1]] for key, _ in cases if key not in dropped]
-                    return None, skipped + [(f, "its source does not compile with a Blueprint's numbers yet: " + message) for f in done]
+                    return None, skipped + [(f, ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + ": " + message) for f in done]
                 found.setdefault(piece, message)
             # a piece of the source that does not compile may be why later ones do not: the first one goes - and with
             # it every other one whose complaint names nothing of a piece that does not compile either (a complaint
@@ -15972,10 +15979,10 @@ class TestWriter:
                         what = tree.decl.get(key[1], {}).get("name", key[1]) if key[0] in ("member", "function", "case") else key[1]
                         sys.stderr.write(f"--- {stem}: without the {key[0]} {what}: {message}\n")
         else:
-            return None, skipped + [(case_of[key[1]], "its source does not compile with a Blueprint's numbers yet") for key, _ in cases]
+            return None, skipped + [(case_of[key[1]], ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + "") for key, _ in cases]
         for key, _ in cases:
             if key in dropped:
-                skipped.append((case_of[key[1]], "its source does not compile with a Blueprint's numbers yet: " + why[key]))
+                skipped.append((case_of[key[1]], ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + ": " + why[key]))
         if not any(key not in dropped for key, _ in cases):
             return None, skipped
         return text, skipped
@@ -16584,6 +16591,17 @@ def convert_unit(job):
             if not more:
                 break
             barred.update(more)
+        # the second pass (KERN_TEST_SOURCE_NUMBERS=1): what is written stands - decided above by the first test -, and its
+        # functions are compared once more with the source as C++ computes it (HONEST: no widen, the engine's types)
+        unit.test_source = (None, [])
+        if SOURCE_NUMBERS and writer is not None and unit.test[0]:
+            honest = TestWriter(unit, os.path.relpath(os.path.dirname(main_file), test), flags)
+            honest.path, honest.test_dir = main_file, test
+            HONEST[0] = True
+            try:
+                unit.test_source = honest.write()
+            finally:
+                HONEST[0] = False
         # what the tests of other files need of this one to hold the source of its functions they call - also of those
         # whose own test does not compare them yet (exported: every try's)
         exports = writer.exports() if writer is not None else ({}, {})
@@ -16612,7 +16630,8 @@ def convert_unit(job):
             "said": [f"    {f.cpp} ({f.lines}): " + (("written" + ("" if f.pure else f" (a step: {'; '.join(f.effects)})")) if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
-            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue(),
+            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports,
+            "test_source": (getattr(unit, "test_source", (None, []))[0], [(f.cpp, why) for f, why in getattr(unit, "test_source", (None, []))[1]]), "errors": said.getvalue(),
             "names": sorted((unit.names - world.taken) | set(unit.type_line)),
             "externs": {"\n".join(unit.externs[x][2]): unit.extern_inputs[x] for x in unit.extern_inputs if x in unit.externs}}
 
@@ -17587,6 +17606,7 @@ def main(argv):
     total = done_n = total_lines = done_lines = 0
     waits, wait_lines = collections.Counter(), collections.Counter()
     compared, not_compared, tests_written = 0, collections.Counter(), set()
+    honest_compared, honest_not = 0, collections.Counter()
     for u in sorted(results, key=lambda u: (u not in program, u)):
         r = results[u]
         if u in program:
@@ -17610,6 +17630,20 @@ def main(argv):
                 if not os.path.exists(name) or open(name).read() != body:
                     open(name, "w").write(body)
                 tests_written.add(os.path.abspath(name))
+            body, skipped = r.get("test_source") or (None, [])
+            if SOURCE_NUMBERS:   # (the second pass: compared once more with the source's own numbers - test_<name>_source.cpp)
+                honest_compared += (body or "").count("converted::Tally tally(")
+                for cpp, why in skipped:
+                    if why != "it gives nothing":
+                        honest_not[why.split(": ", 1)[0] if why.startswith("its source does not compile") else why] += 1
+                        if os.environ.get("FUNCTIONS"):
+                            print(f"    not compared with the source's own numbers: {cpp}: {why}")
+                if body:
+                    name = os.path.join(test, f"test_{u.replace('/', '__')}_source.cpp")
+                    os.makedirs(test, exist_ok=True)
+                    if not os.path.exists(name) or open(name).read() != body:
+                        open(name, "w").write(body)
+                    tests_written.add(os.path.abspath(name))
     if texts:
         os.makedirs(texts, exist_ok=True)
         for u in order:
@@ -17652,6 +17686,9 @@ def main(argv):
         nothing = not_compared.pop("it gives nothing", 0)
         print(f"{compared} functions of the Blueprints are compared with their source, bit for bit, by the tests in {test} - each once, in the Blueprint it stands in"
               + (f"; {nothing} give nothing" if nothing else "") + ("; not compared: " + ", ".join(f"{n} ({w})" for w, n in not_compared.most_common()) if not_compared else ""))
+        if SOURCE_NUMBERS:
+            print(f"{honest_compared} functions are compared once more with their source as C++ computes it (its own numbers - KERN_TEST_SOURCE_NUMBERS=1), by the tests test_*_source.cpp"
+                  + ("; not so compared: " + ", ".join(f"{n} ({w})" for w, n in honest_not.most_common()) if honest_not else ""))
     print("\nwhat the others wait for: functions (lines)")
     for w, n in sorted(waits.items(), key=lambda kv: -wait_lines[kv[0]])[:int(os.environ.get("TOP", "40"))]:
         print(f"  {n:4} ({wait_lines[w]:6})   {w}")
