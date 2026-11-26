@@ -2072,6 +2072,7 @@ class Unit:
         """A type of the engine is a value of a Blueprint only where its header says so (KERN_BLUEPRINT_TYPE,
         kern/core/base.h): the engine's other types stay inside it."""
         if not self.marked(o):
+            import sys as _s; _s.stderr.write(f"DBG {q} file={o.get('_file')} id={o.get('id')} loc={o.get('loc')} inner={[c.get('kind') for c in o.get('inner',())][:6]}\n")
             raise Wait(f"the engine's type {q.split('::')[-1]}, which is not one for Blueprints (its header does not mark it KERN_BLUEPRINT_TYPE)")
 
     def enum(self, q):

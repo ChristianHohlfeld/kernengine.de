@@ -13704,6 +13704,7 @@ TEST(studio_project) {
   CHECK(cmd({{"cmd", "projectOpen"}, {"text", saved["text"]}})["error"].as_string() == "the project Spiel opens with its levels - not given: levels/start.klevel, levels/wald.klevel");
   json::Value given = json::Value::object();
   given.set("levels/start.klevel", start_text);
+  given.set("levels/wald.klevel", start_text);
   given.set("levels/other.klevel", start_text);
   json::Value with = json::Value::object();
   with.set("cmd", "projectOpen");
