@@ -148,7 +148,8 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor U8 U16 U32 I8 I16 I32 List Fixed Callback callback loop machine entry detached kern""".split())   # (kOwnWords, kern/src/logic/notation.cpp)
-FORMULA_WORDS = set("min max clamp abs sign copysign remainder floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
+FORMULA_WORDS = set("min max clamp abs copysign floor ceil round trunc sqrt pow exp expm1 log log10 sin cos tan asin acos atan atan2 lerp hypot fmin fmax fmod isnan isinf isfinite signbit "
+                    "num_cast num_bit_cast true false auto".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
@@ -331,6 +332,94 @@ def number_literal(x, t):
     return str(v) + ("u" if t == "u64" and v > (1 << 63) - 1 else "")
 
 
+INT_TEXT = re.compile(r"-?\d+u?")
+F32_TEXT = re.compile(r"-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?f")
+F64_TEXT = re.compile(r"-?(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|-?\d+[eE][+-]?\d+")
+
+
+def literal_number(text, t):
+    """The number a literal of the language's number type `t` is (as number_literal writes it) - None: `text` is no literal."""
+    text = text.strip()
+    if t == "bool":
+        return {"true": 1, "false": 0}.get(text)
+    if t in INTS:
+        if text == "-9223372036854775807 - 1":
+            return -(1 << 63)
+        return int(text.rstrip("u")) if INT_TEXT.fullmatch(text) else None
+    if t == "f32":
+        return f32_of_text(text[:-1]) if F32_TEXT.fullmatch(text) else None
+    if t == "f64":
+        return float(text) if F64_TEXT.fullmatch(text) else None
+    return None
+
+
+def number_cast(v, have, want):
+    """static_cast<want>(v) of a number `v` of the language's type `have`, as C++ converts it (kern/logic/numbers.h for the
+    rest: a whole number to a narrower one keeps its low bits). What C++ leaves undefined - a floating number beyond the
+    ends of the whole number type, NaN to a whole number - is a wait, with the reason: the source has to say what it wants."""
+    if want == "bool":
+        return 1 if v != 0 else 0
+    if have == "bool":
+        v = 1 if v else 0
+    if want in INTS:
+        if have in FLOATS:
+            if v != v or v in (float("inf"), float("-inf")):
+                raise Wait(f"a {have} that is no finite number converted to a {want} (C++ leaves it undefined)")
+            v = int(v)   # (toward zero)
+            bits, signed = NUM_BITS[want], want[0] == "i"
+            lo, hi = (-(1 << (bits - 1)), (1 << (bits - 1)) - 1) if signed else (0, (1 << bits) - 1)
+            if not lo <= v <= hi:
+                raise Wait(f"a {have} beyond the ends of {want} converted to it (C++ leaves it undefined)")
+            return v
+        v = int(v) & ((1 << NUM_BITS[want]) - 1)
+        if want[0] == "i" and v >= 1 << (NUM_BITS[want] - 1):
+            v -= 1 << NUM_BITS[want]
+        return v
+    if want == "f64":
+        return float(v) if have != "f32" else float(v)
+    if want == "f32":
+        return f32_of_text(str(int(v))) if have in INTS or have == "bool" else f32_of(float(v))
+    raise Wait(f"a {have} as a {want}")
+
+
+def call_parts(text, name):
+    """`name<A, B>(x)` spanning all of `text`: ([A, B], x) - else None."""
+    if not text.startswith(name + "<"):
+        return None
+    close = text.find(">(")
+    if close < 0:
+        return None
+    depth = 0
+    for i in range(close + 1, len(text)):
+        depth += {"(": 1, ")": -1}.get(text[i], 0)
+        if depth == 0:
+            break
+    if depth != 0 or i != len(text) - 1:
+        return None
+    return [x.strip() for x in text[len(name) + 1:close].split(",")], text[close + 2:-1]
+
+
+def num_cast(want, have, text):
+    """static_cast<want>(x) of the value `text` of the number type `have`: the node Cast, `num_cast<want, have>(x)`
+    (kern/docs/blueprint_cpp.md "Zahl-Typen") - every conversion a node of its own. A number written out is the number
+    C++ makes of it; a conversion of a whole number widened before is the one of what was widened (the bits are the
+    same: num_cast<i64, u64>(num_cast<u64, i32>(i)) is num_cast<i64, i32>(i))."""
+    if want == have:
+        return text
+    v = literal_number(text, have)
+    if v is not None:
+        return number_literal(number_cast(v, have, want), want)
+    inner = call_parts(text, "num_cast")
+    if inner is not None and len(inner[0]) == 2 and want in INTS and inner[0][1] in INTS and inner[0][0] in INTS:
+        b, c = inner[0]
+        if NUM_BITS[b] >= NUM_BITS[c] and NUM_BITS[b] >= NUM_BITS[want]:
+            return num_cast(want, c, inner[1])
+    return f"num_cast<{want}, {have}>({text})"
+
+
+# The language's whole number of places, lengths, indexes, codes and ids (what Length, Get Item, Find, Code At, Id of
+# Actor take and give): i64. A C++ index of another type (size_t, int) becomes one by its node Cast.
+IDX = "i64"
 W64 = ("whole64u", "whole64s")     # (a type's name, cleaned: a 64-bit bit pattern, unsigned and signed)
 # A map is, in a Blueprint, the list of its rows - structs of a key (`first`) and what it holds (`second`) -,
 # a set the list of its keys: in the order they were put in (std::map and std::set: in the order of the
@@ -400,17 +489,21 @@ def engine_class_name(q):
     kern::App is App, kern::physics::World physics_World."""
     return re.sub(r"^(?:::)?kern::", "", q).replace("::", "_")
 # (functions of numbers a formula has, by the names C++ calls them)
-MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
-        "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
+# (std::fmin is not std::min: a NaN on one side gives the other - each is its own function of the formula, as the node)
+MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "fmin", "fminf": "fmin", "min": "min", "min_of": "min", "fmax": "fmax", "fmaxf": "fmax", "max": "max",
+        "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "trunc": "trunc",
         "truncf": "trunc", "pow": "pow", "powf": "pow", "exp": "exp", "expf": "exp", "log": "log", "logf": "log", "sin": "sin", "sinf": "sin", "cos": "cos", "cosf": "cos", "tan": "tan",
-        "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp",
-        "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder"}
+        "tanf": "tan", "asin": "asin", "asinf": "asin", "acos": "acos", "acosf": "acos", "atan": "atan", "atanf": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "fmod", "fmodf": "fmod",
+        "copysign": "copysign", "copysignf": "copysign", "hypot": "hypot", "hypotf": "hypot", "log10": "log10", "log10f": "log10", "expm1": "expm1", "expm1f": "expm1",
+        "remainder": "remainder", "remainderf": "remainder",
+        # (the engine's own hyperbolic functions, kern/src/math/hyperbolic.c: what std::sinh ... of a program is)
+        "sinh": "sinh", "sinhf": "sinh", "cosh": "cosh", "coshf": "cosh", "tanh": "tanh", "tanhf": "tanh", "asinh": "asinh", "asinhf": "asinh"}
 
 
 # The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
 # every machine computes them the same) - each with how many arguments it takes. A constant of the program
 # computed with one of them is the number the engine gives for it (engine_formula).
-ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2}
+ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2, "sinh": 1, "cosh": 1, "tanh": 1, "asinh": 1}
 _FORMULAS = {}
 
 
@@ -431,7 +524,10 @@ def engine_formula(text):
 
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
-MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
+# (the engine has not these yet - kern/third_party/musl_math: a call of one waits with its place, see Emit.fx)
+MISSING_MATH = ("ldexp", "ldexpf", "acosh", "acoshf", "atanh", "atanhf", "log2", "log2f", "cbrt", "cbrtf",
+                "exp2", "exp2f", "log1p", "log1pf", "remainder", "remainderf")
+MORE_MATH = ("clampf", "hash_u32", "lround", "lroundf", "llround", "llroundf") + MISSING_MATH
 
 
 # The engine's functions as nodes in converted code (BLUEPRINTS.md, 6c): handles for the engine's objects,
@@ -1820,6 +1916,7 @@ class Function:
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
         self.result_fixed = None   # the same for what it gives
+        self.export_len = None   # an export that gives a text, bytes or floats by a pointer: its parameter for the length (out_len - the glue's, no input)
         self.result = None    # type, None: no result
         self.text = None
         self.wait = None
@@ -1990,6 +2087,9 @@ class Unit:
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
+        named = t[len(self.tree.namespace) + 2:] if self.tree.namespace and t.startswith(self.tree.namespace + "::") else None
+        if named is not None and (named in self.tree.records or named in self.tree.enums):
+            return named   # (a name the compiler writes in full - <program>::LookState::Blast: that one, from wherever it is read)
         if self.lookup_scope and not t.startswith("::"):
             # (as C++ looks a name up from where it is written: the innermost namespace or class around it that
             # has it first - `Mode` in a method of Jet is Jet::Mode, also where the program has a Mode of its own)
@@ -4306,6 +4406,7 @@ class Emit:
                     re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
                 # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
                 self.export_len_param = p["id"]
+                f.export_len = p["id"]
                 continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
@@ -5459,7 +5560,7 @@ class Emit:
         if not inner:
             return []
         t = self.u.struct(q)
-        return [f'if (math_compare<">">(kern::to<Float>(list_length<{t}>({place})), 0.0)) {{', *["  " + x for x in inner], "}"]
+        return [f'if (math_compare<">", i64>(list_length<{t}>({place}), 0)) {{', *["  " + x for x in inner], "}"]
 
     def made_default(self, init, t):
         """The program's class a variable of the struct `t` is made of by C++'s own constructor without arguments
@@ -6227,31 +6328,14 @@ class Emit:
         finally:
             self.pre = saved
 
-    @staticmethod
-    def cast(t, text):
-        """`kern::to<T>(text)`: a conversion - of a conversion with the value in between (Value Int, Value
-        Float: one conversion is one pin's)."""
-        if t == "Float" and re.fullmatch(r"-?\d+", text):   # (a whole number written out: the Float itself)
-            return flit(float(text))
-        m = re.match(r"kern::to<(Float|Int|Bool)>\(", text)
-        if m:
-            depth = 0
-            for k in range(len(m.group(0)) - 1, len(text)):
-                depth += {"(": 1, ")": -1}.get(text[k], 0)
-                if depth == 0:
-                    break
-            if k == len(text) - 1:   # (the whole text is that conversion)
-                text = f"value_{m.group(1).lower()}({text})"
-        return f"kern::to<{t}>({text})"
-
     def minus_one(self, n, text):
+        """A bound of the language's whole numbers (i64) one below `text`, the value of `n`."""
         b = bare(n)
         while b.get("kind") in CAST and kids(b):
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
-        # (a bound that is itself a conversion - `i < from + n` - is a value of its own first: conv)
-        return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, {self.conv(text, 'Int', 'Float')}))"
+        return self.whole_math("-", self.conv(text, self.tp(n), IDX), "1")
 
     def refers(self, n, decl_id):
         n = bare(n)
@@ -6717,13 +6801,16 @@ class Emit:
     def char_of(self, text, index, raw):
         """The byte of a text at an index as the C++ type `raw` holds it: a char (signed here, as on every
         machine the game is built for) is -128..127, an unsigned char 0..255 (Code At gives that)."""
-        code = f"text_code_at({text}, {index})"
+        return num_cast(self.char_type(raw), IDX, f"text_code_at({text}, {index})")   # (Code At gives the byte 0..255)
+
+    def char_type(self, raw):
+        """The number type of a byte of a text read as the C++ type `raw` (char: i8 - signed, as on every machine the subset
+        is built for; unsigned char u8 ...)."""
         c = self.u.clean(re.sub(r"\bconst\b|&", "", raw)).strip()
-        if c in ("char", "signed char"):
-            return f"kern::to<Int>(kern::formula([](Float a) -> Float {{ return a >= 128.0 ? a - 256.0 : a; }}, {self.cast('Float', code)}))"
-        if c in ("unsigned char", "u8", "uint8_t", "int", "unsigned int", "u32"):
-            return code
-        raise Wait(f"a character of a text as a {c}")
+        t = exact_type(ALIAS.get(c, c))
+        if t is None or t in FLOATS:
+            raise Wait(f"a character of a text as a {c}")
+        return t
 
     def text_piece(self, n):
         """What `text += x` appends: a text - or one byte, a char (Text of Code: its 8 bits, as a char holds them)."""
@@ -6753,7 +6840,7 @@ class Emit:
                 self.char_places[v["id"]] = (text, at, raw)
             first = [] if changes else [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
             lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
-            cond = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", count)})'
+            cond = f'{self.compare("<", at, count)}'
             return before + [f"{count} = text_length({text});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
         node = self.u.next_node
         self.u.next_node += 1
@@ -7015,7 +7102,7 @@ class Emit:
         length = count_text if keyed else f"list_length<{it}>({place})"
         if has_break:
             lines = first + self.loop_body(loop, [body], [f"{index} += 1;"])
-            cond = f'math_compare<"<">({self.cast("Float", index)}, {self.cast("Float", count)})'
+            cond = f'{self.compare("<", index, count)}'
             return before + [f"{count} = {length};", f"{index} = 0;"] + self.loop_lines(cond, [], lines, loop)
         lines = first + self.loop_body(loop, [body])
         last = self.whole_math("-", length, "1")
@@ -7101,10 +7188,10 @@ class Emit:
                     lines += one(name, None)
             lines.append("}")
             return lines, all_end and (has_default or len(by_value) == len(self.u.enum_values[st]))
-        if st != "Int":
+        if st not in INTS:
             raise Wait(f"a switch on {st}")
-        sel_name = self.temp("selected", "Int")
-        lines = [f"{sel_name} = {self.ex(sel, 'Int')};"]
+        sel_name = self.temp("selected", st)
+        lines = [f"{sel_name} = {self.ex(sel, st)};"]
         first = True
         default = None
         tail = 0
@@ -7114,7 +7201,7 @@ class Emit:
             vals = [lab for lab in labels if lab is not None]
             if not vals:
                 continue
-            conds = [f'math_compare<"==">({self.cast("Float", sel_name)}, {flit(Const(self.u).number(lab))})' for lab in vals]
+            conds = [self.compare("==", sel_name, number_literal(Const(self.u).number(lab), st), st) for lab in vals]
             cond = conds[0]
             for x in conds[1:]:
                 cond = f"logic_or({cond}, {x})"
@@ -7315,7 +7402,7 @@ class Emit:
                 before, lv, after = self.variable_of(l0, lt)
                 a, b, held = self.temp("first", "Int"), self.temp("last", "Int"), self.temp("held", it)
                 lines = [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};",
-                         f'while (loop(math_compare<"<">({self.cast("Float", a)}, {self.cast("Float", b)}))) {{',
+                         f'while (loop({self.compare("<", a, b)})) {{',
                          f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
                          f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
                 return before + lines + after
@@ -7438,9 +7525,9 @@ class Emit:
                     h = self.entry_life(self.ctype(base))
                     if h is not None:   # (the last entry ends)
                         at = self.temp("at", "Int")
-                        return before + [f"{at} = kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv}))));",
+                        return before + [f"{at} = math_sub<i64>(list_length<{it}>({lv}), 1);",
                                          *self.ended_entry(h, f"{lv}[{at}]"), f"list_remove_at({lv}, {at});"] + after
-                    return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
+                    return before + [f"list_remove_at({lv}, math_sub<i64>(list_length<{it}>({lv}), 1));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
                     return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
                 if name == "insert" and len(args) == 3 and it == "Int" and self.text_range(args[1], args[2]) is not None:
@@ -7541,9 +7628,9 @@ class Emit:
         if name == "memcpy" or not self.same_list(dst, src):
             return before + lines + up + after
         k = self.temp("k", "Int")
-        down = [f"{k} = {last};", f'while (loop(math_compare<">=">({self.cast("Float", k)}, 0.0))) {{',
+        down = [f"{k} = {last};", f'while (loop({self.compare(">=", k, "0")})) {{',
                 f"  {lv}[{self.whole_math('+', to, k)}] = list_get<{st[5:-1]}>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
-        return before + lines + [f'if (math_compare<"<=">({self.cast("Float", to)}, {self.cast("Float", fro)})) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
+        return before + lines + [f'if ({self.compare("<=", to, fro)}) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
 
     def addressed(self, n):
         """What a pointer handed to memset / memcpy points at, when it is the address of a place: `&n`, an
@@ -8642,7 +8729,7 @@ class Emit:
             before, lv, after = self.variable_of(base, lt)
             if h is not None:   # (the key's entry, if there is one, ends)
                 at = self.temp("at", "Int")
-                lines += [f"{at} = {self.found_at(kind, row, lv, key)};", f'if (math_compare<">=">(kern::to<Float>({at}), 0.0)) {{',
+                lines += [f"{at} = {self.found_at(kind, row, lv, key)};", f'if (math_compare<">=", i64>({at}, 0)) {{',
                           *["  " + x for x in self.ended_entry(h, f"{lv}[{at}]")], "}"]
             node = self.u.next_node
             self.u.next_node += 1
@@ -8696,7 +8783,7 @@ class Emit:
         if name == "size" and not a:
             return f"{kind}_length<{row}>({lst})", "Int"
         if name == "empty" and not a:
-            return f'math_compare<"==">(kern::to<Float>({kind}_length<{row}>({lst})), 0.0)', "bool"
+            return f'math_compare<"==", i64>({kind}_length<{row}>({lst}), 0)', "bool"
         if name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the length
             return ("0" if "begin" in name else f"{kind}_length<{row}>({lst})"), "Int"
@@ -8705,18 +8792,18 @@ class Emit:
             if name == "contains":
                 return self.found(kind, row, lst, key), "bool"
             if name == "count":
-                return f"{self.cast('Int', self.found(kind, row, lst, key))}", "Int"
+                return num_cast(IDX, "bool", self.found(kind, row, lst, key)), IDX
             if name == "at":
                 if kind != "map":
                     raise Wait("at() of a set")
                 return f"map_find<{row}>({lst}, {key}).value", vt
-            return (f"kern::to<Int>(kern::formula([](Float at, Float count) -> Float {{ return at < 0.0 ? count : at; }}, "
-                    f"{self.cast('Float', self.found_at(kind, row, lst, key))}, kern::to<Float>({kind}_length<{row}>({lst}))))"), "Int"
+            return (f"kern::formula<{IDX}, {IDX}>([](auto at, auto count) {{ return at < 0 ? count : at; }}, "
+                    f"{self.found_at(kind, row, lst, key)}, {kind}_length<{row}>({lst}))"), IDX
         if name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(a) != 1):
             lines, at, flag = self.keyed_change(base, name, a)
             self.hoist(lines)
             if name == "erase":
-                return (at, "Int") if self.is_iter(a[0]) else (f"{self.cast('Int', flag)}", "Int")
+                return (at, IDX) if self.is_iter(a[0]) else (num_cast(IDX, "bool", flag), IDX)
             pt = self.u.btype(qtype(b))
             if pt not in self.u.struct_fields:
                 raise Wait(f"what {name}() of a map or set gives")
@@ -8791,18 +8878,18 @@ class Emit:
         return kids(v)[-1] if kids(v) and v.get("init") else None
 
     # ---- lists: places and the steps that change several entries ----
-    def whole_math(self, op, a, b):
-        """a + b or a - b of whole numbers (a number written out stands in the formula itself)."""
-        lit = lambda x: re.fullmatch(r"-?\d+", x) is not None
-        if lit(a) and lit(b):
-            return str(int(a) + int(b) if op == "+" else int(a) - int(b))
-        if op == "+" and a == "0":
+    def whole_math(self, op, a, b, t=None):
+        """a + b or a - b of the language's whole numbers (i64: places, lengths, indexes - `t` another type): Add,
+        Subtract (a number written out stands in the node itself; two are worked out)."""
+        t = t or IDX
+        x, y = literal_number(a, t), literal_number(b, t)
+        if x is not None and y is not None:
+            return number_literal(x + y if op == "+" else x - y, t)
+        if op == "+" and x == 0:
             return b
-        if lit(b):
-            return a if int(b) == 0 else f"kern::to<Int>(kern::formula([](Float a) -> Float {{ return a {op} {flit(float(b))}; }}, {self.conv(a, 'Int', 'Float')}))"
-        if lit(a):
-            return f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return {flit(float(a))} {op} b; }}, {self.conv(b, 'Int', 'Float')}))"
-        return f"kern::to<Int>(kern::formula([](Float a, Float b) -> Float {{ return a {op} b; }}, {self.conv(a, 'Int', 'Float')}, {self.conv(b, 'Int', 'Float')}))"
+        if y == 0:
+            return a
+        return f"math_{'add' if op == '+' else 'sub'}<{t}>({a}, {b})"
 
     def pointer_of(self, n):
         """The parameter a pointer into a list is, where `n` names one: (the list's input, the place's input,
@@ -9146,7 +9233,7 @@ class Emit:
             return [f"if (logic_not({same})) {{", f"  {kept} += 1;", f"  {lv}[{kept}] = {lv}[{r}];", "}"]
         first, last = "1", self.whole_math("-", n, "1")
         return [f"{n} = list_length<{it}>({lv});",
-                f'if (math_compare<">">({self.cast("Float", n)}, 0.0)) {{',
+                f'if ({self.compare(">", n, "0")}) {{',
                 f"  {kept} = 0;",
                 *["  " + ln for ln in self.count_loop(first, last, body)],
                 f"  list_resize({lv}, {self.whole_math('+', kept, '1')}, {self.u.zero(it)});",
@@ -9162,7 +9249,7 @@ class Emit:
 
     def list_step(self, name, base, lv, it, args):
         """A call that changes a list (erase, insert, resize, assign) as the steps the language has."""
-        length = f"kern::to<Float>(list_length<{it}>({lv}))"
+        length = f"list_length<{it}>({lv})"
         if name == "erase" and len(args) == 1:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
@@ -9531,7 +9618,7 @@ class Emit:
                 raise Wait(f"algorithm: std::{name} with a function that gives no Bool")
             return got[0] if name == "find_if" else f"logic_not({got[0]})"
         pre, hit = self.lazily(test)
-        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        more = f'{self.compare("<", at, end)}'
         self.hoist(lines + [f"{at} = {first};", f"{end} = {last};", f"{go} = {more};", f"while (loop({go})) {{", *["  " + ln for ln in pre],
                             f"  if ({hit}) {{", f"    {go} = false;", "  } else {", f"    {at} += 1;", f"    {go} = {more};", "  }", "}"])
         return (at, end) if ends else at
@@ -9541,7 +9628,7 @@ class Emit:
         for all - as the library has them: none_of is find_if(first, last, f) == last, any_of its opposite,
         all_of find_if_not(first, last, f) == last. f runs for each entry until the answer is known."""
         at, end = self.first_match("find_if_not" if name == "all_of" else "find_if", a, ends=True)
-        reached = f'math_compare<"==">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        reached = f'{self.compare("==", at, end)}'
         return (f"logic_not({reached})" if name == "any_of" else reached), "bool"
 
     def count_match(self, name, a):
@@ -9557,7 +9644,7 @@ class Emit:
                 raise Wait(f"algorithm: std::{name} with a function that gives no Bool")
             return got[0]
         pre, hit = self.lazily(test)
-        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        more = f'{self.compare("<", at, end)}'
         self.hoist(lines + [f"{count} = 0;", f"{at} = {first};", f"{end} = {last};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
                             f"  if ({hit}) {{", f"    {count} += 1;", "  }", f"  {at} += 1;", "}"])
         return count, "Int"
@@ -9589,7 +9676,7 @@ class Emit:
             self.u.next_node += 1
             self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
             return f"n{node}"
-        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        more = f'{self.compare("<", at, end)}'
         n_first, n_held, n_other, n_back = taken(), taken(), taken(), taken()
         def back(i):
             return [f"var_take({n_back}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = {n_back}.value;"]
@@ -9622,7 +9709,7 @@ class Emit:
         best, at, end = self.temp("best", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
         x, y = self.at_place(l0, at, it), self.at_place(l0, best, it)
         pre, better = self.lazily(lambda: self.is_less(x, y, cpp, cmp) if name == "min_element" else self.is_less(y, x, cpp, cmp))
-        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        more = f'{self.compare("<", at, end)}'
         self.hoist(lines + [f"{best} = {first};", f"{end} = {last};", f"{at} = {self.whole_math('+', best, '1')};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
                             f"  if ({better}) {{", f"    {best} = {at};", "  }", f"  {at} += 1;", "}"])
         return best
@@ -9648,9 +9735,9 @@ class Emit:
         node = self.u.next_node
         self.u.next_node += 1
         self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
-        later = f'math_compare<"<">({self.cast("Float", kept)}, {self.cast("Float", read)})'
+        later = f'{self.compare("<", kept, read)}'
         return lines + [f"{read} = {first};", f"{kept} = {read};", f"{stop} = {end};",
-                        f'while (loop(math_compare<"<">({self.cast("Float", read)}, {self.cast("Float", stop)}))) {{', *["  " + ln for ln in pre],
+                        f'while (loop({self.compare("<", read, stop)})) {{', *["  " + ln for ln in pre],
                         f"  if (logic_not({gone})) {{", f"    if ({later}) {{", f"      var_take(n{node}, {lv}[{read}]);", f"      {lv}[{kept}] = n{node}.value;", "    }",
                         f"    {kept} += 1;", "  }", f"  {read} += 1;", "}", f"list_resize({lv}, {kept}, {self.u.zero(it)});"]
 
@@ -10322,48 +10409,35 @@ class Emit:
 
     # ---- expressions ----
     def conv(self, text, have, want):
-        have, want = wire(have), wire(want)   # (a place of a fixed width takes an Int: it keeps its low bits)
+        """The value `text` of the type `have` where a `want` is needed: the same - or a conversion C++ makes there (the
+        compiler's tree says each: ImplicitCastExpr), written as its node: between numbers Cast (num_cast), between an
+        enum's value and its number Enum Index / Enum From Index. Nothing else converts."""
         if want is None or have == want:
             return text
         if object_class(have) or object_class(want):
             # an object of the engine (kern/docs/engine_object.md): one of a class goes where one of a class it derives
-            # from is wanted, as in C++; as a Bool it is whether there is one (C++ asks a pointer so); nothing else
+            # from is wanted, as in C++; as a bool it is whether there is one (C++ asks a pointer so); nothing else
             # becomes one, and it becomes nothing else - no number
             if object_class(have) and want == "bool":
                 return f"object_valid<{object_class(have)}>({text})"
             if object_class(have) and object_class(want) and self.u.engine_class_is(object_class(have), object_class(want)):
                 return text
             raise Wait(f"an object of the engine as another type ({have} where {want} is wanted)")
-        if want == "Int64" and have in ("Int", "Float", "bool"):
-            return self.to64(text, have)
-        if have == "Int64" and want in ("Int", "Float", "bool"):
-            return self.from64(text, "whole64u", "long" if want == "Int" else "double", want)
-        if want == "Float" and have == "Int" and re.fullmatch(r"-?\d+", text):
-            return flit(float(text))
-        if text.startswith("kern::to<") and have in ("Float", "Int", "bool") and want in ("Float", "Int", "bool"):
-            # (a conversion of a conversion - (int)(float)i: the value in between is a value of its own)
-            text = f"value_{have.lower()}({text})"
-        if want == "Float" and have in ("Int", "bool"):
-            return f"{self.cast('Float', text)}"
-        if want == "Int" and have in ("Float", "bool"):
-            return f"{self.cast('Int', text)}"
-        if want == "bool" and have == "Float":   # (exactly not 0, as C++ asks)
-            return f'math_compare<">">(kern::formula([](Float x) -> Float {{ return x != 0.0; }}, {text}), 0.5)'
-        if want == "bool" and have in ("Float", "Int"):
-            return f'math_compare<"!=">({text if have == "Float" else self.cast("Float", text)}, 0.0)'
-        if want in ("Int", "Float") and have in self.u.enum_values:
+        if have in NUMS and want in NUMS:
+            return num_cast(want, have, text)
+        if want in NUMS and have in self.u.enum_values:
             index = f"enum_index<{have}>({text})"
             if have in self.u.enum_numbers:   # (the number C++ gives the value, not its place)
-                index = f"list_get<Int>({self.u.enum_numbers[have]}, {index})"
-            return index if want == "Int" else f"{self.cast('Float', index)}"
-        if want in self.u.enum_values and have in ("Int", "Float"):
-            index = text if have == "Int" else f"{self.cast('Int', text)}"
+                index = f"list_get<{IDX}>({self.u.enum_numbers[have]}, {index})"
+            return num_cast(want, IDX, index)
+        if want in self.u.enum_values and have in NUMS:
+            index = num_cast(IDX, have, text)
             if want in self.u.enum_numbers:
-                index = f"list_find<Int>({self.u.enum_numbers[want]}, {index})"
+                index = f"list_find<{IDX}>({self.u.enum_numbers[want]}, {index})"
             return f"enum_from_index<{want}>({index}).value"
         if want in self.u.enum_values and have in self.u.enum_values:
             # (an enum's value as one of another enum - static_cast<B>(a): the one with its number)
-            return self.conv(self.conv(text, have, "Int"), "Int", want)
+            return self.conv(self.conv(text, have, IDX), IDX, want)
         if want in self.u.rows and have == self.u.rows[want]:
             return f"struct_make<{want}>({text})"
         if have in self.u.rows and want == self.u.rows[have]:
@@ -10372,7 +10446,7 @@ class Emit:
 
     def numeric(self, n):
         try:
-            return self.tp(n) in ("Float", "Int", "bool")
+            return self.tp(n) in NUMS
         except Wait:
             return False
 
@@ -10395,88 +10469,46 @@ class Emit:
         return self.ex(n, "bool")
 
     def put(self, n, t):
-        """An expression as the value stored in a place of the type `t`. A place of a fixed width keeps the low bits
-        of what it is given, as C++ stores them: what the expression would cut to that width or more at its root
-        (a conversion to a whole number of as many bits or more, an unsigned 32-bit + or -) is not cut there -
-        the place does it (`stored`, read by `value`)."""
-        if t not in WIDTHS:
-            return self.ex(n, t)
-        self.storing = (bare(n), WIDTHS[t])
-        try:
-            return self.ex(n, t)
-        finally:
-            self.storing = None
-
-    CUT_BITS = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32,
-                "long": 64, "long long": 64, "unsigned long": 64, "unsigned long long": 64}
-
-    def stored(self, b, bits):
-        """The expression a place of `bits` bits is given in place of `b` (see `put`): `b` without the conversions
-        at its root that keep `bits` bits or more of a whole number - and an unsigned 32-bit + or - there is marked
-        to be written without its wrap (self.unwrapped)."""
-        while (b.get("kind") in CAST and b.get("castKind") == "IntegralCast" and kids(b) and self.CUT_BITS.get(self.ctype(b), 0) >= bits
-               and self.tp(b) == "Int" and self.tp(kids(b)[-1]) == "Int" and not self.is64(kids(b)[-1])):
-            inner = bare(kids(b)[-1])
-            if inner.get("kind") == "BinaryOperator" and inner.get("opcode") in ("*", "<<"):
-                break   # (a product or a shift of whole numbers is cut where it is made: in a formula it may be no whole number below 2^53)
-            b = inner
-        if (b.get("kind") == "BinaryOperator" and b.get("opcode") in ("+", "-") or b.get("kind") == "UnaryOperator" and b.get("opcode") == "-") \
-                and self.ctype(b) in UNSIGNED and self.ctype(b) not in WIDE_UNSIGNED and self.CUT_BITS[self.ctype(b)] >= bits:
-            self.unwrapped = b
-        return b
+        """An expression as the value stored in a place of the type `t` (C++ converts it there - the compiler's tree says
+        how: the conversion is in it)."""
+        return self.ex(n, t)
 
     def arithmetic(self, n):
-        """Is this a computation with numbers a formula writes (not just a value read somewhere)?"""
+        """Is this a computation with numbers a formula writes (not just a value read somewhere, not one conversion)?"""
         b = bare(n)
         k = b.get("kind")
         if k in CAST:
-            if not kids(b) or not self.numeric(b) or not self.numeric(kids(b)[-1]):
-                return False
-            if self.arithmetic(kids(b)[-1]) or (self.tp(b) == "Int" and self.tp(kids(b)[-1]) == "Float"):
-                return True
-            if self.tp(b) == "Int" and self.tp(kids(b)[-1]) == "Int":
-                try:
-                    return self.narrow("x", self.ctype(kids(b)[-1]), self.ctype(b), kids(b)[-1]) != "x"
-                except Wait:
-                    return True
-            return False
+            return bool(kids(b)) and self.numeric(b) and self.numeric(kids(b)[-1]) and self.arithmetic(kids(b)[-1])
         if not self.numeric(b):
             return False
         if k == "BinaryOperator" and b.get("opcode") in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>") and all(self.numeric(c) for c in kids(b)):
             return True
         if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "~"):
             return True
-        if k == "ConditionalOperator" and self.tp(b) in ("Float", "Int"):
+        if k == "ConditionalOperator" and self.tp(b) in NUMS and self.tp(b) != "bool":
             return True
         return self.formula_function(b)
 
     def formula_function(self, b):
-        """Is this a call of one of the functions of numbers a formula has - with the arguments the formula
-        has it for? (min(a, b) is; a min of three is a call like any other.)"""
+        """Is this a call of one of the functions of numbers of C++ or of the engine (std::sqrt, std::min, kern::clamp ...)
+        that a formula has - with the arguments the formula has it for? (min(a, b) is; a min of three is a call like any
+        other.) A function of the program of the same name is the program's (called as its Blueprint)."""
         if b.get("kind") != "CallExpr" or not all(self.numeric(a) for a in kids(b)[1:]):
+            return False
+        if self.own(callee(b).get("referencedDecl", {}).get("id")):
             return False
         name, count = callee_name(b), len(kids(b)) - 1
         if name in ("clamp", "clampf"):
             return count == 3
         if name in MATH:
-            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2, "remainder": 2}.get(MATH[name], 1)
-        if name in ("hypot", "ldexp", "ldexpf"):
+            return count == {"min": 2, "max": 2, "fmin": 2, "fmax": 2, "pow": 2, "atan2": 2, "fmod": 2, "copysign": 2, "remainder": 2, "hypot": 2}.get(MATH[name], 1)
+        if name in ("ldexp", "ldexpf"):
             return count == 2
-        if name == "lerp":
-            return count == 3
         return name in MORE_MATH and count == 1
 
     def value(self, n):
-        """(text, Blueprint type) of an expression - a whole number of a fixed width read from its place is an Int (`wire`)."""
-        storing, self.storing = getattr(self, "storing", None), None
-        if storing is not None and storing[0] is bare(n):
-            try:
-                text, t = self.value_of(self.stored(bare(n), storing[1]))
-            finally:
-                self.unwrapped = None
-            return text, wire(t)
-        text, t = self.value_of(n)
-        return text, wire(t)
+        """(text, Blueprint type) of an expression."""
+        return self.value_of(n)
 
     def value_of(self, n):
         u = self.u
@@ -10486,7 +10518,7 @@ class Emit:
             return b["_text"], b["_type"]
         if k == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") in self.char_places:
             text, at, raw = self.char_places[b["referencedDecl"]["id"]]   # (a byte of a text where it stands, read there)
-            return self.char_of(text, at, raw), "Int"
+            return self.char_of(text, at, raw), self.char_type(raw)
         got = self.text_pointer_value(b)
         if got is not None:
             return got
@@ -10508,36 +10540,9 @@ class Emit:
             return f"list_get<{lt[5:-1]}>({self.ex(b['inner'][0], lt)}, 0)", lt[5:-1]
         if k == "CXXRewrittenBinaryOperator":   # (a != b written by the compiler as !(a == b))
             return self.value(kids(b)[0])
-        # 64-bit bit patterns (Whole64): what C++ computes with them, the functions of blueprint_whole64.h do
-        if k in CAST and kids(b) and b.get("castKind") not in ("LValueToRValue", "NoOp") and self.is64(kids(b)[-1]) and not self.is64(b):
-            text, have = self.value(kids(b)[-1])
-            want = self.tp(b)
-            if have != self.whole64() or want is None:
-                return self.conv(text, have, want), want
-            return self.from64(text, self.ctype(kids(b)[-1]), self.ctype(b), want), want
-        if (k == "IntegerLiteral" or k in CAST or (k == "InitListExpr" and len(kids(b)) <= 1) or (k == "BinaryOperator" and b.get("opcode") in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>"))
-                or (k == "UnaryOperator" and b.get("opcode") in ("-", "+", "~")) or k == "ConditionalOperator") and self.is64(b):
-            return self.value64(b)
-        if k == "BinaryOperator" and b.get("opcode") in COMPARE and (self.is64(kids(b)[0]) or self.is64(kids(b)[1])):
-            x, y = kids(b)
-            op = b["opcode"]
-            signed = self.ctype(x) in ("whole64s", "long", "long long") and self.ctype(y) in ("whole64s", "long", "long long")
-            l, r = self.ex64(x), self.ex64(y)
-            if op in ("==", "!="):
-                same = self.w64("w64_equal", l, r)
-                return (same if op == "==" else f"logic_not({same})"), "bool"
-            less = "w64_less_signed" if signed else "w64_less"
-            return {"<": self.w64(less, l, r), ">": self.w64(less, r, l), "<=": f"logic_not({self.w64(less, r, l)})", ">=": f"logic_not({self.w64(less, l, r)})"}[op], "bool"
         if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
-            t = self.tp(b)
-            v = Const(u).number(b)
-            if t == "Float":
-                return flit(Const(u).decimal(b)), "Float"
-            if t == "Int":
-                if abs(v) >= 2.0 ** 53:
-                    raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
-                return str(int(v)), "Int"
-            return ("true" if v else "false"), "bool"
+            t = self.tp(b)   # (a number written out: the number C++ makes of it, in its type - 0.5f an f32, 7u a u32)
+            return number_literal(Const(u).number(b), t), t
         if k == "StringLiteral":
             return text_literal(c_string(b["value"])), "Text"
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
@@ -10559,11 +10564,11 @@ class Emit:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
             if ck == "PointerToBoolean" and self.unbound_at(inner) is not None:   # (a pointer to an entry that began as none: has it a place)
-                return f'math_compare<">=">({self.cast("Float", self.unbound_at(inner))}, 0.0)', "bool"
+                return self.compare(">=", self.unbound_at(inner), "0"), "bool"
             if ck == "PointerToBoolean" and self.asked_or_none(inner) is not None:   # (a text or none: is there one)
                 return self.asked_or_none(inner), "bool"
             if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
-                return f'math_compare<">=">({self.cast("Float", self.pointer_of(inner)[1])}, 0.0)', "bool"
+                return self.compare(">=", self.pointer_of(inner)[1], "0"), "bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
                 t = object_type(self.u.object_of(qtype(b)))
                 return t + "{}", t   # (no object of the engine: none)
@@ -10587,7 +10592,7 @@ class Emit:
             i = ref.get("id")
             if ref.get("name") == "npos" and (re.search(r"\bbasic_string(?:_view)?\b|\bstring(?:_view)?\b|size_type", qtype(b) + " " + qtype(ref))
                                              or (b.get("type", {}).get("desugaredQualType") or ref.get("type", {}).get("desugaredQualType") or "").replace("const ", "").strip() == "unsigned long"):
-                return "-1", "Int"   # (no place in a text: npos, a size_t read with its sign)
+                return number_literal(-1, "u64"), "u64"   # (no place in a text: npos, the largest size_t)
             if i in self.names:
                 return self.names[i], self.types[i]
             if i in self.pointers:
@@ -10620,7 +10625,7 @@ class Emit:
                     return u.class_constant(ref["name"])   # (a constant of a Blueprint called as its class)
                 if d is None:
                     if ref.get("name") == "kPi":
-                        return self.engine_constant("kPi", 3.14159265358979323846, "Pi")
+                        return self.engine_constant("kPi", f32_of_text("3.14159265358979323846"), "Pi", "f32")
                     raise Wait(f"the engine's {ref.get('name')}")
                 return u.constant(d)
             raise Wait(f"a name that is {ref.get('kind')}")
@@ -10666,15 +10671,15 @@ class Emit:
             if self.is_vec(base):
                 if b.get("name") not in ("x", "y", "z"):
                     raise Wait(f"vector: .{b.get('name')}")
-                return f"vector_break({self.ex(base, 'Vector')}).{b['name']}", "Float"
+                return f"vector_break({self.ex(base, 'Vector')}).{b['name']}", "f32"
             if is_actor(self.u.clean(qtype(base))):   # (an actor: its id, the one way to an Int - its world no node gives)
                 if b.get("name") != "id":
                     raise Wait(f"the {b.get('name')} of an Actor: an Actor says its world itself - only its id is a number (Id of Actor)")
-                return f"actor_id({self.ex(base, 'Actor')})", "Int"
+                return f"actor_id({self.ex(base, 'Actor')})", IDX
             if b.get("name") == "size" and re.match(r"(?:kern::)?Span<", self.ctype(base)):
                 # (a view of a list is the list: its size is the list's length - its data the place of its first entry, see place)
                 lt = self.tp(base)
-                return f"list_length<{lt[5:-1]}>({self.ex(base, lt)})", "Int"
+                return f"list_length<{lt[5:-1]}>({self.ex(base, lt)})", IDX
             st = self.tp(base)
             if st in u.struct_fields:
                 fname, ft = u.field(st, b["name"])
@@ -10731,13 +10736,13 @@ class Emit:
                     return self.either(op, left, y)
             if op in ("==", "!=") and (self.unbound_at(x) is not None and self.nothing(y) or self.unbound_at(y) is not None and self.nothing(x)):
                 at = self.unbound_at(x) or self.unbound_at(y)   # (a pointer to an entry and null: has it no place)
-                return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "bool"
+                return self.compare("<" if op == "==" else ">=", at, "0"), "bool"
             if op in ("==", "!=") and (self.asked_or_none(x) is not None and self.nothing(y) or self.asked_or_none(y) is not None and self.nothing(x)):
                 there = self.asked_or_none(x) or self.asked_or_none(y)   # (a text or none and null: is there none)
                 return (f"logic_not({there})" if op == "==" else there), "bool"
             if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
                 at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
-                return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "bool"
+                return self.compare("<" if op == "==" else ">=", at, "0"), "bool"
             if op in ("==", "!=") and (object_class(self.tp(x)) or object_class(self.tp(y))):
                 # objects of the engine (kern/docs/engine_object.md): against null, whether there is one (Is Valid Object);
                 # two of them, whether they are the same one (Same Object) - of the class both are one of
@@ -10759,12 +10764,9 @@ class Emit:
                 return (same if op == "==" else f"logic_not({same})"), "bool"
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
-                if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
-                    return self.formula(b)   # (exactly equal, as C++ compares: the Compare node's == has a margin)
-                if op not in ("==", "!=") and self.ctype(x) in WIDE_UNSIGNED and self.ctype(y) in WIDE_UNSIGNED and not (self.never_negative(x) and self.never_negative(y)):
-                    return self.formula(b)   # (two unsigned 64-bit numbers: which is less, the formula says - see fx)
-                if tx in ("Float", "Int") and ty in ("Float", "Int") or (tx in ("Float", "Int", "bool") and ty in ("Float", "Int", "bool") and op not in ("==", "!=")):
-                    return f'math_compare<"{op}">({self.ex(x, "Float")}, {self.ex(y, "Float")})', "bool"
+                if tx in NUMS and tx == ty and tx != "bool":
+                    # (the two in one type: C++ converted them so - the compiler's tree has the conversions)
+                    return self.compare(op, self.ex(x, tx), self.ex(y, tx), tx), "bool"
                 if op in ("==", "!="):
                     if tx == "bool" or ty == "bool":
                         r = f"logic_xor({self.bx(x)}, {self.bx(y)})"
@@ -10773,7 +10775,7 @@ class Emit:
                         r = f"enum_equal<{tx}>({self.ex(x, tx)}, {self.ex(y, tx)})"
                         return (r if op == "==" else f"logic_not({r})"), "bool"
                 if tx in u.enum_values and ty in u.enum_values:   # (which value comes first: by their numbers)
-                    return f'math_compare<"{op}">({self.ex(x, "Float")}, {self.ex(y, "Float")})', "bool"
+                    return self.compare(op, self.ex(x, IDX), self.ex(y, IDX)), "bool"
                     if tx == "Text" and ty == "Text":
                         raise Wait("a pointer")  # (two const char* compared are addresses)
                 raise Wait(f"{tx} {op} {ty}")
@@ -10824,7 +10826,7 @@ class Emit:
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list")
             self.f.indexes = True
-            return f"list_get<{lt[5:-1]}>({self.ex(base, lt)}, {self.ex(idx, 'Int')})", lt[5:-1]
+            return f"list_get<{lt[5:-1]}>({self.ex(base, lt)}, {self.ex(idx, IDX)})", lt[5:-1]
         if k == "CXXDefaultArgExpr":
             raise Wait("a default argument")
         if k in ("ImplicitValueInitExpr", "CXXScalarValueInitExpr", "CXXDefaultInitExpr"):
@@ -10841,9 +10843,9 @@ class Emit:
             got = byte_size(self.u, sized(b) or "") if b.get("name") == "sizeof" else None
             if got is None:
                 raise Wait("sizeof")
-            return str(got[0]), "Int"
+            return str(got[0]), "u64"   # (a size_t)
         if k == "OffsetOfExpr":
-            return str(self.offset_of(b)), "Int"
+            return str(self.offset_of(b)), "u64"
         raise Wait(f"an expression: {k}")
 
     def bit_cast(self, b, x):
@@ -10882,44 +10884,49 @@ class Emit:
             raise Wait(f"offsetof of {m.group(1)}::{m.group(2)}")
         return offsets[fields.index(m.group(2))][0]
 
-    def engine_constant(self, cpp, value, name):
+    def engine_constant(self, cpp, value, name, t):
+        """A constant of the engine (kern::kPi) the program reads: a constant of the Blueprint, of its C++ type, with its value."""
         key = "engine:" + cpp
         if key not in self.u.variables:
             n = self.u.fresh(name)
             self.u.names.add(n)
-            self.u.variable_lines.append(f"  KERN_CONST Float {n} = {flit(value)};")
-            self.u.variable_values[n] = ("Float", flit(value), {"name": cpp, "_engine": True})
-            self.u.variables[key] = (n, "Float")
+            self.u.variable_lines.append(f"  KERN_CONST {t} {n} = {number_literal(value, t)};")
+            self.u.variable_values[n] = (t, number_literal(value, t), {"name": cpp, "_engine": True})
+            self.u.variables[key] = (n, t)
         return self.u.variables[key]
 
-    # ---- formulas ----
+    def compare(self, op, a, b, t=None):
+        """`a op b` of two values of the number type `t` (the language's whole number, i64, when none is given): Compare."""
+        return f'math_compare<"{op}", {t or IDX}>({a}, {b})'
+
+    # ---- formulas (kern/docs/blueprint_cpp.md "Formeln") ----
+    # A computation with numbers is one Formula node: the C++ expression itself, each value in its C++ type, each
+    # conversion the compiler makes (ImplicitCastExpr) written as num_cast - the operations are the nodes' (numbers.h).
     def formula(self, n):
-        leaves = collections.OrderedDict()   # value text -> parameter name
+        leaves = collections.OrderedDict()   # (value text, type) -> its name in the formula
         body = self.fx(n, leaves)
         t = self.tp(n)
         if not leaves:
-            v = Const(self.u).number(n)   # (everything in it is known: it is its value)
-            if t == "Int":
-                return str(int(v)), "Int"
-            if t == "bool":
-                return ("true" if v else "false"), "bool"
-            return flit(v), "Float"
-        params = ", ".join(f"Float {p}" for p in leaves.values())
-        text = f"kern::formula([]({params}) -> Float {{ return {body}; }}, {', '.join(leaves)})"
-        if t == "Int":
-            return f"{self.cast('Int', text)}", "Int"
-        if t == "bool":
-            return f'math_compare<">">({text}, 0.5)', "bool"
-        return text, "Float"
+            return number_literal(Const(self.u).number(n), t), t   # (everything in it is known: it is its value)
+        types = ", ".join(lt for (_, lt) in leaves)
+        params = ", ".join(f"auto {p}" for p in leaves.values())
+        return f"kern::formula<{types}>([]({params}) {{ return {body}; }}, {', '.join(text for (text, _) in leaves)})", t
 
-    def leaf(self, n, leaves, text=None):
+    def leaf(self, n, leaves, text=None, t=None, force=False):
+        """A value in a formula that is no computation of its own (a variable, a call, a field): an input of the formula,
+        of its type - a number written out stands in the formula itself (`force`: it is an input too - a number
+        that does not meet a value of its type, which the formula would take for an i32 or an f64)."""
+        if t is None:
+            t = self.tp(n)
         if text is None:
-            text = self.ex(n, "Float")
-        if re.fullmatch(r"-?\d+(\.\d+)?(e[+-]?\d+)?", text):
+            text = self.ex(n, t)
+        if not force and literal_number(text, t) is not None and text != "-9223372036854775807 - 1":
             return f"({text})" if text.startswith("-") else text
-        if text not in leaves:
-            inner = re.fullmatch(r"kern::to<Float>\(([\w.]+)\)", text)
-            plain = inner.group(1) if inner else text
+        if (text, t) not in leaves:
+            plain = text
+            inner = call_parts(text, "num_cast")
+            if inner is not None and re.fullmatch(r"[\w.]+", inner[1]):
+                plain = inner[1]
             base = re.sub(r"\W", "", plain.split(".")[-1]) if re.fullmatch(r"[\w.]+", plain) else ""
             m = re.search(r"\)\.(\w+)$", text)
             if not base and m:
@@ -10933,167 +10940,123 @@ class Emit:
             while name in leaves.values():
                 i += 1
                 name = f"{base}_{i}"
-            leaves[text] = name
-        return leaves[text]
+            leaves[(text, t)] = name
+        return leaves[(text, t)]
+
+    def literal_only(self, b):
+        """Is this expression made of numbers written out alone (and the operations of C++ on them)?"""
+        k = b.get("kind")
+        if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
+            return True
+        if k in CAST + ("ParenExpr",) or k == "UnaryOperator" and b.get("opcode") in ("-", "+", "~", "!") or k == "BinaryOperator" and b.get("opcode") not in ("=", ",") \
+                or k == "ConditionalOperator":
+            return bool(kids(b)) and all(self.literal_only(bare(c)) for c in kids(b))
+        return False
+
+    # (the C++ type a number written out has alone, as the formula reads it: 7 an i32, 7u a u32, 0.5 an f64, 0.5f an f32)
+    @staticmethod
+    def alone(text, t):
+        if t == "bool":
+            return True
+        if t in FLOATS:
+            return True   # (0.5f / 0.5: the literal says it)
+        v = literal_number(text, t)
+        unsigned = text.endswith("u")
+        if unsigned:
+            return t == ("u32" if v < 1 << 32 else "u64")
+        return t == ("i32" if -(1 << 31) <= v < 1 << 31 else "i64")
 
     def fx(self, n, leaves):
-        """An expression of numbers as the text of a formula over `leaves`."""
+        """An expression of numbers as the text of a formula over `leaves`: of the type C++ gives it."""
         b = bare(n)
         k = b.get("kind")
+        t = self.tp(b)
         if k == "BinaryOperator" and b.get("opcode") == "-" and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]) and self.char_pointer(kids(b)[1]):
-            return self.leaf(None, leaves, self.ex(b, "Float"))   # (end - s.c_str(): how far apart two places of a text are - a value of its own)
+            return self.leaf(b, leaves)   # (end - s.c_str(): how far apart two places of a text are - a value of its own)
         if (k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_c_text(kids(b)[0])) or (k == "ArraySubscriptExpr" and len(kids(b)) == 2 and self.is_c_text(kids(b)[0])):
-            return self.leaf(None, leaves, self.ex(b, "Float"))   # (a character of a C string at a place: read there)
-        if self.is64(b):   # (a 64-bit bit pattern in a computation with numbers: the number it is)
-            text, have = self.value(b)
-            return self.leaf(None, leaves, self.from64(text, self.ctype(b), "double", "Float") if have == self.whole64() else self.conv(text, have, "Float"))
-        if k in CAST and kids(b) and b.get("castKind") not in ("LValueToRValue", "NoOp") and self.is64(kids(b)[-1]):
-            text, have = self.value(b)
-            return self.leaf(None, leaves, self.conv(text, have, "Float"))
-        if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
-            v = Const(self.u).decimal(b)
-            if k == "IntegerLiteral" and v >= 2.0 ** 63 and self.ctype(b) in WIDE_UNSIGNED:
-                v -= 2.0 ** 64   # (read with its sign, as a Blueprint holds a 64-bit number)
-            if k == "IntegerLiteral" and abs(v) >= 2.0 ** 53:
-                raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
-            return flit(v) if v >= 0 else f"({flit(v)})"
+            return self.leaf(b, leaves)   # (a character of a C string at a place: read there)
+        if t in NUMS and self.literal_only(b):
+            # (numbers written out and what C++ computes of them: the number itself, in its type)
+            text = number_literal(Const(self.u).number(b), t)
+            if text == "-9223372036854775807 - 1":
+                return self.leaf(b, leaves, text, t, force=True)
+            return f"({text})" if text.startswith("-") else text
+        if k in CAST and kids(b) and b.get("castKind") == "PointerToBoolean":
+            return self.leaf(b, leaves, self.bx(b), "bool")   # (a pointer asked whether it is there: the question is the value)
         if k in CAST and kids(b) and self.numeric(b) and self.numeric(kids(b)[-1]):
             inner = kids(b)[-1]
-            want, have = self.tp(b), self.tp(inner)
-            if want == "Int" and have == "Float":
-                return f"kern::math::trunc({self.fx(inner, leaves)})"
-            if want == "bool" and have != "bool":
-                return f"({self.fx(inner, leaves)} != 0.0)"
-            if want == "Float" and self.ctype(inner) in WIDE_UNSIGNED:
-                # an unsigned 64-bit number as a number: a Blueprint holds it read with its sign
-                x = self.once(inner, leaves)
-                return f"({x} < 0.0 ? {x} + 18446744073709551616.0 : {x})"
-            return self.narrow(self.fx(inner, leaves), self.ctype(inner), self.ctype(b), inner)
+            want, have = t, self.tp(inner)
+            x = self.fx(inner, leaves)
+            if want == have:
+                return x
+            return f"num_cast<{want}, {have}>({x})"
         if not self.numeric(b):
             if re.search(r"\*\s*(const\s*)?$", self.ctype(b)):
                 raise Wait("a pointer")   # (&p - list.data(): where an entry stands, counted by addresses)
             raise Wait("a value that is not a number in a computation")
-        if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "!"):
+        if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "!", "~"):
             x = self.fx(kids(b)[0], leaves)
-            if b["opcode"] == "-" and self.ctype(b) in WIDE_UNSIGNED:
-                return f"(-{x})"   # (64 bit: the number read with its sign, see WIDE_UNSIGNED)
-            if b["opcode"] == "-" and self.ctype(b) in UNSIGNED and b is not getattr(self, "unwrapped", None):
-                return f"kern::math::wrap32(-{x})"
-            return x if b["opcode"] == "+" else f"({'-' if b['opcode'] == '-' else '!'}{x})"
-        if k == "UnaryOperator" and b.get("opcode") == "~":
-            x = self.fx(kids(b)[0], leaves)
-            if self.ctype(b) in WIDE_UNSIGNED:
-                return f"(-{x} - 1.0)"
-            if self.ctype(b) in UNSIGNED:
-                return f"kern::math::wrap32(kern::math::bxor({x}, -1.0))"
-            return f"kern::math::bxor({x}, -1.0)"
+            return x if b["opcode"] == "+" else f"({b['opcode']}{x})"
         if k == "BinaryOperator":
             op = b.get("opcode")
             x, y = kids(b)
             if op == "/" and self.entries_of(b) is not None:
-                return flit(float(self.entries_of(b)))
+                return number_literal(self.entries_of(b), t)
             if op == "-" and self.entry_index(x, y) is not None:
-                return self.leaf(None, leaves, self.cast("Float", self.entry_index(x, y)))
-            if op in ("+", "-", "*"):
-                if self.ctype(b) in WIDE_UNSIGNED:
-                    return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
-                if self.ctype(b) in UNSIGNED:
-                    # unsigned arithmetic wraps around at 32 bit: the formula's wrap32 and mul32 (not where the place it
-                    # is stored in wraps it: `stored`)
-                    if op == "*":
-                        return f"kern::math::mul32({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-                    if b is getattr(self, "unwrapped", None):
-                        return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
-                    return f"kern::math::wrap32({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
-                return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
-            if op in ("/", "%") and self.tp(b) == "Int" and not (bare(y).get("kind") == "IntegerLiteral" or (bare(y).get("kind") in CAST and kids(bare(y)) and bare(kids(bare(y))[-1]).get("kind") == "IntegerLiteral")):
-                self.f.indexes = True
-            if op == "/":
-                if self.tp(b) == "Int":
-                    return f"kern::math::trunc(kern::math::div({self.fx(x, leaves)}, {self.fx(y, leaves)}))"
-                return f"kern::math::div({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-            if op == "%":
-                return f"kern::math::mod({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-            if op in ("<", ">", "<=", ">=") and self.ctype(x) in WIDE_UNSIGNED and self.ctype(y) in WIDE_UNSIGNED and not (self.never_negative(x) and self.never_negative(y)):
-                # two unsigned 64-bit numbers, held read with their signs: one that reads negative is the larger
-                l, r = (x, y) if op in ("<", ">=") else (y, x)
-                lt, rt = self.once(l, leaves), self.once(r, leaves)
-                less = f"(({lt} < 0.0) != ({rt} < 0.0) ? ({rt} < 0.0) : ({lt} < {rt}))"
-                return less if op in ("<", ">") else f"(!{less})"
-            if op in COMPARE and self.numeric(x) and self.numeric(y):
-                return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
+                return self.leaf(None, leaves, self.conv(self.entry_index(x, y), IDX, t), t)
             if op in ("&&", "||"):
                 return self.guarded(b, leaves, lambda: f"({self.fx(x, leaves)} {op} {self.sometimes(lambda: self.fx(y, leaves))})")
-            if op in ("&", "|", "^"):
-                return f"kern::math::{'band' if op == '&' else 'bor' if op == '|' else 'bxor'}({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-            if op in ("<<", ">>") and bare(y).get("kind") != "IntegerLiteral" and not (bare(y).get("kind") in CAST and kids(bare(y)) and bare(kids(bare(y))[-1]).get("kind") == "IntegerLiteral"):
-                self.f.indexes = True   # (C++ leaves a shift by the width of the number or more undefined; the formula's shl and shr say what it is)
-            if op == ">>":
-                return f"kern::math::shr({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-            if op == "<<":
-                if self.ctype(b) in WIDE_UNSIGNED and not self.shift_fits(b):
-                    raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
-                shifted = f"kern::math::shl({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-                if self.ctype(b) in ("long", "long long") or self.ctype(b) in WIDE_UNSIGNED:
-                    return shifted   # (a 64-bit number: what is shifted stays whole while it is below 2^53)
-                return f"kern::math::wrap32({shifted})" if self.ctype(b) in UNSIGNED else f"kern::math::wrap32s({shifted})"
+            if op in ("/", "%") and t in INTS and not self.literal_only(bare(y)):
+                self.f.indexes = True   # (C++ leaves a whole number divided by 0 undefined - the test says where the source does)
+            if op in ("<<", ">>") and not self.literal_only(bare(y)):
+                self.f.indexes = True   # (C++ leaves a shift by the width of the number or more undefined; the formula's says what it is)
+            if op in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>") + COMPARE:
+                left = self.fx(x, leaves)
+                if op in ("<<", ">>") and self.literal_only(bare(x)) and not self.alone(left.strip("()"), self.tp(x)):
+                    left = self.leaf(x, leaves, left.strip("()"), self.tp(x), force=True)   # (1ull << n: a 1 of its type)
+                return f"({left} {op} {self.fx(y, leaves)})"
         if k == "ConditionalOperator":
             c, x, y = kids(b)
-            return self.guarded(b, leaves, lambda: f"({self.fb(c, leaves)} ? {self.sometimes(lambda: self.fx(x, leaves))} : {self.sometimes(lambda: self.fx(y, leaves))})")
+            def branch(z):
+                text = self.fx(z, leaves)
+                if self.literal_only(bare(z)) and self.literal_only(bare(y if z is x else x)) and not self.alone(text.strip("()"), t):
+                    text = self.leaf(z, leaves, text.strip("()"), t, force=True)   # (c ? 1 : 0 of a u8: no value says the type)
+                return text
+            return self.guarded(b, leaves, lambda: f"({self.fx(c, leaves)} ? {self.sometimes(lambda: branch(x))} : {self.sometimes(lambda: branch(y))})")
         if self.formula_function(b):
-            name = callee_name(b)
-            if name == "hash_u32" and len(kids(b)) == 2:   # kern::hash_u32 (lowbias32), step by step
-                one = f"kern::formula([](Float x) -> Float {{ return kern::math::mul32(kern::math::bxor(x, kern::math::shr(x, 16.0)), 2146121005.0); }}, {self.ex(kids(b)[1], 'Float')})"
-                two = f"kern::formula([](Float x) -> Float {{ return kern::math::mul32(kern::math::bxor(x, kern::math::shr(x, 15.0)), 2221713035.0); }}, {one})"
-                x = self.leaf(None, leaves, two)
-                return f"kern::math::bxor({x}, kern::math::shr({x}, 16.0))"
-            if name in ("clamp", "clampf") and len(kids(b)) == 4:
-                trial = collections.OrderedDict(leaves)
-                args = [self.fx(a, trial) for a in kids(b)[1:]]
-            else:
-                args = [self.fx(a, leaves) for a in kids(b)[1:]]
-            if name in ("clamp", "clampf") and len(args) == 3:
-                # C++'s clamp, as it is written: v below lo is lo, v above hi is hi (the language's own clamp
-                # orders its bounds first - not the same where lo is above hi)
-                simple = re.compile(r"\(?-?[\w.]+\)?$")
-                if all(simple.match(x) for x in args):
-                    v, lo, hi = [self.fx(a, leaves) for a in kids(b)[1:]]
-                else:
-                    v, lo, hi = "v", "lo", "hi"
-                    inner = [self.ex(x, "Float") for x in kids(b)[1:]]
-                    return self.leaf(None, leaves, f"kern::formula([](Float v, Float lo, Float hi) -> Float {{ return v < lo ? lo : (hi < v ? hi : v); }}, {', '.join(inner)})")
-                return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
-            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2, "remainder": 2}.get(MATH[name], 1):
-                return f"kern::math::{MATH[name]}({', '.join(args)})"
-            if name == "hypot" and len(args) == 2:
-                return f"kern::math::sqrt(({args[0]} * {args[0]}) + ({args[1]} * {args[1]}))"
-            if name == "lerp" and len(args) == 3:
-                return f"kern::math::lerp({', '.join(args)})"
-            if name == "sign0":
-                return f"kern::math::sign({args[0]})"
-            if name in ("ldexp", "ldexpf") and len(args) == 2:
-                return f"({args[0]} * kern::math::pow(2.0, {args[1]}))"
-            if name in ("tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf"):
-                # (the engine has not this function yet - kern/third_party/musl_math: a program's mathematics is the engine's, and
-                # a formula of exp is another function; it waits, with the place, until the engine has it)
-                raise Wait(f"std::{name}: the engine has no {name} yet (kern/third_party/musl_math) - a formula of exp and log would be another function than C++'s")
-            if name in ("tanh", "tanhf"):
-                return f"kern::math::div(kern::math::exp(2.0 * {args[0]}) - 1.0, kern::math::exp(2.0 * {args[0]}) + 1.0)"
-            if name in ("sinh", "sinhf"):
-                return f"((kern::math::exp({args[0]}) - kern::math::exp(-{args[0]})) * 0.5)"
-            if name in ("cosh", "coshf"):
-                return f"((kern::math::exp({args[0]}) + kern::math::exp(-{args[0]})) * 0.5)"
-            if name in ("asinh", "asinhf"):
-                return f"kern::math::log({args[0]} + kern::math::sqrt(({args[0]} * {args[0]}) + 1.0))"
-            if name in ("log2", "log2f"):
-                return f"kern::math::div(kern::math::log({args[0]}), 0.6931471805599453)"
-            if name in ("log10", "log10f"):
-                return f"kern::math::div(kern::math::log({args[0]}), 2.302585092994046)"
-            if name in ("cbrt", "cbrtf"):
-                return f"(kern::math::sign({args[0]}) * kern::math::pow(kern::math::abs({args[0]}), 0.3333333333333333))"
+            return self.fx_call(b, leaves, t)
         return self.leaf(b, leaves)
 
-    def guarded(self, b, leaves, inline, flag=False):
+    def fx_call(self, b, leaves, t):
+        """A function of numbers of C++ or of the engine in a formula: the formula's (the node's: numbers.h, the
+        mathematics of the engine)."""
+        name = callee_name(b)
+        a = kids(b)[1:]
+        if name in MISSING_MATH:
+            plain = name[:-1] if name.endswith("f") and name[:-1] in MISSING_MATH else name
+            raise Wait(f"std::{name}: the engine has no {plain} yet (kern/third_party/musl_math) - a formula of exp and log would be another function than C++'s")
+        # (an argument of another type than the function computes in - std::pow(f32, int) is pow of two doubles, as
+        # the library converts them inside: that conversion written)
+        args = lambda want: [self.fx(x, leaves) if self.tp(x) == want else f"num_cast<{want}, {self.tp(x)}>({self.fx(x, leaves)})" for x in a]
+        if name == "hash_u32" and len(a) == 1:   # kern::hash_u32 (lowbias32): its steps, in u32
+            one = f"kern::formula<u32>([](auto x) {{ return (x ^ (x >> 16)) * 2146121005u; }}, {self.ex(a[0], 'u32')})"
+            two = f"kern::formula<u32>([](auto x) {{ return (x ^ (x >> 15)) * 2221713035u; }}, {one})"
+            y = self.leaf(None, leaves, two, "u32")
+            return f"({y} ^ ({y} >> 16))"
+        if name in ("clamp", "clampf") and len(a) == 3:
+            # C++'s clamp (std::clamp, kern::clamp), as it is written: v below lo is lo, v above hi is hi - each value
+            # once (an input of its own where it is more than a name)
+            v, lo, hi = (self.leaf(x, leaves, self.ex(x, t), t) for x in a)
+            return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
+        if name in ("lround", "lroundf", "llround", "llroundf") and len(a) == 1:
+            ft = self.tp(a[0])
+            return f"num_cast<{t}, {ft}>(round({self.fx(a[0], leaves)}))"
+        f = MATH[name]
+        if f in ("isnan", "isinf", "isfinite", "signbit"):
+            return f"{f}({self.fx(a[0], leaves)})"
+        return f"{f}({', '.join(args(t))})"
+
+    def guarded(self, b, leaves, inline):
         """A part of a formula that C++ does not always evaluate (c ? x : y, a && b, a || b), written in the
         formula - or, where a part of it that may not run makes a step of its own (a call that changes
         something), worked out before the formula by an if (chosen, either) that makes the step only when
@@ -11110,33 +11073,11 @@ class Emit:
             leaves.update(kept)
         if b.get("kind") == "ConditionalOperator":
             c, x, y = kids(b)
-            t = self.tp(b)
-            text, t = self.chosen(self.bx(c), x, y, t)
+            text, t = self.chosen(self.bx(c), x, y, self.tp(b))
         else:
             x, y = kids(b)
             text, t = self.either(b["opcode"], self.bx(x), y)
-        if flag:
-            return f"({self.leaf(None, leaves, self.conv(text, t, 'Float'))} != 0.0)"
-        return self.leaf(None, leaves, text if t == "Float" else self.conv(text, t, "Float"))
-
-    def fb(self, n, leaves):
-        b = bare(n)
-        k = b.get("kind")
-        if k == "BinaryOperator" and b.get("opcode") in COMPARE + ("&&", "||") and all(self.numeric(c) for c in kids(b)):
-            x, y = kids(b)
-            if b["opcode"] in ("&&", "||"):
-                return self.guarded(b, leaves, lambda: f"({self.fb(x, leaves)} {b['opcode']} {self.sometimes(lambda: self.fb(y, leaves))})", flag=True)
-            return f"({self.fx(x, leaves)} {b['opcode']} {self.fx(y, leaves)})"
-        if k == "UnaryOperator" and b.get("opcode") == "!":
-            return f"(!{self.fb(kids(b)[0], leaves)})"
-        if k in CAST and kids(b) and b.get("castKind") == "PointerToBoolean" and (self.asked_or_none(kids(b)[-1]) is not None or self.pointer_of(kids(b)[-1]) is not None or self.unbound_at(kids(b)[-1]) is not None):
-            # (a text or none, a pointer into a list, asked whether it is there: the question is the leaf - value)
-            return f"({self.leaf(b, leaves, self.conv(self.bx(b), 'bool', 'Float'))} != 0.0)"
-        if k in CAST and kids(b) and self.numeric(kids(b)[-1]) and self.tp(kids(b)[-1]) != "bool":
-            return f"({self.fx(kids(b)[-1], leaves)} != 0.0)"
-        if k in CAST and kids(b):
-            return self.fb(kids(b)[-1], leaves)
-        return f"({self.leaf(b, leaves, self.conv(self.bx(b), 'bool', 'Float'))} != 0.0)"
+        return self.leaf(None, leaves, text, t)
 
     def entry_index(self, p, base):
         """`&e - list.data()`, `&d - array`: where an entry stands in its list, counted by addresses (C++: the
@@ -11171,231 +11112,6 @@ class Emit:
             return None
         n = self.u.entries(qtype(bare(kids(x)[0])))   # (the outer length: T[3][2] has 3 entries)
         return n if n is not None and bare(kids(y)[0]).get("kind") == "ArraySubscriptExpr" else None
-
-    # ---- 64-bit bit patterns ----
-    def whole64(self):
-        return "Int64"
-
-    def shift_fits(self, b):
-        """An unsigned 64-bit number shifted up (x << y): is it within what a Blueprint's numbers hold exactly -
-        the bits it has and the shift, a number written out, below 53 together? Otherwise it is a bit pattern
-        (a key, a hash, a mask 1ull << k)."""
-        x, y = kids(b)
-        inner = self.unwrap(x)
-        while inner.get("kind") in CAST and kids(inner) and self.ctype(inner) in WIDE_UNSIGNED and self.ctype(kids(inner)[-1]) in WIDE_UNSIGNED:
-            inner = self.unwrap(kids(inner)[-1])
-        has = {"unsigned int": 32, "unsigned short": 16, "unsigned char": 8, "bool": 1}.get(self.ctype(kids(inner)[-1]) if inner.get("kind") in CAST and kids(inner) else "", 64)
-        if inner.get("kind") == "IntegerLiteral":
-            has = max(1, int(inner["value"]).bit_length())   # (a number written out has the bits it is written with)
-        by = bare(y)
-        while by.get("kind") in CAST and kids(by):
-            by = bare(kids(by)[-1])
-        return by.get("kind") == "IntegerLiteral" and has + int(by["value"]) <= 53
-
-    def is64(self, n):
-        """Is this value a 64-bit bit pattern (a Whole64 in the Blueprint)? Its type's spelling says so; where
-        the compiler's tree has lost the spelling, what it is made of does - and an unsigned 64-bit number shifted
-        up past what a Blueprint's numbers hold exactly is one (1ull << k: C++ computes it with 64 bits)."""
-        b = bare(n)
-        if "_bt" in b:
-            return b["_bt"] == "Int64"
-        c = self.ctype(b)
-        if c in W64:
-            return True
-        if c not in ("unsigned long", "long", "unsigned long long", "long long"):
-            return False
-        k, ks = b.get("kind"), kids(b)
-        whole = "Int64"
-        if k == "BinaryOperator" and b.get("opcode") == "<<" and c in WIDE_UNSIGNED and len(ks) == 2 and not self.shift_fits(b):
-            return True
-        if k == "MemberExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) in ("operator*", "operator[]")):
-            return self.tp_or_none(b) == whole   # (a field, a key of a map, what an iterator stands at: as the Blueprint holds it)
-        if k == "DeclRefExpr":
-            return self.types.get(b.get("referencedDecl", {}).get("id")) == whole
-        if k in CAST:
-            return bool(ks) and self.ctype(ks[-1]) in ("unsigned long", "long", "unsigned long long", "long long", *W64) and self.is64(ks[-1])
-        if k in ("BinaryOperator", "CompoundAssignOperator") and len(ks) == 2:
-            op = b.get("opcode", "")
-            if op in ("<<", ">>") or op.endswith("=") and op not in COMPARE:
-                return self.is64(ks[0])
-            if op == ",":
-                return self.is64(ks[1])
-            return op not in COMPARE and op not in ("&&", "||") and (self.is64(ks[0]) or self.is64(ks[1]))
-        if k == "UnaryOperator" and ks:
-            return self.is64(ks[0])
-        if k == "ConditionalOperator" and len(ks) == 3:
-            return self.is64(ks[1]) or self.is64(ks[2])
-        if (k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) == "operator[]")) and len(ks) >= 2:
-            return self.tp_or_none(ks[-2]) == f"List<{whole}>"
-        if k == "CXXMemberCallExpr" and callee(b).get("name") in ("front", "back", "at") and kids(callee(b)):
-            return self.tp_or_none(kids(callee(b))[0]) == f"List<{whole}>"
-        return False
-
-    # What C++ computes with 64 bits, the language's Int64 nodes compute (kern/logic/nodes.h, PureNodes::int64_*).
-    INT64 = {"w64_add": "int64_add", "w64_subtract": "int64_sub", "w64_multiply": "int64_mul", "w64_bit_and": "int64_and", "w64_bit_or": "int64_or",
-             "w64_bit_xor": "int64_xor", "w64_bit_not": "int64_not", "w64_divide": "int64_div_unsigned", "w64_divide_signed": "int64_div",
-             "w64_remainder": "int64_rem_unsigned", "w64_remainder_signed": "int64_rem", "w64_shift_left": "int64_shift_left",
-             "w64_shift_right": "int64_shift_right_unsigned", "w64_shift_right_signed": "int64_shift_right", "w64_equal": "int64_equal",
-             "w64_less": "int64_less_unsigned", "w64_less_signed": "int64_less", "w64_to_number": "int64_to_float_unsigned",
-             "w64_to_signed_number": "int64_to_float"}
-
-    def w64(self, name, *texts):
-        """What C++ computes with 64 bits: an Int64 node."""
-        if name == "w64_negate":
-            return f"int64_sub(Int64{{0x0}}, {texts[0]})"
-        if name == "w64_is_zero":
-            return f"int64_equal({texts[0]}, Int64{{0x0}})"
-        if name == "w64_from_number":
-            return f"int64_of_float({texts[0]})"
-        return f"{self.INT64[name]}({', '.join(texts)})"
-
-    def to64(self, text, have):
-        """A number as 64 bits: a whole number as it is (a negative one in two's complement), another one cut off."""
-        if have in self.u.enum_values:
-            text, have = self.conv(text, have, "Int"), "Int"
-        if have == "Float":
-            text = f"kern::formula([](Float x) -> Float {{ return kern::math::trunc(x); }}, {text})"
-        elif re.fullmatch(r"-?\d+", text):
-            return f"Int64{{{int(text) % (1 << 64):#x}}}"
-        elif have in ("Int", "bool"):
-            return f"int64_of_int({self.conv(text, have, 'Int')})"   # (a whole number as it is: one below 0 in two's complement)
-        return self.w64("w64_from_number", text)
-
-    def ex64(self, n):
-        lit = bare(n)
-        while lit.get("kind") in CAST and kids(lit):
-            lit = bare(kids(lit)[-1])
-        if lit.get("kind") == "IntegerLiteral":   # (a number written out: its bits, whatever its size)
-            return f"Int64{{{int(lit['value']) % (1 << 64):#x}}}"
-        text, have = self.value(n)
-        return text if have == self.whole64() else self.to64(text, have)
-
-    def number_bits(self, n, x):
-        """std::bit_cast between a float and a whole number of its width: the same bits read as the other type -
-        32 bits (Bits of Float 32, Float 32 of Bits: a u32 is 0 .. 2^32 - 1, an i32 its two's complement) and
-        64 bits (Bits of Float, Float of Bits: the Int64 the 64-bit number is)."""
-        plain = lambda t: re.sub(r"\bconst\b", "", self.u.clean(t)).strip()
-        to, frm = plain(self.ctype(n)), plain(self.ctype(x))
-        w32 = ("unsigned int", "int")
-        if frm == "float" and to in w32:
-            bits = f"math_bits_of_float32({self.ex(x, 'Float')})"
-            if to == "int":
-                bits = f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return b >= 2147483648.0 ? b - 4294967296.0 : b; }}, {self.cast('Float', bits)}))"
-            return bits, "Int"
-        if frm in w32 and to == "float":
-            return f"math_float32_of_bits({self.ex(x, 'Int')})", "Float"
-        if frm == "double" and self.tp(n) == self.whole64():
-            return f"int64_bits_of_float({self.ex(x, 'Float')})", self.whole64()
-        if to == "double" and self.tp(x) == self.whole64():
-            return f"int64_float_of_bits({self.ex64(x)})", "Float"
-        raise Wait(f"std::bit_cast from a {frm} to a {to}")
-
-    def from64(self, text, source, target, want):
-        """64 bits as a value of another type, as C++ converts: `source` and `target` are the C++ types."""
-        whole = self.whole64()
-        signed = source in ("whole64s", "long", "long long")
-        if want == "bool":
-            return f"logic_not({self.w64('w64_is_zero', text)})"
-        if want == "Float":
-            return self.w64("w64_to_signed_number" if signed else "w64_to_number", text)
-        if want == "Int" or want in self.u.enum_values:
-            if Const.BITS.get(target, 64) >= 64 or target in W64:
-                got = f"int64_to_int({text})"   # (a number to count with: read with its sign)
-            else:
-                low = f"kern::to<Float>(int64_low({text}))"
-                cut = self.narrow("x", "unsigned int", target, None)
-                got = f"int64_low({text})" if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, {low}))"
-            return got if want == "Int" else self.conv(got, "Int", want)
-        raise Wait(f"a 64-bit number where a {want} is needed")
-
-    def value64(self, b):
-        """(text, Whole64) of a computation with 64-bit bit patterns."""
-        whole = self.whole64()
-        k, ks = b.get("kind"), kids(b)
-        signed = self.ctype(b) in ("whole64s", "long", "long long")
-        b["_w64"] = True   # (said to the test: this is computed around 2^64 - see TestWriter.guard)
-        if k == "IntegerLiteral":
-            return f"Int64{{{int(b['value']) % (1 << 64):#x}}}", whole
-        if k in CAST:
-            return self.ex64(ks[-1]), whole
-        if k == "InitListExpr":   # (u64{x}, u64{})
-            return (self.ex64(ks[0]) if ks else "Int64{0x0}"), whole
-        if k == "BinaryOperator":
-            op = b["opcode"]
-            x, y = ks
-            if op in ("<<", ">>"):
-                name = "w64_shift_left" if op == "<<" else "w64_shift_right_signed" if signed else "w64_shift_right"
-                return self.w64(name, self.ex64(x), self.ex(y, "Int") if not self.is64(y) else self.from64(self.ex64(y), "whole64u", "unsigned int", "Int")), whole
-            name = {"+": "add", "-": "subtract", "*": "multiply", "&": "bit_and", "|": "bit_or", "^": "bit_xor",
-                    "/": "divide_signed" if signed else "divide", "%": "remainder_signed" if signed else "remainder"}[op]
-            return self.w64("w64_" + name, self.ex64(x), self.ex64(y)), whole
-        if k == "UnaryOperator":
-            x = self.ex64(ks[0])
-            return (x if b["opcode"] == "+" else self.w64("w64_bit_not" if b["opcode"] == "~" else "w64_negate", x)), whole
-        if k == "ConditionalOperator":
-            c = self.bx(ks[0])
-            return f"logic_select<{whole}>({c}, {self.sometimes(lambda: self.ex64(ks[1]))}, {self.sometimes(lambda: self.ex64(ks[2]))})", whole
-        raise Wait(f"a 64-bit number written as {k}")
-
-    def once(self, n, leaves):
-        """A part of a formula that the formula names several times: a variable or a number itself, anything
-        else as a value of its own (computed once)."""
-        b = self.unwrap(n)
-        while b.get("kind") in CAST and kids(b) and self.ctype(b) == self.ctype(kids(b)[-1]):
-            b = self.unwrap(kids(b)[-1])
-        if b.get("kind") in ("DeclRefExpr", "IntegerLiteral"):
-            return self.fx(n, leaves)
-        return self.leaf(None, leaves, self.ex(n, "Float"))
-
-    def never_negative(self, n):
-        """Is this unsigned 64-bit value one that never reads negative: a list's length, a whole number
-        written out, a smaller unsigned number made wider?"""
-        b = self.unwrap(n)
-        if b.get("kind") == "IntegerLiteral":
-            return True
-        if b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") in ("size", "length", "count"):
-            return True
-        if b.get("kind") in CAST and kids(b) and self.ctype(kids(b)[-1]) in ("unsigned int", "unsigned short", "unsigned char", "bool"):
-            return True
-        return False
-
-    def cut_low(self, low, want):
-        """The low 32 bits of a 64-bit pattern (`low`: an Int, as int64_low gives them), as the C type `want` keeps
-        them - a step of its own: what `narrow` gives is a formula's text, it stands in a formula."""
-        cut = self.narrow("x", "unsigned int", want, None)
-        return low if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, kern::to<Float>({low})))"
-
-    def narrow(self, text, have, want, inner):
-        """A whole number converted to a C++ type that holds less of it: what that type keeps."""
-        if have == want or want not in NUMBER or NUMBER[want] != "Int" or NUMBER.get(have) == "bool":
-            return text
-        if inner is not None and self.known_positive(inner) and int(bare(inner)["value"]) < {"unsigned char": 256, "unsigned short": 65536}.get(want, 2 ** 31):
-            return text
-        size = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32}
-        if want not in size:   # (64 bit: holds every whole number a Blueprint has; an unsigned one is held read with its sign)
-            return text
-        if have in size and size[have] < size[want] and (have in UNSIGNED or want not in UNSIGNED):
-            return text   # (everything of the smaller type fits)
-        if have in size and size[have] == size[want] and (have in UNSIGNED) == (want in UNSIGNED):
-            return text
-        if want == "unsigned int":
-            return f"kern::math::wrap32({text})"
-        if want == "int":
-            return f"kern::math::wrap32s({text})"
-        if want == "unsigned char":
-            return f"kern::math::band({text}, 255.0)"
-        if want == "unsigned short":
-            return f"kern::math::band({text}, 65535.0)"
-        if want in ("short", "signed char", "char"):
-            # (the low bits, read with their sign - two's complement, as C++20 converts: (v ^ 0x8000) - 0x8000; a char is
-            # signed on every machine the game is built for, as char_of reads it)
-            top = 32768.0 if want == "short" else 128.0
-            return f"(kern::math::bxor(kern::math::band({text}, {flit(top * 2 - 1)}), {flit(top)}) - {flit(top)})"
-        raise Wait(f"a whole number cut to {want}")
-
-    def known_positive(self, n):
-        b = bare(n)
-        return b.get("kind") == "IntegerLiteral"
 
     # ---- calls ----
     def args(self, n, g):
@@ -11450,26 +11166,25 @@ class Emit:
                             f"vector_break({x}).x, vector_break({x}).y, vector_break({y}).x, vector_break({y}).y)"), "Float"
                 return f"vector_cross({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "Vector"
             if name == "lerp" and len(a) == 3 and vec[:2] == [True, True]:
-                return f"vector_lerp({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')}, {self.ex(a[2], 'Float')})", "Vector"
+                return f"vector_lerp({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')}, {self.ex(a[2], 'f32')})", "Vector"
             if name == "normalize" and vec and vec[0]:
                 v = self.ex(a[0], "Vector")
                 fb = self.ex(a[1], "Vector") if len(a) > 1 else "Vector{0.0, 0.0, 1.0}"
-                return f'logic_select<Vector>(math_compare<">">(vector_length({v}), {flit(struct.unpack("f", struct.pack("f", 1e-9))[0])}), vector_normalize({v}), {fb})', "Vector"
-            if name == "hex_color" and len(a) == 1 and self.tp(a[0]) == "Int":
-                # kern::hex_color(0xRRGGBB): each byte / 255 in 32 bit - a quotient of two exact numbers, which the
-                # vector's 32-bit part rounds as the 32-bit division does
-                h = self.held_once(a[0], "Int")
-                hv = self.ex(h, "Int")
-                parts = [f"kern::formula([](Float h) -> Float {{ return kern::math::div({'kern::math::band(kern::math::shr(h, ' + str(sh) + '.0), 255.0)' if sh else 'kern::math::band(h, 255.0)'}, 255.0); }}, {self.cast('Float', hv)})" for sh in (16, 8, 0)]
+                return f'logic_select<Vector>({self.compare(">", f"vector_length({v})", f32_literal(1e-9), "f32")}, vector_normalize({v}), {fb})', "Vector"
+            if name == "hex_color" and len(a) == 1 and self.tp(a[0]) in INTS:
+                # kern::hex_color(0xRRGGBB): each byte / 255 in f32, as kern/math/math.h writes it
+                h = self.held_once(a[0], "u32")
+                hv = self.ex(h, "u32")
+                parts = [f"kern::formula<u32>([](auto h) {{ return num_cast<f32, u32>({'(h >> ' + str(sh) + ') & 255' if sh else 'h & 255'}) / 255.0f; }}, {hv})" for sh in (16, 8, 0)]
                 return f"vector_make({', '.join(parts)})", "Vector"
             if name == "finite" and vec == [True]:
                 v = self.ex(a[0], "Vector")
-                return (f'math_compare<"==">(kern::formula([](Float x, Float y, Float z) -> Float {{ return (x - x) + (y - y) + (z - z); }}, '
-                        f"vector_break({v}).x, vector_break({v}).y, vector_break({v}).z), 0.0)"), "bool"
+                return (f"kern::formula<f32, f32, f32>([](auto x, auto y, auto z) {{ return isfinite(x) && isfinite(y) && isfinite(z); }}, "
+                        f"vector_break({v}).x, vector_break({v}).y, vector_break({v}).z)"), "bool"
             if name in ("size", "ssize") and len(a) == 1 and (self.tp(a[0]).startswith("List<") or self.tp(a[0]) == "Text"):
                 # std::size of a list, an array (a list of a fixed length) or a text: how many entries it has
                 t = self.tp(a[0])
-                return (f"list_length<{t[5:-1]}>({self.ex(a[0], t)})" if t != "Text" else f"text_length({self.ex(a[0], t)})"), "Int"
+                return (f"list_length<{t[5:-1]}>({self.ex(a[0], t)})" if t != "Text" else f"text_length({self.ex(a[0], t)})"), IDX
             if name == "move" and len(a) == 1 and self.is_box(a[0]):
                 # what is moved out of an owned value is gone there
                 lt = self.tp(a[0])
@@ -11595,10 +11310,10 @@ class Emit:
             if name in ("operator*", "operator->") and len(ops) == 1:
                 return self.value(self.entry_of(b))
             if name in ("operator==", "operator!=") and len(ops) == 2:
-                same = f'math_compare<"==">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})'
+                same = f'{self.compare("==", self.ex(ops[0], "Int"), self.ex(ops[1], "Int"))}'
                 return (same if name == "operator==" else f"logic_not({same})"), "bool"
             if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
-                return f'math_compare<"{name[8:]}">({self.cast("Float", self.ex(ops[1], "Int"))}, {self.cast("Float", self.ex(ops[0], "Int"))})', "bool"
+                return self.compare(name[8:], self.ex(ops[1], IDX), self.ex(ops[0], IDX)), "bool"
             if name in ("operator+", "operator-") and len(ops) == 2:
                 if self.is_reverse_iter(ops[1]):   # (how far one is behind the other)
                     return self.whole_math("-", self.ex(ops[1], "Int"), self.ex(ops[0], "Int")), "Int"
@@ -11624,10 +11339,10 @@ class Emit:
                         lt, row, kt, _ = self.rows(fb)
                         there = self.found(self.keyed(fb)[0], row, self.ex(fb, lt), self.ex(kids(f_)[1], kt))
                         return (there if name == "operator!=" else f"logic_not({there})"), "bool"
-                same = f'math_compare<"==">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})'
+                same = f'{self.compare("==", self.ex(ops[0], "Int"), self.ex(ops[1], "Int"))}'
                 return (same if name == "operator==" else f"logic_not({same})"), "bool"
             if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
-                return f'math_compare<"{name[8:]}">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})', "bool"
+                return self.compare(name[8:], self.ex(ops[0], IDX), self.ex(ops[1], IDX)), "bool"
             if name in ("operator+", "operator-") and len(ops) == 2:
                 return self.whole_math(name[-1], self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
             if name in ("operator++", "operator--"):
@@ -11654,7 +11369,7 @@ class Emit:
             if name in ("operator->", "operator*") and len(ops) == 1:
                 return f"list_get<{it}>({self.ex(ops[0], lt)}, 0)", it
             if name in ("operator==", "operator!=") and len(ops) == 2 and self.nothing(ops[1]):
-                empty = f'math_compare<"==">(kern::to<Float>(list_length<{it}>({self.ex(ops[0], lt)})), 0.0)'
+                empty = self.compare("==", f"list_length<{it}>({self.ex(ops[0], lt)})", "0")
                 return (empty if name == "operator==" else f"logic_not({empty})"), "bool"
         if all(self.is_vec(x) or self.numeric(x) for x in ops) and any(self.is_vec(x) for x in ops):
             v = [self.is_vec(x) for x in ops]
@@ -11663,24 +11378,24 @@ class Emit:
             if name in ("operator-", "operator-=") and v == [True, True]:
                 return f"vector_sub({self.ex(ops[0], 'Vector')}, {self.ex(ops[1], 'Vector')})", "Vector"
             if name == "operator-" and v == [True]:
-                return f"vector_scale({self.ex(ops[0], 'Vector')}, -1.0)", "Vector"
+                return f"vector_scale({self.ex(ops[0], 'Vector')}, -1.0f)", "Vector"
             if name in ("operator*", "operator*=") and v == [True, False]:
-                return f"vector_scale({self.ex(ops[0], 'Vector')}, {self.ex(ops[1], 'Float')})", "Vector"
+                return f"vector_scale({self.ex(ops[0], 'Vector')}, {self.ex(ops[1], 'f32')})", "Vector"
             if name in ("operator*", "operator*=") and v == [True, True]:
                 x, y = self.ex(ops[0], "Vector"), self.ex(ops[1], "Vector")
-                mul = "kern::formula([](Float a, Float b) -> Float { return a * b; }, "
+                mul = "kern::formula<f32, f32>([](auto a, auto b) { return a * b; }, "
                 return f"vector_make({mul}vector_break({x}).x, vector_break({y}).x), {mul}vector_break({x}).y, vector_break({y}).y), {mul}vector_break({x}).z, vector_break({y}).z))", "Vector"
             if name in ("operator/", "operator/=") and v == [True, False]:
-                x, s = self.ex(ops[0], "Vector"), self.ex(ops[1], "Float")
-                div = "kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, "
+                x, s = self.ex(ops[0], "Vector"), self.ex(ops[1], "f32")
+                div = "kern::formula<f32, f32>([](auto a, auto b) { return a / b; }, "
                 return f"vector_make({div}vector_break({x}).x, {s}), {div}vector_break({x}).y, {s}), {div}vector_break({x}).z, {s}))", "Vector"
             if name == "operator[]" and v == [True, False]:
-                x, i = self.ex(ops[0], "Vector"), self.ex(ops[1], "Float")
-                return f"kern::formula([](Float i, Float x, Float y, Float z) -> Float {{ return i == 0.0 ? x : (i == 1.0 ? y : z); }}, {i}, vector_break({x}).x, vector_break({x}).y, vector_break({x}).z)", "Float"
+                x, i = self.ex(ops[0], "Vector"), self.ex(ops[1], "i32")
+                return f"kern::formula<i32, f32, f32, f32>([](auto i, auto x, auto y, auto z) {{ return i == 0 ? x : (i == 1 ? y : z); }}, {i}, vector_break({x}).x, vector_break({x}).y, vector_break({x}).z)", "f32"
             if name in ("operator==", "operator!=") and v == [True, True]:
                 x, y = self.ex(ops[0], "Vector"), self.ex(ops[1], "Vector")
-                same = (f'math_compare<"!=">(kern::formula([](Float ax, Float ay, Float az, Float bx, Float by, Float bz) -> Float {{ return ax == bx && ay == by && az == bz; }}, '
-                        f"vector_break({x}).x, vector_break({x}).y, vector_break({x}).z, vector_break({y}).x, vector_break({y}).y, vector_break({y}).z), 0.0)")
+                same = (f"kern::formula<f32, f32, f32, f32, f32, f32>([](auto ax, auto ay, auto az, auto bx, auto by, auto bz) {{ return ax == bx && ay == by && az == bz; }}, "
+                        f"vector_break({x}).x, vector_break({x}).y, vector_break({x}).z, vector_break({y}).x, vector_break({y}).y, vector_break({y}).z)")
                 return (same if name == "operator==" else f"logic_not({same})"), "bool"
             raise Wait(f"vector: {name}")
         t0 = self.tp(ops[0]) if ops else None
@@ -12044,7 +11759,7 @@ class Emit:
                 return f"list_get<{it}>({self.ex(base, lt)}, 0)", it
             if name == "value_or" and len(kids(b)) == 2:
                 lst = self.ex(base, lt)
-                return f'logic_select<{it}>(math_compare<">">(kern::to<Float>(list_length<{it}>({lst})), 0.0), list_get<{it}>({lst}, 0), {self.ex(kids(b)[1], it)})', it
+                return f'logic_select<{it}>(math_compare<">", i64>(list_length<{it}>({lst}), 0), list_get<{it}>({lst}, 0), {self.ex(kids(b)[1], it)})', it
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
@@ -12073,7 +11788,7 @@ class Emit:
             if name == "size" and not a:
                 return f"list_length<{it}>({lst})", "Int"
             if name == "empty" and not a:
-                return f'math_compare<"==">(kern::to<Float>(list_length<{it}>({lst})), 0.0)', "bool"
+                return f'math_compare<"==", i64>(list_length<{it}>({lst}), 0)', "bool"
             if name in ("at", "front", "back"):
                 got = self.spot(b)
                 if got is not None:
@@ -12084,7 +11799,7 @@ class Emit:
             if name == "front" and not a:
                 return f"list_get<{it}>({lst}, 0)", it
             if name == "back" and not a:
-                return f"list_get<{it}>({lst}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lst})))))", it
+                return f"list_get<{it}>({lst}, math_sub<i64>(list_length<{it}>({lst}), 1))", it
             if name == "erase" and len(a) == 1 and self.is_iter(b):
                 # `it = v.erase(it)`: the entry goes, and what erase gives is the place it stood at - where the
                 # entry after it stands now (an iterator is the place it stands at). The place is held before
@@ -13603,6 +13318,15 @@ class TestWriter:
                     return why
         return None
 
+    def own_runtime(self, raw):
+        """A type that is the logic the Blueprints run in (OWN_LOGIC: the test's own, the engine's real one) as the test
+        spells it: by its full name, however the source names it - `logic::Runtime*` inside kern::game, `kern::logic::Runtime&`
+        (the test's source stands in a namespace of its own: a name of a namespace there is another one)."""
+        m = re.fullmatch(r"(const\s+)?(?:::)?(?:\w+::)*Runtime\b\s*(.*)", raw.strip())
+        if m is None:
+            raise Wait(f"the logic the Blueprints run in as {raw.strip()}")
+        return f"{m.group(1) or ''}::{self.OWN_LOGIC[0]}{(' ' + m.group(2)) if m.group(2) else ''}"
+
     def object_name(self, q):
         """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
         if q not in self.objects:
@@ -14183,7 +13907,7 @@ class TestWriter:
             elif self.u.object_of(raw) == self.OWN_LOGIC[0]:
                 # (the logic the Blueprints run in, as a stand-in of the engine gave it - GameWorld::logic_runtime: in
                 # the Blueprint a handle, here the handle as the pointer it stands for, never followed; see the result below)
-                params.append((f"{re.sub(r'^(const\s+)?(?:::)?' + ENGINE + r'::logic::Runtime', lambda m_: (m_.group(1) or '') + '::' + ENGINE + '::logic::Runtime', raw.strip())} {name}", default))
+                params.append((f"{self.own_runtime(raw)} {name}", default))
                 at = name if re.search(r"\*\s*(const)?$", raw) else f"&{name}"
                 values.append(f"converted::logic_value({at})")
             elif self.u.object_of(raw):
@@ -14247,8 +13971,7 @@ class TestWriter:
         elif ret != "void" and self.u.object_of(ret_raw) == self.OWN_LOGIC[0]:
             # (the logic the Blueprints run in: the handle the stand-in gives, as a pointer the source only hands back to the
             # engine - 0: none, as the Blueprint has it)
-            ret = re.sub(r"^(?:::)?" + ENGINE + r"::logic::Runtime", "::" + ENGINE + "::logic::Runtime", re.sub(r"^const\s+", "const ", ret_raw.strip()))
-            ret = re.sub(r"^(const\s+)(?:::)?" + ENGINE + r"::logic::Runtime", r"\1::" + ENGINE + "::logic::Runtime", ret)
+            ret = self.own_runtime(ret_raw)
             body.append(f"{ret} kern_result = converted::logic_pointer<{ret}>(kern_out[0]);")
             k = 1
         elif ret != "void":
@@ -15849,6 +15572,8 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):
                         continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
+                    if p["id"] == f.export_len:
+                        continue   # (the length of what an export gives by a pointer: the call's own place, out_len_ - see `give`)
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
                         if re.match(r"const\s+void$", entry):
@@ -15881,7 +15606,7 @@ class TestWriter:
                     decl_lines.append("converted_pointed_lists = {" + ", ".join([*(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists),
                                                                                   *(f"{{reinterpret_cast<const unsigned char*>({x}.data), reinterpret_cast<const unsigned char*>({x}.data + {x}.size)}}" for x in spans)]) + "};")
                 ret = qtype(d).split("(")[0].strip()
-                if f.value is not None:
+                if f.value is not None and f.export_len is None:
                     self.result_ok(ret)
                 if owner and not f.state:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
@@ -15894,6 +15619,9 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):   # (the logic the source's ActorBlueprints are bound to: converted::Blueprint)
                         handed.append("bp.source_logic()")
+                        continue
+                    if p["id"] == f.export_len:
+                        handed.append("&out_len_")
                         continue
                     if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
                         handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
@@ -15932,6 +15660,15 @@ class TestWriter:
                     fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
                     give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
+                elif f.export_len is not None:
+                    # an export that gives a text, bytes or floats by a pointer and its length (export_text, export_bytes,
+                    # export_floats): what it gives is the piece the two say - as the host reads it, and as the Blueprint gives it
+                    if [src_ for _, _, src_ in f.out_fields] != ["result"]:
+                        raise Wait("an export that gives a piece by a pointer and changes what it is handed")
+                    length = next(p for p in params if p["id"] == f.export_len)
+                    piece = "std::string" if re.match(r"(?:const\s+)?char\s*\*", ret) else "std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(given_)>>>"
+                    give = (f"{self.spell(re.sub(r'\s*\*\s*$', '', qtype(length)))} out_len_ = 0; const auto* given_ = {counted}; "
+                            f"return given_ ? {piece}(given_, given_ + out_len_) : {piece}();")
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_] if src_ == 'state' else f'std::move({parts[src_]})'};"   # (run's values are the test's: handed back moved, as they are)
@@ -15992,16 +15729,27 @@ class TestWriter:
         system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
         if self.pointed:
             system.append("#include <cstdint>")
-        for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', src, re.M):
-            if m.group(1) == "<":
-                if f"#include <{m.group(2)}>" not in system:
-                    system.append(f"#include <{m.group(2)}>")
-            elif m.group(2).startswith("kern/"):
-                own.append(f'#include "{m.group(2)}"')
-            elif CLASSES[0] and m.group(2) == os.path.basename(CLASSES[0]):
-                own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
-            else:
-                own.append(f'#include "{self.source_dir}/{m.group(2)}"')
+        # what the source includes - and what each file includes whose pieces the test holds (G.foreign: a piece of
+        # another file of the program names what its own file includes - a class of the engine it derives from, a
+        # header of the program the source does not include): a piece stands in the test with the headers of its file
+        there = sorted({place[0] for place, piece in G.foreign.items() if isinstance(place, tuple) and place and isinstance(place[0], str)
+                        and piece.get("kind") != "engine" and os.path.abspath(place[0]) != os.path.abspath(self.path) and self.u.world.program(place[0])})
+        for file, text in [(self.path, src), *((f, self.tree.text(f)) for f in there)]:
+            rel = os.path.relpath(os.path.dirname(os.path.abspath(file)), os.path.dirname(os.path.abspath(self.path)))
+            for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', text, re.M):
+                if m.group(1) == "<":
+                    line = f"#include <{m.group(2)}>"
+                    if line not in system:
+                        system.append(line)
+                    continue
+                if m.group(2).startswith("kern/"):
+                    line = f'#include "{m.group(2)}"'
+                elif CLASSES[0] and m.group(2) == os.path.basename(CLASSES[0]):
+                    line = f'#include "{m.group(2)}"'   # (the build's header of the Blueprints' classes: by its name, on the include path)
+                else:
+                    line = f'#include "{self.source_dir}/{m.group(2) if rel == "." else os.path.normpath(os.path.join(rel, m.group(2)))}"'
+                if line not in own:
+                    own.append(line)
         # of the file's own `using` lines only those of the standard library: the program's names are the test's own here
         usings = [m.group(0).strip() for m in re.finditer(r"^using\s+[^;=\n]+;", src, re.M) if re.match(r"using\s+(?:namespace\s+)?std\b", m.group(0))]
         # what a class declares in itself: a piece of its own (see `assemble`). A function of the class that

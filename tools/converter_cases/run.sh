@@ -65,9 +65,25 @@
 #             another state, Look) and that declares no constructor: C++'s own constructor, which makes that field, is
 #             its function (LookApp::LookApp - before: every function reading ext_ waited, "declare one: `LookApp();` ... =
 #             default"); Look, whose fields start with nothing computed, has no such function (nothing to make).
+#   far.cpp + far_b.cpp + far_rules.cpp  a function (reach) that calls one of another file (far::pole_radius), whose pieces
+#             name a class of a third file's header (rules::Blueprint : kern::logic::ActorBlueprint, far_rules.h) that the
+#             caller does not include: its test holds the pieces with the headers of their files - written and compared
+#             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
+#             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
+#             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
+#             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
+#             List<Blast> is needed").
+#   pieces.cpp exports that give a text and bytes by a pointer and their length (`export_text<&f>(x, out_len)`,
+#             export_bytes): the test calls the source with a place for the length and compares the piece the two say -
+#             written and compared (before: "the test has no values of unsigned int *").
+#   running.cpp the logic the Blueprints run in as the engine names it in its own namespace (GameWorld::logic_runtime gives a
+#             `logic::Runtime*`, kern::game::blueprints_running takes one): the test's stand-ins name it by its full name - written
+#             and compared (before: "no type named 'Runtime' in namespace converted_...::logic", the stand-in of GameWorld went).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
+#   hyperbolic.cpp std::sinh, cosh, tanh, asinh: the engine's own (kern/src/math/hyperbolic.c) - written and the same in both passes.
 #   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
 #             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
 #             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
@@ -93,7 +109,8 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
   local f files=()
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
-  echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
+  # (a case with actors of its own in the level - Blueprints the program calls by an actor's name: <case>.klevel)
+  if [ -f "$here/$1.klevel" ]; then cp "$here/$1.klevel" "$out/cases.klevel"; else echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"; fi
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
   (cd "$out" && KERN_TEST_SOURCE_NUMBERS="${SOURCE_NUMBERS:-}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
@@ -187,6 +204,7 @@ logged actors "the five of Crowd are written and compared" '^5 functions of the 
 
 convert bytes
 check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
+classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
@@ -227,6 +245,24 @@ logged chain "free_of_it is written" '^ +Chain::free_of_it \([0-9]+\): written$'
 logged chain "each round says why it is needed" '^round 2: 2 Blueprints - what Chain/chain_b_cpp, Chain/chain_cpp gave is new'
 if grep -q '^round 4' "$top/chain/convert.log"; then echo "FAIL chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fail=1
 else echo "ok   chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fi
+
+convert pieces
+logged pieces "case_label (export_text with out_len) is written" '^ +case_label \([0-9]+\): written$'
+logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes \([0-9]+\): written$'
+logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
+tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
+
+convert running
+logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
+logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+
+convert blasts
+logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
+logged blasts "both are compared" '^2 functions of the Blueprints are compared'
+
+convert far far_b far_rules
+logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
+logged far "all three are compared" '^3 functions of the Blueprints are compared'
 
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
@@ -286,6 +322,14 @@ tested numbers_engine "the second pass holds the engine's own enum" 'using BodyT
 logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
 if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
 else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
+# hyperbolic: std::sinh, cosh, tanh, asinh (f64) - the engine's own functions (kern/src/math/hyperbolic.c): written
+# (before: "std::sinh: the engine has no sinh yet"), and the same as the source in both passes.
+SOURCE_NUMBERS=1 convert hyperbolic
+check hyperbolic "std::sinh and std::cosh are the engine's" yes 'sinh\(.*cosh\('
+check hyperbolic "std::asinh is the engine's" yes 'asinh\('
+logged hyperbolic "all three are compared once more with their source" '^3 functions are compared once more with their source as C\+\+ computes it'
+if right hyperbolic; then echo "ok   hyperbolic: written, and the same as the source in both passes (the engine's sinh, cosh, tanh, asinh)"
+else echo "FAIL hyperbolic: written, and the same as the source in both passes"; cat "$top/hyperbolic/numbers.txt" 2>/dev/null; fail=1; fi
 # Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
 # the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
 # (red): the number types have come, and the case goes up to numbers_same.
@@ -304,6 +348,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

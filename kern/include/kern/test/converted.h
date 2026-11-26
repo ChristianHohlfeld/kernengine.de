@@ -150,10 +150,10 @@ template <class T> using Span = kern::Span<T>;
 // the functions of numbers a formula does not have itself, as the converter writes them
 inline double hypot_bp(double a, double b) { return kern::math::sqrt((a * a) + (b * b)); }
 inline double ldexp_bp(double x, double n) { return (x * kern::math::pow(2.0, n)); }
-inline double tanh_bp(double x) { return kern::math::div(kern::math::exp(2.0 * x) - 1.0, kern::math::exp(2.0 * x) + 1.0); }
-inline double sinh_bp(double x) { return ((kern::math::exp(x) - kern::math::exp(-x)) * 0.5); }
-inline double cosh_bp(double x) { return ((kern::math::exp(x) + kern::math::exp(-x)) * 0.5); }
-inline double asinh_bp(double x) { return kern::math::log(x + kern::math::sqrt((x * x) + 1.0)); }
+inline double tanh_bp(double x) { return kern::math::tanh(x); }   // (the engine's own: kern/src/math/hyperbolic.c)
+inline double sinh_bp(double x) { return kern::math::sinh(x); }
+inline double cosh_bp(double x) { return kern::math::cosh(x); }
+inline double asinh_bp(double x) { return kern::math::asinh(x); }
 inline double log2_bp(double x) { return kern::math::div(kern::math::log(x), 0.6931471805599453); }
 inline double log10_bp(double x) { return kern::math::div(kern::math::log(x), 2.302585092994046); }
 inline double cbrt_bp(double x) { return (kern::math::sign(x) * kern::math::pow(kern::math::abs(x), 0.3333333333333333)); }

@@ -50,7 +50,7 @@ for c in "$root"/third_party/box3d/src/*.c; do
   fi
 done
 musl_header="$({ ls -t "$root"/third_party/musl_math/src/*.h || true; } | head -1)"
-for c in "$root"/third_party/musl_math/src/*.c; do
+for c in "$root"/third_party/musl_math/src/*.c "$root"/src/math/*.c; do
   o="$out/obj/musl_math/$(basename "$c" .c).o"
   if stale "$o" "$c" "$musl_header"; then run "$cc" -std=c17 "${opt[@]}" -fno-math-errno -w -c "$c" -o "$o"; fi
 done

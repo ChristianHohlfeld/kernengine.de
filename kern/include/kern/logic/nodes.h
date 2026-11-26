@@ -83,6 +83,11 @@ inline f64 asin(f64 a) { return dm::asin(kern::clamp(a, -1.0, 1.0)); }
 inline f64 acos(f64 a) { return dm::acos(kern::clamp(a, -1.0, 1.0)); }
 inline f64 atan(f64 a) { return dm::atan(a); }
 inline f64 atan2(f64 y, f64 x) { return dm::atan2(y, x); }
+/// The hyperbolic functions: the engine's own (kern/src/math/hyperbolic.c), as std::sinh ... of a program.
+inline f64 sinh(f64 a) { return dm::sinh(a); }
+inline f64 cosh(f64 a) { return dm::cosh(a); }
+inline f64 tanh(f64 a) { return dm::tanh(a); }
+inline f64 asinh(f64 a) { return dm::asinh(a); }
 inline f64 rad(f64 degrees) { return degrees * (pi / 180); }
 inline f64 deg(f64 radians) { return radians * (180 / pi); }
 inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
@@ -2348,6 +2353,10 @@ struct PureNodes {
   template <class P, num::Floating T = num::raw<P>> static T math_atan2(std::type_identity_t<T> y, std::type_identity_t<T> x) { return num::atan2(y, x); }
   template <class P, num::Floating T = num::raw<P>> static T math_exp(std::type_identity_t<T> a) { return num::exp(a); }
   template <class P, num::Floating T = num::raw<P>> static T math_expm1(std::type_identity_t<T> a) { return num::expm1(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_sinh(std::type_identity_t<T> a) { return num::sinh(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_cosh(std::type_identity_t<T> a) { return num::cosh(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_tanh(std::type_identity_t<T> a) { return num::tanh(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_asinh(std::type_identity_t<T> a) { return num::asinh(a); }
   template <class P, num::Floating T = num::raw<P>> static T math_log(std::type_identity_t<T> a) { return num::log(a); }
   template <class P, num::Floating T = num::raw<P>> static T math_log10(std::type_identity_t<T> a) { return num::log10(a); }
   template <class P, num::Floating T = num::raw<P>> static T math_pow(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::pow(a, b); }
