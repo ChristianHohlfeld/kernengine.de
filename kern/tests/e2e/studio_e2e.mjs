@@ -604,8 +604,14 @@ const vpCenter = async (page, i = 0) => {
           (await state(page)).project.blueprints.length === 1, "project: a name stands once (the page says so)");
     await page.setInputFiles("#fileProject", {name: "bad.kproject", mimeType: "application/json", buffer: Buffer.from('{"format":"kern-project","startLevel":"x"}')});
     check(await until(async () => (await state(page)).log.some(e => /startLevel "x": is none of the project.s levels/.test(e[1]))), "project: a wrong file is refused with where and why");
-    await page.setInputFiles("#fileProject", {name: "Spiel.kproject", mimeType: "application/json", buffer: Buffer.from(saved.text.replace('"Untitled"', '"Zweites"'))});
-    check(await until(async () => (await state(page)).project.name === "Zweites" && !(await state(page)).project.dirty), "project: a .kproject opens from a file");
+    // (a project opens with its levels - the .kproject and the files of the levels it names, chosen together; alone it
+    // is refused, the missing levels named)
+    const levelFile = name => ({name, mimeType: "application/json", buffer: Buffer.from(`{"format":"kern-level","version":1,"name":"${name}","nextId":1,"actors":[]}`)});
+    const second = {name: "Spiel.kproject", mimeType: "application/json", buffer: Buffer.from(saved.text.replace('"Untitled"', '"Zweites"'))};
+    await page.setInputFiles("#fileProject", second);
+    check(await until(async () => /not given: levels\/a\.klevel, levels\/b\.klevel/.test(await page.locator("#toast").textContent())), "project: a .kproject without its levels is refused, the levels named");
+    await page.setInputFiles("#fileProject", [second, levelFile("a.klevel"), levelFile("b.klevel")]);
+    check(await until(async () => (await state(page)).project.name === "Zweites" && !(await state(page)).project.dirty), "project: a .kproject opens from its files, with its levels");
   }
   check(errors.length === 0, "no page errors in the module build" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await ctx.close();

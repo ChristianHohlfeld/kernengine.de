@@ -14,6 +14,7 @@
 #include "kern/app/run.h"
 #include "kern/app/runtime.h"
 #include "kern/game/embedded.h"
+#include "kern/game/program.h"
 #include "murmel.h"
 
 extern "C" kern::i32 kern_app_start(kern::i32 width, kern::i32 height);
@@ -140,7 +141,7 @@ void pruefe(bool ok, const char* was) {
 int main(int argc, char** argv) {
   const bool zeigen = argc > 1 && std::strcmp(argv[1], "--spur") == 0;
   murmel::Murmel& spiel = murmel::spiel();
-  pruefe(run(spiel, game::embedded_project().settings) == 0, "kern::run nimmt die App");
+  pruefe(run(spiel, game::embedded_project()) == 0, "kern::run nimmt die App mit dem Projekt");
   // die Stände in einem Ordner für den Test, ohne Bestwert zu Beginn (kern/docs/app.md 5.)
   const std::string staende = std::string(std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp") + "/murmel-test-saves";
   const std::string args = "saves=" + staende;

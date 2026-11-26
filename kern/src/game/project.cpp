@@ -2,6 +2,7 @@
 #include "kern/game/project.h"
 
 #include "kern/game/level.h"
+#include "kern/logic/engine_libraries.h"
 
 namespace kern::game {
 namespace {
@@ -31,6 +32,23 @@ std::string Project::first_level() const {
   return levels.empty() ? std::string() : levels.front();
 }
 
+const std::string* Project::level_text(std::string_view path, std::string* error) const {
+  bool named = false;
+  std::string all;
+  for (const std::string& l : levels) {
+    named |= l == path;
+    all += (all.empty() ? "" : ", ") + l;
+  }
+  if (!named) {
+    if (error) *error = "the project " + name + " has no level " + std::string(path) + " - its levels: " + (all.empty() ? "none" : all);
+    return nullptr;
+  }
+  for (const auto& [p, text] : level_texts)
+    if (p == path) return &text;
+  if (error) *error = "the level " + std::string(path) + " of the project " + name + " was not loaded with it (Project::level_texts)";
+  return nullptr;
+}
+
 json::Value to_json(const Project& p) {
   json::Value o = json::Value::object();
   o.set("format", "kern-project");
@@ -45,7 +63,8 @@ json::Value to_json(const Project& p) {
   for (const ProgramBlueprint& b : p.blueprints) {
     json::Value x = json::Value::object();
     x.set("name", b.name);
-    x.set("logic", logic::graph_to_json(b.logic));
+    if (!b.folder.empty()) x.set("folder", b.folder);
+    x.set("logic", logic::graph_to_level_json(b.logic));  // (without what it holds of the engine: kern/logic/engine_libraries.h)
     bps.push(std::move(x));
   }
   o.set("blueprints", std::move(bps));
@@ -92,14 +111,25 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
       ProgramBlueprint bp;
       bp.name = b["name"].is_string() ? b["name"].as_string() : std::string();
       if (bp.name.empty()) return fail(error, place(i, "") + ": has no name");
-      if (const std::string e = json::unknown_key(b, {"name", "logic"}); !e.empty()) return fail(error, place(i, bp.name) + ": " + e);
+      if (logic::is_engine_library(bp.name))
+        return fail(error, place(i, bp.name) + ": is called like the engine's library " + bp.name + " - the engine's libraries are the engine's, a project does not hold them");
+      if (const json::Value* f = b.find("folder")) {
+        if (!f->is_string()) return fail(error, place(i, bp.name) + ": folder: must be a name (a text)");
+        bp.folder = f->as_string();
+      }
+      if (const std::string e = json::unknown_key(b, {"name", "folder", "logic"}); !e.empty()) return fail(error, place(i, bp.name) + ": " + e);
       for (std::size_t j = 0; j < p.blueprints.size(); ++j)
         if (p.blueprints[j].name == bp.name)
           return fail(error, place(i, bp.name) + ": the name stands twice (also blueprints[" + std::to_string(j) + "])");
       std::string why;
       if (!b["logic"].is_object()) return fail(error, place(i, bp.name) + ": has no logic (its Blueprint)");
-      if (!logic::graph_from_json(b["logic"], bp.logic, &why)) return fail(error, place(i, bp.name) + ": " + why);
+      if (!logic::graph_from_level_json(b["logic"], bp.logic, &why)) return fail(error, place(i, bp.name) + ": " + why);
       p.blueprints.push_back(std::move(bp));
+    }
+    // (each is given what it uses of the engine's libraries, as a level's Blueprints are)
+    for (std::size_t i = 0; i < p.blueprints.size(); ++i) {
+      std::string why;
+      if (!logic::hold_engine(p.blueprints[i].logic, program_blueprints(p), &why)) return fail(error, place(i, p.blueprints[i].name) + ": " + why);
     }
   }
   out = std::move(p);

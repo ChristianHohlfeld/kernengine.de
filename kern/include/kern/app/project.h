@@ -34,8 +34,9 @@ struct DeviceProfile {
 struct ProjectSettings {
   RendererOptions renderer;             // the renderer at start (width and height are the page's)
   std::vector<DeviceProfile> profiles;  // the renderer on other devices, by name (the launch argument profile=<name>)
-  u32 heap_reserve_mb = 0;
-  InputActions input;                   // the player's actions and axes and what is bound to them (kern/docs/app.md 4.)              // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
+  u32 heap_reserve_mb = 0;              // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
+  u32 loop_budget = 200000;             // the loop guard of the program's logic (logic::Runtime::budget, its default): kern/game/program.h
+  InputActions input;                   // the player's actions and axes and what is bound to them (kern/docs/app.md 4.)
 
   /// The profile of that name (null: none).
   const DeviceProfile* profile(std::string_view name) const {
@@ -155,13 +156,15 @@ inline json::Value project_to_json(const ProjectSettings& p) {
   }
   o.set("profiles", std::move(profiles));
   o.set("heapReserveMb", p.heap_reserve_mb);
+  o.set("loopBudget", p.loop_budget);
   if (!p.input.actions.empty() || !p.input.axes.empty()) o.set("input", input_to_json(p.input));
   return o;
 }
 
 /// Reads the member "settings". Missing keys keep the engine's defaults; a profile starts from the project's renderer.
 /// False - `error` says where and why - for settings that are no object, a profile without a name or with a name
-/// twice, "mobile" (the fixed phone profile of before: now one of "profiles"), or a heapReserveMb outside 0..4095.
+/// twice, "mobile" (the fixed phone profile of before: now one of "profiles"), a heapReserveMb outside 0..4095, or a
+/// loopBudget that is no whole number from 1.
 inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::string* error = nullptr) {
   using namespace project_json;
   auto fail = [&](std::string why) {
@@ -171,7 +174,7 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
   out = ProjectSettings{};
   if (!v.is_object()) return fail("must be an object");
   if (v.has("mobile")) return fail("mobile: a device profile is one of \"profiles\" ({\"name\": \"mobile\", \"renderer\": {...}})");
-  if (std::string e = json::unknown_key(v, {"renderer", "profiles", "heapReserveMb", "input"}); !e.empty()) return fail(e);
+  if (std::string e = json::unknown_key(v, {"renderer", "profiles", "heapReserveMb", "loopBudget", "input"}); !e.empty()) return fail(e);
   if (std::string e = renderer_from(v["renderer"], out.renderer, "renderer"); !e.empty()) return fail(e);
   if (const json::Value* list = v.find("profiles")) {
     if (!list->is_array()) return fail("profiles: must be a list");
@@ -191,6 +194,11 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
   const f64 mb = v["heapReserveMb"].as_number(0);
   if (!(mb >= 0 && mb < 4096)) return fail("heapReserveMb: from 0 to 4095");
   out.heap_reserve_mb = static_cast<u32>(mb);
+  if (const json::Value* b = v.find("loopBudget")) {
+    const f64 n = b->as_number(-1);
+    if (!(n >= 1 && n <= 4294967295.0) || n != static_cast<f64>(static_cast<u64>(n))) return fail("loopBudget: a whole number from 1 to 4294967295 (the passes a loop of the program's logic may take)");
+    out.loop_budget = static_cast<u32>(n);
+  }
   if (const json::Value* in = v.find("input")) {
     std::string why;
     if (!input_from_json(*in, out.input, &why)) return fail(why);

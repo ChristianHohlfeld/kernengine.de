@@ -1,5 +1,6 @@
 #include "kern/game/runtime.h"
 #include "kern/game/project.h"
+#include "kern/app/app.h"
 #include "kern/core/dmath.h"
 
 #include "runtime_internal.h"
@@ -427,6 +428,8 @@ struct GameWorld::Traffic {
 };
 
 GameWorld::GameWorld(Renderer& renderer, NightWindows* windows) : r_(renderer), windows_(windows) { (void)logic_nodes_registered(); }
+
+GameWorld::GameWorld(Engine& engine) : GameWorld(engine.renderer()) { project_ = engine.project(); }
 
 GameWorld::~GameWorld() {
   stop();
@@ -1230,6 +1233,16 @@ physics::Body GameWorld::create_body(const BodyPlan& plan) {
     physics_.set_motion_locks(body, locks);
   }
   return body;
+}
+
+bool GameWorld::start_level(std::string_view path, SimMode mode) {
+  if (!project_) return fail("start_level %.*s: the world has no project - a program makes its world from its Engine (GameWorld(Engine&)) or as an object of its Blueprints, then it has the program's; a host without a program gives one (set_project)", static_cast<int>(path.size()), path.data());
+  std::string why;
+  const std::string* text = project_->level_text(path, &why);
+  if (!text) return fail("start_level: %s", why.c_str());
+  Level level;
+  if (!from_text(*text, level, &why)) return fail("start_level %.*s: %s", static_cast<int>(path.size()), path.data(), why.c_str());
+  return start(level, mode);
 }
 
 bool GameWorld::start(const Level& level, SimMode mode) {
@@ -2754,33 +2767,6 @@ void GameWorld::debug_lines(bool colliders, bool contacts, bool joints, std::vec
         }
     }
   }
-}
-
-namespace {
-const logic::Instance* running_at(const logic::Runtime& logic, std::size_t at) { return at < logic.instances().size() ? logic.instances()[at].get() : nullptr; }
-}  // namespace
-
-std::size_t blueprint_count(const logic::Runtime& logic) { return logic.instances().size(); }
-const std::string& blueprint_name(const logic::Runtime& logic, std::size_t at) {
-  static const std::string none;
-  const logic::Instance* const i = running_at(logic, at);
-  return i ? i->name() : none;
-}
-const char* blueprint_tier(const logic::Runtime& logic, std::size_t at) {
-  const logic::Instance* const i = running_at(logic, at);
-  return i ? i->tier() : "";
-}
-std::size_t blueprint_functions(const logic::Runtime& logic, std::size_t at) {
-  const logic::Instance* const i = running_at(logic, at);
-  return i ? i->graph().functions.size() : 0;
-}
-std::size_t blueprint_nodes(const logic::Runtime& logic, std::size_t at) {
-  const logic::Instance* const i = running_at(logic, at);
-  return i ? i->graph().nodes.size() : 0;
-}
-bool blueprint_disabled(const logic::Runtime& logic, std::size_t at) {
-  const logic::Instance* const i = running_at(logic, at);
-  return i && i->disabled();
 }
 
 std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic) {

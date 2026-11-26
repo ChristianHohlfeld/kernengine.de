@@ -26,9 +26,11 @@
 
 namespace kern {
 
+namespace game { struct Project; }
+
 constexpr u32 kMaxTouches = 10;
 
-struct Touch {
+struct KERN_BLUEPRINT_TYPE Touch {
   i32 id = -1;  // < 0: slot unused
   Vec2 start, position, previous;
   bool began = false;  // it touched down this frame
@@ -36,7 +38,7 @@ struct Touch {
 
 /// A gamepad in the browser's standard mapping (kern/docs/app.md 4.): sticks -1..1 (right and up are +1), the
 /// triggers 0..1, the buttons as bits (bit i = PadButton i).
-struct Gamepad {
+struct KERN_BLUEPRINT_TYPE Gamepad {
   bool connected = false;
   f32 lx = 0, ly = 0, rx = 0, ry = 0;
   f32 lt = 0, rt = 0;
@@ -86,7 +88,7 @@ class Input {
   u32 pad_pressed_ = 0;
 };
 
-struct Frame {
+struct KERN_BLUEPRINT_TYPE Frame {
   f64 time = 0;   // seconds since start
   f32 dt = 0;     // seconds since the previous frame (clamped to 0.1)
   u64 index = 0;
@@ -99,6 +101,12 @@ class Engine {
   Renderer& renderer() const { return renderer_; }
   Input& input() { return input_; }
   const Input& input() const { return input_; }
+  /// The project of the program this engine runs (kern::run(App&, const Project&) or kern::run(Project),
+  /// kern/game/program.h) - null for an App without a project (kern::run(App&, settings)). A world the program makes
+  /// from its Engine has it (GameWorld(Engine&)): the program never hands it on itself.
+  const game::Project* project() const { return project_; }
+  /// Program side (kern/game/program.h, while its App runs): the project of the program.
+  void set_project(const game::Project* project) { project_ = project; }
   /// The app's one mixer (kern/docs/app.md 3.): ready from the App's start at the device's rate; the app runtime
   /// makes it heard (kern/web/app.mjs pulls it). A game fills it - GameAudio(engine.mixer(), bank) - and nothing else.
   audio::Mixer& mixer() { return mixer_; }
@@ -225,6 +233,7 @@ class Engine {
 
  private:
   Renderer& renderer_;
+  const game::Project* project_ = nullptr;
   Input input_;
   audio::Mixer mixer_;
   InputActions actions_;

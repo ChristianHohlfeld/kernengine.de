@@ -4,7 +4,6 @@
 #include <cstdio>
 
 #include "kern/core/base.h"
-#include "kern/game/embedded.h"
 
 namespace murmel {
 
@@ -45,7 +44,7 @@ f32 Murmel::punkte() const {
 
 bool Murmel::start(Engine& engine) {
   renderer_ = &engine.renderer();
-  welt_ = std::make_unique<game::GameWorld>(engine.renderer());
+  welt_ = std::make_unique<game::GameWorld>(engine);   // (eine Welt des Programms: sie hat sein Projekt, also seine Levels)
   bank_ = std::make_unique<game::SoundBank>(engine.mixer());
   audio_ = std::make_unique<game::GameAudio>(engine.mixer(), *bank_);
   kamera_ = engine.renderer().camera();
@@ -65,16 +64,12 @@ bool Murmel::lade(int nummer) {
     audio_->end();
     welt_->stop();
   }
-  const std::string_view text = game::embedded_level(level_pfad(nummer));
-  std::string fehler;
-  // (der Grund mit kern::fail: startet die App deshalb nicht, nennt die App-Laufzeit ihn - kern/docs/app.md 1.)
-  if (!game::from_text(text, geladen_, &fehler)) return fail("murmel: das Level %s: %s", level_pfad(nummer), fehler.c_str());
   level_ = nummer;
   gewonnen_seit_ = -1;
-  welt_->sync(geladen_);
-  if (!welt_->start(geladen_, game::SimMode::play)) return fail("murmel: das Level %s startet nicht", level_pfad(nummer));
-  bank_->request_level(geladen_);
-  audio_->begin(*welt_);
+  // (das Level beim Pfad im Projekt: die Welt hat ihr Projekt - GameWorld::start_level sagt Ort und Grund, wenn nicht;
+  // startet die App deshalb nicht, nennt die App-Laufzeit den Grund - kern/docs/app.md 1.)
+  if (!welt_->start_level(level_pfad(nummer), game::SimMode::play)) return false;
+  audio_->begin(*welt_);   // (die Töne der Welt: GameAudio lädt die Klänge ihres Levels)
   return true;
 }
 

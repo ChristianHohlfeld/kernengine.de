@@ -192,6 +192,7 @@ KERN_LAYOUT(Demo) {
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
 | Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
+| Objekt der Engine (eine Schnittstelle der Engine; kern/docs/engine_object.md) | Typ `Object<kern::App>`, kein Objekt `Object<kern::App>{}` – nie eine Zahl; Liste `List<Object<kern::App>>` |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
@@ -200,7 +201,10 @@ KERN_LAYOUT(Demo) {
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
 | Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
-| Engine Object of Blueprint | `func_engine_object(target)` – das Objekt der Engine, das der Blueprint auf Target ist (die Schnittstelle, die er implementiert: App, ShaderExtension …), als Handle der Engine – einmal gemacht, jedes Mal dasselbe; 0 ohne laufenden Blueprint, ohne Schnittstelle oder ohne Objekte der Engine beim Host (`Runtime::engine_object`); ein Wert-Knoten |
+| Engine Object of Blueprint | `func_engine_object<kern::App>(target)` – das Objekt der Engine, das der Blueprint auf Target als die Schnittstelle der Einstellung ist (App, ShaderExtension …), als `Object<kern::App>` (kern/docs/engine_object.md) – einmal gemacht, jedes Mal dasselbe. Kein Objekt, und das Log sagt den Grund: Target hat keinen laufenden Blueprint, er implementiert keine oder eine andere Schnittstelle, der Host hat keine Objekte der Engine, der Build hat die Schnittstelle nicht (`Runtime::engine_object`); ein Wert-Knoten |
+| Is Valid Object | `object_valid<kern::audio::Mixer>(x)` – verweist es auf ein Objekt der Engine (nicht `Object<…>{}`)? Die Einstellung Class ist jede Klasse der Engine mit Objekten (`engine_classes`); C++ fragt so einen Zeiger (`if (p)`, `p != nullptr`) |
+| Same Object | `object_equal<kern::audio::Mixer>(a, b)` – dasselbe Objekt (dieselbe Welt, dasselbe Handle; keins und keins sind dasselbe)? C++ vergleicht so zwei Zeiger (`a == b`) |
+| Handle of Object | `object_handle<kern::App>(x)` – sein Handle in seiner Welt als Int (zum Zeigen, zum Zählen): der eine ausdrückliche Übergang zu Int; keine Funktion der Engine nimmt eins, und kein Int wird ein Objekt |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
@@ -1222,6 +1226,43 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+#### Die Bibliotheken der Engine
+
+Was die Engine über sich selbst sagt, liefert die Engine und nicht das Level eines Spiels. Jeder Header der Engine, den ein
+Blueprint benutzen kann, ist eine **Bibliothek der Engine**. Ihr Name folgt dem Pfad: `kern/physics/physics.h` heißt
+`engine_physics_physics`. Sie enthält die Funktionen, die der Header definiert, und die Typen, die er für Blueprints
+**ausdrücklich kennzeichnet**:
+
+```cpp
+struct KERN_BLUEPRINT_TYPE Pose { Vec3 position; Quat rotation; };      // kern/core/base.h
+enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
+```
+
+- Nur gekennzeichnete Typen sind Werte eines Blueprints. Die übrigen Typen bleiben in der Engine, etwa `logic::Graph`,
+  `game::Level`, `game::Actor` und die Komponenten. Ein Knoten der Engine, der einen ungekennzeichneten Typ nimmt oder
+  gibt, ist kein Knoten (`tools/engine_api.py --list` nennt ihn mit Grund).
+- **Erzeugt beim Bau der Engine:** `tools/engine_api.py --libraries` übersetzt die Header (`tools/cpp_to_blueprint.py
+  --engine <header>`) und schreibt `kern/src/logic/engine_libraries.gen.cpp`. Die Datei steht wie die anderen `*.gen.*`
+  im Repo, deshalb braucht der Bau kein clang. Jede Bibliothek hat eine **Marke** (Hash ihres Textes).
+- **Da in jeder Laufzeit, in jedem Leser und im Editor**, ohne dass ein Level sie enthält (`kern/logic/engine_libraries.h`).
+  `with_engine(blueprints)` ist der eine Weg, auf dem jeder Leser eine Bibliothek findet: Ein Name der Engine ist immer
+  die Bibliothek der Engine. libraries_of, take_libraries, link, from_cpp und apply_cpp gehen ihn selbst.
+- **Ein Level enthält keine Bibliothek der Engine und keine Kopie ihrer Typen oder Funktionen.** Es nennt sie in `uses`
+  und notiert ihre Marken (`"engine": {"engine_physics_physics": "<marke>"}`). Beim Lesen bekommt jeder Blueprint, was er
+  von ihnen benutzt, aus der Engine (`hold_engine`). Bekommt ein Engine-Struct ein Feld dazu, bleibt das Level gültig.
+  Ein Level, das doch eine Kopie hält (einen Akteur `engine_*` oder einen Typ oder eine Funktion mit
+  `"from": "engine_…"`), wird abgelehnt, mit Akteur, Name und Grund. Einen zweiten Leseweg gibt es nicht.
+- Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
+  und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
+- Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.
+- Ihre Klassen schreibt `tools/blueprint_cpp` aus den Graphen der Engine, nicht aus dem Level. Die Felder binden deshalb immer
+  so, wie der Header der Engine sie deklariert.
+- `tools/engine_api.py --check <level | texte>` nennt, was ein Level oder ein Verzeichnis von Texten von den
+  Bibliotheken der Engine braucht, das diese nicht haben (Typen und Funktionen, mit wer sie nennt). Das geht ohne clang
+  und ohne vollen Lauf.
+- Ein Level notiert die Marken. Passt ein Blueprint beim Lesen nicht mehr zur Engine, nennt die Meldung, was sich seither
+  geändert hat (`engine_physics_physics: written with …, the engine has …`).
+
 ### Exporte: eine Funktion unter festem C-Namen
 Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines
 Programms schreibt dafür `KERN_EXPORT(name)`. Ein Blueprint kann das selbst: Die Funktion trägt den Namen
@@ -1257,8 +1298,10 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   Instanz, die als T läuft – oder `bind_blueprint<T>(instance)` für genau diese; `kern/logic/blueprint_class.h`).
   Nichts bindet still, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht. Die
   Programm-Laufzeit (`kern::game::Program`, `kern/docs/project.md` 4.) bindet beim Start jeden ihrer Blueprints, der als
-  Klasse mit Exporten läuft (`NativeBlueprint::bind_exports`, im Kleber: `bind_blueprint_object`), und löst sie am Ende;
-  zwei Objekte einer solchen Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`).
+  seine Klasse läuft – mit Exporten oder ohne, auch eine Bibliothek (`NativeBlueprint::bind_class`, im Kleber:
+  `bind_blueprint_object`) –, und löst sie am Ende: das C++ des Programms ruft sie mit `blueprint<T>()`, ohne selbst zu
+  binden. Zwei Objekte einer Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`,
+  `program_beside_an_app_of_cpp`).
   Ein Export in einem Blueprint einer **Welt** wird abgewiesen: beim Lesen des Levels mit Stelle, von `validate`
   (Play startet nicht) und im Editor als Fehler des offenen Blueprints.
 - **Exporte gehören zum Programm, nicht zu Welten:** je Klasse ist genau ein Objekt gebunden. Ein zweites
@@ -1321,7 +1364,7 @@ selbst“).
 
 - **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
   eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
-  oder ein solches Objekt hält; im Blueprint ein Handle). Das gilt auch, wo ihr Header sie
+  oder ein solches Objekt hält; im Blueprint ein `Object<I>` seiner Klasse, kern/docs/engine_object.md). Das gilt auch, wo ihr Header sie
   definiert (`int width() const { return width_; }`, `bool ready() const`): was das Objekt hält,
   ist das der Engine. Der Konverter schreibt einen Aufruf von ihr als den Knoten, und keine Funktion
   eines Blueprints – der Plan des Programms folgt ihm nicht, kein Blueprint eines Headers der Engine
@@ -1380,11 +1423,14 @@ selbst“).
 
 ### Plätze der Engine
 
-Gibt eine Methode eines Objekts der Engine eine Referenz ohne `const` auf etwas, das das Objekt hält, und
-schlägt sie es nur nach – ihr Rumpf ist genau `return feld_;` (`std::vector<ShotEvent>& shots() { return
-shots_; }`; `tools/engine_api.py` prüft das am Baum, nicht am Namen), keine weiteren Eingänge, und was sie gibt,
-ist selbst kein Objekt der Engine –, dann ist ihr Knoten ein **Platz der Engine** (`EngineFunction::place`, in
-der Liste `place`), keine Kopie. Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
+Sagt eine Methode eines Objekts der Engine in ihrem Header, dass sie ein Platz ist – `KERN_PLACE` vor der Erklärung
+(`kern/core/base.h`: `KERN_PLACE std::vector<ShotEvent>& shots() { return shots_; }`) –, dann ist ihr Knoten ein
+**Platz der Engine** (`EngineFunction::place`, in der Liste `place`), keine Kopie. Ausdrücklich, nicht erkannt: eine
+Methode ohne `KERN_PLACE` ist nie ein Platz, auch wenn ihr Rumpf ein Feld nachschlägt. Wer `KERN_PLACE` schreibt, muss
+einen Platz schreiben: eine Referenz ohne `const` auf etwas, das das Objekt hält, nur nachgeschlagen – der Rumpf genau
+`return feld_;` oder `return feld_[i];` mit dem einen Eingang `i` –, und was sie gibt, ist kein Objekt der Engine.
+Sonst hält `tools/engine_api.py` an und nennt Funktion, Datei, Zeile und Grund (ein `assert` im Rumpf macht aus einem
+Platz nie still eine Kopie). Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
 
 ```cpp
 void Shoot() {
@@ -1519,23 +1565,32 @@ Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheid
 Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.
 
 ```cpp
-struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Float Time = 0.0;
   struct nameResult { Text result = ""; };
-  KERN_PURE nameResult name() { return {"water"}; }
-  void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
+  KERN_OVERRIDE KERN_PURE nameResult name() { return {"water"}; }
+  KERN_OVERRIDE void frame_uniforms(Object<kern::UniformCache> cache = Object<kern::UniformCache>{}, Object<kern::Renderer> renderer = Object<kern::Renderer>{}) {
+    engine_uniform_cache_set_float(cache, 3, Time);
+  }
 };
 ```
 
 - **Sprache:** `Graph::implements` nennt die Schnittstelle mit ihrem Namen in den Blueprints (`EngineInterface::name`:
-  `App`, `ShaderExtension`, `net_Transport`); JSON `"implements"`, im Text die letzte Basis `kern::Implements<"…">`. Die
-  Funktionen des Blueprints mit den Namen der virtuellen Funktionen sind, was die Engine ruft: jede hat die Eingänge des
+  `App`, `ShaderExtension`, `net_Transport` – die eine Regel der Engine-Namen: der C++-Name unter `kern::`, `::` als `_`,
+  `logic::engine_class_name`); JSON `"implements"`, im Text die letzte Basis mit dem **Typ** der Schnittstelle,
+  `kern::Implements<kern::ShaderExtension>` (kein Text; ein Typ, der keine Schnittstelle ist, ist ein Fehler beim Lesen
+  und in der Klasse ein `static_assert` mit Grund). Welche Funktionen des Blueprints die Engine ruft, sagt jede selbst:
+  `KERN_OVERRIDE` (`Function::overrides`, JSON `"overrides"`) – nicht der Name allein. Sie sind, was die Engine ruft: jede hat die Eingänge des
   Knotens dieser Funktion nach dem ersten (das Objekt ist der Blueprint selbst) und seine Ausgänge, in ihrer Reihenfolge,
-  von ihren Typen – ein Objekt der Engine als Handle (`Int engine`), ein Struct der Engine als Struct des Blueprints
+  von ihren Typen – ein Objekt der Engine als `Object<I>` seiner Klasse (`Object<kern::Engine> engine`, kern/docs/engine_object.md), ein Struct der Engine als Struct des Blueprints
   (`Frame frame`), `const char*` als Text.
 - **Regeln (check):** die Schnittstelle gibt es; jede reine virtuelle Funktion hat der Blueprint; jede Funktion mit dem
   Namen einer virtuellen hat deren Eingänge und Ausgänge (keine Referenz: die Engine übergibt Werte) und ist seine eigene;
-  eine Bibliothek ist kein Objekt. Eine nicht reine, die der Blueprint nicht hat, ist die der Schnittstelle.
+  eine Bibliothek ist kein Objekt. Fehler mit Grund: eine Funktion mit `KERN_OVERRIDE`, die die Schnittstelle nicht hat
+  (ein Tippfehler `upadte` – die Meldung nennt die Funktionen der Schnittstelle), eine Funktion mit dem Namen einer
+  virtuellen ohne `KERN_OVERRIDE`, und `KERN_OVERRIDE` in einem Blueprint, der nichts implementiert. Eine nicht reine,
+  die der Blueprint nicht hat, ist die der Schnittstelle – `check` sagt das als Hinweis (kein Fehler), je Funktion.
+  Geprüft: `engine_interface_overrides_are_said`.
 - **Engine:** `tools/engine_api.py` schreibt aus dem Header je Schnittstelle die Tabelle (`engine_interfaces()`,
   `EngineVirtual`: Name, Knoten, rein) und im `engine_calls.gen.cpp` ihres Teils den **Adapter**
   (`Implements_<Name>`, eine Klasse, die von der Schnittstelle erbt): jede virtuelle Funktion gibt dem Blueprint, was die
@@ -1547,13 +1602,13 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
   extensions)`).
 - **Klasse:** `kern::logic::implementation(blueprint)` macht das Objekt der Schnittstelle aus der Klasse eines Blueprints
-  (sie leitet von `kern::Implements<"…">` ab): `ClassImplements_<Name><B>` in `engine_nodes.gen.h`, je virtuelle Funktion
+  (sie leitet von `kern::Implements<I>` ab): `ClassImplements_<Name><B>` in `engine_nodes.gen.h`, je virtuelle Funktion
   die der Klasse gleichen Namens, typisiert gerufen – was die Engine gibt, als `engine_values::Given` (gelesen, wo die
   Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
   Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
   `engine_interface_a_class_implements`.
 - **Der feste Schritt einer Welt** (`kern/game/runtime.h`, `kern/docs/project.md` 6.1): ein Objekt, das
-  `kern::game::FixedStep` ist (C++ oder ein Blueprint mit `kern::Implements<"game_FixedStep">`), gibt das Programm
+  `kern::game::FixedStep` ist (C++ oder ein Blueprint mit `kern::Implements<kern::game::FixedStep>`), gibt das Programm
   seiner Welt mit `GameWorld::set_fixed_step`; die Welt ruft `fixed_step(dt)` in jedem festen Schritt nach der Physik
   und vor dem Event Tick der Blueprints. Geprüft: `game_world_fixed_step`. (Die frühere Anmeldung eines Knotentyps aus
   einem Objekt, `register_node_type`, ist entfernt.)
@@ -1576,11 +1631,16 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 - **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
   Schnittstelle (eine mit `?` darf fehlen).
 - **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
-  `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
+  `state_classes`) – `static T x;` in einer Funktion des umgewandelten Namensraums (`Game& game() { static Game g; return g; }`)
+  oder im Einstieg `int kern_main() { static MeinSpiel app; return kern::run(app); }` außerhalb jedes Namensraums –
+  und die das Programm auf keinem anderen Weg macht (Feld, lokale Variable, Wert, `new`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
   Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
-  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
+  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<kern::App>` im Text, ihre Funktionen mit `KERN_OVERRIDE`), ihre Overrides sind seine
   Funktionen mit den Namen der Schnittstelle – sobald jede reine geschrieben ist (bis dahin hat die Engine kein Objekt
   von ihm: was noch wartet, hält die Schnittstelle von ihm fern wie jeden Aufrufer); was dann nicht passt, sagt check().
+  Ist eine solche Klasse kein Zustand, sagt die Wartemeldung warum („has a base class, and it is no state: 2 objects of
+  it have static storage …“ / „… makes objects of it in other ways too“ / „its base is no interface of the engine“).
+  Die Parameter ihrer Overrides sind Werte in der Reihenfolge von C++ (die Engine reicht Werte: `update(Int, Frame)`).
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.
@@ -1588,9 +1648,8 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 **Die Blueprints der Welt.** Was eine Logik laufen lässt, sieht ein Blueprint mit dem Knoten der Engine
 `engine.game.blueprints_running` (`kern::game::blueprints_running(const logic::Runtime&)`, das Handle aus
 `engine.game_world.logic_runtime`): je Blueprint Name, Stufe, Zahl der Funktionen und Knoten seines Graphen, ob er
-angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Ohne Kopie, einzeln: `engine.game.blueprint_count`
-und je Index `blueprint_name` (die Referenz, wo die Logik den Namen hält), `blueprint_tier`, `blueprint_functions`,
-`blueprint_nodes`, `blueprint_disabled` – ein Index ohne Blueprint nennt keinen („“, 0, false). Die Sprache selbst (`kern::logic::`) hat keine
+angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Das ist der eine Weg (keine zweiten Knoten je Index,
+deren Index zwischen zwei Fragen einen anderen Blueprint nennen könnte). Die Sprache selbst (`kern::logic::`) hat keine
 Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `engine_blueprints_running`.
 
 ### Formeln
@@ -2078,8 +2137,9 @@ C++, aus dem der Blueprint stammt.) Ohne Zuhörer ist es ein Vergleich mit null.
 **Aus C++ direkt.** Ein Programm, dessen eigenes C++ einen Blueprint des Levels ruft (eine Datei
 des Programms, die zu einem Blueprint geworden ist), ruft ihn als seine Klasse – typisiert, ohne
 Nachschlagen beim Namen, ohne verpackte Werte (`kern/logic/blueprint_class.h`):
-`tools/blueprint_cpp.sh level.klevel out.cpp out.h <Ordner>` schreibt die Klassen der Blueprints
-dieses Ordners des Levels und der Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
+`tools/blueprint_cpp.sh --project spiel.kproject level.klevel out.cpp out.h` schreibt die Klassen der Blueprints
+des Projekts (des Programms – welche es sind, sagt der Ort, nie ein Ordnername; `kern/docs/project.md` 1.) und der
+Bibliotheken, die sie benutzen, in den Header `out.h` (je einmal,
 unter ihren Namen im Namensraum `blueprints`). Jede dieser Klassen steht in einem Header für sich
 (`out/<Namensraum>.h`, er bindet die Header der Bibliotheken ein, die sie benutzt), mit dem, wie ihre
 Strukturen als Werte gehalten werden (`kern::logic::detail::Held`): jede Datei des Programms, die die

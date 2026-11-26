@@ -39,10 +39,11 @@
 
 namespace kern {
 /// A Blueprint that is the object of an interface of the engine (Graph::implements; kern/docs/blueprint_cpp.md,
-/// "Schnittstellen der Engine") names it as its last base - the engine calls its functions of the interface's names:
-///   struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> { ... Text vertex() { ... } ... };
+/// "Schnittstellen der Engine") names it as its last base - by the interface's C++ type, not by a text. Each function
+/// the engine calls on it says so (KERN_OVERRIDE):
+///   struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... KERN_OVERRIDE Text vertex() { ... } ... };
 /// kern::logic::implementation(blueprint) makes the engine's object of a Blueprint's class (engine_nodes.gen.h).
-template <Setting Interface> struct Implements {};
+template <class Interface> struct Implements {};
 }  // namespace kern
 
 namespace kern::logic::engine_direct {
@@ -51,8 +52,11 @@ template <class M> struct MemberOf {};
 template <class R, class C> struct MemberOf<R C::*> { using type = C; };
 /// The adapter of an interface for a Blueprint's class (engine_nodes.gen.h writes one per interface: `template <class B>
 /// using adapter = ...`).
-template <Setting Interface> struct InterfaceOf;
-template <Setting S> InterfaceOf<S> interface_of(const ::kern::Implements<S>&);
+template <class> inline constexpr bool kNoInterface = false;
+template <class Interface> struct InterfaceOf {
+  static_assert(kNoInterface<Interface>, "kern::Implements<I>: I is no interface of the engine (tools/engine_api.py writes one InterfaceOf per class of the engine with virtual functions that are nodes; kern/docs/blueprint_cpp.md, \"Schnittstellen der Engine\")");
+};
+template <class I> InterfaceOf<I> interface_of(const ::kern::Implements<I>&);
 }  // namespace kern::logic::engine_direct
 
 namespace kern::logic::engine_values {
@@ -86,39 +90,50 @@ template <> struct Direct<Bool> {
   template <class B> static B make(EngineObjects&, bool c) { return B(c); }
   static void pass(EngineObjects&, bool) {}
 };
-/// (A whole number - or a pointer to an object of the engine: its handle; or an object of the engine a
-/// value holds as a value: the one of the handle, copied there.)
 template <> struct Direct<Int> {
-  template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) {
+  template <class B, class C> static void from(EngineObjects&, const B& b, C& c) {
     static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
+    static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
     const i64 v = normal(static_cast<i64>(b));
+    if constexpr (is_count<C>) c = C(static_cast<u32>(v));
+    else c = static_cast<C>(v);
+  }
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
+    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
+    static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
+    if constexpr (is_count<C>) return B(normal(static_cast<i64>(static_cast<u32>(c))));
+    else return B(normal(static_cast<i64>(c)));
+  }
+  template <class C> static void pass(EngineObjects&, const C&) {}
+};
+/// An object of the engine (an Object<I> of the class: its ObjectRef) - a pointer to it, or one a value holds as a
+/// value (the one it refers to, copied there). As Conv<Handle> of the door: one of another world, or of no object of
+/// the class, is null, and the call fails (EngineObjects::error says why; the call asks before it calls the engine).
+template <> struct Direct<Handle> {
+  template <class B> static ObjectRef ref_of(const B& b) {
+    if constexpr (std::is_same_v<B, ObjectRef>) return b;
+    else return b.ref;
+  }
+  template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) {
     if constexpr (std::is_pointer_v<C>) {
-      c = o.get<std::remove_pointer_t<C>>(v);
-    } else if constexpr (std::is_class_v<C> && !is_count<C>) {
-      if (const C* p = o.get<C>(v)) c = *p;
-      else c = blank<C>();
+      c = object_in<std::remove_pointer_t<C>>(o, Value::object(ref_of(b)));
     } else {
-      static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number");
-      if constexpr (is_count<C>) c = C(static_cast<u32>(v));
-      else c = static_cast<C>(v);
+      static_assert(std::is_class_v<C>, "an Object pin of something else than an object of the engine");
+      if (const C* p = object_in<C>(o, Value::object(ref_of(b)))) c = *p;
+      else c = blank<C>();
     }
   }
   template <class B, class C> static B make(EngineObjects& o, const C& c) {
-    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
-    if constexpr (std::is_pointer_v<C>) {
-      return B(normal(c ? o.adopt(*c) : 0));
-    } else if constexpr (std::is_class_v<C> && !is_count<C>) {
-      return B(normal(o.own(std::make_unique<C>(c))));
-    } else {
-      static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number");
-      if constexpr (is_count<C>) return B(normal(static_cast<i64>(static_cast<u32>(c))));
-      else return B(normal(static_cast<i64>(c)));
-    }
+    ObjectRef r;
+    if constexpr (std::is_pointer_v<C>) r = o.ref(c ? o.adopt(*c) : 0);
+    else r = o.ref(o.own(std::make_unique<C>(c)));
+    if constexpr (std::is_same_v<B, ObjectRef>) return r;
+    else return B(r);
   }
   template <class C> static void pass(EngineObjects& o, const C& c) {
     if constexpr (std::is_pointer_v<C>) {
       if (c) o.adopt(*c);
-    } else if constexpr (std::is_class_v<C> && !is_count<C>) {
+    } else {
       o.own(std::make_unique<C>(c));
     }
   }
@@ -393,8 +408,8 @@ class String {
 
 /// An output of a call that failed before it was given: the zero of its type (a struct: its defaults).
 template <class B> void none(B& b) { b = B{}; }
-/// An object of the engine a function gave, as the Int the class holds: its handle.
-template <class B> B handle_as(i64 handle) { return B(normal(handle)); }
+/// An object of the engine a function gave, as the Object<I> the class holds: its handle in these objects.
+template <class B> B object_as(EngineObjects& o, i64 handle) { return B(o.ref(handle)); }
 
 namespace direct {
 template <class R> struct Hold {   // what a function gave by value: kept here
@@ -578,9 +593,9 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
   }
   using PlaceOps<Place, Tag, C, B>::operator=;
 
-  /// The node ran: the place of the object of `handle` (what the engine holds there: `at`, null where the
-  /// class has not the engine's objects or the handle names no object).
-  void kern_bind(const BlueprintWorld& world, i64 handle, const typename P::In& in, C* at) {
+  /// The node ran: the place of the object `handle` refers to (what the engine holds there: `at`, null where the
+  /// class has not the engine's objects or the reference names no object).
+  void kern_bind(const BlueprintWorld& world, ObjectRef handle, const typename P::In& in, C* at) {
     kern_world = &world;
     kern_handle = handle;
     kern_in = in;
@@ -591,7 +606,7 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
   /// further inputs, as the node was given them).
   void kern_bind(const BlueprintWorld& world, std::vector<Value> door_in) {
     kern_world = &world;
-    kern_handle = door_in.empty() ? 0 : door_in[0].as_int();
+    kern_handle = door_in.empty() ? ObjectRef{} : door_in[0].as_object();
     kern_door_in = std::move(door_in);
     kern_at = nullptr;
     kern_generation = 0;
@@ -626,7 +641,7 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
         host->engine(P::set, given, none);
       }
     };
-    std::vector<Value> in = kern_door_in.empty() ? std::vector<Value>{Value::integer(kern_handle)} : kern_door_in;
+    std::vector<Value> in = kern_door_in.empty() ? std::vector<Value>{Value::object(kern_handle)} : kern_door_in;
     std::vector<Value> out{Value::zero(pin_type_of<B>())};
     if (!host || !host->engine(P::get, in, out)) return none(r);
     auto door = std::make_shared<Door>();
@@ -647,7 +662,7 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
     return r;
   }
   const BlueprintWorld* kern_world = nullptr;
-  i64 kern_handle = 0;
+  ObjectRef kern_handle;
   typename P::In kern_in{};
   std::vector<Value> kern_door_in;   // (only without the engine's objects - nothing is asked for it else)
   mutable C* kern_at = nullptr;

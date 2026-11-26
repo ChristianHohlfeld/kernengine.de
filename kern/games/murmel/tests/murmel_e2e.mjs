@@ -67,23 +67,46 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   const cmd = c => page.evaluate(c => window.KernStudio.command(c), c);
   const state = () => page.evaluate(() => window.KernStudio.state);
   const status = () => page.evaluate(() => window.KernStudio.status);
-  await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")});
-  check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject");
+  // (a project opens with its levels: each one it names; its start level is the open level)
+  const project = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"));
+  const without = await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")});
+  check(without?.ok === false && /not given: levels\/wiese\.klevel, levels\/bruecke\.klevel/.test(without.error ?? ""), "a project without its levels is refused, the levels named (" + (without?.error ?? "-") + ")");
+  const levels = Object.fromEntries(project.levels.map(l => [l, fs.readFileSync(path.join(game, l), "utf8")]));
+  await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"), levels});
+  check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject with its levels");
   // the project's input actions in its settings (kern/docs/app.md 4.): shown, and a wrong name is refused with its place
   const input = (await state()).project?.settings?.input;
   check(input?.actions?.some(x => x.name === "jump") && input?.axes?.some(x => x.name === "moveX"), "the editor shows the project's actions and axes (" + JSON.stringify(input ?? null).slice(0, 120) + ")");
   check(await page.evaluate(() => !!document.querySelector('#projectBody [data-kind="actions"][data-name="jump"] input.binding')), "the project panel has a row for the action jump");
   const wrong = await cmd({cmd: "projectSet", settings: {...(await state()).project.settings, input: {actions: [{name: "jump", keys: ["spcae"]}]}}});
   check(wrong?.ok === false && /input\.actions\[0\]\.keys\[0\]: unknown name "spcae"/.test(wrong.error ?? ""), "a key the engine has not is refused with its place (" + (wrong?.error ?? "-") + ")");
-  const start = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8")).startLevel;
-  await cmd({cmd: "open", text: fs.readFileSync(path.join(game, start), "utf8"), name: "wiese"});
-  check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "it opens the start level " + start);
+  const start = project.startLevel;
+  check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "opening the project opens its start level " + start);
+  // The player of this check uses the keyboard only (the keys reach the editor from the window, the page has the
+  // focus). In Play the pointer is locked - headless Chromium grants it without a gesture -, every movement of a locked
+  // mouse turns the camera, and a mouse event the test sends under the lock comes with a movement of its own (seen in
+  // CI 45742664680 and 45743657968: the click's move, then -340/-341 px with each press and release), so the arrow
+  // would roll the marble past the coin. So the test sends no mouse event in Play.
   await cmd({cmd: "play", mode: "play"});
   check(await until(async () => /Level 1/.test((await status()).hud?.message ?? "")), "Play runs the level's Blueprint (its message: " + ((await status()).hud?.message ?? "-") + ")");
-  const box = await page.locator(".vp canvas, #gl").first().boundingBox();
-  if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  // (every mouse movement the page sees from here on, and whether the pointer was locked: printed with the state below)
+  await page.evaluate(() => { window.__moves = []; document.addEventListener("mousemove", e => window.__moves.push([e.movementX, e.movementY, !!document.pointerLockElement])); });
+  // (the world takes input once it steps: its first fixed step)
+  check(await until(async () => ((await status()).sim?.steps ?? 0) > 0), "the world steps (" + ((await status()).sim?.steps ?? "-") + " steps)");
+  // (what the editor knows while the key is held: printed when the marble does not reach the coin)
+  const seen = () => page.evaluate(() => {
+    const s = window.KernStudio.status, st = window.KernStudio.state, a = document.activeElement;
+    return {play: s.play, paused: s.paused, captured: s.captured, fps: s.fps, steps: s.sim?.steps, hud: s.hud && {score: s.hud.score, status: s.hud.status, message: s.hud.message},
+            focus: document.hasFocus(), visible: document.visibilityState, active: a ? a.tagName + (a.id ? "#" + a.id : "") + (a.className ? "." + String(a.className).split(" ")[0] : "") : null,
+            locked: !!document.pointerLockElement, logicOpen: !!st?.logic?.open, layout: st?.prefs?.layout, activeView: (st?.viewports ?? []).findIndex(v => v.active), moves: (window.__moves ?? []).slice(0, 12), moveCount: (window.__moves ?? []).length};
+  });
+  const before = await seen();
   await page.keyboard.down("ArrowUp");
-  check(await until(async () => ((await status()).hud?.score ?? 0) >= 10, 90000), "an arrow key rolls the marble over a coin in the editor (score " + ((await status()).hud?.score ?? "-") + ")");
+  const rolled = await until(async () => ((await status()).hud?.score ?? 0) >= 10, 90000);
+  const moved = await page.evaluate(() => (window.__moves ?? []).some(([x, y]) => x || y));
+  console.log((rolled ? "" : "(not rolled) ") + "editor before the key:", JSON.stringify(before), "\neditor after:", JSON.stringify(await seen()));
+  check(!moved, "the mouse does not move while the arrow is held (a locked mouse looks around)");
+  check(rolled, "an arrow key rolls the marble over a coin in the editor (score " + ((await status()).hud?.score ?? "-") + ")");
   await page.keyboard.up("ArrowUp");
   check(errors.length === 0, "no page errors in the editor" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await page.close();

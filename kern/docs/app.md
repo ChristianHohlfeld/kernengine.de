@@ -149,5 +149,7 @@ zwischengespeichert werden, weiß die Engine.
 | Fehler | fehlende Quelle, Projekt, das nicht liest, Level, dessen Blueprints nicht C++ werden: der Bau bricht mit Ort und Grund ab. |
 | bewusst nicht | ein Bausystem (make/cmake), Bibliotheken der Engine als .a/.so, Bau aus dem Editor heraus. |
 
-Geprüft: CI-Job `murmel` (Spieltest über `build_native.sh`, Interpreter und Klassen), `murmel-web` (`kern/build.sh
+Geprüft: CI-Job `native-build` (`kern/tests/native_build/run.sh`: ein Minimalprojekt der Engine selbst – Level im
+Projekt, Aktion, Widget, Stand – mit `--project` und `--classes`, und eine fehlende Quelle als Fehler), CI-Job `murmel`
+(Spieltest über `build_native.sh`, Interpreter und Klassen), `murmel-web` (`kern/build.sh
 --project`), der Export eines Projekts im Job `murmel-web` (die Seite für sich startet das Spiel).

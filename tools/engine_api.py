@@ -2,6 +2,8 @@
 """The engine as nodes: what the engine's headers declare, as nodes of the Blueprint language.
 
   tools/engine_api.py [--list]
+  tools/engine_api.py --check <level.klevel | texts dir>   what it names of the engine's libraries that they do not have
+  tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp
 
 A function a header of the engine declares and does not define there is something only the engine
 can do: cast a ray through the physics world, draw a mesh, play a sound. Each is a node - for
@@ -71,7 +73,7 @@ def c_text(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
 
 
-def table_text(api, functions, interfaces=()):
+def table_text(api, functions, interfaces=(), classes=()):
     lines = ["// The engine's functions as nodes: the table (written by tools/engine_api.py from the engine's headers -",
              "// see kern/logic/engine_api.h; not edited by hand).",
              '#include "kern/logic/engine_api.h"', "", "namespace kern::logic {", "",
@@ -79,7 +81,11 @@ def table_text(api, functions, interfaces=()):
     for f in functions:
         def pins(ps):
             out = []
-            for name, bt, _ in ps:
+            for name, bt, h in ps:
+                # (an object of the engine is an Object<I> of its class at every pin - never a number: kern/docs/engine_object.md)
+                if h is not None and c2b.object_class(bt) != h:
+                    raise SystemExit(f"engine_api.py: {f['type']} has the pin {name} of an object of the engine ({h}) as {bt}, not Object<{h}> - "
+                                     "an object of the engine is never a number (kern/docs/engine_object.md)")
                 t, of = api.pin(bt)
                 count = f.get("counts", {}).get(name) if ps is f["outs"] else None   # (an output list the engine writes through a pointer: its count)
                 per = f.get("per", {}).get(name, 1) if count else 1                  # (... and how many numbers each it counts is)
@@ -97,6 +103,12 @@ def table_text(api, functions, interfaces=()):
     for q, name, virtuals, waits in interfaces:
         fs = ", ".join(f"{{{c_text(f['decl']['name'])}, {c_text(f['type'])}, {'true' if pure else 'false'}" + (f", {c_text(why)}" if why else "") + "}" for f, pure, why in virtuals)
         lines.append(f"      {{{c_text(name)}, {c_text(q)}, {{{fs}}}" + (f", {c_text(waits)}" if waits else "") + "},")
+    lines += ["  };", "  return all;", "}", ""]
+    # the classes of the engine a Blueprint holds objects of (EngineClass): Object<kern::physics::World> - with the
+    # classes each derives from that are objects of the engine too (an Object of one goes where one of those is wanted)
+    lines += ["const std::vector<EngineClass>& engine_classes() {", "  static const std::vector<EngineClass> all = {"]
+    for q, bases in classes:
+        lines.append(f"      {{{c_text(c2b.type_name_of(q))}, {c_text(q)}, {{{', '.join(c_text(c2b.type_name_of(b)) for b in bases)}}}}},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -181,8 +193,9 @@ def case_text(api, functions):
             continue
         node += 1
         maker, name, mk = life["make"]["type"].replace(".", "_"), f["type"].replace(".", "_"), node
-        variables.append(f"  Int H{k} = 0;")
-        members.append(f"  struct {{ Int result = 0; }} n{mk};")
+        ot = life["make"]["outs"][0][1]   # (what the maker gives: an Object of the class)
+        variables.append(f"  {ot} H{k} = {ot}{{}};")
+        members.append(f"  struct {{ {ot} result = {ot}{{}}; }} n{mk};")
         node += 1
         members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
         lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"] + [value(bt) for _, bt, _ in f["ins"][1:]], f"P{k}", node)]
@@ -395,7 +408,7 @@ class Calls:
             outs_at = {o: j for j, (o, _, _) in enumerate(f["outs"])}
             for k, how in enumerate(self.handed(f)):
                 if how[0] == "handle":
-                    args.append(f"Value::integer(o_.adopt<{how[1]}>(kern_p{k}))")
+                    args.append(f"Value::object(o_.ref(o_.adopt<{how[1]}>(kern_p{k})))")
                 elif how[0] == "value":
                     args.append(f"ev::Conv<{self.tag(how[1], need)}>::to(o_, kern_p{k})")
                 elif how[0] == "list":
@@ -457,7 +470,7 @@ class Calls:
 
     def class_adapter_text(self, q, name, virtuals, need):
         """The engine's object of the interface q that a Blueprint's class is (kern::logic::implementation; the class
-        derives from kern::Implements<"name">): each virtual function calls the class's own function of its name, typed
+        derives from kern::Implements<q>): each virtual function calls the class's own function of its name, typed
         - what the engine hands it made into the class's types where the class reads it (engine_values::Given; an
         object of the engine its handle), what the function gives made into the engine's (Direct::from); one the class
         has not, and one the engine cannot hand to a Blueprint, is the interface's own."""
@@ -487,7 +500,7 @@ class Calls:
             for k, how in enumerate(self.handed(f)):
                 P = ptypes[k]
                 if how[0] == "handle":
-                    args.append(f"{EV}handle_as<::kern::logic::Whole>(kern_o.adopt<{how[1]}>(kern_p{k}))")
+                    args.append(f"{EV}object_as<::kern::logic::Object<{how[1]}>>(kern_o, kern_o.adopt<{how[1]}>(kern_p{k}))")
                 elif how[0] in ("value", "both"):
                     args.append(f"{EV}Given<{self.dtag(how[1], need)}, {P}{'' if P.rstrip().endswith('&') else ' const&'}>(kern_o, kern_p{k})")
                     if how[0] == "both":
@@ -523,7 +536,7 @@ class Calls:
                           f"      return {ret}({member}.data(), {member}.size());", "    }", "  }"]
                 continue
             lines += [f"      auto kern_r = {EV}blank<{ret}>();", f"      {EV}Direct<{tg}>::from(kern_o, kern_given, kern_r);", "      return kern_r;", "    }", "  }"]
-        return [f"// {q} that a Blueprint's class is (kern::Implements<\"{name}\">: kern::logic::implementation)",
+        return [f"// {q} that a Blueprint's class is (kern::Implements<{q}>: kern::logic::implementation)",
                 f"template <class B> class {cls} final : public {q} {{",
                 " public:",
                 f"  explicit {cls}(B& b) : b_(b) {{}}",
@@ -536,7 +549,7 @@ class Calls:
                 "  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }",
                 *kept,
                 "};",
-                f'template <> struct InterfaceOf<"{name}"> {{',
+                f'template <> struct InterfaceOf<{q}> {{',
                 f"  template <class B> using adapter = {cls}<B>;",
                 "};", ""]
 
@@ -546,6 +559,8 @@ class Calls:
         u = self.u
         if c2b.wire(bt) in SCALAR_TAG:   # (an entry of a fixed width - of a List<U8> - is an Int)
             return ev + SCALAR_TAG[c2b.wire(bt)]
+        if c2b.object_class(bt):   # (an object of the engine: Object<I>, its ObjectRef)
+            return ev + "Handle"
         if c2b.callback_parts(bt):
             r, a = c2b.callback_parts(bt)
             return f"{ev}Callback<{self.tag(r, need, ev, types) if r else 'void'}({', '.join(self.tag(x, need, ev, types) for x in a)})>"
@@ -566,6 +581,28 @@ class Calls:
                     self.tag(ft, need, ev, types)
             return f"{ev}Struct<{types}S_{bt}>"
         raise SystemExit(f"engine_api.py: no tag for the Blueprint type {bt}")
+
+    def holds_object(self, f):
+        """Does an input of f that is no object itself hold one (a field of a struct, an entry of a list: Object<I>)?
+        Then a reference in it of another world, or of no object, fails the call before the engine is called
+        (engine_values::object_in) - the door and the class alike."""
+        for _, bt, h in f["ins"]:
+            if h:
+                continue
+            need = set()
+            self.tag(bt, need)
+            types = [bt] + [ft for kind, sb in need if kind == "struct" for _, ft, _, _ in self.u.struct_fields[sb]]
+            while types:
+                t = types.pop()
+                if c2b.object_class(t):
+                    return True
+                if t.startswith("List<"):
+                    types.append(t[5:-1])
+                elif t in self.u.rows:
+                    types.append(self.u.rows[t])
+                elif isinstance(self.struct_q.get(t), tuple):
+                    types += [self.struct_q[t][1], self.struct_q[t][2]]
+        return False
 
     def bases(self, q):
         """The classes of the engine `q` derives from that are objects of it too, the nearest first."""
@@ -636,8 +673,9 @@ class Calls:
         d, role, tree = f["decl"], f.get("role"), self.tree
         if role == "release":
             q = f["class"]
-            return [f"if (!o.release<{q}>(in.empty() ? 0 : in[0].as_int())) {{",
-                    f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
+            pin0 = c_text(f["ins"][0][0])
+            return ["ObjectRef r;", f"if (!ev::object_ref(o, in, 0, {pin0}, r)) return false;",
+                    f"return ev::release_of<{q}>(o, r, {pin0}, {c_text(q.split('::')[-1])});"]
         if f.get("field"):   # (a field of the object: what stands there - "<type>@get" - nothing is called)
             q, (pin0, _, _) = f["class"], f["ins"][0]
             return [f'auto* self = ev::object<{q}>(o, in, 0, {c_text(pin0)});', "if (!self) return false;",
@@ -730,13 +768,15 @@ class Calls:
                 if pin_out is not None:
                     after.append(f"ev::give<{self.tag(outs[pin_out][0], need)}>(o, out, {out_at[pin_out]}, {a});")
         lines += later
+        if self.holds_object(f):   # (an Object in a value that names nothing here: object_in said why)
+            lines.append("if (!o.error.empty()) return false;")
         if f.get("index"):   # (a place of an entry of an array the object holds: its index names one of them, or the call fails)
             a = arg_of[f["ins"][1][0]]
             lines.append(f"if (static_cast<std::size_t>({a}) >= {f['index']}) {{ o.error = {c_text(self.outside_text(f))}; return false; }}")
         if role == "make":
             q = f["class"]
             made = f"new {q}({', '.join(args)})" if mangled else f"new {q}()"
-            lines += [f"out[0] = Value::integer(o.own<{self.kinds(q)}>(std::unique_ptr<{q}>({made})));", "return true;"]
+            lines += [f"out[0] = Value::object(o.ref(o.own<{self.kinds(q)}>(std::unique_ptr<{q}>({made}))));", "return true;"]
             return lines
         call = f"{obj}{d['name']}({', '.join(args)})" if method else f"{f['cpp']}({', '.join(args)})"
         ret = c2b.qtype(d).split("(")[0].strip()
@@ -745,9 +785,9 @@ class Calls:
         else:
             lines.append(f"decltype(auto) r = {call};")
             bt, h = outs["result"]
-            h = h or (self.u.object_of(ret) if bt == "Int" else None)   # (one it gives owned - std::unique_ptr<Transport>: its handle)
+            h = h or c2b.object_class(bt)   # (one it gives owned - std::unique_ptr<Transport>: an Object of it)
             if h:
-                after.insert(0, f"out[0] = Value::integer(ev::handle_of<{self.kinds(h)}>(o, std::forward<decltype(r)>(r)));")
+                after.insert(0, f"out[0] = Value::object(o.ref(ev::handle_of<{self.kinds(h)}>(o, std::forward<decltype(r)>(r))));")
             else:
                 after.insert(0, f"ev::give<{self.tag(bt, need)}>(o, out, 0, r);")
         return lines + after + ["return true;"]
@@ -763,7 +803,12 @@ class Calls:
     PLAIN = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
 
     def templated(self, bt):
-        return bt not in self.PLAIN and not (bt.startswith("List<") and bt[5:-1] in self.PLAIN)
+        return bt not in self.PLAIN and not (bt.startswith("List<") and bt[5:-1] in self.PLAIN) and not c2b.object_class(bt)
+
+    @staticmethod
+    def object_cpp(bt):
+        """The C++ type of the class of an Object<q> pin (an object of a class that derives from q goes there too)."""
+        return f"::kern::logic::Object<::{c2b.object_class(bt)}>"
 
     def taken_in(self, name, bt):
         """An input of the class's function as it is taken: what stands at a place it names, or the value."""
@@ -779,7 +824,6 @@ class Calls:
         outputs `given` have been given already."""
         d, role, tree, EV = f["decl"], f.get("role"), self.tree, self.EV
         O = "*kern_o"
-        i64 = "static_cast<::kern::i64>"
         given = []
 
         def give(pin, bt, value):
@@ -791,12 +835,12 @@ class Calls:
 
         def give_handle(pin, handle):
             given.append(pin)
-            return f"kern_n.{pin} = {EV}handle_as<std::remove_cvref_t<decltype(kern_n.{pin})>>({handle});" if mode == "read" else f"(void){handle};"
+            return f"kern_n.{pin} = {EV}object_as<std::remove_cvref_t<decltype(kern_n.{pin})>>({O}, {handle});" if mode == "read" else f"(void){handle};"
         lines = ["kern_o->begin_call();"]
         if role == "release":
             q = f["class"]
             name0 = f["ins"][0][0]
-            return lines + [f'if (!kern_o->release<{q}>({i64}({name0}))) {{ kern_o->error = "the handle names no {q.split("::")[-1]} that was made"; {fail(given)} }}'], None
+            return lines + [f'if (!{EV}release_of<{q}>({O}, {name0}.ref, "{name0}", "{q.split("::")[-1]}")) {fail(given)}'], None
         mangled = d.get("mangledName")
         ptypes = self.ptypes(f)
         parms = [p for p in c2b.kids(d) if p.get("kind") == "ParmVarDecl"]   # (their declarations: an array's length)
@@ -811,7 +855,7 @@ class Calls:
             owner = tree.owner[d["id"]]
             name0, bt0, h0 = f["ins"][0]
             if h0:
-                lines += [f'auto* const kern_self = {EV}object_of<{owner}>({O}, {i64}({name0}), "{name0}");', f"if (!kern_self) {fail(given)}"]
+                lines += [f'auto* const kern_self = {EV}object_of<{owner}>({O}, {name0}.ref, "{name0}");', f"if (!kern_self) {fail(given)}"]
                 obj = "kern_self->"
             else:
                 lines += [f"auto kern_self = {EV}blank<{owner}>();", f"{EV}Direct<{self.dtag(bt0, need)}>::from({O}, {self.taken_in(name0, bt0)}, kern_self);"]
@@ -842,10 +886,10 @@ class Calls:
             bt, h = pin[pin_in]
             if h:
                 if pointer:
-                    lines += [f'{h}* const {a} = {EV}maybe_of<{h}>({O}, {i64}({pin_in}), "{pin_in}");', f"if (!kern_o->error.empty()) {fail(given)}"]
+                    lines += [f'{h}* const {a} = {EV}maybe_of<{h}>({O}, {pin_in}.ref, "{pin_in}");', f"if (!kern_o->error.empty()) {fail(given)}"]
                     args.append(a)
                 else:
-                    lines += [f'{h}* const {a} = {EV}object_of<{h}>({O}, {i64}({pin_in}), "{pin_in}");', f"if (!{a}) {fail(given)}"]
+                    lines += [f'{h}* const {a} = {EV}object_of<{h}>({O}, {pin_in}.ref, "{pin_in}");', f"if (!{a}) {fail(given)}"]
                     args.append(f"*{a}")
                 continue
             tg = self.dtag(bt, need)
@@ -890,6 +934,8 @@ class Calls:
                 if pin_out is not None:
                     after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], a))
         lines += later
+        if self.holds_object(f):   # (as the door: an Object in a value that names nothing here fails the call)
+            lines.append(f"if (!kern_o->error.empty()) {fail(given)}")
         if f.get("index"):   # (a place of an entry of an array the object holds: its index names one of them, or the call fails)
             a = arg_of[f["ins"][1][0]]
             lines.append(f"if (static_cast<std::size_t>({a}) >= {f['index']}) {{ kern_o->error = {c_text(self.outside_text(f))}; {fail(given)} }}")
@@ -906,10 +952,10 @@ class Calls:
         else:
             lines.append(f"decltype(auto) kern_r = {call};")
             bt, h = outs["result"]
-            h = h or (self.u.object_of(ret) if bt == "Int" else None)   # (one it gives owned - std::unique_ptr<Transport>: its handle)
+            h = h or c2b.object_class(bt)   # (one it gives owned - std::unique_ptr<Transport>: an Object of it)
             handle = f"{EV}handle_of<{self.kinds(h)}>({O}, std::forward<decltype(kern_r)>(kern_r))" if h else None
             if mode == "value":
-                lines += [f"return {EV}handle_as<Int>({handle});" if h else f"return {EV}Direct<{self.dtag(bt, need)}>::template make<kern_T>({O}, kern_r);"]
+                lines += [f"return {EV}object_as<kern_T>({O}, {handle});" if h else f"return {EV}Direct<{self.dtag(bt, need)}>::template make<kern_T>({O}, kern_r);"]
             elif mode == "given":
                 self.dtag(bt, need)
             elif h:
@@ -932,6 +978,8 @@ class Calls:
                 return bt
             if bt.startswith("List<") and bt[5:-1] in plain:
                 return bt
+            if c2b.object_class(bt):
+                return self.object_cpp(bt)
             return None
         for f in self.functions:
             headers.add(re.sub(r"^.*/include/", "", self.file_of(f)))
@@ -940,6 +988,8 @@ class Calls:
             for name_, bt, _ in f["ins"]:
                 if bt in plain:
                     params.append(f"{plain[bt]} {name_}")
+                elif c2b.object_class(bt):
+                    params.append(f"{self.object_cpp(bt)} {name_}")
                 elif bt.startswith("List<") and bt[5:-1] in plain:
                     params.append(f"const List<{bt[5:-1]}>& {name_}")
                 else:
@@ -1018,7 +1068,7 @@ class Calls:
                                "};"])
                 lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
                 lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
-                handle = f"static_cast<::kern::i64>({pin})"
+                handle = f"{pin}.ref"
                 P_name = f"engine_direct::P_{name}"
                 taken = []
                 for k_, (n_, bt_, P_) in enumerate(more):
@@ -1275,6 +1325,130 @@ def read_engine(flags=()):
     return tree, c2b.Unit(tree, "Engine")
 
 
+# The headers whose types and functions are the engine's libraries (kern/logic/engine_libraries.h): each one library,
+# named by its path (kern/physics/physics.h: engine_physics_physics).
+LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
+                   "gfx/mesh.h", "gfx/passes.h", "gfx/renderer.h", "gfx/shader.h", "logic/logic.h", "math/math.h", "net/client_server.h",
+                   "net/connection.h", "net/reliable.h", "net/transport.h", "physics/physics.h"]
+
+
+def libraries_text(level):
+    """The engine's libraries as the build of the engine has them: each library's JSON - with what it holds of the
+    engine's libraries it uses, as every Blueprint holds what it uses (they are written together, from the same
+    headers) -, a library after those it uses, with its mark (the hash of its text: what a level that uses it records)."""
+    import hashlib, json
+    graphs = {a["name"]: a["components"]["logic"] for a in level["actors"] if a.get("components", {}).get("logic")}
+    bad = [n for n in graphs if not n.startswith("engine_")]
+    if bad:
+        raise SystemExit(f"engine_api.py --libraries: the engine's libraries would use {', '.join(sorted(bad))} - a library of the engine uses no library of a level")
+    order, seen = [], set()
+    def visit(n, open_=()):
+        if n in seen:
+            return
+        if n in open_:
+            raise SystemExit(f"engine_api.py --libraries: the engine's libraries {', '.join(open_)} use each other")
+        for u in graphs[n].get("uses", []):
+            if u not in graphs:
+                raise SystemExit(f"engine_api.py --libraries: {n} uses {u}, which is no library of the engine")
+            visit(u, (*open_, n))
+        seen.add(n)
+        order.append(n)
+    for n in sorted(graphs):
+        visit(n)
+    lines = ["// The engine's own libraries: the types and functions of its headers as Blueprints (written by tools/engine_api.py",
+             "// --libraries from the engine's headers - see kern/logic/engine_libraries.h; not edited by hand).",
+             '#include "kern/logic/engine_libraries.h"', "", "namespace kern::logic {", "",
+             "const std::vector<EngineLibraryText>& engine_library_texts() {", "  static const std::vector<EngineLibraryText> all = {"]
+    for n in order:
+        text = json.dumps(graphs[n], separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+        assert ')kl"' not in text
+        mark = hashlib.sha256(text.encode()).hexdigest()[:16]
+        lines.append(f'      {{"{n}", "{mark}", R"kl({text})kl"}},')
+    lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
+    return "\n".join(lines)
+
+
+def write_libraries():
+    """Converts the engine's headers into its libraries (tools/cpp_to_blueprint.py --engine) and writes them."""
+    import json, shutil
+    work = tempfile.mkdtemp(prefix="kern-engine-libraries-")
+    try:
+        driver = os.path.join(work, "program", "engine_libraries.cpp")
+        os.makedirs(os.path.dirname(driver))
+        open(driver, "w").write("".join(f'#include "kern/{h}"\n' for h in LIBRARY_HEADERS))
+        level = os.path.join(work, "engine.klevel")
+        json.dump({"format": "kern-level", "version": 1, "name": "engine", "world": {}, "nextId": 1, "actors": []}, open(level, "w"))
+        cmd = [sys.executable, os.path.join(HERE, "cpp_to_blueprint.py"), "--convert", "kern_engine_libraries", "--level", level, "--folder", "Engine"]
+        for h in LIBRARY_HEADERS:
+            cmd += ["--engine", os.path.join(KERN, "include", "kern", h)]
+        cmd += [f"-I{KERN}/include", f"-I{KERN}/third_party/box3d/include", "--", driver]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0 or "were not read" in r.stdout + r.stderr:
+            raise SystemExit("engine_api.py --libraries: the engine's headers do not convert:\n" + (r.stdout + r.stderr)[-4000:])
+        text = libraries_text(json.load(open(level)))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    path = os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp")
+    if not os.path.exists(path) or open(path).read() != text:
+        open(path, "w").write(text)
+    print(f"the engine's libraries: {path}")
+
+
+def built_libraries():
+    """The engine's libraries as engine_libraries.gen.cpp has them: name -> their JSON."""
+    import json
+    text = open(os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp"), encoding="utf-8").read()
+    return {m.group(1): json.loads(m.group(2)) for m in re.finditer(r'\{"(engine_\w+)", "\w*", R"kl\((.*?)\)kl"\}', text, re.S)}
+
+
+def check_level(path):
+    """What a level - or a directory of Blueprint texts (tools/cpp_to_blueprint.py --texts) - names of the engine's
+    libraries that they do not have: each type and function, with who names it. 0: all there."""
+    import json
+    have = {}
+    for name, g in built_libraries().items():
+        have[name] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
+                      "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
+    named = collections.defaultdict(set)   # (library, kind, name) -> who names it
+    if os.path.isdir(path):
+        for f in sorted(os.listdir(path)):
+            if not f.endswith(".cpp") or f.startswith("engine_"):
+                continue
+            text = open(os.path.join(path, f), encoding="utf-8").read()
+            who = f[:-4]
+            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", text):
+                if lib in have and fn not in have[lib]["types"] and not fn.endswith("Result"):
+                    named[(lib, "function", fn)].add(who)
+            for lib in re.findall(r"virtual (engine_\w+)\b", text):
+                if lib not in have:
+                    named[(lib, "library", lib)].add(who)
+    else:
+        for a in json.load(open(path, encoding="utf-8")).get("actors", []):
+            g = (a.get("components") or {}).get("logic") or {}
+            if a["name"].startswith("engine_"):
+                continue
+            for lib in g.get("uses", []):
+                if lib.startswith("engine_") and lib not in have:
+                    named[(lib, "library", lib)].add(a["name"])
+            for k, kind in (("structs", "type"), ("enums", "type"), ("functions", "function")):
+                for x in g.get(k, []):
+                    lib = x.get("from", "")
+                    if lib.startswith("engine_"):
+                        n = x["name"].split("::")[-1]
+                        named[(lib, kind, n)].add(a["name"])
+    missing = []
+    for (lib, kind, n), who in sorted(named.items()):
+        if lib not in have:
+            missing.append(f"{lib}: no library of the engine (named by {', '.join(sorted(who)[:5])})")
+        elif kind != "library" and n not in have[lib]["types" if kind == "type" else "functions"]:
+            missing.append(f"{lib}: the {kind} {n} - the engine does not write it (named by {', '.join(sorted(who)[:5])}{' ...' if len(who) > 5 else ''})")
+    for m in missing:
+        print(m)
+    print(f"{len(missing)} of {len(named)} things of the engine's libraries that {path} names are not in them"
+          + ("" if not missing else " (tools/engine_api.py --libraries; a type a game needs is marked KERN_BLUEPRINT_TYPE)"))
+    return 1 if missing else 0
+
+
 def stale_outputs(kern, wanted):
     """The files an earlier run wrote that this one does not (the calls of a component that has no node of the engine
     any more: src/<component>/engine_calls.gen.cpp): what this tool writes is exactly the files of its run, so these
@@ -1303,6 +1477,11 @@ def selftest():
 def main(argv):
     if "--selftest" in argv:
         return selftest()
+    if "--check" in argv:   # (what a level names of the engine's libraries that they do not have - no clang, no run)
+        return check_level(argv[argv.index("--check") + 1])
+    if "--libraries" in argv:   # (the engine's libraries: a run of the converter over the headers - minutes, not seconds)
+        write_libraries()
+        return 0
     tree, unit = read_engine()
     api = Api(tree, unit)
     functions, waiting = [], []
@@ -1330,6 +1509,9 @@ def main(argv):
     if api.unsaid:   # (a whole number beside a pointer must say in its type that it is its count: no length is guessed)
         raise SystemExit("engine_api.py: a whole number beside a pointer that does not say in its type that it counts what the pointer shows - "
                          "declare it kern::Count<Per> (Per numbers each):\n  " + "\n  ".join(sorted(set(api.unsaid))))
+    if api.false_places:   # (KERN_PLACE says it is a place of the engine: one that cannot be is no copy in its stead)
+        raise SystemExit("engine_api.py: a declaration says KERN_PLACE but is no place of the engine (kern/docs/blueprint_cpp.md, \"Plätze der Engine\"):\n  "
+                         + "\n  ".join(sorted(set(api.false_places))))
     types = [f["type"] for f in functions]
     assert len(set(types)) == len(types), [t for t in types if types.count(t) > 1]
     if "--list" in argv:
@@ -1343,7 +1525,11 @@ def main(argv):
         calls.default_makers()
         for q, why in sorted(calls.unmade.items()):
             print(f"not made for a handle: {q}: {why}")
-    outputs = (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces())), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
+    # (every class of the engine a node takes or gives an object of, and every interface - with their bases)
+    held = {h for f in functions for _, _, h in [*f["ins"], *f["outs"]] if h} | {q for q, _, _, _ in calls.interfaces()}
+    held = sorted(held | {b for q in held for b in calls.bases(q)})
+    classes = [(q, calls.bases(q)) for q in held]
+    outputs = (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces(), classes)), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
                ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items())
     differ = []   # (--check: what a run would change - written anew or removed)
     for rel, text in outputs:

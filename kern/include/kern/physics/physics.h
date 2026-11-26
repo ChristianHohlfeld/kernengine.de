@@ -15,32 +15,32 @@
 
 namespace kern::physics {
 
-enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 };
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 };
+enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh };
 
 /// What a surface is made of, where a pair of materials has its own measured friction (two
 /// materials do not simply combine: TPU on cotton has its own measured value, not the mean of
 /// TPU on TPU and cotton on cotton). Any pair
 /// not in surface_friction() combines the shapes' friction as Box3D does, sqrt(a x b).
-enum class Surface : u8 { none, cloth, tpu, floor };
+enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor };
 const char* surface_name(Surface s);
 bool parse_surface(const std::string& name, Surface& out);
 /// The friction of a pair of surfaces, or < 0 when the pair has no value of its own.
 f32 surface_friction(Surface a, Surface b);
 /// Box3D's native joints. (The editor's "rope" and "friction" are a limited
 /// distance joint and a motor joint without springs.)
-enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
+enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
 
-struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } };
-struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } };
-struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } };
+struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } };
+struct KERN_BLUEPRINT_TYPE Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } };
+struct KERN_BLUEPRINT_TYPE Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } };
 
-struct Pose {
+struct KERN_BLUEPRINT_TYPE Pose {
   Vec3 position;
   Quat rotation;
 };
 
-struct WorldSettings {
+struct KERN_BLUEPRINT_TYPE WorldSettings {
   Vec3 gravity{0, 0, -9.80665f};
   bool enable_sleep = true;
   bool enable_continuous = true;
@@ -53,7 +53,7 @@ struct WorldSettings {
   f32 maximum_linear_speed = 400;  // m/s
 };
 
-struct BodySettings {
+struct KERN_BLUEPRINT_TYPE BodySettings {
   BodyType type = BodyType::dynamic;
   Vec3 position;
   Quat rotation;
@@ -69,13 +69,13 @@ struct BodySettings {
 /// - the mask says which categories of shapes the query accepts, the category lets a shape leave
 /// out certain queries (a camera ray, a projectile). The default meets everything; a plain number
 /// is the mask alone.
-struct QueryFilter {
+struct KERN_BLUEPRINT_TYPE QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
 };
 
-struct ShapeMaterial {
+struct KERN_BLUEPRINT_TYPE ShapeMaterial {
   f32 density = 1;            // kg/m^3
   f32 friction = 0.6f;
   f32 restitution = 0;        // 0..1
@@ -88,7 +88,7 @@ struct ShapeMaterial {
   Surface surface = Surface::none;
 };
 
-struct ShapeSettings {
+struct KERN_BLUEPRINT_TYPE ShapeSettings {
   ShapeKind kind = ShapeKind::box;
   Vec3 center;               // body-local placement of the shape
   Quat rotation;
@@ -103,7 +103,7 @@ struct ShapeSettings {
 /// One definition for all joint types; each type reads the fields it needs.
 /// Local frames: revolute, spherical and parallel joints work about the frame's
 /// Z axis, prismatic and wheel joints along its X axis (see frame_from_axis).
-struct JointSettings {
+struct KERN_BLUEPRINT_TYPE JointSettings {
   JointType type = JointType::revolute;
   Body body_a, body_b;
   Pose frame_a, frame_b;         // in body-local space
@@ -140,7 +140,7 @@ struct JointSettings {
 /// Local joint frame at `anchor` whose X (x_axis = true) or Z axis points along `axis`.
 Pose frame_from_axis(Vec3 anchor, Vec3 axis, bool x_axis);
 
-struct RayHit {
+struct KERN_BLUEPRINT_TYPE RayHit {
   bool hit = false;
   Shape shape;
   Body body;
@@ -148,26 +148,26 @@ struct RayHit {
   f32 fraction = 0;
 };
 
-struct TouchEvent {
+struct KERN_BLUEPRINT_TYPE TouchEvent {
   Shape shape_a, shape_b;  // for sensor events: a = sensor, b = visitor
   Body body_a, body_b;
 };
 
-struct HitEvent {
+struct KERN_BLUEPRINT_TYPE HitEvent {
   Shape shape_a, shape_b;
   Body body_a, body_b;
   Vec3 point, normal;
   f32 approach_speed = 0;
 };
 
-struct ContactPoint {
+struct KERN_BLUEPRINT_TYPE ContactPoint {
   Vec3 point, normal;     // world space; normal points from shape A to shape B
   f32 separation = 0;     // negative when penetrating
   f32 impulse = 0;        // normal impulse of the last sub-step
 };
 
 /// A contact plane of a character mover (relative to the mover's origin).
-struct MoverPlane {
+struct KERN_BLUEPRINT_TYPE MoverPlane {
   Vec3 normal;            // outward, away from the shape
   f32 offset = 0;         // separation of a point p = dot(normal, p) - offset
   Vec3 point;             // closest point on the shape (world space)
@@ -176,17 +176,17 @@ struct MoverPlane {
 };
 
 /// Capsule along Z between two sphere centres (relative to an origin).
-struct Capsule {
+struct KERN_BLUEPRINT_TYPE Capsule {
   Vec3 center1, center2;
   f32 radius = 0.3f;
 };
 
-struct MotionLocks {
+struct KERN_BLUEPRINT_TYPE MotionLocks {
   bool linear[3] = {false, false, false};
   bool angular[3] = {false, false, false};
 };
 
-struct Version { i32 major = 0, minor = 0, revision = 0; };
+struct KERN_BLUEPRINT_TYPE Version { i32 major = 0, minor = 0, revision = 0; };
 Version version();
 
 class World {
@@ -357,7 +357,7 @@ class MouseGrab {
 /// pushes dynamic bodies it walks into.
 class CharacterMover {
  public:
-  struct Settings {
+  struct KERN_BLUEPRINT_TYPE Settings {
     f32 radius = 0.4f;
     f32 height = 1.8f;           // feet to head
     f32 step_height = 0.45f;     // the pogo spring carries the capsule this high over the ground

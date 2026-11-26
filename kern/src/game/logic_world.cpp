@@ -1,6 +1,7 @@
 // Kern Logic in the game world: running the level's and the actors' graphs on
 // the authority, the events the simulation raises for them, and the actor
 // operations their nodes use (with automatic replication of what they change).
+#include "kern/logic/engine_libraries.h"
 #include <algorithm>
 #include "kern/game/project.h"
 #include "kern/core/dmath.h"
@@ -35,7 +36,7 @@ void GameWorld::start_logic() {
   logic_ = std::make_unique<logic::Runtime>(*logic_host_);
   logic_->native = logic_native;
   // (the libraries a Blueprint uses: the level's, by the name of the actor that has them, then the project's)
-  logic_->blueprints = world_blueprints(level_, project_);
+  logic_->blueprints = logic::with_engine(world_blueprints(level_, project_));  // (and the engine's own libraries: kern/logic/engine_libraries.h)
   if (!level_.logic.empty()) logic_->add(level_.logic, 0, "Level");
   for (const Actor& a : level_.actors)
     if (a.logic && !a.logic->empty()) logic_->add(*a.logic, static_cast<logic::ActorRef>(a.id), a.name);

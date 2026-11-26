@@ -12,20 +12,11 @@ namespace ev = engine_values;
 
 struct S_Camera { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Camera& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Camera& x); };
 struct S_Mat4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Mat4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
-struct S_PickHit { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickHit& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickHit& x); };
-struct S_PickQuery { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickQuery& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickQuery& x); };
-struct S_PickStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickStats& x); };
 struct S_Ray { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Ray& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Ray& x); };
 Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Float>::to(o, x.fov), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Float>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
 void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
 Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.m)}); }
 void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.m); }
-Value S_PickHit::to(EngineObjects& o, const kern::PickHit& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.mesh), ev::Conv<ev::Int>::to(o, x.instance), ev::Conv<ev::Int>::to(o, x.triangle), ev::Conv<ev::Float>::to(o, x.distance), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Vector>::to(o, x.barycentric)}); }
-void S_PickHit::from(EngineObjects& o, const Value& v, kern::PickHit& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.mesh); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.instance); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.triangle); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.distance); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(5)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.barycentric); }
-Value S_PickQuery::to(EngineObjects& o, const kern::PickQuery& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.max_distance), ev::Conv<ev::Int>::to(o, x.ignore_id), ev::Conv<ev::Bool>::to(o, x.include_invisible), ev::Conv<ev::Int>::to(o, x.layers)}); }
-void S_PickQuery::from(EngineObjects& o, const Value& v, kern::PickQuery& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.max_distance); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.ignore_id); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.include_invisible); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.layers); }
-Value S_PickStats::to(EngineObjects& o, const kern::PickStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.triangles_examined), ev::Conv<ev::Int>::to(o, x.bounds_rejected)}); }
-void S_PickStats::from(EngineObjects& o, const Value& v, kern::PickStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.triangles_examined); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.bounds_rejected); }
 Value S_Ray::to(EngineObjects& o, const kern::Ray& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.origin), ev::Conv<ev::Vector>::to(o, x.direction), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far)}); }
 void S_Ray::from(EngineObjects& o, const Value& v, kern::Ray& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.origin); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.direction); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.near); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.far); }
 
@@ -87,37 +78,17 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   return true;
 }
 
-// engine.pick_meshes: kern::pick_meshes
-bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  std::vector<kern::Mesh*> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 0, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<kern::Ray const&>>();
-  ev::take<ev::Struct<S_Ray>>(o, in, 1, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<kern::PickQuery const&>>();
-  ev::take<ev::Struct<S_PickQuery>>(o, in, 2, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<kern::PickHit&>>();
-  ev::take<ev::Struct<S_PickHit>>(o, in, 3, a3);
-  auto a4 = ev::blank<kern::PickStats>();
-  decltype(auto) r = kern::pick_meshes(kern::Span<kern::Mesh* const>(a0.data(), a0.size()), a1, a2, a3, &a4);
-  ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Struct<S_PickHit>>(o, out, 1, a3);
-  ev::give<ev::Struct<S_PickStats>>(o, out, 2, a4);
-  return true;
-}
-
 // engine.bvh.make: kern::Bvh::Bvh
-bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Bvh>(std::unique_ptr<kern::Bvh>(new kern::Bvh())));
+bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::Bvh>(std::unique_ptr<kern::Bvh>(new kern::Bvh()))));
   return true;
 }
 
 // engine.bvh.release: kern::Bvh::~Bvh
-bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Bvh>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Bvh that was made";
-    return false;
-  }
-  return true;
+bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "bvh", r)) return false;
+  return ev::release_of<kern::Bvh>(o, r, "bvh", "Bvh");
 }
 
 const EngineCall kCalls[] = {
@@ -125,9 +96,8 @@ const EngineCall kCalls[] = {
     {"engine.bvh.empty", &c1},
     {"engine.bvh.triangle_count", &c2},
     {"engine.screen_ray", &c3},
-    {"engine.pick_meshes", &c4},
-    {"engine.bvh.make", &c5},
-    {"engine.bvh.release", &c6},
+    {"engine.bvh.make", &c4},
+    {"engine.bvh.release", &c5},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

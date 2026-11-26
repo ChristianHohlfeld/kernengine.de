@@ -33,6 +33,10 @@ inline bool real_engine() {
 /// own beyond them, its jobs (kern/core/jobs.h): none, the next numbered 1, run where the program pumps them, so that
 /// when a job runs is fixed by the calls alone. Every side begins the same (a job's number is no count of the sides
 /// that ran before it).
+/// The world of the objects of the engine of every side a test compares (kern/docs/engine_object.md): one number, so
+/// that each side holds the same ObjectRefs - the source's (converted::EngineObject), the Blueprint's on the engine
+/// itself; no EngineObjects of the process is given it (theirs count from 1).
+inline constexpr kern::logic::WorldId kTestWorld = 0x7e57;
 inline void fresh_engine(kern::logic::EngineObjects& objects) {
   objects.clear();
   objects.on_missing(kern::logic::engine_make_default);
@@ -99,11 +103,34 @@ inline const kern::json::Value* level_document(std::string* why = nullptr) {
   if (!read.ok && why) *why = read.why;
   return read.ok ? &read.doc : nullptr;
 }
-/// The Blueprint of the level's actor `actor`, read from the level file's text (false: no such actor, or it
-/// has none - `error` says why). The game itself reads the level as a whole (Game::build_level); only the
-/// tests ask for one actor's Blueprint.
+/// The project file's text as a document, read once by a test program (null: the text is none - `why` says so).
+/// The program's Blueprints stand in it (kern/docs/project.md), a world's in the level.
+inline const kern::json::Value* project_document(std::string* why = nullptr) {
+  static const struct Read {
+    kern::json::Value doc;
+    std::string why;
+    bool ok;
+    Read() : ok(kern::json::parse(kern::game::embedded_project_text(), doc, &why)) {}
+  } read;
+  if (!read.ok && why) *why = read.why;
+  return read.ok ? &read.doc : nullptr;
+}
+/// The Blueprint called `actor` - one of the project's (the program's) or that of the level's actor of that name -,
+/// read from the files' texts (false: neither has one of that name - `error` says why). A name stands once, in the
+/// project or in the level (kern/docs/project.md 5.). The game itself reads the level as a whole
+/// (Game::build_level); only the tests ask for one Blueprint.
 inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error) {
   std::string why;
+  const kern::json::Value* project = project_document(&why);
+  if (!project) {
+    error = "the project file: " + why;
+    return false;
+  }
+  for (const kern::json::Value& b : (*project)["blueprints"].items()) {
+    if (b["name"].as_string() != actor) continue;
+    if (!b["logic"].is_object()) break;
+    return kern::logic::graph_from_json(b["logic"], out, &error);
+  }
   const kern::json::Value* document = level_document(&why);
   if (!document) {
     error = "the level file: " + why;
@@ -116,7 +143,7 @@ inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::st
     if (!graph.is_object()) break;
     return kern::logic::graph_from_json(graph, out, &error);
   }
-  error = "the level has no actor \"" + std::string(actor) + "\" with a Blueprint";
+  error = "neither the project nor the level has a Blueprint \"" + std::string(actor) + "\"";
   return false;
 }
 }  // namespace sc::rules
@@ -165,7 +192,7 @@ struct RuleBlueprint {
     /// The engine of a test: the stand-in, which answers by the outputs' forms and keeps every call - or the
     /// engine itself (real_engine), with the objects of this side.
     kern::logic::EngineStandIn stand_in;
-    kern::logic::EngineObjects objects;
+    kern::logic::EngineObjects objects{kTestWorld};
     /// (another that keeps the calls, where a test compares them with those of other code: else this one's -
     /// with the objects of that code)
     kern::logic::EngineStandIn* keeps = nullptr;

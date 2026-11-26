@@ -19,9 +19,9 @@
 
 namespace kern::audio {
 
-enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse };
+enum class KERN_BLUEPRINT_TYPE Wave : u8 { square, saw, sine, triangle, noise, pink, pulse };
 
-struct SynthPatch {
+struct KERN_BLUEPRINT_TYPE SynthPatch {
   Wave wave = Wave::square;
   f32 volume = 0.5f;
   // envelope (seconds): attack, sustain (with optional punch), release
@@ -58,7 +58,7 @@ void make_seamless(std::vector<f32>& samples, u32 rate, f32 crossfade);
 /// Normalises to `peak` (no-op for silence).
 void normalize(std::vector<f32>& samples, f32 peak);
 
-struct BuiltinSound {
+struct KERN_BLUEPRINT_TYPE BuiltinSound {
   const char* name;      // "pickup" -> asset id "builtin:pickup"
   const char* label;
   const char* category;  // Gameplay, Physics, Vehicle, Ambience, UI, Music, Robot

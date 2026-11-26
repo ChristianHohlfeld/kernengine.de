@@ -17,7 +17,7 @@ namespace kern {
 // grid, so the map does not shimmer while the camera moves and the renderer
 // can reuse it until the focus crosses a texel or a shadow caster changes.
 
-struct ShadowOptions {
+struct KERN_BLUEPRINT_TYPE ShadowOptions {
   i32 resolution = 512;  // power of two, 128..4096
   f32 extent = 120;      // half size of the covered square in metres (without a shadow distance)
   f32 bias = 0.0012f;
@@ -62,7 +62,7 @@ class SunShadowMap {
 // fBm cloud layer. Drawn as a fullscreen triangle at the far plane AFTER the
 // opaque scene, so only uncovered pixels run the sky shader.
 
-struct SkyState {
+struct KERN_BLUEPRINT_TYPE SkyState {
   Vec3 sun{-0.45f, -0.52f, 0.72f};
   Vec3 moon{0.4f, 0.5f, 0.76f};
   f32 night = 0;
@@ -73,7 +73,7 @@ struct SkyState {
 };
 
 /// The scene fog as seen by the sky, so distant geometry and the horizon meet.
-struct SkyAtmosphere {
+struct KERN_BLUEPRINT_TYPE SkyAtmosphere {
   Vec3 fog_color{0.474f, 0.584f, 0.716f};  // sRGB, as Lighting::fog_color
   Vec3 sun_color{2.8f, 2.47f, 2.11f};
   Vec3 sun_direction{-0.45f, -0.52f, 0.72f};
@@ -105,13 +105,13 @@ class SkyPass {
 // finished picture. A frame-time guard switches the glow off for the session
 // on devices that cannot keep up (avg > 27 ms for 3.5 s) unless forced.
 
-struct BloomOptions {
+struct KERN_BLUEPRINT_TYPE BloomOptions {
   bool enabled = true;
   bool forced = false;   // never auto-disable
   bool grade = true;     // composite through the production grade
 };
 
-enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class KERN_BLUEPRINT_TYPE BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 
 class BloomPass {
  public:
@@ -119,7 +119,7 @@ class BloomPass {
   /// Binds the scene target for (width, height); false = render directly to the screen.
   bool begin(i32 width, i32 height, f64 now_ms, bool page_hidden);
   /// Ambient occlusion for the composite: the GTAO target (visibility, view depth) and how it maps to the scene.
-  struct Occlusion {
+  struct KERN_BLUEPRINT_TYPE Occlusion {
     u32 texture = 0;
     f32 scale_x = 1, scale_y = 1;  // AO size / scene size
     Mat4 projection;
@@ -166,9 +166,9 @@ class BloomPass {
 // reflections included). Presets as XeGTAO: low 1x2, medium 2x2, high 3x3,
 // ultra 9x3 (slices x steps per side).
 
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 
-struct AoOptions {
+struct KERN_BLUEPRINT_TYPE AoOptions {
   bool enabled = true;
   AoQuality quality = AoQuality::medium;
   bool half_resolution = true;  // mobile default; desktop: full resolution, high

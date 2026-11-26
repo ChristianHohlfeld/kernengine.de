@@ -9,7 +9,7 @@
 
 namespace kern {
 
-struct Ray {
+struct KERN_BLUEPRINT_TYPE Ray {
   Vec3 origin;
   Vec3 direction{0, 0, -1};  // unit length
   f32 near = 0.05f, far = 1800;

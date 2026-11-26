@@ -9,7 +9,7 @@
 namespace kern {
 
 /// Plain geometry container (triangle soup when `indices` is empty).
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -37,7 +37,7 @@ struct MeshData {
 class Renderer;
 
 /// How a MeshData is drawn: what a MeshInput holds besides its streams.
-struct MeshLook {
+struct KERN_BLUEPRINT_TYPE MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
   u32 texture = 0;      // GPU texture handle (0 = none)
@@ -52,7 +52,7 @@ struct MeshLook {
 /// is read where it is, nothing of it is copied but what the renderer keeps.
 bool upsert(Renderer& renderer, u32 id, const MeshData& mesh, const MeshLook& look, Span<const f32> transforms = {}, Span<const f32> tints = {});
 
-struct WeldStats {
+struct KERN_BLUEPRINT_TYPE WeldStats {
   u32 source_vertices = 0, unique_vertices = 0;
   std::size_t bytes_before = 0, bytes_after = 0;
   bool indexed = false;

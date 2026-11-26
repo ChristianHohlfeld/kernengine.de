@@ -44,6 +44,8 @@
 #pragma once
 
 #include <cmath>
+#include <compare>
+#include <type_traits>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -70,27 +72,35 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// that reads them (Compare Int64 <, <u; Int64 Math /s, /u), as in WebAssembly. `map`: values of
 /// one type, each under a key of its own, in the order the keys came; `set`: keys in the order
 /// they came - of what types says the name beside it (keyed_of).
+/// `object`: an object of the engine (kern/docs/engine_object.md), Object<I> - TypeRef::of names its class or
+/// interface by the rule of the engine's names in Blueprints (kern::App: "App", kern::physics::World:
+/// "physics_World"); its value is an ObjectRef - a handle in the objects of one world and that world, never a number.
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64, object,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list, object_list,
   map, set,
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
   callback, count
 };
-constexpr u8 kValueTypes = 9;  // boolean ... int64
+constexpr u8 kValueTypes = 10;  // boolean ... object
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
-constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::int64_list; }
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::object_list; }
 /// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
 constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::set; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::int64 ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::object ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",      "object",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list", "object_list",
                                                      "map",       "set",      "callback"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
+/// A class of the engine as a Blueprint names it - the one rule of the engine's names (kern/docs/engine_object.md):
+/// its C++ name under kern::, "::" written "_". kern::App is "App", kern::physics::World "physics_World".
+std::string engine_class_name(std::string_view cpp);
+/// The C++ name of a class of the engine a Blueprint names: "physics_World" is "kern::physics::World".
+std::string engine_class_cpp(std::string_view name);
 /// The type with that name (also "number", "double", "boolean", "integer", "string").
 constexpr bool pin_type_from_name(std::string_view name, PinType& out) {
   for (u32 i = 0; i < static_cast<u32>(PinType::count); ++i)
@@ -154,6 +164,49 @@ struct ActorHandle {
   bool operator==(const ActorHandle&) const = default;
 };
 
+/// The number of a world: of one collection of objects of the engine (EngineObjects::world) - of a GameWorld, of a
+/// program's runtime. 0 is none. A reference to an object of the engine or (kern/docs/engine_object.md) to an actor
+/// says in which world it is: looked up in another one, it names nothing - and says so.
+using WorldId = u32;
+
+/// An object of the engine as a Blueprint holds it (PinType::object, Object<I> in its C++): its handle in the
+/// objects of its world, and that world. Which class it is of says its type (TypeRef::of), not the value.
+/// {0, 0} is no object - what a variable of the type starts as; nothing that fails gives anything else
+/// without saying why (kern/docs/engine_object.md).
+struct ObjectRef {
+  i64 handle = 0;
+  WorldId world = 0;
+  constexpr bool valid() const { return handle != 0 && world != 0; }
+  friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+  /// (an order for Sort List: by world, then by handle - the same in every tier)
+  friend constexpr auto operator<=>(ObjectRef a, ObjectRef b) {
+    if (a.world != b.world) return a.world <=> b.world;
+    return a.handle <=> b.handle;
+  }
+};
+/// An object of the engine of the class I in a Blueprint's class: Object<kern::App> (I is the engine's C++ type, a
+/// tag only - nothing of it is used). Object<I>{} is none; no number becomes one (kern/docs/engine_object.md).
+/// The C++ name of a type, as the compiler spells it ("kern::App") - how a Blueprint's class names the class of
+/// an Object<I> it asks for (engine_class_name makes the Blueprint's name of it).
+template <class T> constexpr std::string_view cpp_name_of() {
+  constexpr std::string_view f = __PRETTY_FUNCTION__;  // (gcc and clang: "... [with T = kern::App; ...]" / "... [T = kern::App]")
+  constexpr std::size_t at = f.find("T = ") + 4;
+  constexpr std::size_t end = f.find_first_of(";]", at);
+  return f.substr(at, end - at);
+}
+template <class I> struct Object {
+  ObjectRef ref;
+  constexpr Object() = default;
+  constexpr explicit Object(ObjectRef r) : ref(r) {}
+  /// One of a class that derives from I is one of I (a HostTransport is a Transport), as in C++.
+  template <class J>
+    requires(!std::is_same_v<I, J> && std::is_base_of_v<I, J>)
+  constexpr Object(const Object<J>& o) : ref(o.ref) {}
+  constexpr bool valid() const { return ref.valid(); }
+  friend constexpr bool operator==(const Object&, const Object&) = default;
+  friend constexpr auto operator<=>(const Object& a, const Object& b) { return a.ref <=> b.ref; }
+};
+
 /// The key of an entry of a map or a set, as the interpreter holds it: a whole number (Int, the
 /// place of an enum's value, Bool as 0 or 1) or a text.
 /// (A map holds keys of one type: a whole number or a text, never both.)
@@ -181,7 +234,8 @@ struct Int64 {
 };
 
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>>;
+using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
+                             std::vector<ObjectRef>>;
 /// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
 template <class T> constexpr PinType list_type_of() = delete;
 template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
@@ -191,6 +245,7 @@ template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list
 template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
 template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
+template <> constexpr PinType list_type_of<ObjectRef>() { return PinType::object_list; }
 
 /// What a Callback value calls: a function of a library, with the place it is bound to. Only the engine
 /// calls it (logic::call_back) - a Blueprint does not call, compare or convert a Callback.
@@ -213,6 +268,8 @@ struct Value {
   Vec3 v;
   std::string s;
   ActorRef a = 0;
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef). 0 otherwise.
+  WorldId world = 0;
   /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
   /// whoever changes one (edit) changes its own.
   std::shared_ptr<const ListItems> list;
@@ -232,6 +289,10 @@ struct Value {
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// An object of the engine (none: ObjectRef{}).
+  static Value object(ObjectRef x) { Value r; r.type = PinType::object; r.i = x.handle; r.world = x.world; return r; }
+  /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
+  ObjectRef as_object() const { return type == PinType::object ? ObjectRef{i, world} : ObjectRef{}; }
   /// An Int64: its 64 bits (held in `i`, as they are).
   static Value int64(u64 bits) { Value r; r.type = PinType::int64; r.i = static_cast<i64>(bits); return r; }
   /// A value of an enum: its place among the enum's values (the first is 0).
@@ -578,6 +639,10 @@ struct Function {
   /// setting "scope" (the function); two functions may each have a local of one name.
   std::vector<FunctionPin> locals;
   bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of the interface of the engine the Blueprint implements (Graph::implements): the engine calls it, in
+  /// place of the interface's own. Said, not guessed from the name: check refuses a function of an interface's name
+  /// without it and one with it the interface has not. In the Blueprint's C++: KERN_OVERRIDE void update(...).
+  bool overrides = false;
   /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
@@ -640,10 +705,12 @@ struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
-  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
-  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
-  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
-  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  /// The interface of the engine this Blueprint is the object of, by the one rule of the engine's names
+  /// (engine_class_name: kern::ShaderExtension is "ShaderExtension", kern::net::Transport "net_Transport"; empty:
+  /// none) - the engine calls its functions that say they override one of the interface's (Function::overrides;
+  /// kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a
+  /// running one). In C++ the type itself, the last base:
+  ///   struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... KERN_OVERRIDE Text vertex() ... };
   std::string implements;
   bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
@@ -868,6 +935,9 @@ struct ParamDef {
   /// Kind::type with `widths` and `with_lists`: a single Int of a width too - the values of a map (Map<Int, U8>: the
   /// map is the place, a value it gives is what it holds)
   bool width_values = false;
+  /// Kind::choice: the setting names a class (an interface) of the engine by the rule of the engine's names
+  /// ("App", "physics_World"). In a Blueprint's C++ it is that C++ type: func_engine_object<kern::App>(...).
+  bool engine_class = false;
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.
@@ -885,8 +955,8 @@ class Context;
 
 /// event: starts a chain. action: one step that always goes on (one exec output) or ends the
 /// chain (none). pure: a value, no exec pins. flow: decides where the chain goes on - several exec
-/// outputs, or one it may not take (Do Once, Gate).
-enum class NodeKind : u8 { event, action, pure, flow };
+/// outputs, or one it may not take (Do Once, Gate). A Blueprint may hold it (one that describes nodes).
+enum class KERN_BLUEPRINT_TYPE NodeKind : u8 { event, action, pure, flow };
 
 struct NodeDef {
   std::string type, label, category, help;
@@ -1161,13 +1231,13 @@ class NativeBlueprint {
     (void)type;
     return nullptr;
   }
-  /// A class with exports (Function::exported): this object becomes the one its exports call
-  /// (kern/logic/blueprint_class.h, bind_blueprint) - false, with an error (kern::fail), while another object of
-  /// the class is bound. A class without exports: true, nothing. (The program's runtime binds each of its
-  /// Blueprints when it starts - kern/game/program.h.)
-  virtual bool bind_exports() { return true; }
-  /// ... and its exports call it no more (when it is the one they call).
-  virtual void unbind_exports() {}
+  /// This object becomes the one of its class that the program's C++ (blueprint<T>()) and its exports call
+  /// (kern/logic/blueprint_class.h, bind_blueprint_object) - false, with an error (kern::fail), while another object
+  /// of the class is bound. (The program's runtime binds each of its Blueprints when it starts - kern/game/program.h;
+  /// a world's are bound by the program that calls them, bind_blueprint.)
+  virtual bool bind_class() { return true; }
+  /// ... and it is called so no more (when it is the one bound).
+  virtual void unbind_class() {}
 };
 /// The key of the class T, one in the whole program (an inline variable has one address): what
 /// NativeBlueprint::object is asked by.
@@ -1350,11 +1420,11 @@ class Instance {
   /// Where it runs as its compiled class T, the object of that class (null: it runs otherwise, or as
   /// another class) - what the program's own C++ calls directly (kern/logic/blueprint_class.h).
   template <class T> T* native_object() const { return blueprint_ ? static_cast<T*>(blueprint_->object(&class_key<T>)) : nullptr; }
-  /// Its class's exports call it from now on (NativeBlueprint::bind_exports) - false, with an error, while another
-  /// object of the class is bound; one that runs otherwise has no exports: true.
-  bool bind_exports() { return !blueprint_ || blueprint_->bind_exports(); }
-  void unbind_exports() {
-    if (blueprint_) blueprint_->unbind_exports();
+  /// It is the object of its class the program calls from now on (NativeBlueprint::bind_class) - false, with an
+  /// error, while another object of the class is bound; one that runs otherwise has no class: true.
+  bool bind_class() { return !blueprint_ || blueprint_->bind_class(); }
+  void unbind_class() {
+    if (blueprint_) blueprint_->unbind_class();
   }
   i32 id() const { return id_; }
 
@@ -1533,7 +1603,7 @@ class Instance {
   int active_ = 0;                    // chains of this instance that are running (nested: events, calls)
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
-  i64 engine_object_ = 0;   // (the object of the engine it is, once asked for: Runtime::engine_object)
+  ObjectRef engine_object_;   // (the object of the engine it is, once asked for: Runtime::engine_object)
   bool begun_ = false;
   bool ended_ = false;                // End Play has run (Runtime::end, remove)
 };
@@ -1609,12 +1679,16 @@ class Runtime {
   /// Has Blueprint: does `target` (0: the Level) have a Blueprint that runs - one without errors that
   /// has not been stopped? What Call on Actor and Get Variable on Actor reach when it has one.
   bool has_blueprint(ActorRef target);
-  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` (0: the Level's) is - of the
-  /// interface its graph implements (Graph::implements: App, ShaderExtension ...) - as its handle in the host's
-  /// objects (Host::engine_objects), which own it; made once per Blueprint, the same handle every time. 0: no
-  /// Blueprint that runs there, it implements none, the host has no objects of the engine or this build no adapter
-  /// of the interface (engine_implement). What the engine is handed where it takes such an object (App::extensions).
-  i64 engine_object(ActorRef target);
+  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` (0: the Level's) is as the
+  /// interface `interface` (a name by the rule of the engine's names: "App", "ShaderExtension") - in the host's
+  /// objects (Host::engine_objects), which own it; made once per Blueprint, the same every time
+  /// (kern/docs/engine_object.md). None, and `why` says which: no Blueprint that runs there, it implements no
+  /// interface or another one, the host has no objects of the engine, or this build has no adapter of the interface
+  /// (engine_implement). What the engine is handed where it takes such an object (App::extensions).
+  ObjectRef engine_object(ActorRef target, std::string_view interface, std::string& why);
+  /// The same for the node (in every tier): what fails is told to the host - "<caller>: Engine Object of
+  /// Blueprint: <why>" - and gives none.
+  ObjectRef engine_object(const Instance& caller, ActorRef target, std::string_view interface);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.

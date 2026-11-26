@@ -13,7 +13,7 @@
 namespace kern {
 
 /// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
-enum class Key : u8 {
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,

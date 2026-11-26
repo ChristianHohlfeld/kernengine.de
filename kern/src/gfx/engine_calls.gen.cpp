@@ -25,13 +25,9 @@ struct S_ExtensionAttribute { [[maybe_unused]] static Value to(EngineObjects& o,
 struct S_Lighting { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Lighting& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Lighting& x); };
 struct S_Mat4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Mat4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
 struct S_Material { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Material& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Material& x); };
-struct S_MeshGpu { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshGpu& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshGpu& x); };
 struct S_MeshInput { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshInput& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshInput& x); };
 struct S_ParticleSpec { [[maybe_unused]] static Value to(EngineObjects& o, const kern::ParticleSpec& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::ParticleSpec& x); };
 struct S_ParticleStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::ParticleStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::ParticleStats& x); };
-struct S_PickHit { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickHit& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickHit& x); };
-struct S_PickQuery { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickQuery& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickQuery& x); };
-struct S_PickStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickStats& x); };
 struct S_PointLights { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PointLights& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PointLights& x); };
 struct S_Ray { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Ray& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Ray& x); };
 struct S_RenderParams { [[maybe_unused]] static Value to(EngineObjects& o, const kern::RenderParams& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::RenderParams& x); };
@@ -60,20 +56,12 @@ Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structur
 void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.m); }
 Value S_Material::to(EngineObjects& o, const kern::Material& x) { return Value::structure({ev::Conv<ev::Struct<S_Vec4>>::to(o, x.color), ev::Conv<ev::Enum<E_AlphaMode>>::to(o, x.alpha), ev::Conv<ev::Float>::to(o, x.alpha_cutoff), ev::Conv<ev::Float>::to(o, x.roughness), ev::Conv<ev::Float>::to(o, x.metalness), ev::Conv<ev::Vector>::to(o, x.emissive), ev::Conv<ev::Bool>::to(o, x.unlit), ev::Conv<ev::Bool>::to(o, x.double_sided), ev::Conv<ev::Bool>::to(o, x.cast_shadow), ev::Conv<ev::Bool>::to(o, x.frustum_culled), ev::Conv<ev::Bool>::to(o, x.viewmodel), ev::Conv<ev::Bool>::to(o, x.linear_colors), ev::Conv<ev::Bool>::to(o, x.lines), ev::Conv<ev::List<ev::Int>>::to(o, x.params)}); }
 void S_Material::from(EngineObjects& o, const Value& v, kern::Material& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_Vec4>>::from(o, *f, x.color); if (const Value* f = v.field(1)) ev::Conv<ev::Enum<E_AlphaMode>>::from(o, *f, x.alpha); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.alpha_cutoff); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.roughness); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.metalness); if (const Value* f = v.field(5)) ev::Conv<ev::Vector>::from(o, *f, x.emissive); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.unlit); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.double_sided); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.cast_shadow); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.frustum_culled); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.viewmodel); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.linear_colors); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.lines); if (const Value* f = v.field(13)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.params); }
-Value S_MeshGpu::to(EngineObjects& o, const kern::MeshGpu& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.vao), ev::Conv<ev::Int>::to(o, x.position), ev::Conv<ev::Int>::to(o, x.normal), ev::Conv<ev::Int>::to(o, x.color), ev::Conv<ev::Int>::to(o, x.uv), ev::Conv<ev::Int>::to(o, x.transforms), ev::Conv<ev::Int>::to(o, x.tints), ev::Conv<ev::Int>::to(o, x.instance_normals), ev::Conv<ev::Int>::to(o, x.joints), ev::Conv<ev::Int>::to(o, x.weights), ev::Conv<ev::List<ev::Int>>::to(o, x.extension), ev::Conv<ev::Int>::to(o, x.element), ev::Conv<ev::Int>::to(o, x.element_type), ev::Conv<ev::List<ev::Int>>::to(o, x.capacity)}); }
-void S_MeshGpu::from(EngineObjects& o, const Value& v, kern::MeshGpu& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.vao); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.normal); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.color); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.uv); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.transforms); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.tints); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.instance_normals); if (const Value* f = v.field(8)) ev::Conv<ev::Int>::from(o, *f, x.joints); if (const Value* f = v.field(9)) ev::Conv<ev::Int>::from(o, *f, x.weights); if (const Value* f = v.field(10)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.extension); if (const Value* f = v.field(11)) ev::Conv<ev::Int>::from(o, *f, x.element); if (const Value* f = v.field(12)) ev::Conv<ev::Int>::from(o, *f, x.element_type); if (const Value* f = v.field(13)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.capacity); }
 Value S_MeshInput::to(EngineObjects& o, const kern::MeshInput& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.positions), ev::Conv<ev::List<ev::Float>>::to(o, x.normals), ev::Conv<ev::List<ev::Float>>::to(o, x.colors), ev::Conv<ev::List<ev::Float>>::to(o, x.uvs), ev::Conv<ev::List<ev::Int>>::to(o, x.indices), ev::Conv<ev::List<ev::Float>>::to(o, x.joints), ev::Conv<ev::List<ev::Float>>::to(o, x.weights), ev::Conv<ev::List<ev::Float>>::to(o, x.bones), ev::Conv<ev::List<ev::Row<ev::List<ev::Float>>>>::to(o, x.extension), ev::Conv<ev::List<ev::Float>>::to(o, x.transforms), ev::Conv<ev::List<ev::Float>>::to(o, x.tints), ev::Conv<ev::Struct<S_Material>>::to(o, x.material), ev::Conv<ev::Int>::to(o, x.texture), ev::Conv<ev::Bool>::to(o, x.visible), ev::Conv<ev::Int>::to(o, x.layers), ev::Conv<ev::Bool>::to(o, x.pick_bvh)}); }
 void S_MeshInput::from(EngineObjects& o, const Value& v, kern::MeshInput& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.positions); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.normals); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.colors); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.uvs); if (const Value* f = v.field(4)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.indices); if (const Value* f = v.field(5)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.joints); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.weights); if (const Value* f = v.field(7)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.bones); if (const Value* f = v.field(8)) ev::Conv<ev::List<ev::Row<ev::List<ev::Float>>>>::from(o, *f, x.extension); if (const Value* f = v.field(9)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.transforms); if (const Value* f = v.field(10)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.tints); if (const Value* f = v.field(11)) ev::Conv<ev::Struct<S_Material>>::from(o, *f, x.material); if (const Value* f = v.field(12)) ev::Conv<ev::Int>::from(o, *f, x.texture); if (const Value* f = v.field(13)) ev::Conv<ev::Bool>::from(o, *f, x.visible); if (const Value* f = v.field(14)) ev::Conv<ev::Int>::from(o, *f, x.layers); if (const Value* f = v.field(15)) ev::Conv<ev::Bool>::from(o, *f, x.pick_bvh); }
 Value S_ParticleSpec::to(EngineObjects& o, const kern::ParticleSpec& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Vector>::to(o, x.velocity), ev::Conv<ev::Struct<S_Vec4>>::to(o, x.color), ev::Conv<ev::Float>::to(o, x.start_ms), ev::Conv<ev::Float>::to(o, x.life_ms), ev::Conv<ev::Float>::to(o, x.size), ev::Conv<ev::Float>::to(o, x.gravity), ev::Conv<ev::Float>::to(o, x.grow), ev::Conv<ev::Float>::to(o, x.fade_extra)}); }
 void S_ParticleSpec::from(EngineObjects& o, const Value& v, kern::ParticleSpec& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.velocity); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Vec4>>::from(o, *f, x.color); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.start_ms); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.life_ms); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.size); if (const Value* f = v.field(6)) ev::Conv<ev::Float>::from(o, *f, x.gravity); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.grow); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.fade_extra); }
 Value S_ParticleStats::to(EngineObjects& o, const kern::ParticleStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.active), ev::Conv<ev::Int>::to(o, x.dropped), ev::Conv<ev::Int>::to(o, x.uploaded), ev::Conv<ev::Int>::to(o, x.expired)}); }
 void S_ParticleStats::from(EngineObjects& o, const Value& v, kern::ParticleStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.active); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.dropped); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.uploaded); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.expired); }
-Value S_PickHit::to(EngineObjects& o, const kern::PickHit& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.mesh), ev::Conv<ev::Int>::to(o, x.instance), ev::Conv<ev::Int>::to(o, x.triangle), ev::Conv<ev::Float>::to(o, x.distance), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Vector>::to(o, x.barycentric)}); }
-void S_PickHit::from(EngineObjects& o, const Value& v, kern::PickHit& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.mesh); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.instance); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.triangle); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.distance); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(5)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.barycentric); }
-Value S_PickQuery::to(EngineObjects& o, const kern::PickQuery& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.max_distance), ev::Conv<ev::Int>::to(o, x.ignore_id), ev::Conv<ev::Bool>::to(o, x.include_invisible), ev::Conv<ev::Int>::to(o, x.layers)}); }
-void S_PickQuery::from(EngineObjects& o, const Value& v, kern::PickQuery& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.max_distance); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.ignore_id); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.include_invisible); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.layers); }
-Value S_PickStats::to(EngineObjects& o, const kern::PickStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.triangles_examined), ev::Conv<ev::Int>::to(o, x.bounds_rejected)}); }
-void S_PickStats::from(EngineObjects& o, const Value& v, kern::PickStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.triangles_examined); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.bounds_rejected); }
 Value S_PointLights::to(EngineObjects& o, const kern::PointLights& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.count), ev::Conv<ev::List<ev::Float>>::to(o, x.pos_range), ev::Conv<ev::List<ev::Float>>::to(o, x.color_intensity)}); }
 void S_PointLights::from(EngineObjects& o, const Value& v, kern::PointLights& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.count); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.pos_range); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.color_intensity); }
 Value S_Ray::to(EngineObjects& o, const kern::Ray& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.origin), ev::Conv<ev::Vector>::to(o, x.direction), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far)}); }
@@ -361,7 +349,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::SunShadowMap>(o, in, 0, "sun_shadow_map");
   if (!self) return false;
   std::vector<kern::Mesh*> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -370,6 +358,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 5, a4);
+  if (!o.error.empty()) return false;
   decltype(auto) r = self->draw(kern::Span<kern::Mesh* const>(a0.data(), a0.size()), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
@@ -832,7 +821,8 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::RendererOptions const&>>();
   ev::take<ev::Struct<S_RendererOptions>>(o, in, 1, a0);
   std::vector<kern::ShaderExtension*> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Handle>>(o, in, 2, a1);
+  if (!o.error.empty()) return false;
   decltype(auto) r = self->init(a0, kern::Span<kern::ShaderExtension* const>(a1.data(), a1.size()));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1007,7 +997,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a0);
   decltype(auto) r = self->mesh(std::move(a0));
-  out[0] = Value::integer(ev::handle_of<kern::Mesh>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::Mesh>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1016,7 +1006,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->meshes();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, r);
   return true;
 }
 
@@ -1209,7 +1199,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->ambient_occlusion();
-  out[0] = Value::integer(ev::handle_of<kern::AmbientOcclusionPass>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::AmbientOcclusionPass>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1218,7 +1208,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->shadow();
-  out[0] = Value::integer(ev::handle_of<kern::SunShadowMap>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::SunShadowMap>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -1280,46 +1270,8 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
-// engine.renderer.pick: kern::Renderer::pick
-bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
-  if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<kern::PickQuery const&>>();
-  ev::take<ev::Struct<S_PickQuery>>(o, in, 3, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<kern::PickHit&>>();
-  ev::take<ev::Struct<S_PickHit>>(o, in, 4, a3);
-  auto a4 = ev::blank<kern::PickStats>();
-  decltype(auto) r = self->pick(std::move(a0), std::move(a1), a2, a3, &a4);
-  ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Struct<S_PickHit>>(o, out, 1, a3);
-  ev::give<ev::Struct<S_PickStats>>(o, out, 2, a4);
-  return true;
-}
-
-// engine.renderer.pick_ray: kern::Renderer::pick_ray
-bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
-  if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<kern::Ray const&>>();
-  ev::take<ev::Struct<S_Ray>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<kern::PickQuery const&>>();
-  ev::take<ev::Struct<S_PickQuery>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<kern::PickHit&>>();
-  ev::take<ev::Struct<S_PickHit>>(o, in, 3, a2);
-  auto a3 = ev::blank<kern::PickStats>();
-  decltype(auto) r = self->pick_ray(a0, a1, a2, &a3);
-  ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Struct<S_PickHit>>(o, out, 1, a2);
-  ev::give<ev::Struct<S_PickStats>>(o, out, 2, a3);
-  return true;
-}
-
 // engine.renderer.context_lost: kern::Renderer::context_lost
-bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   self->context_lost();
@@ -1327,7 +1279,7 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.context_restored: kern::Renderer::context_restored
-bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->context_restored();
@@ -1336,7 +1288,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.lost: kern::Renderer::lost
-bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->lost();
@@ -1345,7 +1297,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.set_headless: kern::Renderer::set_headless
-bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   self->set_headless();
@@ -1353,16 +1305,16 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.renderer.extensions: kern::Renderer::extensions
-bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!self) return false;
   decltype(auto) r = self->extensions();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, r);
   return true;
 }
 
 // engine.shader_extension.name: kern::ShaderExtension::name
-bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->name();
@@ -1371,7 +1323,7 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.attributes: kern::ShaderExtension::attributes
-bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->attributes();
@@ -1380,7 +1332,7 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.vertex_declarations: kern::ShaderExtension::vertex_declarations
-bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->vertex_declarations();
@@ -1389,7 +1341,7 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.vertex: kern::ShaderExtension::vertex
-bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->vertex();
@@ -1398,7 +1350,7 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_declarations: kern::ShaderExtension::fragment_declarations
-bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_declarations();
@@ -1407,7 +1359,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_discard: kern::ShaderExtension::fragment_discard
-bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_discard();
@@ -1416,7 +1368,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_input: kern::ShaderExtension::fragment_input
-bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_input();
@@ -1425,7 +1377,7 @@ bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.fragment_surface: kern::ShaderExtension::fragment_surface
-bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   decltype(auto) r = self->fragment_surface();
@@ -1434,7 +1386,7 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.bind: kern::ShaderExtension::bind
-bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::Program* a0 = ev::object<kern::Program>(o, in, 1, "program");
@@ -1444,7 +1396,7 @@ bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.frame_uniforms: kern::ShaderExtension::frame_uniforms
-bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::UniformCache* a0 = ev::object<kern::UniformCache>(o, in, 1, "cache");
@@ -1456,7 +1408,7 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.material_uniforms: kern::ShaderExtension::material_uniforms
-bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   kern::UniformCache* a0 = ev::object<kern::UniformCache>(o, in, 1, "cache");
@@ -1470,80 +1422,73 @@ bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.build_standard_shader: kern::build_standard_shader
-bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<kern::ShaderExtension*> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 0, a0);
+  ev::take<ev::List<ev::Handle>>(o, in, 0, a0);
+  if (!o.error.empty()) return false;
   decltype(auto) r = kern::build_standard_shader(kern::Span<kern::ShaderExtension* const>(a0.data(), a0.size()));
   ev::give<ev::Struct<S_ShaderSource>>(o, out, 0, r);
   return true;
 }
 
 // engine.ambient_occlusion_pass.make: kern::AmbientOcclusionPass::AmbientOcclusionPass
-bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::AmbientOcclusionPass>(std::unique_ptr<kern::AmbientOcclusionPass>(new kern::AmbientOcclusionPass())));
+bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::AmbientOcclusionPass>(std::unique_ptr<kern::AmbientOcclusionPass>(new kern::AmbientOcclusionPass()))));
   return true;
 }
 
 // engine.ambient_occlusion_pass.release: kern::AmbientOcclusionPass::~AmbientOcclusionPass
-bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::AmbientOcclusionPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no AmbientOcclusionPass that was made";
-    return false;
-  }
-  return true;
+bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "ambient_occlusion_pass", r)) return false;
+  return ev::release_of<kern::AmbientOcclusionPass>(o, r, "ambient_occlusion_pass", "AmbientOcclusionPass");
 }
 
 // engine.bloom_pass.make: kern::BloomPass::BloomPass
-bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::BloomPass>(std::unique_ptr<kern::BloomPass>(new kern::BloomPass())));
+bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::BloomPass>(std::unique_ptr<kern::BloomPass>(new kern::BloomPass()))));
   return true;
 }
 
 // engine.bloom_pass.release: kern::BloomPass::~BloomPass
-bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::BloomPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no BloomPass that was made";
-    return false;
-  }
-  return true;
+bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "bloom_pass", r)) return false;
+  return ev::release_of<kern::BloomPass>(o, r, "bloom_pass", "BloomPass");
 }
 
 // engine.light_pool.make: kern::LightPool::LightPool
-bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a1);
-  out[0] = Value::integer(o.own<kern::LightPool>(std::unique_ptr<kern::LightPool>(new kern::LightPool(std::move(a0), std::move(a1)))));
+  out[0] = Value::object(o.ref(o.own<kern::LightPool>(std::unique_ptr<kern::LightPool>(new kern::LightPool(std::move(a0), std::move(a1))))));
   return true;
 }
 
 // engine.light_pool.release: kern::LightPool::~LightPool
-bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::LightPool>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no LightPool that was made";
-    return false;
-  }
-  return true;
+bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "light_pool", r)) return false;
+  return ev::release_of<kern::LightPool>(o, r, "light_pool", "LightPool");
 }
 
 // engine.mesh.make: kern::Mesh::Mesh
-bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Mesh>(std::unique_ptr<kern::Mesh>(new kern::Mesh())));
+bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::Mesh>(std::unique_ptr<kern::Mesh>(new kern::Mesh()))));
   return true;
 }
 
 // engine.mesh.release: kern::Mesh::~Mesh
-bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Mesh>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Mesh that was made";
-    return false;
-  }
-  return true;
+bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "mesh", r)) return false;
+  return ev::release_of<kern::Mesh>(o, r, "mesh", "Mesh");
 }
 
 // engine.mesh.id: kern::Mesh::id
-bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->id);
@@ -1551,7 +1496,7 @@ bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.id@set: what stands at the place kern::Mesh::id gives
-bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c133_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->id);
@@ -1559,7 +1504,7 @@ bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.visible: kern::Mesh::visible
-bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->visible);
@@ -1567,7 +1512,7 @@ bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.visible@set: what stands at the place kern::Mesh::visible gives
-bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->visible);
@@ -1575,7 +1520,7 @@ bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.layers: kern::Mesh::layers
-bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->layers);
@@ -1583,7 +1528,7 @@ bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.layers@set: what stands at the place kern::Mesh::layers gives
-bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c135_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->layers);
@@ -1591,7 +1536,7 @@ bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.pick_bvh: kern::Mesh::pick_bvh
-bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->pick_bvh);
@@ -1599,7 +1544,7 @@ bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.pick_bvh@set: what stands at the place kern::Mesh::pick_bvh gives
-bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c136_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->pick_bvh);
@@ -1607,7 +1552,7 @@ bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.linear_colors: kern::Mesh::linear_colors
-bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->linear_colors);
@@ -1615,7 +1560,7 @@ bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.linear_colors@set: what stands at the place kern::Mesh::linear_colors gives
-bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c137_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->linear_colors);
@@ -1623,7 +1568,7 @@ bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.material: kern::Mesh::material
-bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Material>>(o, out, 0, self->material);
@@ -1631,7 +1576,7 @@ bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.material@set: what stands at the place kern::Mesh::material gives
-bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c138_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Material>>(o, in, 1, self->material);
@@ -1639,7 +1584,7 @@ bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.texture: kern::Mesh::texture
-bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->texture);
@@ -1647,7 +1592,7 @@ bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.texture@set: what stands at the place kern::Mesh::texture gives
-bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c139_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->texture);
@@ -1655,7 +1600,7 @@ bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.positions: kern::Mesh::positions
-bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->positions);
@@ -1663,7 +1608,7 @@ bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.positions@set: what stands at the place kern::Mesh::positions gives
-bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c140_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->positions);
@@ -1671,7 +1616,7 @@ bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.normals: kern::Mesh::normals
-bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->normals);
@@ -1679,7 +1624,7 @@ bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.normals@set: what stands at the place kern::Mesh::normals gives
-bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c141_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->normals);
@@ -1687,7 +1632,7 @@ bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.colors: kern::Mesh::colors
-bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->colors);
@@ -1695,7 +1640,7 @@ bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.colors@set: what stands at the place kern::Mesh::colors gives
-bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c142_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->colors);
@@ -1703,7 +1648,7 @@ bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.uvs: kern::Mesh::uvs
-bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->uvs);
@@ -1711,7 +1656,7 @@ bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.uvs@set: what stands at the place kern::Mesh::uvs gives
-bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c143_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->uvs);
@@ -1719,7 +1664,7 @@ bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.indices: kern::Mesh::indices
-bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Int>>(o, out, 0, self->indices);
@@ -1727,7 +1672,7 @@ bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.indices@set: what stands at the place kern::Mesh::indices gives
-bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c144_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Int>>(o, in, 1, self->indices);
@@ -1735,7 +1680,7 @@ bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.joints: kern::Mesh::joints
-bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->joints);
@@ -1743,7 +1688,7 @@ bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.joints@set: what stands at the place kern::Mesh::joints gives
-bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c145_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->joints);
@@ -1751,7 +1696,7 @@ bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.weights: kern::Mesh::weights
-bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->weights);
@@ -1759,7 +1704,7 @@ bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.weights@set: what stands at the place kern::Mesh::weights gives
-bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c146_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->weights);
@@ -1767,7 +1712,7 @@ bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.bones: kern::Mesh::bones
-bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->bones);
@@ -1775,7 +1720,7 @@ bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.bones@set: what stands at the place kern::Mesh::bones gives
-bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c147_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->bones);
@@ -1783,7 +1728,7 @@ bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.transforms: kern::Mesh::transforms
-bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->transforms);
@@ -1791,7 +1736,7 @@ bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.transforms@set: what stands at the place kern::Mesh::transforms gives
-bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c148_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->transforms);
@@ -1799,7 +1744,7 @@ bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.tints: kern::Mesh::tints
-bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->tints);
@@ -1807,7 +1752,7 @@ bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.tints@set: what stands at the place kern::Mesh::tints gives
-bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c149_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->tints);
@@ -1815,7 +1760,7 @@ bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.instance_normals: kern::Mesh::instance_normals
-bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::List<ev::Float>>(o, out, 0, self->instance_normals);
@@ -1823,7 +1768,7 @@ bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.instance_normals@set: what stands at the place kern::Mesh::instance_normals gives
-bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c150_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::List<ev::Float>>(o, in, 1, self->instance_normals);
@@ -1831,7 +1776,7 @@ bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.instance_count: kern::Mesh::instance_count
-bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->instance_count);
@@ -1839,7 +1784,7 @@ bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.instance_count@set: what stands at the place kern::Mesh::instance_count gives
-bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c151_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->instance_count);
@@ -1847,7 +1792,7 @@ bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.mirror: kern::Mesh::mirror
-bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->mirror);
@@ -1855,7 +1800,7 @@ bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.mirror@set: what stands at the place kern::Mesh::mirror gives
-bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c152_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->mirror);
@@ -1863,7 +1808,7 @@ bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.local_bounds: kern::Mesh::local_bounds
-bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, self->local_bounds);
@@ -1871,7 +1816,7 @@ bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.local_bounds@set: what stands at the place kern::Mesh::local_bounds gives
-bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c153_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Sphere>>(o, in, 1, self->local_bounds);
@@ -1879,7 +1824,7 @@ bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.world_bounds: kern::Mesh::world_bounds
-bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, self->world_bounds);
@@ -1887,31 +1832,15 @@ bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.world_bounds@set: what stands at the place kern::Mesh::world_bounds gives
-bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c154_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Struct<S_Sphere>>(o, in, 1, self->world_bounds);
   return true;
 }
 
-// engine.mesh.gpu: kern::Mesh::gpu
-bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
-  if (!self) return false;
-  ev::give<ev::Struct<S_MeshGpu>>(o, out, 0, self->gpu);
-  return true;
-}
-
-// engine.mesh.gpu@set: what stands at the place kern::Mesh::gpu gives
-bool c157_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
-  auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
-  if (!self) return false;
-  ev::take<ev::Struct<S_MeshGpu>>(o, in, 1, self->gpu);
-  return true;
-}
-
 // engine.mesh.sort_distance: kern::Mesh::sort_distance
-bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Float>(o, out, 0, self->sort_distance);
@@ -1919,7 +1848,7 @@ bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.sort_distance@set: what stands at the place kern::Mesh::sort_distance gives
-bool c158_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c155_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Float>(o, in, 1, self->sort_distance);
@@ -1927,7 +1856,7 @@ bool c158_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.mesh.live_index: kern::Mesh::live_index
-bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->live_index);
@@ -1935,7 +1864,7 @@ bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.mesh.live_index@set: what stands at the place kern::Mesh::live_index gives
-bool c159_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c156_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::Mesh>(o, in, 0, "mesh");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->live_index);
@@ -1943,52 +1872,46 @@ bool c159_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.particles.make: kern::Particles::Particles
-bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Particles>(std::unique_ptr<kern::Particles>(new kern::Particles())));
+bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::Particles>(std::unique_ptr<kern::Particles>(new kern::Particles()))));
   return true;
 }
 
 // engine.particles.release: kern::Particles::~Particles
-bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Particles>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Particles that was made";
-    return false;
-  }
-  return true;
+bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "particles", r)) return false;
+  return ev::release_of<kern::Particles>(o, r, "particles", "Particles");
 }
 
 // engine.program.make: kern::Program::Program
-bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Program>(std::unique_ptr<kern::Program>(new kern::Program())));
+bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::Program>(std::unique_ptr<kern::Program>(new kern::Program()))));
   return true;
 }
 
 // engine.program.release: kern::Program::~Program
-bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Program>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Program that was made";
-    return false;
-  }
-  return true;
+bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "program", r)) return false;
+  return ev::release_of<kern::Program>(o, r, "program", "Program");
 }
 
 // engine.renderer.make: kern::Renderer::Renderer
-bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Renderer>(std::unique_ptr<kern::Renderer>(new kern::Renderer())));
+bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::Renderer>(std::unique_ptr<kern::Renderer>(new kern::Renderer()))));
   return true;
 }
 
 // engine.renderer.release: kern::Renderer::~Renderer
-bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Renderer>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Renderer that was made";
-    return false;
-  }
-  return true;
+bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "renderer", r)) return false;
+  return ev::release_of<kern::Renderer>(o, r, "renderer", "Renderer");
 }
 
 // engine.shader_extension.material_base: kern::ShaderExtension::material_base
-bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->material_base);
@@ -1996,7 +1919,7 @@ bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.material_base@set: what stands at the place kern::ShaderExtension::material_base gives
-bool c166_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c163_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->material_base);
@@ -2004,7 +1927,7 @@ bool c166_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.shader_extension.attribute_base: kern::ShaderExtension::attribute_base
-bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->attribute_base);
@@ -2012,7 +1935,7 @@ bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.shader_extension.attribute_base@set: what stands at the place kern::ShaderExtension::attribute_base gives
-bool c167_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c164_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::ShaderExtension>(o, in, 0, "shader_extension");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->attribute_base);
@@ -2020,52 +1943,46 @@ bool c167_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.sky_pass.make: kern::SkyPass::SkyPass
-bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::SkyPass>(std::unique_ptr<kern::SkyPass>(new kern::SkyPass())));
+bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::SkyPass>(std::unique_ptr<kern::SkyPass>(new kern::SkyPass()))));
   return true;
 }
 
 // engine.sky_pass.release: kern::SkyPass::~SkyPass
-bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::SkyPass>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no SkyPass that was made";
-    return false;
-  }
-  return true;
+bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "sky_pass", r)) return false;
+  return ev::release_of<kern::SkyPass>(o, r, "sky_pass", "SkyPass");
 }
 
 // engine.sun_shadow_map.make: kern::SunShadowMap::SunShadowMap
-bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::SunShadowMap>(std::unique_ptr<kern::SunShadowMap>(new kern::SunShadowMap())));
+bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::SunShadowMap>(std::unique_ptr<kern::SunShadowMap>(new kern::SunShadowMap()))));
   return true;
 }
 
 // engine.sun_shadow_map.release: kern::SunShadowMap::~SunShadowMap
-bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::SunShadowMap>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no SunShadowMap that was made";
-    return false;
-  }
-  return true;
+bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "sun_shadow_map", r)) return false;
+  return ev::release_of<kern::SunShadowMap>(o, r, "sun_shadow_map", "SunShadowMap");
 }
 
 // engine.texture_desc.make: kern::TextureDesc::TextureDesc
-bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::TextureDesc>(std::unique_ptr<kern::TextureDesc>(new kern::TextureDesc())));
+bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::TextureDesc>(std::unique_ptr<kern::TextureDesc>(new kern::TextureDesc()))));
   return true;
 }
 
 // engine.texture_desc.release: kern::TextureDesc::~TextureDesc
-bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::TextureDesc>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no TextureDesc that was made";
-    return false;
-  }
-  return true;
+bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "texture_desc", r)) return false;
+  return ev::release_of<kern::TextureDesc>(o, r, "texture_desc", "TextureDesc");
 }
 
 // engine.texture_desc.width: kern::TextureDesc::width
-bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->width);
@@ -2073,7 +1990,7 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.width@set: what stands at the place kern::TextureDesc::width gives
-bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c171_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->width);
@@ -2081,7 +1998,7 @@ bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.height: kern::TextureDesc::height
-bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->height);
@@ -2089,7 +2006,7 @@ bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.height@set: what stands at the place kern::TextureDesc::height gives
-bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c172_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->height);
@@ -2097,7 +2014,7 @@ bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.mipmaps: kern::TextureDesc::mipmaps
-bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->mipmaps);
@@ -2105,7 +2022,7 @@ bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.mipmaps@set: what stands at the place kern::TextureDesc::mipmaps gives
-bool c176_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c173_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->mipmaps);
@@ -2113,7 +2030,7 @@ bool c176_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.repeat: kern::TextureDesc::repeat
-bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->repeat);
@@ -2121,7 +2038,7 @@ bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.repeat@set: what stands at the place kern::TextureDesc::repeat gives
-bool c177_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c174_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->repeat);
@@ -2129,7 +2046,7 @@ bool c177_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.texture_desc.nearest: kern::TextureDesc::nearest
-bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->nearest);
@@ -2137,7 +2054,7 @@ bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_desc.nearest@set: what stands at the place kern::TextureDesc::nearest gives
-bool c178_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c175_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::TextureDesc>(o, in, 0, "texture_desc");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->nearest);
@@ -2145,18 +2062,16 @@ bool c178_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.uniform_cache.make: kern::UniformCache::UniformCache
-bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::UniformCache>(std::unique_ptr<kern::UniformCache>(new kern::UniformCache())));
+bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  out[0] = Value::object(o.ref(o.own<kern::UniformCache>(std::unique_ptr<kern::UniformCache>(new kern::UniformCache()))));
   return true;
 }
 
 // engine.uniform_cache.release: kern::UniformCache::~UniformCache
-bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::UniformCache>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no UniformCache that was made";
-    return false;
-  }
-  return true;
+bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "uniform_cache", r)) return false;
+  return ev::release_of<kern::UniformCache>(o, r, "uniform_cache", "UniformCache");
 }
 
 // kern::ShaderExtension: the object of the engine a Blueprint is (Graph::implements "ShaderExtension")
@@ -2236,13 +2151,13 @@ class Implements_ShaderExtension final : public kern::ShaderExtension {
   }
   decltype(std::declval<kern::ShaderExtension&>().bind(std::declval<kern::Program const&>())) bind(kern::Program const& kern_p0) override {
     if (!by_->has("bind")) return kern::ShaderExtension::bind(kern_p0);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Program>(kern_p0))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Program>(kern_p0)))};
     std::vector<Value> kern_out;
     by_->call("bind", kern_in, kern_out);
   }
   decltype(std::declval<kern::ShaderExtension&>().frame_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Renderer const&>())) frame_uniforms(kern::UniformCache& kern_p0, kern::Renderer const& kern_p1) override {
     if (!by_->has("frame_uniforms")) return kern::ShaderExtension::frame_uniforms(kern_p0, kern_p1);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::UniformCache>(kern_p0)), Value::integer(o_.adopt<kern::Renderer>(kern_p1))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::UniformCache>(kern_p0))), Value::object(o_.ref(o_.adopt<kern::Renderer>(kern_p1)))};
     std::vector<Value> kern_out;
     by_->call("frame_uniforms", kern_in, kern_out);
   }
@@ -2365,143 +2280,138 @@ const EngineCall kCalls[] = {
     {"engine.renderer.render", &c105},
     {"engine.renderer.last_stats", &c106},
     {"engine.renderer.screen_ray", &c107},
-    {"engine.renderer.pick", &c108},
-    {"engine.renderer.pick_ray", &c109},
-    {"engine.renderer.context_lost", &c110},
-    {"engine.renderer.context_restored", &c111},
-    {"engine.renderer.lost", &c112},
-    {"engine.renderer.set_headless", &c113},
-    {"engine.renderer.extensions", &c114},
-    {"engine.shader_extension.name", &c115},
-    {"engine.shader_extension.attributes", &c116},
-    {"engine.shader_extension.vertex_declarations", &c117},
-    {"engine.shader_extension.vertex", &c118},
-    {"engine.shader_extension.fragment_declarations", &c119},
-    {"engine.shader_extension.fragment_discard", &c120},
-    {"engine.shader_extension.fragment_input", &c121},
-    {"engine.shader_extension.fragment_surface", &c122},
-    {"engine.shader_extension.bind", &c123},
-    {"engine.shader_extension.frame_uniforms", &c124},
-    {"engine.shader_extension.material_uniforms", &c125},
-    {"engine.build_standard_shader", &c126},
-    {"engine.ambient_occlusion_pass.make", &c127},
-    {"engine.ambient_occlusion_pass.release", &c128},
-    {"engine.bloom_pass.make", &c129},
-    {"engine.bloom_pass.release", &c130},
-    {"engine.light_pool.make", &c131},
-    {"engine.light_pool.release", &c132},
-    {"engine.mesh.make", &c133},
-    {"engine.mesh.release", &c134},
-    {"engine.mesh.id", &c135},
-    {"engine.mesh.visible", &c136},
-    {"engine.mesh.layers", &c137},
-    {"engine.mesh.pick_bvh", &c138},
-    {"engine.mesh.linear_colors", &c139},
-    {"engine.mesh.material", &c140},
-    {"engine.mesh.texture", &c141},
-    {"engine.mesh.positions", &c142},
-    {"engine.mesh.normals", &c143},
-    {"engine.mesh.colors", &c144},
-    {"engine.mesh.uvs", &c145},
-    {"engine.mesh.indices", &c146},
-    {"engine.mesh.joints", &c147},
-    {"engine.mesh.weights", &c148},
-    {"engine.mesh.bones", &c149},
-    {"engine.mesh.transforms", &c150},
-    {"engine.mesh.tints", &c151},
-    {"engine.mesh.instance_normals", &c152},
-    {"engine.mesh.instance_count", &c153},
-    {"engine.mesh.mirror", &c154},
-    {"engine.mesh.local_bounds", &c155},
-    {"engine.mesh.world_bounds", &c156},
-    {"engine.mesh.gpu", &c157},
-    {"engine.mesh.sort_distance", &c158},
-    {"engine.mesh.live_index", &c159},
-    {"engine.particles.make", &c160},
-    {"engine.particles.release", &c161},
-    {"engine.program.make", &c162},
-    {"engine.program.release", &c163},
-    {"engine.renderer.make", &c164},
-    {"engine.renderer.release", &c165},
-    {"engine.shader_extension.material_base", &c166},
-    {"engine.shader_extension.attribute_base", &c167},
-    {"engine.sky_pass.make", &c168},
-    {"engine.sky_pass.release", &c169},
-    {"engine.sun_shadow_map.make", &c170},
-    {"engine.sun_shadow_map.release", &c171},
-    {"engine.texture_desc.make", &c172},
-    {"engine.texture_desc.release", &c173},
-    {"engine.texture_desc.width", &c174},
-    {"engine.texture_desc.height", &c175},
-    {"engine.texture_desc.mipmaps", &c176},
-    {"engine.texture_desc.repeat", &c177},
-    {"engine.texture_desc.nearest", &c178},
-    {"engine.uniform_cache.make", &c179},
-    {"engine.uniform_cache.release", &c180},
-    {"engine.mesh.id@get", &c135},
-    {"engine.mesh.id@set", &c135_set},
-    {"engine.mesh.visible@get", &c136},
-    {"engine.mesh.visible@set", &c136_set},
-    {"engine.mesh.layers@get", &c137},
-    {"engine.mesh.layers@set", &c137_set},
-    {"engine.mesh.pick_bvh@get", &c138},
-    {"engine.mesh.pick_bvh@set", &c138_set},
-    {"engine.mesh.linear_colors@get", &c139},
-    {"engine.mesh.linear_colors@set", &c139_set},
-    {"engine.mesh.material@get", &c140},
-    {"engine.mesh.material@set", &c140_set},
-    {"engine.mesh.texture@get", &c141},
-    {"engine.mesh.texture@set", &c141_set},
-    {"engine.mesh.positions@get", &c142},
-    {"engine.mesh.positions@set", &c142_set},
-    {"engine.mesh.normals@get", &c143},
-    {"engine.mesh.normals@set", &c143_set},
-    {"engine.mesh.colors@get", &c144},
-    {"engine.mesh.colors@set", &c144_set},
-    {"engine.mesh.uvs@get", &c145},
-    {"engine.mesh.uvs@set", &c145_set},
-    {"engine.mesh.indices@get", &c146},
-    {"engine.mesh.indices@set", &c146_set},
-    {"engine.mesh.joints@get", &c147},
-    {"engine.mesh.joints@set", &c147_set},
-    {"engine.mesh.weights@get", &c148},
-    {"engine.mesh.weights@set", &c148_set},
-    {"engine.mesh.bones@get", &c149},
-    {"engine.mesh.bones@set", &c149_set},
-    {"engine.mesh.transforms@get", &c150},
-    {"engine.mesh.transforms@set", &c150_set},
-    {"engine.mesh.tints@get", &c151},
-    {"engine.mesh.tints@set", &c151_set},
-    {"engine.mesh.instance_normals@get", &c152},
-    {"engine.mesh.instance_normals@set", &c152_set},
-    {"engine.mesh.instance_count@get", &c153},
-    {"engine.mesh.instance_count@set", &c153_set},
-    {"engine.mesh.mirror@get", &c154},
-    {"engine.mesh.mirror@set", &c154_set},
-    {"engine.mesh.local_bounds@get", &c155},
-    {"engine.mesh.local_bounds@set", &c155_set},
-    {"engine.mesh.world_bounds@get", &c156},
-    {"engine.mesh.world_bounds@set", &c156_set},
-    {"engine.mesh.gpu@get", &c157},
-    {"engine.mesh.gpu@set", &c157_set},
-    {"engine.mesh.sort_distance@get", &c158},
-    {"engine.mesh.sort_distance@set", &c158_set},
-    {"engine.mesh.live_index@get", &c159},
-    {"engine.mesh.live_index@set", &c159_set},
-    {"engine.shader_extension.material_base@get", &c166},
-    {"engine.shader_extension.material_base@set", &c166_set},
-    {"engine.shader_extension.attribute_base@get", &c167},
-    {"engine.shader_extension.attribute_base@set", &c167_set},
-    {"engine.texture_desc.width@get", &c174},
-    {"engine.texture_desc.width@set", &c174_set},
-    {"engine.texture_desc.height@get", &c175},
-    {"engine.texture_desc.height@set", &c175_set},
-    {"engine.texture_desc.mipmaps@get", &c176},
-    {"engine.texture_desc.mipmaps@set", &c176_set},
-    {"engine.texture_desc.repeat@get", &c177},
-    {"engine.texture_desc.repeat@set", &c177_set},
-    {"engine.texture_desc.nearest@get", &c178},
-    {"engine.texture_desc.nearest@set", &c178_set},
+    {"engine.renderer.context_lost", &c108},
+    {"engine.renderer.context_restored", &c109},
+    {"engine.renderer.lost", &c110},
+    {"engine.renderer.set_headless", &c111},
+    {"engine.renderer.extensions", &c112},
+    {"engine.shader_extension.name", &c113},
+    {"engine.shader_extension.attributes", &c114},
+    {"engine.shader_extension.vertex_declarations", &c115},
+    {"engine.shader_extension.vertex", &c116},
+    {"engine.shader_extension.fragment_declarations", &c117},
+    {"engine.shader_extension.fragment_discard", &c118},
+    {"engine.shader_extension.fragment_input", &c119},
+    {"engine.shader_extension.fragment_surface", &c120},
+    {"engine.shader_extension.bind", &c121},
+    {"engine.shader_extension.frame_uniforms", &c122},
+    {"engine.shader_extension.material_uniforms", &c123},
+    {"engine.build_standard_shader", &c124},
+    {"engine.ambient_occlusion_pass.make", &c125},
+    {"engine.ambient_occlusion_pass.release", &c126},
+    {"engine.bloom_pass.make", &c127},
+    {"engine.bloom_pass.release", &c128},
+    {"engine.light_pool.make", &c129},
+    {"engine.light_pool.release", &c130},
+    {"engine.mesh.make", &c131},
+    {"engine.mesh.release", &c132},
+    {"engine.mesh.id", &c133},
+    {"engine.mesh.visible", &c134},
+    {"engine.mesh.layers", &c135},
+    {"engine.mesh.pick_bvh", &c136},
+    {"engine.mesh.linear_colors", &c137},
+    {"engine.mesh.material", &c138},
+    {"engine.mesh.texture", &c139},
+    {"engine.mesh.positions", &c140},
+    {"engine.mesh.normals", &c141},
+    {"engine.mesh.colors", &c142},
+    {"engine.mesh.uvs", &c143},
+    {"engine.mesh.indices", &c144},
+    {"engine.mesh.joints", &c145},
+    {"engine.mesh.weights", &c146},
+    {"engine.mesh.bones", &c147},
+    {"engine.mesh.transforms", &c148},
+    {"engine.mesh.tints", &c149},
+    {"engine.mesh.instance_normals", &c150},
+    {"engine.mesh.instance_count", &c151},
+    {"engine.mesh.mirror", &c152},
+    {"engine.mesh.local_bounds", &c153},
+    {"engine.mesh.world_bounds", &c154},
+    {"engine.mesh.sort_distance", &c155},
+    {"engine.mesh.live_index", &c156},
+    {"engine.particles.make", &c157},
+    {"engine.particles.release", &c158},
+    {"engine.program.make", &c159},
+    {"engine.program.release", &c160},
+    {"engine.renderer.make", &c161},
+    {"engine.renderer.release", &c162},
+    {"engine.shader_extension.material_base", &c163},
+    {"engine.shader_extension.attribute_base", &c164},
+    {"engine.sky_pass.make", &c165},
+    {"engine.sky_pass.release", &c166},
+    {"engine.sun_shadow_map.make", &c167},
+    {"engine.sun_shadow_map.release", &c168},
+    {"engine.texture_desc.make", &c169},
+    {"engine.texture_desc.release", &c170},
+    {"engine.texture_desc.width", &c171},
+    {"engine.texture_desc.height", &c172},
+    {"engine.texture_desc.mipmaps", &c173},
+    {"engine.texture_desc.repeat", &c174},
+    {"engine.texture_desc.nearest", &c175},
+    {"engine.uniform_cache.make", &c176},
+    {"engine.uniform_cache.release", &c177},
+    {"engine.mesh.id@get", &c133},
+    {"engine.mesh.id@set", &c133_set},
+    {"engine.mesh.visible@get", &c134},
+    {"engine.mesh.visible@set", &c134_set},
+    {"engine.mesh.layers@get", &c135},
+    {"engine.mesh.layers@set", &c135_set},
+    {"engine.mesh.pick_bvh@get", &c136},
+    {"engine.mesh.pick_bvh@set", &c136_set},
+    {"engine.mesh.linear_colors@get", &c137},
+    {"engine.mesh.linear_colors@set", &c137_set},
+    {"engine.mesh.material@get", &c138},
+    {"engine.mesh.material@set", &c138_set},
+    {"engine.mesh.texture@get", &c139},
+    {"engine.mesh.texture@set", &c139_set},
+    {"engine.mesh.positions@get", &c140},
+    {"engine.mesh.positions@set", &c140_set},
+    {"engine.mesh.normals@get", &c141},
+    {"engine.mesh.normals@set", &c141_set},
+    {"engine.mesh.colors@get", &c142},
+    {"engine.mesh.colors@set", &c142_set},
+    {"engine.mesh.uvs@get", &c143},
+    {"engine.mesh.uvs@set", &c143_set},
+    {"engine.mesh.indices@get", &c144},
+    {"engine.mesh.indices@set", &c144_set},
+    {"engine.mesh.joints@get", &c145},
+    {"engine.mesh.joints@set", &c145_set},
+    {"engine.mesh.weights@get", &c146},
+    {"engine.mesh.weights@set", &c146_set},
+    {"engine.mesh.bones@get", &c147},
+    {"engine.mesh.bones@set", &c147_set},
+    {"engine.mesh.transforms@get", &c148},
+    {"engine.mesh.transforms@set", &c148_set},
+    {"engine.mesh.tints@get", &c149},
+    {"engine.mesh.tints@set", &c149_set},
+    {"engine.mesh.instance_normals@get", &c150},
+    {"engine.mesh.instance_normals@set", &c150_set},
+    {"engine.mesh.instance_count@get", &c151},
+    {"engine.mesh.instance_count@set", &c151_set},
+    {"engine.mesh.mirror@get", &c152},
+    {"engine.mesh.mirror@set", &c152_set},
+    {"engine.mesh.local_bounds@get", &c153},
+    {"engine.mesh.local_bounds@set", &c153_set},
+    {"engine.mesh.world_bounds@get", &c154},
+    {"engine.mesh.world_bounds@set", &c154_set},
+    {"engine.mesh.sort_distance@get", &c155},
+    {"engine.mesh.sort_distance@set", &c155_set},
+    {"engine.mesh.live_index@get", &c156},
+    {"engine.mesh.live_index@set", &c156_set},
+    {"engine.shader_extension.material_base@get", &c163},
+    {"engine.shader_extension.material_base@set", &c163_set},
+    {"engine.shader_extension.attribute_base@get", &c164},
+    {"engine.shader_extension.attribute_base@set", &c164_set},
+    {"engine.texture_desc.width@get", &c171},
+    {"engine.texture_desc.width@set", &c171_set},
+    {"engine.texture_desc.height@get", &c172},
+    {"engine.texture_desc.height@set", &c172_set},
+    {"engine.texture_desc.mipmaps@get", &c173},
+    {"engine.texture_desc.mipmaps@set", &c173_set},
+    {"engine.texture_desc.repeat@get", &c174},
+    {"engine.texture_desc.repeat@set", &c174_set},
+    {"engine.texture_desc.nearest@get", &c175},
+    {"engine.texture_desc.nearest@set", &c175_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

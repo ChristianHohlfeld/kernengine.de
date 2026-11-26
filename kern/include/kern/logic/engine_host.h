@@ -62,7 +62,10 @@ class EngineObjects {
     return Kinds{{kind<T>(), static_cast<void*>(at)}, {kind<Bases>(), static_cast<void*>(static_cast<Bases*>(at))}...};
   }
 
-  EngineObjects() = default;
+  /// Its world (kern/docs/engine_object.md): a number of its own in the process, from 1 on. Two sides a test
+  /// compares, set up alike, are given the same one.
+  EngineObjects() : world_(next_world()) {}
+  explicit EngineObjects(WorldId world) : world_(world) {}
   EngineObjects(const EngineObjects&) = delete;
   EngineObjects& operator=(const EngineObjects&) = delete;
   /// What it owns ends in the reverse order it came.
@@ -98,6 +101,25 @@ class EngineObjects {
         if (!calling_on_) calling_on_ = handle;   // (made for this call: the object the call is on, as one found)
         return static_cast<T*>(p);
       }
+    return nullptr;
+  }
+  /// The world of these objects: what an ObjectRef of them says.
+  WorldId world() const { return world_; }
+  /// An object of the engine of these objects as a Blueprint holds it (handle 0: none).
+  ObjectRef ref(i64 handle) const { return handle ? ObjectRef{handle, world_} : ObjectRef{}; }
+  /// The object an ObjectRef refers to, as a T. Null - and `error` says why - where it is none, of another world
+  /// (it names nothing here, not the object with the same handle), or no object of that class.
+  template <class T> T* get(ObjectRef r) {
+    if (!r.valid()) {
+      error = "no object of the engine (an Object that refers to none)";
+      return nullptr;
+    }
+    if (r.world != world_) {
+      error = "an object of world " + std::to_string(r.world) + " used in world " + std::to_string(world_) + " - it names nothing here";
+      return nullptr;
+    }
+    if (T* p = get<T>(r.handle)) return p;
+    error = "handle " + std::to_string(r.handle) + " names no object of that class in world " + std::to_string(world_);
     return nullptr;
   }
   /// Ends an object of a handle this owns (its destructor): true if it did. A handle the host keeps
@@ -193,6 +215,11 @@ class EngineObjects {
     void* owner = nullptr;          // what `end` ends, if not the object itself: what holds it (MadeWith)
     Kinds kinds;  // its class first, then those it derives from
   };
+  static WorldId next_world() {
+    static WorldId next = 0;
+    return ++next;
+  }
+  WorldId world_;
   i64 put(Kinds kinds, void (*end)(void*));
   void place(i64 handle, Kinds kinds, void (*end)(void*), void* owner = nullptr);
   void forget_lent(i64 lender);
@@ -311,7 +338,9 @@ template <class T> struct List {};
 template <class L> struct Row {};
 /// std::pair: a struct of `first` and `second`.
 template <class A, class B> struct Pair {};
-/// An object of the engine: its handle.
+/// An object of the engine: an Object<I> of the Blueprint, its value an ObjectRef - its handle in these objects and
+/// their world (kern/docs/engine_object.md). A reference of another world, or one of no object of the class, names
+/// nothing here: the call fails, saying which and why (EngineObjects::error).
 struct Handle {};
 /// A Callback (Callback<Float(Float, Float)>: the tags of its result and its inputs) - in C++ a struct of a pointer
 /// to a function with a void* in front and that void* (kern::HeightSampler), or a std::function.
@@ -366,8 +395,6 @@ template <> struct Conv<Bool> {
     return Value::boolean(c);
   }
 };
-template <> struct Conv<Handle>;
-/// (A whole number - or, in a list, a pointer to an object of the engine: its handle.)
 template <> struct Conv<Int> {
   template <class C> static void from(EngineObjects& o, const Value& v, C& c);
   template <class C> static Value to(EngineObjects& o, const C& c);
@@ -441,48 +468,58 @@ template <class A, class B> struct Conv<Pair<A, B>> {
   }
   template <class C> static Value to(EngineObjects& o, const C& c) { return Value::structure({Conv<A>::to(o, c.first), Conv<B>::to(o, c.second)}); }
 };
+/// The object an ObjectRef names as a T, where an object stands inside a value (a field of a struct, an entry of a
+/// list): null for none (Object<I>{}); one of another world or of no object of the class is null too, and the call
+/// fails - EngineObjects::error says why (call_engine, and the class's own call, ask before they call the engine).
+template <class T> T* object_in(EngineObjects& o, const Value& v) {
+  if (v.type != PinType::object) {
+    o.error = std::string("an object of the engine in a value is no Object (it is ") + pin_type_name(v.type) + ")";
+    return nullptr;
+  }
+  const ObjectRef r = v.as_object();
+  if (!r.valid()) return nullptr;
+  T* p = o.get<T>(r);
+  if (!p && o.error.empty()) o.error = "an object of the engine in a value names nothing";
+  return p;
+}
 template <> struct Conv<Handle> {
   template <class C> static void from(EngineObjects& o, const Value& v, C& c) {
-    static_assert(std::is_pointer_v<C>, "a handle in a list or a struct is a pointer to the object");
-    c = o.get<std::remove_pointer_t<C>>(v.as_int());
+    if constexpr (std::is_pointer_v<C>) {
+      c = object_in<std::remove_pointer_t<C>>(o, v);
+    } else {
+      // (an object of the engine a value holds as a value - a TextureAsset in a Level's list: the one it refers to,
+      // copied there; none is one as C++ makes it)
+      static_assert(std::is_class_v<C>, "an Object pin of something else than an object of the engine");
+      if (const C* p = object_in<C>(o, v)) c = *p;
+      else c = blank<C>();
+    }
   }
   template <class C> static Value to(EngineObjects& o, const C& c) {
-    static_assert(std::is_pointer_v<C>, "a handle in a list or a struct is a pointer to the object");
-    return Value::integer(c ? o.adopt(*c) : 0);
+    if constexpr (std::is_pointer_v<C>) {
+      return Value::object(o.ref(c ? o.adopt(*c) : 0));
+    } else {
+      static_assert(std::is_class_v<C>, "an Object pin of something else than an object of the engine");
+      return Value::object(o.ref(o.own(std::make_unique<C>(c))));   // (... given out: a copy of its own, a handle of its own)
+    }
   }
 };
 
-template <class C> void Conv<Int>::from(EngineObjects& o, const Value& v, C& c) {
-  if constexpr (std::is_pointer_v<C>) {
-    Conv<Handle>::from(o, v, c);
-  } else if constexpr (std::is_class_v<C> && !is_count<C>) {
-    // (an object of the engine a value holds as a value - a TextureAsset in a Level's list: the one of the
-    // handle, copied there; none - the handle 0 - is one as C++ makes it)
-    if (const C* p = o.get<C>(v.as_int())) c = *p;
-    else c = blank<C>();
-  } else {
-    static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number");
-    if constexpr (is_count<C>) c = C(static_cast<u32>(v.as_int()));
-    else c = static_cast<C>(v.as_int());
-  }
+template <class C> void Conv<Int>::from(EngineObjects&, const Value& v, C& c) {
+  static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
+  if constexpr (is_count<C>) c = C(static_cast<u32>(v.as_int()));
+  else c = static_cast<C>(v.as_int());
 }
-template <class C> Value Conv<Int>::to(EngineObjects& o, const C& c) {
-  if constexpr (std::is_pointer_v<C>) {
-    return Conv<Handle>::to(o, c);
-  } else if constexpr (std::is_class_v<C> && !is_count<C>) {
-    return Value::integer(o.own(std::make_unique<C>(c)));   // (... given out: a copy of its own, a handle of its own)
-  } else {
-    static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number");
-    if constexpr (is_count<C>) return Value::integer(static_cast<i64>(static_cast<u32>(c)));
-    else return Value::integer(static_cast<i64>(c));
-  }
+template <class C> Value Conv<Int>::to(EngineObjects&, const C& c) {
+  static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
+  if constexpr (is_count<C>) return Value::integer(static_cast<i64>(static_cast<u32>(c)));
+  else return Value::integer(static_cast<i64>(c));
 }
 
 /// How a list of the Blueprint type T holds its items (Value::of / items).
 template <class T> struct Held { using type = Value; };   // (structs, rows, pairs: a Value each)
 template <> struct Held<Bool> { using type = bool; };
 template <> struct Held<Int> { using type = i64; };
-template <> struct Held<Handle> { using type = i64; };
+template <> struct Held<Handle> { using type = ObjectRef; };
 template <> struct Held<Float> { using type = f64; };
 template <> struct Held<Vector> { using type = Vec3; };
 template <> struct Held<Text> { using type = std::string; };
@@ -499,6 +536,7 @@ template <class T, class C> typename Held<T>::type held_of(EngineObjects& o, con
   else if constexpr (std::is_same_v<H, f64>) return v.n;
   else if constexpr (std::is_same_v<H, Vec3>) return v.v;
   else if constexpr (std::is_same_v<H, std::string>) return v.s;
+  else if constexpr (std::is_same_v<H, ObjectRef>) return v.as_object();
   else return logic::Int64(static_cast<u64>(v.i));
 }
 template <class T, class C, class H> void from_held(EngineObjects& o, const H& h, C& c) {
@@ -508,6 +546,7 @@ template <class T, class C, class H> void from_held(EngineObjects& o, const H& h
   else if constexpr (std::is_same_v<H, f64>) Conv<T>::from(o, Value::number(h), c);
   else if constexpr (std::is_same_v<H, Vec3>) Conv<T>::from(o, Value::vector(h), c);
   else if constexpr (std::is_same_v<H, std::string>) Conv<T>::from(o, Value::text(h), c);
+  else if constexpr (std::is_same_v<H, ObjectRef>) Conv<T>::from(o, Value::object(h), c);
   else Conv<T>::from(o, Value::int64(h.bits), c);
 }
 
@@ -532,9 +571,9 @@ template <class X> struct ListOf<X*> { static constexpr bool is = true, grows = 
 template <class T> struct Conv<List<T>> {
   using H = typename Held<T>::type;
   static const std::vector<H>& items(const Value& v) {
-    if constexpr (std::is_same_v<H, i64>) {
-      static const std::vector<i64> none;
-      return v.holds<i64>() ? v.items<i64>() : none;
+    if constexpr (std::is_same_v<H, i64> || std::is_same_v<H, ObjectRef>) {
+      static const std::vector<H> none;
+      return v.holds<H>() ? v.items<H>() : none;
     } else {
       return v.items<H>();
     }
@@ -585,7 +624,7 @@ template <class T> struct Conv<List<T>> {
       for (const auto& x : c) h.push_back(held_of<T>(o, x));
     }
     if constexpr (std::is_same_v<T, Handle> || std::is_same_v<T, Int>) {
-      return Value::of(std::move(h));
+      return Value::of(std::move(h));   // (an object_list, an int_list)
     } else if constexpr (std::is_same_v<H, i64>) {
       return Value::enumerations(std::move(h));
     } else {
@@ -610,25 +649,50 @@ template <class Tag, class C> void give(EngineObjects& o, std::vector<Value>& ou
   if (k < out.size()) out[k] = Conv<Tag>::to(o, c);
 }
 
-/// The object of a handle as a T, or null - then the call fails, saying which input it was.
-template <class T> T* object_of(EngineObjects& o, i64 handle, const char* pin) {
-  T* p = o.get<T>(handle);
-  if (!p) o.error = std::string("no object of the engine of its class at the input ") + pin;
+/// The object an input refers to as a T (an Object<I>: its ObjectRef), or null - then the call fails, saying which
+/// input it was and why (none, another world, no object of the class - EngineObjects::get).
+template <class T> T* object_of(EngineObjects& o, ObjectRef r, const char* pin) {
+  T* p = o.get<T>(r);
+  if (!p) o.error = std::string("the input ") + pin + ": " + o.error;
   return p;
 }
-/// The same where the function takes a pointer: null for the handle 0; a handle of no such object
-/// fails the call (o.error says which input).
-template <class T> T* maybe_of(EngineObjects& o, i64 handle, const char* pin) {
-  return handle == 0 ? nullptr : object_of<T>(o, handle, pin);
+/// The same where the function takes a pointer: null for none (Object<I>{}); a reference of another world or of no
+/// such object fails the call (o.error says which input and why).
+template <class T> T* maybe_of(EngineObjects& o, ObjectRef r, const char* pin) {
+  return r.valid() ? object_of<T>(o, r, pin) : nullptr;
 }
-/// The object of the handle at input `k` as a T, or null - then the call fails, saying which input.
+/// What stands at input `k` as an object of the engine: its ObjectRef - a value of another type fails the call.
+inline bool object_ref(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin, ObjectRef& r) {
+  r = {};
+  if (k >= in.size()) return true;
+  if (in[k].type != PinType::object) {
+    o.error = std::string("the input ") + pin + " is no Object of the engine (it is " + pin_type_name(in[k].type) + ")";
+    return false;
+  }
+  r = in[k].as_object();
+  return true;
+}
+/// The object input `k` refers to as a T, or null - then the call fails, saying which input and why.
 template <class T> T* object(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin) {
-  return object_of<T>(o, k < in.size() ? in[k].as_int() : 0, pin);
+  ObjectRef r;
+  return object_ref(o, in, k, pin, r) ? object_of<T>(o, r, pin) : nullptr;
 }
-/// The object of the handle at input `k` as a T where the function takes a pointer: null for the handle
-/// 0; a handle of no such object fails the call (o.error says which input).
+/// The same where the function takes a pointer: null for none; anything else that names no such object fails the
+/// call (o.error says which input and why).
 template <class T> T* maybe(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin) {
-  return maybe_of<T>(o, k < in.size() ? in[k].as_int() : 0, pin);
+  ObjectRef r;
+  return object_ref(o, in, k, pin, r) ? maybe_of<T>(o, r, pin) : nullptr;
+}
+/// Ends the object an input refers to (<class>.release): one that was made here. Else the call fails, saying which
+/// input and why (another world; no `name` that was made).
+template <class T> bool release_of(EngineObjects& o, ObjectRef r, const char* pin, const char* name) {
+  if (r.valid() && r.world != o.world()) {
+    o.error = std::string("the input ") + pin + ": an object of world " + std::to_string(r.world) + " used in world " + std::to_string(o.world()) + " - it names nothing here";
+    return false;
+  }
+  if (o.release<T>(r.handle)) return true;
+  o.error = std::string("the input ") + pin + " names no " + name + " that was made";
+  return false;
 }
 /// The room a count says (none for less than nothing).
 template <class C> std::size_t room(const C& c) {

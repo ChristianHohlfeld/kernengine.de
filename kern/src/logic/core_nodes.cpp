@@ -634,6 +634,7 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
     case PinType::int64: f(std::type_identity<Int64>{}); break;
+    case PinType::object: f(std::type_identity<ObjectRef>{}); break;
     case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
     case PinType::structure: f(std::type_identity<Value>{}); break;  // (a struct is the value that holds its fields)
     default: break;
@@ -932,6 +933,7 @@ void add_lists(Library& lib) {
           case PinType::boolean: return a.b < b.b;
           case PinType::text: return a.s < b.s;
           case PinType::int64: return static_cast<u64>(a.i) < static_cast<u64>(b.i);  // (by the bits as a u64 - logic::Int64's <)
+          case PinType::object: return a.as_object() < b.as_object();  // (by world, then handle - logic::ObjectRef's <)
           default: return false;
         }
       };
@@ -2140,6 +2142,45 @@ void add_formula(Library& lib) {
 
 // Functions: named, with typed inputs and outputs (Graph::functions). The four nodes take their
 // data pins from the function they name; a pin's id is its name.
+/// The setting of a node that names an interface of the engine (Engine Object of Blueprint, Is Valid Object, Handle of
+/// Object): one of the engine's interfaces, written as its C++ type - func_engine_object<kern::App>, object_valid<kern::App>.
+/// Its default is said on the node (App); which one it is, the node shows.
+ParamDef interface_param() {
+  std::vector<std::string> interfaces;
+  for (const EngineInterface& i : engine_interfaces()) {
+    interfaces.push_back(i.name);
+    interfaces.push_back(i.name);
+  }
+  ParamDef p = param("interface", "Interface", ParamDef::Kind::choice, "App", std::move(interfaces));
+  p.engine_class = true;
+  return p;
+}
+std::string interface_problem(const Node& n, const Graph&) {
+  const std::string i = n.param("interface", "App");
+  if (i.empty()) return "names no interface of the engine (its setting Interface: App, ShaderExtension ...)";
+  if (!engine_interface(i)) return "the engine has no interface " + i;
+  return {};
+}
+
+/// The setting of a node that works on an Object of any class of the engine (Is Valid Object, Handle of Object, Same
+/// Object): the class, written as its C++ type - object_valid<kern::audio::Mixer>. Its default is said on the node (App).
+ParamDef class_param() {
+  std::vector<std::string> classes;
+  for (const EngineClass& c : engine_classes()) {
+    classes.push_back(c.name);
+    classes.push_back(c.name);
+  }
+  ParamDef p = param("class", "Class", ParamDef::Kind::choice, "App", std::move(classes));
+  p.engine_class = true;
+  return p;
+}
+std::string class_problem(const Node& n, const Graph&) {
+  const std::string c = n.param("class", "App");
+  if (c.empty()) return "names no class of the engine (its setting Class: App, audio_Mixer ...)";
+  if (!engine_class(c)) return "the engine has no class " + c;
+  return {};
+}
+
 void add_functions(Library& lib) {
   // which == 0: the inputs as outputs (entry); 1: the outputs as inputs (return); 2: both (calls)
   auto shape = [](int which) {
@@ -2289,18 +2330,73 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
-    // Engine Object of Blueprint: the object of the engine another Blueprint is (Graph::implements) - its handle
+    // Engine Object of Blueprint: the object of the engine another Blueprint is (Graph::implements), as the interface
+    // its setting names - an Object<I> (kern/docs/engine_object.md)
     NodeDef d = make("func.engine_object", "Engine Object of Blueprint", "Functions", NodeKind::pure,
-                     "The object of the engine the Blueprint on Target (the Level when Target is empty) is - of the interface of the engine it "
-                     "implements (App, Shader Extension ...) - as a handle of the engine: what a function of the engine takes where it is handed "
-                     "such an object (an App's Extensions). The same handle every time; 0 when Target has no Blueprint that runs, it "
-                     "implements none, or this build has no such interface.");
+                     "The object of the engine the Blueprint on Target (the Level when Target is empty) is, as the interface of the "
+                     "engine named in Interface (App, Shader Extension ...): what a function of the engine takes where it is handed "
+                     "such an object (an App's Extensions). The same object every time. Where there is none - Target has no Blueprint "
+                     "that runs, it implements no interface or another one, the host has no objects of the engine, this build lacks "
+                     "the interface - the log says which, and it gives no object.");
     d.world = true;
+    d.params = {interface_param()};
     d.inputs = {data("target", "Target", PinType::actor, 0)};
-    d.outputs = {data("result", "Engine Object", PinType::integer)};
+    d.outputs = {data("result", "Engine Object", PinType::object)};
     d.keywords = "engine object interface implements implementation handle extension app other actor";
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>&, std::vector<PinDef>& out) { out[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
+    d.problem = interface_problem;
     d.run = [](Context& c) {
-      c.out(std::size_t{0}, Value::integer(c.runtime().engine_object(c.in_actor("target"))));
+      c.out(std::size_t{0}, Value::object(c.runtime().engine_object(c.instance(), c.in_actor("target"), c.param("interface"))));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("object.valid", "Is Valid Object", "Engine", NodeKind::pure,
+                     "Does it refer to an object of the engine (and not to none)? Whether that object is still there, the engine "
+                     "says where it is used.");
+    d.params = {class_param()};
+    d.inputs = {data("object", "Object", PinType::object)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("class", "App"); };   // (unset: its default, as the node shows it)
+    d.problem = class_problem;
+    d.outputs = {data("result", "Is Valid", PinType::boolean)};
+    d.keywords = "object valid none engine handle null pointer";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.in("object").as_object().valid()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Same Object: do two Objects refer to the same object of the engine - the same world and the same handle (none and
+    // none are the same; C++ compares two pointers so)
+    NodeDef d = make("object.equal", "Same Object", "Engine", NodeKind::pure,
+                     "Do A and B refer to the same object of the engine (or both to none)? An object of another world is never the same.");
+    d.params = {class_param()};
+    d.inputs = {data("a", "A", PinType::object), data("b", "B", PinType::object)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = in[1].of = n.param("class", "App"); };
+    d.problem = class_problem;
+    d.outputs = {data("result", "Same", PinType::boolean)};
+    d.keywords = "object same equal identical == engine handle pointer";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.in("a").as_object() == c.in("b").as_object()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("object.handle", "Handle of Object", "Engine", NodeKind::pure,
+                     "The handle of an object of the engine in its world, as an Int (0: it refers to none) - to show it or to count "
+                     "with it; no function of the engine takes one (they take Objects, kern/docs/engine_object.md). There is no way "
+                     "back: no Int becomes an Object.");
+    d.params = {class_param()};
+    d.inputs = {data("object", "Object", PinType::object)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("class", "App"); };   // (unset: its default, as the node shows it)
+    d.problem = class_problem;
+    d.outputs = {data("result", "Handle", PinType::integer)};
+    d.keywords = "object handle int engine";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::integer(c.in("object").as_object().handle));
       return kStop;
     };
     lib.add(std::move(d));
