@@ -1361,6 +1361,56 @@ TEST(level_errors_say_where_and_which_values) {
   CHECK(error.find("actor \"Ball\": controller.mode: unknown value \"rollin\" - one of hovercar, rolling, character") == 0);
 }
 
+// A key the reader of a level or a project does not know is an error with its place and the keys there are
+// (kern/docs/app.md 2.) - in every object they read, not only under "components"; nothing is passed over in silence.
+TEST(level_and_project_refuse_unknown_keys) {
+  game::Level l = game::basic_level();
+  game::Actor pad;
+  pad.name = "Pad";
+  pad.mesh = game::MeshComponent{};
+  pad.colliders.push_back({});
+  l.add(pad);
+  const std::string text = game::to_text(l, -1);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));   // (what the writer writes, the reader knows)
+  const auto refused = [&](const std::string& from, const std::string& to) {
+    std::string t = text;
+    const std::size_t at = t.find(from);
+    CHECK(at != std::string::npos);
+    if (at != std::string::npos) t.replace(at, from.size(), to);
+    game::Level b;
+    std::string why;
+    CHECK(!game::from_text(t, b, &why));
+    return why;
+  };
+  // the component's name, one letter off (the case of the second game: "collider" for "colliders")
+  std::string e = refused("\"colliders\":", "\"collider\":");
+  CHECK(e.find("actor \"") == 0 && e.find("\": components.collider: unknown key - one of mesh, light, body, colliders, joints, controller") != std::string::npos);
+  CHECK(refused("\"radius\":", "\"radios\":").find("mesh.radios: unknown key - one of shape, size, radius") != std::string::npos);
+  CHECK(refused("\"roughness\":", "\"ruffness\":").find("ruffness: unknown key - one of color, roughness") != std::string::npos);
+  CHECK(refused("\"sensor\":", "\"sensr\":").find("colliders.sensr: unknown key - one of shape, center") != std::string::npos);
+  CHECK(refused("\"transform\":{\"position\":", "\"transform\":{\"positon\":").find("transform.positon: unknown key - one of position, rotation, scale") != std::string::npos);
+  CHECK(refused("\"name\":\"Pad\"", "\"name\":\"Pad\",\"colour\":1").find("actor \"Pad\": colour: unknown key - one of id, name, parent, folder") == 0);
+  CHECK(refused("\"gravity\":", "\"gravty\":").find("world.gravty: unknown key - one of channels, gravity, substeps") == 0);
+  CHECK(refused("\"yaw\":", "\"jaw\":") .find("camera.jaw: unknown key - one of position, yaw, pitch") == 0);
+  CHECK(refused("\"nextId\":", "\"nextID\":").find("nextID: unknown key - one of name, format, version, world, logic, actors, textures, sounds, motions, camera, nextId") == 0);
+  CHECK(refused("\"textures\":[]", "\"textures\":[{\"id\":\"t\",\"sorce\":\"\"}]") == "textures[0].sorce: unknown key - one of id, name, src, width, height");
+  // the project: its own keys, the settings, the renderer and its parts, a profile, a Blueprint's entry
+  const auto project = [](const std::string& body) {
+    game::Project p;
+    std::string why;
+    CHECK(!game::from_text("{\"format\":\"kern-project\"," + body + "}", p, &why));
+    return why;
+  };
+  CHECK(project("\"start\":\"a\"") == "start: unknown key - one of format, version, name, settings, levels, startLevel, blueprints");
+  CHECK(project("\"settings\":{\"heapReserve\":1}") == "settings: heapReserve: unknown key - one of renderer, profiles, heapReserveMb");
+  CHECK(project("\"settings\":{\"renderer\":{\"shadw\":1}}") == "settings: renderer.shadw: unknown key - one of shadows, shadow, bloom, ao, grade");
+  CHECK(project("\"settings\":{\"renderer\":{\"ao\":{\"radios\":1}}}") == "settings: renderer.ao.radios: unknown key - one of enabled, quality, halfResolution, radius, power, adaptive");
+  CHECK(project("\"settings\":{\"profiles\":[{\"name\":\"m\",\"renderer\":{\"bloom\":{\"on\":true}}}]}") == "settings: profiles[0].renderer.bloom.on: unknown key - one of enabled, forced");
+  CHECK(project("\"blueprints\":[{\"name\":\"A\",\"logik\":{}}]") == "blueprints[0] \"A\": logik: unknown key - one of name, logic");
+}
+
 // A project that does not read says where and why.
 TEST(game_project_errors) {
   const auto why = [](const std::string& text) {
@@ -8502,6 +8552,42 @@ TEST(run_the_program_of_a_project) {
   // started again: its program again, from the project
   CHECK(kern_app_start(64, 48) == 1);
   kern_app_stop();
+}
+
+// The app runtime says why an App does not start (kern/docs/app.md 1.): no App, or the App's start() gave false - with
+// the reason the App gave (kern::fail), or that it named none; an error from before the start is never the reason.
+// A test makes its own app runtime (kern::AppRuntime): the process's one is the platform's.
+TEST(app_runtime_start_says_why) {
+  struct Refuses final : App {
+    const char* why = nullptr;
+    int starts = 0, stops = 0;
+    bool start(Engine&) override { ++starts; return why ? fail("%s", why) : false; }
+    void update(Engine&, const Frame&) override {}
+    void stop(Engine&) override { ++stops; }
+  } app;
+  Renderer r;
+  AppRuntime rt(r);
+  CHECK(!rt.start(64, 48) && std::string(last_error()).find("no App: the program's kern_main()") == 0);
+  CHECK(rt.give(app) == 0 && rt.give(app) == 1);   // (one App, once)
+  fail("an earlier error");
+  CHECK(!rt.start(64, 48) && !rt.running() && app.starts == 1);
+  CHECK(std::string(last_error()) == "the App did not start: its start() gave false and named no reason (an App says why with kern::fail)");
+  app.why = "the level levels/a.klevel: world.gravty: unknown key";
+  CHECK(!rt.start(64, 48) && std::string(last_error()) == "the App did not start: the level levels/a.klevel: world.gravty: unknown key");
+  CHECK(!rt.frame(0, false) && app.stops == 0);   // (not running: no frame, no stop)
+  rt.stop();
+  CHECK(app.stops == 0);
+  struct Starts final : App {
+    int frames = 0;
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame& f) override { frames += f.index == static_cast<u64>(frames); }
+  } good;
+  Renderer r2;
+  AppRuntime rt2(r2);
+  CHECK(rt2.give(good) == 0 && rt2.start(64, 48) && rt2.running());
+  CHECK(rt2.frame(0, false) && rt2.frame(16, false) && good.frames == 2);
+  rt2.stop();
+  CHECK(!rt2.running());
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds

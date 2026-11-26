@@ -70,12 +70,19 @@ inline json::Value shadow_to(const ShadowOptions& s) {
   o.set("filter", s.filter);
   return o;
 }
-inline void shadow_from(const json::Value& v, ShadowOptions& s) {
-  if (!v.is_object()) return;
+/// The keys of an object of the settings (kern/docs/app.md 2.): "" or "<where>.<key>: unknown key - one of ...".
+inline std::string keys_of(const json::Value& v, const char* where, std::initializer_list<std::string_view> known) {
+  const std::string e = json::unknown_key(v, known);
+  return e.empty() ? e : std::string(where) + "." + e;
+}
+inline std::string shadow_from(const json::Value& v, ShadowOptions& s, const std::string& where) {
+  if (!v.is_object()) return {};
+  if (std::string e = keys_of(v, where.c_str(), {"resolution", "extent", "bias", "filter"}); !e.empty()) return e;
   s.resolution = static_cast<i32>(v["resolution"].as_number(s.resolution));
   s.extent = static_cast<f32>(v["extent"].as_number(s.extent));
   s.bias = static_cast<f32>(v["bias"].as_number(s.bias));
   s.filter = static_cast<i32>(v["filter"].as_number(s.filter));
+  return {};
 }
 inline json::Value ao_to(const AoOptions& a) {
   json::Value o = json::Value::object();
@@ -87,14 +94,16 @@ inline json::Value ao_to(const AoOptions& a) {
   o.set("adaptive", a.adaptive);
   return o;
 }
-inline void ao_from(const json::Value& v, AoOptions& a) {
-  if (!v.is_object()) return;
+inline std::string ao_from(const json::Value& v, AoOptions& a, const std::string& where) {
+  if (!v.is_object()) return {};
+  if (std::string e = keys_of(v, where.c_str(), {"enabled", "quality", "halfResolution", "radius", "power", "adaptive"}); !e.empty()) return e;
   a.enabled = v["enabled"].as_bool(a.enabled);
   if (v["quality"].is_string()) a.quality = quality_of(v["quality"].as_string(), a.quality);
   a.half_resolution = v["halfResolution"].as_bool(a.half_resolution);
   a.radius = static_cast<f32>(v["radius"].as_number(a.radius));
   a.power = static_cast<f32>(v["power"].as_number(a.power));
   a.adaptive = v["adaptive"].as_bool(a.adaptive);
+  return {};
 }
 }  // namespace project_json
 
@@ -111,18 +120,22 @@ inline json::Value renderer_to(const RendererOptions& o) {
   r.set("grade", o.grade);
   return r;
 }
-/// The keys of "renderer" a document names, on top of `o` (missing keys keep what `o` has).
-inline void renderer_from(const json::Value& r, RendererOptions& o) {
-  if (!r.is_object()) return;
+/// The keys of "renderer" a document names, on top of `o` (missing keys keep what `o` has). "" or what is wrong
+/// (a key none of the renderer's: `where`.key with the keys there are).
+inline std::string renderer_from(const json::Value& r, RendererOptions& o, const std::string& where) {
+  if (!r.is_object()) return {};
+  if (std::string e = keys_of(r, where.c_str(), {"shadows", "shadow", "bloom", "ao", "grade"}); !e.empty()) return e;
   o.shadows = r["shadows"].as_bool(o.shadows);
-  shadow_from(r["shadow"], o.shadow);
+  if (std::string e = shadow_from(r["shadow"], o.shadow, where + ".shadow"); !e.empty()) return e;
   const json::Value& bloom = r["bloom"];
   if (bloom.is_object()) {
+    if (std::string e = keys_of(bloom, (where + ".bloom").c_str(), {"enabled", "forced"}); !e.empty()) return e;
     o.bloom.enabled = bloom["enabled"].as_bool(o.bloom.enabled);
     o.bloom.forced = bloom["forced"].as_bool(o.bloom.forced);
   }
-  ao_from(r["ao"], o.ao);
+  if (std::string e = ao_from(r["ao"], o.ao, where + ".ao"); !e.empty()) return e;
   o.grade = r["grade"].as_bool(o.grade);
+  return {};
 }
 }  // namespace project_json
 
@@ -155,18 +168,20 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::s
   out = ProjectSettings{};
   if (!v.is_object()) return fail("must be an object");
   if (v.has("mobile")) return fail("mobile: a device profile is one of \"profiles\" ({\"name\": \"mobile\", \"renderer\": {...}})");
-  renderer_from(v["renderer"], out.renderer);
+  if (std::string e = json::unknown_key(v, {"renderer", "profiles", "heapReserveMb"}); !e.empty()) return fail(e);
+  if (std::string e = renderer_from(v["renderer"], out.renderer, "renderer"); !e.empty()) return fail(e);
   if (const json::Value* list = v.find("profiles")) {
     if (!list->is_array()) return fail("profiles: must be a list");
     for (std::size_t i = 0; i < list->size(); ++i) {
       const json::Value& x = (*list)[i];
       const std::string at = "profiles[" + std::to_string(i) + "]";
       if (!x.is_object() || !x["name"].is_string() || x["name"].as_string().empty()) return fail(at + ": a profile has a name");
+      if (std::string e = keys_of(x, at.c_str(), {"name", "renderer"}); !e.empty()) return fail(e);
       DeviceProfile d;
       d.name = x["name"].as_string();
       if (out.profile(d.name)) return fail(at + ": the profile " + d.name + " stands twice");
       d.renderer = out.renderer;
-      renderer_from(x["renderer"], d.renderer);
+      if (std::string e = renderer_from(x["renderer"], d.renderer, at + ".renderer"); !e.empty()) return fail(e);
       out.profiles.push_back(std::move(d));
     }
   }

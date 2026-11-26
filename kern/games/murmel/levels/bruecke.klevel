@@ -138,11 +138,11 @@
       0.12
      ],
      "material": {
-      "color": "#f2c230"
+      "color": "#f2c230",
+      "emissive": "#5a4000"
      },
      "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
+     "height": 0.12
     },
     "pickup": {
      "points": 10
@@ -185,11 +185,11 @@
       0.12
      ],
      "material": {
-      "color": "#f2c230"
+      "color": "#f2c230",
+      "emissive": "#5a4000"
      },
      "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
+     "height": 0.12
     },
     "pickup": {
      "points": 10
@@ -232,11 +232,11 @@
       0.12
      ],
      "material": {
-      "color": "#f2c230"
+      "color": "#f2c230",
+      "emissive": "#5a4000"
      },
      "radius": 0.35,
-     "height": 0.12,
-     "emissive": "#5a4000"
+     "height": 0.12
     },
     "pickup": {
      "points": 10

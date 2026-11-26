@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include <initializer_list>
+#include <string_view>
+
 #include "kern/core/base.h"
 
 namespace kern::json {
@@ -94,6 +97,13 @@ struct ParseOptions {
 
 /// Parses `text`; on failure returns false and describes the problem (with offset) in `error`.
 bool parse(std::string_view text, Value& out, std::string* error = nullptr, const ParseOptions& options = {});
+
+/// The one check of a reader's keys (kern/docs/app.md 2.): the first member of `object` that is none of `known`, as
+/// "<key>: unknown key - one of <known, in their order>"; "" when every member is known (or `object` is no object).
+std::string unknown_key(const Value& object, Span<const std::string_view> known);
+inline std::string unknown_key(const Value& object, std::initializer_list<std::string_view> known) {
+  return unknown_key(object, Span<const std::string_view>(known.begin(), known.size()));
+}
 
 /// Serialises like JSON.stringify(value, null, indent); indent <= 0 writes compact JSON.
 std::string stringify(const Value& value, i32 indent = -1);

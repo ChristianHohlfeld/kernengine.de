@@ -72,17 +72,12 @@ bool Murmel::lade(int nummer) {
   }
   const std::string_view text = game::embedded_level(level_pfad(nummer));
   std::string fehler;
-  if (!game::from_text(text, geladen_, &fehler)) {
-    log(LogLevel::error, "murmel: das Level %s: %s", level_pfad(nummer), fehler.c_str());
-    return false;
-  }
+  // (der Grund mit kern::fail: startet die App deshalb nicht, nennt die App-Laufzeit ihn - kern/docs/app.md 1.)
+  if (!game::from_text(text, geladen_, &fehler)) return fail("murmel: das Level %s: %s", level_pfad(nummer), fehler.c_str());
   level_ = nummer;
   gewonnen_seit_ = -1;
   welt_->sync(geladen_);
-  if (!welt_->start(geladen_, game::SimMode::play)) {
-    log(LogLevel::error, "murmel: das Level %s startet nicht", level_pfad(nummer));
-    return false;
-  }
+  if (!welt_->start(geladen_, game::SimMode::play)) return fail("murmel: das Level %s startet nicht", level_pfad(nummer));
   bank_->request_level(geladen_);
   audio_->begin(*welt_);
   return true;
@@ -94,7 +89,7 @@ void Murmel::update(Engine& engine, const Frame& frame) {
     if (engine.input().pressed(Key::enter)) {
       vorher_ = 0;
       fertig_ = false;
-      lade(0);
+      if (!lade(0)) log(LogLevel::error, "%s", last_error());
     }
   } else {
     welt_->step(frame.dt, in);
@@ -106,13 +101,13 @@ void Murmel::update(Engine& engine, const Frame& frame) {
       if (gewonnen_seit_ > 1.0f) {
         vorher_ += hud.score;
         if (level_ + 1 < kLevels) {
-          lade(level_ + 1);
+          if (!lade(level_ + 1)) log(LogLevel::error, "%s", last_error());
         } else {
           fertig_ = true;
         }
       }
     } else if (hud.status == game::GameStatus::lost) {
-      lade(level_);
+      if (!lade(level_)) log(LogLevel::error, "%s", last_error());
     }
   }
   welt_->update_camera(kamera_, frame.dt, in);
