@@ -13362,7 +13362,7 @@ class TestWriter:
         if count_per(c) is not None:
             return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
-            return "double"
+            return ("float" if c == "float" else c) if HONEST[0] else "double"   # (the second pass: the source's own numbers)
         if c in NUMBER:
             return c
         if c in ("kern::Vec3", "kern::Vec2") or self.u.find_type(c) in ("kern::Vec3", "kern::Vec2"):
@@ -13511,7 +13511,7 @@ class TestWriter:
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
-            return "draw.number()"
+            return "static_cast<float>(draw.number())" if HONEST[0] and c == "float" else "draw.number()"   # (an f32 of the source: an f32 value)
         if c == "bool":
             return "draw.flag()"
         if c in NUMBER:
@@ -15760,7 +15760,7 @@ class TestWriter:
         # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
         # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
         # the real engine in the test)
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::)(\w+)")
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
