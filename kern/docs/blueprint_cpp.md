@@ -2308,14 +2308,14 @@ Nichts geschrieben, gespielt, im Text geändert, Undo) und im Browser `kern/test
 
 `tools/cpp_to_blueprint.py --convert <namespace> … --test <ordner>` schreibt zu jeder umgewandelten Quelldatei einen
 Test, der jede geschriebene Funktion mit ihrer Quelle vergleicht – Bit für Bit, im Interpreter und als kompilierte
-Klasse, mit den Zahlen der Sprache. Der Namensraum ist der des Spiels; der Konverter kennt keinen Spiel­namen
+Klasse, gegen die Quelle, wie C++ sie rechnet (ihre eigenen Zahlen: `f32` bleibt `f32`, ein `u32` bricht bei 2^32 um). Der Namensraum ist der des Spiels; der Konverter kennt keinen Spiel­namen
 (`tools/converter_cases/names.sh` prüft es im CI-Job `converter-cases`). Der Rahmen gehört der Engine:
 
 | Datei | was |
 |---|---|
 | `kern/test/test.h` | die Testliste: `KERN_TEST(name) { … }`, `KERN_CHECK(bedingung, "printf-Text", …)`, `kern::test::cases()` |
 | `kern/test/blueprint.h` | ein Blueprint, wie ein Test ihn laufen lässt (`kern::test::BlueprintRun`, `blueprint_of(name)`): aus dem **eingebetteten Projekt** (`kern/tools/embed_project.py`) – die des Programms aus dem Projekt, die einer Welt aus dem Level, das sie hält (ein Name in zwei Levels ist ein Fehler mit beiden Pfaden); die Schleifenwache ist `loopBudget` des Projekts |
-| `kern/test/converted.h` | der Vergleich (`namespace kern::converted`: die Zahlen der Sprache für die Quelle, Ziehen der Argumente, Vergleich der Werte, der Aufrufe der Engine und der Kosten) |
+| `kern/test/converted.h` | der Vergleich (`namespace kern::converted`: Ziehen der Argumente, Vergleich der Werte je Zahl-Typ – `Lang<T>`, der Zahl-Typ eines C++-Typs –, der Aufrufe der Engine und der Kosten; Wächter für das, was C++ offenlässt) |
 | `kern/test/cost.h` | wie oft ein Aufruf Speicher verlangt (die Klasse nicht öfter als ihre Quelle) |
 | `kern/tools/test_memory.cpp` | der Allokator eines Testprogramms: zählt und gibt genullten Speicher – genau einmal in jedes Testprogramm linken |
 | `kern/tools/test_main.cpp` | ein Läufer für alle registrierten Tests (`--name <test> …`); ein Spiel mit eigenem Läufer nimmt `kern::test::cases()` |
@@ -2327,21 +2327,23 @@ beantworten (sonst der Stellvertreter, der jeden Aufruf aufschreibt); `KERN_COST
 Klasse Speicher verlangen. Beispiel eines zweiten Spiels: `kern/games/murmel/tests/convert.sh` (wandelt die App um, baut
 die Vergleichstests und fährt sie gegen Stellvertreter und Engine).
 
-#### Der zweite Durchgang: gegen die Quelle, wie C++ sie rechnet
+#### Ein Weg: gegen die Quelle, wie C++ sie rechnet, unter UBSan
 
-Mit `KERN_TEST_SOURCE_NUMBERS=1` schreibt der Konverter zu jedem Blueprint einen zweiten Test, `test_<x>_source.cpp`. Dort
-steht die Quelle so, wie sie ist: `f32` bleibt `f32`, `1.0f` bleibt `1.0f`, und die Typen sind die der Engine (`kern::Vec3` …).
-Der erste Test bleibt unverändert und entscheidet wie bisher, was geschrieben wird und was wartet. Der zweite ändert daran
-nichts. Ein Stück der Quelle, das dort nicht kompiliert, fehlt nur in diesem Test, und das Protokoll zählt es
-(„not compared with the source's own numbers“). Jede Funktion, die in einem Test abweicht, bekommt eine Zeile
-`off: <funktion>: n of m calls differ; the largest difference d (Aufruf: Stelle: Quelle, Blueprint)`.
-`tools/source_numbers.py <testordner> <ausgabe der tests>` sagt dann je Funktion: geschrieben; verglichen wie bisher:
-gleich/abweichend; verglichen mit der Quelle, wie sie ist: gleich, abweichend in n von m Aufrufen (größte Abweichung) oder
-nicht verglichen. Am Ende stehen die Summen. Gebaut und gefahren werden die Tests mit `tools/converter_cases/compare.sh`
-(Fälle `numbers_*` in `tools/converter_cases/run.sh`, die Probe der CI mit `source_numbers=1`). Solange die Zahl-Typen der
-Sprache nicht die des Teilsatzes sind (Abschnitt „Zahlen“), ist der zweite Durchgang eine Messung und kein Tor.
+Der Test hält die Quelle so, wie sie ist: `f32` bleibt `f32`, `1.0f` bleibt `1.0f`, die Typen sind die der Engine
+(`kern::Vec3` …), `std::sin` ist die Mathematik der Engine (musl unter den Standardnamen). Es gibt keinen zweiten Durchgang
+und keine umgeschriebene Quelle mehr (`widen`, `KERN_TEST_SOURCE_NUMBERS` sind entfallen). Was C++ offenlässt, setzt der
+Test nicht fort: ein Überlauf einer Zahl mit Vorzeichen, eine ganze Zahl durch 0, ein Shift um die Breite oder mehr, ein
+Eintrag neben einer Liste, eine Fließkommazahl jenseits der Enden eines ganzen Typs – solche Aufrufe gehen über die
+Wächter von `converted.h` (`plus`, `quot`, `fits` …), werden gezählt und nicht verglichen. Gebaut werden Tests und Quellen
+unter UBSan (`-fsanitize=undefined`, `tools/converter_cases/compare.sh`): was dennoch durchkommt, steht als
+„runtime error:“ im Protokoll und macht den Vergleich rot. Eine Fließkomma-Division durch 0, ein NaN, ±inf: IEEE 754 legt
+sie fest – verglichen wie jeder Wert (zwei NaN sind gleich, −0 ≠ 0). Jede Funktion, die abweicht, bekommt eine Zeile
+`off: <funktion>: n of m calls differ; the largest difference d (Aufruf: Stelle: Quelle, Blueprint)`;
+`tools/source_numbers.py <testordner> <ausgabe der tests> [--right]` sagt je Funktion: gleich, abweichend in n von m
+Aufrufen oder nicht verglichen, mit den Summen (`--right`: alle gleich, UBSan still). Fälle: `numbers_*` und `hyperbolic`
+in `tools/converter_cases/run.sh`.
 
-## Zahlen (Entwurf – nicht gebaut; Stufe 1 = der zweite Durchgang oben)
+## Zahlen (der Entwurf von 26.11.2026 – gebaut: „Zahl-Typen“, „Formeln“, der Test oben)
 
 Bitgenau heißt: Der Blueprint rechnet, was C++ rechnet. Nichts wird umgedeutet oder gerundet, was die Quelle nicht selbst
 tut. Die Sprache bekommt dafür die Zahl-Typen des Teilsatzes (bool, i8 … i64, u8 … u64, f32, f64) als Pin-Typen. Jede

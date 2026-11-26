@@ -309,6 +309,9 @@ def f32_literal(x):
         c = f"{f:.{digits}g}"
         if f32_of(float(c)) == f and f32_of_text(c) == f:
             break
+    r = repr(float(c))   # (the same number, as a decimal is written: 180.0 rather than 1.8e+02)
+    if len(r) <= len(c) + 2 and f32_of(float(r)) == f and f32_of_text(r) == f:
+        c = r
     if "e" not in c and "." not in c:
         c += ".0"
     return c + "f"
@@ -6311,13 +6314,13 @@ class Emit:
             self.pre = saved
 
     def minus_one(self, n, text):
-        """A bound of the language's whole numbers (i64) one below `text`, the value of `n`."""
+        """A bound of the language's whole numbers (i64) one below `text` (n's value, as an i64)."""
         b = bare(n)
         while b.get("kind") in CAST and kids(b):
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
-        return self.whole_math("-", self.conv(text, self.tp(n), IDX), "1")
+        return self.whole_math("-", text, "1")   # (`text`: the bound, already the language's whole number)
 
     def refers(self, n, decl_id):
         n = bare(n)
@@ -8003,7 +8006,7 @@ class Emit:
         """Is this a value of one of the language's own types as a Blueprint's class holds it (kern::logic::Sized, Whole,
         Truth, Text): what C++ converts it to is that value, in the notation."""
         c = self.ctype(n)
-        return c in LANGUAGE_TYPES or c.startswith("kern::logic::Sized<")
+        return c in LANGUAGE_TYPES or c.startswith("kern::logic::num::Typed<")
 
     # ---- a function of the Blueprint of an actor of the level: Call on Actor ----
     def on_actor(self, n):
@@ -10934,6 +10937,8 @@ class Emit:
             if re.search(r"\*\s*(const\s*)?$", self.ctype(b)):
                 raise Wait("a pointer")   # (&p - list.data(): where an entry stands, counted by addresses)
             raise Wait("a value that is not a number in a computation")
+        if k in ("UnaryOperator", "BinaryOperator", "ConditionalOperator") and not all(self.numeric(c) for c in (kids(b)[1:] if k == "ConditionalOperator" else kids(b))):
+            return self.leaf(b, leaves)   # (of what is no number - two objects compared, a pointer asked: a value of its own)
         if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "!", "~"):
             x = self.fx(kids(b)[0], leaves)
             return x if b["opcode"] == "+" else f"({b['opcode']}{x})"
@@ -12436,7 +12441,7 @@ SOURCE_PRELUDE = """// the source's own numbers: what C++ computes, compared wit
 using kern::f32; using kern::f64;
 using kern::u8; using kern::u16; using kern::u32; using kern::u64;
 using kern::i8; using kern::i16; using kern::i32; using kern::i64;
-using kern::Vec2; using kern::Vec3; using kern::Span;"""
+using kern::Vec2; using kern::Vec3; using kern::Span; using kern::Map; using kern::Set;"""
 
 
 class Held:
@@ -12891,7 +12896,7 @@ class TestWriter:
             elif n.get("castKind") == "FloatingToIntegral" and ks and self.u.clean(qtype(n)) in Const.BITS:
                 # a number as a whole number of a type that does not hold it
                 ca, cb = span(ks[-1])
-                target = {"whole64u": "converted::Whole", "whole64s": "converted::SignedWhole"}.get(self.u.clean(qtype(n)), self.u.clean(qtype(n)))
+                target = {"whole64u": "unsigned long", "whole64s": "long"}.get(self.u.clean(qtype(n)), self.u.clean(qtype(n)))
                 edits.append((ca, 2, depth, ca, f"converted::fits<{target}>("))
                 edits.append((cb, 0, -depth, cb, ")"))
             elif (k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr") and ks and n.get("castKind") == "IntegralCast"
@@ -13131,9 +13136,7 @@ class TestWriter:
         """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
         64-bit bit pattern (the program's u64, i64) is the language's Int64 - also in a list, a pair, a map
         or a set: converted::shaped makes it that, by the type as the program spells it."""
-        if not re.search(r"\b[ui]64\b", spelled):
-            return expr
-        return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
+        return expr   # (the language's numbers are C++'s: a u64 is a u64 - nothing to shape)
 
     def logic_value(self, q):
         """Is `q` a class of the engine's logic that is a value of the language - plain data (Unit.engine_object):
@@ -13455,7 +13458,7 @@ class TestWriter:
 
     # ---- the types of a Blueprint's class (Unit.class_library): the source holds them where it calls a file of the program that is
     # a Blueprint now; the test draws, hands over, compares and takes them back (converted.h, "the types of a Blueprint's class") ----
-    LANGUAGE_CPP = re.compile(r"kern::logic::(?:Sized<.+>|Whole|Text|Truth|List<.+>|Fixed<.+>)")
+    LANGUAGE_CPP = re.compile(r"kern::logic::(?:num::Typed<.+>|Text|Truth|List<.+>|Fixed<.+>)")
 
     def class_spell(self, c):
         """How the test spells a type of a Blueprint's class (`c`, cleaned) - as the compiler names it: the class's
@@ -13607,7 +13610,7 @@ class TestWriter:
                      + "".join(f" && converted::at_place(same({of(f, 'want')}, (*got.rows)[{i}]), \".{f}\")" for i, (f, _) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {t}& s) {{ return " + " && ".join(f"defined({of(f)})" for f, _ in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {t}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({of(f)})" for f, _ in fields) + ' + "}"; }')
-        shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+        shape = lambda x: x
         takes = []
         for i, (f, _) in enumerate(fields):
             if f in held or f in viewed:
@@ -13743,7 +13746,7 @@ class TestWriter:
                 # (the program's way to call an actor's Blueprint is the test's own, no stand-in: a function of the engine
                 # that hands one between the program and the engine is not compared)
                 raise Wait(f"it hands the logic the Blueprints run in ({self.u.object_of(raw).split('::')[-1]}) between the program and a stand-in of the engine")
-        shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+        shape = lambda x: x
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
         formats = None   # (the format of a function that formats a text - Api.printf_format)
         if plain and not qtype(d).rstrip().endswith("const"):
@@ -13981,7 +13984,7 @@ class TestWriter:
                 defs.append((("object", q), b))
             if fields.get(q):
                 # (the fields the program reads and sets: its own, kept as the engine's by converted::FieldSync)
-                shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+                shape = lambda x: x
                 syncs = []
                 for f in sorted(fields[q], key=lambda f: f["decl"]["name"]):
                     t = self.spell(f["raws"]["result"])

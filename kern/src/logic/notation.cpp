@@ -5489,7 +5489,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
-      if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback || f.type.type == PinType::object || f.type.type == PinType::object_list)
+        return type_in(f.type.type, f.type.of, rooted);
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };

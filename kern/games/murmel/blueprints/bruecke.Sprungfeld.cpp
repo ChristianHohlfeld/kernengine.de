@@ -1,6 +1,6 @@
 struct Sprungfeld : kern::Blueprint {
   /// Wie oft das Feld jemanden hochgeworfen hat.
-  Int Spruenge = 0;
+  i64 Spruenge = 0;
 
   KERN_EVENT(on1, game_overlap_begin)
   void on1(Actor actor, Actor other) {

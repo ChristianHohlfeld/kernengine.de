@@ -206,7 +206,7 @@ check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'li
 classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table
-check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
+check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0f, 180\.0f\}'
 
 convert nested
 check nested "Stream's field holds Stream::Tile, named from inside the struct (not mvt::Tile)" yes 'List<Stream_Tile>'
@@ -214,13 +214,13 @@ check nested "... and nowhere a list of mvt::Tile" no 'List<mvt_Tile>'
 logged nested "both are compared" '^2 functions of the Blueprints are compared'
 
 convert meshextra
-check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<Float> values = List<Float>\{\}, Int values_at = 0\)'
+check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<f32> values = List<f32>\{\}, i64 values_at = 0\)'
 logged meshextra "extra_of_the_shore (hands an array) is written" '^ +extra_of_the_shore \([0-9]+\): written'
 
 convert views
-check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<Float> values = List<Float>\{\}\)'
-check views "const f32* is an input by value and its place" yes 'first_ofResult first_of\(List<Float> values = List<Float>\{\}, Int values_at = 0\)'
-check views "Span<f32> (to write through) is a reference input" yes 'void fill\(List<Float>& out, Float v = 0\.0\)'
+check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<f32> values = List<f32>\{\}\)'
+check views "const f32* is an input by value and its place" yes 'first_ofResult first_of\(List<f32> values = List<f32>\{\}, i64 values_at = 0\)'
+check views "Span<f32> (to write through) is a reference input" yes 'void fill\(List<f32>& out, f32 v = 0\.0f\)'
 logged views "sum_of (a range-for over a view) is a value" '^ +sum_of \([0-9]+\): written$'
 logged views "first_of is a value" '^ +first_of \([0-9]+\): written$'
 logged views "push_extra handed an array is written" '^ +extra_from_an_array \([0-9]+\): written'
