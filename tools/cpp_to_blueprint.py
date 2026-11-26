@@ -14592,6 +14592,15 @@ class TestWriter:
         outer = q.rsplit("::", 1)[0] if "::" in q else ""
         return bool(outer) and (self.top_of(q) != q or outer in records) and outer in self.tree.records and self.inside(self.tree.records[q], [self.tree.records[outer]]) is None
 
+    def engine_record(self, q):
+        """Is this class one of the engine's own types - defined in a header of the engine, in namespaces only (not in a class)? In the second
+        pass of the comparison (HONEST) the test holds it as the engine has it, not as a copy."""
+        d = self.tree.records.get(q)
+        if d is None or "::" not in q or not os.path.abspath(d.get("_file", "") or "").startswith(ENGINE_HEADERS_DIR + os.sep):
+            return False
+        parts = q.split("::")
+        return not any("::".join(parts[:i]) in self.tree.records for i in range(1, len(parts)))
+
     def wrapped(self, q, text, local=None, records=()):
         """A class's text where it stands in the test: in its namespaces - one defined outside its class
         (`struct CityStream::Tile { ... };`) names that class itself."""
@@ -15379,7 +15388,7 @@ class TestWriter:
                 text = re.sub(r"(\b(?:class|struct)\s+\w+(?:\s+final)?)\s*:\s*public\s+(?:::)?[\w:]+", r"\1", head[0], count=1)
                 segments = [(re.sub(r"\boverride\b", "", text), head[1], head[2])] + [(re.sub(r"\)\s*(const\s*)?override\b", lambda m_: ")" + (" " + m_.group(1).strip() if m_.group(1) else ""), x), i_, n_) for x, i_, n_ in rest]
             inside_of = self.local_path(outer(q), local_of(d)) if not self.outside_its_class(q, G.records) else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
-            put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
+            put(d, {"kind": "record", "q": q, "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
@@ -15842,7 +15851,9 @@ class TestWriter:
         # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
         # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
         # the real engine in the test)
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
+        # (in the second pass a type of the engine is the engine's own - engine_record: the source names it as it is)
+        own_types = "".join("|" + re.escape(q[len(ENGINE) + 2:]) + r"\b" for q in sorted(tree.records, key=len, reverse=True) if HONEST[0] and q.startswith(ENGINE + "::") and self.engine_record(q))
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + own_types + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -15905,6 +15916,9 @@ class TestWriter:
                         add(key, directives + self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
                         continue
+                    if HONEST[0] and piece.get("q") and self.engine_record(piece["q"]):   # (the second pass: the engine's own type, as below)
+                        add(key, directives + piece["head"] + f"using {piece['q'].rsplit('::', 1)[-1]} = ::{piece['q']};" + piece["tail"])
+                        continue
                     text, inner, lines_ = "", [], 0
                     for part, place, newlines in piece["segments"]:
                         if place is not None and (place not in G.wanted or ("member", place) in dropped):
@@ -15925,6 +15939,11 @@ class TestWriter:
                     continue
                 q = key[1]
                 d = tree.records[q]
+                if HONEST[0] and self.engine_record(q):
+                    # (the second pass: a type of the engine is the engine's own - kern::Quat with axis_angle -, never a copy;
+                    # its helpers stand in its namespace, see below)
+                    add(("record", q), self.wrapped(q, f"using {q.rsplit('::', 1)[-1]} = ::{q};", records=records))
+                    continue
                 a0, b0 = d["_at"]
                 raw = tree.text(d["_file"])
                 text, at, inner = "", a0, []
@@ -15961,7 +15980,10 @@ class TestWriter:
                     outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
                     # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
                     spaces = self.spaces_of(outer_scope) if self.outside_its_class(home, records) else classes_of(outer_scope)
-                    if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
+                    if HONEST[0] and self.engine_record(q):   # (a type of the engine, itself: its helpers in its own namespace - where a call from converted.h finds them)
+                        hl = [*hl[:-5], f"}} namespace {q.rsplit('::', 1)[0]} {{ using ::kern::converted::arg; using ::kern::converted::same; using ::kern::converted::defined; using ::kern::converted::text; using ::kern::converted::take;",
+                              *hl[-5:], f"}} namespace {ns} {{"]
+                    elif spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]
                     add(("helper", q), "\n".join(hl))
