@@ -1588,7 +1588,7 @@ void add_structs(Library& lib) {
     d.inputs = {data("value", "Value", PinType::structure)};
     d.outputs = {bytes_out("bytes", "Bytes")};
     d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
@@ -1619,7 +1619,7 @@ void add_structs(Library& lib) {
     d.inputs = {any_ints("bytes", "Bytes"), data("at", "At", PinType::i64, 0)};
     d.outputs = {data("value", "Value", PinType::structure)};
     d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
@@ -2238,34 +2238,41 @@ void add_math(Library& lib) {
   }
 }
 
-// A formula as one node: every name in it is an input pin (logic.h, Formula).
+// A formula as one node: every name in it is an input pin, of the type its setting "Types" names (logic.h, Formula).
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
-                   "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp remainder; "
-                   "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); single (the number as a 32-bit float holds it); pi.");
-  d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
-  d.outputs = {data("result", "", PinType::f64)};
+                   "A formula as one node, in C++: every name in it becomes an input, of the type Types names for it (in the order the names first "
+                   "appear). Each operation is the node's of its type - nothing converts but num_cast<To, From>(x). Numbers: 0.5f an f32, 0.5 an "
+                   "f64, a whole number the type of what it meets. Operators + - * / % << >> & | ^ ~, comparisons (a bool), && || !, c ? a : b; "
+                   "functions min max abs clamp lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 exp expm1 log log10 pow hypot "
+                   "copysign fmin fmax fmod isnan isinf isfinite signbit.");
+  d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b"), param("types", "Types", ParamDef::Kind::text, "f32 f32")};
+  d.outputs = {data("result", "", PinType::f32)};
   d.keywords = "math expression formula equation calculate compute";
-  d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) {
-    const std::string text = n.param("formula", "a + b");
-    for (const std::string& name : Formula::cached(text).inputs()) in.push_back(data(name, name, PinType::f64, 0.0));
+  d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+    const std::string text = n.param("formula", "a + b"), types = n.param("types", "f32 f32");
+    const Formula& f = Formula::cached(text, types);
+    for (std::size_t i = 0; i < f.inputs().size(); ++i) {
+      const PinType t = i < f.types().size() ? pin_type_of(f.types()[i]) : PinType::f32;
+      in.push_back(data(f.inputs()[i], f.inputs()[i], t, Value::zero(t).to_json()));
+    }
+    out[0].type = pin_type_of(f.result());
   };
   d.title = [](const NodeDef&, const Node& n) {
     const std::string f = n.param("formula", "a + b");
     return f.size() > 44 ? f.substr(0, 43) + "..." : f;
   };
   d.problem = [](const Node& n, const Graph&) {
-    const std::string text = n.param("formula", "a + b");
-    return Formula::cached(text).error();
+    const std::string text = n.param("formula", "a + b"), types = n.param("types", "f32 f32");
+    return Formula::cached(text, types).error();
   };
   d.run = [](Context& c) {
-    const std::string text = c.param("formula", "a + b");
-    const Formula& f = Formula::cached(text);
-    f64 values[Formula::kMaxInputs] = {};
+    const std::string text = c.param("formula", "a + b"), types = c.param("types", "f32 f32");
+    const Formula& f = Formula::cached(text, types);
+    u64 bits[Formula::kMaxInputs] = {};
     const std::size_t count = min_of(f.inputs().size(), c.input_count());
-    for (std::size_t i = 0; i < count; ++i) values[i] = c.in(i).as_number();
-    c.out(std::size_t{0}, Value::number(f.evaluate(values, count)));
+    for (std::size_t i = 0; i < count; ++i) bits[i] = c.in(i).bits();
+    c.out(std::size_t{0}, Value::of_bits(pin_type_of(f.result()), f.evaluate(bits, count)));
     return kStop;
   };
   lib.add(std::move(d));

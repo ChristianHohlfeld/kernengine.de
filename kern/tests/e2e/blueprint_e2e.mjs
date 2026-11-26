@@ -71,17 +71,17 @@ l = await logic();
 const entry = l.nodes.find(n => n.type === "func.entry"), ret = l.nodes.find(n => n.type === "func.return");
 check(entry.title === "Function Twice" && entry.outputs.some(p => p.id === "x") && ret.inputs.some(p => p.id === "result"), "the entry gives the input, the Return takes the output");
 // a Formula between them: its names are its pins
-const formula = (await cmd({cmd: "logicAdd", type: "math.formula", x: entry.x + 220, y: entry.y + 90, params: {formula: "x * 2 + bonus"}})).id;
+const formula = (await cmd({cmd: "logicAdd", type: "math.formula", x: entry.x + 220, y: entry.y + 90, params: {formula: "x * 2.0f + bonus", types: "f32 f32"}})).id;
 l = await logic();
 const fnode = l.nodes.find(n => n.id === formula);
-check(fnode.title === "x * 2 + bonus" && fnode.inputs.map(p => p.id).join() === "x,bonus", "a Formula node takes its inputs from the formula");
+check(fnode.title === "x * 2.0f + bonus" && fnode.inputs.map(p => p.id).join() === "x,bonus", "a Formula node takes its inputs from the formula");
 await cmd({cmd: "logicConnect", from: entry.id, out: "x", to: formula, in: "x"});
 await cmd({cmd: "logicConnect", from: formula, out: "result", to: ret.id, in: "result"});
 await cmd({cmd: "logicValue", node: formula, pin: "bonus", value: 0.5});
 // a formula that cannot be read is an error that says why; fixed, the error is gone
 await cmd({cmd: "logicParam", node: formula, key: "formula", value: "x * 2 +"});
 check(errorsOf(await logic()).some(t => /ends too early/.test(t)), "a broken formula is a compile error that says why");
-await cmd({cmd: "logicParam", node: formula, key: "formula", value: "x * 2 + bonus"});
+await cmd({cmd: "logicParam", node: formula, key: "formula", value: "x * 2.0f + bonus"});
 await cmd({cmd: "logicConnect", from: entry.id, out: "x", to: formula, in: "x"});
 await cmd({cmd: "logicValue", node: formula, pin: "bonus", value: 0.5});
 check(errorsOf(await logic()).length === 0, "the function compiles");

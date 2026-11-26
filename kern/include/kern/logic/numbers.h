@@ -236,6 +236,11 @@ template <Arithmetic T> constexpr T abs(T a) {
 template <Arithmetic T> constexpr T min(T a, T b) { return b < a ? b : a; }
 template <Arithmetic T> constexpr T max(T a, T b) { return a < b ? b : a; }
 
+/// Value between lo and hi (the two in either order): max(min(value, hi), lo) - the Clamp node, the formula's clamp.
+template <Arithmetic T> constexpr T clamp(T value, T lo, T hi) { return min(max(value, min(lo, hi)), max(lo, hi)); }
+/// a + (b - a) * t, each step in T - the Lerp node, the formula's lerp.
+template <Floating T> constexpr T lerp(T a, T b, T t) { return add(a, mul(sub(b, a), t)); }
+
 // ---- comparisons (of one type, as C++ compares them; a NaN is unequal to everything, itself included) ----
 template <Number T> constexpr bool eq(T a, T b) { return a == b; }
 template <Number T> constexpr bool ne(T a, T b) { return a != b; }
@@ -304,5 +309,70 @@ template <Floating T> inline bool isnan(T a) { return std::isnan(a); }
 template <Floating T> inline bool isinf(T a) { return std::isinf(a); }
 template <Floating T> inline bool isfinite(T a) { return std::isfinite(a); }
 template <Floating T> inline bool signbit(T a) { return std::signbit(a); }
+
+// ---- a formula in C++: a number of one type whose operators are the functions above ----
+/// What the inputs of a Formula node are in a Blueprint's C++ (kern::formula, blueprint.h): a number of the type T
+/// whose operators and functions are those of this header - a * b + 1u on Typed<u32> is add(mul(a, b), 1), and goes
+/// round at 2^32 as the Add and Multiply nodes do (C++'s own operators would promote a u8, and leave a signed
+/// overflow, a division by 0 or a shift by the width open). Two of different types do not meet: the compiler refuses
+/// a + b of a Typed<u32> and a Typed<i64>, as the formula does (num_cast<To, From> says the conversion). A whole
+/// number written out takes the type of what it meets (7 with a u8 is a u8); a floating one is its own type (0.5f an
+/// f32, 0.5 an f64).
+template <Number T> struct Typed {
+  T v;
+  template <class L>
+    requires(std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>))
+  constexpr Typed(L x) : v(static_cast<T>(x)) {}  // NOLINT (implicit: a number written out is one of its type)
+  constexpr explicit operator bool() const requires std::same_as<T, bool> { return v; }
+
+  friend constexpr Typed operator+(Typed a, Typed b) requires Arithmetic<T> { return add(a.v, b.v); }
+  friend constexpr Typed operator-(Typed a, Typed b) requires Arithmetic<T> { return sub(a.v, b.v); }
+  friend constexpr Typed operator*(Typed a, Typed b) requires Arithmetic<T> { return mul(a.v, b.v); }
+  friend constexpr Typed operator/(Typed a, Typed b) requires Arithmetic<T> { return div(a.v, b.v); }
+  friend constexpr Typed operator%(Typed a, Typed b) requires Integer<T> { return rem(a.v, b.v); }
+  friend constexpr Typed operator-(Typed a) requires Arithmetic<T> { return neg(a.v); }
+  friend constexpr Typed operator~(Typed a) requires Integer<T> { return bit_not(a.v); }
+  friend constexpr Typed operator!(Typed a) requires std::same_as<T, bool> { return !a.v; }
+  friend constexpr Typed operator&(Typed a, Typed b) requires Integer<T> { return bit_and(a.v, b.v); }
+  friend constexpr Typed operator|(Typed a, Typed b) requires Integer<T> { return bit_or(a.v, b.v); }
+  friend constexpr Typed operator^(Typed a, Typed b) requires Integer<T> { return bit_xor(a.v, b.v); }
+  friend constexpr Typed operator&&(Typed a, Typed b) requires std::same_as<T, bool> { return a.v && b.v; }
+  friend constexpr Typed operator||(Typed a, Typed b) requires std::same_as<T, bool> { return a.v || b.v; }
+  template <Integer N> friend constexpr Typed operator<<(Typed a, Typed<N> n) requires Integer<T> { return shl(a.v, n.v); }
+  template <Integer N> friend constexpr Typed operator>>(Typed a, Typed<N> n) requires Integer<T> { return shr(a.v, n.v); }
+  template <class L> requires(std::is_integral_v<L> && !std::same_as<L, bool>)
+  friend constexpr Typed operator<<(Typed a, L n) requires Integer<T> { return shl(a.v, n); }
+  template <class L> requires(std::is_integral_v<L> && !std::same_as<L, bool>)
+  friend constexpr Typed operator>>(Typed a, L n) requires Integer<T> { return shr(a.v, n); }
+  friend constexpr Typed<bool> operator==(Typed a, Typed b) { return eq(a.v, b.v); }
+  friend constexpr Typed<bool> operator!=(Typed a, Typed b) { return ne(a.v, b.v); }
+  friend constexpr Typed<bool> operator<(Typed a, Typed b) requires Arithmetic<T> { return lt(a.v, b.v); }
+  friend constexpr Typed<bool> operator<=(Typed a, Typed b) requires Arithmetic<T> { return le(a.v, b.v); }
+  friend constexpr Typed<bool> operator>(Typed a, Typed b) requires Arithmetic<T> { return gt(a.v, b.v); }
+  friend constexpr Typed<bool> operator>=(Typed a, Typed b) requires Arithmetic<T> { return ge(a.v, b.v); }
+
+  // (the formula's functions: found by their argument - min(a, b) of two Typed<f32>)
+  friend constexpr Typed min(Typed a, Typed b) requires Arithmetic<T> { return num::min(a.v, b.v); }
+  friend constexpr Typed max(Typed a, Typed b) requires Arithmetic<T> { return num::max(a.v, b.v); }
+  friend constexpr Typed abs(Typed a) requires Arithmetic<T> { return num::abs(a.v); }
+  friend constexpr Typed clamp(Typed x, Typed lo, Typed hi) requires Arithmetic<T> { return num::clamp(x.v, lo.v, hi.v); }
+  friend constexpr Typed lerp(Typed a, Typed b, Typed t) requires Floating<T> { return num::lerp(a.v, b.v, t.v); }
+#define KERN_TYPED_1(name) friend Typed name(Typed a) requires Floating<T> { return num::name(a.v); }
+#define KERN_TYPED_2(name) friend Typed name(Typed a, Typed b) requires Floating<T> { return num::name(a.v, b.v); }
+#define KERN_TYPED_IS(name) friend Typed<bool> name(Typed a) requires Floating<T> { return num::name(a.v); }
+  KERN_TYPED_1(sqrt) KERN_TYPED_1(floor) KERN_TYPED_1(ceil) KERN_TYPED_1(trunc) KERN_TYPED_1(round)
+  KERN_TYPED_1(sin) KERN_TYPED_1(cos) KERN_TYPED_1(tan) KERN_TYPED_1(asin) KERN_TYPED_1(acos) KERN_TYPED_1(atan)
+  KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(log) KERN_TYPED_1(log10)
+  KERN_TYPED_2(atan2) KERN_TYPED_2(pow) KERN_TYPED_2(hypot) KERN_TYPED_2(copysign) KERN_TYPED_2(fmin) KERN_TYPED_2(fmax) KERN_TYPED_2(fmod)
+  KERN_TYPED_IS(isnan) KERN_TYPED_IS(isinf) KERN_TYPED_IS(isfinite) KERN_TYPED_IS(signbit)
+#undef KERN_TYPED_1
+#undef KERN_TYPED_2
+#undef KERN_TYPED_IS
+};
+/// What a formula gives in C++: the number of a Typed, a number written out as it is.
+template <class R> constexpr auto untyped(R r) {
+  if constexpr (requires { r.v; }) return r.v;
+  else return r;
+}
 
 }  // namespace kern::logic::num

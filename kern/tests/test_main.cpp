@@ -2227,103 +2227,265 @@ TEST(logic_state_machine_timers_events_conditions) {
 }
 
 TEST(logic_formulas) {
-  auto value = [](const char* text, std::initializer_list<f64> in = {}) {
-    const logic::Formula f(text);
-    if (!f.ok()) std::printf("formula \"%s\": %s\n", text, f.error().c_str());
-    return f.ok() ? f.evaluate(in.begin(), in.size()) : -12345.0;
+  using logic::num::Kind;
+  using logic::num::bits_of;
+  // (the value of a formula over inputs of these types, given as their bits: its type and its bits)
+  auto value = [](const char* text, const char* types, std::initializer_list<u64> in = {}) -> std::pair<Kind, u64> {
+    const logic::Formula f(text, types);
+    if (!f.ok()) std::printf("formula \"%s\" [%s]: %s\n", text, types, f.error().c_str());
+    return {f.result(), f.ok() ? f.evaluate(in.begin(), in.size()) : 0x5eed};
   };
-  // precedence and associativity as in C (and ^ as the power, binding tighter than the sign in front)
-  CHECK(value("1 + 2 * 3") == 7 && value("(1 + 2) * 3") == 9 && value("10 - 4 - 3") == 3 && value("2 * 3 % 4") == 2);
-  CHECK(value("2 ^ 3 ^ 2") == 512 && value("-2 ^ 2") == -4 && value("2 ^ -1") == 0.5);
-  CHECK(value("10 / 4") == 2.5 && value("1 / 0") == 0 && value("7 % 0") == 0 && value("7 % 3") == 1);
-  CHECK(value("3 > 2 && 2 >= 2") == 1 && value("1 < 1 || 0 != 0") == 0 && value("!0 + !5") == 1 && value("1 == 1 ? 5 : 6") == 5 && value("0 ? 5 : 1 ? 7 : 8") == 7);
-  CHECK(value("min(3, 4) + max(3, 4) + clamp(9, 0, 5) + abs(-2) + sign(-3)") == 13);
-  CHECK(value("floor(2.7) + ceil(2.1) + round(2.5) + trunc(-2.7)") == 6 && value("sqrt(16) + sqrt(-4) + log(-1)") == 4);
-  CHECK(value("lerp(10, 20, 0.25)") == 12.5);
-  // copysign: the size of one with the sign bit of the other - also of -0 (where sign() says 0)
-  CHECK(value("copysign(2, -1)") == -2 && value("copysign(-2, 1)") == 2 && value("copysign(1, -0)") == -1 && value("copysign(1, 0)") == 1 && value("sign(-0)") == 0);
-  CHECK(std::signbit(value("copysign(0, -5)")) && !std::signbit(value("copysign(-0, 5)")));
-  // remainder: IEEE 754's - x - n * y, n the whole number nearest x / y (of two, the even one); by 0 it is 0
-  CHECK(value("remainder(370, 360)") == 10 && value("remainder(190, 360)") == -170 && value("remainder(180, 360)") == 180 && value("remainder(540, 360)") == -180);
-  CHECK(value("remainder(-190, 360)") == 170 && value("remainder(5.5, 2)") == -0.5 && value("remainder(7, 0)") == 0 && std::signbit(value("remainder(-720, 360)")));
-  // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
-  CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
-  CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 1);  // (a shift by the width or more: by its rest, numbers.h - as x86 and wasm)
-  CHECK(value("wrap32(4294967296 + 5)") == 5 && value("wrap32(-1)") == 4294967295.0 && value("wrap32s(4294967295)") == -1 && value("wrap32s(2147483648)") == -2147483648.0);
-  CHECK(value("mul32(2654435769, 2654435769)") == static_cast<f64>(static_cast<u32>(2654435769u * 2654435769u)) && value("mul32(65536, 65536)") == 0);
-  CHECK(value("wrap32(shl(4294967295, 4))") == 4294967280.0 && value("band(7.9, 3.9)") == 3);
-  CHECK(value("single(0.1)") == static_cast<f64>(0.1f) && value("single(0.5)") == 0.5);
-  CHECK_NEAR(value("sin(rad(90)) + cos(0) + deg(pi) + atan2(1, 1) * 4 / pi + exp(0) + pow(2, 10)"), 1 + 1 + 180 + 1 + 1 + 1024, 1e-12);
-  // numbers are read as a compiler reads them
-  CHECK(value("0.7 * 5") == 0.7 * 5 && value("1e3 + .5") == 1000.5 && value("2.5E-1") == 0.25 && value("16000 - 5 * 1300") == 9500);
-  // names are the inputs, in the order they first appear; a missing one is 0
-  const logic::Formula f("b * a + b - c");
-  CHECK(f.ok() && f.inputs().size() == 3 && f.inputs()[0] == "b" && f.inputs()[1] == "a" && f.inputs()[2] == "c");
-  const f64 in[2] = {2, 3};
-  CHECK(f.evaluate(in, 2) == 8);
-  // what cannot be read says why and where
-  for (const char* bad : {"", "  ", "1 +", "foo(1)", "min(1)", "(1", "1 2", "a $ b", "sin", "a ? b", "min(1, 2", "exec + 1"}) {
-    const logic::Formula e(bad);
-    CHECK(!e.ok() && !e.error().empty() && e.evaluate(nullptr, 0) == 0);
+  auto error = [](const char* text, const char* types) { return logic::Formula(text, types).error(); };
+  auto said = [&](const char* text, const char* types, const char* what) {
+    const std::string e = error(text, types);
+    if (e.find(what) == std::string::npos) std::printf("formula \"%s\" [%s]: \"%s\", not \"%s\"\n", text, types, e.c_str(), what);
+    return e.find(what) != std::string::npos;
+  };
+  // precedence and associativity as in C++
+  CHECK((value("a + b * c", "i32 i32 i32", {1, 2, 3}) == std::pair{Kind::i32, u64{7}} && value("(a + b) * c", "i32 i32 i32", {1, 2, 3}).second == 9));
+  CHECK((value("a - b - c", "i32 i32 i32", {10, 4, 3}).second == 3 && value("a * b % c", "i32 i32 i32", {2, 3, 4}).second == 2));
+  CHECK((value("a << b + c", "u32 u32 u32", {1, 2, 3}).second == 32 && value("a & b | c ^ d", "u8 u8 u8 u8", {12, 10, 3, 5}).second == 14));
+  CHECK((value("a < b == c", "i32 i32 bool", {1, 2, 1}) == std::pair{Kind::boolean, u64{1}} && value("a > 0 && b || c", "i64 bool bool", {0, 1, 0}).second == 0));
+  CHECK((value("c ? a : b", "bool i64 i64", {1, 5, 6}).second == 5 && value("c ? a : d ? b : 9", "bool i64 bool i64", {0, 5, 0, 6}).second == 9));
+  // each operation is the node's of its type (numbers.h): whole numbers go round, / and % by 0 give 0, a shift by its rest
+  CHECK((value("a + b", "u8 u8", {255, 1}) == std::pair{Kind::u8, u64{0}} && value("a + 1", "u8", {255}).second == 0));
+  CHECK((value("a + b", "i32 i32", {2147483647, 1}).second == bits_of(i32{-2147483647 - 1}) && value("a * b", "u32 u32", {65536, 65536}).second == 0));
+  CHECK((value("a / b", "i32 i32", {7, 0}).second == 0 && value("a % b", "i32 i32", {7, 0}).second == 0 && value("a / b", "i32 i32", {bits_of(i32{-2147483647 - 1}), bits_of(i32{-1})}).second == bits_of(i32{-2147483647 - 1})));
+  CHECK((value("a % b", "i32 i32", {bits_of(i32{-7}), 3}).second == bits_of(i32{-1}) && value("a >> b", "i32 i64", {bits_of(i32{-16}), 2}).second == bits_of(i32{-4})));
+  CHECK((value("a << b", "u32 u8", {1, 33}).second == 2 && value("-a", "u32", {1}).second == 0xffffffffu && value("~a", "u16", {0}).second == 0xffff));
+  CHECK((value("a / b", "f64 f64", {bits_of(1.0), bits_of(0.0)}).second == bits_of(std::numeric_limits<f64>::infinity())));
+  // floating numbers: each step rounded to its type, as C++ (-ffp-contract=off) computes it - a * b + c in f32 is not the double rounded once
+  {
+    const f32 a = 0.1f, b = 3.0f, c = -0.3f;
+    f32 r = a * b;
+    r = r + c;
+    CHECK((value("a * b + c", "f32 f32 f32", {bits_of(a), bits_of(b), bits_of(c)}) == std::pair{Kind::f32, u64{bits_of(r)}}));
+    CHECK((value("sin(a) + sqrt(b)", "f32 f32", {bits_of(a), bits_of(b)}).second == bits_of(kern::dm::sin(a) + std::sqrt(b))));
+    CHECK((value("pow(a, b) - hypot(a, b)", "f64 f64", {bits_of(1.5), bits_of(2.5)}).second == bits_of(kern::dm::pow(1.5, 2.5) - kern::dm::hypot(1.5, 2.5))));
+    CHECK((value("a * 0.1f", "f32", {bits_of(3.0f)}).second == bits_of(3.0f * 0.1f) && value("a * 0.1", "f64", {bits_of(3.0)}).second == bits_of(3.0 * 0.1)));
+    CHECK((value("fmod(a, b) + lerp(a, b, 0.25)", "f64 f64", {bits_of(7.5), bits_of(2.0)}).second == bits_of(std::fmod(7.5, 2.0) + (7.5 + (2.0 - 7.5) * 0.25))));
+    CHECK((value("isnan(a / b) || signbit(-b)", "f64 f64", {bits_of(0.0), bits_of(0.0)}) == std::pair{Kind::boolean, u64{1}}));
   }
-  CHECK(logic::Formula("no function").error().find("unexpected") != std::string::npos);
-  CHECK(logic::Formula("nope(1)").error().find("no function \"nope\"") != std::string::npos);
-  CHECK(logic::Formula("min(1)").error().find("min takes 2 values") != std::string::npos);
-  CHECK(!logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q").ok() && logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p").ok());
-  // one canonical spelling, and the same formula as a C++ expression: both read back as the same
-  // formula with the same values
-  struct Spelled { const char* typed; const char* canonical; const char* cpp; };
+  // numbers written out: a whole one takes the type it meets (and is one of it), a floating one is its own type
+  CHECK((value("a + 7", "u8", {1}).second == 8 && value("a + -1", "i64", {0}).second == ~u64{0} && value("a + 18446744073709551615u", "u64", {1}).second == 0));
+  CHECK((value("1 << b", "i64", {31}) == std::pair{Kind::i32, bits_of(i32{-2147483647 - 1})} && value("b ? 1 : 2", "bool", {1}) == std::pair{Kind::i32, u64{1}}));
+  CHECK((said("b ? 1 : 2u", "bool", "an i32 and a u32")));
+  CHECK((said("a + 300", "u8", "300 is not a u8") && said("a + 7u", "i32", "7u is unsigned") && said("a * 2", "f32", "2.0f") && said("a * 0.5", "f32", "is an f64, and it meets an f32")));
+  CHECK((said("a * 0.5f", "f64", "is an f32, and it meets an f64") && said("a + 2 * 3", "i32", "numbers written out only") && said("a + -(2)", "i32", "written out")));
+  CHECK((said("a + 9223372036854775808", "u64", "beyond i64") && said("a + 017", "i32", "octal")));
+  // no value converts by itself: a conversion is num_cast<To, From> (the Cast node), num_bit_cast (Bit Cast)
+  CHECK((said("a + b", "u32 i64", "a u32 and an i64") && said("a < b", "f32 f64", "an f32 and an f64") && said("!a", "i32", "~ of its bits")));
+  CHECK((said("a % b", "f64 f64", "fmod(a, b)") && said("a & b", "bool bool", "operation of whole numbers") && said("a + b", "bool bool", "a bool has no arithmetic")));
+  CHECK((said("sqrt(a)", "i64", "a function of floating numbers") && said("a ? 1 : 2", "i32", "what ? asks is a bool") && said("a && b", "i32 i32", "& of its bits")));
+  CHECK((value("num_cast<f64, i64>(a) * 0.5", "i64", {7}) == std::pair{Kind::f64, bits_of(3.5)} && value("num_cast<i32, f64>(a)", "f64", {bits_of(1e30)}).second == bits_of(i32{2147483647})));
+  CHECK((value("num_cast<i32, f64>(a)", "f64", {bits_of(std::numeric_limits<f64>::quiet_NaN())}).second == 0 && value("num_cast<u8, i64>(a)", "i64", {300}).second == 44));
+  CHECK((value("num_bit_cast<u32, f32>(a)", "f32", {bits_of(0.1f)}) == std::pair{Kind::u32, u64{0x3dcccccd}} && value("num_cast<f32, f64>(a)", "f64", {bits_of(0.1)}).second == bits_of(0.1f)));
+  CHECK((said("num_cast<f64, i32>(a)", "i64", "this is an i64, and num_cast<f64, i32> converts an i32") && said("num_bit_cast<u32, f64>(a)", "f64", "of the same size")));
+  CHECK((said("num_cast<i64, i64>(a)", "i64", "converts nothing") && said("num_cast<int, i64>(a)", "i64", "a number type expected")));
+  // names are the inputs, in the order they first appear, each of its type; what cannot be read says why and where
+  const logic::Formula f("b * a + b - c", "i64 i64 i64");
+  CHECK((f.ok() && f.inputs().size() == 3 && f.inputs()[0] == "b" && f.inputs()[1] == "a" && f.inputs()[2] == "c" && f.types().size() == 3 && f.result() == Kind::i64));
+  const u64 in[2] = {2, 3};
+  CHECK((f.evaluate(in, 2) == 8));
+  for (const char* bad : {"", "  ", "a +", "foo(a)", "min(a)", "(a", "a 2", "a $ b", "sin", "a ? b", "min(a, b", "exec + a", "5", "+a"}) {
+    const logic::Formula e(bad, "f64 f64");
+    CHECK((!e.ok() && !e.error().empty() && e.evaluate(nullptr, 0) == 0));
+  }
+  CHECK((said("nope(a)", "f64", "no function \"nope\"") && said("min(a)", "f64", "min takes 2 values") && said("a + b", "f64", "its types name 1") && said("a", "f64 f64", "its types name 2")));
+  CHECK((said("a + b", "f64 float", "\"float\" is no number type") && said("a +", "f64", "(at 4)") && said("7", "", "at least one input")));
+  CHECK((!logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q", "").ok() && logic::Formula("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p", "i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8 i8").ok()));
+  // one canonical spelling (brackets where C++ compilers ask for them), which reads back as the same formula
+  struct Spelled { const char* typed; const char* types; const char* canonical; };
   for (const Spelled& c : {
-           Spelled{"max( 9000,16000-level*1300 )", "max(9000, 16000 - level * 1300)", "kern::math::max(9000.0, 16000.0 - level * 1300.0)"},
-           Spelled{"(a+b)*c - (d)", "(a + b) * c - d", "(a + b) * c - d"},
-           Spelled{"a-(b-c)-(d+e)", "a - (b - c) - (d + e)", "a - (b - c) - (d + e)"},
-           Spelled{"a/b%c^d^e", "a / b % c ^ d ^ e", "kern::math::mod(kern::math::div(a, b), kern::math::pow(c, kern::math::pow(d, e)))"},
-           Spelled{"-a^2 + --b + !!c", "-a ^ 2 + -(-b) + !(!c)", "-kern::math::pow(a, 2.0) + -(-b) + !(!c)"},
-           Spelled{"(a ^ b) ^ c", "(a ^ b) ^ c", "kern::math::pow(kern::math::pow(a, b), c)"},
-           Spelled{"a<b==c", "(a < b) == c", "(a < b) == c"},
-           Spelled{"a==(b<c) || !d && e", "a == (b < c) || !d && e", "a == (b < c) || (!d && e)"},  // (C++: && inside || in brackets)
-           Spelled{"(a||b)&&c ? (d?1:2) : e?3:4", "(a || b) && c ? (d ? 1 : 2) : e ? 3 : 4", "(a || b) && c ? (d ? 1.0 : 2.0) : e ? 3.0 : 4.0"},
-           Spelled{"pow(x,2)+div(x,3)+mod(x,4)", "x ^ 2 + x / 3 + x % 4", "kern::math::pow(x, 2.0) + kern::math::div(x, 3.0) + kern::math::mod(x, 4.0)"},
-           Spelled{"clamp(0.28+level*.02,1e-1,3.8E-1)*2*pi", "clamp(0.28 + level * 0.02, 0.1, 0.38) * 2 * pi", "kern::math::clamp(0.28 + level * 0.02, 0.1, 0.38) * 2.0 * kern::math::pi"},
-           Spelled{"-(a+b)*-c", "-(a + b) * -c", "-(a + b) * -c"},
-           Spelled{"1e21+1e-7+123456789012", "1e+21 + 1e-07 + 123456789012", "1e+21 + 1e-07 + 123456789012.0"},
+           Spelled{"max( 9000,16000-level*1300 )", "i64", "max(9000, 16000 - level * 1300)"},
+           Spelled{"(a+b)*c - (d)", "f32 f32 f32 f32", "(a + b) * c - d"},
+           Spelled{"a-(b-c)-(d+e)", "i32 i32 i32 i32 i32", "a - (b - c) - (d + e)"},
+           Spelled{"a<b==c", "i32 i32 bool", "(a < b) == c"},
+           Spelled{"a==(b<c) || !d && e", "bool i32 i32 bool bool", "a == (b < c) || (!d && e)"},
+           Spelled{"(a||b)&&c ? (d?1:2) : e?3:4", "bool bool bool bool bool", "(a || b) && c ? (d ? 1 : 2) : e ? 3 : 4"},
+           Spelled{"a&b|c^d", "u8 u8 u8 u8", "(a & b) | (c ^ d)"},
+           Spelled{"a+b<<c>>1", "u32 u32 u32", "(a + b) << c >> 1"},
+           Spelled{"-(a+b)*-c", "f64 f64 f64", "-(a + b) * -c"},
+           Spelled{"- -a + ~~b", "i32 i32", "-(-a) + ~(~b)"},
+           Spelled{"a*1e21+1e-7-.5", "f64", "a * 1e+21 + 1e-07 - 0.5"},
+           Spelled{"a*.1F+2.f", "f32", "a * 0.1f + 2.0f"},
+           Spelled{"num_cast< f64 ,i64 >( a )*2.", "i64", "num_cast<f64, i64>(a) * 2.0"},
+           Spelled{"x - -1 + num_cast<i64,f64>(-0.0 * y)", "i64 f64", "x - -1 + num_cast<i64, f64>(-0.0 * y)"},
        }) {
-    const logic::Formula typed(c.typed);
-    CHECK(typed.ok());
+    const logic::Formula typed(c.typed, c.types);
+    CHECK((typed.ok()));
     if (typed.text() != c.canonical) std::printf("formula \"%s\": canonical \"%s\"\n", c.typed, typed.text().c_str());
-    if (typed.cpp() != c.cpp) std::printf("formula \"%s\": C++ \"%s\"\n", c.typed, typed.cpp().c_str());
-    CHECK(typed.text() == c.canonical && typed.cpp() == c.cpp);
-    std::string plain = typed.cpp();  // (as from_cpp reads it: the names without their namespace)
-    for (std::size_t at = plain.find("kern::math::"); at != std::string::npos; at = plain.find("kern::math::")) plain.erase(at, 12);
-    const logic::Formula again(typed.text()), from_cpp(plain);
-    CHECK(again.ok() && again.text() == c.canonical && from_cpp.ok() && from_cpp.text() == c.canonical);
-    CHECK(again.inputs() == typed.inputs() && from_cpp.inputs() == typed.inputs());
-    const f64 at[5] = {1.5, -2.25, 3, 0.5, 7};
-    const f64 want = typed.evaluate(at, 5);
-    CHECK(again.evaluate(at, 5) == want && from_cpp.evaluate(at, 5) == want);
+    const logic::Formula again(typed.text(), typed.types_text());
+    CHECK((typed.text() == c.canonical && again.ok() && again.text() == c.canonical && again.inputs() == typed.inputs() && again.result() == typed.result()));
+    const u64 at[5] = {bits_of(1.5), 3, 1, 0, 7};
+    CHECK((again.evaluate(at, 5) == typed.evaluate(at, 5)));
   }
-  CHECK(!logic::Formula("1e999").ok());
-  // the node: its pins are the formula's names; a formula that cannot be read is an error of the graph
+  // the node: its pins are the formula's names, of their types, its result of the formula's type; a formula that cannot be read
+  // or does not suit its types is an error of the graph
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Out","type":"f64","value":0}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Out","type":"f64","value":0},{"name":"Small","type":"u8","value":0}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Out"}},
-      {"id":3,"type":"math.formula","params":{"formula":"max(9000, 16000 - level * 1300) + bonus"},"values":{"bonus":0.5}}],
-    "links":[[1,"then",2,"exec"],[1,"value",3,"level"],[3,"result",2,"value"]]})");
-  CHECK(no_errors(logic::check(g)));
+      {"id":3,"type":"math.formula","params":{"formula":"max(9000.0, 16000.0 - level * 1300.0) + bonus","types":"f64 f64"},"values":{"bonus":0.5}},
+      {"id":4,"type":"var.set","params":{"variable":"Small"}},{"id":5,"type":"math.formula","params":{"formula":"a + 250","types":"u8"},"values":{"a":10}}],
+    "links":[[1,"then",2,"exec"],[1,"value",3,"level"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"]]})");
+  CHECK((no_errors(logic::check(g))));
   std::vector<logic::PinDef> pins_in, pins_out;
   logic::library().pins(g.nodes[2], g, pins_in, pins_out);
-  CHECK(pins_in.size() == 2 && pins_in[0].id == "level" && pins_in[1].id == "bonus" && pins_out.size() == 1);
+  CHECK((pins_in.size() == 2 && pins_in[0].id == "level" && pins_in[1].id == "bonus" && pins_in[0].type == logic::PinType::f64 && pins_out.size() == 1 && pins_out[0].type == logic::PinType::f64));
+  logic::library().pins(g.nodes[4], g, pins_in, pins_out);
+  CHECK((pins_in.size() == 1 && pins_in[0].type == logic::PinType::u8 && pins_out[0].type == logic::PinType::u8));
   logic::Instance* inst = rt.add(g, 0, "Level");
   rt.begin();
   rt.call("Go", 0, {{"value", logic::Value::number(5)}});
-  CHECK(inst->get("Out").as_number() == 9500.5);
+  CHECK((inst->get("Out").as<f64>() == 9500.5 && inst->get("Small").as<u8>() == 4));
   rt.call("Go", 0, {{"value", logic::Value::number(1)}});
-  CHECK(inst->get("Out").as_number() == 14700.5);
-  const logic::Graph bad = logic_graph(R"({"nodes":[{"id":1,"type":"math.formula","params":{"formula":"1 +"}}]})");
-  bool said = false;
-  for (const logic::Issue& i : logic::check(bad)) said |= i.error && i.node == 1 && i.text.find("ends too early") != std::string::npos;
-  CHECK(said);
+  CHECK((inst->get("Out").as<f64>() == 14700.5));
+  for (const auto& [formula, types, why] : {std::tuple{"1 +", "f64", "ends too early"}, std::tuple{"a + b", "u32", "one type for each"}, std::tuple{"a + b", "u32 i64", "a u32 and an i64"}}) {
+    const std::string text = std::string(R"({"nodes":[{"id":1,"type":"math.formula","params":{"formula":")") + formula + R"(","types":")" + types + R"("}}]})";
+    const logic::Graph bad = logic_graph(text.c_str());
+    bool told = false;
+    for (const logic::Issue& i : logic::check(bad)) told |= i.error && i.node == 1 && i.text.find(why) != std::string::npos;
+    CHECK((told));
+  }
+}
+
+namespace {
+/// One formula, the same computation as nodes (what the formula stands for) and as C++ (kern::formula: the class).
+struct FormulaAndNodes {
+  const char* formula;
+  const char* nodes;  // the node tree: nodes 10.. on the inputs A (node 3), B (4), C (5), giving its value at node 10's "result"
+  const char* links;
+  bool floating_only, whole_only;
+};
+template <class T> void formula_is_its_nodes(const FormulaAndNodes& c, std::span<const T> values, int& compared) {
+  constexpr std::string_view type = logic::num::kind_name(logic::num::kind_of<T>());
+  std::string formula = c.formula;
+  const std::string t(type);
+  std::string nodes = c.nodes, links = c.links;
+  for (std::string* s : {&nodes, &links})
+    for (std::size_t at = s->find("$T"); at != std::string::npos; at = s->find("$T", at)) s->replace(at, 2, t);
+  const std::string text = R"({"variables":[{"name":"A","type":")" + t + R"(","value":0},{"name":"B","type":")" + t + R"(","value":0},{"name":"C","type":")" + t +
+                           R"(","value":0},{"name":"F","type":")" + t + R"(","value":0},{"name":"N","type":")" + t + R"(","value":0}],
+    "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"F"}},{"id":3,"type":"var.get","params":{"variable":"A"}},
+      {"id":4,"type":"var.get","params":{"variable":"B"}},{"id":5,"type":"var.get","params":{"variable":"C"}},{"id":6,"type":"var.set","params":{"variable":"N"}},
+      {"id":7,"type":"math.formula","params":{"formula":")" + formula + R"(","types":")" + t + " " + t + " " + t + R"("}},)" + nodes + R"(],
+    "links":[[1,"then",2,"exec"],[2,"then",6,"exec"],[3,"value",7,"a"],[4,"value",7,"b"],[5,"value",7,"c"],[7,"result",2,"value"],[10,"result",6,"value"])" + links + "]}";
+  const logic::Graph g = logic_graph(text.c_str());
+  const auto issues = logic::check(g);
+  if (!no_errors(issues)) {
+    std::printf("formula \"%s\" of %s:\n", c.formula, t.c_str());
+    for (const logic::Issue& i : issues) std::printf("  %s\n", i.text.c_str());
+    CHECK((false));
+    return;
+  }
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  for (T a : values)
+    for (T b : values)
+      for (T x : {values[0], values[values.size() / 2], values.back()}) {
+        inst->set("A", logic::Value::of_number(a));
+        inst->set("B", logic::Value::of_number(b));
+        inst->set("C", logic::Value::of_number(x));
+        rt.call("Go");
+        const u64 f = inst->get("F").bits(), n = inst->get("N").bits();
+        if (f != n) {
+          std::printf("formula \"%s\" of %s, %s %s %s: the formula %llx, its nodes %llx\n", c.formula, t.c_str(), logic::number_as_text(logic::Value::of_number(a)).c_str(),
+                      logic::number_as_text(logic::Value::of_number(b)).c_str(), logic::number_as_text(logic::Value::of_number(x)).c_str(), (unsigned long long)f, (unsigned long long)n);
+          CHECK((false));
+          return;
+        }
+        ++compared;
+      }
+}
+}  // namespace
+
+// A formula is the computation of the nodes it stands for, bit for bit, in every number type: in the interpreter, the Formula
+// node against its node tree (Add, Multiply ... of the type); in C++, kern::formula (what a Blueprint's class runs) against C++'s
+// own arithmetic of the type - where C++ defines it (unsigned whole numbers, and signed ones without overflow; floating ones
+// with -ffp-contract=off, each step rounded to the type).
+TEST(logic_formula_is_its_nodes) {
+  const FormulaAndNodes cases[] = {
+      {"a * b + c", R"({"id":10,"type":"math.add","params":{"type":"$T"}},{"id":11,"type":"math.mul","params":{"type":"$T"}})",
+       R"(,[3,"value",11,"a"],[4,"value",11,"b"],[11,"result",10,"a"],[5,"value",10,"b"])", false, false},
+      {"(a - b) / c", R"({"id":10,"type":"math.div","params":{"type":"$T"}},{"id":11,"type":"math.sub","params":{"type":"$T"}})",
+       R"(,[3,"value",11,"a"],[4,"value",11,"b"],[11,"result",10,"a"],[5,"value",10,"b"])", false, false},
+      {"min(a, b) - max(b, c) * a", R"({"id":10,"type":"math.sub","params":{"type":"$T"}},{"id":11,"type":"math.min","params":{"type":"$T"}},{"id":12,"type":"math.max","params":{"type":"$T"}},{"id":13,"type":"math.mul","params":{"type":"$T"}})",
+       R"(,[3,"value",11,"a"],[4,"value",11,"b"],[4,"value",12,"a"],[5,"value",12,"b"],[12,"result",13,"a"],[3,"value",13,"b"],[11,"result",10,"a"],[13,"result",10,"b"])", false, false},
+      {"clamp(a, b, c) + abs(-a)", R"({"id":10,"type":"math.add","params":{"type":"$T"}},{"id":11,"type":"math.clamp","params":{"type":"$T"}},{"id":12,"type":"math.abs","params":{"type":"$T"}},{"id":13,"type":"math.negate","params":{"type":"$T"}})",
+       R"(,[3,"value",11,"value"],[4,"value",11,"min"],[5,"value",11,"max"],[3,"value",13,"a"],[13,"result",12,"a"],[11,"result",10,"a"],[12,"result",10,"b"])", false, false},
+      {"(a ^ b) & c | ~a % (b | c)", R"({"id":10,"type":"math.or","params":{"type":"$T"}},{"id":11,"type":"math.and","params":{"type":"$T"}},{"id":12,"type":"math.xor","params":{"type":"$T"}},{"id":13,"type":"math.rem","params":{"type":"$T"}},{"id":14,"type":"math.not","params":{"type":"$T"}},{"id":15,"type":"math.or","params":{"type":"$T"}})",
+       R"(,[3,"value",12,"a"],[4,"value",12,"b"],[12,"result",11,"a"],[5,"value",11,"b"],[3,"value",14,"a"],[4,"value",15,"a"],[5,"value",15,"b"],[14,"result",13,"a"],[15,"result",13,"b"],[11,"result",10,"a"],[13,"result",10,"b"])", false, true},
+      {"a << b >> c", R"({"id":10,"type":"math.shift_right","params":{"type":"$T"}},{"id":11,"type":"math.shift_left","params":{"type":"$T"}},{"id":12,"type":"num.cast","params":{"to":"i64","from":"$T"}},{"id":13,"type":"num.cast","params":{"to":"i64","from":"$T"}})",
+       R"(,[3,"value",11,"a"],[4,"value",12,"a"],[12,"result",11,"by"],[11,"result",10,"a"],[5,"value",13,"a"],[13,"result",10,"by"])", false, true},
+      {"sqrt(a) * b + sin(c) - fmod(a, b)", R"({"id":10,"type":"math.sub","params":{"type":"$T"}},{"id":11,"type":"math.add","params":{"type":"$T"}},{"id":12,"type":"math.mul","params":{"type":"$T"}},{"id":13,"type":"math.sqrt","params":{"type":"$T"}},{"id":14,"type":"math.sin","params":{"type":"$T"}},{"id":15,"type":"math.rem","params":{"type":"$T"}})",
+       R"(,[3,"value",13,"a"],[13,"result",12,"a"],[4,"value",12,"b"],[5,"value",14,"a"],[12,"result",11,"a"],[14,"result",11,"b"],[3,"value",15,"a"],[4,"value",15,"b"],[11,"result",10,"a"],[15,"result",10,"b"])", true, false},
+      {"pow(a, b) + hypot(b, c) * exp(-a)", R"({"id":10,"type":"math.add","params":{"type":"$T"}},{"id":11,"type":"math.pow","params":{"type":"$T"}},{"id":12,"type":"math.mul","params":{"type":"$T"}},{"id":13,"type":"math.hypot","params":{"type":"$T"}},{"id":14,"type":"math.exp","params":{"type":"$T"}},{"id":15,"type":"math.negate","params":{"type":"$T"}})",
+       R"(,[3,"value",11,"a"],[4,"value",11,"b"],[4,"value",13,"a"],[5,"value",13,"b"],[3,"value",15,"a"],[15,"result",14,"a"],[13,"result",12,"a"],[14,"result",12,"b"],[11,"result",10,"a"],[12,"result",10,"b"])", true, false},
+      {"lerp(a, b, c) - atan2(a, b) + floor(c) * round(a)", R"({"id":10,"type":"math.add","params":{"type":"$T"}},{"id":11,"type":"math.sub","params":{"type":"$T"}},{"id":12,"type":"math.lerp","params":{"type":"$T"}},{"id":13,"type":"math.atan2","params":{"type":"$T"}},{"id":14,"type":"math.mul","params":{"type":"$T"}},{"id":15,"type":"math.floor","params":{"type":"$T"}},{"id":16,"type":"math.round","params":{"type":"$T"}})",
+       R"(,[3,"value",12,"a"],[4,"value",12,"b"],[5,"value",12,"alpha"],[3,"value",13,"y"],[4,"value",13,"x"],[12,"result",11,"a"],[13,"result",11,"b"],[5,"value",15,"a"],[3,"value",16,"a"],[15,"result",14,"a"],[16,"result",14,"b"],[11,"result",10,"a"],[14,"result",10,"b"])", true, false},
+  };
+  int compared = 0;
+  auto each = [&]<class T>(std::initializer_list<T> v) {
+    const std::vector<T> values(v);
+    for (const FormulaAndNodes& c : cases) {
+      if (c.floating_only && !logic::num::Floating<T>) continue;
+      if (c.whole_only && !logic::num::Integer<T>) continue;
+      formula_is_its_nodes<T>(c, values, compared);
+    }
+  };
+  each.operator()<i8>({0, 1, -1, 2, 7, 127, -128, -127, 100});
+  each.operator()<i16>({0, 1, -1, 3, 15, 16, 32767, -32768, 1000});
+  each.operator()<i32>({0, 1, -1, 5, 31, 32, 2147483647, -2147483647 - 1, 1000000007});
+  each.operator()<i64>({0, 1, -1, 5, 63, 64, 9223372036854775807, -9223372036854775807 - 1, 9007199254740993});
+  each.operator()<u8>({0, 1, 2, 7, 8, 9, 128, 255});
+  each.operator()<u16>({0, 1, 2, 15, 16, 17, 32768, 65535});
+  each.operator()<u32>({0, 1, 2, 31, 32, 33, 2654435769u, 4294967295u});
+  each.operator()<u64>({0, 1, 2, 63, 64, 65, 9223372036854775808ull, 18446744073709551615ull});
+  const f32 inf32 = std::numeric_limits<f32>::infinity(), nan32 = std::numeric_limits<f32>::quiet_NaN();
+  const f64 inf64 = std::numeric_limits<f64>::infinity(), nan64 = std::numeric_limits<f64>::quiet_NaN();
+  each.operator()<f32>({0.0f, -0.0f, 1.0f, -1.0f, 0.1f, 2.5f, -7.25f, 16777215.0f, 1e-30f, 3e38f, inf32, nan32});
+  each.operator()<f64>({0.0, -0.0, 1.0, -1.0, 0.1, 2.5, -7.25, 9007199254740993.0, 1e-300, 1e300, inf64, nan64});
+  CHECK((compared > 10000));
+  // C++: kern::formula (the class) against C++'s own arithmetic of the type, where C++ defines it
+  int in_cpp = 0;
+  auto cpp = [&]<class T>(std::initializer_list<T> v) {
+    for (T a : v)
+      for (T b : v)
+        for (T c : v) {
+          using U = std::make_unsigned_t<std::conditional_t<std::is_integral_v<T>, T, int>>;
+          if constexpr (std::is_floating_point_v<T>) {
+            T r = a * b;
+            r = r + c;
+            CHECK((logic::num::bits_of(kern::formula<T, T, T>([](auto x, auto y, auto z) { return x * y + z; }, a, b, c)) == logic::num::bits_of(r)));
+            T q = a - b;
+            q = q / c;
+            CHECK((logic::num::bits_of(kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x - y) / z; }, a, b, c)) == logic::num::bits_of(q)));
+          } else {
+            // (C++ computes a narrow one as an int and puts it back, a wide one in two's complement where it is unsigned: the same low bits)
+            const T r = static_cast<T>(static_cast<U>(static_cast<U>(a) * static_cast<U>(b)) + static_cast<U>(c));
+            CHECK((kern::formula<T, T, T>([](auto x, auto y, auto z) { return x * y + z; }, a, b, c) == r));
+            if (c != 0 && !(std::is_signed_v<T> && c == T(-1))) {
+              const T q = static_cast<T>(static_cast<T>(static_cast<U>(a) - static_cast<U>(b)) / c);
+              CHECK((kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x - y) / z; }, a, b, c) == q));
+            }
+            const T s = static_cast<T>((a ^ b) & c);
+            CHECK((kern::formula<T, T, T>([](auto x, auto y, auto z) { return (x ^ y) & z; }, a, b, c) == s));
+          }
+          ++in_cpp;
+        }
+  };
+  cpp.operator()<i8>({0, 1, -1, 7, 127, -128});
+  cpp.operator()<i32>({0, 1, -1, 7, 2147483647, -2147483647 - 1});
+  cpp.operator()<i64>({0, 1, -1, 7, 9223372036854775807, -9223372036854775807 - 1});
+  cpp.operator()<u8>({0, 1, 7, 128, 255});
+  cpp.operator()<u32>({0, 1, 7, 2654435769u, 4294967295u});
+  cpp.operator()<u64>({0, 1, 7, 9223372036854775808ull, 18446744073709551615ull});
+  cpp.operator()<f32>({0.0f, -0.0f, 0.1f, 3.0f, -7.25f, 3e38f, inf32, nan32});
+  cpp.operator()<f64>({0.0, -0.0, 0.1, 3.0, -7.25, 1e300, inf64, nan64});
+  CHECK((in_cpp > 1000));
 }
 
 TEST(logic_bytes_of_struct) {
@@ -4895,7 +5057,7 @@ struct Demo : kern::Blueprint {
   /// The level for a heat.
   KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
     if (math_compare<">", f64>(heat, 10.0)) {
-      return {kern::formula([](f64 h, f64 s) -> f64 { return h*s; }, heat, scale), true};
+      return {kern::formula<f64, f64>([](auto h, auto s) { return h*s; }, heat, scale), true};
     } else {
       return {0.0, false};
     }
@@ -4934,7 +5096,7 @@ struct Demo : kern::Blueprint {
   /// The level for a heat.
   KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
     if (math_compare<">", f64>(heat, 10.0)) {
-      return {kern::formula([](f64 h, f64 s) -> f64 { return h * s; }, heat, scale), true};
+      return {kern::formula<f64, f64>([](auto h, auto s) { return h * s; }, heat, scale), true};
     }
     return {0.0, false};
   }
@@ -5489,9 +5651,43 @@ TEST(logic_number_types_at_places) {
     logic::Instance* li = lr.add(logic_cases::parse(c), 0, "l");
     lr.begin();
     // (the interpreter's numbers - the class and the JIT give the same, logic_tier_cases_*)
-    CHECK(li->get("W").as_text() ==
-          "[3, 0, 2, 6, 7, 2, 3, 7, 6, 2, 3, 2, 2, 3, 3, 18, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, -1, 0, -1, 127, -128, 0, -1, "
-          "-128, 127, -1, 1, 0, 127, 20]");
+    const std::string want =
+        "[3, 0, 2, 6, 7, 2, 3, 7, 6, 2, 3, 2, 2, 3, 3, 18, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, -1, 0, -1, 127, -128, 0, -1, "
+        "-128, 127, -1, 1, 0, 127, 20]";
+    CHECK(li->get("W").as_text() == want);
+    // ... and these numbers are C++'s: the same steps on std::vector<u8>, <i8>, <u32> (not only what the interpreter gave)
+    const std::vector<i64> in = {0, 1, -1, 127, 128, 255, 256, -128, -129, 65535, 65536, -32769, 4294967295, 4294967296, 9007199254740992, -9007199254740994};
+    std::vector<u8> b = {1, 2, 255};
+    std::vector<i8> sv;
+    std::vector<u32> u;
+    std::vector<i64> w;
+    for (i64 x : in) {
+      b.push_back(static_cast<u8>(x));                // (Add: num_cast<u8, i64> - the low bits, C++20)
+      sv.insert(sv.begin(), static_cast<i8>(x));      // (Insert at 0)
+      u.push_back(static_cast<u32>(x));
+      const auto at = std::find(b.begin(), b.end(), static_cast<u8>(x));
+      w.push_back(at == b.end() ? -1 : at - b.begin());  // (Find: the first index)
+    }
+    const std::string bytes = "\xc3\xbfz";             // ("ÿz" in UTF-8, put in at 1: Insert Text Bytes)
+    sv.insert(sv.begin() + 1, bytes.begin(), bytes.end());
+    u.resize(20, logic::num::cast<u32>(-1.0));       // (Set Length's value -1 as a u32: numbers.h - beyond the type's end the nearer one, 0)
+    std::memcpy(b.data(), u.data(), 8);              // (Copy Bytes: 8 bytes of the u32s from item 0 into the u8s from item 0)
+    w.push_back(static_cast<i64>(std::min<std::size_t>(6, b.size())));  // (Text Length of Text of Bytes, 6 from 0)
+    u16 ha = 0;
+    std::memcpy(&ha, b.data() + 1, 2);               // (Struct of Bytes "4: u16@0 u8@2" at 1)
+    const u8 hb = b[3];
+    w.push_back(ha);
+    w.push_back(hb);
+    b.erase(std::remove(b.begin(), b.end(), u8{255}), b.end());  // (Remove Item: every 255)
+    for (u8 x : b) w.push_back(x);
+    for (i8 x : sv) w.push_back(x);
+    w.push_back(u[3]);
+    w.push_back(static_cast<i64>(u.size()));
+    std::string cpp = "[";
+    for (std::size_t k = 0; k < w.size(); ++k) cpp += (k ? ", " : "") + std::to_string(w[k]);
+    cpp += "]";
+    if (cpp != want) std::printf("fixed_width_lists in C++: %s\n", cpp.c_str());
+    CHECK(cpp == want);
   }
 }
 
@@ -6083,21 +6279,18 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Heat = n9.value;"), "n9 names no node");
   refused(in_event("    go9();"), "go9 names no step");
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
-  refused(in_event("    Heat = kern::formula([](f64 a) -> f64 { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
-  refused(in_event("    Heat = kern::formula([](f64 a) -> f64 { return a +; }, 1.0);"), "the formula:");
-  // (i64 inputs only where Formula::int_input holds, an i64 result only where Formula::whole_result holds and - by +, - or * -
-  // everything that reads it is an Int; every i64 input a wire from an i64 as it is)
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> f64 { return kern::math::div(a, 2.0); }, Count));"), "the input a is an i64 only where");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an i64 only where");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an i64 only where");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> f64 { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an i64 only where");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return a < 3.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
-  refused(in_event("    Heat = kern::formula([](i64 a) -> i64 { return a + 1.0; }, Count);"), "this formula gives an i64 by +, - or *, and this reads it as f64");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a, f64 b) -> i64 { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a f64 input gives a f64: -> f64");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an i64");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, num_cast<f64, i64>(Count)));"), "this is f64, the input of the formula is an i64");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  refused(in_event("    Heat = kern::formula<f64>([](auto a) { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
+  refused(in_event("    Heat = kern::formula<f64>([](auto a) { return a +; }, 1.0);"), "the formula:");
+  // (a formula names the types of its inputs; each operation is of one type, nothing converts but num_cast; the wires as everywhere)
+  refused(in_event("    Heat = kern::formula([](f64 a) -> f64 { return a; }, 1.0);"), "the types of the inputs");
+  refused(in_event("    Heat = kern::formula<f64, f64>([](auto a) { return a; }, 1.0);"), "one type for each input");
+  refused(in_event("    Heat = kern::formula<Text>([](auto a) { return a; }, Heat);"), "an input of a formula is a number");
+  refused(in_event("    Count = kern::formula<i64, f64>([](auto a, auto b) { return a + b; }, Count, Heat);"), "the values meeting here are an i64 and an f64");
+  refused(in_event("    Heat = kern::formula<f64>([](auto a) { return a * 2; }, Heat);"), "2 is a whole number, and it meets an f64: 2.0");
+  refused(in_event("    Heat = kern::formula<f64>([](auto a) { return a * 0.5f; }, Heat);"), "this number is an f32, and it meets an f64");
+  refused(in_event("    Count = kern::formula<i64>([](auto a) { return a; }, Heat);"), "this is f64, the input is i64");
+  refused(in_event("    Heat = kern::formula<i64>([](auto a) { return a + 1; }, Count);"), "this is i64, the input is f64");
+  refused(in_event("    Open = kern::formula<bool>([](auto a) { return a + 1; }, Open);"), "a bool has no arithmetic");
   // (a list of a fixed length written out on an input says the input's length: Fixed<f64, 3> for a field of three)
   for (const char* wrong : {"Fixed<f64, 4>{1.5}", "Fixed<f64, 2>{1.5}"})
     refused("  KERN_STRUCT(Trio) { Fixed<f64, 3> m = Fixed<f64, 3>{}; i64 k = 0; };\n  Trio P = Trio{Fixed<f64, 3>{}, 0};\n" +
@@ -6359,7 +6552,7 @@ TEST(logic_callbacks) {
   const char* ground =
       "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    f64 Base = 1.0;\n    f64 Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
       "  struct heightResult { f64 h = 0.0; };\n"
-      "  KERN_PURE heightResult height(const Field& f, f64 x = 0.0, f64 y = 0.0) {\n    return {kern::formula([](f64 b, f64 s, f64 x, f64 y) -> f64 { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
+      "  KERN_PURE heightResult height(const Field& f, f64 x = 0.0, f64 y = 0.0) {\n    return {kern::formula<f64, f64, f64, f64>([](auto b, auto s, auto x, auto y) { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
       "  struct loudResult { f64 h = 0.0; };\n"
       "  loudResult loud(const Field& f, f64 x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
   const char* site =

@@ -1255,8 +1255,8 @@ struct Shape {
         if (typed && !typed_ok(title(i) + ": \"" + pin.id + "\"", pin.type, pin.of, *typed)) return false;
       }
       if (t == "math.formula") {
-        const std::string text = x.node->param("formula", "a + b");
-        const Formula& f = Formula::cached(text);
+        const std::string text = x.node->param("formula", "a + b"), types = x.node->param("types", "f32 f32");
+        const Formula& f = Formula::cached(text, types);
         for (const std::string& input : f.inputs())
           if (!cpp_name_ok(input)) return fail(title(i) + ": \"" + input + "\" cannot be an input's name (a word of C++ or of the notation)", i);
       }
@@ -1332,25 +1332,6 @@ struct Writer {
     (void)convert;
     return e;
   }
-  /// The types of the formula `x` in a Blueprint's C++ (docs/blueprint_cpp.md, "Formeln"): input i is an
-  /// Int where Formula::int_input(i) holds and its wire comes from an Int, else a Float; the result is an
-  /// Int where every input is and Formula::whole_result() holds - and, its root being +, - or *
-  /// (result_sum), where every input that reads it is an Int. Returns whether the result is an Int.
-  bool formula_types(int x, const Formula& f, std::vector<char>& ints) {
-    ints.assign(f.inputs().size(), 0);
-    bool all = !ints.empty();
-    for (std::size_t i = 0; i < at(x).data_in.size() && i < ints.size(); ++i) {
-      const auto [from, o] = at(x).src[static_cast<std::size_t>(at(x).data_in[i])];
-      ints[i] = from >= 0 && at(from).out[static_cast<std::size_t>(o)].type == PinType::i64 && f.int_input(i);
-      all = all && ints[i];
-    }
-    if (!all || !f.whole_result()) return false;
-    if (f.result_sum())
-      for (const auto& [reader, input] : at(x).readers)
-        if (at(reader).in[static_cast<std::size_t>(input)].type != PinType::i64) return false;
-    return true;
-  }
-
   /// The place a node names, as C++ writes it: its variable and from there its path - a field
   /// by its name, a list entry by the value of its index input: Cars[n4.index].Wheels[0].
   /// `prefix`: "" for the node's own place; "<input>." for the place a call gives that reference
@@ -1688,17 +1669,17 @@ struct Writer {
       return "callback<&" + (fn.find("::") != std::string::npos ? fn : cls_ + "::" + fn) + ">(" + place + ")";
     }
     if (t == "math.formula") {
-      const std::string text = at(x).node->param("formula", "a + b");
-      const Formula& f = Formula::cached(text);
-      // (Int inputs where they are read as whole numbers and come from Ints, an Int where the value is one - the same value, docs/blueprint_cpp.md "Formeln")
-      std::vector<char> ints;
-      const bool whole = formula_types(x, f, ints);
-      std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += std::string(i ? ", " : "") + (ints[i] ? "i64 " : "f64 ") + f.inputs()[i];
-      lambda += std::string(") -> ") + (whole ? "i64 " : "f64 ") + "{ return " + f.cpp() + "; }";
-      std::string args = lambda;
-      for (std::size_t i = 0; i < at(x).data_in.size(); ++i) args += ", " + value(x, at(x).data_in[i], c, i >= ints.size() || !ints[i]);
-      return "kern::formula(" + args + ")";
+      // kern::formula<u32, f32>([](auto a, auto s) { return ...; }, values): the types of the inputs, the formula as it is
+      const std::string text = at(x).node->param("formula", "a + b"), types_of = at(x).node->param("types", "f32 f32");
+      const Formula& f = Formula::cached(text, types_of);
+      std::string types, lambda = "[](";
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) {
+        types += std::string(i ? ", " : "") + std::string(num::kind_name(i < f.types().size() ? f.types()[i] : num::Kind::f32));
+        lambda += std::string(i ? ", " : "") + "auto " + f.inputs()[i];
+      }
+      std::string args = lambda + ") { return " + f.text() + "; }";
+      for (std::size_t i = 0; i < at(x).data_in.size(); ++i) args += ", " + value(x, at(x).data_in[i], c);
+      return "kern::formula<" + types + ">(" + args + ")";
     }
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
@@ -2260,8 +2241,6 @@ struct Reader {
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
-  std::set<std::pair<int, std::string>> int_inputs;  // (the Int inputs of formulas: (node, input) - Ints, as they are)
-  std::vector<int> int_sums;  // (the formulas that give an Int by +, - or *: read only by Ints)
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
   /// An exec output that waits for its wire. node < 0 (kGone): a path that has ended in the graph
   /// where C++ would go on with the next statement (after a wait, a Sequence, go<id>()).
@@ -3924,7 +3903,7 @@ struct Reader {
       if (fn->second->kind != NodeKind::pure) { fail(s.tok, t.s + " is a step, not a value: it stands on a line of its own"); return s; }
       if (fn->second->type == "var.get") { fail(s.tok, "a variable is read by its name"); return s; }
       if (fn->second->type == "func.pure") { fail(s.tok, "a function's value is Function(values).result"); return s; }
-      if (fn->second->type == "math.formula") { fail(s.tok, "a formula is kern::formula([](f64 a) -> f64 { return ...; }, value)"); return s; }
+      if (fn->second->type == "math.formula") { fail(s.tok, "a formula is kern::formula<f32>([](auto a) { return ...; }, value)"); return s; }
       s = pure_call(fn->second, s.tok);
       if (failed()) return s;
       if (accept(".")) {
@@ -3939,30 +3918,35 @@ struct Reader {
                       (scope.root < 0 ? " (after a wait or in a go method, an event's or function's values are read as n<id>.<name>)" : ""));
     return s;
   }
-  /// kern::formula([](Float a, Float b) -> Float { return ...; }, a's value, b's value)
+  /// kern::formula<u32, f32>([](auto a, auto s) { return ...; }, a's value, s's value): the types of the inputs, in the
+  /// order the formula first reads them; the lambda's parameters are those names, its body the formula (logic.h, Formula).
   Src formula(std::size_t tok) {
     Src s;
     s.tok = tok;
-    std::vector<std::string> names;
-    if (!expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
-    // (each input a Float or - where Formula::int_input holds - an Int, the result a Float or - where every input is an Int
-    // and Formula::whole_result holds - an Int: docs/blueprint_cpp.md "Formeln")
-    std::vector<char> ints;
-    while (!is(")")) {
-      std::string nm;
-      const bool int_in = is("i64");
-      if (!int_in && !is("f64")) { expect("f64", "(an input of a formula is f64, or i64 where it is read as a whole number - until the formula is of the number types)"); return s; }
-      ++p;
-      if (!word(nm, "the input's name")) return s;
-      names.push_back(nm);
-      ints.push_back(int_in);
+    const std::string form = "kern::formula<u32, f32>([](auto a, auto s) { return ...; }, values): the types of the inputs, a parameter for each";
+    if (!is("<")) { fail(p, form); return s; }
+    ++p;
+    std::string types;
+    std::vector<std::size_t> type_toks;
+    while (!is(">")) {
+      TypeRef t;
+      type_toks.push_back(p);
+      const std::size_t at = p;
+      if (!type_here(t)) return s;
+      if (!is_number(t.type)) { fail(at, "an input of a formula is a number (bool, i8 ... i64, u8 ... u64, f32, f64), not " + cpp_type(t)); return s; }
+      types += (types.empty() ? "" : " ") + std::string(num::kind_name(kind_of(t.type)));
       if (!accept(",")) break;
     }
-    if (!expect(")") || !expect("->")) return s;
-    const bool whole = is("i64");
-    if (!whole && !expect("f64", "(a formula gives an f64, or an i64 where its value is a whole number)")) return s;
-    if (whole) ++p;
-    if (!expect("{") || !expect("return")) return s;
+    if (!expect(">", "(" + form + ")") || !expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
+    std::vector<std::string> names;
+    while (!is(")")) {
+      std::string nm;
+      if (!expect("auto", "(" + form + ")")) return s;
+      if (!word(nm, "the input's name")) return s;
+      names.push_back(nm);
+      if (!accept(",")) break;
+    }
+    if (!expect(")") || !expect("{") || !expect("return")) return s;
     const std::size_t from = peek().begin;
     int depth = 0;
     while (peek().kind != Tok::end && !(depth == 0 && (is(";") || is("}")))) {
@@ -3973,45 +3957,21 @@ struct Reader {
     std::string body(text.substr(from, peek().begin - from));
     const std::size_t body_tok = p;
     if (!expect(";") || !expect("}")) return s;
-    for (std::size_t at = body.find("kern::math::"); at != std::string::npos; at = body.find("kern::math::", at)) body.erase(at, 12);
-    const Formula f(body);
-    if (!f.ok()) { fail(body_tok, "the formula: " + f.error()); return s; }
-    if (f.inputs() != names) {
+    const Formula f(body, types);
+    if (f.inputs() != names && (f.ok() || f.inputs().size() >= names.size())) {
       std::string want;
-      for (const std::string& in : f.inputs()) want += (want.empty() ? "f64 " : ", f64 ") + in;
+      for (const std::string& in : f.inputs()) want += (want.empty() ? "auto " : ", auto ") + in;
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
-    for (std::size_t i = 0; i < ints.size(); ++i)
-      if (ints[i] && !f.int_input(i)) {
-        fail(body_tok, "the input " + names[i] + " is an i64 only where the formula reads it as a whole number: as an argument of band, bor, bxor, shl, shr, wrap32, wrap32s "
-                       "or mul32, as a side of a comparison whose other side is an input, a number or one of those, or through +, - and * between them - "
-                       "here it is read otherwise (by /, %, ^, a function, ! or ?:): f64 " + names[i]);
-        return s;
-      }
-    if (whole && std::find(ints.begin(), ints.end(), 0) != ints.end()) { fail(tok, "a formula with a f64 input gives a f64: -> f64"); return s; }
-    if (whole && !f.whole_result()) {
-      fail(body_tok, "-> i64 is a formula whose value is a whole number: band, bor, bxor, shl, shr, wrap32, wrap32s or mul32, or +, - and * of inputs, numbers and those - "
-                     "this one gives a f64: -> f64");
-      return s;
-    }
-    const int node = make("math.formula", tok, {{"formula", f.text()}});
+    if (type_toks.size() != names.size()) { fail(tok, "one type for each input of the formula (" + std::to_string(names.size()) + "): kern::formula<...>"); return s; }
+    if (!f.ok()) { fail(body_tok, "the formula: " + f.error()); return s; }
+    const int node = make("math.formula", tok, {{"formula", f.text()}, {"types", f.types_text()}});
     if (node < 0) return s;
     Args a{*this};
     a.first = false;  // (the lambda was the first argument)
-    const std::size_t wires_before = data_wires.size();
     if (!args_of(node, a, "this formula")) return s;
     if (!expect(")", "(one value per input of the formula)")) return s;
-    // (every Int input a wire from an Int - what the graph has where the text says Int)
-    // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
-    for (std::size_t i = 0; i < ints.size(); ++i) {
-      if (!ints[i]) continue;
-      bool wired = false;
-      for (std::size_t w = wires_before; w < data_wires.size(); ++w) wired = wired || (data_wires[w].to == node && data_wires[w].in == names[i]);
-      if (!wired) { fail(tok, "an i64 input of a formula is an i64 that is read (no number written out): f64 " + names[i]); return s; }
-      int_inputs.insert({node, names[i]});
-    }
-    if (whole && f.result_sum()) int_sums.push_back(node);
     s.node = node;
     s.root = true;
     return s;
@@ -5031,15 +4991,6 @@ struct Reader {
       // any type takes each as it is: kAnyWidth)
       const bool same = from_type == to_type || (to_type.of == kAnyWidth && fits(from_type, to_type)) ||
                         (element_of(to_type.type) == PinType::object && from_type.type == to_type.type && fits(from_type, to_type));   // (an object where one of a class it derives from goes, as in C++)
-      if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::i64)
-        return fail(w.from.tok, "this formula gives an i64 by +, - or *, and this reads it as " + need + " (past i64's ends the two differ): the formula is -> f64");
-      if (int_inputs.count({w.to, w.in})) {
-        // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
-        if (w.from.cast) return fail(w.from.tok, "an i64 input of a formula is an i64 as it is: no num_cast");
-        if (from_type.type != PinType::i64) return fail(w.from.tok, "this is " + have + ", the input of the formula is an i64");
-        g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
-        continue;
-      }
       if (w.from.cast) {
         if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (same ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
         if (same) return fail(w.from.tok, "the value is " + (from_type == to_type ? need : "an Int") + " already: no kern::to");
@@ -5241,8 +5192,10 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
     }
     for (const ParamDef& p : def->params) {
       std::string v = n->param(p.key, p.def);
-      if (n->type == "math.formula" && p.key == "formula")
-        if (const Formula& f = Formula::cached(v); f.ok()) v = f.text();
+      if (n->type == "math.formula" && p.key == "formula") {
+        const std::string types = n->param("types", "f32 f32");
+        if (const Formula& f = Formula::cached(v, types); f.ok()) v = f.text();
+      }
       add("the setting \"" + p.key + "\" of " + key, v);
     }
     std::vector<PinDef> in, out;

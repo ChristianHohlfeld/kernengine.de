@@ -247,7 +247,7 @@ struct Ground : virtual kern::Library {
   struct heightResult { f64 h = 0.0; };
   /// The height of the field at (x, y): what the engine asks.
   KERN_PURE heightResult height(const Field& f, f64 x = 0.0, f64 y = 0.0) {
-    return {kern::formula([](f64 b, f64 s, f64 x, f64 y) -> f64 { return b + s * x - y; }, f.Base, f.Slope, x, y)};
+    return {kern::formula<f64, f64, f64, f64>([](auto b, auto s, auto x, auto y) { return b + s * x - y; }, f.Base, f.Slope, x, y)};
   }
   struct highResult { bool up = false; };
   KERN_PURE highResult high(f64 x = 0.0) {
@@ -605,7 +605,7 @@ struct Calls : kern::Blueprint {
   /// A value two inputs read (it has a name), a formula.
   KERN_PURE ScaleResult Scale(f64 x = 1.0, f64 by = 2.0) {
     const auto n40 = [&] { return math_mul<f64>(x, by); };
-    return {n40(), kern::formula([](f64 a, f64 b) -> f64 { return a + b; }, n40(), n40())};
+    return {n40(), kern::formula<f64, f64>([](auto a, auto b) { return a + b; }, n40(), n40())};
   }
 
   struct AddUpResult { f64 total = 0.0; i64 steps = 0; };

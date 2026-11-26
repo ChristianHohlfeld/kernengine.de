@@ -139,7 +139,7 @@ struct Demo : kern::Blueprint {
   /// The level for a heat.
   KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
     if (math_compare<">">(heat, 10.0)) {
-      return {kern::formula([](Float h, Float s) -> Float { return h * s; }, heat, scale), true};
+      return {kern::formula<f32, f32>([](auto h, auto s) { return h * s; }, heat, scale), true};
     }
     return {0.0, false};
   }
@@ -230,7 +230,7 @@ KERN_LAYOUT(Demo) {
 | Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
-| Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
+| Formel-Knoten | `kern::formula<f32, f32>([](auto a, auto b) { return a * b; }, wertA, wertB)` – die Typen der Eingänge, die Formel als Rumpf (siehe „Formeln“) |
 | Umwandlung an einem Draht (Int → Float …) | `kern::to<Float>(wert)` |
 | ein Wert, den nach diesem Eingang nichts mehr braucht | `std::move(wert)` – der Draht ist derselbe, der Text reicht den Wert weiter, statt ihn zu kopieren (siehe „Übergeben statt kopieren“) |
 | Branch | `if (wert) { ... } else { ... }` |
@@ -1652,67 +1652,45 @@ Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `en
 
 ### Formeln
 
-Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
-anderes bedeuten oder fehlen, sind dort Aufrufe: `/` ist `kern::math::div` (durch 0 ergibt 0), `%`
-ist `kern::math::mod`, `^` ist `kern::math::pow`; die Funktionen und `pi` stehen in `kern::math`.
-Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `shl`, `shr` (die Bits
-einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
-eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
-dieselben Funktionen von `kern::math`.
-`copysign(a, b)` ist der Betrag von `a` mit dem Vorzeichen von `b` – auch dem von −0 (`copysign(1, -0)`
-ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
-dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
-Konverter schreibt `std::copysign` und `copysignf` damit.
-`remainder(a, b)` ist der Rest nach IEEE 754: `a − n · b`, mit `n` der ganzen Zahl, die `a / b` am
-nächsten liegt (von zweien die gerade) – `std::remainder`, exakt (das Ergebnis ist immer eine Zahl, die
-ein `double` hält), also auf jeder Plattform dieselben Bits; ist es 0, hat es das Vorzeichen von `a`.
-Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebracht (`remainder(w, 360)`);
-der Konverter schreibt `std::remainder` und `remainderf` damit.
-Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
-(`Formula::text()`).
+Eine Formel ist ein Ausdruck in C++ über ihre Eingänge, und sie ist **dieselbe Rechnung wie die Knoten, für die
+sie steht**: jede Operation ist die Funktion aus `kern/logic/numbers.h`, die der Knoten dieser Operation ruft
+(`a + b` zweier `u32` die von Add, die bei 2^32 umbricht), in der Reihenfolge, in der sie dasteht, jeder Wert in
+seinem Typ – kein Schritt in einem breiteren. Im Text steht sie als Lambda mit den Typen ihrer Eingänge:
 
-**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
-jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
-bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
-Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
-Funktion liest (`Formula::whole_result()`, unten), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
-und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
-`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
-Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
-Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
-weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
-liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
-Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
-`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
-`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
-und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
-neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
-verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
-Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
-(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
-Formel, an `band` … `mul32` als ganze Zahl, als Int `whole` dieser Zahl).
+`Heat = kern::formula<f32, u32>([](auto h, auto n) { return h * 0.5f + num_cast<f32, u32>(n); }, Heat, Count);`
 
-**Int-Eingänge und Int-Ergebnis, Eingang für Eingang** (`Formula::int_input(k)`, `Formula::whole_result()` – eine
-Regel am Ausdruck, keine Namen). Ein Eingang ist ein `Int`, wo sein Draht von einem Int kommt und die Formel ihn
-nur als ganze Zahl liest: als Argument einer solchen Funktion, als Seite eines Vergleichs (`==` `!=` `<` `<=` `>`
-`>=`), dessen andere Seite ein Eingang, eine geschriebene Zahl, eine solche Funktion oder ein solches `+`/`−`/`×` ist,
-oder durch `+`, `−`, `×` (die nur Eingänge, Zahlen, solche Funktionen und einander bekommen), deren Wert selbst so
-gelesen wird oder der Wert der Formel ist. Unter `/`, `%`, `^`, einer anderen Funktion, `-a`, `!` oder `?:` ist er
-ein Float (Int/Int wäre in C++ ganzzahlige Division; `/` steht ohnehin als `kern::math::div`). Jeder andere Eingang
-ist ein Float wie oben – ein Float-Eingang oder eine geschriebene Zahl macht nur diesen Eingang zum Float:
-`kern::formula([](Int a, Float f) -> Float { return a + f; }, n3.item, 0.25)`.
-Das Ergebnis ist ein `Int`, wo jeder Eingang einer ist und die Wurzel eine solche Funktion ist oder ein `+`/`−`/`×`,
-in dem ein Eingang steht – im zweiten Fall nur, wo alles, was den Wert liest, ein Int ist (jenseits der Enden von Int
-ist das Int sein Ende, das double nicht): `List[kern::to<Int>(kern::formula([](Int i) -> Int { return i - 1.0; }, i))]`.
-Sonst ein `Float`, auch mit Int-Eingängen: `kern::formula([](Int i, Int n) -> Float { return (i < 0.0) != (n < 0.0); }, i, n)`.
-In jeder Stufe derselbe Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double. In der Klasse ist jedes
-Int als double exakt (`normal`), und die Umwandlung erhält die Ordnung – der Vergleich zweier Ints oder eines Ints mit
-einer Zahl in i64 bzw. über das double gibt, was der der doubles gibt (auch an 2^53 und ±(2^63 − 1): `a == 9007199254740993`
-vergleicht mit dem double 2^53); `+`/`−`/`×` sind `logic::Sum` – als Float genau die double-Rechnung, als Int
-`whole` von ihr (ganzzahlig, wo jede Zahl auf dem Weg in ±2^53 liegt). Der Leser lehnt ab: `Int` an einem Eingang,
-den die Formel anders liest (`div(a, 2.0)`, `-a`, `a * sqrt(2.0)`, `a < 3.0 ? a : 1.0`); `-> Int` mit einem Float-Eingang,
-mit einer Wurzel, die kein Int gibt (`a < 3.0`, `sin(a)`, `band(a, 1.0) + 2.0`), oder mit `+`/`−`/`×` an der Wurzel und
-einem Leser, der kein Int ist; eine geschriebene Zahl oder ein `kern::to` an einem Int-Eingang.
+- **Eingänge**: jeder Name, den die Formel liest, ist ein Eingang, vom Typ, den die Einstellung „Types“ des Knotens
+  für ihn nennt (in der Reihenfolge, in der die Namen zuerst vorkommen; im Text die Typen von `kern::formula<…>`,
+  die Parameter des Lambdas sind genau diese Namen). Die Drähte in die Eingänge sind Drähte wie überall: ein Wert
+  des Typs des Eingangs, nichts wandelt.
+- **Typen**: zwei Werte, die sich treffen, haben einen Typ – `a + b` eines `u32` und eines `i64` ist ein Fehler mit
+  Stelle („the values meeting here are a u32 and an i64“); umgewandelt wird nur ausdrücklich, mit
+  `num_cast<To, From>(x)` (der Knoten Cast) oder `num_bit_cast<To, From>(x)` (Bit Cast), dieselbe Schreibweise wie
+  sonst im Text. Was die Formel gibt, hat den Typ ihres Ausdrucks; so ist der Ausgang des Knotens getypt.
+- **Zahlen**: `0.5f` ist ein `f32`, `0.5`, `1e3` ein `f64` – sie treffen nur ihren Typ (`a * 0.5` eines `f32` ist ein
+  Fehler: „with f after it“). Eine ganze Zahl (`7`, `7u`) nimmt den Typ dessen, was sie trifft, und muss eine
+  solche sein (`a + 300` eines `u8` ist ein Fehler, `7u` trifft nur vorzeichenlose, `2` trifft kein `f32`: `2.0f`);
+  allein (`c ? 1 : 0`, `1 << n`) ist sie die von C++: `i32`, über dessen Ende `i64` (`7u`: `u32`, `u64`).
+  `true`, `false`. Eine Operation nur auf geschriebenen Zahlen ist abgelehnt (ihr Wert ist selbst eine Zahl).
+- **Operatoren** binden wie in C++: `+ - * /`, `%` (ganze Zahlen; für Kommazahlen `fmod`), `-` `~` `!` davor, `<< >>`
+  (die Weite eine ganze Zahl jedes Typs), `< <= > >= == !=` (geben ein `bool`), `& | ^` (ganze Zahlen), `&& ||` (bools),
+  `c ? a : b`. Was numbers.h festlegt, wo C++ offenlässt, gilt auch hier (ganze Zahlen brechen um, `/` und `%` durch 0
+  geben 0, ein Shift um seinen Rest; Kommazahlen nach IEEE: `/ 0` ist ±inf).
+- **Funktionen** (die der Knoten): `min max abs clamp(x, lo, hi)`, für Kommazahlen `lerp(a, b, t) sqrt floor ceil
+  trunc round sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 pow hypot copysign fmin fmax fmod` (die
+  Mathematik der Engine, musl, die f-Variante beim `f32`) und `isnan isinf isfinite signbit` (geben ein `bool`).
+
+In der Klasse ist jeder Eingang ein `logic::num::Typed<T>` (numbers.h): seine Operatoren und Funktionen sind die
+von numbers.h, zwei verschiedene Typen treffen sich nicht (der Compiler lehnt `a + b` eines `Typed<u32>` und eines
+`Typed<i64>` ab wie die Formel), eine ganze Zahl nimmt den Typ, den sie trifft, eine Kommazahl nur den eigenen. So
+rechnet das Lambda, was der Knoten rechnet, Bit für Bit – nicht C++s eigene Operatoren, die ein `u8` auf `int`
+heben und einen Überlauf mit Vorzeichen, eine Division durch 0 oder einen Shift um die Breite offenlassen.
+Zurückgelesen wird der Rumpf als Formel in ihrer einen kanonischen Schreibweise (`Formula::text()`): einfache
+Leerzeichen, Klammern nur, wo sie etwas ändern – und um eine andere Operation unter `& | ^ << >>`, um `&&` in `||`
+und um einen Vergleich in einem Vergleich, wie Compiler es verlangen.
+Belegt in `logic_formulas` (jede Operation und jeder Fehler mit Stelle) und `logic_formula_is_its_nodes` (für jeden
+der zehn Zahl-Typen: Formel == ihr Knotenbaum im Interpreter, und `kern::formula` == C++s eigene Rechnung, wo C++ sie
+festlegt), dazu die Fälle `formula_<typ>` und `formula_casts` (logic_cases.h) in allen Stufen.
 
 ## Wo was steht
 

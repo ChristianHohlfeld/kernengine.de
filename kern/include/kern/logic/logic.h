@@ -820,68 +820,73 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 // ---------------------------------------------------------------------------
 // formulas
 
-/// A formula over named numbers, e.g. "max(9000, 16000 - level * 1300)" - what the Formula node
-/// computes. Parsed once, evaluated on f64 exactly like the maths nodes (the same functions, the
-/// same results in every tier and on every platform).
+/// A formula over named numbers of the number types, e.g. "max(a * 3u, b) + 1u" over the inputs "u32 a, u32 b" -
+/// what the Formula node computes. It is the same computation as the nodes it stands for: every operation is the
+/// function of numbers.h the node of that operation calls (a + b of two u32 the Add node's, going round at 2^32),
+/// in the order it is written, each value in its type - no step is computed in a wider one. Its text is C++ (the
+/// body of the lambda kern::formula has in a Blueprint's C++), and C++ gives it the same bits (numbers.h, Typed).
 ///
-///   numbers      1, 2.5, .5, 1e3            names   letters, digits and _ (each is an input)
-///   operators    + - * / %  ^ (power)       unary - and !
-///                < <= > >= == !=            1 when true, else 0
-///                && ||                      a ? b : c
-///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
-///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
-///                lerp(a, b, t) remainder(x, y) (IEEE 754's: x - n * y, n the whole number nearest x / y)
-///   constants    pi
-/// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
-/// are those of 0 and of nothing (0).
+///   inputs       the names it reads, each of the type the node names for it ("types", in the order the names
+///                first appear): a + b of a u32 a and an i64 b is an error, num_cast<i64, u32>(a) + b is not
+///   numbers      0.5f an f32, 0.5 / 1e3 an f64; a whole number - 7, 7u - takes the type of what it meets
+///                (a + 7 of an i64 a: an i64; 7u only an unsigned one) and must be one of it; standing alone it is
+///                C++'s: 7 an i32, 7u a u32. true, false. An operation of numbers written out only is refused:
+///                its value is a number written out itself
+///   operators    as C++ binds them: + - * / % (whole numbers), - ~ ! in front, << >> (the amount any whole
+///                number), < <= > >= == != (give a bool), & | ^ (whole numbers), && || ! (bools), c ? a : b
+///   functions    min max abs clamp(x, lo, hi); of floating numbers lerp(a, b, t) sqrt floor ceil trunc round
+///                sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 pow hypot copysign fmin fmax fmod,
+///                isnan isinf isfinite signbit (give a bool)
+///   conversions  num_cast<To, From>(x), num_bit_cast<To, From>(x) - the nodes Cast and Bit Cast
+/// What numbers.h fixes where C++ leaves the result open (a whole number / 0 ...) holds here as well.
 class Formula {
  public:
   static constexpr std::size_t kMaxInputs = 16;
-  explicit Formula(std::string_view text);
+  /// The formula `text` over inputs of the types `types` (their names, "u32 f32": one for each input, in the order
+  /// the inputs first appear in the text).
+  Formula(std::string_view text, std::string_view types);
   bool ok() const { return error_.empty(); }
-  /// Why it could not be parsed (empty when it could).
+  /// Why it could not be read, or does not suit its types, with the place (empty when it could).
   const std::string& error() const { return error_; }
   /// The names the formula reads, in the order they first appear.
   const std::vector<std::string>& inputs() const { return inputs_; }
-  /// Its value for these inputs, in the order of inputs() (missing ones are 0); 0 when !ok().
-  f64 evaluate(const f64* values, std::size_t count) const;
-  /// The parsed formula for a text (parsed once, kept).
-  static const Formula& cached(const std::string& text);
-  /// The formula written the one canonical way (single spaces, no brackets that change nothing,
-  /// / % ^ as operators): what the C++ notation reads a formula back as. Empty when !ok().
+  /// The type of each input (as far as `types` names them).
+  const std::vector<num::Kind>& types() const { return types_; }
+  /// The type of what it gives (f64 when !ok()).
+  num::Kind result() const { return result_; }
+  /// Its value for these inputs (their bits, num::bits_of - in the order of inputs(); missing ones are 0), as bits of
+  /// result(); 0 when !ok().
+  u64 evaluate(const u64* bits, std::size_t count) const;
+  /// The formula for a text and types (read once, kept).
+  static const Formula& cached(const std::string& text, const std::string& types);
+  /// The formula written the one canonical way (single spaces, brackets only where they change something - and
+  /// around & | ^ << >> && of another operation and a comparison in a comparison, as compilers ask): what the
+  /// node holds, and the body of its lambda in a Blueprint's C++. Empty when !ok().
   std::string text() const;
-  /// The formula as a C++ expression over its inputs as doubles, with the same value: functions
-  /// and pi are those of kern::math, / % ^ are its calls div, mod and pow, numbers are double
-  /// literals. Read back by from_cpp (the text without "kern::math::" is a formula again).
-  std::string cpp() const;
-  /// Int inputs and an Int result (docs/blueprint_cpp.md, "Formeln") - one rule on the formula, no
-  /// list of names: which functions give a whole number for whole numbers says the formula's table
-  /// of functions (band bor bxor shl shr wrap32 wrap32s mul32); +, - and * (kWholeOperators) are
-  /// whole where they are given only inputs, numbers written out, such functions and such operators.
-  /// int_input(k): input k is read only as a whole number - as an argument of such a function, as a
-  /// side of a comparison (== != < <= > >=) whose other side is an input, a number written out,
-  /// such a function or such an operator, or through such an operator whose own value is read so
-  /// (or is the formula's value). Never under / % ^ or another function: there it is a Float. In a
-  /// Blueprint's C++ the input is then an Int where its wire comes from an Int: the same value,
-  /// because every Int is exact as a double and the comparison of two of them is that of the doubles.
-  bool int_input(std::size_t k) const;
-  /// whole_result(): every input is int_input, and what the formula gives is a whole number - its root
-  /// is such a function, or such an operator with an input among its operands (result_sum()). -> Int in a Blueprint's C++ where every
-  /// input is a wire from an Int; with result_sum() only where everything that reads the value is an
-  /// Int (past Int's ends the Int is its end, the double is not).
-  bool whole_result() const;
-  bool result_sum() const;
+  /// The types written the one way ("u32 f32").
+  std::string types_text() const;
 
  private:
   friend struct FormulaParser;
-  struct Op { u8 code = 0; u8 args = 0; u16 index = 0; f64 number = 0; };
-  struct Term { u8 code = 0; u16 index = 0; int a = -1, b = -1, c = -1; f64 number = 0; };  // the formula as a tree
-  std::string print(int term, int outer, bool cpp) const;
-  bool whole_operand(int term) const;  // (an input, a number, a whole function, or +, - or * of those)
+  using Fn = u64 (*)(u64, u64, u64);
+  struct Op { u8 code = 0; u8 args = 0; u16 index = 0; u64 bits = 0; Fn fn = nullptr; };
+  struct Term {
+    u8 code = 0;
+    num::Kind kind = num::Kind::f64;  // (what it gives)
+    num::Kind from = num::Kind::f64;  // (a conversion's From)
+    u16 index = 0;
+    int a = -1, b = -1, c = -1;
+    u64 bits = 0;                     // (a number written out: its bits; a whole one before it has its type: its size)
+    bool loose = false, minus = false, unsigned_ = false;  // (a whole number written out that takes its type from what it meets)
+    u32 at = 0;                       // (where it is in the text)
+  };
+  std::string print(int term, int outer) const;
   std::vector<Term> tree_;
   int root_ = -1;
   std::vector<Op> code_;
   std::vector<std::string> inputs_;
+  std::vector<num::Kind> types_;
+  num::Kind result_ = num::Kind::f64;
   std::string error_;
 };
 

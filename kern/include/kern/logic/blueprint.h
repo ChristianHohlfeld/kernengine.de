@@ -95,9 +95,12 @@ struct Machine {
   Machine& automatic(u32, u32, u32, std::string_view = {}) { return *this; }
 };
 
-/// kern::formula(lambda, values...): a Formula node. The lambda is the formula. (Rebuilt on numbers.h at the end of
-/// stage 3 of the number types - until then a formula of f64.)
-template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(values...)); }
+/// kern::formula<u32, f32>([](auto a, auto s) { return ...; }, a's value, s's value): a Formula node - the types of its
+/// inputs, the formula as the lambda's body. Each input is a logic::num::Typed of its type there, whose operators and
+/// functions are those of numbers.h: the lambda computes what the node computes, bit for bit (logic.h, Formula).
+template <class... T, class F> constexpr auto formula(F&& f, std::type_identity_t<T>... values) {
+  return logic::num::untyped(f(logic::num::Typed<T>(values)...));
+}
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
 /// order of the function's outputs (func_call_on).

@@ -43,7 +43,8 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
-/// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
+/// Functions of f64 that C++ of the engine and converted tests call (kern::math::sin ...). (A Formula node computes with
+/// numbers.h, logic.h Formula.)
 namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
 inline f64 div(f64 a, f64 b) { return b != 0 ? a / b : 0; }
@@ -78,18 +79,6 @@ inline f64 atan2(f64 y, f64 x) { return dm::atan2(y, x); }
 inline f64 rad(f64 degrees) { return degrees * (pi / 180); }
 inline f64 deg(f64 radians) { return radians * (180 / pi); }
 inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
-// (Formula's bit functions - the Formula node is rebuilt on numbers.h, stage 3 of the number types: until then on i64)
-inline i64 band(i64 a, i64 b) { return a & b; }
-inline i64 bor(i64 a, i64 b) { return a | b; }
-inline i64 bxor(i64 a, i64 b) { return a ^ b; }
-inline i64 shl(i64 a, i64 n) { return logic::num::shl(a, n); }
-inline i64 shr(i64 a, i64 n) { return logic::num::shr(a, n); }
-// (the Formula's 32-bit functions of the time before the number types - what Formula::evaluate computes; they go with
-// the typed Formula, stage 3, where a cast and the operators of the type say it)
-inline f64 wrap32(f64 a) { return static_cast<f64>(logic::num::cast<u32>(logic::num::cast<i64>(a))); }
-inline f64 wrap32s(f64 a) { return static_cast<f64>(logic::num::cast<i32>(logic::num::cast<i64>(a))); }
-inline f64 mul32(f64 a, f64 b) { return static_cast<f64>(logic::num::mul(logic::num::cast<u32>(logic::num::cast<i64>(a)), logic::num::cast<u32>(logic::num::cast<i64>(b)))); }
-inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
 }  // namespace math
 
 namespace logic {
@@ -2282,9 +2271,9 @@ struct PureNodes {
   template <num::Arithmetic T> static T math_min(T a, T b) { return num::min(a, b); }
   template <num::Arithmetic T> static T math_max(T a, T b) { return num::max(a, b); }
   /// Value between Min and Max (the two in either order): max(min(value, hi), lo) of numbers.h.
-  template <num::Arithmetic T> static T math_clamp(T value, T min, T max) { return num::min(num::max(value, num::min(min, max)), num::max(min, max)); }
+  template <num::Arithmetic T> static T math_clamp(T value, T min, T max) { return num::clamp(value, min, max); }
   /// A + (B - A) × Alpha, each step in T.
-  template <num::Floating T> static T math_lerp(T a, T b, T alpha) { return num::add(a, num::mul(num::sub(b, a), alpha)); }
+  template <num::Floating T> static T math_lerp(T a, T b, T alpha) { return num::lerp(a, b, alpha); }
   // (comparisons: of one type, as C++ compares them - a NaN is unequal to everything)
   template <num::Number T> static Bool math_equal(T a, T b) { return num::eq(a, b); }
   template <num::Number T> static Bool math_not_equal(T a, T b) { return num::ne(a, b); }
@@ -2341,6 +2330,9 @@ struct PureNodes {
   template <num::Floating T> static Bool math_signbit(T a) { return num::signbit(a); }
   // (conversions: one node for each, From and To its settings - static_cast<To>(x), numbers.h's cast)
   template <num::Number To, num::Number From> static To num_cast(From x) { return num::cast<To>(x); }
+  /// (the same in a formula: num_cast<f64, i64>(n) of the formula's input n - kern::formula, numbers.h Typed)
+  template <num::Number To, num::Number From> static num::Typed<To> num_cast(num::Typed<From> x) { return num::cast<To>(x.v); }
+  template <num::Number To, num::Number From> static num::Typed<To> num_bit_cast(num::Typed<From> x) { return num::reinterpret<To>(x.v); }
   /// The bits of x as the type To of the same size (std::bit_cast: f32 <-> u32, f64 <-> u64 ...).
   template <num::Number To, num::Number From> static To num_bit_cast(From x) { return num::reinterpret<To>(x); }
   /// A number as a text (To Text): logic::number_as_text - a whole number in decimal, a floating one the shortest
