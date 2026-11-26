@@ -178,7 +178,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
 3. Im Level die Akteure und ihre Blueprints anlegen.
 4. Optional ein fester Schritt: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … game_FixedStep“ und
    `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
-5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::Project::embedded())`.
+5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::game::embedded_project())` (kern/game/embedded.h, siehe 4.).
 
 ## Stand (25.11.2026, Zweig work-projekt)
 
