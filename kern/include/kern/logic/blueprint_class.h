@@ -89,18 +89,18 @@ template <> inline bool export_in<bool, f64>(f64 x) { return x != 0; }
 inline Text export_text_in(const char* text, u32 length) { return Text(std::string_view(text ? text : "", text ? length : 0)); }
 /// A text that comes in without its length: up to its 0.
 inline Text export_text_in(const char* text) { return Text(std::string_view(text ? text : "")); }
-/// Bytes that come in: a List of Int, one entry each.
-inline List<Whole> export_bytes_in(const u8* bytes, u32 length) {
-  List<Whole> out;
+/// Bytes that come in: a list of the Blueprint's input (L - List<U8>, List<Int>), one entry each, as C++ converts a u8.
+template <class L = List<Whole>> inline L export_bytes_in(const u8* bytes, u32 length) {
+  L out;
   out.reserve(length);
-  for (u32 i = 0; i < length; ++i) out.push_back(Whole(static_cast<i64>(bytes[i])));
+  for (u32 i = 0; i < length; ++i) out.push_back(typename L::value_type(Whole(static_cast<i64>(bytes[i]))));
   return out;
 }
-/// Floats that come in (f32, as the host gives them): a List of Float, one entry each, as C++ converts an f32.
-inline List<f64> export_floats_in(const f32* floats, u32 length) {
-  List<f64> out;
+/// Floats that come in (f32, as the host gives them): a list of the Blueprint's input (L), one entry each, as C++ converts an f32.
+template <class L = List<f64>> inline L export_floats_in(const f32* floats, u32 length) {
+  L out;
   out.reserve(length);
-  for (u32 i = 0; i < length; ++i) out.push_back(static_cast<f64>(floats[i]));
+  for (u32 i = 0; i < length; ++i) out.push_back(typename L::value_type(static_cast<f64>(floats[i])));
   return out;
 }
 /// A number as the export gives it (i32, u32, f32, f64): as C++ converts it.

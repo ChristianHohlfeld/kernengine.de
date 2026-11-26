@@ -1673,6 +1673,7 @@ class Function:
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
         self.result_fixed = None   # the same for what it gives
+        self.export_len = None   # an export that gives a text, bytes or floats by a pointer: its parameter for the length (out_len - the glue's, no input)
         self.result = None    # type, None: no result
         self.text = None
         self.wait = None
@@ -4144,6 +4145,7 @@ class Emit:
                     re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
                 # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
                 self.export_len_param = p["id"]
+                f.export_len = p["id"]
                 continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
@@ -13400,6 +13402,15 @@ class TestWriter:
                     return why
         return None
 
+    def own_runtime(self, raw):
+        """A type that is the logic the Blueprints run in (OWN_LOGIC: the test's own, the engine's real one) as the test
+        spells it: by its full name, however the source names it - `logic::Runtime*` inside kern::game, `kern::logic::Runtime&`
+        (the test's source stands in a namespace of its own: a name of a namespace there is another one)."""
+        m = re.fullmatch(r"(const\s+)?(?:::)?(?:\w+::)*Runtime\b\s*(.*)", raw.strip())
+        if m is None:
+            raise Wait(f"the logic the Blueprints run in as {raw.strip()}")
+        return f"{m.group(1) or ''}::{self.OWN_LOGIC[0]}{(' ' + m.group(2)) if m.group(2) else ''}"
+
     def object_name(self, q):
         """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
         if q not in self.objects:
@@ -13980,7 +13991,7 @@ class TestWriter:
             elif self.u.object_of(raw) == self.OWN_LOGIC[0]:
                 # (the logic the Blueprints run in, as a stand-in of the engine gave it - GameWorld::logic_runtime: in
                 # the Blueprint a handle, here the handle as the pointer it stands for, never followed; see the result below)
-                params.append((f"{re.sub(r'^(const\s+)?(?:::)?' + ENGINE + r'::logic::Runtime', lambda m_: (m_.group(1) or '') + '::' + ENGINE + '::logic::Runtime', raw.strip())} {name}", default))
+                params.append((f"{self.own_runtime(raw)} {name}", default))
                 at = name if re.search(r"\*\s*(const)?$", raw) else f"&{name}"
                 values.append(f"converted::logic_value({at})")
             elif self.u.object_of(raw):
@@ -14044,8 +14055,7 @@ class TestWriter:
         elif ret != "void" and self.u.object_of(ret_raw) == self.OWN_LOGIC[0]:
             # (the logic the Blueprints run in: the handle the stand-in gives, as a pointer the source only hands back to the
             # engine - 0: none, as the Blueprint has it)
-            ret = re.sub(r"^(?:::)?" + ENGINE + r"::logic::Runtime", "::" + ENGINE + "::logic::Runtime", re.sub(r"^const\s+", "const ", ret_raw.strip()))
-            ret = re.sub(r"^(const\s+)(?:::)?" + ENGINE + r"::logic::Runtime", r"\1::" + ENGINE + "::logic::Runtime", ret)
+            ret = self.own_runtime(ret_raw)
             body.append(f"{ret} kern_result = converted::logic_pointer<{ret}>(kern_out[0]);")
             k = 1
         elif ret != "void":
@@ -15646,6 +15656,8 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):
                         continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
+                    if p["id"] == f.export_len:
+                        continue   # (the length of what an export gives by a pointer: the call's own place, out_len_ - see `give`)
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
                         if re.match(r"const\s+void$", entry):
@@ -15678,7 +15690,7 @@ class TestWriter:
                     decl_lines.append("converted_pointed_lists = {" + ", ".join([*(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists),
                                                                                   *(f"{{reinterpret_cast<const unsigned char*>({x}.data), reinterpret_cast<const unsigned char*>({x}.data + {x}.size)}}" for x in spans)]) + "};")
                 ret = qtype(d).split("(")[0].strip()
-                if f.value is not None:
+                if f.value is not None and f.export_len is None:
                     self.result_ok(ret)
                 if owner and not f.state:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
@@ -15691,6 +15703,9 @@ class TestWriter:
                 for p in params:
                     if self.u.is_logic(qtype(p)):   # (the logic the source's ActorBlueprints are bound to: converted::Blueprint)
                         handed.append("bp.source_logic()")
+                        continue
+                    if p["id"] == f.export_len:
+                        handed.append("&out_len_")
                         continue
                     if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
                         handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
@@ -15729,6 +15744,15 @@ class TestWriter:
                     fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
                     give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
+                elif f.export_len is not None:
+                    # an export that gives a text, bytes or floats by a pointer and its length (export_text, export_bytes,
+                    # export_floats): what it gives is the piece the two say - as the host reads it, and as the Blueprint gives it
+                    if [src_ for _, _, src_ in f.out_fields] != ["result"]:
+                        raise Wait("an export that gives a piece by a pointer and changes what it is handed")
+                    length = next(p for p in params if p["id"] == f.export_len)
+                    piece = "std::string" if re.match(r"(?:const\s+)?char\s*\*", ret) else "std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(given_)>>>"
+                    give = (f"{self.spell(re.sub(r'\s*\*\s*$', '', qtype(length)))} out_len_ = 0; const auto* given_ = {counted}; "
+                            f"return given_ ? {piece}(given_, given_ + out_len_) : {piece}();")
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_] if src_ == 'state' else f'std::move({parts[src_]})'};"   # (run's values are the test's: handed back moved, as they are)
