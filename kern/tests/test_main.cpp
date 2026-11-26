@@ -41,6 +41,7 @@
 #include "kern/logic/nodes.h"
 #include "logic_cases.h"
 #include "math_names.h"
+#include "hyperbolic_reference.h"
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
@@ -12734,6 +12735,86 @@ TEST(math_of_the_standard_library_is_the_engines) {
   if (f) std::fclose(f);
   if (!read || want != r.digest) std::printf("  digest %016llx (math_names_digest.txt: %016llx)\n", static_cast<unsigned long long>(r.digest), want);
   CHECK(read && want == r.digest);
+}
+
+TEST(hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges) {
+  // sinh, cosh, tanh, asinh are the engine's own (kern/src/math/hyperbolic.c, from the definitions over musl's exp, expm1,
+  // log and sqrt). (1) Against values computed with 200 digits (hyperbolic_reference.h, kern/tests/hyperbolic_reference.py):
+  // the error in ulp of the exact value - at most 2 ulp for f64 (measured 1.95, tanh), at most 1 ulp for f32 (computed in
+  // f64, rounded once: measured 0.50). (2) Their edges and identities, bit for bit.
+  using F = double (*)(double);
+  using G = float (*)(float);
+  const F f64s[] = {[](double x) { return kern::dm::sinh(x); }, [](double x) { return kern::dm::cosh(x); },
+                    [](double x) { return kern::dm::tanh(x); }, [](double x) { return kern::dm::asinh(x); }};
+  const G f32s[] = {[](float x) { return kern::dm::sinh(x); }, [](float x) { return kern::dm::cosh(x); },
+                    [](float x) { return kern::dm::tanh(x); }, [](float x) { return kern::dm::asinh(x); }};
+  const char* names[] = {"sinh", "cosh", "tanh", "asinh"};
+  auto ulps = [](double got, const hyperbolic_reference::Row& row, bool single) {
+    if (!std::isfinite(got)) return 1e9;
+    const int e = std::ilogb(row.hi);
+    const double ulp = single ? std::ldexp(1.0, std::max(e, -126) - 23) : std::ldexp(1.0, std::max(e, -1022) - 52);
+    return std::fabs((got - row.hi) - row.lo) / ulp;
+  };
+  double worst[2][4] = {};
+  double worst_at[2][4] = {};
+  for (const auto& row : hyperbolic_reference::kDouble) {
+    const double e = ulps(f64s[row.fn](row.x), row, false);
+    if (e > worst[0][row.fn]) worst[0][row.fn] = e, worst_at[0][row.fn] = row.x;
+  }
+  for (const auto& row : hyperbolic_reference::kFloat) {
+    const double e = ulps(static_cast<double>(f32s[row.fn](static_cast<float>(row.x))), row, true);
+    if (e > worst[1][row.fn]) worst[1][row.fn] = e, worst_at[1][row.fn] = row.x;
+  }
+  for (int k = 0; k < 4; ++k) {
+    if (worst[0][k] > 2.0) std::printf("  %s (f64): %.3f ulp at %a\n", names[k], worst[0][k], worst_at[0][k]);
+    if (worst[1][k] > 1.0) std::printf("  %s (f32): %.3f ulp at %a\n", names[k], worst[1][k], worst_at[1][k]);
+    CHECK(worst[0][k] <= 2.0);
+    CHECK(worst[1][k] <= 1.0);
+  }
+  CHECK(std::size(hyperbolic_reference::kDouble) > 1000 && std::size(hyperbolic_reference::kFloat) > 1000);
+  // ±0 keep their sign (cosh: 1); ±inf; NaN.
+  const double inf = std::numeric_limits<double>::infinity(), nan = std::numeric_limits<double>::quiet_NaN();
+  for (double z : {0.0, -0.0}) {
+    CHECK(math_names::bits(kern::dm::sinh(z)) == math_names::bits(z) && math_names::bits(kern::dm::tanh(z)) == math_names::bits(z) &&
+          math_names::bits(kern::dm::asinh(z)) == math_names::bits(z) && kern::dm::cosh(z) == 1.0);
+    const float zf = static_cast<float>(z);
+    CHECK(math_names::bits(kern::dm::sinh(zf)) == math_names::bits(zf) && math_names::bits(kern::dm::tanh(zf)) == math_names::bits(zf) &&
+          math_names::bits(kern::dm::asinh(zf)) == math_names::bits(zf) && kern::dm::cosh(zf) == 1.0f);
+  }
+  CHECK(kern::dm::sinh(inf) == inf && kern::dm::sinh(-inf) == -inf && kern::dm::cosh(inf) == inf && kern::dm::cosh(-inf) == inf);
+  CHECK(kern::dm::tanh(inf) == 1.0 && kern::dm::tanh(-inf) == -1.0 && kern::dm::asinh(inf) == inf && kern::dm::asinh(-inf) == -inf);
+  CHECK(std::isnan(kern::dm::sinh(nan)) && std::isnan(kern::dm::cosh(nan)) && std::isnan(kern::dm::tanh(nan)) && std::isnan(kern::dm::asinh(nan)));
+  CHECK(std::isnan(kern::dm::sinh(static_cast<float>(nan))) && std::isnan(kern::dm::asinh(static_cast<float>(nan))));
+  // Where they overflow: sinh and cosh of 710.475 are finite, of 710.476 infinite (ln(2 * DBL_MAX) = 710.4758600739...);
+  // in f32 at 89.41598... (ln(2 * FLT_MAX)).
+  CHECK(std::isfinite(kern::dm::sinh(710.475)) && kern::dm::sinh(710.476) == inf && kern::dm::sinh(-710.476) == -inf);
+  CHECK(std::isfinite(kern::dm::cosh(-710.475)) && kern::dm::cosh(710.476) == inf);
+  CHECK(std::isfinite(kern::dm::sinh(89.4159f)) && std::isinf(kern::dm::sinh(89.4161f)) && std::isinf(kern::dm::cosh(-89.4161f)));
+  // Very small x: sinh x, tanh x, asinh x are x; cosh x is 1. Large: tanh is ±1.
+  for (double t : {1e-10, -3e-12, 1e-300, 5e-324}) {
+    CHECK(kern::dm::sinh(t) == t && kern::dm::tanh(t) == t && kern::dm::asinh(t) == t && kern::dm::cosh(t) == 1.0);
+  }
+  CHECK(kern::dm::tanh(30.0) == 1.0 && kern::dm::tanh(-30.0) == -1.0 && kern::dm::tanh(30.0f) == 1.0f);
+  // Odd and even, bit for bit; |tanh| <= 1; asinh(sinh(x)) is x within 4 ulp.
+  std::uint64_t s = 0x2545f4914f6cdd1dull;
+  int odd = 0, bounded = 0, back = 0, n = 0;
+  for (int i = 0; i < 4000; ++i) {
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double u = static_cast<double>(s >> 11) / 9007199254740992.0;
+    const double x = u * std::ldexp(1.0, static_cast<int>(s % 30) - 25);   // (0 .. 32)
+    const float xf = static_cast<float>(x);
+    ++n;
+    if (math_names::bits(kern::dm::sinh(-x)) == math_names::bits(-kern::dm::sinh(x)) && math_names::bits(kern::dm::cosh(-x)) == math_names::bits(kern::dm::cosh(x)) &&
+        math_names::bits(kern::dm::tanh(-x)) == math_names::bits(-kern::dm::tanh(x)) && math_names::bits(kern::dm::asinh(-x)) == math_names::bits(-kern::dm::asinh(x)) &&
+        math_names::bits(kern::dm::sinh(-xf)) == math_names::bits(-kern::dm::sinh(xf)) && math_names::bits(kern::dm::cosh(-xf)) == math_names::bits(kern::dm::cosh(xf)) &&
+        math_names::bits(kern::dm::tanh(-xf)) == math_names::bits(-kern::dm::tanh(xf)) && math_names::bits(kern::dm::asinh(-xf)) == math_names::bits(-kern::dm::asinh(xf)))
+      ++odd;
+    if (std::fabs(kern::dm::tanh(x)) <= 1.0 && std::fabs(kern::dm::tanh(xf)) <= 1.0f && kern::dm::cosh(x) >= 1.0) ++bounded;
+    const double ulp = std::ldexp(1.0, std::max(std::ilogb(x), -1022) - 52);
+    if (x == 0 || std::fabs(kern::dm::asinh(kern::dm::sinh(x)) - x) <= 4 * ulp) ++back;
+  }
+  if (odd != n || bounded != n || back != n) std::printf("  of %d: odd/even %d, bounded %d, asinh(sinh(x)) = x %d\n", n, odd, bounded, back);
+  CHECK(odd == n && bounded == n && back == n);
 }
 
 TEST(determinism_is_bit_identical_across_builds_and_platforms) {

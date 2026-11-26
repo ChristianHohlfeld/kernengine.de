@@ -324,13 +324,15 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
         "truncf": "trunc", "pow": "pow", "powf": "pow", "exp": "exp", "expf": "exp", "log": "log", "logf": "log", "sin": "sin", "sinf": "sin", "cos": "cos", "cosf": "cos", "tan": "tan",
         "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp",
-        "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder"}
+        "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder",
+        # (the engine's own hyperbolic functions, kern/src/math/hyperbolic.c: what std::sinh ... of a program is)
+        "sinh": "sinh", "sinhf": "sinh", "cosh": "cosh", "coshf": "cosh", "tanh": "tanh", "tanhf": "tanh", "asinh": "asinh", "asinhf": "asinh"}
 
 
 # The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
 # every machine computes them the same) - each with how many arguments it takes. A constant of the program
 # computed with one of them is the number the engine gives for it (engine_formula).
-ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2}
+ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2, "sinh": 1, "cosh": 1, "tanh": 1, "asinh": 1}
 _FORMULAS = {}
 
 
@@ -349,7 +351,7 @@ def engine_formula(text):
 
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
-MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
+MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
 
 
 # The engine's functions as nodes in converted code (BLUEPRINTS.md, 6c): handles for the engine's objects,
@@ -10909,18 +10911,6 @@ class Emit:
                 return f"kern::math::sign({args[0]})"
             if name in ("ldexp", "ldexpf") and len(args) == 2:
                 return f"({args[0]} * kern::math::pow(2.0, {args[1]}))"
-            if name in ("tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf"):
-                # (the engine has not this function yet - kern/third_party/musl_math: a program's mathematics is the engine's, and
-                # a formula of exp is another function; it waits, with the place, until the engine has it)
-                raise Wait(f"std::{name}: the engine has no {name} yet (kern/third_party/musl_math) - a formula of exp and log would be another function than C++'s")
-            if name in ("tanh", "tanhf"):
-                return f"kern::math::div(kern::math::exp(2.0 * {args[0]}) - 1.0, kern::math::exp(2.0 * {args[0]}) + 1.0)"
-            if name in ("sinh", "sinhf"):
-                return f"((kern::math::exp({args[0]}) - kern::math::exp(-{args[0]})) * 0.5)"
-            if name in ("cosh", "coshf"):
-                return f"((kern::math::exp({args[0]}) + kern::math::exp(-{args[0]})) * 0.5)"
-            if name in ("asinh", "asinhf"):
-                return f"kern::math::log({args[0]} + kern::math::sqrt(({args[0]} * {args[0]}) + 1.0))"
             if name in ("log2", "log2f"):
                 return f"kern::math::div(kern::math::log({args[0]}), 0.6931471805599453)"
             if name in ("log10", "log10f"):

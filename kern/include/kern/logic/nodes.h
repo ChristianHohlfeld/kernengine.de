@@ -85,6 +85,11 @@ inline f64 asin(f64 a) { return dm::asin(kern::clamp(a, -1.0, 1.0)); }
 inline f64 acos(f64 a) { return dm::acos(kern::clamp(a, -1.0, 1.0)); }
 inline f64 atan(f64 a) { return dm::atan(a); }
 inline f64 atan2(f64 y, f64 x) { return dm::atan2(y, x); }
+/// The hyperbolic functions: the engine's own (kern/src/math/hyperbolic.c), as std::sinh ... of a program.
+inline f64 sinh(f64 a) { return dm::sinh(a); }
+inline f64 cosh(f64 a) { return dm::cosh(a); }
+inline f64 tanh(f64 a) { return dm::tanh(a); }
+inline f64 asinh(f64 a) { return dm::asinh(a); }
 inline f64 rad(f64 degrees) { return degrees * (pi / 180); }
 inline f64 deg(f64 radians) { return radians * (180 / pi); }
 inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }

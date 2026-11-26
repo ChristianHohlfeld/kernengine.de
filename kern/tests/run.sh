@@ -23,7 +23,7 @@ done
 for p in "${pids[@]}"; do wait "$p"; done
 # The deterministic libm (kern/core/dmath.h).
 mkdir -p "$out/musl_math"
-for c in "$root"/third_party/musl_math/src/*.c; do
+for c in "$root"/third_party/musl_math/src/*.c "$root"/src/math/*.c; do
   o="$out/musl_math/$(basename "$c" .c).o"
   objects+=("$o")
   "$cc" -std=c17 -O2 -g -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o"

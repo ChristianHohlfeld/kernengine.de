@@ -77,6 +77,7 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
+#   hyperbolic.cpp std::sinh, cosh, tanh, asinh: the engine's own (kern/src/math/hyperbolic.c) - written and the same in both passes.
 #   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
 #             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
 #             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
@@ -304,6 +305,14 @@ tested numbers_engine "the second pass holds the engine's own enum" 'using BodyT
 logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
 if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
 else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
+# hyperbolic: std::sinh, cosh, tanh, asinh (and tanh of an f32) - the engine's own functions (kern/src/math/hyperbolic.c): written
+# (before: "std::sinh: the engine has no sinh yet"), and the same as the source in both passes.
+SOURCE_NUMBERS=1 convert hyperbolic
+check hyperbolic "std::sinh and std::cosh are the engine's" yes 'sinh\(.*cosh\('
+check hyperbolic "std::asinh is the engine's" yes 'asinh\('
+logged hyperbolic "all four are compared once more with their source" '^4 functions are compared once more with their source as C\+\+ computes it'
+if right hyperbolic; then echo "ok   hyperbolic: written, and the same as the source in both passes (the engine's sinh, cosh, tanh, asinh)"
+else echo "FAIL hyperbolic: written, and the same as the source in both passes"; cat "$top/hyperbolic/numbers.txt" 2>/dev/null; fail=1; fi
 # Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
 # the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
 # (red): the number types have come, and the case goes up to numbers_same.
