@@ -16,7 +16,7 @@ using kern::game::ActorId;
 
 namespace {
 
-constexpr f64 kStepHz = 240;   // fixed physics rate: the firmware runs 4 ticks per step (~1 kHz); the level's world.stepHz
+constexpr f64 kStepHz = 240;   // fixed physics rate: the firmware runs 4 ticks per step (~1 kHz); the level's world.stepHz (tests/test_entry.cpp holds it)
 constexpr u32 kMaxSteps = 24;  // at most 0.1 s of simulation per frame (GameWorld::step's guard against the spiral of death)
 
 f32 key(const kern::Input& in, Key k) { return in.down(k) ? 1.0f : 0.0f; }
@@ -39,12 +39,6 @@ bool pad_hit(const PadState& p, int b) { return (p.pressed & (1u << b)) != 0; }
 SpawnCity& game() {
   static SpawnCity g;
   return g;
-}
-
-kern::Span<kern::ShaderExtension* const> SpawnCity::extensions() {
-  extensions_[0] = &facades_;
-  extensions_[1] = &water_;
-  return {extensions_, 2};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -74,8 +68,6 @@ bool SpawnCity::start(kern::Engine& e) {
   // (Controls, Settings) and the drone as a template. No player: the drone flies in a simulated world.
   world_ = std::make_unique<kern::game::GameWorld>(e);
   if (!world_->start_level("spawncity.klevel", kern::game::SimMode::simulate)) return kern::fail("level start: %s", kern::last_error());
-  if (static_cast<f64>(world_->level().world.step_hz) != kStepHz)
-    return kern::fail("SpawnCity: the level steps at %g Hz, the drone's fixed step is %g Hz (level/spawncity.klevel world.stepHz)", world_->level().world.step_hz, kStepHz);
   kern::logic::Runtime* logic = world_->logic_runtime();
   if (!logic || !controls::bind(*logic)) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
   if (!bind_settings(*logic, settings_table_)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
@@ -228,8 +220,7 @@ void SpawnCity::update(kern::Engine& e, const kern::Frame& f) {
   update_camera(e, dt);
   e.renderer().set_camera(cam_);
   world_->set_view(cam_);
-  facades_.set_night(world_->apply_lighting(cam_.eye));
-  water_.set_time(time_);
+  world_->apply_lighting(cam_.eye);
   world_->present(f.time * 1000.0, cam_.eye);
   if (placed_) {
     std::array<Vec3, 4> motors;

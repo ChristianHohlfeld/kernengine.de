@@ -17,9 +17,9 @@ TEMPLATES = {"Drone"}
 # the sources of the small game (src/) and the firmware, as the converter names their Blueprints; and the engine's
 SOURCE = {"Arondight45_DroneFC_Core", "Arondight45_FirmwareRuntime", "Arondight45_HardwareSensors", "Arondight45_StateControl",
           "blueprint_call", "city_jobs", "city_jobs_cpp", "city_stream", "city_stream_cpp", "common", "controls", "controls_cpp",
-          "drone", "drone_cpp", "drone_art", "drone_art_cpp", "facades", "facades_cpp", "main_cpp", "mvt", "mvt_cpp", "rigid_spec",
+          "drone", "drone_cpp", "drone_art", "drone_art_cpp", "main_cpp", "mvt", "mvt_cpp", "rigid_spec",
           "settings", "settings_cpp", "sound_fx", "sound_fx_cpp", "spiel", "spiel_cpp", "terrain", "terrain_cpp", "tiles", "tiles_cpp",
-          "touch_play", "touch_play_cpp", "water_look", "water_look_cpp", "wire"}
+          "touch_play", "touch_play_cpp", "wire"}
 PROGRAM_OUT = {"person_hit", "qr_code", "qr_code_cpp", "combat_audio", "combat_audio_cpp"}
 
 

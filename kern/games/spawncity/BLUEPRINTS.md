@@ -11,10 +11,11 @@ wie Murmel (`kern/games/murmel`):
   `level/spawncity.klevel`) als simulierte Welt ohne Spieler und holt die Drohne aus der Vorlage `Drone`
   (`GameWorld::spawn`). Den festen Schritt der Drohne macht die App selbst: `GameWorld::step_once`, danach
   `Drone::step`, je 1/240 s, so viele, wie die Zeit des Frames erlaubt. Es gibt kein `FixedStep` und keinen
-  Getter eines anderen Zustands. Die Shader-Erweiterungen (Fassaden: Strom 0, Wasser: Strom 1) sind Felder
-  der App.
+  Getter eines anderen Zustands. Die App selbst (`SpawnCityApp` in `src/main.cpp`) ist schlank und gibt Start,
+  Frames und Stop an den Zustand `sc::SpawnCity` (`game()`), so wie die Exporte. Die App hat keine
+  Shader-Erweiterungen (siehe unten).
 - **Die Drohne**: `drone.*` mit der unveränderten Flugregler-Firmware (`firmware/`), Modell `drone_art.*`.
-- **Die Stadt**: `city_stream`, `city_jobs`, `terrain`, `tiles`, `mvt`, `wire`, `facades`, `water_look`.
+- **Die Stadt**: `city_stream`, `city_jobs`, `terrain`, `tiles`, `mvt`, `wire` (ohne Fassaden- und Wasser-Shader).
   Kacheln, Höhen und Luftbilder holt die Seite.
 - **Steuerung, Einstellungen, Ton**: `controls`, `touch_play`, `settings`. Die Regel-Blueprints `Controls`
   und `Settings` stehen im Level. `sound_fx` und Kerns Mixer gelten für `?audio=kern`, sonst spielt die
@@ -50,6 +51,15 @@ Fahrzeuge …; Entwurf: Zweig `koordination`, `koordination/bausteine_entwurf.md
 | Jet, Fallschirm | `jet`, `jet_seats` | `test_jet`; Vorlagen Jet, Parachute; Regel JetSeats |
 | VR | `game_vr` | VR-Teil von `web/host.mjs`; Export `sc_vr_hand` |
 | GPS live, Leistung | `gps_live`, `look`, `perf` | `test_start`, `test_look` |
+| **Shader-Erweiterungen der Stadt: Fassaden (Fensterbänder, Nacht), Wasser** | `facades`, `water_look` | `tests/lowered` und `tests/converted` von beiden |
+
+**Fassaden und Wasser kommen zurück, sobald der Konverter sie trägt.** Eine App gibt ihre Erweiterungen als
+Zeiger auf Objekte der Engine (`App::extensions`). Die Probe 45867935971 zeigt, dass das heute nicht geschrieben
+wird, aus zwei Gründen. Ein Zeiger ist kein Wert der Sprache („a pointer“). Und ein Zustand mit Basisklasse
+als Feld der App ist kein Zustand („no object of it with static storage“). Den Getter eines anderen Zustands
+im Test gibt es auch noch nicht (Punkt 3f, work-konverter). Bis dahin zeichnet die Stadt Wände und Wasser mit
+dem Standard-Shader der Engine. Die Ströme der Erweiterungen (`city_stream`: Strom 0, `terrain`: Strom 1)
+schreiben die Bibliotheken weiter; der Renderer übergeht sie ohne Erweiterung.
 
 Die Tests der entfernten Bereiche gingen mit ihnen, ebenso ihre Differenztests (`tests/lowered`) und
 Vergleichstests (`tests/converted`). Es wurde kein Test abgeschwächt.

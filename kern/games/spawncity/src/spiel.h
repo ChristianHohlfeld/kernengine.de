@@ -18,15 +18,13 @@
 #include "controls.h"
 #include "drone.h"
 #include "drone_art.h"
-#include "facades.h"
-#include "kern/app/app.h"
+#include "kern/app/app.h"  // (kern::Engine, kern::Frame)
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
 #include "settings.h"
 #include "sound_fx.h"
 #include "touch_play.h"
-#include "water_look.h"
 
 namespace sc {
 
@@ -43,15 +41,13 @@ enum PadButtonIndex { kPadA = 0, kPadB, kPadX, kPadY, kPadLB, kPadRB, kPadLT, kP
 bool pad_down(const PadState& p, int b);
 bool pad_hit(const PadState& p, int b);
 
-/// The game: the App the engine runs (kern::run, main.cpp).
-class SpawnCity final : public kern::App {
+/// The game (its one object: game()). The App the engine runs is SpawnCityApp (main.cpp): it hands its start, its
+/// frames and its stop to this.
+class SpawnCity {
  public:
-  /// The shader extensions of the city: Kern's wall records (stream 0: the facades), the water (stream 1:
-  /// terrain.cpp build_water_chunk) - the App's own.
-  kern::Span<kern::ShaderExtension* const> extensions() override;
-  bool start(kern::Engine& e) override;
-  void update(kern::Engine& e, const kern::Frame& f) override;
-  void stop(kern::Engine& e) override;
+  bool start(kern::Engine& e);
+  void update(kern::Engine& e, const kern::Frame& f);
+  void stop(kern::Engine& e);
 
   // ---- what the page hands over (main.cpp: the exports)
   CityStream& city() { return city_; }
@@ -90,9 +86,6 @@ class SpawnCity final : public kern::App {
   std::string settings_command(const std::string& cmd);
 
   kern::Engine* engine_ = nullptr;
-  Facades facades_;
-  WaterLook water_;
-  kern::ShaderExtension* extensions_[2] = {};
   std::unique_ptr<kern::game::GameWorld> world_;
   kern::game::ActorId drone_actor_ = 0;
   CityStream city_;

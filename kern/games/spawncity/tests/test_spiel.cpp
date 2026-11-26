@@ -1,4 +1,4 @@
-// The small game, played natively: the App (sc::game(), spiel.h) runs on an app runtime of the engine with its project
+// The small game, played natively: the game (sc::game(), spiel.h) as its App runs on an app runtime of the engine with its project
 // (the embedded one: level/spawncity.kproject and its level), as kern::run runs it - offline, in the stand-in town, a
 // fixed frame time - and gets ONLY keys, as a player gives them. An autopilot presses them: it waits for the ground,
 // arms the drone (R), climbs (Space), flies forward (W), turns (D under the right stick: the arrows), and lands (R in
@@ -19,6 +19,13 @@
 
 namespace {
 
+// The App of the game as main.cpp gives it to the engine (SpawnCityApp: the entry is not linked into the tests).
+struct GameApp final : kern::App {
+  bool start(kern::Engine& e) override { return sc::game().start(e); }
+  void update(kern::Engine& e, const kern::Frame& f) override { sc::game().update(e, f); }
+  void stop(kern::Engine& e) override { sc::game().stop(e); }
+};
+
 struct Flight {
   std::vector<std::string> track;   // one line a second
   bool placed = false, armed_high = false, down_disarmed = false, started = false;
@@ -33,7 +40,8 @@ Flight fly_once() {
   kern::game::ProgramApp program;
   std::string error;
   if (!kern::game::from_text(kern::game::embedded_project_text(), program.project, &error)) { std::printf("the project does not read: %s\n", error.c_str()); return f; }
-  program.given = &sc::game();
+  GameApp app;
+  program.given = &app;
   kern::Renderer renderer;
   kern::AppRuntime rt(renderer);
   const char* args = "offline=1&dem=0&mobile=0";
@@ -103,7 +111,8 @@ KERN_TEST(spiel_commands) {
   kern::game::ProgramApp program;
   std::string error;
   KERN_CHECK(kern::game::from_text(kern::game::embedded_project_text(), program.project, &error), "the project reads: %s", error.c_str());
-  program.given = &sc::game();
+  GameApp app;
+  program.given = &app;
   kern::Renderer renderer;
   kern::AppRuntime rt(renderer);
   const char* args = "offline=1&dem=0";
