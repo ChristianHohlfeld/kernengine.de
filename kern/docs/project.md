@@ -140,7 +140,9 @@ int kern_main() { return kern::run(kern::game::embedded_project()); }
   der Akteur einer Welt –, und jeder, der als seine Klasse läuft, ist beim Start gebunden (`NativeBlueprint::bind_class`):
   was das C++ des Programms ruft (`kern::logic::blueprint<T>()`) und was ein Export ruft, ohne dass das Programm selbst
   bindet. Die Schleifenwache der Programm-Logik ist die Einstellung `loopBudget` des Projekts (Vorgabe 200000,
-  `logic::Runtime::budget`).
+  `logic::Runtime::budget`) – und die der Blueprints jeder Welt des Programms: `GameWorld` setzt sie bei jedem Start
+  aus ihrem Projekt (ein Programm stellt sie nicht selbst über `logic_runtime()->budget`; eine Welt ohne Projekt
+  behält die Vorgabe).
 - **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
   Programm-Blueprint. Die Programm-Laufzeit bindet beim Start jeden ihrer Blueprints, der als Klasse mit Exporten
   läuft (`NativeBlueprint::bind_exports`), und löst sie am Ende (danach meldet ein Export „no instance … is bound“);

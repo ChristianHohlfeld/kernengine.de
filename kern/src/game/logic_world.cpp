@@ -40,6 +40,9 @@ void GameWorld::start_logic() {
   logic_host_ = std::make_unique<LogicHost>(*this);
   logic_ = std::make_unique<logic::Runtime>(*logic_host_);
   logic_->native = logic_native;
+  // (the loop guard is the project's - settings "loopBudget" -, for the Blueprints of a world as for the program's own:
+  // kern/game/program.cpp; a world without a project keeps the Runtime's default)
+  if (project_) logic_->budget = project_->settings.loop_budget;
   // (the libraries a Blueprint uses: the level's, by the name of the actor that has them, then the project's)
   logic_->blueprints = logic::with_engine(world_blueprints(level_, project_));  // (and the engine's own libraries: kern/logic/engine_libraries.h)
   if (!level_.logic.empty()) logic_->add(level_.logic, 0, "Level");
