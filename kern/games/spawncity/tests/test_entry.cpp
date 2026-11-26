@@ -39,10 +39,10 @@ KERN_TEST(entry_fixed_step_of_the_world) {
 #include "drone.h"
 #include "jet.h"
 
-SC_TEST(entry_vehicle_templates_are_the_rigid_specs) {
+KERN_TEST(entry_vehicle_templates_are_the_rigid_specs) {
   kern::game::Level l;
   std::string error;
-  SC_CHECK(kern::game::from_text(sc::rules::level_text(), l, &error), "the level file reads: %s", error.c_str());
+  KERN_CHECK(kern::game::from_text(sc::rules::level_text(), l, &error), "the level file reads: %s", error.c_str());
   auto find = [&](const char* name) -> const kern::game::Actor* {
     for (const kern::game::Actor& a : l.actors)
       if (a.name == name) return &a;
@@ -50,13 +50,13 @@ SC_TEST(entry_vehicle_templates_are_the_rigid_specs) {
   };
   const kern::game::Actor* player = find("Player");
   const kern::game::Actor* head = find("Head");
-  SC_CHECK(player && !player->is_template && player->controller && player->body && player->weapon && player->health, "the level has the player");
-  SC_CHECK(head && player && head->parent == player->id && !head->is_template, "the player's head is its child");
-  SC_CHECK(player && kern::game::default_player(l) == player->id, "Play possesses the player");
+  KERN_CHECK(player && !player->is_template && player->controller && player->body && player->weapon && player->health, "the level has the player");
+  KERN_CHECK(head && player && head->parent == player->id && !head->is_template, "the player's head is its child");
+  KERN_CHECK(player && kern::game::default_player(l) == player->id, "Play possesses the player");
   auto near = [](kern::f32 a, kern::f32 b, kern::f32 rel) { return std::fabs(a - b) <= 1e-6f + rel * std::fabs(b); };
   auto same = [&](const char* name, const sc::RigidSpec& spec) {
     const kern::game::Actor* a = find(name);
-    SC_CHECK(a && a->is_template && a->parent == 0, "the level has the template %s", name);
+    KERN_CHECK(a && a->is_template && a->parent == 0, "the level has the template %s", name);
     if (!a || !a->body) return;
     bool ok = a->body->motion == kern::game::Motion::dynamic && near(a->body->mass, spec.mass.mass, 1e-6f) && a->body->bullet == spec.bullet &&
               !a->body->allow_sleep && near(a->body->linear_damping, spec.linear_damping, 0) && near(a->body->angular_damping, spec.angular_damping, 0) &&
@@ -73,7 +73,7 @@ SC_TEST(entry_vehicle_templates_are_the_rigid_specs) {
       for (std::size_t p = 0; ok && p < s.points.size(); ++p)
         for (int i = 0; i < 3; ++i) ok = ok && near(c.points[p][i], s.points[p][i], 0);
     }
-    SC_CHECK(ok, "the template %s has the body and the colliders of its rigid spec", name);
+    KERN_CHECK(ok, "the template %s has the body and the colliders of its rigid spec", name);
   };
   same("Drone", sc::Drone::rigid_spec());
   same("Jet", sc::Jet::rigid_spec());
@@ -82,14 +82,14 @@ SC_TEST(entry_vehicle_templates_are_the_rigid_specs) {
   // What the game's code set on the level at every start is the level's and the project's (tools/level_world.py): the
   // 240 Hz step the vehicles' force models run at, one Box3D sub-step, the shadow over 110 m - on a phone 70 m, the
   // device profile "mobile" (kern/docs/project.md 2.).
-  SC_CHECK(l.world.step_hz == 240 && l.world.substeps == 1 && l.world.shadow_distance == 110, "the level's world steps at 240 Hz, one sub-step, shadow 110 m");
+  KERN_CHECK(l.world.step_hz == 240 && l.world.substeps == 1 && l.world.shadow_distance == 110, "the level's world steps at 240 Hz, one sub-step, shadow 110 m");
   kern::game::Project project;
-  SC_CHECK(kern::game::from_text(kern::game::embedded_project_text(), project, &error), "the project reads: %s", error.c_str());
+  KERN_CHECK(kern::game::from_text(kern::game::embedded_project_text(), project, &error), "the project reads: %s", error.c_str());
   const kern::DeviceProfile* mobile = project.settings.profile("mobile");
   kern::game::WorldSettings phone = l.world;
-  SC_CHECK(mobile && kern::game::overlay_world(mobile->world, phone, &error) && phone.shadow_distance == 70 && phone.step_hz == 240,
+  KERN_CHECK(mobile && kern::game::overlay_world(mobile->world, phone, &error) && phone.shadow_distance == 70 && phone.step_hz == 240,
            "the profile mobile has the phone's shadow (70 m), nothing else of the world: %s", error.c_str());
   const kern::game::Actor* chute = find("Parachute");
-  SC_CHECK(chute && chute->is_template && chute->body && chute->body->lock_angular[0] && chute->body->lock_angular[2] && chute->colliders.size() == 1,
+  KERN_CHECK(chute && chute->is_template && chute->body && chute->body->lock_angular[0] && chute->body->lock_angular[2] && chute->colliders.size() == 1,
            "the level has the template Parachute (an upright capsule)");
 }
