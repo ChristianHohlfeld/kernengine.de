@@ -99,9 +99,10 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   Zustand), sind seine eigenen Variablen und bleiben. Fehler mit Grund: die Welt hat kein Projekt (die Meldung sagt, wie eine
   Welt des Programms es hat), das Projekt hat kein Level dieses Pfads (seine Levels werden genannt) oder seinen Text
   nicht, der Text ist kein Level. Geprüft: `world_starts_a_level_of_its_project` (zwei Levels, Wechsel, Wert bleibt,
-  auch über den Knoten einer Welt des Programms). Eine App in C++ macht es ebenso: `kern/games/murmel/src/murmel.cpp`
+  auch über den Knoten einer Welt des Programms). Murmels App macht es ebenso – ihre Quelle `kern/games/murmel/src/murmel.cpp`
   (`Murmel::start`: `GameWorld(engine)`, `Murmel::lade`: je Level `start_level`; die Töne der Welt lädt
-  `GameAudio::begin`), nativ belegt vom CI-Job `murmel` (Level 2 im erwarteten Frame, Punkte über beide Levels).
+  `GameAudio::begin`), im Spiel ihr Programm-Blueprint `Murmel`; nativ belegt vom CI-Job `murmel` (Level 2 im erwarteten
+  Frame, Punkte über beide Levels).
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der
   Level-Graph, dann die Akteure in der Reihenfolge des Levels.
@@ -347,10 +348,12 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   Blueprint-Editor; Play spielt das offene Level mit den Bibliotheken des Projekts. „Play Project“
   (`kern/src/studio/project_play.cpp`): das Programm mit seiner App im Viewport – `game::ProgramApp` auf einer
   `AppRuntime` im Host des Editors (`kern::AppHost`, app.md 1.). Tests `studio_project`, `studio_play_project`, e2e.
-- Zweites Spiel: `kern/games/murmel` (App in C++, zwei Levels, Wechsel, Punkte über die Levels) – nativ und im
-  Browser belegt (CI-Jobs `murmel`, `murmel-web`). Seine App ist C++ (`kern::run(app, projekt)`): „Play Project“
-  spielt nur ein Programm, dessen App ein Programm-Blueprint ist – Murmel dort zu spielen braucht seine App als
-  Blueprint (sie wartet noch am Testrahmen der Vergleichstests).
+- Zweites Spiel: `kern/games/murmel` (zwei Levels, Wechsel, Punkte über die Levels) – nativ und im Browser belegt
+  (CI-Jobs `murmel`, `murmel-web`). Seine App ist der Programm-Blueprint `Murmel` (mit der Bibliothek `murmel_cpp`),
+  eingecheckt in `murmel.kproject`: der Konverter schreibt beide aus der Quelle `src/murmel.cpp` (`tests/convert.sh`
+  prüft, dass das Projekt genau sie hält; `--write` schreibt sie), der Einstieg ist `kern::run(embedded_project())`,
+  das Spiel baut sie als Klassen (`--classes`). `tests/run.sh` spielt drei Wege – die Quelle nativ, den Blueprint im
+  Interpreter, als Klasse – und verlangt ein Ergebnis, Zeile für Zeile (blueprint_cpp.md „Zahlen“).
 - Offen: Feld-Anfangswerte, die keine Konstante sind (`ShaderExtension* ext_[1] = {&look()}` in einem Zustand ohne
   eigenen Konstruktor), im Konverter und Vergleichstest.
 - SpawnCity: `kern::run(sc::app(), embedded_project())`; seine Programm-Klassen stehen im Projekt.
