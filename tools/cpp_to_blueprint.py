@@ -14596,6 +14596,11 @@ class TestWriter:
         return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else []) + [d["name"]])
 
     def enum_text(self, q, local=None):
+        if q.startswith(ENGINE + "::logic::"):
+            # (an enum of the engine's logic - logic::NodeKind of a NodeDef the source fills -: the real one, which the
+            # logic of the test is; a copy of it would be another type than the field of the real struct. Written with
+            # spaces, `:: kern :: logic :: NodeKind`: the renamer, which makes a held name the test's, leaves it as it is)
+            return self.in_classes(q.rsplit("::", 1)[0] + "::", f"using {q.split('::')[-1]} = :: {' :: '.join(q.split('::'))};", local)
         return self.in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(self.tree.enums[q]) + ";", local)
 
     def statement_start(self, d):

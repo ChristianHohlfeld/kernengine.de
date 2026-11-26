@@ -12,6 +12,8 @@
 #   getter.cpp a function of another state (Other::look) reads the holder's state through its getter: no call of it is
 #             compared on Holder's object - it waits, with the place and the reason, and its test does not call it on a
 #             missing object (the test writer refuses the same where it writes a test: guard).
+#   nodekind.cpp an enum of the engine's logic (kern::logic::NodeKind) in the program's source: in its test the real
+#             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of game.cpp).
 # Each case is a program of its own, its Blueprints read into a level of their own, as the game's are: the engine's
 # reader refuses what is wrong (a function read as a value that changes something).
 set -euo pipefail
@@ -60,6 +62,10 @@ convert getter
 logged getter "Other::look waits with its reason, in the converter" '^ +Other::look \([0-9]+\): the state of the Blueprint Holder'
 if grep -qs "look(" "$top/getter"/pt/converted/*.cpp; then echo "FAIL getter: no test calls Other::look"; fail=1; else echo "ok   getter: no test calls Other::look"; fi
 
+convert nodekind
+logged nodekind "is_event is written" '^ +is_event \([0-9]+\): written$'
+tested nodekind "its test has the engine's NodeKind itself" 'using NodeKind = :: kern :: logic :: NodeKind;'
+
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
@@ -67,6 +73,6 @@ convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
 
 if [ $fail != 0 ]; then
-  for c in pad getter bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind bytes table; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
