@@ -48,7 +48,7 @@
 #   actors.cpp actors are Actors (kern::logic::ActorHandle: an id and its world, kern/docs/project.md 7), never a number: as
 #             an input, what a function gives, a list of them, none (Actor{}), two compared (Same Actor), the id (Id of
 #             Actor, the one way to an Int) - written and compared; one made of numbers waits with its reason.
-#   meshextra.cpp the engine's MeshData::push_extra(const f32* values) handed only arrays of a fixed length (`const f32
+#   meshextra.cpp the engine's MeshData::push_extra(Span<const f32> values) handed only arrays of a fixed length (`const f32
 #             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
 #             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
 #   objects.cpp once more, from a folder of another length: the same texts and the same level, byte for byte.
@@ -214,7 +214,7 @@ check nested "... and nowhere a list of mvt::Tile" no 'List<mvt_Tile>'
 logged nested "both are compared" '^2 functions of the Blueprints are compared'
 
 convert meshextra
-check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<f32> values = List<f32>\{\}, i64 values_at = 0\)'
+check meshextra "push_extra's record (Span<const f32>, a view to read) is the array itself, handed by value to the engine's node" yes 'engine_mesh_data_push_extra\(n[0-9]+, m, rec\)'
 logged meshextra "extra_of_the_shore (hands an array) is written" '^ +extra_of_the_shore \([0-9]+\): written'
 
 convert views
@@ -224,9 +224,9 @@ check views "Span<f32> (to write through) is a reference input" yes 'void fill\(
 logged views "sum_of (a range-for over a view) is a value" '^ +sum_of \([0-9]+\): written$'
 logged views "first_of is a value" '^ +first_of \([0-9]+\): written$'
 logged views "push_extra handed an array is written" '^ +extra_from_an_array \([0-9]+\): written'
-logged views "push_extra handed a list and a place in it is written" '^ +extra_from_a_list \([0-9]+\): written'
+logged views "push_extra handed a list and a part of it (a Span) is written" '^ +extra_from_a_list \([0-9]+\): written'
 logged views "fill (a view to write through) is written" '^ +fill \([0-9]+\): written'
-logged views "all eight are written and compared" '^8 functions of the Blueprints are compared'
+logged views "all seven are written and compared (push_extra is the engine's node)" '^7 functions of the Blueprints are compared'
 
 convert inner
 check inner "the export inside the namespace is written" yes 'KERN_EXPORT_AS\("case_doubled"'

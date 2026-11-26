@@ -10972,8 +10972,10 @@ class Emit:
             c, x, y = kids(b)
             def branch(z):
                 text = self.fx(z, leaves)
-                if self.literal_only(bare(z)) and self.literal_only(bare(y if z is x else x)) and not self.alone(text.strip("()"), t):
-                    text = self.leaf(z, leaves, text.strip("()"), t, force=True)   # (c ? 1 : 0 of a u8: no value says the type)
+                if self.literal_only(bare(z)) and t != "bool":
+                    # (a number written out as a branch: an input of its type - c ? 1 : 0 of a u8 has no value that says the
+                    # type, and in the class C++'s ?: takes a place of the language and a bare number as two types)
+                    text = self.leaf(z, leaves, text.strip("()"), t, force=True)
                 return text
             return self.guarded(b, leaves, lambda: f"({self.fx(c, leaves)} ? {self.sometimes(lambda: branch(x))} : {self.sometimes(lambda: branch(y))})")
         if self.formula_function(b):
@@ -11585,6 +11587,21 @@ class Emit:
                     self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {n}, {u.zero(it)});",
                                 f"list_copy_bytes<{text_literal(code)}, {text_literal(code)}>({made}, 0, {lname}, {aname}, {n});"])
                     return made, t
+                # (a part of a list of numbers the source names by its first entry - `v.data() + 1`, `&v[k]` - and a count: those
+                # entries, copied into a list of their own - Copy Bytes of their bytes, as memcpy)
+                if args_ and re.match(r"const\b", args_[0].strip()) and it in BYTE_WIDTH and it != "bool":
+                    try:
+                        whole, first = self.place(a[0])
+                    except Wait:
+                        whole = None
+                    if whole is not None and self.tp_or_none(whole) == t:
+                        n = self.ex(a[1], IDX)
+                        size = BYTE_WIDTH[it]
+                        made = self.temp("part", t)
+                        count = n if size == 1 else (number_literal(literal_number(n, IDX) * size, IDX) if literal_number(n, IDX) is not None else f"math_mul<{IDX}>({n}, {size})")
+                        self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {n}, {u.zero(it)});",
+                                    f"list_copy_bytes<{text_literal(it)}, {text_literal(it)}>({made}, 0, {self.ex(whole, t)}, {first}, {count});"])
+                        return made, t
                 raise Wait("a view (Span) of a part of a list")
             if len(a) in (1, 2) and self.tp_or_none(a[0]) in INTS + FLOATS and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
                 # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:

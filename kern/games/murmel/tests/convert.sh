@@ -7,14 +7,25 @@
 # seinem Level), die Blueprints als ihre C++-Klassen (tools/blueprint_cpp.sh) und im Interpreter - zweimal: gegen den
 # Stellvertreter der Engine und gegen die Engine selbst (KERN_TEST_ENGINE=real).
 #
-#   kern/games/murmel/tests/convert.sh        (CLANGXX: der clang++ des Konverters; CXX/CC wie tests/run.sh;
-#                                              KEEP=1 behält den Ordner)
-# Endet mit 1, solange eine Funktion der App wartet, nicht verglichen wird oder ihr Vergleich abweicht.
+# Die Programm-Blueprints, die der Konverter schreibt (die App Murmel und die Bibliothek murmel_cpp), stehen eingecheckt
+# in murmel.kproject - das Spiel baut aus ihnen (build.sh, tests/run.sh). Das Skript prüft, dass das Projekt genau sie
+# hält; --write schreibt sie hinein (wie tests/blueprints.sh für die Blueprints der Levels).
+#
+#   kern/games/murmel/tests/convert.sh [--write]   (CLANGXX: der clang++ des Konverters; CXX/CC wie tests/run.sh;
+#                                                   KEEP=1 behält den Ordner)
+# Endet mit 1, solange eine Funktion der App wartet, nicht verglichen wird, ihr Vergleich abweicht oder murmel.kproject
+# andere Programm-Blueprints hält, als der Konverter aus der Quelle schreibt.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game="$(dirname "$here")"
 kern="$(cd "$game/../.." && pwd)"
 root="$(cd "$kern/.." && pwd)"
+write=0
+case "${1:-}" in
+  "") ;;
+  --write) write=1 ;;
+  *) echo "convert.sh: $1: unbekannt (--write schreibt die Programm-Blueprints in murmel.kproject)" >&2; exit 1 ;;
+esac
 work="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($work)" >&2 || trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/src" "$work/texts" "$work/pt/converted"
@@ -48,6 +59,26 @@ echo "convert.sh: $w von $all Funktionen geschrieben, ${compared:-0} verglichen"
 # "a name for a place - written where it is called" - und wird mit ihnen verglichen)
 functions="$(grep -cE '^    [^ ]+ \([0-9]+\): written' "$work/convert.log" || true)"
 [ "${compared:-0}" = "$functions" ] || { echo "convert.sh: $functions Funktionen als Funktion geschrieben, aber ${compared:-0} verglichen (Gründe: siehe oben, \"cannot compare\")"; exit 1; }
+
+# Die Programm-Blueprints im eingecheckten Projekt: genau die, die der Konverter eben schrieb (--write: sie werden es).
+python3 - "$game/murmel.kproject" "$work/murmel.kproject" "$write" <<'PY' || exit 1
+import json, sys
+path, made, write = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+p, q = json.load(open(path, encoding="utf-8")), json.load(open(made, encoding="utf-8"))
+if p.get("blueprints") == q.get("blueprints"):
+    print("convert.sh: murmel.kproject hält genau die Programm-Blueprints der Quelle: " + ", ".join(b["name"] for b in q.get("blueprints", [])))
+elif write:
+    p["blueprints"] = q.get("blueprints", [])
+    open(path, "w", encoding="utf-8").write(json.dumps(p, indent=2, ensure_ascii=False) + "\n")
+    print("convert.sh: murmel.kproject geschrieben - die Programm-Blueprints der Quelle: " + ", ".join(b["name"] for b in p["blueprints"]))
+else:
+    have = {b["name"]: b for b in p.get("blueprints", [])}
+    want = {b["name"]: b for b in q.get("blueprints", [])}
+    diff = sorted(n for n in set(have) | set(want) if have.get(n) != want.get(n))
+    print("convert.sh: murmel.kproject hält nicht die Programm-Blueprints, die der Konverter aus der Quelle schreibt - anders: "
+          + ", ".join(diff or ["ihre Reihenfolge"]) + " (kern/games/murmel/tests/convert.sh --write schreibt sie)")
+    sys.exit(1)
+PY
 
 # Die Vergleichstests bauen und fahren: die Engine (tests/engine.sh), das Projekt des Konverters eingebettet, seine
 # Blueprints als Klassen, der Läufer und der Allokator der Engine (kern/tools/test_main.cpp, test_memory.cpp).

@@ -521,7 +521,7 @@ jobs:
           kern/games/murmel/build.sh
           tools/build_studio.sh
           # the export of a project with its App: one page for itself (kern/docs/app.md 7.)
-          tools/export_game.sh kern/games/murmel/murmel.kproject generated/murmel.html -Ikern/games/murmel/src kern/games/murmel/src/murmel.cpp kern/games/murmel/src/main.cpp
+          tools/export_game.sh kern/games/murmel/murmel.kproject generated/murmel.html kern/games/murmel/src/main.cpp
       - name: Murmel e2e
         run: |
           set -euo pipefail
