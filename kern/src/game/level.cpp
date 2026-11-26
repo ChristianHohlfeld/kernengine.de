@@ -1303,13 +1303,6 @@ bool sound_reference_ok(const Level& level, std::string_view ref) {
   return level.sound(ref) != nullptr;
 }
 
-std::string world_export(const logic::Graph& g) {
-  for (const logic::Function& f : g.functions)
-    if (!f.exported.empty() && !f.external && f.from.empty())
-      return "the function " + f.name + " is an export (" + f.exported + ") - exports belong to the program: a Blueprint with an export stands in the project, not in a world (kern/docs/project.md 4.)";
-  return {};
-}
-
 std::vector<Issue> validate(const Level& level) {
   std::vector<Issue> out;
   if (const std::string e = world_export(level.logic); !e.empty()) out.push_back({true, 0, "the level's graph: " + e});

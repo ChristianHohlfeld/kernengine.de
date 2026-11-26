@@ -753,8 +753,9 @@ und zeichenweise lesen.
 
 Aufruf (in `kern/games/spawncity`):
 
-    ../../../tools/cpp_to_blueprint.py --convert sc --level level/spawncity.klevel --test tests/converted \
-        -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
+    ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract --level level/spawncity.klevel \
+        --project level/spawncity.kproject --folder Source --classes level_blueprints.h --whole-program \
+        --test tests/converted -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
 
 Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
 1. [x] **Objekte:** Die Daten einer Klasse sind eine Struktur, ihre Methoden Funktionen über diesen
@@ -928,12 +929,12 @@ direkt, typisiert, mit den Typen des Blueprints:
   das noch nicht umgeschaltet ist, bleiben nur einzelne Zahlen (siehe „Zahlen an der Grenze“:
   hinein `rules::decimal`, heraus `static_cast<f32>`; eine ganze Zahl ist ein `Int`, das jede
   ganze Zahl von C++ nimmt und gibt). Die Grenze verschwindet, wenn der Aufrufer umschaltet.
-- **Ein Header aus dem Level.** `tools/blueprint_cpp.sh level.klevel src/level_blueprints.cpp
-  src/level_blueprints.h Program` – derselbe Generator, der alle Blueprints als Klassen schreibt –
-  schreibt die Klassen der Blueprints des Ordners und der Bibliotheken, die sie benutzen, in den
+- **Ein Header aus dem Projekt.** `tools/blueprint_cpp.sh --project level/spawncity.kproject level.klevel
+  src/level_blueprints.cpp src/level_blueprints.h` – derselbe Generator, der alle Blueprints als Klassen schreibt –
+  schreibt die Klassen der Blueprints des Projekts (des Programms; nie nach einem Ordnernamen) und der Bibliotheken, die sie benutzen, in den
   Header: je einmal, unter ihren Namen im Namensraum `blueprints` (`blueprints::qr_code_cpp`), dazu
   `blueprints::bind`. `build.sh` und `tests/run_tests.sh` schreiben ihn; der Konverter mit
-  `--classes src/level_blueprints.h=Program` ebenso, bevor er die Quellen liest.
+  `--classes src/level_blueprints.h` ebenso, bevor er die Quellen liest.
 - **Ein Objekt je Klasse, einmal gebunden.** Das Objekt ist das, als das die Logik des Levels den
   Blueprint ausführt: `blueprints::bind(logic)` bindet beim Start jede Klasse an die Instanz, die
   als sie läuft (`kern::logic::bind_blueprint`, `kern/logic/blueprint_class.h`, einmal gesucht);

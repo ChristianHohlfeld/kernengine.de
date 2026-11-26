@@ -42,15 +42,17 @@ if [ "$skip_wasm" = 0 ]; then
   # The project (level/spawncity.kproject: the settings) and its level (world settings, actors, their Blueprints) as
   # a source the game links (kern/tools/embed_project.py). The built game carries what it runs: not the folder
   # "Source" - the Blueprints written from the game's C++, which stand beside it until their file switches
-  # (BLUEPRINTS.md; tools/ship_level.py) - but for the libraries the Blueprints that stay use (those of "Program"
+  # (BLUEPRINTS.md; tools/ship_level.py) - but for the libraries the Blueprints that stay use (the program's
   # call libraries of "Source"). The tests take the whole level.
+  # (the program's Blueprints stand in the project, a world's in the level - kern/docs/project.md: both lose "Source")
   shipped="${TMPDIR:-/tmp}/spawncity-level-$(printf '%s' "$here" | sha256sum | cut -c1-12).klevel"
-  python3 "$here/tools/ship_level.py" "$here/level/spawncity.klevel" "$shipped" --without Source
-  python3 "$root/kern/tools/embed_project.py" "$here/level/spawncity.kproject" "$here/src/level_data.cpp" --level spawncity.klevel "$shipped"
+  shipped_project="${shipped%.klevel}.kproject"
+  python3 "$here/tools/ship_level.py" "$here/level/spawncity.klevel" "$shipped" --without Source --project "$here/level/spawncity.kproject" "$shipped_project"
+  python3 "$root/kern/tools/embed_project.py" "$shipped_project" "$here/src/level_data.cpp" --level spawncity.klevel "$shipped"
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
-  # Those of the folder "Program" - files of the game that are Blueprints now - the game's C++ calls as their
+  # The project's - the program's: files of the game that are Blueprints now - the game's C++ calls as their
   # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").
-  "$root/tools/blueprint_cpp.sh" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h" Program
+  "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h"
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).

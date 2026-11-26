@@ -3,13 +3,15 @@
 // logic editor like a level's (logicOpen {program}); the commands here change the project as a whole:
 //
 //   projectNew {name}                 a new project with one empty level, levels/start.klevel (opened)
-//   projectOpen {text}                a .kproject (errors say where and why; nothing changes then)
+//   projectOpen {text, levels}        a .kproject with its levels {path: text} - every one it names; its start
+//                                     level opens (errors say where and why; nothing changes then)
 //   projectSave -> {text, file}       the project as text and its file name; projectSaved when it is written
 //   projectSet {name, levels, startLevel, settings}   any of them (read like the file: the same checks; null: not named)
 //   projectBlueprint {op: add|remove|rename, name, to, library}   a program Blueprint
 //
 // Every change is a step of the undo history (HistoryEntry::project).
 
+#include <algorithm>
 #include <cctype>
 
 #include "kern/game/demos.h"
@@ -65,25 +67,40 @@ const game::Level& Studio::logic_level() const {
   return program_view_;
 }
 
-bool Studio::load_project_text(std::string_view text, std::string* error) {
+bool Studio::load_project_text(std::string_view text, const std::vector<std::pair<std::string, std::string>>& levels, std::string* error) {
   game::Project p;
   std::string why;
-  if (!game::from_text(text, p, &why)) {
-    report("project: " + why, "error");
-    if (error) *error = why;
+  auto refuse = [&](const std::string& w) {
+    report("project: " + w, "error");
+    if (error) *error = w;
     return false;
+  };
+  if (!game::from_text(text, p, &why)) return refuse(why);
+  // (its levels, each given once - a level the project does not name is refused, one it names and that is not given too)
+  std::string missing;
+  for (const std::string& path : p.levels)
+    if (std::none_of(levels.begin(), levels.end(), [&](const auto& l) { return l.first == path; })) missing += (missing.empty() ? "" : ", ") + path;
+  if (!missing.empty()) return refuse("the project " + p.name + " opens with its levels - not given: " + missing);
+  game::Level start;
+  for (const auto& [path, level_text] : levels) {
+    if (std::find(p.levels.begin(), p.levels.end(), path) == p.levels.end()) return refuse("the level " + path + " is none of the project " + p.name + "'s levels");
+    if (std::any_of(p.level_texts.begin(), p.level_texts.end(), [&](const auto& l) { return l.first == path; })) return refuse("the level " + path + " is given twice");
+    game::Level l;
+    if (!game::from_text(level_text, l, &why)) return refuse(path + ": " + why);
+    if (const std::vector<std::string> conflicts = game::library_conflicts(l, p); !conflicts.empty()) return refuse(path + ": " + conflicts.front());
+    if (path == p.first_level()) start = std::move(l);
+    p.level_texts.push_back({path, level_text});
   }
-  if (const std::vector<std::string> conflicts = game::library_conflicts(level_, p); !conflicts.empty()) {
-    report("project: " + conflicts.front(), "error");
-    if (error) *error = conflicts.front();
-    return false;
+  if (p.levels.empty()) {   // (a project without levels: the open level stays - and its Blueprints' names count)
+    if (const std::vector<std::string> conflicts = game::library_conflicts(level_, p); !conflicts.empty()) return refuse(conflicts.front());
+    start = level_;
   }
   project_ = std::move(p);
   project_rev_ = project_saved_rev_ = next_project_rev_++;
   program_view_stale_ = true;
   if (logic_program_) logic_open_ = false;
   logic_program_ = false;
-  load_level(level_);  // a new history: its first step holds this project
+  load_level(std::move(start));  // its start level, a new history: its first step holds this project
   report("Opened project " + project_.name);
   return true;
 }
@@ -133,7 +150,15 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
   }
   if (name == "projectOpen") {
     std::string error;
-    if (!load_project_text(str("text"), &error)) return fail_result(error);
+    std::vector<std::pair<std::string, std::string>> levels;
+    if (const json::Value* l = c.find("levels")) {
+      if (!l->is_object()) return fail_result("projectOpen: levels is an object - a level's path, its text");
+      for (const auto& [path, text] : l->members()) {
+        if (!text.is_string()) return fail_result("projectOpen: levels." + path + " is the level's text");
+        levels.push_back({path, text.as_string()});
+      }
+    }
+    if (!load_project_text(str("text"), levels, &error)) return fail_result(error);
     return ok_result();
   }
   if (name == "projectSave") {

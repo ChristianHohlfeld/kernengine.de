@@ -53,6 +53,7 @@ f32 Murmel::punkte() const {
 bool Murmel::start(Engine& engine) {
   renderer_ = &engine.renderer();
   welt_ = std::make_unique<game::GameWorld>(engine.renderer());
+  welt_->set_project(&game::embedded_project());   // (die Levels des Spiels sind die seines Projekts)
   mixer_.init(48000);
   bank_ = std::make_unique<game::SoundBank>(mixer_);
   audio_ = std::make_unique<game::GameAudio>(mixer_, *bank_);
@@ -70,21 +71,11 @@ bool Murmel::lade(int nummer) {
     audio_->end();
     welt_->stop();
   }
-  const std::string_view text = game::embedded_level(level_pfad(nummer));
-  std::string fehler;
-  if (!game::from_text(text, geladen_, &fehler)) {
-    log(LogLevel::error, "murmel: das Level %s: %s", level_pfad(nummer), fehler.c_str());
-    return false;
-  }
   level_ = nummer;
   gewonnen_seit_ = -1;
-  welt_->sync(geladen_);
-  if (!welt_->start(geladen_, game::SimMode::play)) {
-    log(LogLevel::error, "murmel: das Level %s startet nicht", level_pfad(nummer));
-    return false;
-  }
-  bank_->request_level(geladen_);
-  audio_->begin(*welt_);
+  // (das Level beim Pfad im Projekt: die Welt hat ihr Projekt - GameWorld::start_level sagt Ort und Grund, wenn nicht)
+  if (!welt_->start_level(level_pfad(nummer), game::SimMode::play)) return false;
+  audio_->begin(*welt_);   // (die Töne der Welt: GameAudio lädt die Klänge ihres Levels)
   return true;
 }
 

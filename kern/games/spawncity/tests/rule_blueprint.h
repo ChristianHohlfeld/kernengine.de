@@ -103,11 +103,34 @@ inline const kern::json::Value* level_document(std::string* why = nullptr) {
   if (!read.ok && why) *why = read.why;
   return read.ok ? &read.doc : nullptr;
 }
-/// The Blueprint of the level's actor `actor`, read from the level file's text (false: no such actor, or it
-/// has none - `error` says why). The game itself reads the level as a whole (Game::build_level); only the
-/// tests ask for one actor's Blueprint.
+/// The project file's text as a document, read once by a test program (null: the text is none - `why` says so).
+/// The program's Blueprints stand in it (kern/docs/project.md), a world's in the level.
+inline const kern::json::Value* project_document(std::string* why = nullptr) {
+  static const struct Read {
+    kern::json::Value doc;
+    std::string why;
+    bool ok;
+    Read() : ok(kern::json::parse(kern::game::embedded_project_text(), doc, &why)) {}
+  } read;
+  if (!read.ok && why) *why = read.why;
+  return read.ok ? &read.doc : nullptr;
+}
+/// The Blueprint called `actor` - one of the project's (the program's) or that of the level's actor of that name -,
+/// read from the files' texts (false: neither has one of that name - `error` says why). A name stands once, in the
+/// project or in the level (kern/docs/project.md 5.). The game itself reads the level as a whole
+/// (Game::build_level); only the tests ask for one Blueprint.
 inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error) {
   std::string why;
+  const kern::json::Value* project = project_document(&why);
+  if (!project) {
+    error = "the project file: " + why;
+    return false;
+  }
+  for (const kern::json::Value& b : (*project)["blueprints"].items()) {
+    if (b["name"].as_string() != actor) continue;
+    if (!b["logic"].is_object()) break;
+    return kern::logic::graph_from_json(b["logic"], out, &error);
+  }
   const kern::json::Value* document = level_document(&why);
   if (!document) {
     error = "the level file: " + why;
@@ -120,7 +143,7 @@ inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::st
     if (!graph.is_object()) break;
     return kern::logic::graph_from_json(graph, out, &error);
   }
-  error = "the level has no actor \"" + std::string(actor) + "\" with a Blueprint";
+  error = "neither the project nor the level has a Blueprint \"" + std::string(actor) + "\"";
   return false;
 }
 }  // namespace sc::rules

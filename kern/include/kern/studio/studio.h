@@ -285,9 +285,12 @@ class Studio {
   /// The project the open level belongs to (kern/game/project.h): its settings, levels, start level and the
   /// program's Blueprints. A new Studio has a project "Untitled" without levels.
   const game::Project& project() const { return project_; }
-  /// Opens a project (.kproject text). False - `error` says where and why - and nothing changes for one that does
-  /// not read, or whose program Blueprints share a name with a Blueprint of the open level (game::library_conflicts).
-  bool load_project_text(std::string_view text, std::string* error = nullptr);
+  /// Opens a project (.kproject text) with its levels (`levels`: path as the project's "levels" name it, the level's
+  /// text): the project holds their texts (Project::level_texts - what Play's "Start Level" starts) and its start
+  /// level is the open level. False - `error` says where and why - and nothing changes for a project that does not
+  /// read, a level of it that is not given (all are named) or does not read, a level given that is none of its, or
+  /// a program Blueprint that shares a name with a Blueprint of one of its levels (game::library_conflicts).
+  bool load_project_text(std::string_view text, const std::vector<std::pair<std::string, std::string>>& levels, std::string* error = nullptr);
   std::string project_text() const { return game::to_text(project_); }
   /// The project has changes since it was opened, made or saved.
   bool project_dirty() const { return project_rev_ != project_saved_rev_; }

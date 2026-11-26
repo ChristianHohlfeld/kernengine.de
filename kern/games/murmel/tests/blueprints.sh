@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Die Blueprints der Levels von Murmel sind ihre Texte (kern/docs/blueprint_cpp.md): blueprints/<level>.<actor>.cpp
-# ist der Blueprint des Akteurs <actor> im Level levels/<level>.klevel ("Level": der Level-Graph). Ohne Argument
+# ist der Blueprint des Akteurs <actor> im Level levels/<level>.klevel ("Level": der Level-Graph, --level-graph). Ohne Argument
 # schreibt das Skript die Texte in die Levels (tools/blueprint_cpp.sh --apply); --check prüft, dass jedes Level genau
 # die Blueprints seiner Texte hält (in einer Kopie angewendet, das Level danach unverändert).
 set -euo pipefail
@@ -18,7 +18,8 @@ for level in "$game"/levels/*.klevel; do
   for t in "$game"/blueprints/"$name".*.cpp; do
     [ -e "$t" ] || continue
     actor="$(basename "$t" .cpp)"; actor="${actor#"$name".}"
-    args+=("$actor" "$t")
+    # (der Text <level>.Level.cpp ist der Level-Graph - ausdrücklich, kein Akteur dieses Namens: --level-graph)
+    if [ "$actor" = Level ]; then args+=(--level-graph "$t"); else args+=("$actor" "$t"); fi
   done
   [ ${#args[@]} -gt 0 ] || continue
   target="$level"

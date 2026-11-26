@@ -5,7 +5,7 @@
 //   { "format": "kern-project", "version": 1, "name": "My Game",
 //     "settings": { "renderer": { ... }, "profiles": [{ "name": ..., "renderer": { ... } }], "heapReserveMb": 0 },   (kern/app/project.h)
 //     "levels": ["levels/start.klevel"], "startLevel": "levels/start.klevel",
-//     "blueprints": [ { "name": "MyGame", "logic": { ... } }, { "name": "Math", "logic": { "library": true, ... } } ] }
+//     "blueprints": [ { "name": "MyGame", "logic": { ... } }, { "name": "Math", "folder": "Tools", "logic": { "library": true, ... } } ] }
 //
 // Where a Blueprint finds the libraries it uses (`uses`, by name): one of the program only in the project; one of a
 // world first in its level, then in the project. A name that stands in the level and in the project is an error
@@ -14,6 +14,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "kern/app/project.h"
@@ -28,6 +29,9 @@ struct Level;
 struct ProgramBlueprint {
   std::string name;
   logic::Graph logic;
+  /// Order in the editor, as an actor's folder in a level ("": none) - it means nothing to the engine; a tool that
+  /// writes Blueprints (tools/cpp_to_blueprint.py) knows its own by it.
+  std::string folder;
 };
 
 struct Project {
@@ -36,11 +40,18 @@ struct Project {
   std::vector<std::string> levels;          // the project's levels, paths relative to the project file
   std::string start_level;                  // one of `levels` ("": none named - the first, if any)
   std::vector<ProgramBlueprint> blueprints;  // the program's Blueprints and libraries, in their order
+  /// The texts of its levels, by their paths (as `levels` names them): not part of the project file - who loads the
+  /// project gives them (the build's embedded_project(), the editor from the files beside it). A world of the project
+  /// starts one by its path (GameWorld::start_level).
+  std::vector<std::pair<std::string, std::string>> level_texts;
 
   ProgramBlueprint* blueprint(std::string_view name);
   const ProgramBlueprint* blueprint(std::string_view name) const;
   /// The level the editor opens at Play and a program that chooses none starts: start_level, else the first.
   std::string first_level() const;
+  /// The text of the level at `path` (level_texts); null when the project has no level of that path or its text was
+  /// not given - `error` says which ("the project X has no level y.klevel - its levels: a.klevel, b.klevel").
+  const std::string* level_text(std::string_view path, std::string* error = nullptr) const;
 };
 
 json::Value to_json(const Project& project);

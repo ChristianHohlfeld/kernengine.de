@@ -4778,6 +4778,36 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.present", {to_value(game_world), to_value(now_ms), to_value(eye)}, {});
   }
+  /// Starts the level of its project at `path` (as the project's "levels" name it: Project::level_text) - how a program starts a world and changes to the next one (stop, then start_level of the next; what the program keeps - points, a state - is its own and stays). False, with the reason: the world has no project (set_project), the project has no level of that path (its levels named) or not its text, the text is no level (where and why).
+  template <class T1> void engine_game_world_start_level(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& path, const T1& mode) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.start_level"); return; }
+      const std::string_view kern_a0 = path.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
+      decltype(auto) kern_r = kern_self->start_level(kern_a0, std::move(kern_a1));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.game_world.start_level", {to_value(game_world), to_value(path), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
+  }
+  template <class KernNode, class T1> void engine_game_world_start_level(KernNode& kern_n, ::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& path, const T1& mode) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.start_level"); return; }
+      const std::string_view kern_a0 = path.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
+      decltype(auto) kern_r = kern_self->start_level(kern_a0, std::move(kern_a1));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start_level", {to_value(game_world), to_value(path), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
   /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs or be taken back (set_fixed_step(nullptr)) before it ends.
   void engine_game_world_set_fixed_step(::kern::logic::Object<::kern::game::GameWorld> game_world, ::kern::logic::Object<::kern::game::FixedStep> step) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

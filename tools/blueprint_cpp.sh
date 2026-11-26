@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # The Blueprints of a Kern level as C++ classes a game links (tools/blueprint_cpp.cpp).
 #
-#   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]
+#   tools/blueprint_cpp.sh [--project <name.kproject>] <level.klevel> <out.cpp> [<out.h> [<name> ...]]
 #
-# With <out.h> and <folder>: the classes of the Blueprints of that folder of the level - those the
-# program's own C++ calls directly - and of the libraries they use go into <out.h> (see blueprint_cpp.cpp); the
-# actors named after the folder too, wherever they stand.
+# With <out.h>: the classes of the project's Blueprints - the program's, those the program's own C++ calls
+# directly - and of the libraries they use go into <out.h> (see blueprint_cpp.cpp); the Blueprints named after
+# it too, wherever they stand.
 #
 # Builds the tool with the host compiler - once per state of its sources (Kern Logic, the node
 # library and the tool itself; cached in $TMPDIR/kern-blueprint-cpp) - and runs it. HOST_CXX / HOST_CC override
@@ -15,7 +15,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cxx="${HOST_CXX:-c++}" cc="${HOST_CC:-cc}"
 # (the gameplay nodes as the library knows them - names, pins, settings - need nothing of the game)
-sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp")
+sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp" "$root/kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/kern/src/logic" "$root/kern/src/core" -name '*.cpp' | sort)
 key="$({ cat "${sources[@]}"; find "$root/kern/include" -name '*.h' | sort | xargs cat; cat "$root"/kern/third_party/musl_math/src/*.c; echo "$cxx $cc"; } | sha256sum | cut -c1-16)"
 dir="${TMPDIR:-/tmp}/kern-blueprint-cpp/$key"

@@ -11,7 +11,8 @@
 
 #include "game.h"
 #include "kern/api/c_api.h"
-#include "kern/game/embedded.h"  // (the project the game carries: its settings for kern::run)
+#include "kern/game/embedded.h"  // (the project the game carries: kern::run)
+#include "kern/game/program.h"  // (kern::run(App&, const Project&): the program beside the App)
 #include "kern/logic/blueprint_class.h"  // (what an export gives: kern::logic::export_text, export_bytes, export_floats)
 #include "kern/kern.h"
 
@@ -49,8 +50,9 @@ SpawnCityApp& app() {
 
 }  // namespace sc
 
-// The program's entry (kern/docs/project.md 4.): the App, with the settings of the project the game carries.
-int kern_main() { return kern::run(sc::app(), kern::game::embedded_project().settings); }
+// The program's entry (kern/docs/project.md 4.): the App, with the project the game carries - its settings, and its
+// program's Blueprints running beside the App (bound as their classes: what the game's C++ calls).
+int kern_main() { return kern::run(sc::app(), kern::game::embedded_project()); }
 
 namespace sc {
 
