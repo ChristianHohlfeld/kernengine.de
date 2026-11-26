@@ -77,7 +77,8 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   // the project's input actions in its settings (kern/docs/app.md 4.): shown, and a wrong name is refused with its place
   const input = (await state()).project?.settings?.input;
   check(input?.actions?.some(x => x.name === "jump") && input?.axes?.some(x => x.name === "moveX"), "the editor shows the project's actions and axes (" + JSON.stringify(input ?? null).slice(0, 120) + ")");
-  check(await page.evaluate(() => !!document.querySelector('#projectBody [data-kind="actions"][data-name="jump"] input.binding')), "the project panel has a row for the action jump");
+  // (the panel is drawn with the next state the page reads: waited for, as the project's name above)
+  check(await until(() => page.evaluate(() => !!document.querySelector('#projectBody [data-kind="actions"][data-name="jump"] input.binding'))), "the project panel has a row for the action jump");
   const wrong = await cmd({cmd: "projectSet", settings: {...(await state()).project.settings, input: {actions: [{name: "jump", keys: ["spcae"]}]}}});
   check(wrong?.ok === false && /input\.actions\[0\]\.keys\[0\]: unknown name "spcae"/.test(wrong.error ?? ""), "a key the engine has not is refused with its place (" + (wrong?.error ?? "-") + ")");
   const start = project.startLevel;

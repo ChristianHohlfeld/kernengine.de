@@ -1327,7 +1327,7 @@ def read_engine(flags=()):
 
 # The headers whose types and functions are the engine's libraries (kern/logic/engine_libraries.h): each one library,
 # named by its path (kern/physics/physics.h: engine_physics_physics).
-LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
+LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "core/base.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
                    "gfx/mesh.h", "gfx/passes.h", "gfx/renderer.h", "gfx/shader.h", "logic/logic.h", "math/math.h", "net/client_server.h",
                    "net/connection.h", "net/reliable.h", "net/transport.h", "physics/physics.h"]
 
