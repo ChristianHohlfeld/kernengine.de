@@ -4824,8 +4824,9 @@ class Emit:
             if i is None:
                 return "it changes what is not a variable of its own (through a pointer, a reference, the place a call gives)"
             if i not in own:
-                v = next((x for x in walk(body) if x.get("kind") == "VarDecl" and x.get("id") == i), None) or self.tree.decl.get(i) or {}
-                what = "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
+                v = next((x for x in [*kids(d), *walk(body)] if x.get("kind") in ("VarDecl", "ParmVarDecl") and x.get("id") == i), None) or self.tree.decl.get(i) or {}
+                what = "an input it is handed by reference or pointer" if v.get("kind") == "ParmVarDecl" else \
+                       "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
                        "a variable of the file" if v.get("kind") == "VarDecl" and self.tree.scope_of.get(i) is not None and not any(i == x["id"] for x in walk(body) if x.get("kind") == "VarDecl") else \
                        "a pointer it holds" if "*" in qtype(v) else "what is not its own"
                 return f"it changes {v.get('name') or '?'} ({what})"
@@ -11579,6 +11580,8 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
+        if name == "get" and not a and bt == "Int" and re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(qtype(base)).strip()) and self.u.object_of(qtype(base)):
+            return self.ex(base, "Int"), "Int"   # (an object of the engine held as its own - unique_ptr<T>::get(): its handle)
         if name == "operator bool" and not a and self.ctype(base) == "std::_Bit_reference":
             return self.value(base)   # (an entry of a std::vector<bool>, read)
         if name == "operator bool" and not a and self.u.object_of(qtype(base)):
@@ -12563,6 +12566,12 @@ class TestWriter:
                 if r is not None and function_key(self.tree, r) in self.u.world.getters:
                     obj = re.sub(r"\b(const|volatile)\b|&", "", qtype(r).split("(")[0]).strip()
                     a, b = span(n)
+                    mine = self.u.functions.get(d["id"])
+                    if self.u.state is None or self.u.state.split("::")[-1] != obj.split("::")[-1] or (mine is not None and not mine.state):
+                        # (only a call compared on the state's object has one: a function that is no part of that Blueprint has none)
+                        line = raw.count("\n", 0, a) + 1
+                        raise Wait(f"{os.path.basename(file)}:{line}: it calls {r.get('name')}() - the one object of the state {obj.split('::')[-1]} - "
+                                   f"in {d.get('name')}(), which is no function of that Blueprint")
                     edits.append((a, 1, 0, b, f"(*static_cast<{obj}*>(kern_state_now))"))
                     return
             if k == "CallExpr" and len(ks) > 1:
@@ -14683,6 +14692,11 @@ class TestWriter:
         return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else []) + [d["name"]])
 
     def enum_text(self, q, local=None):
+        if q.startswith(ENGINE + "::logic::"):
+            # (an enum of the engine's logic - logic::NodeKind of a NodeDef the source fills -: the real one, which the
+            # logic of the test is; a copy of it would be another type than the field of the real struct. Written with
+            # spaces, `:: kern :: logic :: NodeKind`: the renamer, which makes a held name the test's, leaves it as it is)
+            return self.in_classes(q.rsplit("::", 1)[0] + "::", f"using {q.split('::')[-1]} = :: {' :: '.join(q.split('::'))};", local)
         return self.in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(self.tree.enums[q]) + ";", local)
 
     def statement_start(self, d):
@@ -15788,8 +15802,8 @@ class TestWriter:
                 if m:
                     last = int(m.group(1))
                 e = re.search(r"\berror: (.*)", line)
-                if not e:
-                    continue
+                if not e or "too many errors emitted" in line:
+                    continue   # (the compiler stopping after so many is no complaint of a piece: those before it are)
                 at = int(m.group(1)) if m else last
                 if at is None:
                     for later in out[i + 1:i + 12]:

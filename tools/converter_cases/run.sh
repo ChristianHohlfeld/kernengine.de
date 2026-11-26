@@ -15,6 +15,15 @@
 #             Blueprint and what it uses stand in the project, the door in the level - each with its reason in the log
 #             (kern/docs/project.md: a level refuses an export); the project and the level both read, and their classes
 #             are written from both (tools/blueprint_cpp.sh --project).
+#   getter.cpp a function of another state (Other::look) reads the holder's state through its getter: no call of it is
+#             compared on Holder's object - it waits, with the place and the reason, and its test does not call it on a
+#             missing object (the test writer refuses the same where it writes a test: guard).
+#   nodekind.cpp an enum of the engine's logic (kern::logic::NodeKind) in the program's source: in its test the real
+#             enum (an alias), not a copy - else the field of a real NodeDef is another type (register_node of game.cpp).
+#   compiles.py the test writer's compile check: "too many errors emitted" is no complaint of a piece ("too many errors"
+#             in the test of game.cpp: the piece before it went for it).
+#   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
+#             (Murmel's welt_.get(), B8) - written and compared.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as the game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -72,6 +81,18 @@ logged pad "the log says doubled is a value" '^ +doubled \([0-9]+\): written$'
 tested pad "take_pad's test calls it on the object compared on" 'kern_state_now = s.get\(\), .*take_pad\('
 tested pad "holder() in the test is that object" 'static_cast<Holder\*>\(kern_state_now\)\)\.pad'
 
+convert getter
+logged getter "Other::look waits with its reason, in the converter" '^ +Other::look \([0-9]+\): the state of the Blueprint Holder'
+if grep -qs "look(" "$top/getter"/pt/converted/*.cpp; then echo "FAIL getter: no test calls Other::look"; fail=1; else echo "ok   getter: no test calls Other::look"; fi
+
+convert nodekind
+logged nodekind "is_event is written" '^ +is_event \([0-9]+\): written$'
+tested nodekind "its test has the engine's NodeKind itself" 'using NodeKind = :: kern :: logic :: NodeKind;'
+
+convert ownget
+logged ownget "Holder::world (unique_ptr::get()) is written" '^ +Holder::world \([0-9]+\): written$'
+logged ownget "both are compared" '^2 functions of the Blueprints are compared'
+
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
@@ -99,7 +120,9 @@ if out=$("$root/tools/blueprint_cpp.sh" --apply "$top/program/refuses.klevel" --
 elif echo "$out" | grep -q 'is an export (sc_case_score) - exports belong to the program'; then echo "ok   program: a level refuses an export (with the reason)"
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
 
+python3 "$here/compiles.py" || fail=1
+
 if [ $fail != 0 ]; then
-  for c in pad bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
