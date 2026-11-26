@@ -1508,11 +1508,34 @@ def copies_whole(n):
     return own(m.group(1)) == own(qtype(n))
 
 
+def implicit_maker(d):
+    """C++'s own constructor without arguments of a class that declares none, where the program makes an object of it
+    (`static MyApp a;`): the same as one declared `S(); ... S::S() = default;` - nothing of it is written in C++."""
+    return (d.get("kind") == "CXXConstructorDecl" and bool(d.get("isImplicit")) and bool(d.get("isUsed")) and d.get("explicitlyDefaulted") == "default"
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
+
+
+def states_made_by_cpp(tree, world, namespace):
+    """The states (World.states) of a tree whose class declares no constructor and whose constructor C++ has not written
+    in it (the tree of headers alone: no object of the class is made there) - their names in C++ (::<namespace>::State)."""
+    out = []
+    for q in sorted(world.states):
+        rec = tree.records.get(q)
+        if rec is None or rec.get("_local"):
+            continue
+        makers = [k for k in kids(rec) if k.get("kind") == "CXXConstructorDecl"]
+        if any(not k.get("isImplicit") for k in makers) or any(implicit_maker(k) for k in makers):
+            continue
+        out.append(f"::{namespace}::{q}" if namespace and not q.startswith(ENGINE + "::") else f"::{q}")
+    return out
+
+
 def defaulted_maker(d):
     """A constructor without arguments a class declares and defines `= default` outside itself, where its parts
-    are known (`Game::Game() = default;` in its source file): C++'s own constructor, written down there."""
+    are known (`Game::Game() = default;` in its source file): C++'s own constructor, written down there - or C++'s
+    own of a class that declares none (implicit_maker): one way, whether the program writes it down or not."""
     return (d.get("kind") == "CXXConstructorDecl" and d.get("explicitlyDefaulted") == "default" and bool(d.get("previousDecl"))
-            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d))) or implicit_maker(d)
 
 
 def ends_itself(d):
@@ -2910,7 +2933,7 @@ class Unit:
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
             computed = init is not None and self.computed_init(c)   # (set where the object is made: its constructor)
             if computed and self.state in self.tree.records and self.state not in self.world.defaulted and not any(
-                    k.get("kind") == "CXXConstructorDecl" and not k.get("isImplicit") for k in kids(self.tree.records[self.state])):
+                    k.get("kind") == "CXXConstructorDecl" and (not k.get("isImplicit") or implicit_maker(k)) for k in kids(self.tree.records[self.state])):
                 # (C++'s own constructor, which the class does not write down, is no function of the program: the step
                 # has no place - the class declares one, `S() = default;` defined outside it, and it is written there)
                 raise Wait(f"it starts with what is computed when the object is made, and the state {self.name} has no constructor of its own (declare one: `{self.state.split('::')[-1]}();` ... `= default`)")
@@ -4133,11 +4156,13 @@ class Emit:
                     continue
                 if "anyInit" not in init:
                     # (a base that is an interface of the engine - kern::App -, made without arguments: it has nothing
-                    # to make - its object is the Blueprint's own, Graph::implements)
+                    # to make - its object is the Blueprint's own, Graph::implements; what the interface holds -
+                    # ShaderExtension::material_base - is the engine's, which the class does not name: engine_interface_of)
                     base = (init.get("baseInit") or {}).get("qualType", "")
                     made = kids(init)[0] if kids(init) else {}
-                    if base.startswith(ENGINE + "::") and base in self.tree.records and made.get("kind") == "CXXConstructExpr" and not kids(made) and not any(
-                            c.get("kind") == "FieldDecl" for c in kids(self.tree.records.get(base, {}))):
+                    implemented = (u.world.state_implements.get(u.state) or [None] * 4)[3] if u.state else None
+                    if base.startswith(ENGINE + "::") and base in self.tree.records and made.get("kind") == "CXXConstructExpr" and not kids(made) and (
+                            base == implemented or not any(c.get("kind") == "FieldDecl" for c in kids(self.tree.records.get(base, {})))):
                         continue
                     raise Wait("a constructor that calls another constructor or a base class")
                 e = kids(init)[0] if kids(init) else None
@@ -12592,6 +12617,8 @@ class TestWriter:
     def piece(self, d):
         a, b = d["_at"]
         text = self.tree.said(self.cut(d["_file"], a, b))
+        if implicit_maker(d):   # (C++'s own, declared nowhere: nothing of it stands in the test's source - C++ makes it there too)
+            return ""
         if defaulted_maker(d):   # (the compiler's tree ends `Game::Game() = default;` before `= default`)
             text = re.sub(r"\s*(=\s*default\s*)?;?\s*$", "", text) + " = default;"
         return text
@@ -16103,7 +16130,7 @@ def survey_one(job):
             ending.add(tree.owner[d["id"]])
     for i, d in tree.body.items():
         # (a constructor defined `= default` outside its class is C++'s own: a function only of the state - see main)
-        if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
+        if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or (d.get("isImplicit") and not implicit_maker(d)) or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
                 or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))):
             continue
         file = os.path.abspath(d["_file"])
@@ -16460,12 +16487,18 @@ def convert_unit(job):
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
         tree = Tree(path, namespace, flags, world.spaces)
+        if source is None and (made := states_made_by_cpp(tree, world, namespace)):
+            # (C++ writes the constructor of a state that declares none where its object is made - in a source file;
+            # read from its headers alone the tree has none: the file that reads them makes one, and C++ writes it -
+            # with what the fields start as, `ext_[1] = {&look()}`. That function is none of the program's.)
+            open(path, "a").write("namespace kern_cpp_to_blueprint_made {\n" + "".join(f"inline void made_{k}() {{ (void)new {q}; }}\n" for k, q in enumerate(made)) + "}\n")
+            tree = Tree(path, namespace, flags, world.spaces)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                and not ((d.get("isImplicit") and not (implicit_maker(d) and tree.owner.get(d["id"]) in world.states)) or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
@@ -16485,6 +16518,9 @@ def convert_unit(job):
             for d in mine:
                 if world.wanted is not None and function_key(tree, d) not in world.wanted:
                     continue   # (of a Blueprint that is not the program's own: what the program calls)
+                if implicit_maker(d) and not any(unit.computed_init(c) for c in kids(tree.records.get(tree.owner.get(d["id"], ""), {}))):
+                    continue   # (C++'s own constructor of a state that has nothing to make - no field starts with what is computed: its
+                               # fields start as the struct says, and there is no step to write)
                 try:
                     unit.function(d["id"])
                 except Wait:

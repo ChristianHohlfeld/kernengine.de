@@ -54,6 +54,10 @@
 #             from file to file): root waits for a reason of its own, and every one that calls it waits, saying the one it calls
 #             - all in the same round, whatever the length of the chain (before: one link a round, and step2/step4 waited on
 #             their tests, which did not hold what they lean on). Its log says, round by round, why the round is needed.
+#   look.cpp + lookapp.cpp  an App whose field starts with what is computed (`ext_[1] = {&look()}`: the engine object of
+#             another state, Look) and that declares no constructor: C++'s own constructor, which makes that field, is
+#             its function (LookApp::LookApp - before: every function reading ext_ waited, "declare one: `LookApp();` ... =
+#             default"); Look, whose fields start with nothing computed, has no such function (nothing to make).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -198,6 +202,12 @@ logged chain "each round says why it is needed" '^round 2: 2 Blueprints - what C
 if grep -q '^round 4' "$top/chain/convert.log"; then echo "FAIL chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fail=1
 else echo "ok   chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fi
 
+convert look lookapp
+logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
+if grep -q 'has no constructor of its own' "$top/look/convert.log"; then echo "FAIL look: nothing waits for a constructor written down"; fail=1; else echo "ok   look: nothing waits for a constructor written down"; fi
+if grep -q '^ *Look::Look ' "$top/look/convert.log"; then echo "FAIL look: Look (nothing to make) has no constructor as a function"; fail=1; else echo "ok   look: Look (nothing to make) has no constructor as a function"; fi
+logged look "Look::name is written" '^ +Look::name \([0-9]+\): written$'
+
 # (the same case from a folder of another length: the same Blueprints, byte for byte - a declaration's identity is its own
 # in the one tree of the compiler, never an address: kern/docs/blueprint_cpp.md)
 INTO=a_folder_whose_name_is_much_longer_than_the_other_ones/ convert objects
@@ -230,6 +240,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
