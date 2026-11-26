@@ -77,6 +77,9 @@
 #   pieces.cpp exports that give a text and bytes by a pointer and their length (`export_text<&f>(x, out_len)`,
 #             export_bytes): the test calls the source with a place for the length and compares the piece the two say -
 #             written and compared (before: "the test has no values of unsigned int *").
+#   running.cpp the logic the Blueprints run in as the engine names it in its own namespace (GameWorld::logic_runtime gives a
+#             `logic::Runtime*`, kern::game::blueprints_running takes one): the test's stand-ins name it by its full name - written
+#             and compared (before: "no type named 'Runtime' in namespace converted_...::logic", the stand-in of GameWorld went).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -200,6 +203,7 @@ logged actors "the five of Crowd are written and compared" '^5 functions of the 
 
 convert bytes
 check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
+classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
@@ -246,6 +250,10 @@ logged pieces "case_label (export_text with out_len) is written" '^ +case_label 
 logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes \([0-9]+\): written$'
 logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
 tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
+
+convert running
+logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
+logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
 
 convert blasts
 logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
@@ -331,6 +339,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

@@ -13412,6 +13412,15 @@ class TestWriter:
                     return why
         return None
 
+    def own_runtime(self, raw):
+        """A type that is the logic the Blueprints run in (OWN_LOGIC: the test's own, the engine's real one) as the test
+        spells it: by its full name, however the source names it - `logic::Runtime*` inside kern::game, `kern::logic::Runtime&`
+        (the test's source stands in a namespace of its own: a name of a namespace there is another one)."""
+        m = re.fullmatch(r"(const\s+)?(?:::)?(?:\w+::)*Runtime\b\s*(.*)", raw.strip())
+        if m is None:
+            raise Wait(f"the logic the Blueprints run in as {raw.strip()}")
+        return f"{m.group(1) or ''}::{self.OWN_LOGIC[0]}{(' ' + m.group(2)) if m.group(2) else ''}"
+
     def object_name(self, q):
         """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
         if q not in self.objects:
@@ -13992,7 +14001,7 @@ class TestWriter:
             elif self.u.object_of(raw) == self.OWN_LOGIC[0]:
                 # (the logic the Blueprints run in, as a stand-in of the engine gave it - GameWorld::logic_runtime: in
                 # the Blueprint a handle, here the handle as the pointer it stands for, never followed; see the result below)
-                params.append((f"{re.sub(r'^(const\s+)?(?:::)?' + ENGINE + r'::logic::Runtime', lambda m_: (m_.group(1) or '') + '::' + ENGINE + '::logic::Runtime', raw.strip())} {name}", default))
+                params.append((f"{self.own_runtime(raw)} {name}", default))
                 at = name if re.search(r"\*\s*(const)?$", raw) else f"&{name}"
                 values.append(f"converted::logic_value({at})")
             elif self.u.object_of(raw):
@@ -14056,8 +14065,7 @@ class TestWriter:
         elif ret != "void" and self.u.object_of(ret_raw) == self.OWN_LOGIC[0]:
             # (the logic the Blueprints run in: the handle the stand-in gives, as a pointer the source only hands back to the
             # engine - 0: none, as the Blueprint has it)
-            ret = re.sub(r"^(?:::)?" + ENGINE + r"::logic::Runtime", "::" + ENGINE + "::logic::Runtime", re.sub(r"^const\s+", "const ", ret_raw.strip()))
-            ret = re.sub(r"^(const\s+)(?:::)?" + ENGINE + r"::logic::Runtime", r"\1::" + ENGINE + "::logic::Runtime", ret)
+            ret = self.own_runtime(ret_raw)
             body.append(f"{ret} kern_result = converted::logic_pointer<{ret}>(kern_out[0]);")
             k = 1
         elif ret != "void":
