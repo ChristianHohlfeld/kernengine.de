@@ -61,6 +61,11 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
+#   numbers.cpp  a program in the language's numbers (kern::Float, kern/docs/blueprint_cpp.md "Zahlen"), with --language-numbers:
+#             the engine's f32 (Frame::dt, a component of a kern::Vec3) read as it is, a Float rounded into a component -
+#             written and compared. numbers_f32.cpp: the same in f32, double, f64, an alias of float, 1.0f, a cast to
+#             float, a product of two components - each refused with its file and line, all at once (without the option:
+#             converted, the old silent way).
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -76,9 +81,10 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
   echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
-  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases ${CASE_OPTS:-} -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
-    || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
+    || { [ -n "${REFUSED:-}" ] && { echo "ok   $1: the converter refuses it"; return; }; grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
+  [ -n "${REFUSED:-}" ] && { echo "FAIL $1: the converter refuses it"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(cat "$out/cases.klevel" "$out/cases.kproject" | grep -c '"logic"')" = 0 ]; then
     echo "FAIL $1: the level and the project read their Blueprints"; grep -B2 -A2 "not read\|is read as a value" "$out/convert.log" | head; fail=1
   else echo "ok   $1: the level and the project read their Blueprints"; fi
@@ -173,6 +179,18 @@ logged nested "both are compared" '^2 functions of the Blueprints are compared'
 convert meshextra
 check meshextra "push_extra's values is an input by value (a view to read)" yes 'void MeshData_push_extra\(MeshData& self, List<Float> values = List<Float>\{\}, Int values_at = 0\)'
 logged meshextra "extra_of_the_shore (hands an array) is written" '^ +extra_of_the_shore \([0-9]+\): written'
+
+CASE_OPTS=--language-numbers convert numbers
+check numbers "a Float of the program is a Float" yes 'Float seconds = 0\.0'
+logged numbers "Clock's three are written" '^3 of 3 functions of the program are written'
+logged numbers "... and compared (the engine's f32 read exactly, a Float rounded into a component)" '^3 functions of the Blueprints are compared'
+CASE_OPTS=--language-numbers REFUSED=1 convert numbers_f32
+for why in 'numbers_f32\.h:[0-9]+: Real is a float - no number' 'numbers_f32\.h:[0-9]+: seconds is a f32 - no number of the language: write kern::Float' \
+           'numbers_f32\.h:[0-9]+: total is a double - no number' 'numbers_f32\.h:[0-9]+: scale is a Real' \
+           'numbers_f32\.cpp:[0-9]+: 1\.0f is a 32-bit number - write 1\.0' 'numbers_f32\.cpp:[0-9]+: area gives a f32' \
+           'numbers_f32\.cpp:[0-9]+: computes in 32 bit \(\* of float\)' 'numbers_f32\.cpp:[0-9]+: x is a f64' 'numbers_f32\.cpp:[0-9]+: a cast to float'; do
+  logged numbers_f32 "refused with its place: ${why//\\/}" "$why"
+done
 
 convert views
 check views "Span<const f32> is an input by value" yes 'sum_ofResult sum_of\(List<Float> values = List<Float>\{\}\)'

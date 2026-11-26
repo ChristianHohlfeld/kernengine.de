@@ -49,7 +49,7 @@ bool Murmel::start(Engine& engine) {
   bank_ = std::make_unique<game::SoundBank>(engine.mixer());
   audio_ = std::make_unique<game::GameAudio>(engine.mixer(), *bank_);
   kamera_ = engine.renderer().camera();
-  kamera_.fov = 60 * kPi / 180;
+  kamera_.fov = 60 * Float(kPi) / 180;   // (kPi ist eine Zahl der Engine: als Float gelesen, gerundet erst in fov)
   level_ = 0;
   vorher_ = 0;
   fertig_ = false;

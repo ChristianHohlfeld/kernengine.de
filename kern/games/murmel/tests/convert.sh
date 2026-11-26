@@ -40,7 +40,7 @@ p["levels"].append("levels/programm.klevel")
 json.dump(p, open(sys.argv[2], "w"), indent=2)
 PY
 status=0
-(cd "$work" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert murmel -I"$kern/include" -I"$kern/third_party/box3d/include" -Isrc \
+(cd "$work" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert murmel --language-numbers -I"$kern/include" -I"$kern/third_party/box3d/include" -Isrc \
    --level "$work/levels/programm.klevel" --project "$work/murmel.kproject" --folder Programm --test "$work/pt/converted" --texts "$work/texts" \
    -- src/murmel.cpp src/main.cpp) > "$work/convert.log" 2>&1 || status=$?
 grep -v '^round' "$work/convert.log" | tail -60

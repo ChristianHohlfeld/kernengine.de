@@ -8,7 +8,7 @@ in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--project <name.kproject>] --folder <name>
       [--whole-program] [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
-      [--classes <header.h>] <include flags...> -- <file.cpp>...
+      [--classes <header.h>] [--language-numbers] <include flags...> -- <file.cpp>...
 
   - the program is the folders of the sources, in the namespace given - and the further folders named
     with --program, each with the namespaces its files declare (vendored code the program includes:
@@ -16469,6 +16469,82 @@ def state_classes(world, surveys):
     return out
 
 
+# --language-numbers (kern/docs/blueprint_cpp.md, "Zahlen"): a source of the subset holds and computes its numbers with
+# a fraction as kern::Float, the language's (64 bit). For now (from 26.11.2026) the rule holds only with this option:
+# until the sources of every game are written so (tools/language_numbers.py rewrites them); the step that rewrites the
+# last of them drops the option, and then the rule holds for every run.
+LANGUAGE_NUMBERS = [False]
+NOT_A_NUMBER_OF_THE_LANGUAGE = re.compile(r"(?<![\w:])(?:kern::|std::)?(long double|float|double|f32|f64)\b")
+
+
+class LanguageNumbers(Exception):
+    """What language_number_errors found in one Blueprint's tree (main says all of a round at once)."""
+
+
+def language_number_errors(tree, world):
+    """Where a file of the program (World.program) holds or computes a number with a fraction otherwise than as kern::Float:
+    a field, variable, input, result or alias of float/double/f32/f64, a cast to one, a literal with f (0.5f), a
+    computation whose result is a float (`v.x * v.y` of two components of a kern::Vec3). Each as "file:line: why - what
+    to write". What the engine holds in 32 bit is read as it is (exactly), and a Float that goes into it is rounded - at
+    the engine's types, the one place where the numbers meet; the signature of a method that overrides one of the
+    engine's is the engine's."""
+    out = set()
+
+    def at(n, why):
+        f, a = n.get("_file", ""), (n.get("_at") or (None,))[0]
+        if not f or not world.program(f) or a is None:
+            return
+        line = tree.text(f).count("\n", 0, a) + 1
+        out.add((os.path.abspath(f), line, f"{os.path.basename(f)}:{line}: {why}"))
+
+    def bad(ty):
+        q, d = (ty or {}).get("qualType", ""), (ty or {}).get("desugaredQualType", "")
+        m = NOT_A_NUMBER_OF_THE_LANGUAGE.search(q)
+        if m:
+            return m.group(0)
+        if re.search(r"\bfloat\b", d) or (re.search(r"\bdouble\b", d) and not re.search(r"\bFloat\b", q)):
+            return q
+        return None
+
+    def single(ty):   # (a computation's result: a float - a double is the language's Float)
+        return ((ty or {}).get("desugaredQualType") or (ty or {}).get("qualType", "")).replace("const ", "") == "float"
+
+    def literal(n):
+        f, (a, b) = n.get("_file", ""), n.get("_at") or (None, None)
+        return tree.text(f)[a:b] if f and a is not None and b is not None else n.get("value", "")
+
+    write = "write kern::Float (64 bit, kern/core/numbers.h)"
+    skip = set()
+    for dumps in [tree.dumps] + [d for _, d in tree.more]:
+        for o in dumps:
+            for n in walk(o):
+                k = n.get("kind", "")
+                if n.get("isImplicit") or id(n) in skip:
+                    continue
+                if k in ("CXXMethodDecl", "CXXConversionDecl") and any(c.get("kind") in ("OverrideAttr", "FinalAttr") for c in n.get("inner") or []):
+                    skip.update(id(c) for c in kids(n) if c.get("kind") == "ParmVarDecl")   # (the engine's signature)
+                    continue
+                if k in ("VarDecl", "FieldDecl", "ParmVarDecl", "TypeAliasDecl", "TypedefDecl"):
+                    if (w := bad(n.get("type"))):
+                        at(n, f"{n.get('name') or 'an input'} is a {w} - no number of the language: {write}")
+                elif k in ("FunctionDecl", "CXXMethodDecl"):
+                    ret = {"qualType": re.split(r"\s*\(", (n.get("type") or {}).get("qualType", ""), maxsplit=1)[0]}
+                    if (w := bad(ret)):
+                        at(n, f"{n.get('name')} gives a {w} - no number of the language: {write}")
+                elif k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr"):
+                    if (w := bad(n.get("type"))):
+                        at(n, f"a cast to {w} - no number of the language: {write}")
+                elif k == "FloatingLiteral" and (n.get("type") or {}).get("qualType") == "float":
+                    x = literal(n)
+                    at(n, f"{x} is a 32-bit number - write {re.sub(r'[fF]$', '', x)} (a Float has 64 bit)")
+                elif (k == "BinaryOperator" and n.get("opcode") in ("+", "-", "*", "/") and single(n.get("type"))) or \
+                     (k == "CompoundAssignOperator" and single(n.get("computeResultType"))) or \
+                     (k == "UnaryOperator" and n.get("opcode") in ("++", "--") and single(n.get("type"))):
+                    at(n, f"computes in 32 bit ({k == 'UnaryOperator' and n.get('opcode') or n.get('opcode')} of float) - read the engine's numbers as "
+                          f"kern::Float first (kern::Float(v.x) * v.y): a Float is rounded only where it goes into a number of the engine")
+    return [(f, line, w) for f, line, w in sorted(out)]
+
+
 def convert_unit(job):
     """One Blueprint: the functions of its files, converted as far as they are, and - with a test directory
     - its test written. What main needs of it, as plain values (a process of its own does this for every
@@ -16487,6 +16563,8 @@ def convert_unit(job):
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
         tree = Tree(path, namespace, flags, world.spaces)
+        if LANGUAGE_NUMBERS[0] and (wrong := language_number_errors(tree, world)):
+            raise LanguageNumbers(wrong)
         if source is None and (made := states_made_by_cpp(tree, world, namespace)):
             # (C++ writes the constructor of a state that declares none where its object is made - in a source file;
             # read from its headers alone the tree has none: the file that reads them makes one, and C++ writes it -
@@ -16923,6 +17001,9 @@ def main(argv):
                 more.append((d, spaces.split(",")))
             else: texts = v
             i += 2
+        elif opts[i] == "--language-numbers":
+            LANGUAGE_NUMBERS[0] = True   # (for now: until every game's sources are written so - see LANGUAGE_NUMBERS)
+            i += 1
         elif opts[i] == "--engine":
             ENGINE_RUN[0] = True
             ENGINE_HEADERS.add(os.path.abspath(opts[i + 1]))
@@ -17384,8 +17465,15 @@ def main(argv):
         first = sorted(now, key=lambda u: (u in took, -took.get(u, 0), -sum(os.path.getsize(f) for f in unit_files[u]), u))
         futures = {u: pool.submit(convert_timed, jobs[u]) for u in first}
         got = {}
+        wrong = set()
         for u in now:
-            took[u], got[u] = futures[u].result()
+            try:
+                took[u], got[u] = futures[u].result()
+            except LanguageNumbers as e:
+                wrong.update(e.args[0])
+        if wrong:
+            raise SystemExit("numbers that are not the language's (--language-numbers; kern/docs/blueprint_cpp.md, \"Zahlen\"):\n  "
+                             + "\n  ".join(w for _, _, w in sorted(wrong)))
         for u in now:
             r = got[u]
             # (what is given only grows - more of the others written - and with it what is written: a function
