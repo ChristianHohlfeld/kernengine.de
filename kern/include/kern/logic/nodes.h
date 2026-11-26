@@ -84,6 +84,12 @@ inline i64 bor(i64 a, i64 b) { return a | b; }
 inline i64 bxor(i64 a, i64 b) { return a ^ b; }
 inline i64 shl(i64 a, i64 n) { return logic::num::shl(a, n); }
 inline i64 shr(i64 a, i64 n) { return logic::num::shr(a, n); }
+// (the Formula's 32-bit functions of the time before the number types - what Formula::evaluate computes; they go with
+// the typed Formula, stage 3, where a cast and the operators of the type say it)
+inline f64 wrap32(f64 a) { return static_cast<f64>(logic::num::cast<u32>(logic::num::cast<i64>(a))); }
+inline f64 wrap32s(f64 a) { return static_cast<f64>(logic::num::cast<i32>(logic::num::cast<i64>(a))); }
+inline f64 mul32(f64 a, f64 b) { return static_cast<f64>(logic::num::mul(logic::num::cast<u32>(logic::num::cast<i64>(a)), logic::num::cast<u32>(logic::num::cast<i64>(b)))); }
+inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
 }  // namespace math
 
 namespace logic {

@@ -2339,6 +2339,17 @@ template <> struct InterfaceOf<kern::net::Transport> {
 }  // namespace engine_direct
 
 template <class Core> struct EngineNodesOf : Core {
+  // (the number types of the language, by their C++ names - a Blueprint's class names them in its own scope)
+  using i8 = ::kern::i8;
+  using i16 = ::kern::i16;
+  using i32 = ::kern::i32;
+  using i64 = ::kern::i64;
+  using u8 = ::kern::u8;
+  using u16 = ::kern::u16;
+  using u32 = ::kern::u32;
+  using u64 = ::kern::u64;
+  using f32 = ::kern::f32;
+  using f64 = ::kern::f64;
   using Bool = bool;
   using Int = i64;
   using Float = f64;

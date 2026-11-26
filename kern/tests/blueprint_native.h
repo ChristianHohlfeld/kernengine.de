@@ -1909,14 +1909,14 @@ inline std::vector<Case> cases() {
     const Value engine = Value::object(logic::ObjectRef{2, 2});   // (an Object<kern::Engine>, never a number)
     c.calls.push_back({"start", {engine}});
     c.calls.push_back({"update", {engine, Value::structure({N(1.5), N(0.016), Value::of_number<u64>(7)})}});
-    c.calls.push_back({"update", {engine, Value::structure({N(1.75), N(0.25), Value::of_number<u64>(8)})}});
+    c.calls.push_back({"update", {engine, Value::structure({N(1.75), Value::of_number<f32>(0.25f), Value::of_number<u64>(8)})}});
     c.calls.push_back({"stop", {engine}});
   }
   if (Case& c = read("Loop", kImplementsLoop); c.error.empty()) {
     const Value at = Value::structure({Value::of_number<u64>(9)});
     c.calls.push_back({"address", {}});
-    c.calls.push_back({"send", {at, Value::of(std::vector<i64>{4, 5, 6}), I(3)}});
-    c.calls.push_back({"receive", {Value::structure({Value::of_number<u64>(0)}), I(2)}});
+    c.calls.push_back({"send", {at, Value::of(std::vector<u8>{4, 5, 6}), Value::of_number<u32>(3)}});
+    c.calls.push_back({"receive", {Value::structure({Value::of_number<u64>(0)}), Value::of_number<u32>(2)}});
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.

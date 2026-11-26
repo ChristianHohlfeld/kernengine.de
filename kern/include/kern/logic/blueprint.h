@@ -788,7 +788,9 @@ struct BlueprintCore : logic::PureNodes {
   // Make is the struct from a value for each field, in their order; Break is the struct, read
   // field by field: struct_break<Weapon>(Held).Damage. (A field of a variable is set where it
   // is: Held.Damage = 2.0; - the Set at that place, no function.)
-  template <class S, class... V> static S struct_make(V&&... fields) { return S{std::forward<V>(fields)...}; }
+  // (in parentheses, C++20: a number written out goes into a field of any number type that holds it - the notation has
+  // checked that it does, struct_make<Frame>(1447121230, 0) for a u32 and a u16 - as it does in braces where it stands)
+  template <class S, class... V> static S struct_make(V&&... fields) { return S(std::forward<V>(fields)...); }
   /// list_find_row<&Weapon::Name>(Rack, "Bow"): the first item of a list of structs whose field
   /// is the value - a table's row by its key. Not found: the struct's defaults, index -1.
   template <class S> struct FoundRow {
