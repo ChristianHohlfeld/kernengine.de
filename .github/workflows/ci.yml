@@ -84,6 +84,7 @@ jobs:
             game_sources=(); for f in src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || game_sources+=("$PWD/$f"); done
             CASES_OBJ="$W/engine" KERN_JOBS=4 CLANGXX=clang++ INCLUDES="-I$PWD/src" ../../../tools/converter_cases/compare.sh "$W/pt/l.kproject" "$W/pt/l.klevel" "$W/pt/converted" "$W/built" "${game_sources[@]}"; echo "compare rc=$?"
             grep -E "^(ok|FAIL) +converted_|^[0-9]+ tests," "$W/built/compare.log" | tail -n 80
+            grep -E "interp && native \||problems.empty\(\) \|" "$W/built/compare.log" | cut -c1-400 | head -n 20   # (a Blueprint that does not run in the test: why)
             python3 ../../../tools/source_numbers.py "$W/pt/converted" "$W/built/compare.log" | tee "$W/texts/numbers.txt"
             cp "$W/built/compare.log" "$W/texts/" 2>/dev/null
           fi

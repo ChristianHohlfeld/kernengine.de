@@ -43,12 +43,10 @@ fi
 # (a level written without format and version - the converter's cases write it so: as a level is read)
 python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault('format','kern-level'); d.setdefault('version',1); json.dump(d,open(p,'w'))" "$level"
 python3 "$kern/tools/embed_project.py" "$project" "$o/project.cpp" > /dev/null
-# (the header of the classes the program calls - level_blueprints.h - where its tests name it: the converter's --classes)
-if grep -qs 'level_blueprints.h' "$tests"/test_*.cpp; then
-  "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > /dev/null
-else
+# (with the header of the classes the program calls - level_blueprints.h, the converter's --classes - where there are such
+# classes; else without it)
+"$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" "$o/level_blueprints.h" > "$o/classes.log" 2>&1 ||
   "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" > /dev/null
-fi
 own=("$o/project.cpp" "$o/level_blueprints.cpp" "$tests"/test_*.cpp "$@")
 export cxx o
 printf '%s\n' "${own[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '

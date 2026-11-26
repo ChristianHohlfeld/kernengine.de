@@ -260,7 +260,7 @@ else echo "FAIL numbers_same: written, and the same as the source in both passes
 # the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
 # (red): the number types have come, and the case goes up to numbers_same.
 #   numbers_f32  an intermediate in f32 (a*b): the Blueprint computes it in 64 bit
-#   numbers_sum  an f32 sum of 1/60 against a threshold (Murmel's gewonnen_seit_): past 1 after 60 frames in 64 bit, after 61 in f32
+#   numbers_sum  an f32 sum of 1/60 against a threshold: past 1 after 60 frames in 64 bit, after 61 in f32
 #   numbers_i64  a long long past 2^53 (a Blueprint's Int is exact up to 2^53: the function waits)
 for c in numbers_f32 numbers_sum numbers_i64; do
   SOURCE_NUMBERS=1 convert $c

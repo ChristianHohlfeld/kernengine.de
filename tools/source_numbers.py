@@ -65,7 +65,8 @@ def main(argv):
                 if f in t1[1]:
                     before = f"differs in {t1[1][f][0]} of {t1[1][f][1]} calls"
                 elif f in t1[2]:
-                    before = t1[2][f]
+                    before = "not compared: " + t1[2][f]
+                    n["before"] -= 1
                 else:
                     before = "same"
                     n["before_same"] += 1
@@ -82,14 +83,15 @@ def main(argv):
                     source = f"differs in {k} of {m} calls (the largest difference {by}: {at})"
                     n["source_off"] += 1
                     worst.append((-1.0 if by == "-" else float(by), k, m, stem, f, at))   # (-: no number differs - a bool, a text: after those of numbers)
-                elif f in t2[2]:
-                    source = t2[2][f]
-                    n["source_off"] += 1
+                elif f in t2[2]:   # (no call compared - the Blueprint did not run in the test: not a difference, not measured)
+                    source = "not compared: " + t2[2][f]
+                    n["source"] -= 1
+                    n["source_not"] += 1
                 else:
                     source = "same"
                     n["source_same"] += 1
             print(f"  {f}: written; compared as before: {before}; compared with the source as it is: {source}")
-    print(f"\n{n['written']} functions written and compared; as before (the language's numbers): {n['before_same']} of {n['before']} the same; "
+    print(f"\n{n['written']} functions written and in a test; as before (the language's numbers): {n['before_same']} of {n['before']} the same; "
           f"with the source as it is (its own numbers): {n['source_same']} the same, {n['source_off']} differ, {n['source_not']} not compared")
     if worst:
         print("the largest differences (with the source as it is):")
