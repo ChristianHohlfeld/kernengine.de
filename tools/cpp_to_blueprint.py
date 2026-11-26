@@ -3290,7 +3290,8 @@ class Unit:
                     if f.self_type is not None:
                         mine = self.struct(self.tree.owner.get(d["id"]))
                         seen += [mine] if not f.ctor else []
-                    seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
+                    # (the logic the Blueprints run in is no input: a Blueprint's own - as the function says it, Emit's f.logic)
+                    seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" and not self.is_logic(qtype(x)) for t in self.param_types(x)]
                     if f.value is not None:
                         seen.append(self.place(qtype(d).split("(")[0].strip()))
                 finally:
