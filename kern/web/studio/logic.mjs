@@ -23,12 +23,16 @@
 
 import {wheelPixels} from "../kern.mjs";
 
-const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", int: "#1fe0b0", float: "#9be36b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5", int64: "#0f9d8a"};
-const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Float", vector: "Vector", text: "Text", actor: "Actor", int64: "Int64"};
+// (the number types of C++ - kern/logic/numbers.h: a whole number green-blue, a floating one green; the name is the
+// type's own. Stage 7 of the number types brings the type menu and the conversion nodes on connecting.)
+const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5"};
+const LG_TYPE_NAMES = {exec: "Exec", bool: "bool", vector: "Vector", text: "Text", actor: "Actor"};
+const LG_NUMBER_TYPES = ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"];
+for (const t of LG_NUMBER_TYPES) { LG_TYPE_COLORS[t] = t[0] === "f" ? "#9be36b" : "#1fe0b0"; LG_TYPE_NAMES[t] = t; }
 // A list of values of one type ("float_list"): the colour of its items, a pin of its own shape.
 // (An Int64 is its 64 bits: in the document the text of their u64 - more than a number of JSON
 // holds -, so here a text too: "18446744073709551615", "0x1f".)
-const LG_VALUE_TYPES = ["bool", "int", "float", "vector", "text", "actor", "int64"];
+const LG_VALUE_TYPES = ["bool", ...LG_NUMBER_TYPES, "vector", "text", "actor"];
 // Ints of a fixed width (U8 ... I32): a place holds the low bits of the Int it is given; a pin is an Int.
 const LG_WIDTHS = ["u8", "u16", "u32", "i8", "i16", "i32"];
 for (const w of LG_WIDTHS) { LG_TYPE_COLORS[w] = LG_TYPE_COLORS.int; LG_TYPE_NAMES[w] = w.toUpperCase(); }
@@ -942,7 +946,7 @@ export class LogicEditor {
     ], x, y);
   }
 
-  addVariable(type = "float") {
+  addVariable(type = "f32") {
     const r = this.cmd({cmd: "logicVariable", op: "add", name: "NewVar", type});
     if (r?.name) {
       this.selectVariable(r.name);
@@ -1144,8 +1148,10 @@ export class LogicEditor {
     if (of && !lgIsList(p.type)) return `<select class="lg-lit enm" ${attr}>${of.values.map((name, k) => `<option value="${k}"${k === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
     switch (p.type) {
       case "bool": return `<input type="checkbox" class="lg-lit chk" ${attr}${v ? " checked" : ""}>`;
-      case "int":
-      case "float": return `<input class="lg-lit num" ${attr} value="${lgEsc(lgNum(v))}" spellcheck="false" inputmode="decimal">`;
+      case "i8": case "i16": case "i32": case "u8": case "u16": case "u32": case "f32": case "f64":
+        return `<input class="lg-lit num" ${attr} value="${lgEsc(lgNum(v))}" spellcheck="false" inputmode="decimal">`;
+      case "i64": case "u64":   // (64 bits: more than a number of JavaScript holds - a text, as the document has one beyond 2^53)
+        return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="a whole number of 64 bits">`;
       case "text": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v)}" spellcheck="false">`;
       case "int64": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="64 bits: a whole number up to 18446744073709551615, or 0x... in hexadecimal">`;
       case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
@@ -2231,13 +2237,7 @@ export class LogicEditor {
     const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
     if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;
     if (!lgBuiltin(from) || !lgBuiltin(to)) return false;  // an enum's value goes where its own enum is wanted, nowhere else (a map, a set: where its own keys and values are)
-    if ([from, to].some(t => t === "int64" || t === "int64_list")) return false;  // (64 bits: the Int64 nodes say what they are as another type)
-    if (to === "text") return true;
-    if (lgIsList(from) || lgIsList(to)) return false;
-    const numeric = t => t === "int" || LG_WIDTHS.includes(t) || t === "float" || t === "bool";  // (an Int of a fixed width is an Int on a wire)
-    if (numeric(from) && numeric(to)) return true;
-    if (to === "bool" && from === "actor") return true;
-    if (to === "vector" && (from === "int" || LG_WIDTHS.includes(from) || from === "float")) return true;
+    // (no wire converts: a value goes where its own type is wanted - a conversion is a node, num.cast / num.text)
     return false;
   }
 

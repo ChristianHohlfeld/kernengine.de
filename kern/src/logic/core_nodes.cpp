@@ -1612,8 +1612,14 @@ void add_structs(Library& lib) {
       const StructType* st = of(c.node(), g);
       const bytes::Layout l = bytes::layout(c.param("layout", ""));
       const Value list = c.in(std::size_t{0});
-      const std::vector<i64>& held = list.items<i64>();
       const i64 from = c.in_int("at");
+      // (the bytes: the last 8 bits of each number of the list, whatever whole type it is of)
+      std::vector<i64> held;
+      if (is_list(list.type) && is_integer(element_of(list.type)))
+        with_number(element_of(list.type), [&](auto t) {
+          using T = typename decltype(t)::type;
+          for (const auto& x : list.items<T>()) held.push_back(static_cast<i64>(x));
+        });
       auto byte = [&](u32 i) { return bytes::byte_at(held.data(), held.size(), from, i); };
       std::vector<Value> fields;
       if (st) {

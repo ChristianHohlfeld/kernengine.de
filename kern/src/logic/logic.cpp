@@ -4414,6 +4414,9 @@ Value Context::in(std::size_t index) {
   if (index >= c.in.size()) return Value();
   const auto& src = c.data_in[index];
   if (src.node < 0) return c.literal[index];
+  // (a value of the input's type - check() refuses any other wire; an input over the items of a list of whole numbers
+  // of any type takes the list as it is: kAnyWidth)
+  if (c.in[index].of == kAnyWidth) return pull(src.node, src.pin);
   return pull(src.node, src.pin).converted(c.in[index].type);
 }
 

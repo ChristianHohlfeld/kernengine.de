@@ -79,7 +79,7 @@ struct Level : kern::Blueprint {
     actor_set_property(actor, "components.mesh.material.roughness", text);
     actor_set_light(actor_find("Lamp"), Vector{0.2, 0.4, 0.8}, 3.0, 7.0);
     actor_set_color(actor, Vector{0.1, 0.9, 0.3});
-    actor_enable(actor_find("Lamp"), math_compare<">">(value, 0.0));
+    actor_enable(actor_find("Lamp"), math_compare<">", f64>(value, 0.0));
   }
 
   KERN_EVENT(on4, event_custom<"Physics">)

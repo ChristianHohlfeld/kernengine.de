@@ -2133,7 +2133,8 @@ TEST(logic_flow_variables_and_latent_nodes) {
   FakeLogicHost host;
   logic::Runtime rt(host);
   // Begin Play -> For 1..5 { Add to Sum (Index) } -> Print "Sum " + Sum -> Delay 1 -> Print "later"
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Sum","type":"f64","value":0}],
+  // (the index is an i64, Sum too; Sum as a text: To Text - no wire converts)
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Sum","type":"i64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},
       {"id":2,"type":"flow.for","values":{"first":1,"last":5}},
       {"id":3,"type":"var.add","params":{"variable":"Sum"}},
@@ -2141,9 +2142,10 @@ TEST(logic_flow_variables_and_latent_nodes) {
       {"id":5,"type":"text.append","values":{"a":"Sum "}},
       {"id":6,"type":"var.get","params":{"variable":"Sum"}},
       {"id":7,"type":"flow.delay","values":{"duration":1}},
-      {"id":8,"type":"debug.print","values":{"text":"later"}}],
+      {"id":8,"type":"debug.print","values":{"text":"later"}},
+      {"id":9,"type":"num.text","params":{"type":"i64"}}],
     "links":[[1,"then",2,"exec"],[2,"body",3,"exec"],[2,"index",3,"amount"],[2,"completed",4,"exec"],
-      [6,"value",5,"b"],[5,"result",4,"text"],[4,"then",7,"exec"],[7,"completed",8,"exec"]]})");
+      [6,"value",9,"a"],[9,"result",5,"b"],[5,"result",4,"text"],[4,"then",7,"exec"],[7,"completed",8,"exec"]]})");
   CHECK(no_errors(logic::check(g)));
   logic::Instance* inst = rt.add(g, 0, "Level");
   rt.begin();
@@ -2328,9 +2330,9 @@ TEST(logic_bytes_of_struct) {
   // a frame of a wire protocol (NAV1): its bytes as C++ lays them out, and back
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"i64","value":1447121230},{"name":"Seq","type":"i64","value":513},
-      {"name":"Vx","type":"i64","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"f64","value":0.1},{"name":"Key","type":"u64","value":"18364758544493064720"}]}],
-    "variables":[{"name":"B","type":"i64_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"u32","value":1447121230},{"name":"Seq","type":"u16","value":513},
+      {"name":"Vx","type":"i16","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"f32","value":0.1},{"name":"Key","type":"u64","value":"18364758544493064720"}]}],
+    "variables":[{"name":"B","type":"u8_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
       {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
       {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},
@@ -2340,11 +2342,12 @@ TEST(logic_bytes_of_struct) {
   logic::Instance* inst = rt.add(g, 0, "Level");
   rt.begin();
   rt.call("Go");
-  const std::vector<i64> want = {78, 81, 65, 86, 1, 2, 253, 255, 1, 205, 204, 204, 61, 0, 0, 0, 16, 50, 84, 118, 152, 186, 220, 254};
-  CHECK(inst->get("B").items<i64>() == want);
+  // (each field of its own type - a u32, a u16, an i16, a bool, an f32, a u64 - into a List<u8>)
+  const std::vector<u8> want = {78, 81, 65, 86, 1, 2, 253, 255, 1, 205, 204, 204, 61, 0, 0, 0, 16, 50, 84, 118, 152, 186, 220, 254};
+  CHECK(inst->get("B").items<u8>() == want);
   const logic::Value back = inst->get("Back");
   CHECK(back.field(0) && back.field(0)->as_int() == 1447121230 && back.field(1)->as_int() == 513 && back.field(2)->as_int() == -3 && back.field(3)->as_bool());
-  CHECK(back.field(4) && back.field(4)->as_number() == static_cast<f64>(0.1f) && static_cast<u64>(back.field(5)->i) == 0xfedcba9876543210ull);
+  CHECK(back.field(4) && back.field(4)->type == logic::PinType::f32 && back.field(4)->as<f32>() == 0.1f && back.field(5)->as<u64>() == 0xfedcba9876543210ull);
   // what does not suit the struct is an error of the graph
   const logic::Graph wrong = logic_graph(R"({"structs":[{"name":"P","fields":[{"name":"A","type":"f64","value":0}]}],
     "nodes":[{"id":1,"type":"struct.bytes","params":{"struct":"P","layout":"4: i32@0"}}]})");
@@ -2361,40 +2364,41 @@ TEST(logic_copy_bytes) {
   const f32 floats[3] = {0.1f, -2.5f, 1e30f};
   u8 raw[12] = {7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
   std::memcpy(raw + 1, floats, 10);
-  std::vector<i64> bytes(12, 7);
-  const std::vector<f64> held = {static_cast<f64>(floats[0]), static_cast<f64>(floats[1]), static_cast<f64>(floats[2])};
+  // (each list of the number of its code: List<u8>, List<f32> ...)
+  std::vector<u8> bytes(12, 7);
+  const std::vector<f32> held = {floats[0], floats[1], floats[2]};
   logic::bytes::copy(bytes.data(), bytes.size(), Code::u8, 1, held.data(), held.size(), Code::f32, 0, 10);
   for (int k = 0; k < 12; ++k) CHECK(bytes[static_cast<std::size_t>(k)] == raw[k]);
   // back: 6 bytes from the second on into floats (the second float keeps its upper two bytes)
   f32 back[2] = {9.0f, 9.0f};
   std::memcpy(back, raw + 2, 6);
-  std::vector<f64> into = {9.0, 9.0};
+  std::vector<f32> into = {9.0f, 9.0f};
   logic::bytes::copy(into.data(), into.size(), Code::f32, 0, bytes.data(), bytes.size(), Code::u8, 2, 6);
-  CHECK(std::bit_cast<u32>(static_cast<f32>(into[0])) == std::bit_cast<u32>(back[0]) && std::bit_cast<u32>(static_cast<f32>(into[1])) == std::bit_cast<u32>(back[1]));
+  CHECK(std::bit_cast<u32>(into[0]) == std::bit_cast<u32>(back[0]) && std::bit_cast<u32>(into[1]) == std::bit_cast<u32>(back[1]));
   // into whole numbers of 16 bits with a sign, and of 32 without
   i16 shorts[3] = {1, 2, 3};
   std::memcpy(shorts, raw + 1, 5);
-  std::vector<i64> whole = {1, 2, 3};
+  std::vector<i16> whole = {1, 2, 3};
   logic::bytes::copy(whole.data(), whole.size(), Code::i16, 0, bytes.data(), bytes.size(), Code::u8, 1, 5);
   for (int k = 0; k < 3; ++k) CHECK(whole[static_cast<std::size_t>(k)] == shorts[k]);
   // an u64 into bytes: what is beyond the list is not written, what is before it is not either
   const u64 big = 0xfedcba9876543210ull;
-  std::vector<i64> short_bytes(5, 0);
+  std::vector<u8> short_bytes(5, 0);
   const std::vector<u64> wide = {big};
   logic::bytes::copy(short_bytes.data(), short_bytes.size(), Code::u8, -2, wide.data(), wide.size(), Code::u64, 0, 8);
   for (int k = 0; k < 5; ++k) CHECK(static_cast<u64>(short_bytes[static_cast<std::size_t>(k)]) == ((big >> (8 * (k + 2))) & 0xffu));
   // no bytes: nothing; a list into itself, up and down (as memmove)
-  std::vector<i64> self = {1, 2, 3, 4};
+  std::vector<u32> self = {1, 2, 3, 4};
   logic::bytes::copy(self.data(), self.size(), Code::u32, 0, self.data(), self.size(), Code::u32, 0, 0);
-  CHECK((self == std::vector<i64>{1, 2, 3, 4}));
+  CHECK((self == std::vector<u32>{1, 2, 3, 4}));
   u32 moved[4] = {1, 2, 3, 4};
   std::memmove(moved + 1, moved, 8);
-  std::vector<i64> down = {1, 2, 3, 4};
+  std::vector<u32> down = {1, 2, 3, 4};
   logic::bytes::copy(down.data(), down.size(), Code::u32, 1, down.data(), down.size(), Code::u32, 0, 8);
   for (int k = 0; k < 4; ++k) CHECK(down[static_cast<std::size_t>(k)] == moved[k]);
   u32 moved_back[4] = {1, 2, 3, 4};
   std::memmove(moved_back, moved_back + 1, 12);
-  std::vector<i64> back_down = {1, 2, 3, 4};
+  std::vector<u32> back_down = {1, 2, 3, 4};
   logic::bytes::copy(back_down.data(), back_down.size(), Code::u32, 0, back_down.data(), back_down.size(), Code::u32, 1, 12);
   for (int k = 0; k < 4; ++k) CHECK(back_down[static_cast<std::size_t>(k)] == moved_back[k]);
   // the node on a graph: the list's numbers suit its setting, or the check says so
@@ -2842,7 +2846,7 @@ struct Cop : kern::Blueprint {
   DownResult Down(i64 n = 0, Actor me = Actor{}) {
     i64 Mine = 0;
     Mine = n;
-    if (math_compare<">">(num_cast<f64, i64>(n), 0.0)) {
+    if (math_compare<">", f64>(num_cast<f64, i64>(n), 0.0)) {
       func_call_on<"Down">(me, kern::out(n20.sum), num_cast<i64, f64>(math_sub<f64>(num_cast<f64, i64>(n), 1.0)), me);
     }
     return {math_add<f64>(num_cast<f64, i64>(Mine), n20.sum)};
@@ -2975,7 +2979,7 @@ struct Rules : kern::Blueprint {
   KeepOnResult KeepOn(i64 n = 0) {
     i64 Mine = 0;
     Mine = n;
-    if (math_compare<">">(num_cast<f64, i64>(n), 0.0)) {
+    if (math_compare<">", f64>(num_cast<f64, i64>(n), 0.0)) {
       func_call_on<"KeepOn">(actor_find("Rules"), kern::out(n30.kept), 0);
     }
     return {Mine};
@@ -4843,16 +4847,16 @@ TEST(logic_recursion_rules) {
     return !read && error.find(why) != std::string::npos;
   };
   CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { f64 h = 0.0; };\n  KERN_PURE HalfResult Half(f64 x = 0.0) {\n"
-                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div<f64>(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+                "    if (math_compare<\">\", f64>(x, 1.0)) {\n      return {Half(math_div<f64>(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
                 "calls itself and is read as a value"));
   CHECK(refused("struct Q : kern::Blueprint {\n  f64 Seen = 0.0;\n\n  struct HalfResult { f64 h = 0.0; };\n  HalfResult Half(f64 x = 0.0) {\n"
-                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+                "    if (math_compare<\">\", f64>(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
                 "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
                 "calls itself, so every call has its own values"));
   logic::Graph ok;
   std::string error;
   CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { f64 h = 0.0; };\n  HalfResult Half(f64 x = 0.0) {\n    HalfResult n5;\n"
-                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+                        "    if (math_compare<\">\", f64>(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
                         ok, nullptr, &error));
   if (!error.empty()) std::printf("%s\n", error.c_str());
 }
@@ -4872,7 +4876,7 @@ struct Demo : kern::Blueprint {
   struct LevelResult { f64 Result = 0.0; bool Hot = false; };
   /// The level for a heat.
   KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
-    if (math_compare<">">(heat, 10.0)) {
+    if (math_compare<">", f64>(heat, 10.0)) {
       return {kern::formula([](f64 h, f64 s) -> f64 { return h*s; }, heat, scale), true};
     } else {
       return {0.0, false};
@@ -4884,8 +4888,8 @@ struct Demo : kern::Blueprint {
     else {
       Heat = math_sub<f64>(Heat, by);
       if (Open) { Count += 1; }
-      else { if (math_compare<">">(Heat, 5.0)) { Count += 2; } }
-      debug_print(kern::to<Text>(Count), false);
+      else { if (math_compare<">", f64>(Heat, 5.0)) { Count += 2; } }
+      debug_print(num_text<i64>(Count), false);
     }
   }
 
@@ -4911,7 +4915,7 @@ struct Demo : kern::Blueprint {
   struct LevelResult { f64 Result = 0.0; bool Hot = false; };
   /// The level for a heat.
   KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
-    if (math_compare<">">(heat, 10.0)) {
+    if (math_compare<">", f64>(heat, 10.0)) {
       return {kern::formula([](f64 h, f64 s) -> f64 { return h * s; }, heat, scale), true};
     }
     return {0.0, false};
@@ -4924,10 +4928,10 @@ struct Demo : kern::Blueprint {
     Heat = math_sub<f64>(Heat, by);
     if (Open) {
       Count += 1;
-    } else if (math_compare<">">(Heat, 5.0)) {
+    } else if (math_compare<">", f64>(Heat, 5.0)) {
       Count += 2;
     }
-    debug_print(kern::to<Text>(Count), false);
+    debug_print(num_text<i64>(Count), false);
   }
 
   // ---- events ----
@@ -5042,7 +5046,7 @@ struct Door : kern::Blueprint {
   void go30(Text entry) {
     if (flow_gate(n30, entry, true)) {
       state_set<"Door", "open">();
-      debug_print(text_append("pushed by ", kern::to<Text>(n2.actor), ""), true);
+      debug_print(text_append("pushed by ", num_text<i64>(actor_id(n2.actor)), ""), true);
     }
   }
 
@@ -5871,7 +5875,7 @@ TEST(logic_notation_hands_over) {
   CHECK(has(written("given, name", plain), "    Made = given;\n    return {std::move(given), std::move(name)};\n"));  // (the Set is not the last to read it, the Return is)
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = n5.list;\n    Log = n5.list;\n"), "    Kept = n5.list;\n    Log = n5.list;\n"));
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Count += 1;\n    Kept = n5.list;\n"), "    Count += 1;\n    Kept = n5.list;\n"));  // (not the step right before)
-  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    if (math_compare<\">\">(value, 1.0)) {\n      Count += 1;\n    }\n    Kept = n5.list;\n"), "    Kept = n5.list;\n"));
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    if (math_compare<\">\", f64>(value, 1.0)) {\n      Count += 1;\n    }\n    Kept = n5.list;\n"), "    Kept = n5.list;\n"));
   CHECK(has(written("Log, name", plain), "    return {Log, std::move(name)};\n"));  // (a variable of the Blueprint stays)
   // a local variable in a loop: handed over when the next round sets it anew before reading it - and the input
   // that every round reads is copied
@@ -5880,7 +5884,7 @@ TEST(logic_notation_hands_over) {
   CHECK(has(written("Made, name", plain, "      list_add(Item, 1.0);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      All = std::move(n23.list);\n"));
   CHECK(has(written("Made, name", plain, "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n      Item = from;\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n"));
   CHECK(has(written("Made, name", plain, "      n23 = Make(All, \"x\");\n      All = n23.list;\n"), "      n23 = Make(std::move(All), \"x\");\n      All = std::move(n23.list);\n"));  // (All = Make(All): nothing is copied)
-  CHECK(has(written("Made, name", plain, "      if (math_compare<\">\">(num_cast<f64, i64>(n20.index), 1.0)) {\n        Item = from;\n      }\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
+  CHECK(has(written("Made, name", plain, "      if (math_compare<\">\", f64>(num_cast<f64, i64>(n20.index), 1.0)) {\n        Item = from;\n      }\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
             "      n23 = Make(Item, \"x\");\n"));  // (a round that does not set it reads what the round before left)
   // and where C++ would leave a place empty that the Blueprint still reads, the text is refused
   auto refused = [&](const std::string& returned, const std::string& event, const char* where, const std::string& round = {}) {
@@ -6285,7 +6289,7 @@ TEST(logic_callbacks) {
   // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
   {
     const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { f64 h = 0.0; };\n  stepsResult steps(f64 x = 0.0) {\n"
-                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(num_cast<f64, i64>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\", f64>(num_cast<f64, i64>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
                                             "    return {x};\n  }\n\n  struct mResult { Callback<f64(f64)> c = Callback<f64(f64)>{}; };\n  KERN_PURE mResult m() {\n"
                                             "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { i64 index = 0; } n1;\n};\n");
     CHECK(loops.empty());
@@ -6892,7 +6896,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
   }
   // A change in the text: what is still there keeps its id and place, what is new gets new ones.
   const char* before_text = "struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n"
-                            "    Heat = math_add<f64>(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
+                            "    Heat = math_add<f64>(Heat, value);\n    if (math_compare<\">\", f64>(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
   logic::Graph g0, g1, g2, g3;
   std::string error;
   CHECK(logic::from_cpp(before_text, g0, nullptr, &error));

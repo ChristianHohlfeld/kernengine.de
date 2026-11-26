@@ -249,7 +249,7 @@ struct Ground : virtual kern::Library {
   }
   struct highResult { bool up = false; };
   KERN_PURE highResult high(f64 x = 0.0) {
-    return {math_compare<">">(x, 1.0)};
+    return {math_compare<">", f64>(x, 1.0)};
   }
 };
 )kn";
@@ -479,9 +479,9 @@ struct Flow : kern::Blueprint {
   struct GradeResult { i64 grade = 0; Text name = "none"; };
   /// Branches that return, an else-if chain, a path that ends without a Return.
   KERN_PURE GradeResult Grade(f64 points = 0.0) {
-    if (math_compare<">=">(points, 90.0)) {
+    if (math_compare<">=", f64>(points, 90.0)) {
       return {1, "top"};
-    } else if (math_compare<">=">(points, 50.0)) {
+    } else if (math_compare<">=", f64>(points, 50.0)) {
       return {2, "pass"};
     } else if (math_compare<"<", f64>(points, 0.0)) {
       return {};
@@ -493,7 +493,7 @@ struct Flow : kern::Blueprint {
   /// A loop that returns from its middle, an index read after the loop.
   KERN_PURE FirstAboveResult FirstAbove(i64 from = 0, i64 to = 9, f64 limit = 4.5) {
     for (auto it12 = flow_for(n12, from, to); it12.next();) {
-      if (math_compare<">">(num_cast<f64, i64>(n12.index), limit)) {
+      if (math_compare<">", f64>(num_cast<f64, i64>(n12.index), limit)) {
         return {n12.index, n12.index};
       }
     }
@@ -509,7 +509,7 @@ struct Flow : kern::Blueprint {
         Heat += 0.25;
       }
     }
-    while (loop(math_compare<">">(Heat, 1.0))) {
+    while (loop(math_compare<">", f64>(Heat, 1.0))) {
       Heat += -1.0;
       Log = text_append(Log, "-", "");
     }
@@ -635,7 +635,7 @@ struct Calls : kern::Blueprint {
   BothResult Both(f64 a = 1.0, f64 b = 2.0) {
     n61 = AddUp(a, 2);
     n62 = AddUp(b, 1);
-    Flag = math_compare<">">(n61.total, n62.total);
+    Flag = math_compare<">", f64>(n61.total, n62.total);
     Mark(n62.total, Flag);
     return {math_add<f64>(n61.total, n62.total), text_append(kern::to<Text>(n61.steps), "/", kern::to<Text>(n62.steps))};
   }
@@ -697,7 +697,7 @@ struct Locals : kern::Blueprint {
   KERN_PURE LimitResult Limit(f64 x = 0.0) {
     f64 Out = -1.0;
     Out = x;
-    if (math_compare<">">(x, 1.0)) {
+    if (math_compare<">", f64>(x, 1.0)) {
       Out = 1.0;
     }
     return {Out};

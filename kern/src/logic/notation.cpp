@@ -1693,8 +1693,8 @@ struct Writer {
       std::vector<char> ints;
       const bool whole = formula_types(x, f, ints);
       std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += std::string(i ? ", " : "") + (ints[i] ? "Int " : "Float ") + f.inputs()[i];
-      lambda += std::string(") -> ") + (whole ? "Int " : "Float ") + "{ return " + f.cpp() + "; }";
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += std::string(i ? ", " : "") + (ints[i] ? "i64 " : "f64 ") + f.inputs()[i];
+      lambda += std::string(") -> ") + (whole ? "i64 " : "f64 ") + "{ return " + f.cpp() + "; }";
       std::string args = lambda;
       for (std::size_t i = 0; i < at(x).data_in.size(); ++i) args += ", " + value(x, at(x).data_in[i], c, i >= ints.size() || !ints[i]);
       return "kern::formula(" + args + ")";
@@ -3957,8 +3957,8 @@ struct Reader {
     std::vector<char> ints;
     while (!is(")")) {
       std::string nm;
-      const bool int_in = is("Int");
-      if (!int_in && !is("Float")) { expect("Float", "(an input of a formula is Float, or Int where it is read as a whole number)"); return s; }
+      const bool int_in = is("i64");
+      if (!int_in && !is("f64")) { expect("f64", "(an input of a formula is f64, or i64 where it is read as a whole number - until the formula is of the number types)"); return s; }
       ++p;
       if (!word(nm, "the input's name")) return s;
       names.push_back(nm);
@@ -3966,8 +3966,8 @@ struct Reader {
       if (!accept(",")) break;
     }
     if (!expect(")") || !expect("->")) return s;
-    const bool whole = is("Int");
-    if (!whole && !expect("Float", "(a formula gives a Float, or an Int where its value is a whole number)")) return s;
+    const bool whole = is("i64");
+    if (!whole && !expect("f64", "(a formula gives an f64, or an i64 where its value is a whole number)")) return s;
     if (whole) ++p;
     if (!expect("{") || !expect("return")) return s;
     const std::size_t from = peek().begin;
@@ -3985,7 +3985,7 @@ struct Reader {
     if (!f.ok()) { fail(body_tok, "the formula: " + f.error()); return s; }
     if (f.inputs() != names) {
       std::string want;
-      for (const std::string& in : f.inputs()) want += (want.empty() ? "Float " : ", Float ") + in;
+      for (const std::string& in : f.inputs()) want += (want.empty() ? "f64 " : ", f64 ") + in;
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
