@@ -107,9 +107,15 @@ KERN_TEST(stream_offline_town) {
   city.fail(key);
   city.fail(key);  // no map service: three times nothing
   KERN_CHECK(city.offline(), "falls back to the stand-in town");
+  // Until it stands - bounded by the clock, as the tile above and the terrain (test_terrain.cpp), not by a number of
+  // frames: the town is built in slices of milliseconds, its jobs run on threads, and the collision set round the
+  // player is built again at most every 250 ms (world_building_collisions.mjs) - how many frames that takes is a
+  // matter of the machine's speed (a fast build without sanitizers did 3000 frames in 0.2 s and stopped before the
+  // first 250 ms were over). What is built is the same on every machine.
   int frames = 0;
-  while (!city.ready_at({0, 0, 0}) && frames++ < 3000) city.update({0, 0, 0}, 4);
-  KERN_CHECK(city.ready_at({0, 0, 0}), "stand-in town built");
+  const f64 give_up = kern::now_ms() + 60000;
+  while (!city.ready_at({0, 0, 0}) && kern::now_ms() < give_up) { city.update({0, 0, 0}, 4); ++frames; }
+  KERN_CHECK(city.ready_at({0, 0, 0}), "stand-in town built (%d frames)", frames);
   KERN_CHECK(city.stats().colliders > 100, "with collision (%u)", city.stats().colliders);
   KERN_CHECK(!city.has_real_data(), "marked as not real map data");
 }
