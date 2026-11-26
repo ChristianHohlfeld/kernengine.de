@@ -827,15 +827,14 @@ struct S_game_GameWorld_DetectorModel {
   };
 };
 struct S_game_GameWorld_SpawnChange {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::GameWorld::SpawnChange& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Int>::from(o, f0, x.source); ev::Direct<ev::Int>::from(o, f1, x.id); ev::Direct<ev::Vector>::from(o, f2, x.position); ev::Direct<ev::Vector>::from(o, f3, x.rotation); }
-  template <class B> static B make(EngineObjects& o, const kern::game::GameWorld::SpawnChange& x) { B b{ev::made<ev::Int>(o, x.source), ev::made<ev::Int>(o, x.id), ev::made<ev::Vector>(o, x.position), ev::made<ev::Vector>(o, x.rotation)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.source); ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Vector>::pass(o, x.position); ev::Direct<ev::Vector>::pass(o, x.rotation); }
+  template <class B> static void from(EngineObjects& o, const B& b, kern::game::GameWorld::SpawnChange& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Text>::from(o, f0, x.template_name); ev::Direct<ev::Int>::from(o, f1, x.id); ev::Direct<ev::Struct<S_game_Transform>>::from(o, f2, x.at); }
+  template <class B> static B make(EngineObjects& o, const kern::game::GameWorld::SpawnChange& x) { B b{ev::made<ev::Text>(o, x.template_name), ev::made<ev::Int>(o, x.id), ev::made<ev::Struct<S_game_Transform>>(o, x.at)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.template_name); ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Struct<S_game_Transform>>::pass(o, x.at); }
   template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::GameWorld::SpawnChange::source), decltype(B::source), &kern::game::GameWorld::SpawnChange::source, &B::source> source;
+    ev::Field<D, ev::Text, C, B, decltype(kern::game::GameWorld::SpawnChange::template_name), decltype(B::template_name), &kern::game::GameWorld::SpawnChange::template_name, &B::template_name> template_name;
     ev::Field<D, ev::Int, C, B, decltype(kern::game::GameWorld::SpawnChange::id), decltype(B::id), &kern::game::GameWorld::SpawnChange::id, &B::id> id;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::GameWorld::SpawnChange::position), decltype(B::position), &kern::game::GameWorld::SpawnChange::position, &B::position> position;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::GameWorld::SpawnChange::rotation), decltype(B::rotation), &kern::game::GameWorld::SpawnChange::rotation, &B::rotation> rotation;
-    explicit Fields(D* kern_d) : source(kern_d), id(kern_d), position(kern_d), rotation(kern_d) { (void)kern_d; }
+    ev::Field<D, ev::Struct<S_game_Transform>, C, B, decltype(kern::game::GameWorld::SpawnChange::at), decltype(B::at), &kern::game::GameWorld::SpawnChange::at, &B::at> at;
+    explicit Fields(D* kern_d) : template_name(kern_d), id(kern_d), at(kern_d) { (void)kern_d; }
   };
 };
 struct S_game_GameWorld_WalkerJoint {
@@ -5859,7 +5858,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.props = from_value<std::remove_cvref_t<decltype(kern_n.props)>>(kern_out[0]);
     kern_n.spawns = from_value<std::remove_cvref_t<decltype(kern_n.spawns)>>(kern_out[1]);
   }
-  /// Sets a component property of a running actor by JSON path ("components.light.color").
+  /// Sets a component property of a running actor by its path in the level file ("components.light.intensity") - the way changes are replicated. False with the reason (last_error): no such actor, an empty or a locked path (id, parent, components.logic), a path the actor does not have (the keys where it stops are named), a value of another kind than the field's (a number for a number - a text only when it is all a number -, true/false for a flag, a number for a vector sets all three, a #rrggbb text for a colour).
   void engine_game_world_set_property(Int game_world, Int id, const Text& path, Int value) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5891,6 +5890,38 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_property", {to_value(game_world), to_value(id), to_value(path), to_value(value)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The colour of the actor's mesh material (0..1 a channel; stored as in the level, 8 bits a channel). False with the reason: no such actor, it has no mesh.
+  void engine_game_world_set_material_color(Int game_world, Int id, Vector color) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_material_color"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, color, kern_a1);
+      decltype(auto) kern_r = kern_self->set_material_color(std::move(kern_a0), std::move(kern_a1));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.game_world.set_material_color", {to_value(game_world), to_value(id), to_value(color)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_game_world_set_material_color(KernNode& kern_n, Int game_world, Int id, Vector color) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.set_material_color"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, color, kern_a1);
+      decltype(auto) kern_r = kern_self->set_material_color(std::move(kern_a0), std::move(kern_a1));
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_material_color", {to_value(game_world), to_value(id), to_value(color)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// The same with a number, a truth value or a text as the value - the JSON value it is (what a Blueprint has to give: it holds no JSON).
@@ -5991,44 +6022,36 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_property_text", {to_value(game_world), to_value(id), to_value(path), to_value(value)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  /// A copy of `source` (with children and logic) at a place; `id` forces the root id (replicas).
-  void engine_game_world_spawn_copy(Int game_world, Int source, Vector position, Vector rotation_deg, Int id) {
+  /// A copy of the level's template `template_name` (an actor with "template": true) with its children, components and Blueprint, its root at `at` in the world (scale too) - kern/docs/runtime_actors.md. The ids are the next free ones (root, then its children as in the level): the same calls give the same ids. `id` forces the root's id (a replica mirrors its server). 0 with the reason (last_error): the world does not run, no template of that name (the level's templates are named), the ids are taken.
+  template <class T1> void engine_game_world_spawn(Int game_world, const Text& template_name, const T1& at, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.spawn_copy"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, position, kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, rotation_deg, kern_a2);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a3);
-      decltype(auto) kern_r = kern_self->spawn_copy(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.spawn"); return; }
+      const std::string_view kern_a0 = template_name.view();
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Transform>, std::remove_cvref_t<kern::game::Transform const&>>(*kern_o, ::kern::logic::engine_values::input_value(at));
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a2);
+      decltype(auto) kern_r = kern_self->spawn(kern_a0, kern_a1, std::move(kern_a2));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.spawn_copy", {to_value(game_world), to_value(source), to_value(position), to_value(rotation_deg), to_value(id)}, {PinType::integer});
+    this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::integer});
   }
-  template <class KernNode> void engine_game_world_spawn_copy(KernNode& kern_n, Int game_world, Int source, Vector position, Vector rotation_deg, Int id) {
+  template <class KernNode, class T1> void engine_game_world_spawn(KernNode& kern_n, Int game_world, const Text& template_name, const T1& at, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.spawn_copy"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, source, kern_a0);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, position, kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, rotation_deg, kern_a2);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a3);
-      decltype(auto) kern_r = kern_self->spawn_copy(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
+      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.spawn"); return; }
+      const std::string_view kern_a0 = template_name.view();
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Transform>, std::remove_cvref_t<kern::game::Transform const&>>(*kern_o, ::kern::logic::engine_values::input_value(at));
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a2);
+      decltype(auto) kern_r = kern_self->spawn(kern_a0, kern_a1, std::move(kern_a2));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.spawn_copy", {to_value(game_world), to_value(source), to_value(position), to_value(rotation_deg), to_value(id)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.spawn", {to_value(game_world), to_value(template_name), to_value(::kern::logic::engine_values::input_value(at)), to_value(id)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_game_world_teleport(Int game_world, Int id, Vector position, const List<Vector>& rotation_deg) {
@@ -7417,6 +7440,19 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.sound_bank.request", {to_value(sound_bank), to_value(ref)}, {});
+  }
+  /// Requests every sound a world needs: its actors' and its templates' (what GameWorld::spawn makes sounds at once) - how a game has its sounds ready without holding a level (kern/docs/runtime_actors.md).
+  void engine_sound_bank_request_world(Int sound_bank, Int world) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
+      if (!kern_self) { this->kern_engine_failed("engine.sound_bank.request_world"); return; }
+      kern::game::GameWorld* const kern_a0 = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(world), "world");
+      if (!kern_a0) { this->kern_engine_failed("engine.sound_bank.request_world"); return; }
+      kern_self->request_world(*kern_a0);
+      return;
+    }
+    this->kern_engine("engine.sound_bank.request_world", {to_value(sound_bank), to_value(world)}, {});
   }
   /// Renders queued built-in sounds for about `budget_ms` (0 = all now). True when none is queued.
   void engine_sound_bank_prepare(Int sound_bank, Float budget_ms) {

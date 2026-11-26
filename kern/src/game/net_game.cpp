@@ -51,12 +51,13 @@ struct PropertyMsg {
 };
 
 struct SpawnMsg {
-  u32 source = 0, id = 0;
-  Vec3 position, rotation;
+  std::string template_name;   // (GameWorld::spawn: a template of the level, by its name)
+  u32 id = 0;
+  Vec3 position, rotation, scale{1, 1, 1};
   template <class S>
   bool serialize(S& s) {
-    return net::serialize_u32(s, source) && net::serialize_u32(s, id) && net::serialize_compressed_vec3(s, position, kWorldBound, 0.001f) &&
-           net::serialize_compressed_vec3(s, rotation, 720, 0.01f);
+    return net::serialize_string(s, template_name, 200) && net::serialize_u32(s, id) && net::serialize_compressed_vec3(s, position, kWorldBound, 0.001f) &&
+           net::serialize_compressed_vec3(s, rotation, 720, 0.01f) && net::serialize_compressed_vec3(s, scale, 1e4f, 0.001f);
   }
 };
 
@@ -327,7 +328,7 @@ void NetGame::server_update(f64 time, f32 dt, const PlayInput& input) {
         std::vector<GameWorld::PropertyChange> props;
         std::vector<GameWorld::SpawnChange> spawns;
         world_.replicated_state(props, spawns);
-        for (const auto& sp : spawns) server_->send(slot, kReliable, kSpawn, SpawnMsg{static_cast<u32>(sp.source), static_cast<u32>(sp.id), sp.position, sp.rotation});
+        for (const auto& sp : spawns) server_->send(slot, kReliable, kSpawn, SpawnMsg{sp.template_name, static_cast<u32>(sp.id), sp.at.position, sp.at.rotation, sp.at.scale});
         for (const auto& p : props) server_->send(slot, kReliable, kProperty, PropertyMsg{static_cast<u32>(p.actor), p.path, json::stringify(p.value)});
       }
       for (ActorId dead : world_.dead_actors()) server_->send(slot, kReliable, kAlive, ActorMsg{static_cast<u32>(dead), false});
@@ -377,7 +378,7 @@ void NetGame::server_update(f64 time, f32 dt, const PlayInput& input) {
     std::vector<GameWorld::PropertyChange> props;
     std::vector<GameWorld::SpawnChange> spawns;
     world_.take_replicated_changes(props, spawns);
-    for (const auto& sp : spawns) server_->broadcast(kReliable, kSpawn, SpawnMsg{static_cast<u32>(sp.source), static_cast<u32>(sp.id), sp.position, sp.rotation});
+    for (const auto& sp : spawns) server_->broadcast(kReliable, kSpawn, SpawnMsg{sp.template_name, static_cast<u32>(sp.id), sp.at.position, sp.at.rotation, sp.at.scale});
     for (const auto& p : props) server_->broadcast(kReliable, kProperty, PropertyMsg{static_cast<u32>(p.actor), p.path, json::stringify(p.value)});
   }
   for (const auto& [id, alive] : changes) server_->broadcast(kReliable, kAlive, ActorMsg{static_cast<u32>(id), alive});
@@ -519,7 +520,7 @@ void NetGame::client_update(f64 time, f32 dt, const PlayInput& input) {
         case kSpawn: {
           SpawnMsg sp;
           if (net::read(*m, sp) && welcomed_ && !world_.level().find(static_cast<ActorId>(sp.id)))
-            world_.spawn_copy(static_cast<ActorId>(sp.source), sp.position, sp.rotation, static_cast<ActorId>(sp.id));
+            world_.spawn(sp.template_name, Transform{sp.position, sp.rotation, sp.scale}, static_cast<ActorId>(sp.id));
           break;
         }
         case kProperty: {

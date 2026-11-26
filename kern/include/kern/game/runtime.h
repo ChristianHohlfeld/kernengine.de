@@ -342,19 +342,33 @@ class GameWorld {
   void key_event(const std::string& code, bool down);
   /// Replicated changes made by logic (the network server sends them; clients apply them).
   struct PropertyChange { ActorId actor = 0; std::string path; json::Value value; };
-  struct KERN_BLUEPRINT_TYPE SpawnChange { ActorId source = 0, id = 0; Vec3 position, rotation; };
+  /// A copy of a template (spawn): the template's name, the root's id and where it stands.
+  struct KERN_BLUEPRINT_TYPE SpawnChange { std::string template_name; ActorId id = 0; Transform at; };
   void take_replicated_changes(std::vector<PropertyChange>& props, std::vector<SpawnChange>& spawns);
   /// Everything changed so far (for players who join later).
   void replicated_state(std::vector<PropertyChange>& props, std::vector<SpawnChange>& spawns) const;
-  /// Sets a component property of a running actor by JSON path ("components.light.color").
+  /// Sets a component property of a running actor by its path in the level file ("components.light.intensity") - the
+  /// way changes are replicated. False with the reason (last_error): no such actor, an empty or a locked path (id,
+  /// parent, components.logic), a path the actor does not have (the keys where it stops are named), a value of another
+  /// kind than the field's (a number for a number - a text only when it is all a number -, true/false for a flag, a
+  /// number for a vector sets all three, a #rrggbb text for a colour).
   bool set_property(ActorId id, const std::string& path, const json::Value& value);
+  /// The colour of the actor's mesh material (0..1 a channel; stored as in the level, 8 bits a channel). False with the
+  /// reason: no such actor, it has no mesh.
+  bool set_material_color(ActorId id, Vec3 color);
   /// The same with a number, a truth value or a text as the value - the JSON value it is (what a
   /// Blueprint has to give: it holds no JSON).
   bool set_property_number(ActorId id, const std::string& path, f64 value);
   bool set_property_flag(ActorId id, const std::string& path, bool value);
   bool set_property_text(ActorId id, const std::string& path, const std::string& value);
-  /// A copy of `source` (with children and logic) at a place; `id` forces the root id (replicas).
-  ActorId spawn_copy(ActorId source, Vec3 position, Vec3 rotation_deg, ActorId id = 0);
+  /// A copy of the level's template `template_name` (an actor with "template": true) with its children, components
+  /// and Blueprint, its root at `at` in the world (scale too) - kern/docs/runtime_actors.md. The ids are the next free
+  /// ones (root, then its children as in the level): the same calls give the same ids. `id` forces the root's id (a
+  /// replica mirrors its server). 0 with the reason (last_error): the world does not run, no template of that name
+  /// (the level's templates are named), the ids are taken.
+  ActorId spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
+  /// The level's templates and their children while the world runs (they are not in level()).
+  const Level& templates() const { return templates_; }
   bool teleport(ActorId id, Vec3 position, const Vec3* rotation_deg = nullptr);
   Vec3 actor_velocity(ActorId id) const;
   bool set_actor_velocity(ActorId id, Vec3 velocity);
@@ -739,6 +753,7 @@ class GameWorld {
   std::map<std::pair<ActorId, ActorId>, int> overlaps_;  // (sensor, visitor) -> shapes inside       // start() for a network replica: no logic           // the level has graphs: shapes report sensor / hit events
   std::vector<PropertyChange> prop_changes_, prop_log_;
   std::vector<SpawnChange> spawn_changes_, spawn_log_;
+  Level templates_;   // the level's templates and their children (start: not in level_)
   std::unordered_map<ActorId, std::pair<Vec3, Quat>> replica_poses_;
 };
 

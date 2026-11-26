@@ -1253,8 +1253,13 @@ bool GameWorld::start(const Level& level, SimMode mode) {
     if (i.error) return fail("%s", i.text.c_str());
   if (project_)
     for (const std::string& c : library_conflicts(level, *project_)) return fail("%s", c.c_str());
-  sync(level);
-  level_ = level;
+  // A template and its children are not in the world: the world keeps them apart for spawn (kern/docs/runtime_actors.md).
+  Level world_part = level;
+  world_part.actors.clear();
+  templates_ = Level{};
+  for (const Actor& a : level.actors) (template_of(level, a.id) ? templates_ : world_part).actors.push_back(a);
+  sync(world_part);
+  level_ = std::move(world_part);
   edit_level_ = level;
   physics::WorldSettings ws;
   ws.gravity = level.world.gravity;
@@ -1460,6 +1465,7 @@ void GameWorld::stop() {
   if (particles_ready_) particles_.clear();
   hud_.status = GameStatus::inactive;
   cues_.clear();
+  templates_ = Level{};
   sync(edit_level_);
 }
 

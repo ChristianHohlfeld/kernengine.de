@@ -116,11 +116,9 @@ void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float
       if (d < r) w.damage(a.id, dmg * (1 - d / r), self, false, location);
     }
 }
-Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view named, Actor tpl, Vector location, Vector rotation) {
-  ActorId source = tpl.id;
-  if (!source) source = w.find_actor(named);
-  const ActorId id = source ? w.spawn_copy(source, location, rotation) : 0;
-  if (!id) host.error("Spawn Actor: no template \"" + std::string(named) + "\"");
+Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view template_name, Vector location, Vector rotation, Vector scale) {
+  const ActorId id = w.spawn(template_name, Transform{location, rotation, scale});
+  if (!id) host.error(std::string("Spawn Actor: ") + last_error());
   return {id};
 }
 void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(target, self)); }
@@ -130,21 +128,15 @@ void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target
   if (!json::parse(value, v)) v = json::Value(value);
   if (!w.set_property(or_self(target, self), std::string(path), v)) host.error(std::string("Set Property: ") + last_error());
 }
-void actor_set_light(GameWorld& w, Self self, Actor target, Vector color, Float intensity, Float range) {
+void actor_set_light(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color, Float intensity, Float range) {
   const ActorId t = or_self(target, self);
-  json::Value rgb = json::Value::array();
-  rgb.push(static_cast<f64>(color.x));
-  rgb.push(static_cast<f64>(color.y));
-  rgb.push(static_cast<f64>(color.z));
-  w.set_property(t, "components.light.color", rgb);
-  w.set_property(t, "components.light.intensity", json::Value(intensity));
-  w.set_property(t, "components.light.range", json::Value(range));
+  // (the light's colour is a #rrggbb text in the level, as the mesh's: Set Color)
+  if (!w.set_property(t, "components.light.color", json::Value(hex_color(color))) || !w.set_property(t, "components.light.intensity", json::Value(intensity)) ||
+      !w.set_property(t, "components.light.range", json::Value(range)))
+    host.error(std::string("Set Light: ") + last_error());
 }
-void actor_set_color(GameWorld& w, Self self, Actor target, Vector color) {
-  char hex[8];
-  auto b = [](f32 v) { return static_cast<int>(std::lround(clamp(v, 0.0f, 1.0f) * 255)); };
-  std::snprintf(hex, sizeof hex, "#%02x%02x%02x", b(color.x), b(color.y), b(color.z));
-  w.set_property(or_self(target, self), "components.mesh.material.color", json::Value(hex));
+void actor_set_color(GameWorld& w, Self self, logic::Host& host, Actor target, Vector color) {
+  if (!w.set_material_color(or_self(target, self), color)) host.error(std::string("Set Color: ") + last_error());
 }
 
 void game_message(GameWorld& w, Self, std::string_view text) { w.show_message(std::string(text)); }
@@ -363,9 +355,8 @@ void bind_actor_nodes(logic::Library& lib) {
   bind(lib, "actor.explode", &nodes::actor_explode);
   // (its setting names the template; errors go to the host)
   bind(lib, "actor.spawn", [](Context& c) {
-    const logic::ActorHandle tpl{c.in_actor("template")};
-    const Vec3 location = c.in_vector("location"), rotation = c.in_vector("rotation");
-    if (GameWorld* w = world(c)) c.out("spawned", logic::to_value(nodes::actor_spawn(*w, c.self(), c.host(), c.param("template"), tpl, location, rotation)));
+    const Vec3 location = c.in_vector("location"), rotation = c.in_vector("rotation"), scale = c.in_vector("scale");
+    if (GameWorld* w = world(c)) c.out("spawned", logic::to_value(nodes::actor_spawn(*w, c.self(), c.host(), c.param("template"), location, rotation, scale)));
     return 0;
   });
   bind(lib, "actor.destroy", &nodes::actor_destroy);
@@ -376,8 +367,19 @@ void bind_actor_nodes(logic::Library& lib) {
     if (GameWorld* w = world(c)) nodes::actor_set_property(*w, c.self(), c.host(), to, path, text);
     return 0;
   });
-  bind(lib, "actor.set_light", &nodes::actor_set_light);
-  bind(lib, "actor.set_color", &nodes::actor_set_color);
+  bind(lib, "actor.set_light", [](Context& c) {
+    const logic::ActorHandle to{c.in_actor("target")};
+    const Vec3 color = c.in_vector("color");
+    const f64 intensity = c.in_number("intensity"), range = c.in_number("range");
+    if (GameWorld* w = world(c)) nodes::actor_set_light(*w, c.self(), c.host(), to, color, intensity, range);
+    return 0;
+  });
+  bind(lib, "actor.set_color", [](Context& c) {
+    const logic::ActorHandle to{c.in_actor("target")};
+    const Vec3 color = c.in_vector("color");
+    if (GameWorld* w = world(c)) nodes::actor_set_color(*w, c.self(), c.host(), to, color);
+    return 0;
+  });
 }
 
 void bind_game_nodes(logic::Library& lib) {
