@@ -102,7 +102,7 @@ struct SmokeEffect {
 };
 class SmokeField {
  public:
-  explicit SmokeField(u32 pool = 78) : puffs_(::sc::converted::count(pool)) {}
+  explicit SmokeField(u32 pool = 78) : puffs_(::kern::converted::count(pool)) {}
   /// startWorldCriticalDamage: returns the time it goes off (an existing effect keeps its clock).
   f32 start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f32 now);
   /// accelerateWorldCriticalDamage: never later, at least 0.18 s from now.
@@ -200,10 +200,10 @@ f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
   if (!g_sirens.call("VoiceUpdate", {rules::number(d), rules::number(dt), rules::number(base), rules::number(level), Value::boolean(have_d), rules::number(last_d), rules::number(doppler)}, r) ||
       r.size() < 4)
     return 0;
-  have_d = ::sc::converted::at(r, 1).b;
-  last_d = static_cast<f32>(::sc::converted::at(r, 2).as_number());
-  doppler = static_cast<f32>(::sc::converted::at(r, 3).as_number());
-  return static_cast<f32>(::sc::converted::at(r, 0).as_number());
+  have_d = ::kern::converted::at(r, 1).b;
+  last_d = static_cast<f32>(::kern::converted::at(r, 2).as_number());
+  doppler = static_cast<f32>(::kern::converted::at(r, 3).as_number());
+  return static_cast<f32>(::kern::converted::at(r, 0).as_number());
 }
 
 f32 post_arrival_grace_ms(i32 stars) { return num("PostArrivalGraceMs", {Value::integer(stars)}); }
@@ -240,8 +240,8 @@ f32 SmokeField::start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f3
   e.expires = now + std::fmax(0.25f, delay_s);
   e.seed = hash_text(id);
   effects_.push_back(e);
-  emit(::sc::converted::back(effects_), now);
-  ::sc::converted::back(effects_).last_emit = now;
+  emit(::kern::converted::back(effects_), now);
+  ::kern::converted::back(effects_).last_emit = now;
   return e.expires;
 }
 
@@ -252,7 +252,7 @@ bool SmokeField::accelerate(const std::string& id, f32 expires_at, f32 now) {
 }
 
 void SmokeField::stop(const std::string& id) {
-  ::sc::converted::erase(effects_, std::remove_if(effects_.begin(), effects_.end(), [&](const SmokeEffect& e) { return e.id == id; }), effects_.end());
+  ::kern::converted::erase(effects_, std::remove_if(effects_.begin(), effects_.end(), [&](const SmokeEffect& e) { return e.id == id; }), effects_.end());
 }
 
 void SmokeField::move(const std::string& id, Vec3 at) {
@@ -273,7 +273,7 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
   for (Puff& q : puffs_)
     if (!q.alive) { p = &q; break; }
   if (!p) {
-    p = &::sc::converted::at(puffs_, 0);
+    p = &::kern::converted::at(puffs_, 0);
     for (Puff& q : puffs_)
       if (q.born < p->born) p = &q;
   }
@@ -298,8 +298,8 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
 
 void SmokeField::update(f32 now, f32 dt) {
   for (std::size_t i = 0; i < effects_.size();) { ::sc::lowered::tick();
-    SmokeEffect& e = ::sc::converted::at(effects_, i);
-    if (now >= e.expires) { ::sc::converted::erase(effects_, effects_.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
+    SmokeEffect& e = ::kern::converted::at(effects_, i);
+    if (now >= e.expires) { ::kern::converted::erase(effects_, effects_.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
     const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
     const f32 interval = (155 - progress * 72) / 1000;
     if (now - e.last_emit >= interval) {
@@ -473,7 +473,7 @@ class SmokeField {
   /// none yet: it emits nothing.
   static SmokeField of(u32 pool) {
     SmokeField f;
-    f.puffs_.resize(::sc::converted::count(pool));
+    f.puffs_.resize(::kern::converted::count(pool));
     return f;
   }
   /// startWorldCriticalDamage: returns the time it goes off (an existing effect keeps its clock).
@@ -633,8 +633,8 @@ f32 SmokeField::start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f3
   e.expires = now + std::fmax(0.25f, delay_s);
   e.seed = hash_text(id);
   effects_.push_back(e);
-  emit(::sc::converted::back(effects_), now);
-  ::sc::converted::back(effects_).last_emit = now;
+  emit(::kern::converted::back(effects_), now);
+  ::kern::converted::back(effects_).last_emit = now;
   return e.expires;
 }
 
@@ -645,7 +645,7 @@ bool SmokeField::accelerate(const std::string& id, f32 expires_at, f32 now) {
 }
 
 void SmokeField::stop(const std::string& id) {
-  ::sc::converted::erase(effects_, std::remove_if(effects_.begin(), effects_.end(), [&](const SmokeEffect& e) { return e.id == id; }), effects_.end());
+  ::kern::converted::erase(effects_, std::remove_if(effects_.begin(), effects_.end(), [&](const SmokeEffect& e) { return e.id == id; }), effects_.end());
 }
 
 void SmokeField::move(const std::string& id, Vec3 at) {
@@ -664,11 +664,11 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
   // choosePuff: a free one, else the oldest
   i32 at = -1;  // (its place in puffs_)
   for (std::size_t i = 0; (::sc::lowered::tick(), i < puffs_.size()); ++i)
-    if (!::sc::converted::at(puffs_, i).alive) { at = static_cast<i32>(i); break; }
+    if (!::kern::converted::at(puffs_, i).alive) { at = static_cast<i32>(i); break; }
   if (at < 0) {
     at = 0;
     for (std::size_t i = 0; (::sc::lowered::tick(), i < puffs_.size()); ++i)
-      if (::sc::converted::at(puffs_, i).born < ::sc::converted::at(puffs_, static_cast<std::size_t>(at)).born) at = static_cast<i32>(i);
+      if (::kern::converted::at(puffs_, i).born < ::kern::converted::at(puffs_, static_cast<std::size_t>(at)).born) at = static_cast<i32>(i);
   }
   const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
   const u32 serial = e.serial;
@@ -676,7 +676,7 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
   const u32 seed = hash_text(e.id + ":" + std::to_string(serial));
   const f32 a = unit_hash(seed) * 2 * kPi, side = (unit_hash(seed + 17) - 0.5f) * (0.22f + e.scale * 0.18f);
   const bool ember = progress > 0.67f && serial % 5 == 0;
-  Puff& p = ::sc::converted::at(puffs_, static_cast<std::size_t>(at));
+  Puff& p = ::kern::converted::at(puffs_, static_cast<std::size_t>(at));
   p.alive = true;
   p.ember = ember;
   p.pos = e.at + Vec3{std::cos(a) * side, std::sin(a) * side, 0};
@@ -693,8 +693,8 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
 
 void SmokeField::update(f32 now, f32 dt) {
   for (std::size_t i = 0; i < effects_.size();) { ::sc::lowered::tick();
-    SmokeEffect& e = ::sc::converted::at(effects_, i);
-    if (now >= e.expires) { ::sc::converted::erase(effects_, effects_.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
+    SmokeEffect& e = ::kern::converted::at(effects_, i);
+    if (now >= e.expires) { ::kern::converted::erase(effects_, effects_.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
     const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
     const f32 interval = (155 - progress * 72) / 1000;
     if (now - e.last_emit >= interval) {
@@ -809,14 +809,14 @@ template <> struct Values<::sc_new_gaps_rules::sc::gaps::Organic> { static const
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_gaps_rules_cpp) {
+KERN_TEST(lowered_gaps_rules_cpp) {
   ::sc::lowered::World world({"Sirens"});
   ::sc_new_gaps_rules::sc::gaps::g_sirens.bind(world.logic(false));
   ::sc_old_gaps_rules::sc::gaps::bind_sirens(world.instance(true, "Sirens"));
   ::sc_new_gaps_rules::sc::gaps::bind_sirens(world.logic(false));
   {  // SmokeField::SmokeField(u32)  ->  SmokeField::of(u32)
     ::sc::lowered::Tally tally("SmokeField::SmokeField(u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<::sc_old_gaps_rules::sc::gaps::SmokeField> o_obj;
       std::optional<::sc_new_gaps_rules::sc::gaps::SmokeField> n_obj;
@@ -835,7 +835,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // horn_low()  ->  horn_low()
     ::sc::lowered::Tally tally("horn_low()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::horn_low())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::horn_low())>> n_r;
@@ -851,7 +851,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // horn_high()  ->  horn_high()
     ::sc::lowered::Tally tally("horn_high()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::horn_high())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::horn_high())>> n_r;
@@ -867,7 +867,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // car_gain()  ->  car_gain()
     ::sc::lowered::Tally tally("car_gain()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::car_gain())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::car_gain())>> n_r;
@@ -883,7 +883,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // drone_gain()  ->  drone_gain()
     ::sc::lowered::Tally tally("drone_gain()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::drone_gain())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::drone_gain())>> n_r;
@@ -899,7 +899,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // whoop_base()  ->  whoop_base()
     ::sc::lowered::Tally tally("whoop_base()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::whoop_base())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::whoop_base())>> n_r;
@@ -915,7 +915,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // organic_gain()  ->  organic_gain()
     ::sc::lowered::Tally tally("organic_gain()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::organic_gain())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::organic_gain())>> n_r;
@@ -931,7 +931,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // organic_min_gap_s()  ->  organic_min_gap_s()
     ::sc::lowered::Tally tally("organic_min_gap_s()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_gaps_rules::sc::gaps::organic_min_gap_s())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_gaps_rules::sc::gaps::organic_min_gap_s())>> n_r;
@@ -947,7 +947,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // horn_hz(f32)  ->  horn_hz(f32)
     ::sc::lowered::Tally tally("horn_hz(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -966,7 +966,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // whoop_hz(f32)  ->  whoop_hz(f32)
     ::sc::lowered::Tally tally("whoop_hz(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -985,7 +985,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // siren_gain(f32, f32, f32)  ->  siren_gain(f32, f32, f32)
     ::sc::lowered::Tally tally("siren_gain(f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1010,7 +1010,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // siren_cutoff(f32)  ->  siren_cutoff(f32)
     ::sc::lowered::Tally tally("siren_cutoff(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f32> o0;
       ::sc::lowered::Arg<f32> n0;
@@ -1029,7 +1029,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // SirenVoice::update(f32, f32, f32, f32)  ->  SirenVoice::update(f32, f32, f32, f32)
     ::sc::lowered::Tally tally("SirenVoice::update(f32, f32, f32, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_gaps_rules::sc::gaps::SirenVoice o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1062,7 +1062,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // post_arrival_grace_ms(i32)  ->  post_arrival_grace_ms(i32)
     ::sc::lowered::Tally tally("post_arrival_grace_ms(i32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<i32> o0;
       ::sc::lowered::Arg<i32> n0;
@@ -1081,7 +1081,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // organic_rate(Organic)  ->  organic_rate(Organic)
     ::sc::lowered::Tally tally("organic_rate(Organic)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_gaps_rules::sc::gaps::Organic> o0;
       ::sc::lowered::Arg<::sc_new_gaps_rules::sc::gaps::Organic> n0;
@@ -1100,7 +1100,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
   }
   {  // SmokeField::emit(SmokeEffect &, f32)  ->  SmokeField::emit(SmokeEffect &, f32)
     ::sc::lowered::Tally tally("SmokeField::emit(SmokeEffect &, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_gaps_rules::sc::gaps::SmokeField o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1123,7 +1123,7 @@ SC_TEST(lowered_gaps_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_gaps_rules::sc::gaps::g_sirens.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_gaps_rules::sc::gaps::g_sirens.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_gaps_rules::sc::gaps::bind_sirens(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

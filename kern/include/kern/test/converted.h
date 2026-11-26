@@ -1,7 +1,8 @@
-// What the generated tests of tests/converted/ share (tools/cpp_to_blueprint.py --test writes them).
+// What the generated tests share (tools/cpp_to_blueprint.py --test writes them: one test of each converted source
+// file, in the namespace the converter was given - --convert <namespace>).
 //
-// A source file was converted to a Blueprint of the level. Its test holds the source of every
-// converted function once more - the text as it stands in the game, compiled with the numbers and
+// A source file was converted to a Blueprint of the project or a level. Its test holds the source of every
+// converted function once more - the text as it stands in the program, compiled with the numbers and
 // the mathematics of the Blueprint language (f32 is a 64-bit number there, std::sin is
 // kern::math::sin; a class is compiled along, so that its data is 64-bit too). That is what the
 // source computes in the Blueprint language. The Blueprint - in the interpreter and as its
@@ -40,18 +41,18 @@
 #include <type_traits>
 #include <vector>
 
-#include "../src/blueprint_call.h"
 #include "kern/logic/engine_api.h"
-#include "../src/common.h"
 #include "kern/core/map.h"
 #include "kern/logic/nodes.h"
-#include "cost.h"
+#include "kern/test/cost.h"
 #include "kern/game/runtime.h"
 #include "kern/kern.h"
-#include "rule_blueprint.h"
-#include "test_util.h"
+#include "kern/test/blueprint.h"
+#include "kern/test/test.h"
 
-namespace sc::converted {
+namespace kern::converted {
+
+using namespace ::kern::test;   // (the Blueprints a test runs, the cost of a call, the registry: kern/test/)
 
 using Value = kern::logic::Value;
 
@@ -314,9 +315,16 @@ template <class SK> struct Shape<kern::Set<SK>> {
   template <class M> static ShapedSet<SK, M> of(const M& s) { return {s}; }
 };
 
+/// The numbers the arguments are drawn from: xorshift32 - the same on every machine and in every run.
+struct Rng {
+  u32 s = 0x9e3779b9u;
+  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  f32 unit() { return static_cast<f32>(next() >> 8) * (1.0f / 16777216.0f); }
+  f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
+};
 /// The arguments a function is tried with: the same in every run.
 struct Draw {
-  Rng rng{0x5eed1234u};
+  Rng rng{0x5eed1234u};   // (xorshift: the same numbers on every machine)
   u32 below(u32 n) { return n ? rng.next() % n : 0; }
   f64 number() {
     switch (below(10)) {
@@ -475,7 +483,7 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 // ---- the engine in a test ----
 // A converted function that calls the engine calls a node of the engine in its Blueprint (kern/logic/
 // engine_api.h). In a test both go to a stand-in that answers from the call itself and keeps every call
-// (or, SC_ENGINE=real, to the engine itself, each side with objects of its own - sc::real_engine):
+// (or, KERN_TEST_ENGINE=real, to the engine itself, each side with objects of its own - kern::test::real_engine):
 // the source through the stand-in classes the test has for the engine's (they derive from EngineObject -
 // an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
 // have asked the same, call for call (Tally::take).
@@ -560,7 +568,7 @@ template <class T> T* engine_object(long long handle) {
   return object;
 }
 /// What the source asked the engine in the call being compared - and, where the test runs on the engine
-/// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
+/// itself (KERN_TEST_ENGINE=real: kern::test::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
 inline kern::logic::EngineObjects g_source_objects;
 /// (the places of the engine the source holds: set back before every call of the engine, read again after it - below)
@@ -1366,11 +1374,11 @@ inline constexpr int kCalls = 300;
 // `counted` - and while the class's function runs: the class's glue says when (logic::native_probe).
 // What makes the arguments and takes the results is outside on both sides.
 inline long g_source_asks = 0, g_class_asks = 0;
-inline cost::Trace g_source_trace, g_class_trace;   // (from where they asked: kept for the function SC_COST_WHERE names - cost.h)
+inline cost::Trace g_source_trace, g_class_trace;   // (from where they asked: kept for the function KERN_COST_WHERE names - kern/test/cost.h)
 // ---- what C++ leaves open in an object: what nothing sets (a member without an initializer, `i32 on;`) ----
 // Its value is indeterminate - C++ does not say it; the Blueprint starts every value at the zero of its type.
 // The source's call runs on zeroed memory - its stack below the test (zero_stack), what it gives in zeroed
-// room (Zeroed), what it asks the allocator for zeroed (test_main.cpp) -: then what C++ leaves open is that
+// room (Zeroed), what it asks the allocator for zeroed (the runner's allocator: kern/tools/test_main.cpp) -: then what C++ leaves open is that
 // zero, which is one of the values C++ allows there. Nothing C++ sets changes: a value set overwrites it.
 [[gnu::noinline]] inline void zero_stack() {
   unsigned char room[1 << 16];
@@ -1706,14 +1714,14 @@ template <class T> T draw_callback(Draw& draw) {
   return out;
 }
 
-/// The Blueprints of the level's actors a converted Blueprint calls on them (Call on Actor, Get Variable on
+/// The Blueprints of the actors a converted Blueprint calls on them (Call on Actor, Get Variable on
 /// Actor - kern::logic::ActorBlueprint in the source), running beside it in its runtime, each by its name
-/// (RuleBlueprint: the host's find_actor finds them) - and for the source in a runtime of their own, bound
+/// (BlueprintRun: the host's find_actor finds them) - and for the source in a runtime of their own, bound
 /// to its ActorBlueprints. The engine is the test's stand-in in all of them. Every call begins with the
 /// actors' variables as they were when the runtime started, in all three, and they must be the same after it.
 struct ActorsStarted {
   std::vector<std::pair<kern::logic::Instance*, std::vector<std::pair<std::string, Value>>>> started;
-  void keep(RuleBlueprint& r, const std::vector<std::string>& actors) {
+  void keep(BlueprintRun& r, const std::vector<std::string>& actors) {
     for (const std::string& name : actors)
       if (kern::logic::Instance* i = r.find(name)) {
         std::vector<std::pair<std::string, Value>> vars;
@@ -1737,56 +1745,56 @@ struct ActorsStarted {
 };
 
 /// A converted source file's Blueprint, in the interpreter and as its compiled class. (`actors`: the
-/// level's actors whose Blueprints it calls on them - see ActorsStarted.)
+/// actors whose Blueprints it calls on them - see ActorsStarted.)
 struct Blueprint {
-  std::unique_ptr<RuleBlueprint> interpreted, compiled, source;
+  std::unique_ptr<BlueprintRun> interpreted, compiled, source;
   ActorsStarted interpreted_actors, compiled_actors, source_actors;
   kern::logic::Instance* interp = nullptr;
   kern::logic::Instance* native = nullptr;
   const char* name;
   std::vector<std::string> others;
   explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) : name(actor), others(actors) {
-    // (What it takes before the first call - reading the Blueprint and those it uses from the level, linking,
+    // (What it takes before the first call - reading the Blueprint and those it uses from the project and its levels, linking,
     // checking and starting it, in the interpreter and as the class - is said like a function's time: ~Began.)
     const struct Began {
       const char* actor;
       std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
       ~Began() {
         const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count();
-        if (took >= 1.0) std::printf("  time: Blueprint %s: %.1f s before its first call (read from the level, linked, checked and started - the interpreter and the class)\n", actor, took);
+        if (took >= 1.0) std::printf("  time: Blueprint %s: %.1f s before its first call (read, linked, checked and started - the interpreter and the class)\n", actor, took);
       }
     } began{actor};
-    interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
-    compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
-    // (The loop guard is the host's: the game's functions loop long - a sound computed sample by sample, a
-    // number raised to a 256-bit power -, and the game sets it to what they take: as here, rules::kLoopBudget.)
-    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;
+    interpreted = std::make_unique<BlueprintRun>(actor, nullptr, false, actors);
+    compiled = std::make_unique<BlueprintRun>(actor, nullptr, true, actors);
+    // (The loop guard is the project's - settings "loopBudget" -, as the program runs them: a program's functions may
+    // loop long - a sound computed sample by sample, a number raised to a 256-bit power.)
+    interpreted->rt.budget = compiled->rt.budget = loop_budget();
     interp = interpreted->inst;
     native = compiled->inst;
-    SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
-    SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
+    KERN_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
+    KERN_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
     if (!actors.empty()) {
-      source = std::make_unique<RuleBlueprint>(nullptr, nullptr, true, actors);
-      source->rt.budget = sc::rules::kLoopBudget;
+      source = std::make_unique<BlueprintRun>(nullptr, nullptr, true, actors);
+      source->rt.budget = loop_budget();
       source->host.keeps = &g_source_engine;   // (what the actors ask the engine for the source: what the source asks)
       source->host.keeps_objects = &g_source_objects;
-      SC_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
+      KERN_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
       interpreted_actors.keep(*interpreted, actors);
       compiled_actors.keep(*compiled, actors);
       source_actors.keep(*source, actors);
     }
-    SC_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
+    KERN_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
     kern::logic::native_probe = class_runs;
   }
   /// Did a call stop the Blueprint because it held an entry of a list that handlers changed (Runtime::held_lost)? In C++
   /// the reference would go nowhere - what the call gives C++ leaves open. The Blueprint (class and interpreter) is made
   /// anew - a stopped one takes no call - and true.
   bool held_lost() {
-    const auto lost = [](const std::unique_ptr<RuleBlueprint>& r) { return r && r->host.errors.find("a call held an entry of a list while handlers ran") != std::string::npos; };
+    const auto lost = [](const std::unique_ptr<BlueprintRun>& r) { return r && r->host.errors.find("a call held an entry of a list while handlers ran") != std::string::npos; };
     if (!lost(interpreted) && !lost(compiled)) return false;
-    interpreted = std::make_unique<RuleBlueprint>(name, nullptr, false, others);
-    compiled = std::make_unique<RuleBlueprint>(name, nullptr, true, others);
-    interpreted->rt.budget = compiled->rt.budget = sc::rules::kLoopBudget;   // (as the game sets it)
+    interpreted = std::make_unique<BlueprintRun>(name, nullptr, false, others);
+    compiled = std::make_unique<BlueprintRun>(name, nullptr, true, others);
+    interpreted->rt.budget = compiled->rt.budget = loop_budget();   // (as the program runs them)
     interp = interpreted->inst;
     native = compiled->inst;
     interpreted_actors = {};
@@ -1934,7 +1942,7 @@ struct Tally {
     held += given;
     work += given;
     if (left || !defined(want)) { ++outside; return; }
-    // The engine itself (SC_ENGINE=real) refused a call the source made: what the source got there is the
+    // The engine itself (KERN_TEST_ENGINE=real) refused a call the source made: what the source got there is the
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
     // compared calls a function needs stay twenty). (A call refused on a side of the Blueprint only is in
     // its record of the engine's calls: that differs from the source's - see engine_same.)
@@ -2018,7 +2026,7 @@ struct Tally {
     ++compared;
     if (class_asks > source_asks) {
       if (++costlier == 1 && cost::tracing) {
-        // (SC_COST_WHERE names this function: from where the source and the class asked, in the first such call)
+        // (KERN_COST_WHERE names this function: from where the source and the class asked, in the first such call)
         std::printf("  cost of %s(%s):\n", function, describe().c_str());
         cost::print("the source", g_source_trace, source_asks);
         cost::print("the class", g_class_trace, class_asks);
@@ -2058,12 +2066,12 @@ struct Tally {
     if (refused > 0)
       std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
                   first_refused.c_str());
-    SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
+    KERN_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
     const bool long_calls = compared >= 5 && compared < 20 && work >= kLongWork;
     if (long_calls) std::printf("  note: %s: %d calls compared (their work: %lld values and loop passes; of a function whose calls are less work, twenty at least are)\n", function, compared, work);
-    SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
+    KERN_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
   }
 };
 
@@ -2078,7 +2086,7 @@ inline bool g_open = false;
 inline std::jmp_buf g_bail;
 /// (What a call that is given up had on the heap stays there: the leak check does not count what the
 /// source allocates while it may be given up.)
-#if defined(SC_ASAN)
+#if defined(KERN_ASAN)
 extern "C" void __lsan_disable();
 extern "C" void __lsan_enable();
 inline void may_bail(bool on) { on ? __lsan_disable() : __lsan_enable(); }
@@ -2597,4 +2605,4 @@ template <class T> T draw_class(Draw& draw) {
   }
 }
 
-}  // namespace sc::converted
+}  // namespace kern::converted

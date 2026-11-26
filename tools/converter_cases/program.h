@@ -1,7 +1,7 @@
 #pragma once
 #include "kern/app/app.h"
 #include "kern/math/math.h"
-namespace sc {
+namespace cases {
 /// The program's App (an object of the engine's interface kern::App): its one object is made in the entry kern_main.
 class CasesApp final : public kern::App {
  public:

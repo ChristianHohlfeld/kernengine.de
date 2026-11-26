@@ -379,10 +379,10 @@ template <> struct Values<::kern::AlphaMode> { static constexpr long long all[] 
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_mp_art_cpp) {
+KERN_TEST(lowered_mp_art_cpp) {
   {  // MpArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &)  ->  MpArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &)
     ::sc::lowered::Tally tally("MpArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_mp_art::sc::MpArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -415,7 +415,7 @@ SC_TEST(lowered_mp_art_cpp) {
   }
   {  // MpArt::begin()  ->  MpArt::begin()
     ::sc::lowered::Tally tally("MpArt::begin()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_mp_art::sc::MpArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -431,7 +431,7 @@ SC_TEST(lowered_mp_art_cpp) {
   }
   {  // MpArt::end()  ->  MpArt::end()
     ::sc::lowered::Tally tally("MpArt::end()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_mp_art::sc::MpArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

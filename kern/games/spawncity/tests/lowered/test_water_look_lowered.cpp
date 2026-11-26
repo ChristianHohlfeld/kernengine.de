@@ -228,10 +228,10 @@ template <> struct Fields<::sc_new_water_look::sc::WaterLook> { static auto of(:
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_water_look_cpp) {
+KERN_TEST(lowered_water_look_cpp) {
   {  // WaterLook::name()  ->  WaterLook::name()
     ::sc::lowered::Tally tally("WaterLook::name()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_water_look::sc::WaterLook o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

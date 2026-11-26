@@ -79,6 +79,7 @@ called_by_tests=(
 sources=()
 for d in core physics geo gfx scene audio net logic api app game; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
 sources+=("$kern/tests/gl_stub.cpp")
+sources+=("$kern/tools/test_memory.cpp")   # (the allocator of the tests: what the comparison counts - kern/test/cost.h)
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
 while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
@@ -87,7 +88,7 @@ while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cp
 beleg="${SC_BELEG:-}"
 if [ -n "$beleg" ]; then
   [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
-  keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
+  keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$kern"/tools/test_memory.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
   sources=("${keep[@]}")
 fi
 flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
@@ -153,7 +154,7 @@ rc=0
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
-if [ $# -eq 0 ] && [ "$pass" != 1 ] && [ -z "$beleg" ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
+if [ $# -eq 0 ] && [ "$pass" != 1 ] && [ -z "$beleg" ]; then KERN_TEST_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The differential tests in the form "two builds" (tools/source_diff.py; tests/lowered/builds/<file>/): each side is the
 # whole program in its state - the old tree (the game's sources as they stood at the test's base: these sources with
 # old/ put over them and the files named in gone taken away) and the sources as they stand -, the engine and the level
@@ -192,7 +193,7 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
     done
   }
   oflags=(); for f in "${flags[@]}"; do [ "$f" = "-I$game/src" ] && oflags+=("-I$tree") || oflags+=("$f"); done
-  engine=(); for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*|*_tests_test_main.cpp-*) engine+=("$f") ;; esac; done
+  engine=(); for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*|*_kern_tools_test_memory*|*_tests_test_main.cpp-*) engine+=("$f") ;; esac; done
   for side in new old; do
     if [ "$side" = new ]; then t="$game/src" d="$drv" sf=("${flags[@]}"); else t="$tree" d="$bout/tree/tests/${drv#"$here"/}" sf=("${oflags[@]}"); fi
     mapfile -t objs < <(side_objects "$t")

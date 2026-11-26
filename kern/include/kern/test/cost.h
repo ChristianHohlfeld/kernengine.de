@@ -1,35 +1,36 @@
 // What a function's own work costs: how often it asks for memory.
 //
-// The allocator of the tests counts while `counting` is on (test_main.cpp). The comparison of a
+// The allocator of the tests counts while `counting` is on: the program that runs the tests calls asked() for every
+// piece of memory it is asked for (kern/tools/test_main.cpp does it in operator new). The comparison of a
 // converted function with its source turns it on around the source's call and - through the
-// engine's logic::native_probe - around the call of the Blueprint's compiled class (converted.h):
+// engine's logic::native_probe - around the call of the Blueprint's compiled class (kern/test/converted.h):
 // the class does not ask for memory more often than the source it was written from.
 //
-// Where it asks: SC_COST_WHERE=<function> (the name a test's cost line has) keeps, for that function,
+// Where it asks: KERN_COST_WHERE=<function> (the name a test's cost line has) keeps, for that function,
 // from where each piece of memory is asked for - in the source and in the class -, and the first
 // call in which the class asks more often prints both (converted.h, Tally::take). A tool to find
 // out why; it changes nothing that is counted.
 #pragma once
 
 // Are the tests built with AddressSanitizer? GCC says it with __SANITIZE_ADDRESS__, clang - the compiler of the
-// game and of the tests (run_tests.sh) - with __has_feature(address_sanitizer).
+// tests - with __has_feature(address_sanitizer).
 #if defined(__SANITIZE_ADDRESS__)
-#define SC_ASAN 1
+#define KERN_ASAN 1
 #elif defined(__has_feature)
 #if __has_feature(address_sanitizer)
-#define SC_ASAN 1
+#define KERN_ASAN 1
 #endif
 #endif
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(SC_ASAN)
+#if defined(KERN_ASAN)
 #include <execinfo.h>
 extern "C" void __sanitizer_symbolize_pc(void* pc, const char* format, char* out, unsigned long size);
 #endif
 
-namespace sc::cost {
+namespace kern::test::cost {
 
 inline bool counting = false;  // the allocator counts
 inline long asks = 0;          // what it counted since the count began
@@ -41,14 +42,14 @@ struct Trace {
   int deep[kAsks];
   int kept = 0;
 };
-inline bool tracing = false;   // the function being compared is the one SC_COST_WHERE names
+inline bool tracing = false;   // the function being compared is the one KERN_COST_WHERE names
 inline Trace now;              // the count that runs, or the one that ended last
 
 /// Called by the allocator for every piece of memory it is asked for.
 inline void asked() {
   if (!counting) return;
   ++asks;
-#if defined(SC_ASAN)
+#if defined(KERN_ASAN)
   if (tracing && now.kept < Trace::kAsks) {
     counting = false;  // (what taking the trace asks for is not the function's)
     now.deep[now.kept] = backtrace(now.frame[now.kept], Trace::kDeep);
@@ -66,16 +67,16 @@ inline long end() {
   counting = false;
   return asks;
 }
-/// The function SC_COST_WHERE names (nullptr: none).
+/// The function KERN_COST_WHERE names (nullptr: none).
 inline const char* where() {
-  static const char* const name = std::getenv("SC_COST_WHERE");
+  static const char* const name = std::getenv("KERN_COST_WHERE");
   return name;
 }
 /// Prints a trace: per piece of memory the functions it was asked for from, innermost first -
 /// without the allocator's own frames and what lies outside the function's call.
 inline void print(const char* who, const Trace& t, long asked_for) {
   std::printf("    %s asks %ld time(s)%s\n", who, asked_for, asked_for > t.kept ? " (the first are shown)" : "");
-#if defined(SC_ASAN)
+#if defined(KERN_ASAN)
   for (int k = 0; k < t.kept; ++k) {
     std::printf("      %d:", k + 1);
     int shown = 0;
@@ -83,10 +84,10 @@ inline void print(const char* who, const Trace& t, long asked_for) {
       char text[512];
       __sanitizer_symbolize_pc(t.frame[k][d], "%f %S", text, sizeof text);
       // (the allocator and the count themselves, and from the comparison outward: not the function's)
-      if (std::strstr(text, "sc::cost::") || std::strstr(text, "asked_for_memory") || std::strstr(text, "__sanitizer") || std::strstr(text, "__interceptor") ||
+      if (std::strstr(text, "kern::test::cost::") || std::strstr(text, "asked_for_memory") || std::strstr(text, "__sanitizer") || std::strstr(text, "__interceptor") ||
           std::strstr(text, "operator new") || std::strstr(text, "__asan") || std::strstr(text, "backtrace"))
         continue;
-      if (std::strstr(text, "sc::converted::counted") || std::strstr(text, "Native::call") || std::strstr(text, "_Native")) break;
+      if (std::strstr(text, "kern::converted::counted") || std::strstr(text, "Native::call") || std::strstr(text, "_Native")) break;
       std::printf("%s %.200s\n", shown ? "         <-" : "", text);
       ++shown;
     }
@@ -95,4 +96,4 @@ inline void print(const char* who, const Trace& t, long asked_for) {
 #endif
 }
 
-}  // namespace sc::cost
+}  // namespace kern::test::cost

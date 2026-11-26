@@ -102,7 +102,7 @@ rules::Blueprint g_rules;
 Value to_value(const Row& r) { return Value::structure({Value::integer(r.owner), Value::integer(r.pilot), Value::integer(r.passenger)}); }
 Value to_value(const std::vector<Row>& rows) {
   std::vector<Value> list;
-  list.reserve(::sc::converted::count(rows.size()));
+  list.reserve(::kern::converted::count(rows.size()));
   for (const Row& r : rows) list.push_back(to_value(r));
   return Value::of(std::move(list));
 }
@@ -126,28 +126,28 @@ kern::logic::Instance* blueprint() { return g_rules.running; }
 
 std::string result_name(Result r) {
   std::vector<Value> out;
-  return g_rules.call("ResultName", {of_enum(r)}, out) && !out.empty() ? ::sc::converted::at(out, 0).as_text() : std::string();
+  return g_rules.call("ResultName", {of_enum(r)}, out) && !out.empty() ? ::kern::converted::at(out, 0).as_text() : std::string();
 }
 
 Row Table::get(u8 owner) const {
   std::vector<Value> out;
-  return g_rules.call("Get", {to_value(rows_), Value::integer(owner)}, out) && !out.empty() ? to_row(::sc::converted::at(out, 0)) : Row{owner, kNone, kNone};
+  return g_rules.call("Get", {to_value(rows_), Value::integer(owner)}, out) && !out.empty() ? to_row(::kern::converted::at(out, 0)) : Row{owner, kNone, kNone};
 }
 
 bool Table::seat_of(u8 player, Row& row, Seat& seat) const {
   std::vector<Value> out;
-  if (!g_rules.call("SeatOf", {to_value(rows_), Value::integer(player)}, out) || out.size() < 3 || !::sc::converted::at(out, 0).b) return false;
-  row = to_row(::sc::converted::at(out, 1));
-  seat = static_cast<Seat>(::sc::converted::at(out, 2).i);
+  if (!g_rules.call("SeatOf", {to_value(rows_), Value::integer(player)}, out) || out.size() < 3 || !::kern::converted::at(out, 0).b) return false;
+  row = to_row(::kern::converted::at(out, 1));
+  seat = static_cast<Seat>(::kern::converted::at(out, 2).i);
   return true;
 }
 
 Result Table::claim(u8 owner, u8 player, Seat seat) {
   std::vector<Value> out;
   if (!g_rules.call("Claim", {to_value(rows_), Value::integer(owner), Value::integer(player), of_enum(seat)}, out) || out.size() < 2) return Result::invalid;
-  const Result r = static_cast<Result>(::sc::converted::at(out, 1).i);
+  const Result r = static_cast<Result>(::kern::converted::at(out, 1).i);
   if (r == Result::ok) {
-    rows_ = to_rows(::sc::converted::at(out, 0));
+    rows_ = to_rows(::kern::converted::at(out, 0));
     ++revision_;
   }
   return r;
@@ -156,9 +156,9 @@ Result Table::claim(u8 owner, u8 player, Seat seat) {
 Result Table::release(u8 owner, u8 player, Seat seat) {
   std::vector<Value> out;
   if (!g_rules.call("Release", {to_value(rows_), Value::integer(owner), Value::integer(player), of_enum(seat)}, out) || out.size() < 2) return Result::invalid;
-  const Result r = static_cast<Result>(::sc::converted::at(out, 1).i);
+  const Result r = static_cast<Result>(::kern::converted::at(out, 1).i);
   if (r == Result::ok) {
-    rows_ = to_rows(::sc::converted::at(out, 0));
+    rows_ = to_rows(::kern::converted::at(out, 0));
     ++revision_;
   }
   return r;
@@ -166,8 +166,8 @@ Result Table::release(u8 owner, u8 player, Seat seat) {
 
 bool Table::drop(u8 player) {
   std::vector<Value> out;
-  if (!g_rules.call("Drop", {to_value(rows_), Value::integer(player)}, out) || out.size() < 2 || !::sc::converted::at(out, 1).b) return false;
-  rows_ = to_rows(::sc::converted::at(out, 0));
+  if (!g_rules.call("Drop", {to_value(rows_), Value::integer(player)}, out) || out.size() < 2 || !::kern::converted::at(out, 1).b) return false;
+  rows_ = to_rows(::kern::converted::at(out, 0));
   ++revision_;
   return true;
 }
@@ -339,15 +339,15 @@ template <> struct Values<::sc_new_jet_seats::sc::seats::Result> { static conste
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_jet_seats_cpp) {
+KERN_TEST(lowered_jet_seats_cpp) {
   ::sc::lowered::World world({"JetSeats"});
   ::sc_new_jet_seats::sc::seats::g_rules.bind(world.logic(false));
   ::sc_old_jet_seats::sc::seats::bind(world.instance(true, "JetSeats"));
   ::sc_new_jet_seats::sc::seats::bind(world.logic(false));
-  SC_CHECK(::sc_old_jet_seats::sc::seats::blueprint() == world.instance(true, "JetSeats"), "blueprint(): not the Blueprint it was bound to");
+  KERN_CHECK(::sc_old_jet_seats::sc::seats::blueprint() == world.instance(true, "JetSeats"), "blueprint(): not the Blueprint it was bound to");
   {  // result_name(Result)  ->  result_name(Result)
     ::sc::lowered::Tally tally("result_name(Result)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_jet_seats::sc::seats::Result> o0;
       ::sc::lowered::Arg<::sc_new_jet_seats::sc::seats::Result> n0;
@@ -366,7 +366,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::get(u8)  ->  Table::get(u8)
     ::sc::lowered::Tally tally("Table::get(u8)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -390,7 +390,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::seat_of(u8, Row &, Seat &)  ->  Table::seat_of(u8, Row &, Seat &)
     ::sc::lowered::Tally tally("Table::seat_of(u8, Row &, Seat &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -422,7 +422,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::claim(u8, u8, Seat)  ->  Table::claim(u8, u8, Seat)
     ::sc::lowered::Tally tally("Table::claim(u8, u8, Seat)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -452,7 +452,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::release(u8, u8, Seat)  ->  Table::release(u8, u8, Seat)
     ::sc::lowered::Tally tally("Table::release(u8, u8, Seat)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -482,7 +482,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::drop(u8)  ->  Table::drop(u8)
     ::sc::lowered::Tally tally("Table::drop(u8)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -506,7 +506,7 @@ SC_TEST(lowered_jet_seats_cpp) {
   }
   {  // Table::load(u32, const std::vector<Row> &)  ->  Table::load(u32, const std::vector<Row> &)
     ::sc::lowered::Tally tally("Table::load(u32, const std::vector<Row> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_jet_seats::sc::seats::Table o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -531,7 +531,7 @@ SC_TEST(lowered_jet_seats_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_jet_seats::sc::seats::g_rules.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_jet_seats::sc::seats::g_rules.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_jet_seats::sc::seats::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

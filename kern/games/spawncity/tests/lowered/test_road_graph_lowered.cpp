@@ -94,7 +94,7 @@ f32 dist(Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 u64 lane_signature(const std::vector<Lane>& lanes) {
   u64 h = 1469598103934665603ull;
   for (std::size_t i = 0; i < lanes.size(); ++i) { ::sc::lowered::tick();
-    h ^= (static_cast<u64>(i) << 1) | (::sc::converted::at(lanes, i).alive ? 1u : 0u);
+    h ^= (static_cast<u64>(i) << 1) | (::kern::converted::at(lanes, i).alive ? 1u : 0u);
     h *= 1099511628211ull;
   }
   return h;
@@ -105,7 +105,7 @@ i32 RoadGraph::node_at(Vec2 p) {
   for (i32 dx = -1; (::sc::lowered::tick(), dx <= 1); ::sc::lowered::pre_inc(dx))
     for (i32 dy = -1; dy <= 1; ::sc::lowered::pre_inc(dy)) { ::sc::lowered::tick();
       auto it = cells_.find(cell_key(::sc::lowered::plus(cx, dx), ::sc::lowered::plus(cy, dy)));
-      if (it != cells_.end() && dist(::sc::converted::at(nodes_, it->second).p, p) < kCell) return it->second;
+      if (it != cells_.end() && dist(::kern::converted::at(nodes_, it->second).p, p) < kCell) return it->second;
     }
   const i32 id = static_cast<i32>(nodes_.size());
   nodes_.push_back({p, {}});
@@ -118,15 +118,15 @@ void RoadGraph::rebuild(const std::vector<Lane>& lanes) {
   cells_.clear();
   for (const Lane& l : lanes) { ::sc::lowered::tick();
     if (!l.alive || l.points.size() < 2) continue;
-    i32 prev = node_at(::sc::converted::at(l.points, 0));
+    i32 prev = node_at(::kern::converted::at(l.points, 0));
     for (std::size_t i = 1; i < l.points.size(); ++i) { ::sc::lowered::tick();
-      const i32 cur = node_at(::sc::converted::at(l.points, i));
+      const i32 cur = node_at(::kern::converted::at(l.points, i));
       if (cur == prev) continue;
-      const f32 len = dist(::sc::converted::at(nodes_, prev).p, ::sc::converted::at(nodes_, cur).p);
+      const f32 len = dist(::kern::converted::at(nodes_, prev).p, ::kern::converted::at(nodes_, cur).p);
       auto link = [&](i32 a, i32 b) {
-        for (auto& e : ::sc::converted::at(nodes_, a).edges)
+        for (auto& e : ::kern::converted::at(nodes_, a).edges)
           if (e.first == b) return;
-        ::sc::converted::at(nodes_, a).edges.push_back({b, len});
+        ::kern::converted::at(nodes_, a).edges.push_back({b, len});
       };
       link(prev, cur);
       link(cur, prev);
@@ -140,7 +140,7 @@ i32 RoadGraph::nearest(Vec2 p, f32 max_m) const {
   i32 best = -1;
   f32 bd = max_m;
   for (std::size_t i = 0; i < nodes_.size(); ++i) { ::sc::lowered::tick();
-    const f32 d = dist(::sc::converted::at(nodes_, i).p, p);
+    const f32 d = dist(::kern::converted::at(nodes_, i).p, p);
     if (d < bd) { bd = d; best = static_cast<i32>(i); }
   }
   return best;
@@ -156,27 +156,27 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
   std::vector<u8> closed(n, 0);
   using Item = std::pair<f32, i32>;
   std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
-  ::sc::converted::at(g, a) = 0;
-  open.push({dist(::sc::converted::at(nodes_, a).p, ::sc::converted::at(nodes_, b).p), a});
+  ::kern::converted::at(g, a) = 0;
+  open.push({dist(::kern::converted::at(nodes_, a).p, ::kern::converted::at(nodes_, b).p), a});
   u32 expanded = 0;
   while (!open.empty()) { ::sc::lowered::tick();
     const i32 cur = open.top().second;
     open.pop();
-    if (::sc::converted::at(closed, cur)) continue;
-    ::sc::converted::at(closed, cur) = 1;
+    if (::kern::converted::at(closed, cur)) continue;
+    ::kern::converted::at(closed, cur) = 1;
     if (cur == b || ++expanded > 20000) break;
-    for (const auto& [nb, len] : ::sc::converted::at(nodes_, cur).edges) { ::sc::lowered::tick();
-      const f32 ng = ::sc::converted::at(g, cur) + len;
-      if (ng < ::sc::converted::at(g, nb)) {
-        ::sc::converted::at(g, nb) = ng;
-        ::sc::converted::at(came, nb) = cur;
-        open.push({ng + dist(::sc::converted::at(nodes_, nb).p, ::sc::converted::at(nodes_, b).p), nb});
+    for (const auto& [nb, len] : ::kern::converted::at(nodes_, cur).edges) { ::sc::lowered::tick();
+      const f32 ng = ::kern::converted::at(g, cur) + len;
+      if (ng < ::kern::converted::at(g, nb)) {
+        ::kern::converted::at(g, nb) = ng;
+        ::kern::converted::at(came, nb) = cur;
+        open.push({ng + dist(::kern::converted::at(nodes_, nb).p, ::kern::converted::at(nodes_, b).p), nb});
       }
     }
   }
-  if (a != b && ::sc::converted::at(came, b) < 0) return false;
+  if (a != b && ::kern::converted::at(came, b) < 0) return false;
   std::vector<Vec2> rev;
-  for (i32 c = b; (::sc::lowered::tick(), c >= 0); c = c == a ? -1 : ::sc::converted::at(came, c)) rev.push_back(::sc::converted::at(nodes_, c).p);
+  for (i32 c = b; (::sc::lowered::tick(), c >= 0); c = c == a ? -1 : ::kern::converted::at(came, c)) rev.push_back(::kern::converted::at(nodes_, c).p);
   out.push_back(from);
   for (auto it = rev.rbegin(); (::sc::lowered::tick(), it != rev.rend()); ++it) out.push_back(*it);
   out.push_back(to);
@@ -185,11 +185,11 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
 
 Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   if (path.empty()) return p;
-  if (path.size() < 2) return ::sc::converted::at(path, 0);
+  if (path.size() < 2) return ::kern::converted::at(path, 0);
   std::size_t bi = 0;
   f32 bt = 0, bd = 1e30f;
   for (std::size_t i = 0; i + 1 < path.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(path, i), b = ::sc::converted::at(path, i + 1), d = b - a;
+    const Vec2 a = ::kern::converted::at(path, i), b = ::kern::converted::at(path, i + 1), d = b - a;
     const f32 l2 = std::fmax(1e-6f, d.x * d.x + d.y * d.y);
     const f32 t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l2, 0, 1);
     const f32 dd = dist(p, a + d * t);
@@ -197,13 +197,13 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   }
   f32 left = look, t = bt;
   for (std::size_t i = bi; i + 1 < path.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(path, i), b = ::sc::converted::at(path, i + 1);
+    const Vec2 a = ::kern::converted::at(path, i), b = ::kern::converted::at(path, i + 1);
     const f32 l = std::fmax(1e-6f, dist(a, b)), rest = (1 - t) * l;
     if (rest >= left) return a + (b - a) * (t + left / l);
     left -= rest;
     t = 0;
   }
-  return ::sc::converted::back(path);
+  return ::kern::converted::back(path);
 }
 
 }  // namespace sc
@@ -286,22 +286,22 @@ void heap_push(std::vector<Item>& h, Item x) {
   h.push_back(x);
   while (i > 0) { ::sc::lowered::tick();
     const std::size_t up = (i - 1) / 2;
-    if (!before(::sc::converted::at(h, i), ::sc::converted::at(h, up))) break;
-    std::swap(::sc::converted::at(h, i), ::sc::converted::at(h, up));
+    if (!before(::kern::converted::at(h, i), ::kern::converted::at(h, up))) break;
+    std::swap(::kern::converted::at(h, i), ::kern::converted::at(h, up));
     i = up;
   }
 }
 Item heap_pop(std::vector<Item>& h) {
-  const Item top = ::sc::converted::at(h, 0);
-  ::sc::converted::at(h, 0) = ::sc::converted::back(h);
-  ::sc::converted::pop_back(h);
+  const Item top = ::kern::converted::at(h, 0);
+  ::kern::converted::at(h, 0) = ::kern::converted::back(h);
+  ::kern::converted::pop_back(h);
   std::size_t i = 0;
   while (2 * i + 1 < h.size()) { ::sc::lowered::tick();
     const std::size_t l = 2 * i + 1, r = l + 1;
-    std::size_t m = before(::sc::converted::at(h, l), ::sc::converted::at(h, i)) ? l : i;
-    if (r < h.size() && before(::sc::converted::at(h, r), ::sc::converted::at(h, m))) m = r;
+    std::size_t m = before(::kern::converted::at(h, l), ::kern::converted::at(h, i)) ? l : i;
+    if (r < h.size() && before(::kern::converted::at(h, r), ::kern::converted::at(h, m))) m = r;
     if (m == i) break;
-    std::swap(::sc::converted::at(h, i), ::sc::converted::at(h, m));
+    std::swap(::kern::converted::at(h, i), ::kern::converted::at(h, m));
     i = m;
   }
   return top;
@@ -311,7 +311,7 @@ Item heap_pop(std::vector<Item>& h) {
 u64 lane_signature(const std::vector<Lane>& lanes) {
   u64 h = 1469598103934665603ull;
   for (std::size_t i = 0; i < lanes.size(); ++i) { ::sc::lowered::tick();
-    h ^= (static_cast<u64>(i) << 1) | (::sc::converted::at(lanes, i).alive ? 1u : 0u);
+    h ^= (static_cast<u64>(i) << 1) | (::kern::converted::at(lanes, i).alive ? 1u : 0u);
     h *= 1099511628211ull;
   }
   return h;
@@ -322,7 +322,7 @@ i32 RoadGraph::node_at(Vec2 p) {
   for (i32 dx = -1; (::sc::lowered::tick(), dx <= 1); ::sc::lowered::pre_inc(dx))
     for (i32 dy = -1; dy <= 1; ::sc::lowered::pre_inc(dy)) { ::sc::lowered::tick();
       auto it = cells_.find(cell_key(::sc::lowered::plus(cx, dx), ::sc::lowered::plus(cy, dy)));
-      if (it != cells_.end() && dist(::sc::converted::at(nodes_, it->second).p, p) < kCell) return it->second;
+      if (it != cells_.end() && dist(::kern::converted::at(nodes_, it->second).p, p) < kCell) return it->second;
     }
   const i32 id = static_cast<i32>(nodes_.size());
   nodes_.push_back({p, {}});
@@ -335,15 +335,15 @@ void RoadGraph::rebuild(const std::vector<Lane>& lanes) {
   cells_.clear();
   for (const Lane& l : lanes) { ::sc::lowered::tick();
     if (!l.alive || l.points.size() < 2) continue;
-    i32 prev = node_at(::sc::converted::at(l.points, 0));
+    i32 prev = node_at(::kern::converted::at(l.points, 0));
     for (std::size_t i = 1; i < l.points.size(); ++i) { ::sc::lowered::tick();
-      const i32 cur = node_at(::sc::converted::at(l.points, i));
+      const i32 cur = node_at(::kern::converted::at(l.points, i));
       if (cur == prev) continue;
-      const f32 len = dist(::sc::converted::at(nodes_, prev).p, ::sc::converted::at(nodes_, cur).p);
+      const f32 len = dist(::kern::converted::at(nodes_, prev).p, ::kern::converted::at(nodes_, cur).p);
       auto link = [&](i32 a, i32 b) {
-        for (auto& e : ::sc::converted::at(nodes_, a).edges)
+        for (auto& e : ::kern::converted::at(nodes_, a).edges)
           if (e.first == b) return;
-        ::sc::converted::at(nodes_, a).edges.push_back({b, len});
+        ::kern::converted::at(nodes_, a).edges.push_back({b, len});
       };
       link(prev, cur);
       link(cur, prev);
@@ -357,7 +357,7 @@ i32 RoadGraph::nearest(Vec2 p, f32 max_m) const {
   i32 best = -1;
   f32 bd = max_m;
   for (std::size_t i = 0; i < nodes_.size(); ++i) { ::sc::lowered::tick();
-    const f32 d = dist(::sc::converted::at(nodes_, i).p, p);
+    const f32 d = dist(::kern::converted::at(nodes_, i).p, p);
     if (d < bd) { bd = d; best = static_cast<i32>(i); }
   }
   return best;
@@ -372,39 +372,39 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
   std::vector<i32> came(n, -1);
   std::vector<u8> closed(n, 0);
   std::vector<Item> open;
-  ::sc::converted::at(g, a) = 0;
-  heap_push(open, {dist(::sc::converted::at(nodes_, a).p, ::sc::converted::at(nodes_, b).p), a});
+  ::kern::converted::at(g, a) = 0;
+  heap_push(open, {dist(::kern::converted::at(nodes_, a).p, ::kern::converted::at(nodes_, b).p), a});
   u32 expanded = 0;
   while (!open.empty()) { ::sc::lowered::tick();
     const i32 cur = heap_pop(open).second;
-    if (::sc::converted::at(closed, cur)) continue;
-    ::sc::converted::at(closed, cur) = 1;
+    if (::kern::converted::at(closed, cur)) continue;
+    ::kern::converted::at(closed, cur) = 1;
     if (cur == b || ++expanded > 20000) break;
-    for (const auto& [nb, len] : ::sc::converted::at(nodes_, cur).edges) { ::sc::lowered::tick();
-      const f32 ng = ::sc::converted::at(g, cur) + len;
-      if (ng < ::sc::converted::at(g, nb)) {
-        ::sc::converted::at(g, nb) = ng;
-        ::sc::converted::at(came, nb) = cur;
-        heap_push(open, {ng + dist(::sc::converted::at(nodes_, nb).p, ::sc::converted::at(nodes_, b).p), nb});
+    for (const auto& [nb, len] : ::kern::converted::at(nodes_, cur).edges) { ::sc::lowered::tick();
+      const f32 ng = ::kern::converted::at(g, cur) + len;
+      if (ng < ::kern::converted::at(g, nb)) {
+        ::kern::converted::at(g, nb) = ng;
+        ::kern::converted::at(came, nb) = cur;
+        heap_push(open, {ng + dist(::kern::converted::at(nodes_, nb).p, ::kern::converted::at(nodes_, b).p), nb});
       }
     }
   }
-  if (a != b && ::sc::converted::at(came, b) < 0) return false;
+  if (a != b && ::kern::converted::at(came, b) < 0) return false;
   std::vector<Vec2> rev;
-  for (i32 c = b; (::sc::lowered::tick(), c >= 0); c = c == a ? -1 : ::sc::converted::at(came, c)) rev.push_back(::sc::converted::at(nodes_, c).p);
+  for (i32 c = b; (::sc::lowered::tick(), c >= 0); c = c == a ? -1 : ::kern::converted::at(came, c)) rev.push_back(::kern::converted::at(nodes_, c).p);
   out.push_back(from);
-  for (std::size_t k = 0; (::sc::lowered::tick(), k < rev.size()); ++k) out.push_back(::sc::converted::at(rev, rev.size() - 1 - k));  // (from the start on)
+  for (std::size_t k = 0; (::sc::lowered::tick(), k < rev.size()); ++k) out.push_back(::kern::converted::at(rev, rev.size() - 1 - k));  // (from the start on)
   out.push_back(to);
   return true;
 }
 
 Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   if (path.empty()) return p;
-  if (path.size() < 2) return ::sc::converted::at(path, 0);
+  if (path.size() < 2) return ::kern::converted::at(path, 0);
   std::size_t bi = 0;
   f32 bt = 0, bd = 1e30f;
   for (std::size_t i = 0; i + 1 < path.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(path, i), b = ::sc::converted::at(path, i + 1), d = b - a;
+    const Vec2 a = ::kern::converted::at(path, i), b = ::kern::converted::at(path, i + 1), d = b - a;
     const f32 l2 = std::fmax(1e-6f, d.x * d.x + d.y * d.y);
     const f32 t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l2, 0, 1);
     const f32 dd = dist(p, a + d * t);
@@ -412,13 +412,13 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   }
   f32 left = look, t = bt;
   for (std::size_t i = bi; i + 1 < path.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(path, i), b = ::sc::converted::at(path, i + 1);
+    const Vec2 a = ::kern::converted::at(path, i), b = ::kern::converted::at(path, i + 1);
     const f32 l = std::fmax(1e-6f, dist(a, b)), rest = (1 - t) * l;
     if (rest >= left) return a + (b - a) * (t + left / l);
     left -= rest;
     t = 0;
   }
-  return ::sc::converted::back(path);
+  return ::kern::converted::back(path);
 }
 
 }  // namespace sc
@@ -447,10 +447,10 @@ template <> struct Values<::sc::AreaKind> { static constexpr long long all[] = {
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_road_graph_cpp) {
+KERN_TEST(lowered_road_graph_cpp) {
   {  // RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)  ->  RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)
     ::sc::lowered::Tally tally("RoadGraph::path(kern::Vec2, kern::Vec2, std::vector<Vec2> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_road_graph::sc::RoadGraph o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

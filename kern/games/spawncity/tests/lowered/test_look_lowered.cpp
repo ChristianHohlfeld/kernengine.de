@@ -207,7 +207,7 @@ void Stabilizer::apply(kern::Camera& c, f32 dt) {
 // speed streaks (speed_lines.mjs)
 
 void SpeedLines::respawn(int i) {
-  Streak& t = ::sc::converted::at(s, i);
+  Streak& t = ::kern::converted::at(s, i);
   t.a = rng.unit() * 2 * kPi;
   t.r = 0.15f + rng.unit() * 0.5f;
   t.len = 0.08f + rng.unit() * 0.22f;
@@ -227,8 +227,8 @@ f32 SpeedLines::update(Vec3 eye, f32 dt) {
   k = clampf((speed - kStart) / (kFull - kStart), 0, 1);
   if (k <= 0) return 0;
   for (int i = 0; i < kCount; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    ::sc::converted::at(s, i).r += ::sc::converted::at(s, i).v * dt * (0.6f + 1.8f * k);
-    if (::sc::converted::at(s, i).r > 1.15f) respawn(i);
+    ::kern::converted::at(s, i).r += ::kern::converted::at(s, i).v * dt * (0.6f + 1.8f * k);
+    if (::kern::converted::at(s, i).r > 1.15f) respawn(i);
   }
   return k;
 }
@@ -517,7 +517,7 @@ void Stabilizer::apply(kern::Camera& c, f32 dt) {
 // speed streaks (speed_lines.mjs)
 
 void SpeedLines::respawn(int i) {
-  Streak& t = ::sc::converted::at(s, i);
+  Streak& t = ::kern::converted::at(s, i);
   t.a = rng.unit() * 2 * kPi;
   t.r = 0.15f + rng.unit() * 0.5f;
   t.len = 0.08f + rng.unit() * 0.22f;
@@ -537,8 +537,8 @@ f32 SpeedLines::update(Vec3 eye, f32 dt) {
   k = clampf((speed - kStart) / (kFull - kStart), 0, 1);
   if (k <= 0) return 0;
   for (int i = 0; i < kCount; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    ::sc::converted::at(s, i).r += ::sc::converted::at(s, i).v * dt * (0.6f + 1.8f * k);
-    if (::sc::converted::at(s, i).r > 1.15f) respawn(i);
+    ::kern::converted::at(s, i).r += ::kern::converted::at(s, i).v * dt * (0.6f + 1.8f * k);
+    if (::kern::converted::at(s, i).r > 1.15f) respawn(i);
   }
   return k;
 }
@@ -652,10 +652,10 @@ namespace sc::lowered {
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_look_cpp) {
+KERN_TEST(lowered_look_cpp) {
   {  // parse_time(const char *, f32 &)  ->  parse_time(const char *, f32 &)
     ::sc::lowered::Tally tally("parse_time(const char *, f32 &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const char *> o0;
       ::sc::lowered::Arg<const char *> n0;

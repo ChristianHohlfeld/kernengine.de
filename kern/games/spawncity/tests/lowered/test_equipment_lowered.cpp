@@ -184,15 +184,15 @@ f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.variable("Ignit
 bool Jetpack::ignite(f32 vz) {
   (void)vz;
   std::vector<Value> r;
-  return g_jetpack.call("Ignite", {pack()}, r) && r.size() >= 2 && (take(::sc::converted::at(r, 0)), ::sc::converted::at(r, 1).b);
+  return g_jetpack.call("Ignite", {pack()}, r) && r.size() >= 2 && (take(::kern::converted::at(r, 0)), ::kern::converted::at(r, 1).b);
 }
 
 f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
   std::vector<Value> r;
   if (!g_jetpack.call("Update", {pack(), rules::number(dt), rules::number(now), Value::boolean(airborne), rules::number(vz), rules::number(height), Value::boolean(hold)}, r) || r.size() < 2)
     return 0;
-  take(::sc::converted::at(r, 0));
-  return static_cast<f32>(::sc::converted::at(r, 1).as_number());
+  take(::kern::converted::at(r, 0));
+  return static_cast<f32>(::kern::converted::at(r, 1).as_number());
 }
 
 kern::logic::Value Jetpack::pack() const {
@@ -257,13 +257,13 @@ void FlightLog::finish(const char* reason) {
   active_ = false;
   cur_.reason = reason;
   flights_.insert(flights_.begin(), cur_);
-  if (flights_.size() > kMaxFlights) flights_.resize(::sc::converted::count(kMaxFlights));
+  if (flights_.size() > kMaxFlights) flights_.resize(::kern::converted::count(kMaxFlights));
   ++serial_;
 }
 
 void FlightLog::network(const std::string& stage, f32 t) {
   events_.insert(events_.begin(), Event{t, stage});
-  if (events_.size() > kMaxEvents) events_.resize(::sc::converted::count(kMaxEvents));
+  if (events_.size() > kMaxEvents) events_.resize(::kern::converted::count(kMaxEvents));
   ++serial_;
 }
 
@@ -271,12 +271,12 @@ std::string FlightLog::json() const {
   std::string o = "{\"flights\":[";
   char b[256];
   for (std::size_t i = 0; i < flights_.size(); ++i) { ::sc::lowered::tick();
-    const Flight& f = ::sc::converted::at(flights_, i);
+    const Flight& f = ::kern::converted::at(flights_, i);
     std::snprintf(b, sizeof b, "%s{\"id\":%u,\"start\":%.2f,\"duration\":%.2f,\"distance\":%.1f,\"maxSpeed\":%.2f,\"maxAgl\":%.2f,\"maxAlt\":%.2f,\"voltsStart\":%.2f,\"voltsEnd\":%.2f,\"voltsMin\":%.2f,\"reason\":\"%s\",\"path\":[",
                   i ? "," : "", f.id, f.start, f.duration, f.distance, f.max_speed, f.max_agl, f.max_alt, f.volts_start, f.volts_end, f.volts_min, f.reason.c_str());
     o += b;
     for (std::size_t k = 0; k < f.path.size(); ++k) { ::sc::lowered::tick();
-      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", ::sc::converted::at(f.path, k).x, ::sc::converted::at(f.path, k).y, ::sc::converted::at(f.path, k).z);
+      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", ::kern::converted::at(f.path, k).x, ::kern::converted::at(f.path, k).y, ::kern::converted::at(f.path, k).z);
       o += b;
     }
     o += "]}";
@@ -284,8 +284,8 @@ std::string FlightLog::json() const {
   o += "],\"events\":[";
   for (std::size_t i = 0; i < events_.size(); ++i) { ::sc::lowered::tick();
     std::string stage;
-    for (char c : ::sc::converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
-    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", ::sc::converted::at(events_, i).t);
+    for (char c : ::kern::converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
+    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", ::kern::converted::at(events_, i).t);
     o += b + stage + "\"}";
   }
   return o + "]}";
@@ -304,14 +304,14 @@ const MusicSynth::Station MusicSynth::kStations[] = {
     {"8-BIT RADIO", "Chiptune", 144, 41},
     {"NACHTSCHICHT", "Techno", 132, 53},
 };
-i32 MusicSynth::station_count() { return static_cast<i32>(::sc::lowered::quot(sizeof kStations, sizeof ::sc::converted::at(kStations, 0))); }
+i32 MusicSynth::station_count() { return static_cast<i32>(::sc::lowered::quot(sizeof kStations, sizeof ::kern::converted::at(kStations, 0))); }
 
 namespace {
 enum Genre { synthwave, house, lofi, chip, techno };
 struct Prog { Genre genre; f32 bpm; u32 seed; i32 root; bool minor; };
 Prog prog_of(i32 p) {
   if (p == MusicSynth::kMenu) return {chip, 140, 7, 57, true};  // the title: 8 bits, A minor
-  const MusicSynth::Station& s = ::sc::converted::at(MusicSynth::kStations, p);
+  const MusicSynth::Station& s = ::kern::converted::at(MusicSynth::kStations, p);
   const Genre g = static_cast<Genre>(::sc::lowered::enum_fits<0LL, 7LL>(p % 5));
   return {g, s.bpm, s.seed, g == house ? 53 : g == lofi ? 55 : g == techno ? 50 : 52, g != house};
 }
@@ -333,7 +333,7 @@ void MusicSynth::step() {
   const Prog p = prog_of(programme_);
   const u32 pos = step_ % 16, bar = step_ / 16;
   auto rnd = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(rng_ >> 8) / 16777216.0f; };
-  const i32 chord = ::sc::converted::at((p.minor ? kMinorProg : kMajorProg), bar % 4);
+  const i32 chord = ::kern::converted::at((p.minor ? kMinorProg : kMajorProg), bar % 4);
   const i32* scale = p.minor ? kMinorScale : kMajorScale;
   const f32 rate = static_cast<f32>(rate_);
   auto decay = [&](f32 tau) { return std::exp(-1.0f / (tau * rate)); };
@@ -364,7 +364,7 @@ void MusicSynth::step() {
   if (pos == 0 && p.genre != chip && p.genre != techno) {
     const i32 third = p.minor ? 3 : 4;
     const i32 tones[3] = {0, third, 7};
-    for (int i = 0; i < 3; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); ::sc::converted::at(pad_, i).freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(p.root, chord), ::sc::converted::at(tones, i)))); ::sc::converted::at(pad_, i).env = 1; ::sc::converted::at(pad_, i).decay = decay(1.6f); }
+    for (int i = 0; i < 3; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); ::kern::converted::at(pad_, i).freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(p.root, chord), ::kern::converted::at(tones, i)))); ::kern::converted::at(pad_, i).env = 1; ::kern::converted::at(pad_, i).decay = decay(1.6f); }
   }
   ++step_;
 }
@@ -419,12 +419,12 @@ f32 MusicSynth::next_sample(f32& right) {
   }
   lp_ += (pad - lp_) * (p.genre == lofi ? 0.03f : 0.08f);
   // A dotted-eighth echo on the lead (synthwave, title), wider in stereo.
-  const u32 echo_len = std::min<u32>(::sc::lowered::quot(sizeof echo_, sizeof ::sc::converted::at(echo_, 0)), static_cast<u32>(samples_per_step_ * 3));
+  const u32 echo_len = std::min<u32>(::sc::lowered::quot(sizeof echo_, sizeof ::kern::converted::at(echo_, 0)), static_cast<u32>(samples_per_step_ * 3));
   f32 echo = 0;
   if (echo_len > 0) {
     echo_at_ %= echo_len;
-    echo = ::sc::converted::at(echo_, echo_at_);
-    ::sc::converted::at(echo_, echo_at_) = lead + echo * 0.38f;
+    echo = ::kern::converted::at(echo_, echo_at_);
+    ::kern::converted::at(echo_, echo_at_) = lead + echo * 0.38f;
     ++echo_at_;
   }
   const f32 mono = s + lp_;
@@ -712,13 +712,13 @@ void FlightLog::finish(const char* reason) {
   active_ = false;
   cur_.reason = reason;
   flights_.insert(flights_.begin(), cur_);
-  if (flights_.size() > kMaxFlights) flights_.resize(::sc::converted::count(kMaxFlights));
+  if (flights_.size() > kMaxFlights) flights_.resize(::kern::converted::count(kMaxFlights));
   ++serial_;
 }
 
 void FlightLog::network(const std::string& stage, f32 t) {
   events_.insert(events_.begin(), Event{t, stage});
-  if (events_.size() > kMaxEvents) events_.resize(::sc::converted::count(kMaxEvents));
+  if (events_.size() > kMaxEvents) events_.resize(::kern::converted::count(kMaxEvents));
   ++serial_;
 }
 
@@ -726,12 +726,12 @@ std::string FlightLog::json() const {
   std::string o = "{\"flights\":[";
   char b[256];
   for (std::size_t i = 0; i < flights_.size(); ++i) { ::sc::lowered::tick();
-    const Flight& f = ::sc::converted::at(flights_, i);
+    const Flight& f = ::kern::converted::at(flights_, i);
     std::snprintf(b, sizeof b, "%s{\"id\":%u,\"start\":%.2f,\"duration\":%.2f,\"distance\":%.1f,\"maxSpeed\":%.2f,\"maxAgl\":%.2f,\"maxAlt\":%.2f,\"voltsStart\":%.2f,\"voltsEnd\":%.2f,\"voltsMin\":%.2f,\"reason\":\"%s\",\"path\":[",
                   i ? "," : "", f.id, f.start, f.duration, f.distance, f.max_speed, f.max_agl, f.max_alt, f.volts_start, f.volts_end, f.volts_min, f.reason.c_str());
     o += b;
     for (std::size_t k = 0; k < f.path.size(); ++k) { ::sc::lowered::tick();
-      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", ::sc::converted::at(f.path, k).x, ::sc::converted::at(f.path, k).y, ::sc::converted::at(f.path, k).z);
+      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", ::kern::converted::at(f.path, k).x, ::kern::converted::at(f.path, k).y, ::kern::converted::at(f.path, k).z);
       o += b;
     }
     o += "]}";
@@ -739,8 +739,8 @@ std::string FlightLog::json() const {
   o += "],\"events\":[";
   for (std::size_t i = 0; i < events_.size(); ++i) { ::sc::lowered::tick();
     std::string stage;
-    for (char c : ::sc::converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
-    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", ::sc::converted::at(events_, i).t);
+    for (char c : ::kern::converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
+    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", ::kern::converted::at(events_, i).t);
     o += b + stage + "\"}";
   }
   return o + "]}";
@@ -752,14 +752,14 @@ std::string FlightLog::json() const {
 // four-chord progression, drums from noise and pitched sines, bass, lead and pad from simple
 // oscillators. Everything is generated here; no recording is played.
 
-i32 MusicSynth::station_count() { return static_cast<i32>(::sc::lowered::quot(sizeof kStations, sizeof ::sc::converted::at(kStations, 0))); }
+i32 MusicSynth::station_count() { return static_cast<i32>(::sc::lowered::quot(sizeof kStations, sizeof ::kern::converted::at(kStations, 0))); }
 
 namespace {
 enum Genre { synthwave, house, lofi, chip, techno };
 struct Prog { Genre genre; f32 bpm; u32 seed; i32 root; bool minor; };
 Prog prog_of(i32 p) {
   if (p == MusicSynth::kMenu) return {chip, 140, 7, 57, true};  // the title: 8 bits, A minor
-  const MusicSynth::Station& s = ::sc::converted::at(MusicSynth::kStations, p);
+  const MusicSynth::Station& s = ::kern::converted::at(MusicSynth::kStations, p);
   const Genre g = static_cast<Genre>(::sc::lowered::enum_fits<0LL, 7LL>(p % 5));
   return {g, s.bpm, s.seed, g == house ? 53 : g == lofi ? 55 : g == techno ? 50 : 52, g != house};
 }
@@ -781,7 +781,7 @@ void MusicSynth::step() {
   const Prog p = prog_of(programme_);
   const u32 pos = step_ % 16, bar = step_ / 16;
   auto rnd = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(rng_ >> 8) / 16777216.0f; };
-  const i32 chord = ::sc::converted::at((p.minor ? kMinorProg : kMajorProg), bar % 4);
+  const i32 chord = ::kern::converted::at((p.minor ? kMinorProg : kMajorProg), bar % 4);
   const f32 rate = static_cast<f32>(rate_);
   auto decay = [&](f32 tau) { return std::exp(-1.0f / (tau * rate)); };
   // drums
@@ -803,7 +803,7 @@ void MusicSynth::step() {
   const f32 lead_prob = p.genre == chip ? 0.85f : p.genre == synthwave ? 0.55f : p.genre == lofi ? 0.3f : 0.25f;
   if ((pos % 2 == 0 || p.genre == chip) && rnd() < lead_prob) {
     const i32 deg = static_cast<i32>(::sc::lowered::fits<int>(rnd() * 7)) % 7, oct = rnd() < 0.3f ? 12 : 0;
-    lead_.freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(::sc::lowered::plus(::sc::lowered::plus(p.root, 12), chord), (p.minor ? ::sc::converted::at(kMinorScale, deg) : ::sc::converted::at(kMajorScale, deg))), oct)));
+    lead_.freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(::sc::lowered::plus(::sc::lowered::plus(p.root, 12), chord), (p.minor ? ::kern::converted::at(kMinorScale, deg) : ::kern::converted::at(kMajorScale, deg))), oct)));
     lead_.env = 1;
     lead_.decay = decay(p.genre == chip ? 0.09f : 0.22f);
   }
@@ -811,7 +811,7 @@ void MusicSynth::step() {
   if (pos == 0 && p.genre != chip && p.genre != techno) {
     const i32 third = p.minor ? 3 : 4;
     const i32 tones[3] = {0, third, 7};
-    for (int i = 0; i < 3; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); ::sc::converted::at(pad_, i).freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(p.root, chord), ::sc::converted::at(tones, i)))); ::sc::converted::at(pad_, i).env = 1; ::sc::converted::at(pad_, i).decay = decay(1.6f); }
+    for (int i = 0; i < 3; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick(); ::kern::converted::at(pad_, i).freq = midi(static_cast<f32>(::sc::lowered::plus(::sc::lowered::plus(p.root, chord), ::kern::converted::at(tones, i)))); ::kern::converted::at(pad_, i).env = 1; ::kern::converted::at(pad_, i).decay = decay(1.6f); }
   }
   ++step_;
 }
@@ -866,12 +866,12 @@ f32 MusicSynth::next_sample(f32& right) {
   }
   lp_ += (pad - lp_) * (p.genre == lofi ? 0.03f : 0.08f);
   // A dotted-eighth echo on the lead (synthwave, title), wider in stereo.
-  const u32 echo_len = std::min<u32>(::sc::lowered::quot(sizeof echo_, sizeof ::sc::converted::at(echo_, 0)), static_cast<u32>(samples_per_step_ * 3));
+  const u32 echo_len = std::min<u32>(::sc::lowered::quot(sizeof echo_, sizeof ::kern::converted::at(echo_, 0)), static_cast<u32>(samples_per_step_ * 3));
   f32 echo = 0;
   if (echo_len > 0) {
     echo_at_ %= echo_len;
-    echo = ::sc::converted::at(echo_, echo_at_);
-    ::sc::converted::at(echo_, echo_at_) = lead + echo * 0.38f;
+    echo = ::kern::converted::at(echo_, echo_at_);
+    ::kern::converted::at(echo_, echo_at_) = lead + echo * 0.38f;
     ++echo_at_;
   }
   const f32 mono = s + lp_;
@@ -907,8 +907,8 @@ void MusicSynth::render_add(std::vector<f32>& out, u32 frames) {
     f32 r = 0;
     const f32 l = next_sample(r);
     const f32 g = gain_ * fade_ * 0.7f;
-    ::sc::converted::at(out, 2 * i) += l * g;
-    ::sc::converted::at(out, 2 * i + 1) += r * g;
+    ::kern::converted::at(out, 2 * i) += l * g;
+    ::kern::converted::at(out, 2 * i + 1) += r * g;
     peak = std::fmax(peak, std::fabs(l * g));
   }
 }
@@ -941,14 +941,14 @@ template <> struct Values<::kern::logic::PinType> { static constexpr long long a
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_equipment_cpp) {
+KERN_TEST(lowered_equipment_cpp) {
   ::sc::lowered::World world({"Jetpack"});
   ::sc_new_equipment::sc::g_jetpack.bind(world.logic(false));
   ::sc_old_equipment::sc::Jetpack::bind(world.instance(true, "Jetpack"));
   ::sc_new_equipment::sc::Jetpack::bind(world.logic(false));
   {  // Jetpack::acc()  ->  Jetpack::acc()
     ::sc::lowered::Tally tally("Jetpack::acc()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::acc())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::acc())>> n_r;
@@ -964,7 +964,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::air_accel()  ->  Jetpack::air_accel()
     ::sc::lowered::Tally tally("Jetpack::air_accel()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::air_accel())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::air_accel())>> n_r;
@@ -980,7 +980,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::max_climb()  ->  Jetpack::max_climb()
     ::sc::lowered::Tally tally("Jetpack::max_climb()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::max_climb())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::max_climb())>> n_r;
@@ -996,7 +996,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::gravity()  ->  Jetpack::gravity()
     ::sc::lowered::Tally tally("Jetpack::gravity()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::gravity())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::gravity())>> n_r;
@@ -1012,7 +1012,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::fall_safe()  ->  Jetpack::fall_safe()
     ::sc::lowered::Tally tally("Jetpack::fall_safe()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::fall_safe())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::fall_safe())>> n_r;
@@ -1028,7 +1028,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::ignition_damp()  ->  Jetpack::ignition_damp()
     ::sc::lowered::Tally tally("Jetpack::ignition_damp()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       std::optional<std::remove_cvref_t<decltype(::sc_old_equipment::sc::Jetpack::ignition_damp())>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_equipment::sc::Jetpack::ignition_damp())>> n_r;
@@ -1044,7 +1044,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::ignite(f32)  ->  Jetpack::ignite(f32)
     ::sc::lowered::Tally tally("Jetpack::ignite(f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::Jetpack o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1068,7 +1068,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::update(f32, f32, bool, f32, f32, bool)  ->  Jetpack::update(f32, f32, bool, f32, f32, bool)
     ::sc::lowered::Tally tally("Jetpack::update(f32, f32, bool, f32, f32, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::Jetpack o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1107,7 +1107,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::pack()  ->  Jetpack::pack()
     ::sc::lowered::Tally tally("Jetpack::pack()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::Jetpack o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1128,7 +1128,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // Jetpack::take(const kern::logic::Value &)  ->  Jetpack::take(const Pack &)
     ::sc::lowered::Tally tally("Jetpack::take(const kern::logic::Value &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::Jetpack o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1149,7 +1149,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // MusicSynth::step()  ->  MusicSynth::step()
     ::sc::lowered::Tally tally("MusicSynth::step()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::MusicSynth o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1167,7 +1167,7 @@ SC_TEST(lowered_equipment_cpp) {
   }
   {  // MusicSynth::render_add(f32 *, u32)  ->  MusicSynth::render_add(std::vector<f32> &, u32)
     ::sc::lowered::Tally tally("MusicSynth::render_add(f32 *, u32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_equipment::sc::MusicSynth o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -1191,7 +1191,7 @@ SC_TEST(lowered_equipment_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  ::sc_new_equipment::sc::g_jetpack.bind(no_logic());   // (the test's logic is gone with it)
+  ::sc_new_equipment::sc::g_jetpack.bind(kern::test::no_logic());   // (the test's logic is gone with it)
   ::sc_old_equipment::sc::Jetpack::bind(nullptr);   // (the test's logic is gone with it)
 }
 }  // namespace sc

@@ -121,9 +121,9 @@ bool CombatArt::init(kern::Renderer& r) {
       m.metalness = 0;
       m.cast_shadow = false;
     }
-    Part& p = ::sc::converted::at(parts_, i);
+    Part& p = ::kern::converted::at(parts_, i);
     p.id = r.allocate_id();
-    kern::MeshInput in = ::sc::converted::at(meshes, i).as_input(kern::kMaxExtensionAttributes);
+    kern::MeshInput in = ::kern::converted::at(meshes, i).as_input(kern::kMaxExtensionAttributes);
     in.material = m;
     in.visible = false;
     static const Mat4 parked = Mat4::translate({0, 0, -1000});
@@ -138,13 +138,13 @@ void CombatArt::begin() {
 }
 
 void CombatArt::put(Shape s, const Mat4& m, Vec3 tint) {
-  Part& p = ::sc::converted::at(parts_, s);
+  Part& p = ::kern::converted::at(parts_, s);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
 }
 
 void CombatArt::put(Shape s, const Mat4& m, Vec3 tint, f32 alpha) {
-  Part& p = ::sc::converted::at(parts_, s);
+  Part& p = ::kern::converted::at(parts_, s);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, clampf(alpha, 0, 1)});
 }
@@ -364,14 +364,14 @@ bool CombatArt::init(kern::Renderer& r) {
       m.metalness = 0;
       m.cast_shadow = false;
     }
-    Part& p = ::sc::converted::at(parts_, i);
+    Part& p = ::kern::converted::at(parts_, i);
     p.id = r.allocate_id();
     kern::MeshLook look;
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
     const Mat4 parked = Mat4::translate({0, 0, -1000});
-    if (!kern::upsert(r, p.id, ::sc::converted::at(meshes, i), look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
+    if (!kern::upsert(r, p.id, ::kern::converted::at(meshes, i), look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   }
   return true;
 }
@@ -381,13 +381,13 @@ void CombatArt::begin() {
 }
 
 void CombatArt::put(Shape s, const Mat4& m, Vec3 tint) {
-  Part& p = ::sc::converted::at(parts_, s);
+  Part& p = ::kern::converted::at(parts_, s);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
 }
 
 void CombatArt::put(Shape s, const Mat4& m, Vec3 tint, f32 alpha) {
-  Part& p = ::sc::converted::at(parts_, s);
+  Part& p = ::kern::converted::at(parts_, s);
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, clampf(alpha, 0, 1)});
 }
@@ -524,10 +524,10 @@ template <> struct Values<::sc_new_combat_art::sc::CombatArt::Shape> { static co
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_combat_art_cpp) {
+KERN_TEST(lowered_combat_art_cpp) {
   {  // CombatArt::init(kern::Renderer &)  ->  CombatArt::init(kern::Renderer &)
     ::sc::lowered::Tally tally("CombatArt::init(kern::Renderer &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_combat_art::sc::CombatArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

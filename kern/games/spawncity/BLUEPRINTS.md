@@ -484,7 +484,7 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
   Speicher anfordern; fordert die Klasse öfter an, ist das ein Fehler. Die Zeit misst ein
   Export-Build (ohne Prüfwerkzeuge) für dieselben Aufrufe gegen den Quelltext.
   - **Der Test zählt (seit 14.11.2026, 07:25).** Der Speicherverwalter der Tests zählt, während
-    die Funktion selbst läuft – im Quelltext um ihren Aufruf (`converted::counted`), in der
+    die Funktion selbst läuft – im Quelltext um ihren Aufruf (`kern::converted::counted`), in der
     Klasse zwischen den zwei Meldungen ihres Aufrufcodes (`logic::native_probe`, eine allgemeine
     Messstelle der Engine: Argumente bauen und Ergebnisse zurückgeben liegt außerhalb). Der
     Vergleichstest prüft dabei auch, dass wirklich die Klasse läuft.
@@ -553,7 +553,7 @@ Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
    geschnitten, nicht nach Gründen des Konverters; der Konverter bekommt nur, was allgemein ist.
 
 Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
-Test mit (`SC_ENGINE=real`).
+Test mit (`KERN_TEST_ENGINE=real`).
 
 **Bewusste Abweichungen** (eine Änderung der Quelle, die ihr Verhalten mit Absicht ändert – keine Absenkung;
 der Differenztest hält genau sie fest, jede andere Abweichung ist ein Fehler):
@@ -671,7 +671,7 @@ und schreibt sie in der Schreibweise:
   Reihenfolge der Übersetzungseinheit – und wird mit den Zahlen der Blueprint-Sprache übersetzt:
   `f32` ist `double`, Zahlen ohne das `f`, das sie auf 32 Bit bringt, die Funktionen der Zahlen
   (`sin`, `pow`, `sqrt` …) sind die der Formel (`kern::math`), und ein Vektor hält seine Komponenten
-  in 32 Bit, gelesen sind sie Zahlen wie alle anderen (`converted::wide` in `tests/converted.h`); was
+  in 32 Bit, gelesen sind sie Zahlen wie alle anderen (`kern::converted::wide` in `tests/converted.h`); was
   Vektoren als Ganzes tun, tun die Funktionen der Engine, wie in den Knoten. Dieser Quelltext steht in
   einem eigenen Namensraum: Vom Programm selbst ist dort nichts erreichbar – was er nennt und der
   Test nicht hält, übersetzt nicht, statt still auf die 32-Bit-Funktion des Programms zu fallen.
@@ -684,7 +684,7 @@ und schreibt sie in der Schreibweise:
   Negativem), und einen, in dem er einen Eintrag außerhalb einer Liste liest oder schreibt, aus einer
   leeren Liste nimmt, ganze Zahlen durch null teilt, Bits um die Breite der Zahl schiebt, eine Zahl
   in einen ganzzahligen Typ bringt, der sie nicht hält, oder eine in einen Aufzählungswert, den es
-  nicht gibt. Dafür führt der Test diese Stellen im Quelltext durch Funktionen (`converted::at`,
+  nicht gibt. Dafür führt der Test diese Stellen im Quelltext durch Funktionen (`kern::converted::at`,
   `quot`, `shl`, `fits` …), die den Wert geben, wo es einen gibt, und den Aufruf sonst markieren.
   Für einen markierten Aufruf werden neue Argumente gewürfelt (bis zum Zwanzigfachen); je Funktion
   müssen mindestens 20 Aufrufe verglichen sein, sonst schlägt der Test fehl. Objekte einer Klasse
@@ -708,14 +708,14 @@ und schreibt sie in der Schreibweise:
   Konverter umschreibt. Sie stehen in jedem Blueprint, der sie benutzt, und werden wie die
   Funktionen des Programms Bit für Bit mit ihrem Quelltext verglichen – über den ganzen Bereich
   von 64 Bit. Offen lässt C++ dort nur: vorzeichenbehaftetes Rechnen, das die 64 Bit verlässt, eine
-  Division durch null, ein Schieben um 64 oder mehr (`converted::plus_bits`, `quot_bits`,
+  Division durch null, ein Schieben um 64 oder mehr (`kern::converted::plus_bits`, `quot_bits`,
   `shl_bits` … markieren den Aufruf). Eine Zahl, die `size_t`, `long` … geschrieben ist, ist eine,
   mit der gezählt wird: die ganze Zahl des Blueprints (siehe unten).
 - **Maps und Sets sind Listen.** Eine Map ist im Blueprint die Liste ihrer Zeilen – Strukturen aus
   Schlüssel (`first`) und Wert (`second`) –, ein Set die Liste seiner Schlüssel. Die Reihenfolge ist
   die, in der die Schlüssel hineinkamen (`std::map` und `std::set`: die der Schlüssel) – was
   `std::unordered_map` offen lässt, ist damit festgelegt, und im Test steht an ihrer Stelle eine Map
-  mit genau dieser Reihenfolge (`converted::wide::Map`, `Set`). Nachschlagen ist der Knoten Find Row
+  mit genau dieser Reihenfolge (`kern::converted::wide::Map`, `Set`). Nachschlagen ist der Knoten Find Row
   (`list_find_row<&Zeile::first>(liste, schlüssel)`); `m[k]` legt die Zeile an, wenn es sie nicht
   gibt, wie in C++ – auch wenn nur gelesen wird; `insert`, `emplace`, `try_emplace`,
   `insert_or_assign`, `erase`, `find`, `count`, `contains`, `at` sind Schritte und Werte über diese
@@ -881,9 +881,9 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      - [x] (c) Der Test dazu ist geschrieben: Für jede Klasse der Engine, von der der Quelltext
        ein Objekt hält, hat der Test eine Stellvertreter-Klasse (`TestWriter.stand_ins`) mit genau
        den gerufenen Methoden – Signatur aus dem Header, in den Typen des Tests. Jede Methode gibt
-       ihre Argumente als Werte an den Stellvertreter der Engine (`converted::engine_call`) und
+       ihre Argumente als Werte an den Stellvertreter der Engine (`kern::converted::engine_call`) und
        nimmt die Antwort zurück (`take` je Struktur, das Gegenstück zu `arg`). Objekte würfelt der
-       Test aus einem kleinen Vorrat (`converted::engine_object`, Handle 1..6). Der Host der
+       Test aus einem kleinen Vorrat (`kern::converted::engine_object`, Handle 1..6). Der Host der
        Blueprints im Test hat denselben Stellvertreter. `Tally::take` vergleicht zusätzlich die
        drei Aufzeichnungen (Quelltext, Interpreter, Klasse): dieselben Aufrufe in derselben
        Reihenfolge mit denselben Bits; die erste Abweichung nennt er.
@@ -895,7 +895,7 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
        - Ein Quelltext, der außerhalb einer Liste liest, hat verlassen, was C++ festlegt; tut er
          das in einer Schleife weiter (bis zu einer Länge, die es nicht gibt), liefe er endlos.
          Nach zehntausend solchen Lesern gibt der Test den Aufruf auf und würfelt neu
-         (`converted::open_read`).
+         (`kern::converted::open_read`).
        - Offen (wartet mit Grund): `pistol` (Feld-Zuweisung im Test), drei Funktionen mit
          `std::initializer_list<…>` als Argument, `Jet::step` und `PeopleArt::projectile` (ihr
          Quelltext mischt in `?:` eine Zahl mit einer Vektor-Komponente), Methoden schlichter
@@ -945,7 +945,7 @@ direkt, typisiert, mit den Typen des Blueprints:
   (`blueprint_call.h`) – die Funktionen des Spiels schleifen lange (ein Code Bit für Bit, ein Klang
   Abtastwert für Abtastwert). Der Vergleichstest, der Differenztest und das Spiel nehmen dieselbe.
 - **Die Tests der Datei** prüfen den Blueprint: Sie binden die Klasse an eine Laufzeit, in der der
-  Blueprint läuft (`RuleBlueprint`), und rufen sie wie das Spiel. Ihr Vergleichstest
+  Blueprint läuft (`kern::test::BlueprintRun`), und rufen sie wie das Spiel. Ihr Vergleichstest
   (`tests/converted/test_<datei>.cpp`) entfällt mit dem C++, mit dem er verglich.
 - **Zahlen:** Die Datei rechnet jetzt in den Zahlen der Sprache (64 Bit) – was das Original
   rechnet. Wo ein Test deshalb einen anderen Wert sieht, wird er nicht weich gemacht: Die Stelle

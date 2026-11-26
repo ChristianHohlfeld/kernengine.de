@@ -268,8 +268,8 @@ void VehicleArt::car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit
     // On its axle in the (interpolated) chassis frame: the suspension travel of the last step.
     const CarSpec& s = c.spec();
     const f32 travel = clampf(ws.travel, s.susp_lower, s.susp_upper);
-    const f32 steer = ::sc::converted::at(s.wheels, i).front ? c.steer_angle() : 0;
-    const Mat4 m = chassis * at({::sc::converted::at(s.wheels, i).x, ::sc::converted::at(s.wheels, i).y, s.attach_z + travel}) * rot({0, 0, 1}, steer) * rot({0, 1, 0}, ws.angle) * Mat4::scale({r, w / 0.62f, r});
+    const f32 steer = ::kern::converted::at(s.wheels, i).front ? c.steer_angle() : 0;
+    const Mat4 m = chassis * at({::kern::converted::at(s.wheels, i).x, ::kern::converted::at(s.wheels, i).y, s.attach_z + travel}) * rot({0, 0, 1}, steer) * rot({0, 1, 0}, ws.angle) * Mat4::scale({r, w / 0.62f, r});
     put(wheel_, m);
   }
 }
@@ -600,8 +600,8 @@ void VehicleArt::car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit
     // On its axle in the (interpolated) chassis frame: the suspension travel of the last step.
     const CarSpec& s = c.spec();
     const f32 travel = clampf(ws.travel, s.susp_lower, s.susp_upper);
-    const f32 steer = ::sc::converted::at(s.wheels, i).front ? c.steer_angle() : 0;
-    const Mat4 m = chassis * at({::sc::converted::at(s.wheels, i).x, ::sc::converted::at(s.wheels, i).y, s.attach_z + travel}) * rot({0, 0, 1}, steer) * rot({0, 1, 0}, ws.angle) * Mat4::scale({r, w / 0.62f, r});
+    const f32 steer = ::kern::converted::at(s.wheels, i).front ? c.steer_angle() : 0;
+    const Mat4 m = chassis * at({::kern::converted::at(s.wheels, i).x, ::kern::converted::at(s.wheels, i).y, s.attach_z + travel}) * rot({0, 0, 1}, steer) * rot({0, 1, 0}, ws.angle) * Mat4::scale({r, w / 0.62f, r});
     put(wheel_, m);
   }
 }
@@ -626,8 +626,8 @@ void VehicleArt::drone(const Mat4& body, const std::array<Vec3, 4>& motors, cons
   if (fpv_view) return;
   put(drone_frame_, body);
   for (int i = 0; i < 4; ::sc::lowered::pre_inc(i)) { ::sc::lowered::tick();
-    put(drone_motor_, body * at(::sc::converted::at(motors, i) + Vec3{0, 0, -0.004f}));
-    const Mat4 p = body * at(::sc::converted::at(motors, i) + Vec3{0, 0, 0.018f}) * rot({0, 0, 1}, ::sc::converted::at(rotor_angles, i)) * Mat4::scale({prop_d, 1, 1});
+    put(drone_motor_, body * at(::kern::converted::at(motors, i) + Vec3{0, 0, -0.004f}));
+    const Mat4 p = body * at(::kern::converted::at(motors, i) + Vec3{0, 0, 0.018f}) * rot({0, 0, 1}, ::kern::converted::at(rotor_angles, i)) * Mat4::scale({prop_d, 1, 1});
     if (i % 2) put(drone_prop_b_, p);
     else put(drone_prop_a_, p);
   }
@@ -706,10 +706,10 @@ template <> struct Values<::kern::AlphaMode> { static constexpr long long all[] 
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_vehicle_art_cpp) {
+KERN_TEST(lowered_vehicle_art_cpp) {
   {  // VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)  ->  VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)
     ::sc::lowered::Tally tally("VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -745,7 +745,7 @@ SC_TEST(lowered_vehicle_art_cpp) {
   }
   {  // VehicleArt::begin()  ->  VehicleArt::begin()
     ::sc::lowered::Tally tally("VehicleArt::begin()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -761,7 +761,7 @@ SC_TEST(lowered_vehicle_art_cpp) {
   }
   {  // VehicleArt::drone(const kern::Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)  ->  VehicleArt::drone(const kern::Mat4 &, const std::array<Vec3, 4> &, const std::array<f32, 4> &, f32, bool, bool)
     ::sc::lowered::Tally tally("VehicleArt::drone(const kern::Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
@@ -797,7 +797,7 @@ SC_TEST(lowered_vehicle_art_cpp) {
   }
   {  // VehicleArt::end()  ->  VehicleArt::end()
     ::sc::lowered::Tally tally("VehicleArt::end()");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);

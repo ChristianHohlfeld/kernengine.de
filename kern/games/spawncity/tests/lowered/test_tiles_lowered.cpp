@@ -205,7 +205,7 @@ void polygons(const mvt::Feature& f, std::vector<std::vector<std::vector<Vec2>>>
     if (part.size() < 3) continue;
     const f64 a = mvt::ring_area(part);
     if (a > 0 || out.empty()) out.emplace_back();
-    ::sc::converted::back(out).push_back(part);
+    ::kern::converted::back(out).push_back(part);
   }
 }
 
@@ -242,7 +242,7 @@ std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
   auto pass = [&](auto inside, auto cut) {
     b.clear();
     for (std::size_t i = 0; i < a.size(); ++i) { ::sc::lowered::tick();
-      const Vec2 p = ::sc::converted::at(a, i), q = ::sc::converted::at(a, ::sc::lowered::rem((i + 1), a.size()));
+      const Vec2 p = ::kern::converted::at(a, i), q = ::kern::converted::at(a, ::sc::lowered::rem((i + 1), a.size()));
       const bool pi = inside(p), qi = inside(q);
       if (pi) b.push_back(p);
       if (pi != qi) b.push_back(cut(p, q));
@@ -288,14 +288,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         if (!poly.empty()) {
           // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
           bool over = false;
-          for (Vec2 q : ::sc::converted::at(poly, 0)) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
-          if (over) { std::vector<Vec2> m; for (Vec2 q : ::sc::converted::at(poly, 0)) m.push_back(P(q)); apron.push_back(std::move(m)); }
+          for (Vec2 q : ::kern::converted::at(poly, 0)) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
+          if (over) { std::vector<Vec2> m; for (Vec2 q : ::kern::converted::at(poly, 0)) m.push_back(P(q)); apron.push_back(std::move(m)); }
         }
         for (auto& ring : poly) { ::sc::lowered::tick();
           const std::vector<Vec2> clipped = clip_to_tile(ring, ext);
           if (clipped.size() < 3) { if (b.rings.empty()) break; continue; }  // the outline outside: the house is the other tile's
           std::vector<Vec2> m;
-          m.reserve(::sc::converted::count(clipped.size()));
+          m.reserve(::kern::converted::count(clipped.size()));
           for (Vec2 p : clipped) m.push_back(P(p));
           b.rings.push_back(std::move(m));
         }
@@ -417,12 +417,12 @@ struct FurnishIndex {
     const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
     if (it == ring_cells.end()) return false;
     for (u32 id : it->second) { ::sc::lowered::tick();
-      const Ring& g = ::sc::converted::at(rings, id);
+      const Ring& g = ::kern::converted::at(rings, id);
       if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
       const std::vector<Vec2>& r = *g.r;
       bool c = false;
       for (std::size_t i = 0, j = r.size() - 1; (::sc::lowered::tick(), i < r.size()); j = i++)
-        if ((::sc::converted::at(r, i).y > p.y) != (::sc::converted::at(r, j).y > p.y) && p.x < (::sc::converted::at(r, j).x - ::sc::converted::at(r, i).x) * (p.y - ::sc::converted::at(r, i).y) / (::sc::converted::at(r, j).y - ::sc::converted::at(r, i).y + 1e-12f) + ::sc::converted::at(r, i).x) c = !c;
+        if ((::kern::converted::at(r, i).y > p.y) != (::kern::converted::at(r, j).y > p.y) && p.x < (::kern::converted::at(r, j).x - ::kern::converted::at(r, i).x) * (p.y - ::kern::converted::at(r, i).y) / (::kern::converted::at(r, j).y - ::kern::converted::at(r, i).y + 1e-12f) + ::kern::converted::at(r, i).x) c = !c;
       if (c) return true;
     }
     return false;
@@ -432,7 +432,7 @@ struct FurnishIndex {
     const auto it = seg_cells.find(key(cell(p.x), cell(p.y)));
     if (it == seg_cells.end()) return true;
     for (u32 id : it->second) { ::sc::lowered::tick();
-      const Seg& s = ::sc::converted::at(segs, id);
+      const Seg& s = ::kern::converted::at(segs, id);
       const Vec2 d = s.b - s.a;
       const f32 l2 = d.x * d.x + d.y * d.y;
       const f32 t = l2 > 1e-6f ? clampf(((p.x - s.a.x) * d.x + (p.y - s.a.y) * d.y) / l2, 0, 1) : 0;
@@ -448,19 +448,19 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
   out.lamps.clear();
   FurnishIndex ix;
   for (u32 ri = 0; ri < out.roads.size(); ++ri) { ::sc::lowered::tick();
-    const MapFeatures::Road& r = ::sc::converted::at(out.roads, ri);
+    const MapFeatures::Road& r = ::kern::converted::at(out.roads, ri);
     if (road_is_water(r.cls)) continue;
     const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
-    for (std::size_t k = 0; (::sc::lowered::tick(), k + 1 < r.points.size()); ++k) ix.add_seg(::sc::converted::at(r.points, k), ::sc::converted::at(r.points, k + 1), road_width(r.cls) / 2, ri, paved);
+    for (std::size_t k = 0; (::sc::lowered::tick(), k + 1 < r.points.size()); ++k) ix.add_seg(::kern::converted::at(r.points, k), ::kern::converted::at(r.points, k + 1), road_width(r.cls) / 2, ri, paved);
   }
   for (const MapFeatures::Building& b : out.buildings)
-    if (!b.rings.empty()) ix.add_ring(::sc::converted::at(b.rings, 0));
+    if (!b.rings.empty()) ix.add_ring(::kern::converted::at(b.rings, 0));
   for (const std::vector<Vec2>& r : apron) ix.add_ring(r);
   auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
   constexpr f32 kPi2 = 6.2831853f;
   std::unordered_set<u64> lamp_cells;
   for (u32 ri = 0; ri < out.roads.size(); ++ri) { ::sc::lowered::tick();
-    const MapFeatures::Road& r = ::sc::converted::at(out.roads, ri);
+    const MapFeatures::Road& r = ::kern::converted::at(out.roads, ri);
     if (road_is_water(r.cls) || r.points.size() < 2) continue;
     const f32 w = road_width(r.cls);
     // ---- trees beside the streets cars drive (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m,
@@ -469,7 +469,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
       f32 carry = 17;
       u32 i = ri * 7;
       for (std::size_t k = 0; k + 1 < r.points.size(); ++k) { ::sc::lowered::tick();
-        const Vec2 a = ::sc::converted::at(r.points, k), d = ::sc::converted::at(r.points, k + 1) - a;
+        const Vec2 a = ::kern::converted::at(r.points, k), d = ::kern::converted::at(r.points, k + 1) - a;
         const f32 len = std::hypot(d.x, d.y);
         if (len < 1) continue;
         const Vec2 u = d * (1 / len), right{u.y, -u.x};
@@ -488,7 +488,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
     if (r.cls != RoadClass::path && r.cls != RoadClass::track) {
       f32 carry = 34 * 0.5f, side = 1;
       for (std::size_t k = 0; k + 1 < r.points.size(); ++k) { ::sc::lowered::tick();
-        const Vec2 a = ::sc::converted::at(r.points, k), d = ::sc::converted::at(r.points, k + 1) - a;
+        const Vec2 a = ::kern::converted::at(r.points, k), d = ::kern::converted::at(r.points, k + 1) - a;
         const f32 len = std::hypot(d.x, d.y);
         if (len < 0.5f) continue;
         const Vec2 u = d * (1 / len), n{-u.y, u.x};
@@ -637,15 +637,15 @@ std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const ke
   std::vector<Vec2> cur;
   auto close = [&] { if (cur.size() >= 2) out.push_back(std::move(cur)); cur.clear(); };
   for (std::size_t i = 0; i + 1 < line.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(line, i), b = ::sc::converted::at(line, i + 1);
+    const Vec2 a = ::kern::converted::at(line, i), b = ::kern::converted::at(line, i + 1);
     const f32 dx = b.x - a.x, dy = b.y - a.y;
     f32 t0 = 0, t1 = 1;
     bool in = true;
     const f32 p[4] = {-dx, dx, -dy, dy}, q[4] = {a.x - rect.x, rect.z - a.x, a.y - rect.y, rect.w - a.y};
     for (int k = 0; k < 4 && in; ::sc::lowered::pre_inc(k)) { ::sc::lowered::tick();
-      if (::sc::converted::at(p, k) == 0) { in = ::sc::converted::at(q, k) >= 0; continue; }
-      const f32 r = ::sc::converted::at(q, k) / ::sc::converted::at(p, k);
-      if (::sc::converted::at(p, k) < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
+      if (::kern::converted::at(p, k) == 0) { in = ::kern::converted::at(q, k) >= 0; continue; }
+      const f32 r = ::kern::converted::at(q, k) / ::kern::converted::at(p, k);
+      if (::kern::converted::at(p, k) < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
       else { if (r < t0) in = false; else if (r < t1) t1 = r; }
     }
     if (!in || t1 <= t0) { close(); continue; }
@@ -835,7 +835,7 @@ void polygons(const mvt::Feature& f, std::vector<std::vector<std::vector<Vec2>>>
     if (part.size() < 3) continue;
     const f64 a = mvt::ring_area(part);
     if (a > 0 || out.empty()) out.emplace_back();
-    ::sc::converted::back(out).push_back(part);
+    ::kern::converted::back(out).push_back(part);
   }
 }
 
@@ -885,7 +885,7 @@ Vec2 cut_side(i32 side, Vec2 p, Vec2 q, f32 ext) {
 void clip_pass(std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
   b.clear();
   for (std::size_t i = 0; i < a.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 p = ::sc::converted::at(a, i), q = ::sc::converted::at(a, ::sc::lowered::rem((i + 1), a.size()));
+    const Vec2 p = ::kern::converted::at(a, i), q = ::kern::converted::at(a, ::sc::lowered::rem((i + 1), a.size()));
     const bool pi = inside_side(side, p, ext), qi = inside_side(side, q, ext);
     if (pi) b.push_back(p);
     if (pi != qi) b.push_back(cut_side(side, p, q, ext));
@@ -912,12 +912,12 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
   std::vector<std::vector<std::vector<Vec2>>> polys;
   std::vector<std::vector<Vec2>> apron;
   if (const i32 at = tile.layer("building"); at >= 0) {
-    const mvt::Layer& l = ::sc::converted::at(tile.layers, static_cast<std::size_t>(at));
+    const mvt::Layer& l = ::kern::converted::at(tile.layers, static_cast<std::size_t>(at));
     const Projector P(key, proj, static_cast<f64>(l.extent));
     for (const mvt::Feature& f : l.features) { ::sc::lowered::tick();
       if (f.type != mvt::GeomType::polygon) continue;
       const i32 hide = l.tag(f, "hide_3d");
-      if (hide >= 0 && ::sc::converted::at(l.values, static_cast<std::size_t>(hide)).kind == mvt::Value::Kind::boolean && ::sc::converted::at(l.values, static_cast<std::size_t>(hide)).b) continue;
+      if (hide >= 0 && ::kern::converted::at(l.values, static_cast<std::size_t>(hide)).kind == mvt::Value::Kind::boolean && ::kern::converted::at(l.values, static_cast<std::size_t>(hide)).b) continue;
       f32 top = static_cast<f32>(l.number(f, "render_height", -1));
       if (!(top > 0)) top = 8;  // SpawnCity's default (real_world_bootstrap.mjs:443)
       const f32 base = static_cast<f32>(std::fmax(0.0, l.number(f, "render_min_height", 0)));
@@ -932,14 +932,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         if (!poly.empty()) {
           // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
           bool over = false;
-          for (Vec2 q : ::sc::converted::at(poly, 0)) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
-          if (over) { std::vector<Vec2> m; for (Vec2 q : ::sc::converted::at(poly, 0)) m.push_back(P(q)); apron.push_back(std::move(m)); }
+          for (Vec2 q : ::kern::converted::at(poly, 0)) over = over || q.x < 0 || q.y < 0 || q.x > ext || q.y > ext;
+          if (over) { std::vector<Vec2> m; for (Vec2 q : ::kern::converted::at(poly, 0)) m.push_back(P(q)); apron.push_back(std::move(m)); }
         }
         for (auto& ring : poly) { ::sc::lowered::tick();
           const std::vector<Vec2> clipped = clip_to_tile(ring, ext);
           if (clipped.size() < 3) { if (b.rings.empty()) break; continue; }  // the outline outside: the house is the other tile's
           std::vector<Vec2> m;
-          m.reserve(::sc::converted::count(clipped.size()));
+          m.reserve(::kern::converted::count(clipped.size()));
           for (Vec2 p : clipped) m.push_back(P(p));
           b.rings.push_back(std::move(m));
         }
@@ -948,7 +948,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   if (const i32 at = tile.layer("transportation"); at >= 0) {
-    const mvt::Layer& l = ::sc::converted::at(tile.layers, static_cast<std::size_t>(at));
+    const mvt::Layer& l = ::kern::converted::at(tile.layers, static_cast<std::size_t>(at));
     const Projector P(key, proj, static_cast<f64>(l.extent));
     for (const mvt::Feature& f : l.features) { ::sc::lowered::tick();
       if (f.type != mvt::GeomType::line) continue;
@@ -967,7 +967,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   if (const i32 at = tile.layer("waterway"); at >= 0) {
-    const mvt::Layer& l = ::sc::converted::at(tile.layers, static_cast<std::size_t>(at));
+    const mvt::Layer& l = ::kern::converted::at(tile.layers, static_cast<std::size_t>(at));
     const Projector P(key, proj, static_cast<f64>(l.extent));
     for (const mvt::Feature& f : l.features) { ::sc::lowered::tick();
       if (f.type != mvt::GeomType::line) continue;
@@ -986,7 +986,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
   auto areas = [&](const char* layer, auto kind_of) {
     const i32 at = tile.layer(layer);
     if (at < 0) return;
-    const mvt::Layer& l = ::sc::converted::at(tile.layers, static_cast<std::size_t>(at));
+    const mvt::Layer& l = ::kern::converted::at(tile.layers, static_cast<std::size_t>(at));
     const Projector P(key, proj, static_cast<f64>(l.extent));
     for (const mvt::Feature& f : l.features) { ::sc::lowered::tick();
       if (f.type != mvt::GeomType::polygon) continue;
@@ -1066,12 +1066,12 @@ struct FurnishIndex {
     const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
     if (it == ring_cells.end()) return false;
     for (u32 id : it->second) { ::sc::lowered::tick();
-      const Ring& g = ::sc::converted::at(rings, id);
+      const Ring& g = ::kern::converted::at(rings, id);
       if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
-      const std::vector<Vec2>& r = g.apron ? ::sc::converted::at(apron, g.index) : ::sc::converted::at(::sc::converted::at(buildings, g.index).rings, 0);
+      const std::vector<Vec2>& r = g.apron ? ::kern::converted::at(apron, g.index) : ::kern::converted::at(::kern::converted::at(buildings, g.index).rings, 0);
       bool c = false;
       for (std::size_t i = 0, j = r.size() - 1; (::sc::lowered::tick(), i < r.size()); j = i++)
-        if ((::sc::converted::at(r, i).y > p.y) != (::sc::converted::at(r, j).y > p.y) && p.x < (::sc::converted::at(r, j).x - ::sc::converted::at(r, i).x) * (p.y - ::sc::converted::at(r, i).y) / (::sc::converted::at(r, j).y - ::sc::converted::at(r, i).y + 1e-12f) + ::sc::converted::at(r, i).x) c = !c;
+        if ((::kern::converted::at(r, i).y > p.y) != (::kern::converted::at(r, j).y > p.y) && p.x < (::kern::converted::at(r, j).x - ::kern::converted::at(r, i).x) * (p.y - ::kern::converted::at(r, i).y) / (::kern::converted::at(r, j).y - ::kern::converted::at(r, i).y + 1e-12f) + ::kern::converted::at(r, i).x) c = !c;
       if (c) return true;
     }
     return false;
@@ -1081,7 +1081,7 @@ struct FurnishIndex {
     const auto it = seg_cells.find(key(cell(p.x), cell(p.y)));
     if (it == seg_cells.end()) return true;
     for (u32 id : it->second) { ::sc::lowered::tick();
-      const Seg& s = ::sc::converted::at(segs, id);
+      const Seg& s = ::kern::converted::at(segs, id);
       const Vec2 d = s.b - s.a;
       const f32 l2 = d.x * d.x + d.y * d.y;
       const f32 t = l2 > 1e-6f ? clampf(((p.x - s.a.x) * d.x + (p.y - s.a.y) * d.y) / l2, 0, 1) : 0;
@@ -1097,19 +1097,19 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
   out.lamps.clear();
   FurnishIndex ix;
   for (u32 ri = 0; ri < out.roads.size(); ++ri) { ::sc::lowered::tick();
-    const MapFeatures::Road& r = ::sc::converted::at(out.roads, ri);
+    const MapFeatures::Road& r = ::kern::converted::at(out.roads, ri);
     if (road_is_water(r.cls)) continue;
     const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
-    for (std::size_t k = 0; (::sc::lowered::tick(), k + 1 < r.points.size()); ++k) ix.add_seg(::sc::converted::at(r.points, k), ::sc::converted::at(r.points, k + 1), road_width(r.cls) / 2, ri, paved);
+    for (std::size_t k = 0; (::sc::lowered::tick(), k + 1 < r.points.size()); ++k) ix.add_seg(::kern::converted::at(r.points, k), ::kern::converted::at(r.points, k + 1), road_width(r.cls) / 2, ri, paved);
   }
   for (u32 bi = 0; (::sc::lowered::tick(), bi < out.buildings.size()); ++bi)
-    if (!::sc::converted::at(out.buildings, bi).rings.empty()) ix.add_ring(::sc::converted::at(::sc::converted::at(out.buildings, bi).rings, 0), false, bi);
-  for (u32 ai = 0; (::sc::lowered::tick(), ai < apron.size()); ++ai) ix.add_ring(::sc::converted::at(apron, ai), true, ai);
+    if (!::kern::converted::at(out.buildings, bi).rings.empty()) ix.add_ring(::kern::converted::at(::kern::converted::at(out.buildings, bi).rings, 0), false, bi);
+  for (u32 ai = 0; (::sc::lowered::tick(), ai < apron.size()); ++ai) ix.add_ring(::kern::converted::at(apron, ai), true, ai);
   auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
   constexpr f32 kPi2 = 6.2831853f;
   kern::Set<u64> lamp_cells;
   for (u32 ri = 0; ri < out.roads.size(); ++ri) { ::sc::lowered::tick();
-    const MapFeatures::Road& r = ::sc::converted::at(out.roads, ri);
+    const MapFeatures::Road& r = ::kern::converted::at(out.roads, ri);
     if (road_is_water(r.cls) || r.points.size() < 2) continue;
     const f32 w = road_width(r.cls);
     // ---- trees beside the streets cars drive (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m,
@@ -1118,7 +1118,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
       f32 carry = 17;
       u32 i = ri * 7;
       for (std::size_t k = 0; k + 1 < r.points.size(); ++k) { ::sc::lowered::tick();
-        const Vec2 a = ::sc::converted::at(r.points, k), d = ::sc::converted::at(r.points, k + 1) - a;
+        const Vec2 a = ::kern::converted::at(r.points, k), d = ::kern::converted::at(r.points, k + 1) - a;
         const f32 len = std::hypot(d.x, d.y);
         if (len < 1) continue;
         const Vec2 u = d * (1 / len), right{u.y, -u.x};
@@ -1137,7 +1137,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
     if (r.cls != RoadClass::path && r.cls != RoadClass::track) {
       f32 carry = 34 * 0.5f, side = 1;
       for (std::size_t k = 0; k + 1 < r.points.size(); ++k) { ::sc::lowered::tick();
-        const Vec2 a = ::sc::converted::at(r.points, k), d = ::sc::converted::at(r.points, k + 1) - a;
+        const Vec2 a = ::kern::converted::at(r.points, k), d = ::kern::converted::at(r.points, k + 1) - a;
         const f32 len = std::hypot(d.x, d.y);
         if (len < 0.5f) continue;
         const Vec2 u = d * (1 / len), n{-u.y, u.x};
@@ -1286,15 +1286,15 @@ std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const ke
   std::vector<Vec2> cur;
   auto close = [&] { if (cur.size() >= 2) out.push_back(std::move(cur)); cur.clear(); };
   for (std::size_t i = 0; i + 1 < line.size(); ++i) { ::sc::lowered::tick();
-    const Vec2 a = ::sc::converted::at(line, i), b = ::sc::converted::at(line, i + 1);
+    const Vec2 a = ::kern::converted::at(line, i), b = ::kern::converted::at(line, i + 1);
     const f32 dx = b.x - a.x, dy = b.y - a.y;
     f32 t0 = 0, t1 = 1;
     bool in = true;
     const f32 p[4] = {-dx, dx, -dy, dy}, q[4] = {a.x - rect.x, rect.z - a.x, a.y - rect.y, rect.w - a.y};
     for (int k = 0; k < 4 && in; ::sc::lowered::pre_inc(k)) { ::sc::lowered::tick();
-      if (::sc::converted::at(p, k) == 0) { in = ::sc::converted::at(q, k) >= 0; continue; }
-      const f32 r = ::sc::converted::at(q, k) / ::sc::converted::at(p, k);
-      if (::sc::converted::at(p, k) < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
+      if (::kern::converted::at(p, k) == 0) { in = ::kern::converted::at(q, k) >= 0; continue; }
+      const f32 r = ::kern::converted::at(q, k) / ::kern::converted::at(p, k);
+      if (::kern::converted::at(p, k) < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
       else { if (r < t0) in = false; else if (r < t1) t1 = r; }
     }
     if (!in || t1 <= t0) { close(); continue; }
@@ -1352,10 +1352,10 @@ template <> struct Values<::sc_new_tiles::sc::AreaKind> { static constexpr long 
 }  // namespace sc::lowered
 
 namespace sc {
-SC_TEST(lowered_tiles_cpp) {
+KERN_TEST(lowered_tiles_cpp) {
   {  // clip_to_tile(const std::vector<Vec2> &, f32)  ->  clip_to_tile(const std::vector<Vec2> &, f32)
     ::sc::lowered::Tally tally("clip_to_tile(const std::vector<Vec2> &, f32)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<Vec2> &> o0;
       ::sc::lowered::Arg<const std::vector<Vec2> &> n0;
@@ -1375,7 +1375,7 @@ SC_TEST(lowered_tiles_cpp) {
   }
   {  // extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)  ->  extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)
     ::sc::lowered::Tally tally("extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_base_fb6cf4c28186::mvt::Tile &> o0;
       ::sc::lowered::Arg<const ::sc::mvt::Tile &> n0;
@@ -1399,7 +1399,7 @@ SC_TEST(lowered_tiles_cpp) {
   }
   {  // furnish(MapFeatures &, const kern::Vec4 &, const std::vector<std::vector<Vec2>> &)  ->  furnish(MapFeatures &, const kern::Vec4 &, const std::vector<std::vector<Vec2>> &)
     ::sc::lowered::Tally tally("furnish(MapFeatures &, const kern::Vec4 &, const std::vector<std::vector<Vec2>> &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_tiles::sc::MapFeatures &> o0;
       ::sc::lowered::Arg<::sc_new_tiles::sc::MapFeatures &> n0;
@@ -1420,7 +1420,7 @@ SC_TEST(lowered_tiles_cpp) {
   }
   {  // procedural_city(f64, f64, f64, u32, MapFeatures &)  ->  procedural_city(f64, f64, f64, u32, MapFeatures &)
     ::sc::lowered::Tally tally("procedural_city(f64, f64, f64, u32, MapFeatures &)");
-    ::sc::converted::Draw draw;
+    ::kern::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<f64> o0;
       ::sc::lowered::Arg<f64> n0;

@@ -1,4 +1,4 @@
 #include "frame.h"
-namespace sc {
+namespace cases {
 f32 seconds_of(const Frame& frame) { return frame.dt; }
 }

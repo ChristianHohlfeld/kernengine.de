@@ -55,7 +55,7 @@ except SystemExit as e:
 check((open(lp).read(), open(pp).read()) == before, "... and the level and the project stay as they are")
 
 # --classes: the header only
-r = subprocess.run([sys.executable, os.path.join(root, "tools", "cpp_to_blueprint.py"), "--convert", "sc", "--folder", "Cases", "--level", lp, "--project", pp,
+r = subprocess.run([sys.executable, os.path.join(root, "tools", "cpp_to_blueprint.py"), "--convert", "cases", "--folder", "Cases", "--level", lp, "--project", pp,
                     "--classes", "level_blueprints.h=Program", "--", "x.cpp"], capture_output=True, text=True)
 check(r.returncode != 0 and "no folder" in (r.stderr + r.stdout), "--classes <header.h>=<folder> is refused: the project says which Blueprints the program calls as their classes")
 sys.exit(1 if fail else 0)
