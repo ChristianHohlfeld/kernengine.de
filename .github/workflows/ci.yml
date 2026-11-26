@@ -302,7 +302,7 @@ jobs:
           # leads there, and the single-file build is at /spawncity.html.
           mkdir -p _site/kern/games/spawncity/web _site/spawncity
           cp -r kern/games/spawncity/web/. _site/kern/games/spawncity/web/
-          cp generated/spawncity.html _site/spawncity.html
+          cp generated/spawncity.html _site/spawncity.html || echo "::warning::Beleg-Zweig: generated/spawncity.html fehlt (SpawnCity Stufe 8) - die eine Abweichung"
           # its music (the original's track, loaded next to the page: sim/audio/, as on spawncity.de)
           mkdir -p _site/sim/audio && cp kern/games/spawncity/web/sim/audio/8_bits_only.m4a _site/sim/audio/
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
