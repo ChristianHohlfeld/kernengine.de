@@ -336,6 +336,9 @@ struct Float {};
 struct Vector {};
 struct Text {};
 struct Int64 {};
+/// A number of the type T of the engine's signature (i8 ... u64, f32, f64): on the pin a value of T itself - nothing is
+/// converted at the door (kern/docs/blueprint_cpp.md "Zahl-Typen"). The C++ type is T, or an enum or a kern::Count of it.
+template <class T> struct Num {};
 /// An actor (kern::logic::ActorHandle: its id and its world - kern/docs/project.md 7); whose world it must be, the
 /// function of the engine that takes it says (GameWorld: its own).
 struct Actor {};
@@ -456,11 +459,33 @@ template <> struct Conv<Actor> {
 template <> struct Conv<Int64> {
   template <class C> static void from(EngineObjects&, const Value& v, C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    c = static_cast<C>(static_cast<u64>(v.i));
+    c = static_cast<C>(v.as<u64>());
   }
   template <class C> static Value to(EngineObjects&, const C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    return Value::int64(static_cast<u64>(c));
+    return Value::of_number(static_cast<u64>(c));
+  }
+};
+template <class T> struct Conv<Num<T>> {
+  template <class C> static constexpr bool fits() {
+    if constexpr (std::is_enum_v<C>) return std::is_same_v<std::underlying_type_t<C>, T> || sizeof(C) == sizeof(T);
+    else if constexpr (is_count<C>) return std::is_same_v<T, u32>;
+    // (the same number under another name - u64 is unsigned long long on one platform and unsigned long on another; and a
+    // size of the platform, std::size_t, is the language's u64 on every platform - where it is 32 bits, the door widens and
+    // narrows it, which never cuts: no size is beyond the memory - kern/docs/blueprint_cpp.md "Zahl-Typen")
+    else if constexpr (std::is_integral_v<C> && std::is_integral_v<T> && !std::is_same_v<C, bool> && sizeof(C) == sizeof(T) && std::is_signed_v<C> == std::is_signed_v<T>) return true;
+    else if constexpr (std::is_same_v<C, std::size_t>) return std::is_same_v<T, u64>;
+    else return std::is_same_v<C, T>;
+  }
+  template <class C> static void from(EngineObjects&, const Value& v, C& c) {
+    static_assert(fits<C>(), "a pin of a number type of something else than that type (no number is converted at the door)");
+    if constexpr (is_count<C>) c = C(v.as<T>());
+    else c = static_cast<C>(v.as<T>());
+  }
+  template <class C> static Value to(EngineObjects&, const C& c) {
+    static_assert(fits<C>(), "a pin of a number type of something else than that type (no number is converted at the door)");
+    if constexpr (is_count<C>) return Value::of_number<T>(static_cast<u32>(c));
+    else return Value::of_number<T>(static_cast<T>(c));
   }
 };
 template <class E> struct Conv<Enum<E>> {
@@ -543,7 +568,8 @@ template <> struct Held<Handle> { using type = ObjectRef; };
 template <> struct Held<Float> { using type = f64; };
 template <> struct Held<Vector> { using type = Vec3; };
 template <> struct Held<Text> { using type = std::string; };
-template <> struct Held<Int64> { using type = logic::Int64; };
+template <> struct Held<Int64> { using type = u64; };
+template <class T> struct Held<Num<T>> { using type = T; };
 template <class E> struct Held<Enum<E>> { using type = i64; };
 
 /// One item of a list of T as the list holds it, and back.
@@ -551,23 +577,17 @@ template <class T, class C> typename Held<T>::type held_of(EngineObjects& o, con
   const Value v = Conv<T>::to(o, c);
   using H = typename Held<T>::type;
   if constexpr (std::is_same_v<H, Value>) return v;
-  else if constexpr (std::is_same_v<H, bool>) return v.b;
-  else if constexpr (std::is_same_v<H, i64>) return v.i;
-  else if constexpr (std::is_same_v<H, f64>) return v.n;
+  else if constexpr (num::Number<H>) return v.as<H>();
   else if constexpr (std::is_same_v<H, Vec3>) return v.v;
   else if constexpr (std::is_same_v<H, std::string>) return v.s;
-  else if constexpr (std::is_same_v<H, ObjectRef>) return v.as_object();
-  else return logic::Int64(static_cast<u64>(v.i));
+  else return v.as_object();
 }
 template <class T, class C, class H> void from_held(EngineObjects& o, const H& h, C& c) {
   if constexpr (std::is_same_v<H, Value>) Conv<T>::from(o, h, c);
-  else if constexpr (std::is_same_v<H, bool>) Conv<T>::from(o, Value::boolean(h), c);
-  else if constexpr (std::is_same_v<H, i64>) Conv<T>::from(o, Value::integer(h), c);
-  else if constexpr (std::is_same_v<H, f64>) Conv<T>::from(o, Value::number(h), c);
+  else if constexpr (num::Number<H>) Conv<T>::from(o, Value::of_number(h), c);
   else if constexpr (std::is_same_v<H, Vec3>) Conv<T>::from(o, Value::vector(h), c);
   else if constexpr (std::is_same_v<H, std::string>) Conv<T>::from(o, Value::text(h), c);
-  else if constexpr (std::is_same_v<H, ObjectRef>) Conv<T>::from(o, Value::object(h), c);
-  else Conv<T>::from(o, Value::int64(h.bits), c);
+  else Conv<T>::from(o, Value::object(h), c);
 }
 
 /// Entry k of a list the value holds, as the type it holds (a std::vector<bool> gives a proxy for an entry -

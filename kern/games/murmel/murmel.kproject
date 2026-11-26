@@ -66,5 +66,7660 @@
     "levels/bruecke.klevel"
   ],
   "startLevel": "levels/wiese.klevel",
-  "blueprints": []
+  "blueprints": [
+    {
+      "name": "murmel_cpp",
+      "folder": "Programm",
+      "logic": {
+        "kind": "kern-logic",
+        "version": 1,
+        "nextId": 41,
+        "variables": [
+          {
+            "name": "kLevels",
+            "type": "i32",
+            "value": 2,
+            "help": "Die Levels des Spiels, in ihrer Reihenfolge (wie das Projekt sie nennt).",
+            "const": true
+          }
+        ],
+        "library": true,
+        "uses": [
+          "engine_game_runtime"
+        ],
+        "nodes": [
+          {
+            "id": 1,
+            "type": "func.entry",
+            "x": 0,
+            "y": 0,
+            "params": {
+              "function": "level_pfad"
+            }
+          },
+          {
+            "id": 2,
+            "type": "flow.branch",
+            "x": 280,
+            "y": 0
+          },
+          {
+            "id": 3,
+            "type": "math.compare",
+            "x": 160,
+            "y": 150,
+            "params": {
+              "op": "==",
+              "type": "i32"
+            },
+            "values": {
+              "b": 0
+            }
+          },
+          {
+            "id": 4,
+            "type": "func.return",
+            "x": 560,
+            "y": 0,
+            "params": {
+              "function": "level_pfad"
+            },
+            "values": {
+              "Result": "levels/wiese.klevel"
+            }
+          },
+          {
+            "id": 5,
+            "type": "func.return",
+            "x": 840,
+            "y": 0,
+            "params": {
+              "function": "level_pfad"
+            },
+            "values": {
+              "Result": "levels/bruecke.klevel"
+            }
+          },
+          {
+            "id": 6,
+            "type": "func.entry",
+            "x": 0,
+            "y": 290,
+            "params": {
+              "function": "steuerung"
+            }
+          },
+          {
+            "id": 7,
+            "type": "var.set",
+            "x": 280,
+            "y": 290,
+            "params": {
+              "variable": "in",
+              "scope": "steuerung"
+            },
+            "values": {
+              "value": {
+                "move_x": 0,
+                "move_y": 0,
+                "up": 0,
+                "jump": false,
+                "boost": false,
+                "camera": false,
+                "handbrake": false,
+                "robot": 0,
+                "look_x": 0,
+                "look_y": 0,
+                "turn_deg": 0,
+                "speed_scale": 1,
+                "zoom": 0,
+                "view_yaw": 0,
+                "has_view_yaw": false,
+                "view_pitch": 0,
+                "fire": false,
+                "aim": false,
+                "reload": false,
+                "crouch": false,
+                "interact": false,
+                "look_stick_x": 0,
+                "look_stick_y": 0,
+                "gamepad": false,
+                "rewind": 0
+              }
+            }
+          },
+          {
+            "id": 8,
+            "type": "var.set",
+            "x": 560,
+            "y": 290,
+            "params": {
+              "variable": "axis",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 9,
+            "type": "engine.engine.axis",
+            "x": 440,
+            "y": 440,
+            "values": {
+              "name": "moveX"
+            }
+          },
+          {
+            "id": 10,
+            "type": "var.set",
+            "x": 840,
+            "y": 290,
+            "params": {
+              "variable": "in",
+              "scope": "steuerung",
+              "path": ".move_x"
+            }
+          },
+          {
+            "id": 11,
+            "type": "var.get",
+            "x": 720,
+            "y": 440,
+            "params": {
+              "variable": "axis",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 12,
+            "type": "var.set",
+            "x": 1120,
+            "y": 290,
+            "params": {
+              "variable": "axis_2",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 13,
+            "type": "engine.engine.axis",
+            "x": 1000,
+            "y": 440,
+            "values": {
+              "name": "moveY"
+            }
+          },
+          {
+            "id": 14,
+            "type": "var.set",
+            "x": 1400,
+            "y": 290,
+            "params": {
+              "variable": "in",
+              "scope": "steuerung",
+              "path": ".move_y"
+            }
+          },
+          {
+            "id": 15,
+            "type": "var.get",
+            "x": 1280,
+            "y": 440,
+            "params": {
+              "variable": "axis_2",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 16,
+            "type": "var.set",
+            "x": 1680,
+            "y": 290,
+            "params": {
+              "variable": "action",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 17,
+            "type": "engine.engine.action",
+            "x": 1560,
+            "y": 440,
+            "values": {
+              "name": "jump"
+            }
+          },
+          {
+            "id": 18,
+            "type": "var.set",
+            "x": 1960,
+            "y": 290,
+            "params": {
+              "variable": "in",
+              "scope": "steuerung",
+              "path": ".jump"
+            }
+          },
+          {
+            "id": 19,
+            "type": "var.get",
+            "x": 1840,
+            "y": 440,
+            "params": {
+              "variable": "action",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 20,
+            "type": "func.return",
+            "x": 2240,
+            "y": 290,
+            "params": {
+              "function": "steuerung"
+            }
+          },
+          {
+            "id": 21,
+            "type": "var.get",
+            "x": 2120,
+            "y": 440,
+            "params": {
+              "variable": "in",
+              "scope": "steuerung"
+            }
+          },
+          {
+            "id": 22,
+            "type": "func.entry",
+            "x": 0,
+            "y": 580,
+            "params": {
+              "function": "anzeige"
+            }
+          },
+          {
+            "id": 23,
+            "type": "var.set",
+            "x": 280,
+            "y": 580,
+            "params": {
+              "variable": "zeile",
+              "scope": "anzeige"
+            },
+            "values": {
+              "value": ""
+            }
+          },
+          {
+            "id": 24,
+            "type": "flow.branch",
+            "x": 560,
+            "y": 580
+          },
+          {
+            "id": 25,
+            "type": "var.set",
+            "x": 840,
+            "y": 580,
+            "params": {
+              "variable": "zeile",
+              "scope": "anzeige"
+            }
+          },
+          {
+            "id": 26,
+            "type": "text.format",
+            "x": 720,
+            "y": 730,
+            "params": {
+              "format": "Geschafft! %d Punkte (Bestwert %lld)"
+            },
+            "values": {
+              "most": 199
+            }
+          },
+          {
+            "id": 27,
+            "type": "num.cast",
+            "x": 720,
+            "y": 820,
+            "params": {
+              "to": "i64",
+              "from": "i32"
+            }
+          },
+          {
+            "id": 28,
+            "type": "num.cast",
+            "x": 720,
+            "y": 910,
+            "params": {
+              "to": "i32",
+              "from": "f32"
+            }
+          },
+          {
+            "id": 29,
+            "type": "func.return",
+            "x": 1120,
+            "y": 580,
+            "params": {
+              "function": "anzeige"
+            }
+          },
+          {
+            "id": 30,
+            "type": "var.get",
+            "x": 1000,
+            "y": 730,
+            "params": {
+              "variable": "zeile",
+              "scope": "anzeige"
+            }
+          },
+          {
+            "id": 31,
+            "type": "var.set",
+            "x": 1400,
+            "y": 580,
+            "params": {
+              "variable": "zeile",
+              "scope": "anzeige"
+            }
+          },
+          {
+            "id": 32,
+            "type": "text.format",
+            "x": 1280,
+            "y": 730,
+            "params": {
+              "format": "Level %d/%d   Punkte %d   Bestwert %lld"
+            },
+            "values": {
+              "most": 199
+            }
+          },
+          {
+            "id": 33,
+            "type": "num.cast",
+            "x": 1280,
+            "y": 820,
+            "params": {
+              "to": "i64",
+              "from": "i32"
+            }
+          },
+          {
+            "id": 34,
+            "type": "math.formula",
+            "x": 1280,
+            "y": 910,
+            "params": {
+              "formula": "level + 1",
+              "types": "i32"
+            }
+          },
+          {
+            "id": 35,
+            "type": "num.cast",
+            "x": 1280,
+            "y": 1000,
+            "params": {
+              "to": "i64",
+              "from": "i32"
+            }
+          },
+          {
+            "id": 36,
+            "type": "var.get",
+            "x": 1280,
+            "y": 1090,
+            "params": {
+              "variable": "kLevels"
+            }
+          },
+          {
+            "id": 37,
+            "type": "num.cast",
+            "x": 1280,
+            "y": 1180,
+            "params": {
+              "to": "i64",
+              "from": "i32"
+            }
+          },
+          {
+            "id": 38,
+            "type": "num.cast",
+            "x": 1280,
+            "y": 1270,
+            "params": {
+              "to": "i32",
+              "from": "f32"
+            }
+          },
+          {
+            "id": 39,
+            "type": "func.return",
+            "x": 1680,
+            "y": 580,
+            "params": {
+              "function": "anzeige"
+            }
+          },
+          {
+            "id": 40,
+            "type": "var.get",
+            "x": 1560,
+            "y": 730,
+            "params": {
+              "variable": "zeile",
+              "scope": "anzeige"
+            }
+          }
+        ],
+        "links": [
+          [
+            1,
+            "nummer",
+            3,
+            "a"
+          ],
+          [
+            1,
+            "then",
+            2,
+            "exec"
+          ],
+          [
+            2,
+            "false",
+            5,
+            "exec"
+          ],
+          [
+            2,
+            "true",
+            4,
+            "exec"
+          ],
+          [
+            3,
+            "result",
+            2,
+            "condition"
+          ],
+          [
+            6,
+            "engine",
+            9,
+            "engine"
+          ],
+          [
+            6,
+            "engine",
+            13,
+            "engine"
+          ],
+          [
+            6,
+            "engine",
+            17,
+            "engine"
+          ],
+          [
+            6,
+            "then",
+            7,
+            "exec"
+          ],
+          [
+            7,
+            "then",
+            8,
+            "exec"
+          ],
+          [
+            8,
+            "then",
+            10,
+            "exec"
+          ],
+          [
+            9,
+            "result",
+            8,
+            "value"
+          ],
+          [
+            10,
+            "then",
+            12,
+            "exec"
+          ],
+          [
+            11,
+            "value",
+            10,
+            "value"
+          ],
+          [
+            12,
+            "then",
+            14,
+            "exec"
+          ],
+          [
+            13,
+            "result",
+            12,
+            "value"
+          ],
+          [
+            14,
+            "then",
+            16,
+            "exec"
+          ],
+          [
+            15,
+            "value",
+            14,
+            "value"
+          ],
+          [
+            16,
+            "then",
+            18,
+            "exec"
+          ],
+          [
+            17,
+            "result",
+            16,
+            "value"
+          ],
+          [
+            18,
+            "then",
+            20,
+            "exec"
+          ],
+          [
+            19,
+            "value",
+            18,
+            "value"
+          ],
+          [
+            21,
+            "value",
+            20,
+            "Result"
+          ],
+          [
+            22,
+            "bestwert",
+            26,
+            "v1"
+          ],
+          [
+            22,
+            "bestwert",
+            32,
+            "v3"
+          ],
+          [
+            22,
+            "fertig",
+            24,
+            "condition"
+          ],
+          [
+            22,
+            "level",
+            34,
+            "level"
+          ],
+          [
+            22,
+            "punkte",
+            28,
+            "a"
+          ],
+          [
+            22,
+            "punkte",
+            38,
+            "a"
+          ],
+          [
+            22,
+            "then",
+            23,
+            "exec"
+          ],
+          [
+            23,
+            "then",
+            24,
+            "exec"
+          ],
+          [
+            24,
+            "false",
+            31,
+            "exec"
+          ],
+          [
+            24,
+            "true",
+            25,
+            "exec"
+          ],
+          [
+            25,
+            "then",
+            29,
+            "exec"
+          ],
+          [
+            26,
+            "result",
+            25,
+            "value"
+          ],
+          [
+            27,
+            "result",
+            26,
+            "v0"
+          ],
+          [
+            28,
+            "result",
+            27,
+            "a"
+          ],
+          [
+            30,
+            "value",
+            29,
+            "Result"
+          ],
+          [
+            31,
+            "then",
+            39,
+            "exec"
+          ],
+          [
+            32,
+            "result",
+            31,
+            "value"
+          ],
+          [
+            33,
+            "result",
+            32,
+            "v0"
+          ],
+          [
+            34,
+            "result",
+            33,
+            "a"
+          ],
+          [
+            35,
+            "result",
+            32,
+            "v1"
+          ],
+          [
+            36,
+            "value",
+            35,
+            "a"
+          ],
+          [
+            37,
+            "result",
+            32,
+            "v2"
+          ],
+          [
+            38,
+            "result",
+            37,
+            "a"
+          ],
+          [
+            40,
+            "value",
+            39,
+            "Result"
+          ]
+        ],
+        "machines": [],
+        "functions": [
+          {
+            "name": "level_pfad",
+            "pure": true,
+            "inputs": [
+              {
+                "name": "nummer",
+                "type": "i32",
+                "value": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "name": "steuerung",
+            "pure": true,
+            "inputs": [
+              {
+                "name": "engine",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "struct",
+                "of": "game_PlayInput",
+                "value": {
+                  "move_x": 0,
+                  "move_y": 0,
+                  "up": 0,
+                  "jump": false,
+                  "boost": false,
+                  "camera": false,
+                  "handbrake": false,
+                  "robot": 0,
+                  "look_x": 0,
+                  "look_y": 0,
+                  "turn_deg": 0,
+                  "speed_scale": 1,
+                  "zoom": 0,
+                  "view_yaw": 0,
+                  "has_view_yaw": false,
+                  "view_pitch": 0,
+                  "fire": false,
+                  "aim": false,
+                  "reload": false,
+                  "crouch": false,
+                  "interact": false,
+                  "look_stick_x": 0,
+                  "look_stick_y": 0,
+                  "gamepad": false,
+                  "rewind": 0
+                }
+              }
+            ],
+            "locals": [
+              {
+                "name": "in",
+                "type": "struct",
+                "of": "game_PlayInput",
+                "value": {
+                  "move_x": 0,
+                  "move_y": 0,
+                  "up": 0,
+                  "jump": false,
+                  "boost": false,
+                  "camera": false,
+                  "handbrake": false,
+                  "robot": 0,
+                  "look_x": 0,
+                  "look_y": 0,
+                  "turn_deg": 0,
+                  "speed_scale": 1,
+                  "zoom": 0,
+                  "view_yaw": 0,
+                  "has_view_yaw": false,
+                  "view_pitch": 0,
+                  "fire": false,
+                  "aim": false,
+                  "reload": false,
+                  "crouch": false,
+                  "interact": false,
+                  "look_stick_x": 0,
+                  "look_stick_y": 0,
+                  "gamepad": false,
+                  "rewind": 0
+                }
+              },
+              {
+                "name": "axis",
+                "type": "f32",
+                "value": 0
+              },
+              {
+                "name": "axis_2",
+                "type": "f32",
+                "value": 0
+              },
+              {
+                "name": "action",
+                "type": "bool",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "anzeige",
+            "pure": true,
+            "inputs": [
+              {
+                "name": "level",
+                "type": "i32",
+                "value": 0
+              },
+              {
+                "name": "punkte",
+                "type": "f32",
+                "value": 0
+              },
+              {
+                "name": "fertig",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "bestwert",
+                "type": "i64",
+                "value": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "text",
+                "value": ""
+              }
+            ],
+            "locals": [
+              {
+                "name": "zeile",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          }
+        ],
+        "engine": {
+          "engine_game_runtime": "f246062f8ce33b42"
+        }
+      }
+    },
+    {
+      "name": "Murmel",
+      "folder": "Programm",
+      "logic": {
+        "kind": "kern-logic",
+        "version": 1,
+        "nextId": 1048961,
+        "variables": [
+          {
+            "name": "renderer_",
+            "type": "object",
+            "of": "Renderer",
+            "value": null
+          },
+          {
+            "name": "welt_",
+            "type": "object",
+            "of": "game_GameWorld",
+            "value": null
+          },
+          {
+            "name": "bank_",
+            "type": "object",
+            "of": "game_SoundBank",
+            "value": null,
+            "help": "(die Töne spielen auf dem Mixer der Engine: die App-Laufzeit macht ihn hörbar - kern/docs/app.md 3.)"
+          },
+          {
+            "name": "audio_",
+            "type": "object",
+            "of": "game_GameAudio",
+            "value": null
+          },
+          {
+            "name": "kamera_",
+            "type": "struct",
+            "of": "Camera",
+            "value": {
+              "eye": [
+                0,
+                -18,
+                8
+              ],
+              "target": [
+                0,
+                0,
+                2
+              ],
+              "up": [
+                0,
+                0,
+                1
+              ],
+              "fov": 1.0471975803375244,
+              "near": 0.05000000074505806,
+              "far": 1800,
+              "orthographic": false,
+              "ortho_height": 20,
+              "has_projection": false,
+              "projection": {
+                "m": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            }
+          },
+          {
+            "name": "level_",
+            "type": "i32",
+            "value": 0
+          },
+          {
+            "name": "vorher_",
+            "type": "f32",
+            "value": 0,
+            "help": "die Punkte der fertigen Levels"
+          },
+          {
+            "name": "fertig_",
+            "type": "bool",
+            "value": false
+          },
+          {
+            "name": "gewonnen_seit_",
+            "type": "f32",
+            "value": -1,
+            "help": "Sekunden seit dem Ziel (< 0: noch nicht)"
+          },
+          {
+            "name": "toene_",
+            "type": "u32",
+            "value": 0
+          },
+          {
+            "name": "bestwert_",
+            "type": "i64",
+            "value": 0
+          },
+          {
+            "name": "text_",
+            "type": "text",
+            "value": ""
+          },
+          {
+            "name": "kLevels",
+            "type": "i32",
+            "value": 2,
+            "help": "Die Levels des Spiels, in ihrer Reihenfolge (wie das Projekt sie nennt).",
+            "const": true
+          },
+          {
+            "name": "kPi",
+            "type": "f32",
+            "value": 3.1415927410125732,
+            "const": true
+          }
+        ],
+        "uses": [
+          "engine_app_app",
+          "engine_core_base",
+          "engine_math_math",
+          "murmel_cpp"
+        ],
+        "implements": "App",
+        "nodes": [
+          {
+            "id": 1048586,
+            "type": "engine.game_world.make_2",
+            "x": 1400,
+            "y": 2480
+          },
+          {
+            "id": 1048587,
+            "type": "engine.engine.mixer",
+            "x": 3080,
+            "y": 2480
+          },
+          {
+            "id": 1048588,
+            "type": "engine.sound_bank.make",
+            "x": 3640,
+            "y": 2480
+          },
+          {
+            "id": 1048589,
+            "type": "engine.engine.mixer",
+            "x": 5320,
+            "y": 2480
+          },
+          {
+            "id": 1048590,
+            "type": "engine.game_audio.make",
+            "x": 5880,
+            "y": 2480
+          },
+          {
+            "id": 1048591,
+            "type": "engine.engine.load_int",
+            "x": 9800,
+            "y": 2480,
+            "values": {
+              "slot": "murmel",
+              "key": "best",
+              "fallback": 0
+            }
+          },
+          {
+            "id": 1048592,
+            "type": "engine.game_world.start_level",
+            "x": 1960,
+            "y": 2100,
+            "values": {
+              "mode": 2
+            }
+          },
+          {
+            "id": 1048593,
+            "type": "func.call",
+            "x": 11760,
+            "y": 2480,
+            "params": {
+              "function": "lade"
+            },
+            "values": {
+              "nummer": 0
+            }
+          },
+          {
+            "id": 1048594,
+            "type": "engine.engine.ui_menu",
+            "x": 1120,
+            "y": 3040,
+            "values": {
+              "id": "weiter",
+              "items": "Noch einmal\nNur Level 2",
+              "x": 0.5,
+              "y": 0.6000000238418579
+            }
+          },
+          {
+            "id": 1048595,
+            "type": "func.call",
+            "x": 3920,
+            "y": 3040,
+            "params": {
+              "function": "lade"
+            }
+          },
+          {
+            "id": 1048596,
+            "type": "func.call",
+            "x": 7840,
+            "y": 3040,
+            "params": {
+              "function": "lade"
+            }
+          },
+          {
+            "id": 1048597,
+            "type": "engine.engine.save_int",
+            "x": 9800,
+            "y": 3040,
+            "values": {
+              "slot": "murmel",
+              "key": "best"
+            }
+          },
+          {
+            "id": 1048598,
+            "type": "func.call",
+            "x": 11480,
+            "y": 3040,
+            "params": {
+              "function": "lade"
+            }
+          },
+          {
+            "id": 1048599,
+            "type": "engine.game_world.update_camera",
+            "x": 12600,
+            "y": 3040
+          },
+          {
+            "id": 1048600,
+            "type": "engine.game_world.apply_lighting",
+            "x": 14000,
+            "y": 3040
+          },
+          {
+            "id": 1048601,
+            "type": "engine.game_world.sound_cues",
+            "x": 14840,
+            "y": 3040
+          },
+          {
+            "id": 1048602,
+            "type": "engine.sound_bank.prepare",
+            "x": 15680,
+            "y": 3040,
+            "values": {
+              "budget_ms": 4
+            }
+          },
+          {
+            "id": 1048603,
+            "type": "func.entry",
+            "x": 0,
+            "y": 0,
+            "params": {
+              "function": "level"
+            }
+          },
+          {
+            "id": 1048604,
+            "type": "func.return",
+            "x": 280,
+            "y": 0,
+            "params": {
+              "function": "level"
+            }
+          },
+          {
+            "id": 1048605,
+            "type": "var.get",
+            "x": 160,
+            "y": 150,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048606,
+            "type": "func.entry",
+            "x": 0,
+            "y": 290,
+            "params": {
+              "function": "fertig"
+            }
+          },
+          {
+            "id": 1048607,
+            "type": "func.return",
+            "x": 280,
+            "y": 290,
+            "params": {
+              "function": "fertig"
+            }
+          },
+          {
+            "id": 1048608,
+            "type": "var.get",
+            "x": 160,
+            "y": 440,
+            "params": {
+              "variable": "fertig_"
+            }
+          },
+          {
+            "id": 1048609,
+            "type": "func.entry",
+            "x": 0,
+            "y": 580,
+            "params": {
+              "function": "toene"
+            }
+          },
+          {
+            "id": 1048610,
+            "type": "func.return",
+            "x": 280,
+            "y": 580,
+            "params": {
+              "function": "toene"
+            }
+          },
+          {
+            "id": 1048611,
+            "type": "var.get",
+            "x": 160,
+            "y": 730,
+            "params": {
+              "variable": "toene_"
+            }
+          },
+          {
+            "id": 1048612,
+            "type": "func.entry",
+            "x": 0,
+            "y": 870,
+            "params": {
+              "function": "bestwert"
+            }
+          },
+          {
+            "id": 1048613,
+            "type": "func.return",
+            "x": 280,
+            "y": 870,
+            "params": {
+              "function": "bestwert"
+            }
+          },
+          {
+            "id": 1048614,
+            "type": "var.get",
+            "x": 160,
+            "y": 1020,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048615,
+            "type": "func.entry",
+            "x": 0,
+            "y": 1160,
+            "params": {
+              "function": "welt"
+            }
+          },
+          {
+            "id": 1048616,
+            "type": "func.return",
+            "x": 280,
+            "y": 1160,
+            "params": {
+              "function": "welt"
+            }
+          },
+          {
+            "id": 1048617,
+            "type": "var.get",
+            "x": 160,
+            "y": 1310,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048618,
+            "type": "func.entry",
+            "x": 0,
+            "y": 1450,
+            "params": {
+              "function": "punkte"
+            }
+          },
+          {
+            "id": 1048619,
+            "type": "flow.branch",
+            "x": 280,
+            "y": 1450
+          },
+          {
+            "id": 1048620,
+            "type": "logic.or",
+            "x": 160,
+            "y": 1600
+          },
+          {
+            "id": 1048621,
+            "type": "logic.not",
+            "x": 160,
+            "y": 1690
+          },
+          {
+            "id": 1048622,
+            "type": "object.valid",
+            "x": 160,
+            "y": 1780,
+            "params": {
+              "class": "game_GameWorld"
+            }
+          },
+          {
+            "id": 1048623,
+            "type": "var.get",
+            "x": 160,
+            "y": 1870,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048624,
+            "type": "var.get",
+            "x": 160,
+            "y": 1960,
+            "params": {
+              "variable": "fertig_"
+            }
+          },
+          {
+            "id": 1048625,
+            "type": "func.return",
+            "x": 560,
+            "y": 1450,
+            "params": {
+              "function": "punkte"
+            }
+          },
+          {
+            "id": 1048626,
+            "type": "var.get",
+            "x": 440,
+            "y": 1600,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048627,
+            "type": "var.set",
+            "x": 840,
+            "y": 1450,
+            "params": {
+              "variable": "hud",
+              "scope": "punkte"
+            }
+          },
+          {
+            "id": 1048628,
+            "type": "engine.game_world.hud",
+            "x": 720,
+            "y": 1600
+          },
+          {
+            "id": 1048629,
+            "type": "var.get",
+            "x": 720,
+            "y": 1690,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048630,
+            "type": "func.return",
+            "x": 1120,
+            "y": 1450,
+            "params": {
+              "function": "punkte"
+            }
+          },
+          {
+            "id": 1048631,
+            "type": "math.formula",
+            "x": 1000,
+            "y": 1600,
+            "params": {
+              "formula": "vorher_ + score",
+              "types": "f32 f32"
+            }
+          },
+          {
+            "id": 1048632,
+            "type": "var.get",
+            "x": 1000,
+            "y": 1690,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048633,
+            "type": "struct.break",
+            "x": 1000,
+            "y": 1780,
+            "params": {
+              "struct": "game_Hud"
+            }
+          },
+          {
+            "id": 1048634,
+            "type": "var.get",
+            "x": 1000,
+            "y": 1870,
+            "params": {
+              "variable": "hud",
+              "scope": "punkte"
+            }
+          },
+          {
+            "id": 1048635,
+            "type": "func.entry",
+            "x": 0,
+            "y": 2100,
+            "params": {
+              "function": "lade"
+            }
+          },
+          {
+            "id": 1048636,
+            "type": "var.set",
+            "x": 280,
+            "y": 2100,
+            "params": {
+              "variable": "running",
+              "scope": "lade"
+            }
+          },
+          {
+            "id": 1048637,
+            "type": "engine.game_world.running",
+            "x": 160,
+            "y": 2250
+          },
+          {
+            "id": 1048638,
+            "type": "var.get",
+            "x": 160,
+            "y": 2340,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048639,
+            "type": "flow.branch",
+            "x": 560,
+            "y": 2100
+          },
+          {
+            "id": 1048640,
+            "type": "var.get",
+            "x": 440,
+            "y": 2250,
+            "params": {
+              "variable": "running",
+              "scope": "lade"
+            }
+          },
+          {
+            "id": 1048641,
+            "type": "engine.game_audio.end",
+            "x": 840,
+            "y": 2100,
+            "values": {
+              "fade": 0.25
+            }
+          },
+          {
+            "id": 1048642,
+            "type": "var.get",
+            "x": 720,
+            "y": 2250,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048643,
+            "type": "engine.game_world.stop",
+            "x": 1120,
+            "y": 2100
+          },
+          {
+            "id": 1048644,
+            "type": "var.get",
+            "x": 1000,
+            "y": 2250,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048645,
+            "type": "var.set",
+            "x": 1400,
+            "y": 2100,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048646,
+            "type": "var.set",
+            "x": 1680,
+            "y": 2100,
+            "params": {
+              "variable": "gewonnen_seit_"
+            },
+            "values": {
+              "value": -1
+            }
+          },
+          {
+            "id": 1048647,
+            "type": "var.get",
+            "x": 1840,
+            "y": 2250,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048648,
+            "type": "func.pure",
+            "x": 1840,
+            "y": 2340,
+            "params": {
+              "function": "murmel_cpp::level_pfad"
+            }
+          },
+          {
+            "id": 1048649,
+            "type": "var.set",
+            "x": 2240,
+            "y": 2100,
+            "params": {
+              "variable": "start_level",
+              "scope": "lade"
+            }
+          },
+          {
+            "id": 1048650,
+            "type": "flow.branch",
+            "x": 2520,
+            "y": 2100
+          },
+          {
+            "id": 1048651,
+            "type": "logic.not",
+            "x": 2400,
+            "y": 2250
+          },
+          {
+            "id": 1048652,
+            "type": "var.get",
+            "x": 2400,
+            "y": 2340,
+            "params": {
+              "variable": "start_level",
+              "scope": "lade"
+            }
+          },
+          {
+            "id": 1048653,
+            "type": "func.return",
+            "x": 2800,
+            "y": 2100,
+            "params": {
+              "function": "lade"
+            },
+            "values": {
+              "Result": false
+            }
+          },
+          {
+            "id": 1048654,
+            "type": "engine.game_audio.begin",
+            "x": 3080,
+            "y": 2100
+          },
+          {
+            "id": 1048655,
+            "type": "var.get",
+            "x": 2960,
+            "y": 2250,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048656,
+            "type": "var.get",
+            "x": 2960,
+            "y": 2340,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048657,
+            "type": "func.return",
+            "x": 3360,
+            "y": 2100,
+            "params": {
+              "function": "lade"
+            },
+            "values": {
+              "Result": true
+            }
+          },
+          {
+            "id": 1048658,
+            "type": "func.entry",
+            "x": 0,
+            "y": 2480,
+            "params": {
+              "function": "start"
+            }
+          },
+          {
+            "id": 1048659,
+            "type": "var.set",
+            "x": 280,
+            "y": 2480,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048660,
+            "type": "var.set",
+            "x": 560,
+            "y": 2480,
+            "params": {
+              "variable": "renderer",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048661,
+            "type": "engine.engine.renderer",
+            "x": 440,
+            "y": 2630
+          },
+          {
+            "id": 1048662,
+            "type": "var.get",
+            "x": 440,
+            "y": 2720,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048663,
+            "type": "var.set",
+            "x": 840,
+            "y": 2480,
+            "params": {
+              "variable": "renderer_"
+            }
+          },
+          {
+            "id": 1048664,
+            "type": "var.get",
+            "x": 720,
+            "y": 2630,
+            "params": {
+              "variable": "renderer",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048665,
+            "type": "var.set",
+            "x": 1120,
+            "y": 2480,
+            "params": {
+              "variable": "old",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048666,
+            "type": "var.get",
+            "x": 1000,
+            "y": 2630,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048667,
+            "type": "var.get",
+            "x": 1280,
+            "y": 2630,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048668,
+            "type": "var.set",
+            "x": 1680,
+            "y": 2480,
+            "params": {
+              "variable": "game_world",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048669,
+            "type": "var.set",
+            "x": 1960,
+            "y": 2480,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048670,
+            "type": "var.get",
+            "x": 1840,
+            "y": 2630,
+            "params": {
+              "variable": "game_world",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048671,
+            "type": "flow.branch",
+            "x": 2240,
+            "y": 2480
+          },
+          {
+            "id": 1048672,
+            "type": "object.valid",
+            "x": 2120,
+            "y": 2630,
+            "params": {
+              "class": "game_GameWorld"
+            }
+          },
+          {
+            "id": 1048673,
+            "type": "var.get",
+            "x": 2120,
+            "y": 2720,
+            "params": {
+              "variable": "old",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048674,
+            "type": "engine.game_world.release",
+            "x": 2520,
+            "y": 2480
+          },
+          {
+            "id": 1048675,
+            "type": "var.get",
+            "x": 2400,
+            "y": 2630,
+            "params": {
+              "variable": "old",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048676,
+            "type": "var.set",
+            "x": 2800,
+            "y": 2480,
+            "params": {
+              "variable": "old_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048677,
+            "type": "var.get",
+            "x": 2680,
+            "y": 2630,
+            "params": {
+              "variable": "bank_"
+            }
+          },
+          {
+            "id": 1048678,
+            "type": "var.get",
+            "x": 2960,
+            "y": 2630,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048679,
+            "type": "var.set",
+            "x": 3360,
+            "y": 2480,
+            "params": {
+              "variable": "mixer",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048680,
+            "type": "var.get",
+            "x": 3520,
+            "y": 2630,
+            "params": {
+              "variable": "mixer",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048681,
+            "type": "var.set",
+            "x": 3920,
+            "y": 2480,
+            "params": {
+              "variable": "sound_bank",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048682,
+            "type": "var.set",
+            "x": 4200,
+            "y": 2480,
+            "params": {
+              "variable": "bank_"
+            }
+          },
+          {
+            "id": 1048683,
+            "type": "var.get",
+            "x": 4080,
+            "y": 2630,
+            "params": {
+              "variable": "sound_bank",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048684,
+            "type": "flow.branch",
+            "x": 4480,
+            "y": 2480
+          },
+          {
+            "id": 1048685,
+            "type": "object.valid",
+            "x": 4360,
+            "y": 2630,
+            "params": {
+              "class": "game_SoundBank"
+            }
+          },
+          {
+            "id": 1048686,
+            "type": "var.get",
+            "x": 4360,
+            "y": 2720,
+            "params": {
+              "variable": "old_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048687,
+            "type": "engine.sound_bank.release",
+            "x": 4760,
+            "y": 2480
+          },
+          {
+            "id": 1048688,
+            "type": "var.get",
+            "x": 4640,
+            "y": 2630,
+            "params": {
+              "variable": "old_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048689,
+            "type": "var.set",
+            "x": 5040,
+            "y": 2480,
+            "params": {
+              "variable": "old_3",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048690,
+            "type": "var.get",
+            "x": 4920,
+            "y": 2630,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048691,
+            "type": "var.get",
+            "x": 5200,
+            "y": 2630,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048692,
+            "type": "var.set",
+            "x": 5600,
+            "y": 2480,
+            "params": {
+              "variable": "mixer_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048693,
+            "type": "var.get",
+            "x": 5760,
+            "y": 2630,
+            "params": {
+              "variable": "mixer_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048694,
+            "type": "var.get",
+            "x": 5760,
+            "y": 2720,
+            "params": {
+              "variable": "bank_"
+            }
+          },
+          {
+            "id": 1048695,
+            "type": "var.set",
+            "x": 6160,
+            "y": 2480,
+            "params": {
+              "variable": "game_audio",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048696,
+            "type": "var.set",
+            "x": 6440,
+            "y": 2480,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048697,
+            "type": "var.get",
+            "x": 6320,
+            "y": 2630,
+            "params": {
+              "variable": "game_audio",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048698,
+            "type": "flow.branch",
+            "x": 6720,
+            "y": 2480
+          },
+          {
+            "id": 1048699,
+            "type": "object.valid",
+            "x": 6600,
+            "y": 2630,
+            "params": {
+              "class": "game_GameAudio"
+            }
+          },
+          {
+            "id": 1048700,
+            "type": "var.get",
+            "x": 6600,
+            "y": 2720,
+            "params": {
+              "variable": "old_3",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048701,
+            "type": "engine.game_audio.release",
+            "x": 7000,
+            "y": 2480
+          },
+          {
+            "id": 1048702,
+            "type": "var.get",
+            "x": 6880,
+            "y": 2630,
+            "params": {
+              "variable": "old_3",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048703,
+            "type": "var.set",
+            "x": 7280,
+            "y": 2480,
+            "params": {
+              "variable": "renderer_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048704,
+            "type": "engine.engine.renderer",
+            "x": 7160,
+            "y": 2630
+          },
+          {
+            "id": 1048705,
+            "type": "var.get",
+            "x": 7160,
+            "y": 2720,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048706,
+            "type": "var.set",
+            "x": 7560,
+            "y": 2480,
+            "params": {
+              "variable": "camera",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048707,
+            "type": "engine.renderer.camera",
+            "x": 7440,
+            "y": 2630
+          },
+          {
+            "id": 1048708,
+            "type": "var.get",
+            "x": 7440,
+            "y": 2720,
+            "params": {
+              "variable": "renderer_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048709,
+            "type": "var.set",
+            "x": 7840,
+            "y": 2480,
+            "params": {
+              "variable": "kamera_"
+            }
+          },
+          {
+            "id": 1048710,
+            "type": "var.get",
+            "x": 7720,
+            "y": 2630,
+            "params": {
+              "variable": "camera",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048711,
+            "type": "var.set",
+            "x": 8120,
+            "y": 2480,
+            "params": {
+              "variable": "kamera_",
+              "path": ".fov"
+            }
+          },
+          {
+            "id": 1048712,
+            "type": "math.formula",
+            "x": 8000,
+            "y": 2630,
+            "params": {
+              "formula": "6e+01f * kPi / 1.8e+02f",
+              "types": "f32"
+            }
+          },
+          {
+            "id": 1048713,
+            "type": "var.get",
+            "x": 8000,
+            "y": 2720,
+            "params": {
+              "variable": "kPi"
+            }
+          },
+          {
+            "id": 1048714,
+            "type": "var.set",
+            "x": 8400,
+            "y": 2480,
+            "params": {
+              "variable": "level_"
+            },
+            "values": {
+              "value": 0
+            }
+          },
+          {
+            "id": 1048715,
+            "type": "var.set",
+            "x": 8680,
+            "y": 2480,
+            "params": {
+              "variable": "vorher_"
+            },
+            "values": {
+              "value": 0
+            }
+          },
+          {
+            "id": 1048716,
+            "type": "var.set",
+            "x": 8960,
+            "y": 2480,
+            "params": {
+              "variable": "fertig_"
+            },
+            "values": {
+              "value": false
+            }
+          },
+          {
+            "id": 1048717,
+            "type": "var.set",
+            "x": 9240,
+            "y": 2480,
+            "params": {
+              "variable": "toene_"
+            },
+            "values": {
+              "value": 0
+            }
+          },
+          {
+            "id": 1048718,
+            "type": "engine.clear_error",
+            "x": 9520,
+            "y": 2480
+          },
+          {
+            "id": 1048719,
+            "type": "var.get",
+            "x": 9680,
+            "y": 2630,
+            "params": {
+              "variable": "engine_",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048720,
+            "type": "var.set",
+            "x": 10080,
+            "y": 2480,
+            "params": {
+              "variable": "load_int",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048721,
+            "type": "var.set",
+            "x": 10360,
+            "y": 2480,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048722,
+            "type": "var.get",
+            "x": 10240,
+            "y": 2630,
+            "params": {
+              "variable": "load_int",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048723,
+            "type": "var.set",
+            "x": 10640,
+            "y": 2480,
+            "params": {
+              "variable": "last_error",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048724,
+            "type": "engine.last_error",
+            "x": 10520,
+            "y": 2630
+          },
+          {
+            "id": 1048725,
+            "type": "flow.branch",
+            "x": 10920,
+            "y": 2480
+          },
+          {
+            "id": 1048726,
+            "type": "logic.not",
+            "x": 10800,
+            "y": 2630
+          },
+          {
+            "id": 1048727,
+            "type": "math.compare",
+            "x": 10800,
+            "y": 2720,
+            "params": {
+              "op": "==",
+              "type": "i64"
+            },
+            "values": {
+              "b": 0
+            }
+          },
+          {
+            "id": 1048728,
+            "type": "text.length",
+            "x": 10800,
+            "y": 2810
+          },
+          {
+            "id": 1048729,
+            "type": "var.get",
+            "x": 10800,
+            "y": 2900,
+            "params": {
+              "variable": "last_error",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048730,
+            "type": "var.set",
+            "x": 11200,
+            "y": 2480,
+            "params": {
+              "variable": "last_error_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048731,
+            "type": "engine.last_error",
+            "x": 11080,
+            "y": 2630
+          },
+          {
+            "id": 1048732,
+            "type": "engine.log",
+            "x": 11480,
+            "y": 2480,
+            "values": {
+              "level": 2
+            }
+          },
+          {
+            "id": 1048733,
+            "type": "text.format",
+            "x": 11360,
+            "y": 2630,
+            "params": {
+              "format": "%s"
+            },
+            "values": {
+              "most": -1
+            }
+          },
+          {
+            "id": 1048734,
+            "type": "var.get",
+            "x": 11360,
+            "y": 2720,
+            "params": {
+              "variable": "last_error_2",
+              "scope": "start"
+            }
+          },
+          {
+            "id": 1048735,
+            "type": "func.return",
+            "x": 12040,
+            "y": 2480,
+            "params": {
+              "function": "start"
+            }
+          },
+          {
+            "id": 1048736,
+            "type": "func.entry",
+            "x": 0,
+            "y": 3040,
+            "params": {
+              "function": "update"
+            }
+          },
+          {
+            "id": 1048737,
+            "type": "var.set",
+            "x": 280,
+            "y": 3040,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048738,
+            "type": "var.set",
+            "x": 560,
+            "y": 3040,
+            "params": {
+              "variable": "in",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048739,
+            "type": "func.pure",
+            "x": 440,
+            "y": 3190,
+            "params": {
+              "function": "murmel_cpp::steuerung"
+            }
+          },
+          {
+            "id": 1048740,
+            "type": "var.get",
+            "x": 440,
+            "y": 3280,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048741,
+            "type": "flow.branch",
+            "x": 840,
+            "y": 3040
+          },
+          {
+            "id": 1048742,
+            "type": "var.get",
+            "x": 720,
+            "y": 3190,
+            "params": {
+              "variable": "fertig_"
+            }
+          },
+          {
+            "id": 1048743,
+            "type": "var.get",
+            "x": 1000,
+            "y": 3190,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048744,
+            "type": "var.set",
+            "x": 1400,
+            "y": 3040,
+            "params": {
+              "variable": "ui_menu",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048745,
+            "type": "var.set",
+            "x": 1680,
+            "y": 3040,
+            "params": {
+              "variable": "wahl",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048746,
+            "type": "var.get",
+            "x": 1560,
+            "y": 3190,
+            "params": {
+              "variable": "ui_menu",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048747,
+            "type": "var.set",
+            "x": 1960,
+            "y": 3040,
+            "params": {
+              "variable": "either",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048748,
+            "type": "math.compare",
+            "x": 1840,
+            "y": 3190,
+            "params": {
+              "op": ">=",
+              "type": "i32"
+            },
+            "values": {
+              "b": 0
+            }
+          },
+          {
+            "id": 1048749,
+            "type": "var.get",
+            "x": 1840,
+            "y": 3280,
+            "params": {
+              "variable": "wahl",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048750,
+            "type": "flow.branch",
+            "x": 2240,
+            "y": 3040
+          },
+          {
+            "id": 1048751,
+            "type": "logic.not",
+            "x": 2120,
+            "y": 3190
+          },
+          {
+            "id": 1048752,
+            "type": "var.get",
+            "x": 2120,
+            "y": 3280,
+            "params": {
+              "variable": "either",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048753,
+            "type": "var.set",
+            "x": 2520,
+            "y": 3040,
+            "params": {
+              "variable": "action_pressed_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048754,
+            "type": "engine.engine.action_pressed",
+            "x": 2400,
+            "y": 3190,
+            "values": {
+              "name": "again"
+            }
+          },
+          {
+            "id": 1048755,
+            "type": "var.get",
+            "x": 2400,
+            "y": 3280,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048756,
+            "type": "var.set",
+            "x": 2800,
+            "y": 3040,
+            "params": {
+              "variable": "either",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048757,
+            "type": "var.get",
+            "x": 2680,
+            "y": 3190,
+            "params": {
+              "variable": "action_pressed_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048758,
+            "type": "flow.branch",
+            "x": 3080,
+            "y": 3040
+          },
+          {
+            "id": 1048759,
+            "type": "var.get",
+            "x": 2960,
+            "y": 3190,
+            "params": {
+              "variable": "either",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048760,
+            "type": "var.set",
+            "x": 3360,
+            "y": 3040,
+            "params": {
+              "variable": "vorher_"
+            },
+            "values": {
+              "value": 0
+            }
+          },
+          {
+            "id": 1048761,
+            "type": "var.set",
+            "x": 3640,
+            "y": 3040,
+            "params": {
+              "variable": "fertig_"
+            },
+            "values": {
+              "value": false
+            }
+          },
+          {
+            "id": 1048762,
+            "type": "math.formula",
+            "x": 3800,
+            "y": 3190,
+            "params": {
+              "formula": "wahl == 1 ? a1 : a0",
+              "types": "i32 i32 i32"
+            },
+            "values": {
+              "a1": 1,
+              "a0": 0
+            }
+          },
+          {
+            "id": 1048763,
+            "type": "var.get",
+            "x": 3800,
+            "y": 3280,
+            "params": {
+              "variable": "wahl",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048764,
+            "type": "flow.branch",
+            "x": 4200,
+            "y": 3040
+          },
+          {
+            "id": 1048765,
+            "type": "logic.not",
+            "x": 4080,
+            "y": 3190
+          },
+          {
+            "id": 1048766,
+            "type": "var.set",
+            "x": 4480,
+            "y": 3040,
+            "params": {
+              "variable": "last_error",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048767,
+            "type": "engine.last_error",
+            "x": 4360,
+            "y": 3190
+          },
+          {
+            "id": 1048768,
+            "type": "engine.log",
+            "x": 4760,
+            "y": 3040,
+            "values": {
+              "level": 3
+            }
+          },
+          {
+            "id": 1048769,
+            "type": "text.format",
+            "x": 4640,
+            "y": 3190,
+            "params": {
+              "format": "%s"
+            },
+            "values": {
+              "most": -1
+            }
+          },
+          {
+            "id": 1048770,
+            "type": "var.get",
+            "x": 4640,
+            "y": 3280,
+            "params": {
+              "variable": "last_error",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048771,
+            "type": "engine.game_world.step",
+            "x": 5040,
+            "y": 3040
+          },
+          {
+            "id": 1048772,
+            "type": "var.get",
+            "x": 4920,
+            "y": 3190,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048773,
+            "type": "var.get",
+            "x": 4920,
+            "y": 3280,
+            "params": {
+              "variable": "frame",
+              "scope": "update",
+              "path": ".dt"
+            }
+          },
+          {
+            "id": 1048774,
+            "type": "var.get",
+            "x": 4920,
+            "y": 3370,
+            "params": {
+              "variable": "in",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048775,
+            "type": "var.set",
+            "x": 5320,
+            "y": 3040,
+            "params": {
+              "variable": "hud_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048776,
+            "type": "engine.game_world.hud",
+            "x": 5200,
+            "y": 3190
+          },
+          {
+            "id": 1048777,
+            "type": "var.get",
+            "x": 5200,
+            "y": 3280,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048778,
+            "type": "var.set",
+            "x": 5600,
+            "y": 3040,
+            "params": {
+              "variable": "hud",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048779,
+            "type": "var.get",
+            "x": 5480,
+            "y": 3190,
+            "params": {
+              "variable": "hud_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048780,
+            "type": "flow.branch",
+            "x": 5880,
+            "y": 3040
+          },
+          {
+            "id": 1048781,
+            "type": "enum.equal",
+            "x": 5760,
+            "y": 3190,
+            "params": {
+              "enum": "game_GameStatus"
+            },
+            "values": {
+              "b": 2
+            }
+          },
+          {
+            "id": 1048782,
+            "type": "var.get",
+            "x": 5760,
+            "y": 3280,
+            "params": {
+              "variable": "hud",
+              "scope": "update",
+              "path": ".status"
+            }
+          },
+          {
+            "id": 1048783,
+            "type": "flow.branch",
+            "x": 6160,
+            "y": 3040
+          },
+          {
+            "id": 1048784,
+            "type": "math.compare",
+            "x": 6040,
+            "y": 3190,
+            "params": {
+              "op": "<",
+              "type": "f32"
+            },
+            "values": {
+              "b": 0
+            }
+          },
+          {
+            "id": 1048785,
+            "type": "var.get",
+            "x": 6040,
+            "y": 3280,
+            "params": {
+              "variable": "gewonnen_seit_"
+            }
+          },
+          {
+            "id": 1048786,
+            "type": "var.set",
+            "x": 6440,
+            "y": 3040,
+            "params": {
+              "variable": "gewonnen_seit_"
+            },
+            "values": {
+              "value": 0
+            }
+          },
+          {
+            "id": 1048787,
+            "type": "var.set",
+            "x": 6720,
+            "y": 3040,
+            "params": {
+              "variable": "gewonnen_seit_"
+            }
+          },
+          {
+            "id": 1048788,
+            "type": "math.formula",
+            "x": 6600,
+            "y": 3190,
+            "params": {
+              "formula": "gewonnen_seit_ + dt",
+              "types": "f32 f32"
+            }
+          },
+          {
+            "id": 1048789,
+            "type": "var.get",
+            "x": 6600,
+            "y": 3280,
+            "params": {
+              "variable": "gewonnen_seit_"
+            }
+          },
+          {
+            "id": 1048790,
+            "type": "var.get",
+            "x": 6600,
+            "y": 3370,
+            "params": {
+              "variable": "frame",
+              "scope": "update",
+              "path": ".dt"
+            }
+          },
+          {
+            "id": 1048791,
+            "type": "flow.branch",
+            "x": 7000,
+            "y": 3040
+          },
+          {
+            "id": 1048792,
+            "type": "math.compare",
+            "x": 6880,
+            "y": 3190,
+            "params": {
+              "op": ">",
+              "type": "f32"
+            },
+            "values": {
+              "b": 1
+            }
+          },
+          {
+            "id": 1048793,
+            "type": "var.get",
+            "x": 6880,
+            "y": 3280,
+            "params": {
+              "variable": "gewonnen_seit_"
+            }
+          },
+          {
+            "id": 1048794,
+            "type": "var.set",
+            "x": 7280,
+            "y": 3040,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048795,
+            "type": "math.formula",
+            "x": 7160,
+            "y": 3190,
+            "params": {
+              "formula": "vorher_ + score",
+              "types": "f32 f32"
+            }
+          },
+          {
+            "id": 1048796,
+            "type": "var.get",
+            "x": 7160,
+            "y": 3280,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048797,
+            "type": "var.get",
+            "x": 7160,
+            "y": 3370,
+            "params": {
+              "variable": "hud",
+              "scope": "update",
+              "path": ".score"
+            }
+          },
+          {
+            "id": 1048798,
+            "type": "flow.branch",
+            "x": 7560,
+            "y": 3040
+          },
+          {
+            "id": 1048799,
+            "type": "math.compare",
+            "x": 7440,
+            "y": 3190,
+            "params": {
+              "op": "<",
+              "type": "i32"
+            }
+          },
+          {
+            "id": 1048800,
+            "type": "math.formula",
+            "x": 7440,
+            "y": 3280,
+            "params": {
+              "formula": "level_ + 1",
+              "types": "i32"
+            }
+          },
+          {
+            "id": 1048801,
+            "type": "var.get",
+            "x": 7440,
+            "y": 3370,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048802,
+            "type": "var.get",
+            "x": 7440,
+            "y": 3460,
+            "params": {
+              "variable": "kLevels"
+            }
+          },
+          {
+            "id": 1048803,
+            "type": "math.formula",
+            "x": 7720,
+            "y": 3190,
+            "params": {
+              "formula": "level_ + 1",
+              "types": "i32"
+            }
+          },
+          {
+            "id": 1048804,
+            "type": "var.get",
+            "x": 7720,
+            "y": 3280,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048805,
+            "type": "flow.branch",
+            "x": 8120,
+            "y": 3040
+          },
+          {
+            "id": 1048806,
+            "type": "logic.not",
+            "x": 8000,
+            "y": 3190
+          },
+          {
+            "id": 1048807,
+            "type": "var.set",
+            "x": 8400,
+            "y": 3040,
+            "params": {
+              "variable": "last_error_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048808,
+            "type": "engine.last_error",
+            "x": 8280,
+            "y": 3190
+          },
+          {
+            "id": 1048809,
+            "type": "engine.log",
+            "x": 8680,
+            "y": 3040,
+            "values": {
+              "level": 3
+            }
+          },
+          {
+            "id": 1048810,
+            "type": "text.format",
+            "x": 8560,
+            "y": 3190,
+            "params": {
+              "format": "%s"
+            },
+            "values": {
+              "most": -1
+            }
+          },
+          {
+            "id": 1048811,
+            "type": "var.get",
+            "x": 8560,
+            "y": 3280,
+            "params": {
+              "variable": "last_error_2",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048812,
+            "type": "var.set",
+            "x": 8960,
+            "y": 3040,
+            "params": {
+              "variable": "fertig_"
+            },
+            "values": {
+              "value": true
+            }
+          },
+          {
+            "id": 1048813,
+            "type": "flow.branch",
+            "x": 9240,
+            "y": 3040
+          },
+          {
+            "id": 1048814,
+            "type": "math.compare",
+            "x": 9120,
+            "y": 3190,
+            "params": {
+              "op": ">",
+              "type": "i64"
+            }
+          },
+          {
+            "id": 1048815,
+            "type": "num.cast",
+            "x": 9120,
+            "y": 3280,
+            "params": {
+              "to": "i64",
+              "from": "f32"
+            }
+          },
+          {
+            "id": 1048816,
+            "type": "var.get",
+            "x": 9120,
+            "y": 3370,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048817,
+            "type": "var.get",
+            "x": 9120,
+            "y": 3460,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048818,
+            "type": "var.set",
+            "x": 9520,
+            "y": 3040,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048819,
+            "type": "num.cast",
+            "x": 9400,
+            "y": 3190,
+            "params": {
+              "to": "i64",
+              "from": "f32"
+            }
+          },
+          {
+            "id": 1048820,
+            "type": "var.get",
+            "x": 9400,
+            "y": 3280,
+            "params": {
+              "variable": "vorher_"
+            }
+          },
+          {
+            "id": 1048821,
+            "type": "var.get",
+            "x": 9680,
+            "y": 3190,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048822,
+            "type": "var.get",
+            "x": 9680,
+            "y": 3280,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048823,
+            "type": "var.set",
+            "x": 10080,
+            "y": 3040,
+            "params": {
+              "variable": "save_int",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048824,
+            "type": "flow.branch",
+            "x": 10360,
+            "y": 3040
+          },
+          {
+            "id": 1048825,
+            "type": "logic.not",
+            "x": 10240,
+            "y": 3190
+          },
+          {
+            "id": 1048826,
+            "type": "var.get",
+            "x": 10240,
+            "y": 3280,
+            "params": {
+              "variable": "save_int",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048827,
+            "type": "var.set",
+            "x": 10640,
+            "y": 3040,
+            "params": {
+              "variable": "last_error_3",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048828,
+            "type": "engine.last_error",
+            "x": 10520,
+            "y": 3190
+          },
+          {
+            "id": 1048829,
+            "type": "engine.log",
+            "x": 10920,
+            "y": 3040,
+            "values": {
+              "level": 3
+            }
+          },
+          {
+            "id": 1048830,
+            "type": "text.format",
+            "x": 10800,
+            "y": 3190,
+            "params": {
+              "format": "%s"
+            },
+            "values": {
+              "most": -1
+            }
+          },
+          {
+            "id": 1048831,
+            "type": "var.get",
+            "x": 10800,
+            "y": 3280,
+            "params": {
+              "variable": "last_error_3",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048832,
+            "type": "flow.branch",
+            "x": 11200,
+            "y": 3040
+          },
+          {
+            "id": 1048833,
+            "type": "enum.equal",
+            "x": 11080,
+            "y": 3190,
+            "params": {
+              "enum": "game_GameStatus"
+            },
+            "values": {
+              "b": 3
+            }
+          },
+          {
+            "id": 1048834,
+            "type": "var.get",
+            "x": 11080,
+            "y": 3280,
+            "params": {
+              "variable": "hud",
+              "scope": "update",
+              "path": ".status"
+            }
+          },
+          {
+            "id": 1048835,
+            "type": "var.get",
+            "x": 11360,
+            "y": 3190,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048836,
+            "type": "flow.branch",
+            "x": 11760,
+            "y": 3040
+          },
+          {
+            "id": 1048837,
+            "type": "logic.not",
+            "x": 11640,
+            "y": 3190
+          },
+          {
+            "id": 1048838,
+            "type": "var.set",
+            "x": 12040,
+            "y": 3040,
+            "params": {
+              "variable": "last_error_4",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048839,
+            "type": "engine.last_error",
+            "x": 11920,
+            "y": 3190
+          },
+          {
+            "id": 1048840,
+            "type": "engine.log",
+            "x": 12320,
+            "y": 3040,
+            "values": {
+              "level": 3
+            }
+          },
+          {
+            "id": 1048841,
+            "type": "text.format",
+            "x": 12200,
+            "y": 3190,
+            "params": {
+              "format": "%s"
+            },
+            "values": {
+              "most": -1
+            }
+          },
+          {
+            "id": 1048842,
+            "type": "var.get",
+            "x": 12200,
+            "y": 3280,
+            "params": {
+              "variable": "last_error_4",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048843,
+            "type": "var.get",
+            "x": 12480,
+            "y": 3190,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048844,
+            "type": "var.get",
+            "x": 12480,
+            "y": 3280,
+            "params": {
+              "variable": "kamera_"
+            }
+          },
+          {
+            "id": 1048845,
+            "type": "var.get",
+            "x": 12480,
+            "y": 3370,
+            "params": {
+              "variable": "frame",
+              "scope": "update",
+              "path": ".dt"
+            }
+          },
+          {
+            "id": 1048846,
+            "type": "var.get",
+            "x": 12480,
+            "y": 3460,
+            "params": {
+              "variable": "in",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048847,
+            "type": "var.set",
+            "x": 12880,
+            "y": 3040,
+            "params": {
+              "variable": "update_camera",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048848,
+            "type": "var.set",
+            "x": 13160,
+            "y": 3040,
+            "params": {
+              "variable": "kamera_"
+            }
+          },
+          {
+            "id": 1048849,
+            "type": "var.set",
+            "x": 13440,
+            "y": 3040,
+            "params": {
+              "variable": "renderer",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048850,
+            "type": "engine.engine.renderer",
+            "x": 13320,
+            "y": 3190
+          },
+          {
+            "id": 1048851,
+            "type": "var.get",
+            "x": 13320,
+            "y": 3280,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048852,
+            "type": "engine.renderer.set_camera",
+            "x": 13720,
+            "y": 3040
+          },
+          {
+            "id": 1048853,
+            "type": "var.get",
+            "x": 13600,
+            "y": 3190,
+            "params": {
+              "variable": "renderer",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048854,
+            "type": "var.get",
+            "x": 13600,
+            "y": 3280,
+            "params": {
+              "variable": "kamera_"
+            }
+          },
+          {
+            "id": 1048855,
+            "type": "var.get",
+            "x": 13880,
+            "y": 3190,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048856,
+            "type": "var.get",
+            "x": 13880,
+            "y": 3280,
+            "params": {
+              "variable": "kamera_",
+              "path": ".eye"
+            }
+          },
+          {
+            "id": 1048857,
+            "type": "var.set",
+            "x": 14280,
+            "y": 3040,
+            "params": {
+              "variable": "apply_lighting",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048858,
+            "type": "engine.game_world.present",
+            "x": 14560,
+            "y": 3040
+          },
+          {
+            "id": 1048859,
+            "type": "var.get",
+            "x": 14440,
+            "y": 3190,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048860,
+            "type": "math.formula",
+            "x": 14440,
+            "y": 3280,
+            "params": {
+              "formula": "time * 1e+03",
+              "types": "f64"
+            }
+          },
+          {
+            "id": 1048861,
+            "type": "var.get",
+            "x": 14440,
+            "y": 3370,
+            "params": {
+              "variable": "frame",
+              "scope": "update",
+              "path": ".time"
+            }
+          },
+          {
+            "id": 1048862,
+            "type": "var.get",
+            "x": 14440,
+            "y": 3460,
+            "params": {
+              "variable": "kamera_",
+              "path": ".eye"
+            }
+          },
+          {
+            "id": 1048863,
+            "type": "var.get",
+            "x": 14720,
+            "y": 3190,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048864,
+            "type": "var.set",
+            "x": 15120,
+            "y": 3040,
+            "params": {
+              "variable": "sound_cues",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048865,
+            "type": "var.get",
+            "x": 15000,
+            "y": 3190,
+            "params": {
+              "bound": "1048601"
+            }
+          },
+          {
+            "id": 1048866,
+            "type": "var.set",
+            "x": 15400,
+            "y": 3040,
+            "params": {
+              "variable": "toene_"
+            }
+          },
+          {
+            "id": 1048867,
+            "type": "math.formula",
+            "x": 15280,
+            "y": 3190,
+            "params": {
+              "formula": "toene_ + num_cast<u32, u64>(a)",
+              "types": "u32 u64"
+            }
+          },
+          {
+            "id": 1048868,
+            "type": "var.get",
+            "x": 15280,
+            "y": 3280,
+            "params": {
+              "variable": "toene_"
+            }
+          },
+          {
+            "id": 1048869,
+            "type": "num.cast",
+            "x": 15280,
+            "y": 3370,
+            "params": {
+              "to": "u64",
+              "from": "i64"
+            }
+          },
+          {
+            "id": 1048870,
+            "type": "list.length",
+            "x": 15280,
+            "y": 3460,
+            "params": {
+              "type": "game_SoundCue"
+            }
+          },
+          {
+            "id": 1048871,
+            "type": "var.get",
+            "x": 15280,
+            "y": 3550,
+            "params": {
+              "variable": "sound_cues",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048872,
+            "type": "var.get",
+            "x": 15560,
+            "y": 3190,
+            "params": {
+              "variable": "bank_"
+            }
+          },
+          {
+            "id": 1048873,
+            "type": "var.set",
+            "x": 15960,
+            "y": 3040,
+            "params": {
+              "variable": "prepare",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048874,
+            "type": "engine.game_audio.update",
+            "x": 16240,
+            "y": 3040
+          },
+          {
+            "id": 1048875,
+            "type": "var.get",
+            "x": 16120,
+            "y": 3190,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048876,
+            "type": "var.get",
+            "x": 16120,
+            "y": 3280,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048877,
+            "type": "var.get",
+            "x": 16120,
+            "y": 3370,
+            "params": {
+              "variable": "kamera_"
+            }
+          },
+          {
+            "id": 1048878,
+            "type": "var.get",
+            "x": 16120,
+            "y": 3460,
+            "params": {
+              "variable": "frame",
+              "scope": "update",
+              "path": ".dt"
+            }
+          },
+          {
+            "id": 1048879,
+            "type": "var.set",
+            "x": 16520,
+            "y": 3040,
+            "params": {
+              "variable": "hud_4",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048880,
+            "type": "engine.game_world.hud",
+            "x": 16400,
+            "y": 3190
+          },
+          {
+            "id": 1048881,
+            "type": "var.get",
+            "x": 16400,
+            "y": 3280,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048882,
+            "type": "var.set",
+            "x": 16800,
+            "y": 3040,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048883,
+            "type": "var.get",
+            "x": 16680,
+            "y": 3190,
+            "params": {
+              "variable": "hud_4",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048884,
+            "type": "var.set",
+            "x": 17080,
+            "y": 3040,
+            "params": {
+              "variable": "text_"
+            }
+          },
+          {
+            "id": 1048885,
+            "type": "func.pure",
+            "x": 16960,
+            "y": 3190,
+            "params": {
+              "function": "murmel_cpp::anzeige"
+            }
+          },
+          {
+            "id": 1048886,
+            "type": "var.get",
+            "x": 16960,
+            "y": 3280,
+            "params": {
+              "variable": "level_"
+            }
+          },
+          {
+            "id": 1048887,
+            "type": "func.pure",
+            "x": 16960,
+            "y": 3370,
+            "params": {
+              "function": "punkte"
+            }
+          },
+          {
+            "id": 1048888,
+            "type": "var.get",
+            "x": 16960,
+            "y": 3460,
+            "params": {
+              "variable": "fertig_"
+            }
+          },
+          {
+            "id": 1048889,
+            "type": "var.get",
+            "x": 16960,
+            "y": 3550,
+            "params": {
+              "variable": "bestwert_"
+            }
+          },
+          {
+            "id": 1048890,
+            "type": "engine.engine.ui_text",
+            "x": 17360,
+            "y": 3040,
+            "values": {
+              "id": "stand",
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 1048891,
+            "type": "var.get",
+            "x": 17240,
+            "y": 3190,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048892,
+            "type": "var.get",
+            "x": 17240,
+            "y": 3280,
+            "params": {
+              "variable": "text_"
+            }
+          },
+          {
+            "id": 1048893,
+            "type": "flow.branch",
+            "x": 17640,
+            "y": 3040
+          },
+          {
+            "id": 1048894,
+            "type": "logic.not",
+            "x": 17520,
+            "y": 3190
+          },
+          {
+            "id": 1048895,
+            "type": "var.get",
+            "x": 17520,
+            "y": 3280,
+            "params": {
+              "variable": "fertig_"
+            }
+          },
+          {
+            "id": 1048896,
+            "type": "var.set",
+            "x": 17920,
+            "y": 3040,
+            "params": {
+              "variable": "muenzen",
+              "scope": "update"
+            },
+            "values": {
+              "value": ""
+            }
+          },
+          {
+            "id": 1048897,
+            "type": "var.set",
+            "x": 18200,
+            "y": 3040,
+            "params": {
+              "variable": "muenzen",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048898,
+            "type": "text.format",
+            "x": 18080,
+            "y": 3190,
+            "params": {
+              "format": "Muenzen %u/%u"
+            },
+            "values": {
+              "most": 63
+            }
+          },
+          {
+            "id": 1048899,
+            "type": "num.cast",
+            "x": 18080,
+            "y": 3280,
+            "params": {
+              "to": "i64",
+              "from": "u32"
+            }
+          },
+          {
+            "id": 1048900,
+            "type": "var.get",
+            "x": 18080,
+            "y": 3370,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".pickups"
+            }
+          },
+          {
+            "id": 1048901,
+            "type": "num.cast",
+            "x": 18080,
+            "y": 3460,
+            "params": {
+              "to": "i64",
+              "from": "u32"
+            }
+          },
+          {
+            "id": 1048902,
+            "type": "var.get",
+            "x": 18080,
+            "y": 3550,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".pickups_total"
+            }
+          },
+          {
+            "id": 1048903,
+            "type": "engine.engine.ui_bar",
+            "x": 18480,
+            "y": 3040,
+            "values": {
+              "id": "muenzen",
+              "x": 1,
+              "y": 0,
+              "width": 0.25
+            }
+          },
+          {
+            "id": 1048904,
+            "type": "var.get",
+            "x": 18360,
+            "y": 3190,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048905,
+            "type": "var.get",
+            "x": 18360,
+            "y": 3280,
+            "params": {
+              "variable": "muenzen",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048906,
+            "type": "math.formula",
+            "x": 18360,
+            "y": 3370,
+            "params": {
+              "formula": "num_cast<bool, u32>(pickups_total) ? num_cast<f32, u32>(pickups) / num_cast<f32, u32>(pickups_total) : a0f",
+              "types": "u32 u32 f32"
+            },
+            "values": {
+              "a0f": 0
+            }
+          },
+          {
+            "id": 1048907,
+            "type": "var.get",
+            "x": 18360,
+            "y": 3460,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".pickups_total"
+            }
+          },
+          {
+            "id": 1048908,
+            "type": "var.get",
+            "x": 18360,
+            "y": 3550,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".pickups"
+            }
+          },
+          {
+            "id": 1048909,
+            "type": "flow.branch",
+            "x": 18760,
+            "y": 3040
+          },
+          {
+            "id": 1048910,
+            "type": "logic.and",
+            "x": 18640,
+            "y": 3190
+          },
+          {
+            "id": 1048911,
+            "type": "math.compare",
+            "x": 18640,
+            "y": 3280,
+            "params": {
+              "op": "<",
+              "type": "f32"
+            },
+            "values": {
+              "b": 3
+            }
+          },
+          {
+            "id": 1048912,
+            "type": "var.get",
+            "x": 18640,
+            "y": 3370,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".message_age"
+            }
+          },
+          {
+            "id": 1048913,
+            "type": "logic.not",
+            "x": 18640,
+            "y": 3460
+          },
+          {
+            "id": 1048914,
+            "type": "math.compare",
+            "x": 18640,
+            "y": 3550,
+            "params": {
+              "op": "==",
+              "type": "i64"
+            },
+            "values": {
+              "b": 0
+            }
+          },
+          {
+            "id": 1048915,
+            "type": "text.length",
+            "x": 18640,
+            "y": 3640
+          },
+          {
+            "id": 1048916,
+            "type": "var.get",
+            "x": 18640,
+            "y": 3730,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".message"
+            }
+          },
+          {
+            "id": 1048917,
+            "type": "engine.engine.ui_text",
+            "x": 19040,
+            "y": 3040,
+            "values": {
+              "id": "meldung",
+              "x": 0.5,
+              "y": 0.20000000298023224
+            }
+          },
+          {
+            "id": 1048918,
+            "type": "var.get",
+            "x": 18920,
+            "y": 3190,
+            "params": {
+              "variable": "engine_",
+              "scope": "update"
+            }
+          },
+          {
+            "id": 1048919,
+            "type": "var.get",
+            "x": 18920,
+            "y": 3280,
+            "params": {
+              "variable": "hud_3",
+              "scope": "update",
+              "path": ".message"
+            }
+          },
+          {
+            "id": 1048920,
+            "type": "func.entry",
+            "x": 0,
+            "y": 3870,
+            "params": {
+              "function": "stop"
+            }
+          },
+          {
+            "id": 1048921,
+            "type": "var.set",
+            "x": 280,
+            "y": 3870,
+            "params": {
+              "variable": "both",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048922,
+            "type": "object.valid",
+            "x": 160,
+            "y": 4020,
+            "params": {
+              "class": "game_GameWorld"
+            }
+          },
+          {
+            "id": 1048923,
+            "type": "var.get",
+            "x": 160,
+            "y": 4110,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048924,
+            "type": "flow.branch",
+            "x": 560,
+            "y": 3870
+          },
+          {
+            "id": 1048925,
+            "type": "var.get",
+            "x": 440,
+            "y": 4020,
+            "params": {
+              "variable": "both",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048926,
+            "type": "var.set",
+            "x": 840,
+            "y": 3870,
+            "params": {
+              "variable": "running_2",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048927,
+            "type": "engine.game_world.running",
+            "x": 720,
+            "y": 4020
+          },
+          {
+            "id": 1048928,
+            "type": "var.get",
+            "x": 720,
+            "y": 4110,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048929,
+            "type": "var.set",
+            "x": 1120,
+            "y": 3870,
+            "params": {
+              "variable": "both",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048930,
+            "type": "var.get",
+            "x": 1000,
+            "y": 4020,
+            "params": {
+              "variable": "running_2",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048931,
+            "type": "flow.branch",
+            "x": 1400,
+            "y": 3870
+          },
+          {
+            "id": 1048932,
+            "type": "var.get",
+            "x": 1280,
+            "y": 4020,
+            "params": {
+              "variable": "both",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048933,
+            "type": "engine.game_audio.end",
+            "x": 1680,
+            "y": 3870,
+            "values": {
+              "fade": 0.25
+            }
+          },
+          {
+            "id": 1048934,
+            "type": "var.get",
+            "x": 1560,
+            "y": 4020,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048935,
+            "type": "engine.game_world.stop",
+            "x": 1960,
+            "y": 3870
+          },
+          {
+            "id": 1048936,
+            "type": "var.get",
+            "x": 1840,
+            "y": 4020,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048937,
+            "type": "var.set",
+            "x": 2240,
+            "y": 3870,
+            "params": {
+              "variable": "old",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048938,
+            "type": "var.get",
+            "x": 2120,
+            "y": 4020,
+            "params": {
+              "variable": "audio_"
+            }
+          },
+          {
+            "id": 1048939,
+            "type": "var.set",
+            "x": 2520,
+            "y": 3870,
+            "params": {
+              "variable": "audio_"
+            },
+            "values": {
+              "value": null
+            }
+          },
+          {
+            "id": 1048940,
+            "type": "flow.branch",
+            "x": 2800,
+            "y": 3870
+          },
+          {
+            "id": 1048941,
+            "type": "object.valid",
+            "x": 2680,
+            "y": 4020,
+            "params": {
+              "class": "game_GameAudio"
+            }
+          },
+          {
+            "id": 1048942,
+            "type": "var.get",
+            "x": 2680,
+            "y": 4110,
+            "params": {
+              "variable": "old",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048943,
+            "type": "engine.game_audio.release",
+            "x": 3080,
+            "y": 3870
+          },
+          {
+            "id": 1048944,
+            "type": "var.get",
+            "x": 2960,
+            "y": 4020,
+            "params": {
+              "variable": "old",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048945,
+            "type": "var.set",
+            "x": 3360,
+            "y": 3870,
+            "params": {
+              "variable": "old_2",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048946,
+            "type": "var.get",
+            "x": 3240,
+            "y": 4020,
+            "params": {
+              "variable": "bank_"
+            }
+          },
+          {
+            "id": 1048947,
+            "type": "var.set",
+            "x": 3640,
+            "y": 3870,
+            "params": {
+              "variable": "bank_"
+            },
+            "values": {
+              "value": null
+            }
+          },
+          {
+            "id": 1048948,
+            "type": "flow.branch",
+            "x": 3920,
+            "y": 3870
+          },
+          {
+            "id": 1048949,
+            "type": "object.valid",
+            "x": 3800,
+            "y": 4020,
+            "params": {
+              "class": "game_SoundBank"
+            }
+          },
+          {
+            "id": 1048950,
+            "type": "var.get",
+            "x": 3800,
+            "y": 4110,
+            "params": {
+              "variable": "old_2",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048951,
+            "type": "engine.sound_bank.release",
+            "x": 4200,
+            "y": 3870
+          },
+          {
+            "id": 1048952,
+            "type": "var.get",
+            "x": 4080,
+            "y": 4020,
+            "params": {
+              "variable": "old_2",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048953,
+            "type": "var.set",
+            "x": 4480,
+            "y": 3870,
+            "params": {
+              "variable": "old_3",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048954,
+            "type": "var.get",
+            "x": 4360,
+            "y": 4020,
+            "params": {
+              "variable": "welt_"
+            }
+          },
+          {
+            "id": 1048955,
+            "type": "var.set",
+            "x": 4760,
+            "y": 3870,
+            "params": {
+              "variable": "welt_"
+            },
+            "values": {
+              "value": null
+            }
+          },
+          {
+            "id": 1048956,
+            "type": "flow.branch",
+            "x": 5040,
+            "y": 3870
+          },
+          {
+            "id": 1048957,
+            "type": "object.valid",
+            "x": 4920,
+            "y": 4020,
+            "params": {
+              "class": "game_GameWorld"
+            }
+          },
+          {
+            "id": 1048958,
+            "type": "var.get",
+            "x": 4920,
+            "y": 4110,
+            "params": {
+              "variable": "old_3",
+              "scope": "stop"
+            }
+          },
+          {
+            "id": 1048959,
+            "type": "engine.game_world.release",
+            "x": 5320,
+            "y": 3870
+          },
+          {
+            "id": 1048960,
+            "type": "var.get",
+            "x": 5200,
+            "y": 4020,
+            "params": {
+              "variable": "old_3",
+              "scope": "stop"
+            }
+          }
+        ],
+        "links": [
+          [
+            1048586,
+            "result",
+            1048668,
+            "value"
+          ],
+          [
+            1048586,
+            "then",
+            1048668,
+            "exec"
+          ],
+          [
+            1048587,
+            "result",
+            1048679,
+            "value"
+          ],
+          [
+            1048587,
+            "then",
+            1048679,
+            "exec"
+          ],
+          [
+            1048588,
+            "result",
+            1048681,
+            "value"
+          ],
+          [
+            1048588,
+            "then",
+            1048681,
+            "exec"
+          ],
+          [
+            1048589,
+            "result",
+            1048692,
+            "value"
+          ],
+          [
+            1048589,
+            "then",
+            1048692,
+            "exec"
+          ],
+          [
+            1048590,
+            "result",
+            1048695,
+            "value"
+          ],
+          [
+            1048590,
+            "then",
+            1048695,
+            "exec"
+          ],
+          [
+            1048591,
+            "result",
+            1048720,
+            "value"
+          ],
+          [
+            1048591,
+            "then",
+            1048720,
+            "exec"
+          ],
+          [
+            1048592,
+            "result",
+            1048649,
+            "value"
+          ],
+          [
+            1048592,
+            "then",
+            1048649,
+            "exec"
+          ],
+          [
+            1048593,
+            "Result",
+            1048735,
+            "Result"
+          ],
+          [
+            1048593,
+            "then",
+            1048735,
+            "exec"
+          ],
+          [
+            1048594,
+            "result",
+            1048744,
+            "value"
+          ],
+          [
+            1048594,
+            "then",
+            1048744,
+            "exec"
+          ],
+          [
+            1048595,
+            "Result",
+            1048765,
+            "a"
+          ],
+          [
+            1048595,
+            "then",
+            1048764,
+            "exec"
+          ],
+          [
+            1048596,
+            "Result",
+            1048806,
+            "a"
+          ],
+          [
+            1048596,
+            "then",
+            1048805,
+            "exec"
+          ],
+          [
+            1048597,
+            "result",
+            1048823,
+            "value"
+          ],
+          [
+            1048597,
+            "then",
+            1048823,
+            "exec"
+          ],
+          [
+            1048598,
+            "Result",
+            1048837,
+            "a"
+          ],
+          [
+            1048598,
+            "then",
+            1048836,
+            "exec"
+          ],
+          [
+            1048599,
+            "camera",
+            1048848,
+            "value"
+          ],
+          [
+            1048599,
+            "result",
+            1048847,
+            "value"
+          ],
+          [
+            1048599,
+            "then",
+            1048847,
+            "exec"
+          ],
+          [
+            1048600,
+            "result",
+            1048857,
+            "value"
+          ],
+          [
+            1048600,
+            "then",
+            1048857,
+            "exec"
+          ],
+          [
+            1048601,
+            "then",
+            1048864,
+            "exec"
+          ],
+          [
+            1048602,
+            "result",
+            1048873,
+            "value"
+          ],
+          [
+            1048602,
+            "then",
+            1048873,
+            "exec"
+          ],
+          [
+            1048603,
+            "then",
+            1048604,
+            "exec"
+          ],
+          [
+            1048605,
+            "value",
+            1048604,
+            "Result"
+          ],
+          [
+            1048606,
+            "then",
+            1048607,
+            "exec"
+          ],
+          [
+            1048608,
+            "value",
+            1048607,
+            "Result"
+          ],
+          [
+            1048609,
+            "then",
+            1048610,
+            "exec"
+          ],
+          [
+            1048611,
+            "value",
+            1048610,
+            "Result"
+          ],
+          [
+            1048612,
+            "then",
+            1048613,
+            "exec"
+          ],
+          [
+            1048614,
+            "value",
+            1048613,
+            "Result"
+          ],
+          [
+            1048615,
+            "then",
+            1048616,
+            "exec"
+          ],
+          [
+            1048617,
+            "value",
+            1048616,
+            "Result"
+          ],
+          [
+            1048618,
+            "then",
+            1048619,
+            "exec"
+          ],
+          [
+            1048619,
+            "false",
+            1048627,
+            "exec"
+          ],
+          [
+            1048619,
+            "true",
+            1048625,
+            "exec"
+          ],
+          [
+            1048620,
+            "result",
+            1048619,
+            "condition"
+          ],
+          [
+            1048621,
+            "result",
+            1048620,
+            "a"
+          ],
+          [
+            1048622,
+            "result",
+            1048621,
+            "a"
+          ],
+          [
+            1048623,
+            "value",
+            1048622,
+            "object"
+          ],
+          [
+            1048624,
+            "value",
+            1048620,
+            "b"
+          ],
+          [
+            1048626,
+            "value",
+            1048625,
+            "Result"
+          ],
+          [
+            1048627,
+            "then",
+            1048630,
+            "exec"
+          ],
+          [
+            1048628,
+            "result",
+            1048627,
+            "value"
+          ],
+          [
+            1048629,
+            "value",
+            1048628,
+            "game_world"
+          ],
+          [
+            1048631,
+            "result",
+            1048630,
+            "Result"
+          ],
+          [
+            1048632,
+            "value",
+            1048631,
+            "vorher_"
+          ],
+          [
+            1048633,
+            "score",
+            1048631,
+            "score"
+          ],
+          [
+            1048634,
+            "value",
+            1048633,
+            "value"
+          ],
+          [
+            1048635,
+            "nummer",
+            1048645,
+            "value"
+          ],
+          [
+            1048635,
+            "nummer",
+            1048648,
+            "nummer"
+          ],
+          [
+            1048635,
+            "then",
+            1048636,
+            "exec"
+          ],
+          [
+            1048636,
+            "then",
+            1048639,
+            "exec"
+          ],
+          [
+            1048637,
+            "result",
+            1048636,
+            "value"
+          ],
+          [
+            1048638,
+            "value",
+            1048637,
+            "game_world"
+          ],
+          [
+            1048639,
+            "false",
+            1048645,
+            "exec"
+          ],
+          [
+            1048639,
+            "true",
+            1048641,
+            "exec"
+          ],
+          [
+            1048640,
+            "value",
+            1048639,
+            "condition"
+          ],
+          [
+            1048641,
+            "then",
+            1048643,
+            "exec"
+          ],
+          [
+            1048642,
+            "value",
+            1048641,
+            "game_audio"
+          ],
+          [
+            1048643,
+            "then",
+            1048645,
+            "exec"
+          ],
+          [
+            1048644,
+            "value",
+            1048643,
+            "game_world"
+          ],
+          [
+            1048645,
+            "then",
+            1048646,
+            "exec"
+          ],
+          [
+            1048646,
+            "then",
+            1048592,
+            "exec"
+          ],
+          [
+            1048647,
+            "value",
+            1048592,
+            "game_world"
+          ],
+          [
+            1048648,
+            "Result",
+            1048592,
+            "path"
+          ],
+          [
+            1048649,
+            "then",
+            1048650,
+            "exec"
+          ],
+          [
+            1048650,
+            "false",
+            1048654,
+            "exec"
+          ],
+          [
+            1048650,
+            "true",
+            1048653,
+            "exec"
+          ],
+          [
+            1048651,
+            "result",
+            1048650,
+            "condition"
+          ],
+          [
+            1048652,
+            "value",
+            1048651,
+            "a"
+          ],
+          [
+            1048654,
+            "then",
+            1048657,
+            "exec"
+          ],
+          [
+            1048655,
+            "value",
+            1048654,
+            "game_audio"
+          ],
+          [
+            1048656,
+            "value",
+            1048654,
+            "world"
+          ],
+          [
+            1048658,
+            "engine",
+            1048659,
+            "value"
+          ],
+          [
+            1048658,
+            "then",
+            1048659,
+            "exec"
+          ],
+          [
+            1048659,
+            "then",
+            1048660,
+            "exec"
+          ],
+          [
+            1048660,
+            "then",
+            1048663,
+            "exec"
+          ],
+          [
+            1048661,
+            "result",
+            1048660,
+            "value"
+          ],
+          [
+            1048662,
+            "value",
+            1048661,
+            "engine"
+          ],
+          [
+            1048663,
+            "then",
+            1048665,
+            "exec"
+          ],
+          [
+            1048664,
+            "value",
+            1048663,
+            "value"
+          ],
+          [
+            1048665,
+            "then",
+            1048586,
+            "exec"
+          ],
+          [
+            1048666,
+            "value",
+            1048665,
+            "value"
+          ],
+          [
+            1048667,
+            "value",
+            1048586,
+            "engine"
+          ],
+          [
+            1048668,
+            "then",
+            1048669,
+            "exec"
+          ],
+          [
+            1048669,
+            "then",
+            1048671,
+            "exec"
+          ],
+          [
+            1048670,
+            "value",
+            1048669,
+            "value"
+          ],
+          [
+            1048671,
+            "false",
+            1048676,
+            "exec"
+          ],
+          [
+            1048671,
+            "true",
+            1048674,
+            "exec"
+          ],
+          [
+            1048672,
+            "result",
+            1048671,
+            "condition"
+          ],
+          [
+            1048673,
+            "value",
+            1048672,
+            "object"
+          ],
+          [
+            1048674,
+            "then",
+            1048676,
+            "exec"
+          ],
+          [
+            1048675,
+            "value",
+            1048674,
+            "game_world"
+          ],
+          [
+            1048676,
+            "then",
+            1048587,
+            "exec"
+          ],
+          [
+            1048677,
+            "value",
+            1048676,
+            "value"
+          ],
+          [
+            1048678,
+            "value",
+            1048587,
+            "engine"
+          ],
+          [
+            1048679,
+            "then",
+            1048588,
+            "exec"
+          ],
+          [
+            1048680,
+            "value",
+            1048588,
+            "mixer"
+          ],
+          [
+            1048681,
+            "then",
+            1048682,
+            "exec"
+          ],
+          [
+            1048682,
+            "then",
+            1048684,
+            "exec"
+          ],
+          [
+            1048683,
+            "value",
+            1048682,
+            "value"
+          ],
+          [
+            1048684,
+            "false",
+            1048689,
+            "exec"
+          ],
+          [
+            1048684,
+            "true",
+            1048687,
+            "exec"
+          ],
+          [
+            1048685,
+            "result",
+            1048684,
+            "condition"
+          ],
+          [
+            1048686,
+            "value",
+            1048685,
+            "object"
+          ],
+          [
+            1048687,
+            "then",
+            1048689,
+            "exec"
+          ],
+          [
+            1048688,
+            "value",
+            1048687,
+            "sound_bank"
+          ],
+          [
+            1048689,
+            "then",
+            1048589,
+            "exec"
+          ],
+          [
+            1048690,
+            "value",
+            1048689,
+            "value"
+          ],
+          [
+            1048691,
+            "value",
+            1048589,
+            "engine"
+          ],
+          [
+            1048692,
+            "then",
+            1048590,
+            "exec"
+          ],
+          [
+            1048693,
+            "value",
+            1048590,
+            "mixer"
+          ],
+          [
+            1048694,
+            "value",
+            1048590,
+            "bank"
+          ],
+          [
+            1048695,
+            "then",
+            1048696,
+            "exec"
+          ],
+          [
+            1048696,
+            "then",
+            1048698,
+            "exec"
+          ],
+          [
+            1048697,
+            "value",
+            1048696,
+            "value"
+          ],
+          [
+            1048698,
+            "false",
+            1048703,
+            "exec"
+          ],
+          [
+            1048698,
+            "true",
+            1048701,
+            "exec"
+          ],
+          [
+            1048699,
+            "result",
+            1048698,
+            "condition"
+          ],
+          [
+            1048700,
+            "value",
+            1048699,
+            "object"
+          ],
+          [
+            1048701,
+            "then",
+            1048703,
+            "exec"
+          ],
+          [
+            1048702,
+            "value",
+            1048701,
+            "game_audio"
+          ],
+          [
+            1048703,
+            "then",
+            1048706,
+            "exec"
+          ],
+          [
+            1048704,
+            "result",
+            1048703,
+            "value"
+          ],
+          [
+            1048705,
+            "value",
+            1048704,
+            "engine"
+          ],
+          [
+            1048706,
+            "then",
+            1048709,
+            "exec"
+          ],
+          [
+            1048707,
+            "result",
+            1048706,
+            "value"
+          ],
+          [
+            1048708,
+            "value",
+            1048707,
+            "renderer"
+          ],
+          [
+            1048709,
+            "then",
+            1048711,
+            "exec"
+          ],
+          [
+            1048710,
+            "value",
+            1048709,
+            "value"
+          ],
+          [
+            1048711,
+            "then",
+            1048714,
+            "exec"
+          ],
+          [
+            1048712,
+            "result",
+            1048711,
+            "value"
+          ],
+          [
+            1048713,
+            "value",
+            1048712,
+            "kPi"
+          ],
+          [
+            1048714,
+            "then",
+            1048715,
+            "exec"
+          ],
+          [
+            1048715,
+            "then",
+            1048716,
+            "exec"
+          ],
+          [
+            1048716,
+            "then",
+            1048717,
+            "exec"
+          ],
+          [
+            1048717,
+            "then",
+            1048718,
+            "exec"
+          ],
+          [
+            1048718,
+            "then",
+            1048591,
+            "exec"
+          ],
+          [
+            1048719,
+            "value",
+            1048591,
+            "engine"
+          ],
+          [
+            1048720,
+            "then",
+            1048721,
+            "exec"
+          ],
+          [
+            1048721,
+            "then",
+            1048723,
+            "exec"
+          ],
+          [
+            1048722,
+            "value",
+            1048721,
+            "value"
+          ],
+          [
+            1048723,
+            "then",
+            1048725,
+            "exec"
+          ],
+          [
+            1048724,
+            "result",
+            1048723,
+            "value"
+          ],
+          [
+            1048725,
+            "false",
+            1048593,
+            "exec"
+          ],
+          [
+            1048725,
+            "true",
+            1048730,
+            "exec"
+          ],
+          [
+            1048726,
+            "result",
+            1048725,
+            "condition"
+          ],
+          [
+            1048727,
+            "result",
+            1048726,
+            "a"
+          ],
+          [
+            1048728,
+            "result",
+            1048727,
+            "a"
+          ],
+          [
+            1048729,
+            "value",
+            1048728,
+            "a"
+          ],
+          [
+            1048730,
+            "then",
+            1048732,
+            "exec"
+          ],
+          [
+            1048731,
+            "result",
+            1048730,
+            "value"
+          ],
+          [
+            1048732,
+            "then",
+            1048593,
+            "exec"
+          ],
+          [
+            1048733,
+            "result",
+            1048732,
+            "text"
+          ],
+          [
+            1048734,
+            "value",
+            1048733,
+            "v0"
+          ],
+          [
+            1048736,
+            "engine",
+            1048737,
+            "value"
+          ],
+          [
+            1048736,
+            "then",
+            1048737,
+            "exec"
+          ],
+          [
+            1048737,
+            "then",
+            1048738,
+            "exec"
+          ],
+          [
+            1048738,
+            "then",
+            1048741,
+            "exec"
+          ],
+          [
+            1048739,
+            "Result",
+            1048738,
+            "value"
+          ],
+          [
+            1048740,
+            "value",
+            1048739,
+            "engine"
+          ],
+          [
+            1048741,
+            "false",
+            1048771,
+            "exec"
+          ],
+          [
+            1048741,
+            "true",
+            1048594,
+            "exec"
+          ],
+          [
+            1048742,
+            "value",
+            1048741,
+            "condition"
+          ],
+          [
+            1048743,
+            "value",
+            1048594,
+            "engine"
+          ],
+          [
+            1048744,
+            "then",
+            1048745,
+            "exec"
+          ],
+          [
+            1048745,
+            "then",
+            1048747,
+            "exec"
+          ],
+          [
+            1048746,
+            "value",
+            1048745,
+            "value"
+          ],
+          [
+            1048747,
+            "then",
+            1048750,
+            "exec"
+          ],
+          [
+            1048748,
+            "result",
+            1048747,
+            "value"
+          ],
+          [
+            1048749,
+            "value",
+            1048748,
+            "a"
+          ],
+          [
+            1048750,
+            "false",
+            1048758,
+            "exec"
+          ],
+          [
+            1048750,
+            "true",
+            1048753,
+            "exec"
+          ],
+          [
+            1048751,
+            "result",
+            1048750,
+            "condition"
+          ],
+          [
+            1048752,
+            "value",
+            1048751,
+            "a"
+          ],
+          [
+            1048753,
+            "then",
+            1048756,
+            "exec"
+          ],
+          [
+            1048754,
+            "result",
+            1048753,
+            "value"
+          ],
+          [
+            1048755,
+            "value",
+            1048754,
+            "engine"
+          ],
+          [
+            1048756,
+            "then",
+            1048758,
+            "exec"
+          ],
+          [
+            1048757,
+            "value",
+            1048756,
+            "value"
+          ],
+          [
+            1048758,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048758,
+            "true",
+            1048760,
+            "exec"
+          ],
+          [
+            1048759,
+            "value",
+            1048758,
+            "condition"
+          ],
+          [
+            1048760,
+            "then",
+            1048761,
+            "exec"
+          ],
+          [
+            1048761,
+            "then",
+            1048595,
+            "exec"
+          ],
+          [
+            1048762,
+            "result",
+            1048595,
+            "nummer"
+          ],
+          [
+            1048763,
+            "value",
+            1048762,
+            "wahl"
+          ],
+          [
+            1048764,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048764,
+            "true",
+            1048766,
+            "exec"
+          ],
+          [
+            1048765,
+            "result",
+            1048764,
+            "condition"
+          ],
+          [
+            1048766,
+            "then",
+            1048768,
+            "exec"
+          ],
+          [
+            1048767,
+            "result",
+            1048766,
+            "value"
+          ],
+          [
+            1048768,
+            "then",
+            1048599,
+            "exec"
+          ],
+          [
+            1048769,
+            "result",
+            1048768,
+            "text"
+          ],
+          [
+            1048770,
+            "value",
+            1048769,
+            "v0"
+          ],
+          [
+            1048771,
+            "then",
+            1048775,
+            "exec"
+          ],
+          [
+            1048772,
+            "value",
+            1048771,
+            "game_world"
+          ],
+          [
+            1048773,
+            "value",
+            1048771,
+            "dt"
+          ],
+          [
+            1048774,
+            "value",
+            1048771,
+            "input"
+          ],
+          [
+            1048775,
+            "then",
+            1048778,
+            "exec"
+          ],
+          [
+            1048776,
+            "result",
+            1048775,
+            "value"
+          ],
+          [
+            1048777,
+            "value",
+            1048776,
+            "game_world"
+          ],
+          [
+            1048778,
+            "then",
+            1048780,
+            "exec"
+          ],
+          [
+            1048779,
+            "value",
+            1048778,
+            "value"
+          ],
+          [
+            1048780,
+            "false",
+            1048832,
+            "exec"
+          ],
+          [
+            1048780,
+            "true",
+            1048783,
+            "exec"
+          ],
+          [
+            1048781,
+            "result",
+            1048780,
+            "condition"
+          ],
+          [
+            1048782,
+            "value",
+            1048781,
+            "a"
+          ],
+          [
+            1048783,
+            "false",
+            1048787,
+            "exec"
+          ],
+          [
+            1048783,
+            "true",
+            1048786,
+            "exec"
+          ],
+          [
+            1048784,
+            "result",
+            1048783,
+            "condition"
+          ],
+          [
+            1048785,
+            "value",
+            1048784,
+            "a"
+          ],
+          [
+            1048786,
+            "then",
+            1048787,
+            "exec"
+          ],
+          [
+            1048787,
+            "then",
+            1048791,
+            "exec"
+          ],
+          [
+            1048788,
+            "result",
+            1048787,
+            "value"
+          ],
+          [
+            1048789,
+            "value",
+            1048788,
+            "gewonnen_seit_"
+          ],
+          [
+            1048790,
+            "value",
+            1048788,
+            "dt"
+          ],
+          [
+            1048791,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048791,
+            "true",
+            1048794,
+            "exec"
+          ],
+          [
+            1048792,
+            "result",
+            1048791,
+            "condition"
+          ],
+          [
+            1048793,
+            "value",
+            1048792,
+            "a"
+          ],
+          [
+            1048794,
+            "then",
+            1048798,
+            "exec"
+          ],
+          [
+            1048795,
+            "result",
+            1048794,
+            "value"
+          ],
+          [
+            1048796,
+            "value",
+            1048795,
+            "vorher_"
+          ],
+          [
+            1048797,
+            "value",
+            1048795,
+            "score"
+          ],
+          [
+            1048798,
+            "false",
+            1048812,
+            "exec"
+          ],
+          [
+            1048798,
+            "true",
+            1048596,
+            "exec"
+          ],
+          [
+            1048799,
+            "result",
+            1048798,
+            "condition"
+          ],
+          [
+            1048800,
+            "result",
+            1048799,
+            "a"
+          ],
+          [
+            1048801,
+            "value",
+            1048800,
+            "level_"
+          ],
+          [
+            1048802,
+            "value",
+            1048799,
+            "b"
+          ],
+          [
+            1048803,
+            "result",
+            1048596,
+            "nummer"
+          ],
+          [
+            1048804,
+            "value",
+            1048803,
+            "level_"
+          ],
+          [
+            1048805,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048805,
+            "true",
+            1048807,
+            "exec"
+          ],
+          [
+            1048806,
+            "result",
+            1048805,
+            "condition"
+          ],
+          [
+            1048807,
+            "then",
+            1048809,
+            "exec"
+          ],
+          [
+            1048808,
+            "result",
+            1048807,
+            "value"
+          ],
+          [
+            1048809,
+            "then",
+            1048599,
+            "exec"
+          ],
+          [
+            1048810,
+            "result",
+            1048809,
+            "text"
+          ],
+          [
+            1048811,
+            "value",
+            1048810,
+            "v0"
+          ],
+          [
+            1048812,
+            "then",
+            1048813,
+            "exec"
+          ],
+          [
+            1048813,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048813,
+            "true",
+            1048818,
+            "exec"
+          ],
+          [
+            1048814,
+            "result",
+            1048813,
+            "condition"
+          ],
+          [
+            1048815,
+            "result",
+            1048814,
+            "a"
+          ],
+          [
+            1048816,
+            "value",
+            1048815,
+            "a"
+          ],
+          [
+            1048817,
+            "value",
+            1048814,
+            "b"
+          ],
+          [
+            1048818,
+            "then",
+            1048597,
+            "exec"
+          ],
+          [
+            1048819,
+            "result",
+            1048818,
+            "value"
+          ],
+          [
+            1048820,
+            "value",
+            1048819,
+            "a"
+          ],
+          [
+            1048821,
+            "value",
+            1048597,
+            "engine"
+          ],
+          [
+            1048822,
+            "value",
+            1048597,
+            "value"
+          ],
+          [
+            1048823,
+            "then",
+            1048824,
+            "exec"
+          ],
+          [
+            1048824,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048824,
+            "true",
+            1048827,
+            "exec"
+          ],
+          [
+            1048825,
+            "result",
+            1048824,
+            "condition"
+          ],
+          [
+            1048826,
+            "value",
+            1048825,
+            "a"
+          ],
+          [
+            1048827,
+            "then",
+            1048829,
+            "exec"
+          ],
+          [
+            1048828,
+            "result",
+            1048827,
+            "value"
+          ],
+          [
+            1048829,
+            "then",
+            1048599,
+            "exec"
+          ],
+          [
+            1048830,
+            "result",
+            1048829,
+            "text"
+          ],
+          [
+            1048831,
+            "value",
+            1048830,
+            "v0"
+          ],
+          [
+            1048832,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048832,
+            "true",
+            1048598,
+            "exec"
+          ],
+          [
+            1048833,
+            "result",
+            1048832,
+            "condition"
+          ],
+          [
+            1048834,
+            "value",
+            1048833,
+            "a"
+          ],
+          [
+            1048835,
+            "value",
+            1048598,
+            "nummer"
+          ],
+          [
+            1048836,
+            "false",
+            1048599,
+            "exec"
+          ],
+          [
+            1048836,
+            "true",
+            1048838,
+            "exec"
+          ],
+          [
+            1048837,
+            "result",
+            1048836,
+            "condition"
+          ],
+          [
+            1048838,
+            "then",
+            1048840,
+            "exec"
+          ],
+          [
+            1048839,
+            "result",
+            1048838,
+            "value"
+          ],
+          [
+            1048840,
+            "then",
+            1048599,
+            "exec"
+          ],
+          [
+            1048841,
+            "result",
+            1048840,
+            "text"
+          ],
+          [
+            1048842,
+            "value",
+            1048841,
+            "v0"
+          ],
+          [
+            1048843,
+            "value",
+            1048599,
+            "game_world"
+          ],
+          [
+            1048844,
+            "value",
+            1048599,
+            "camera"
+          ],
+          [
+            1048845,
+            "value",
+            1048599,
+            "dt"
+          ],
+          [
+            1048846,
+            "value",
+            1048599,
+            "input"
+          ],
+          [
+            1048847,
+            "then",
+            1048848,
+            "exec"
+          ],
+          [
+            1048848,
+            "then",
+            1048849,
+            "exec"
+          ],
+          [
+            1048849,
+            "then",
+            1048852,
+            "exec"
+          ],
+          [
+            1048850,
+            "result",
+            1048849,
+            "value"
+          ],
+          [
+            1048851,
+            "value",
+            1048850,
+            "engine"
+          ],
+          [
+            1048852,
+            "then",
+            1048600,
+            "exec"
+          ],
+          [
+            1048853,
+            "value",
+            1048852,
+            "renderer"
+          ],
+          [
+            1048854,
+            "value",
+            1048852,
+            "camera"
+          ],
+          [
+            1048855,
+            "value",
+            1048600,
+            "game_world"
+          ],
+          [
+            1048856,
+            "value",
+            1048600,
+            "eye"
+          ],
+          [
+            1048857,
+            "then",
+            1048858,
+            "exec"
+          ],
+          [
+            1048858,
+            "then",
+            1048601,
+            "exec"
+          ],
+          [
+            1048859,
+            "value",
+            1048858,
+            "game_world"
+          ],
+          [
+            1048860,
+            "result",
+            1048858,
+            "now_ms"
+          ],
+          [
+            1048861,
+            "value",
+            1048860,
+            "time"
+          ],
+          [
+            1048862,
+            "value",
+            1048858,
+            "eye"
+          ],
+          [
+            1048863,
+            "value",
+            1048601,
+            "game_world"
+          ],
+          [
+            1048864,
+            "then",
+            1048866,
+            "exec"
+          ],
+          [
+            1048865,
+            "value",
+            1048864,
+            "value"
+          ],
+          [
+            1048866,
+            "then",
+            1048602,
+            "exec"
+          ],
+          [
+            1048867,
+            "result",
+            1048866,
+            "value"
+          ],
+          [
+            1048868,
+            "value",
+            1048867,
+            "toene_"
+          ],
+          [
+            1048869,
+            "result",
+            1048867,
+            "a"
+          ],
+          [
+            1048870,
+            "length",
+            1048869,
+            "a"
+          ],
+          [
+            1048871,
+            "value",
+            1048870,
+            "list"
+          ],
+          [
+            1048872,
+            "value",
+            1048602,
+            "sound_bank"
+          ],
+          [
+            1048873,
+            "then",
+            1048874,
+            "exec"
+          ],
+          [
+            1048874,
+            "then",
+            1048879,
+            "exec"
+          ],
+          [
+            1048875,
+            "value",
+            1048874,
+            "game_audio"
+          ],
+          [
+            1048876,
+            "value",
+            1048874,
+            "world"
+          ],
+          [
+            1048877,
+            "value",
+            1048874,
+            "listener"
+          ],
+          [
+            1048878,
+            "value",
+            1048874,
+            "dt"
+          ],
+          [
+            1048879,
+            "then",
+            1048882,
+            "exec"
+          ],
+          [
+            1048880,
+            "result",
+            1048879,
+            "value"
+          ],
+          [
+            1048881,
+            "value",
+            1048880,
+            "game_world"
+          ],
+          [
+            1048882,
+            "then",
+            1048884,
+            "exec"
+          ],
+          [
+            1048883,
+            "value",
+            1048882,
+            "value"
+          ],
+          [
+            1048884,
+            "then",
+            1048890,
+            "exec"
+          ],
+          [
+            1048885,
+            "Result",
+            1048884,
+            "value"
+          ],
+          [
+            1048886,
+            "value",
+            1048885,
+            "level"
+          ],
+          [
+            1048887,
+            "Result",
+            1048885,
+            "punkte"
+          ],
+          [
+            1048888,
+            "value",
+            1048885,
+            "fertig"
+          ],
+          [
+            1048889,
+            "value",
+            1048885,
+            "bestwert"
+          ],
+          [
+            1048890,
+            "then",
+            1048893,
+            "exec"
+          ],
+          [
+            1048891,
+            "value",
+            1048890,
+            "engine"
+          ],
+          [
+            1048892,
+            "value",
+            1048890,
+            "text"
+          ],
+          [
+            1048893,
+            "true",
+            1048896,
+            "exec"
+          ],
+          [
+            1048894,
+            "result",
+            1048893,
+            "condition"
+          ],
+          [
+            1048895,
+            "value",
+            1048894,
+            "a"
+          ],
+          [
+            1048896,
+            "then",
+            1048897,
+            "exec"
+          ],
+          [
+            1048897,
+            "then",
+            1048903,
+            "exec"
+          ],
+          [
+            1048898,
+            "result",
+            1048897,
+            "value"
+          ],
+          [
+            1048899,
+            "result",
+            1048898,
+            "v0"
+          ],
+          [
+            1048900,
+            "value",
+            1048899,
+            "a"
+          ],
+          [
+            1048901,
+            "result",
+            1048898,
+            "v1"
+          ],
+          [
+            1048902,
+            "value",
+            1048901,
+            "a"
+          ],
+          [
+            1048903,
+            "then",
+            1048909,
+            "exec"
+          ],
+          [
+            1048904,
+            "value",
+            1048903,
+            "engine"
+          ],
+          [
+            1048905,
+            "value",
+            1048903,
+            "label"
+          ],
+          [
+            1048906,
+            "result",
+            1048903,
+            "value"
+          ],
+          [
+            1048907,
+            "value",
+            1048906,
+            "pickups_total"
+          ],
+          [
+            1048908,
+            "value",
+            1048906,
+            "pickups"
+          ],
+          [
+            1048909,
+            "true",
+            1048917,
+            "exec"
+          ],
+          [
+            1048910,
+            "result",
+            1048909,
+            "condition"
+          ],
+          [
+            1048911,
+            "result",
+            1048910,
+            "a"
+          ],
+          [
+            1048912,
+            "value",
+            1048911,
+            "a"
+          ],
+          [
+            1048913,
+            "result",
+            1048910,
+            "b"
+          ],
+          [
+            1048914,
+            "result",
+            1048913,
+            "a"
+          ],
+          [
+            1048915,
+            "result",
+            1048914,
+            "a"
+          ],
+          [
+            1048916,
+            "value",
+            1048915,
+            "a"
+          ],
+          [
+            1048918,
+            "value",
+            1048917,
+            "engine"
+          ],
+          [
+            1048919,
+            "value",
+            1048917,
+            "text"
+          ],
+          [
+            1048920,
+            "then",
+            1048921,
+            "exec"
+          ],
+          [
+            1048921,
+            "then",
+            1048924,
+            "exec"
+          ],
+          [
+            1048922,
+            "result",
+            1048921,
+            "value"
+          ],
+          [
+            1048923,
+            "value",
+            1048922,
+            "object"
+          ],
+          [
+            1048924,
+            "false",
+            1048931,
+            "exec"
+          ],
+          [
+            1048924,
+            "true",
+            1048926,
+            "exec"
+          ],
+          [
+            1048925,
+            "value",
+            1048924,
+            "condition"
+          ],
+          [
+            1048926,
+            "then",
+            1048929,
+            "exec"
+          ],
+          [
+            1048927,
+            "result",
+            1048926,
+            "value"
+          ],
+          [
+            1048928,
+            "value",
+            1048927,
+            "game_world"
+          ],
+          [
+            1048929,
+            "then",
+            1048931,
+            "exec"
+          ],
+          [
+            1048930,
+            "value",
+            1048929,
+            "value"
+          ],
+          [
+            1048931,
+            "false",
+            1048937,
+            "exec"
+          ],
+          [
+            1048931,
+            "true",
+            1048933,
+            "exec"
+          ],
+          [
+            1048932,
+            "value",
+            1048931,
+            "condition"
+          ],
+          [
+            1048933,
+            "then",
+            1048935,
+            "exec"
+          ],
+          [
+            1048934,
+            "value",
+            1048933,
+            "game_audio"
+          ],
+          [
+            1048935,
+            "then",
+            1048937,
+            "exec"
+          ],
+          [
+            1048936,
+            "value",
+            1048935,
+            "game_world"
+          ],
+          [
+            1048937,
+            "then",
+            1048939,
+            "exec"
+          ],
+          [
+            1048938,
+            "value",
+            1048937,
+            "value"
+          ],
+          [
+            1048939,
+            "then",
+            1048940,
+            "exec"
+          ],
+          [
+            1048940,
+            "false",
+            1048945,
+            "exec"
+          ],
+          [
+            1048940,
+            "true",
+            1048943,
+            "exec"
+          ],
+          [
+            1048941,
+            "result",
+            1048940,
+            "condition"
+          ],
+          [
+            1048942,
+            "value",
+            1048941,
+            "object"
+          ],
+          [
+            1048943,
+            "then",
+            1048945,
+            "exec"
+          ],
+          [
+            1048944,
+            "value",
+            1048943,
+            "game_audio"
+          ],
+          [
+            1048945,
+            "then",
+            1048947,
+            "exec"
+          ],
+          [
+            1048946,
+            "value",
+            1048945,
+            "value"
+          ],
+          [
+            1048947,
+            "then",
+            1048948,
+            "exec"
+          ],
+          [
+            1048948,
+            "false",
+            1048953,
+            "exec"
+          ],
+          [
+            1048948,
+            "true",
+            1048951,
+            "exec"
+          ],
+          [
+            1048949,
+            "result",
+            1048948,
+            "condition"
+          ],
+          [
+            1048950,
+            "value",
+            1048949,
+            "object"
+          ],
+          [
+            1048951,
+            "then",
+            1048953,
+            "exec"
+          ],
+          [
+            1048952,
+            "value",
+            1048951,
+            "sound_bank"
+          ],
+          [
+            1048953,
+            "then",
+            1048955,
+            "exec"
+          ],
+          [
+            1048954,
+            "value",
+            1048953,
+            "value"
+          ],
+          [
+            1048955,
+            "then",
+            1048956,
+            "exec"
+          ],
+          [
+            1048956,
+            "true",
+            1048959,
+            "exec"
+          ],
+          [
+            1048957,
+            "result",
+            1048956,
+            "condition"
+          ],
+          [
+            1048958,
+            "value",
+            1048957,
+            "object"
+          ],
+          [
+            1048960,
+            "value",
+            1048959,
+            "game_world"
+          ]
+        ],
+        "machines": [],
+        "functions": [
+          {
+            "name": "murmel_cpp::anzeige",
+            "pure": true,
+            "from": "murmel_cpp",
+            "inputs": [
+              {
+                "name": "level",
+                "type": "i32",
+                "value": 0
+              },
+              {
+                "name": "punkte",
+                "type": "f32",
+                "value": 0
+              },
+              {
+                "name": "fertig",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "bestwert",
+                "type": "i64",
+                "value": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "name": "murmel_cpp::level_pfad",
+            "pure": true,
+            "from": "murmel_cpp",
+            "inputs": [
+              {
+                "name": "nummer",
+                "type": "i32",
+                "value": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "name": "murmel_cpp::steuerung",
+            "pure": true,
+            "from": "murmel_cpp",
+            "inputs": [
+              {
+                "name": "engine",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "struct",
+                "of": "game_PlayInput",
+                "value": {
+                  "move_x": 0,
+                  "move_y": 0,
+                  "up": 0,
+                  "jump": false,
+                  "boost": false,
+                  "camera": false,
+                  "handbrake": false,
+                  "robot": 0,
+                  "look_x": 0,
+                  "look_y": 0,
+                  "turn_deg": 0,
+                  "speed_scale": 1,
+                  "zoom": 0,
+                  "view_yaw": 0,
+                  "has_view_yaw": false,
+                  "view_pitch": 0,
+                  "fire": false,
+                  "aim": false,
+                  "reload": false,
+                  "crouch": false,
+                  "interact": false,
+                  "look_stick_x": 0,
+                  "look_stick_y": 0,
+                  "gamepad": false,
+                  "rewind": 0
+                }
+              }
+            ]
+          },
+          {
+            "name": "level",
+            "pure": true,
+            "help": "Das laufende Level (0, 1), die Punkte aller fertigen Levels und des laufenden, ob alles geschafft ist.",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "i32",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "name": "fertig",
+            "pure": true,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "bool",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "toene",
+            "pure": true,
+            "help": "Wie viele Töne die Welt bisher verlangt hat.",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "name": "bestwert",
+            "pure": true,
+            "help": "Der Bestwert: gespeichert im Stand \"murmel\" unter \"best\" (kern/docs/app.md 5.), über einen Neustart hinaus.",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "i64",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "name": "welt",
+            "pure": true,
+            "help": "Die Welt des laufenden Levels (zum Ansehen, etwa im Test).",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "object",
+                "of": "game_GameWorld",
+                "value": null
+              }
+            ]
+          },
+          {
+            "name": "punkte",
+            "pure": true,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "f32",
+                "value": 0
+              }
+            ],
+            "locals": [
+              {
+                "name": "hud",
+                "type": "struct",
+                "of": "game_Hud",
+                "value": {
+                  "status": 0,
+                  "title": "",
+                  "message": "",
+                  "message_age": 0,
+                  "score": 0,
+                  "pickups": 0,
+                  "pickups_total": 0,
+                  "elapsed": 0,
+                  "remaining": -1,
+                  "speed": 0,
+                  "boost": -1,
+                  "boosting": false,
+                  "interior": false,
+                  "best": 0,
+                  "soldier": false,
+                  "health": -1,
+                  "max_health": 100,
+                  "armor": 0,
+                  "ammo": -1,
+                  "magazine": 0,
+                  "reserve": 0,
+                  "reload": -1,
+                  "spread": 0,
+                  "hit_age": 99,
+                  "hit_head": false,
+                  "hit_kill": false,
+                  "damage_age": 99,
+                  "damage_yaw": 0,
+                  "respawn_in": -1,
+                  "aiming": false,
+                  "fov": 60
+                }
+              }
+            ]
+          },
+          {
+            "name": "lade",
+            "inputs": [
+              {
+                "name": "nummer",
+                "type": "i32",
+                "value": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "bool",
+                "value": false
+              }
+            ],
+            "locals": [
+              {
+                "name": "running",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "start_level",
+                "type": "bool",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "start",
+            "overrides": true,
+            "inputs": [
+              {
+                "name": "engine",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "Result",
+                "type": "bool",
+                "value": false
+              }
+            ],
+            "locals": [
+              {
+                "name": "engine_",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              },
+              {
+                "name": "renderer",
+                "type": "object",
+                "of": "Renderer",
+                "value": null
+              },
+              {
+                "name": "old",
+                "type": "object",
+                "of": "game_GameWorld",
+                "value": null
+              },
+              {
+                "name": "game_world",
+                "type": "object",
+                "of": "game_GameWorld",
+                "value": null
+              },
+              {
+                "name": "old_2",
+                "type": "object",
+                "of": "game_SoundBank",
+                "value": null
+              },
+              {
+                "name": "mixer",
+                "type": "object",
+                "of": "audio_Mixer",
+                "value": null
+              },
+              {
+                "name": "sound_bank",
+                "type": "object",
+                "of": "game_SoundBank",
+                "value": null
+              },
+              {
+                "name": "old_3",
+                "type": "object",
+                "of": "game_GameAudio",
+                "value": null
+              },
+              {
+                "name": "mixer_2",
+                "type": "object",
+                "of": "audio_Mixer",
+                "value": null
+              },
+              {
+                "name": "game_audio",
+                "type": "object",
+                "of": "game_GameAudio",
+                "value": null
+              },
+              {
+                "name": "renderer_2",
+                "type": "object",
+                "of": "Renderer",
+                "value": null
+              },
+              {
+                "name": "camera",
+                "type": "struct",
+                "of": "Camera",
+                "value": {
+                  "eye": [
+                    0,
+                    -18,
+                    8
+                  ],
+                  "target": [
+                    0,
+                    0,
+                    2
+                  ],
+                  "up": [
+                    0,
+                    0,
+                    1
+                  ],
+                  "fov": 1.0471975803375244,
+                  "near": 0.05000000074505806,
+                  "far": 1800,
+                  "orthographic": false,
+                  "ortho_height": 20,
+                  "has_projection": false,
+                  "projection": {
+                    "m": [
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1,
+                      0,
+                      0,
+                      0,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "load_int",
+                "type": "i64",
+                "value": 0
+              },
+              {
+                "name": "last_error",
+                "type": "text",
+                "value": ""
+              },
+              {
+                "name": "last_error_2",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "name": "update",
+            "overrides": true,
+            "inputs": [
+              {
+                "name": "engine",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              },
+              {
+                "name": "frame",
+                "type": "struct",
+                "of": "Frame",
+                "value": {
+                  "time": 0,
+                  "dt": 0,
+                  "index": 0
+                }
+              }
+            ],
+            "outputs": [],
+            "locals": [
+              {
+                "name": "engine_",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              },
+              {
+                "name": "in",
+                "type": "struct",
+                "of": "game_PlayInput",
+                "value": {
+                  "move_x": 0,
+                  "move_y": 0,
+                  "up": 0,
+                  "jump": false,
+                  "boost": false,
+                  "camera": false,
+                  "handbrake": false,
+                  "robot": 0,
+                  "look_x": 0,
+                  "look_y": 0,
+                  "turn_deg": 0,
+                  "speed_scale": 1,
+                  "zoom": 0,
+                  "view_yaw": 0,
+                  "has_view_yaw": false,
+                  "view_pitch": 0,
+                  "fire": false,
+                  "aim": false,
+                  "reload": false,
+                  "crouch": false,
+                  "interact": false,
+                  "look_stick_x": 0,
+                  "look_stick_y": 0,
+                  "gamepad": false,
+                  "rewind": 0
+                }
+              },
+              {
+                "name": "wahl",
+                "type": "i32",
+                "value": 0
+              },
+              {
+                "name": "ui_menu",
+                "type": "i32",
+                "value": 0
+              },
+              {
+                "name": "action_pressed",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "action_pressed_2",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "either",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "last_error",
+                "type": "text",
+                "value": ""
+              },
+              {
+                "name": "hud",
+                "type": "struct",
+                "of": "game_Hud",
+                "value": {
+                  "status": 0,
+                  "title": "",
+                  "message": "",
+                  "message_age": 0,
+                  "score": 0,
+                  "pickups": 0,
+                  "pickups_total": 0,
+                  "elapsed": 0,
+                  "remaining": -1,
+                  "speed": 0,
+                  "boost": -1,
+                  "boosting": false,
+                  "interior": false,
+                  "best": 0,
+                  "soldier": false,
+                  "health": -1,
+                  "max_health": 100,
+                  "armor": 0,
+                  "ammo": -1,
+                  "magazine": 0,
+                  "reserve": 0,
+                  "reload": -1,
+                  "spread": 0,
+                  "hit_age": 99,
+                  "hit_head": false,
+                  "hit_kill": false,
+                  "damage_age": 99,
+                  "damage_yaw": 0,
+                  "respawn_in": -1,
+                  "aiming": false,
+                  "fov": 60
+                }
+              },
+              {
+                "name": "hud_2",
+                "type": "struct",
+                "of": "game_Hud",
+                "value": {
+                  "status": 0,
+                  "title": "",
+                  "message": "",
+                  "message_age": 0,
+                  "score": 0,
+                  "pickups": 0,
+                  "pickups_total": 0,
+                  "elapsed": 0,
+                  "remaining": -1,
+                  "speed": 0,
+                  "boost": -1,
+                  "boosting": false,
+                  "interior": false,
+                  "best": 0,
+                  "soldier": false,
+                  "health": -1,
+                  "max_health": 100,
+                  "armor": 0,
+                  "ammo": -1,
+                  "magazine": 0,
+                  "reserve": 0,
+                  "reload": -1,
+                  "spread": 0,
+                  "hit_age": 99,
+                  "hit_head": false,
+                  "hit_kill": false,
+                  "damage_age": 99,
+                  "damage_yaw": 0,
+                  "respawn_in": -1,
+                  "aiming": false,
+                  "fov": 60
+                }
+              },
+              {
+                "name": "last_error_2",
+                "type": "text",
+                "value": ""
+              },
+              {
+                "name": "save_int",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "last_error_3",
+                "type": "text",
+                "value": ""
+              },
+              {
+                "name": "last_error_4",
+                "type": "text",
+                "value": ""
+              },
+              {
+                "name": "update_camera",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "renderer",
+                "type": "object",
+                "of": "Renderer",
+                "value": null
+              },
+              {
+                "name": "apply_lighting",
+                "type": "f32",
+                "value": 0
+              },
+              {
+                "name": "sound_cues",
+                "type": "struct_list",
+                "of": "game_SoundCue",
+                "value": []
+              },
+              {
+                "name": "prepare",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "hud_3",
+                "type": "struct",
+                "of": "game_Hud",
+                "value": {
+                  "status": 0,
+                  "title": "",
+                  "message": "",
+                  "message_age": 0,
+                  "score": 0,
+                  "pickups": 0,
+                  "pickups_total": 0,
+                  "elapsed": 0,
+                  "remaining": -1,
+                  "speed": 0,
+                  "boost": -1,
+                  "boosting": false,
+                  "interior": false,
+                  "best": 0,
+                  "soldier": false,
+                  "health": -1,
+                  "max_health": 100,
+                  "armor": 0,
+                  "ammo": -1,
+                  "magazine": 0,
+                  "reserve": 0,
+                  "reload": -1,
+                  "spread": 0,
+                  "hit_age": 99,
+                  "hit_head": false,
+                  "hit_kill": false,
+                  "damage_age": 99,
+                  "damage_yaw": 0,
+                  "respawn_in": -1,
+                  "aiming": false,
+                  "fov": 60
+                }
+              },
+              {
+                "name": "hud_4",
+                "type": "struct",
+                "of": "game_Hud",
+                "value": {
+                  "status": 0,
+                  "title": "",
+                  "message": "",
+                  "message_age": 0,
+                  "score": 0,
+                  "pickups": 0,
+                  "pickups_total": 0,
+                  "elapsed": 0,
+                  "remaining": -1,
+                  "speed": 0,
+                  "boost": -1,
+                  "boosting": false,
+                  "interior": false,
+                  "best": 0,
+                  "soldier": false,
+                  "health": -1,
+                  "max_health": 100,
+                  "armor": 0,
+                  "ammo": -1,
+                  "magazine": 0,
+                  "reserve": 0,
+                  "reload": -1,
+                  "spread": 0,
+                  "hit_age": 99,
+                  "hit_head": false,
+                  "hit_kill": false,
+                  "damage_age": 99,
+                  "damage_yaw": 0,
+                  "respawn_in": -1,
+                  "aiming": false,
+                  "fov": 60
+                }
+              },
+              {
+                "name": "muenzen",
+                "type": "text",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "name": "stop",
+            "overrides": true,
+            "inputs": [
+              {
+                "name": "engine",
+                "type": "object",
+                "of": "Engine",
+                "value": null
+              }
+            ],
+            "outputs": [],
+            "locals": [
+              {
+                "name": "running",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "running_2",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "both",
+                "type": "bool",
+                "value": false
+              },
+              {
+                "name": "old",
+                "type": "object",
+                "of": "game_GameAudio",
+                "value": null
+              },
+              {
+                "name": "old_2",
+                "type": "object",
+                "of": "game_SoundBank",
+                "value": null
+              },
+              {
+                "name": "old_3",
+                "type": "object",
+                "of": "game_GameWorld",
+                "value": null
+              }
+            ]
+          }
+        ],
+        "engine": {
+          "engine_app_app": "c2634db37af23232",
+          "engine_audio_audio": "939eed1076ce340e",
+          "engine_core_base": "238d0fb70627ea81",
+          "engine_game_runtime": "f246062f8ce33b42",
+          "engine_math_math": "ec1bbc09d9b9a1f2"
+        }
+      }
+    }
+  ]
 }

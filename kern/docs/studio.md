@@ -438,7 +438,7 @@ Jeder Blueprint hat genau einen C++-Text und jeder solche Text ist genau ein Blu
 Text folgt dem Graphen, und ein geänderter Text wird mit **Apply** (Ctrl+Enter) zum Blueprint –
 ein Undo-Schritt; Knoten, die es noch gibt, bleiben, wo sie sind. Deshalb sind die Namen von Variablen, Funktionen und
 Funktions-Pins C++-Namen: Buchstaben, Ziffern und `_`, keine Leerzeichen, kein Wort von C++ und
-keins der Schreibweise (`Float`, `Text`, `loop` …). Der Editor nimmt andere Namen nicht an und
+keins der Schreibweise (`f32`, `Text`, `loop` …). Der Editor nimmt andere Namen nicht an und
 sagt, warum; `check()` meldet einen Graphen, den C++ nicht sagen kann, als Fehler – auch einen
 Exec-Ausgang mit zwei Drähten, ein Return außerhalb des Wegs seiner Funktion, einen Zufallswert,
 den zwei Eingänge lesen, oder einen Weg, der ohne Warten in sich selbst zurückführt (dafür gibt
@@ -487,8 +487,8 @@ Funktion – `KERN_OVERRIDE`), Beschreibung und die Pins.
   Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
 - **Konstanten:** In den Details einer Variablen macht *Constant* sie zu einer Konstanten: Sie
   wird gelesen wie eine Variable und nie geändert – das Knotenmenü bietet nur noch *Get* an, und
-  ein Knoten, der sie ändern würde, ist ein Compile-Fehler. Im C++-Text: `KERN_CONST Float Gravity
-  = 9.81;`. Eine Bibliothek hat nur Konstanten.
+  ein Knoten, der sie ändern würde, ist ein Compile-Fehler. Im C++-Text: `KERN_CONST f32 Gravity
+  = 9.81f;`. Eine Bibliothek hat nur Konstanten.
 - **Bibliotheken:** Im Abschnitt *Libraries* von *My Blueprint* steht, ob dieser Blueprint eine
   Bibliothek ist (*This Blueprint is a library*: er behält nichts – Typen und Funktionen, keine
   Variablen, keine Events) und welche Bibliotheken des Levels er benutzt (*+ Use a library…*; eine
@@ -603,11 +603,65 @@ Was womit kollidiert und was ein Strahl trifft, folgt genau Box3D (Erin Catto, *
   Level nicht hat, ist kein Bit. In C++:
   `physics_trace_channels(n4, start, end, Actor{}, physics_channels("World"), 4294967295);`
 
+### Zahl-Typen im Editor
+
+Die Sprache hat die Zahl-Typen des C++-Teilsatzes – `bool`, `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`,
+`f64` –, jeder ein eigener Pin-Typ ([blueprint_cpp.md](blueprint_cpp.md), „Zahl-Typen“). Der Editor zeigt und wählt sie so:
+
+- **Der Typ steht am Pin.** Jeder Zahl-Pin trägt sein Kürzel neben dem Kreis (`f32`, `u8`, eine Liste `f32[]`), in der Farbe
+  seiner Familie: Kommazahlen grün, ganze Zahlen grün-blau, bool rot. Ebenso in My Blueprint (Variablen, die Signaturen der
+  Funktionen: `(x: f32) → result: f32`), in Details (Eingänge eines Knotens, Ein- und Ausgänge, Felder) und im Tooltip.
+  Ein kompakter Knoten nennt seinen Typ unter dem Symbol (`+` mit `i64`).
+- **Vorgaben:** *Float* ist `f32` (wie die Engine, Grafik und Physik), *Int* ist `i64`. Eine neue Variable, ein neuer Ein-
+  oder Ausgang, eine lokale Variable, das erste Feld einer neuen Struktur und ein neuer Knoten der Zahlen („Add“) sind
+  `f32`.
+- **Typ wählen:** Jede Auswahl eines Typs – *Type* einer Variablen, eines Felds, eines Ein- oder Ausgangs, das Element einer
+  Liste, die Einstellung *Type* eines Knotens – führt zuerst **Float (f32)** und **Int (i64)**, darunter die übrigen Breiten
+  (`f64`, `i32`, `u32`, `u64`, `i16`, `u16`, `i8`, `u8`). Ein Knoten der Zahlen bietet nur die Typen an, die er nimmt (Add:
+  die zehn Zahlen; Shift Left: die ganzen), keinen Vector und keinen Text.
+- **Werte eintragen:** Was in ein Zahl-Feld getippt wird, geht als Text an die Engine und wird im Typ des Pins gelesen,
+  genau: eine ganze Zahl muss eine sein, die der Typ hält (`300` ist kein `u8`, `1.5` kein `i32`, `-1` kein `u64`); eine
+  Kommazahl ist der nächste Wert ihres Typs (beim `f32` der von `strtof`, wie `0.1f` in C++ – nie über eine double-Zahl;
+  `0.5f` darf man so schreiben), dazu `inf`, `-inf`, `nan`. `i64` und `u64` jenseits von 2^53 bleiben Ziffern, kein Wert
+  geht über eine JavaScript-Zahl. Gezeigt wird ein `f32` in der kürzesten Form, die genau ihn ergibt (`0.1`, nicht
+  `0.10000000149011612`). Ein Wert, den der Typ nicht hält, wird nicht genommen: das Feld wird rot, behält das Getippte und
+  sagt den Grund („"256" is no u8: a u8 is a whole number from 0 to 255“; in Details mit dem Namen davor).
+- **Verbinden verschiedener Typen:** Kein Draht wandelt um. Zieht man einen Draht von einem Typ in einen Pin eines anderen,
+  leuchtet der Pin beim Ziehen gelb, wo ein Knoten die Umwandlung kann, und beim Loslassen setzt der Editor diesen Knoten
+  **sichtbar auf den Draht**, auf halbem Weg – ein Undo-Schritt, die Meldung nennt ihn:
+
+  | von → nach | Knoten auf dem Draht |
+  |---|---|
+  | Zahl → andere Zahl (auch bool ↔ Zahl) | **Cast** „f32 → i64 (FloatingToIntegral)“ (`num_cast<i64, f32>`) |
+  | Zahl, bool → Text | **To Text** des Typs (`num_text<i64>`) |
+  | Liste → Text | **List to Text** (`list_text<f32>`) |
+  | Zahl → Vector | **Make Vector** mit der Zahl in X, Y und Z (davor ein Cast nach `f32`, wo sie keins ist) |
+
+  Kann die Umwandlung einen Wert ändern, sagt der Cast das auf dem Knoten („can change a value“, gelb) und im Tooltip und in
+  Details mit dem Grund: Kommazahl → ganze („goes toward zero: its fraction is lost, NaN gives 0, beyond … the nearer end“),
+  breiter → schmaler („keeps its low 8 bits and goes round“), mit ↔ ohne Vorzeichen („-1 becomes 4294967295“), f64 → f32,
+  ganze Zahl → Kommazahl, die nicht jeden Wert hält (`i32 → f32` jenseits von 2^24), Zahl → bool. Wo nichts verloren geht
+  (`f32 → f64`, `i32 → i64`, `u8 → i16`), steht nichts dabei. Wo kein Knoten umwandelt, wird der Draht abgelehnt, mit Grund
+  („a Vector cannot go into an i64 pin: Break Vector gives a Vector's X, Y and Z“; Text → Zahl: Scan Text; Liste → Liste:
+  For Each und Cast).
+- **Der Typ eines Knotens folgt dem ersten Draht:** Ein frisch gesetzter Knoten der Zahlen, an dem noch nichts hängt, nimmt den
+  Typ des ersten Drahts an (ein `i64` in ein neues Add macht es zum Add von `i64`); der Knoten zeigt ihn (Einstellung *Type*,
+  am kompakten Knoten unter dem Symbol). Hängen schon Drähte an seinen Zahl-Pins, bleibt er, was er ist, und der neue Draht
+  bekommt seinen Cast. Den Typ ändert man nachträglich in Details; hängen dann Drähte anderen Typs an ihm, wird die Änderung
+  abgelehnt und der Draht genannt („the wire into A brings an i64: with type f32 the pin is an f32 - break the wire first, or
+  put a Cast on it“). Dasselbe gilt für *To*/*From* eines Casts und die *Types* einer Formel.
+- **Formeln** siehe unten.
+
+Geprüft: `studio_logic_number_types` (Vorgaben, angebotene Typen, Literale jedes Typs an seinen Rändern, Cast auf dem Draht
+mit Undo und Redo, was jede Umwandlung verlieren kann, To Text, Make Vector, Ablehnen mit Grund, Typwechsel mit Drähten,
+Formel-Typen und Fehlerstelle) und `kern/tests/e2e/blueprint_e2e.mjs` (ein Blueprint mit `f32` und `i64` im Browser gebaut,
+verbunden, der Cast erscheint, kompiliert, gespielt).
+
 ### Listen und For Each
 
 Eine Variable, ein Pin einer Funktion oder ein Draht kann eine **Liste** von Werten eines Typs
-tragen: Boolean List, Integer List, Float List, Vector List, Text List, Actor List (Unreals
-Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
+tragen: eine Liste jedes Zahl-Typs (Float List (f32), Int List (i64), u8 List …), bool List, Vector List, Text List, Actor List (Unreals
+Arrays); ein Zahl-Pin einer Liste trägt sein Kürzel mit `[]` (`f32[]`). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
 
 - **Anlegen:** In Details einer Variablen (oder eines Funktions-Pins) als *Type* eine Liste
   wählen. Darunter stehen die Einträge des Defaults, einer je Zeile mit dem Feld seines Typs;
@@ -632,8 +686,8 @@ Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
 - Eine Liste passt nur in einen Eingang ihres Typs – und in jeden Text-Eingang: Print zeigt
   `[1, 2.5, 7]`. (Ausnahme: eine Liste einer Aufzählung, siehe unten.)
 - **All Actors with Tag** (Actors) gibt alle lebenden Actors mit einem Tag als Actor List.
-- Als C++: `List<Float> Scores = List<Float>{1.0, 2.5};`, `list_add(Scores, x);`,
-  `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – siehe
+- Als C++: `List<f32> Scores = List<f32>{1.0f, 2.5f};`, `list_add(Scores, x);`,
+  `for (auto it9 = flow_for_each<f32>(n9, Scores); it9.next();) { ... }` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Listen“.
 
 ### Aufzählungen
@@ -678,7 +732,7 @@ Text-Eingang). Wo eine Zahl oder ein Text gebraucht wird, sagt ein Knoten, was g
   einer Funktion, ein Knoten –, lässt sich nicht entfernen; der Editor sagt, was sie benutzt.
 - **Namen:** Der Name einer Aufzählung und die Namen ihrer Werte sind C++-Namen: Buchstaben,
   Ziffern und `_`, keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise
-  (`Float` …). Der Name einer Aufzählung endet nicht auf `_list`, keine zwei Werte einer
+  (`f32` …). Der Name einer Aufzählung endet nicht auf `_list`, keine zwei Werte einer
   Aufzählung heißen gleich, und eine Aufzählung hat mindestens einen Wert (höchstens 256).
 - Als C++: `KERN_ENUM(Mode, Closed, Opening, Open);`, `Mode State = Mode::Closed;`,
   `switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { ... } break; ... }` – siehe
@@ -694,7 +748,7 @@ Er ist weder Zahl noch Text: Er wandelt sich in nichts um, und ein Draht verbind
 derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
 
 - **Anlegen:** **+** bei *Structures* in My Blueprint legt eine an; sie beginnt als `NewStruct`
-  mit dem Feld `Field` (Float). Ist sie ausgewählt, zeigt Details ihren Namen, eine Beschreibung
+  mit dem Feld `Field` (Float, f32). Ist sie ausgewählt, zeigt Details ihren Namen, eine Beschreibung
   und ihre Felder: Jedes Feld hat einen Namen, einen Typ und einen Default; man kann es
   umbenennen, nach oben oder unten schieben oder entfernen. **+ Field** fügt eins an.
 - **Der Typ eines Felds** ist ein Wert-Typ, eine Aufzählung, eine andere Struktur oder eine Liste
@@ -732,12 +786,12 @@ derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
   ein Knoten –, lässt sich nicht entfernen; der Editor sagt, was sie benutzt.
 - **Namen:** Der Name einer Struktur und die Namen ihrer Felder sind C++-Namen: Buchstaben,
   Ziffern und `_`, keine Ziffer am Anfang, kein Wort von C++ und keins der Schreibweise
-  (`Float` …). Der Name einer Struktur endet nicht auf `_list`; sie heißt nicht wie eine Variable,
+  (`f32` …). Der Name einer Struktur endet nicht auf `_list`; sie heißt nicht wie eine Variable,
   Funktion oder Aufzählung. Keine zwei Felder einer Struktur heißen gleich, und kein Feld heißt
   wie eine Aufzählung oder Struktur des Blueprints.
-- Als C++: `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`,
-  `Weapon Held = Weapon{"Knife", 25.0};`, `struct_make<Weapon>("Bow", 12.0)`,
-  `struct_break<Weapon>(Held).Damage`, `Held.Damage = 30.0;` – siehe
+- Als C++: `KERN_STRUCT(Weapon) { Text Name = ""; f32 Damage = 10.0f; };`,
+  `Weapon Held = Weapon{"Knife", 25.0f};`, `struct_make<Weapon>("Bow", 12.0f)`,
+  `struct_break<Weapon>(Held).Damage`, `Held.Damage = 30.0f;` – siehe
   [blueprint_cpp.md](blueprint_cpp.md), Abschnitt „Strukturen“.
 
 ### Datentabellen
@@ -759,22 +813,29 @@ Jeder Eintrag ist eine Zeile, jedes Feld eine Spalte.
 
 ### Formel-Knoten
 
-**Formula** (Kategorie Math) ist eine Formel als ein Knoten: Jeder Name darin wird ein Eingang,
+**Formula** (Kategorie Math) ist eine Formel in C++ als ein Knoten: Jeder Name darin wird ein Eingang,
 `max(9000, 16000 - level * 1300)` hat also den Eingang `level`. Die Formel steht in Details unter
-Settings und ist der Titel des Knotens; eine Formel, die sich nicht lesen lässt, ist ein
-Compile-Fehler mit Stelle und Grund.
+Settings und ist der Titel des Knotens. Sie ist **dieselbe Rechnung wie die Knoten**, für die sie steht, getypt und streng
+([blueprint_cpp.md](blueprint_cpp.md), „Formeln“):
+
+- **Eingänge mit Typ:** Details zeigt unter *Formula* jeden Eingang mit seinem Typ (eine Auswahl wie überall: Float (f32),
+  Int (i64), die übrigen Breiten, bool) und was die Formel gibt; die Pins tragen ihr Kürzel. Die Einstellung *Types* hält
+  sie, einen je Name in der Reihenfolge, in der die Namen zuerst vorkommen. Wird die Formel geändert, behält ein Name, den es
+  schon gab, seinen Typ; ein neuer ist ein `f32`.
+- **Streng:** Zwei Werte verschiedener Typen treffen sich nicht (`a + b` eines `u32` und eines `i64` ist ein Fehler),
+  umgewandelt wird nur ausdrücklich – `num_cast<To, From>(x)`, `num_bit_cast<To, From>(x)`, wie im C++-Text. `0.5f` ist ein
+  `f32`, `0.5` ein `f64`; eine ganze Zahl nimmt den Typ dessen, was sie trifft.
+- **Fehler mit Stelle:** Eine Formel, die sich nicht lesen lässt oder nicht zu ihren Typen passt, ist ein Compile-Fehler mit
+  Grund und Stelle; Details zeigt den Text mit der Stelle markiert („the values meeting here are an f32 and an i64 (at 10)“).
 
 | | |
 |---|---|
-| Operatoren | `+ - * / %`, `^` (Potenz), Vorzeichen `-`, `!` |
-| Vergleiche | `< <= > >= == !=` ergeben 1 oder 0; `&&`, `||`; `a ? b : c` |
-| Funktionen | `min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log lerp(a, b, t)`; `copysign(x, s)`: der Betrag von x mit dem Vorzeichen von s, auch dem von −0 (`copysign(1, -0)` ist −1) |
-| Winkel | `sin cos tan asin acos atan atan2(y, x)` in Radiant; `rad(grad)`, `deg(radiant)`; `pi`; hyperbolisch `sinh cosh tanh asinh acosh atanh` (eigene der Engine, kern/src/math/hyperbolic.c) |
-| Potenzen und Logarithmen | `log2 log1p exp2 cbrt`; `ldexp(x, n)`: x · 2^n, exakt; `remainder(x, y)`: x − n·y mit n der x/y nächsten ganzen Zahl, exakt (eigene der Engine, kern/src/math/elementary.c); log2/log1p/atanh/acosh außerhalb ihres Bereichs 0 wie log |
-| Ganze Zahlen, wie eine Maschine sie hat | Bits: `band(a, b)`, `bor(a, b)`, `bxor(a, b)`, `shl(a, n)`, `shr(a, n)`; 32 Bit: `wrap32(x)` (was eine vorzeichenlose 32-Bit-Zahl davon hält: 0 … 4294967295), `wrap32s(x)` (mit Vorzeichen), `mul32(a, b)` (das Produkt, wie 32 Bit es halten) – für Hashes und Paketformate; `single(x)`: die Zahl, wie eine 32-Bit-Kommazahl sie hält (was die Komponente eines Vektors ist) |
+| Operatoren | `+ - * /`, `%` (ganze Zahlen), `- ~ !` davor, `<< >>`, `& | ^`, `< <= > >= == !=` (geben ein `bool`), `&& ||`, `c ? a : b` – Bindung wie in C++ |
+| Funktionen | `min max abs clamp(x, lo, hi)`, für Kommazahlen `lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 sinh cosh tanh asinh acosh atanh exp expm1 exp2 log log10 log2 log1p cbrt pow hypot copysign remainder fmin fmax fmod isnan isinf isfinite signbit` (Radiant; die Mathematik der Engine – sinh … atanh, log2, log1p, exp2, cbrt, remainder ihre eigenen, kern/src/math –, beim `f32` die f-Variante; außerhalb ihres Bereichs geben sie, was C++ gibt: NaN, ±Inf). `ldexp(x, n)` ist der Knoten Ldexp (n ein `i32`) |
+| Umwandlungen | `num_cast<To, From>(x)`, `num_bit_cast<To, From>(x)` |
 
-Gerechnet wird wie in den Mathe-Knoten (f64, dieselben Funktionen auf jeder Plattform); eine
-Division durch 0 ergibt 0.
+Gerechnet wird wie in den Knoten (`kern/logic/numbers.h`): ganze Zahlen brechen an ihrer Breite um, `/` und `%` durch 0
+geben 0, Kommazahlen nach IEEE (`x / 0` ist ±inf).
 
 Ausgeführt wird in drei Stufen, die dasselbe Ergebnis liefern (`kern/tests/logic_cases.h`):
 1. **Interpreter**, zum Bearbeiten.

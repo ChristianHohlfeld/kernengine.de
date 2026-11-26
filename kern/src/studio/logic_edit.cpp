@@ -11,6 +11,7 @@
 #include "internal.h"
 #include "kern/audio/synth.h"
 #include "kern/logic/engine_api.h"
+#include "kern/logic/nodes.h"
 #include "kern/studio/studio.h"
 
 namespace kern::studio {
@@ -334,18 +335,272 @@ bool keyed_settings(logic::Graph& g, u32 id, const std::string& pin, const logic
   std::string key, value;
   if (!def || !keyed_params(*def, pin, want, key, value)) return false;
   const bool has_value = !value.empty();
-  if (node->param("key", "int") == key && (!has_value || node->param("value", "float") == value)) return false;
+  if (node->param("key", "i64") == key && (!has_value || node->param("value", "f32") == value)) return false;
   node->set_param("key", key);
   if (has_value) node->set_param("value", value);
   node->values.erase(std::remove_if(node->values.begin(), node->values.end(), [](const auto& v) { return v.first == "key" || v.first == "value"; }), node->values.end());
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// numbers in the editor: the types offered, the literals typed in, the conversions put on a wire
+
+/// "a u8", "an f32", "an i64", "a Vector", "an Actor": a name with its article, as it is said.
+std::string an(const std::string& name) {
+  const char c = name.empty() ? 'x' : name[0];
+  const bool vowel = c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U' || (c == 'f' && name.size() > 1 && std::isdigit(static_cast<unsigned char>(name[1])));
+  return (vowel ? "an " : "a ") + name;
+}
+
+/// The smallest and the largest value of a whole number type, written out ("-128", "127").
+std::pair<std::string, std::string> integer_range(logic::PinType t) {
+  const logic::num::Kind k = logic::kind_of(t);
+  const int w = logic::num::width(k);
+  if (!logic::num::is_signed(k)) return {"0", std::to_string(w == 64 ? ~u64{0} : (u64{1} << w) - 1)};
+  const i64 hi = w == 64 ? std::numeric_limits<i64>::max() : static_cast<i64>((u64{1} << (w - 1)) - 1);
+  return {std::to_string(-hi - 1), std::to_string(hi)};
+}
+
+/// How the editor names a type in its menus: the two defaults by what they are for - "Float (f32)", "Int (i64)" -,
+/// every other number by its C++ name, the rest as logic::type_label names them.
+std::string editor_type_label(const logic::TypeRef& t) {
+  const logic::PinType e = logic::element_of(t.type);
+  const char* list = logic::is_list(t.type) ? " List" : "";
+  if (e == logic::kFloat && t.of.empty()) return std::string("Float") + list + " (f32)";
+  if (e == logic::kInt && t.of.empty()) return std::string("Int") + list + " (i64)";
+  return logic::type_label(t);
+}
+
+/// Why a value of the number type `from` can change on its way to `to` (static_cast, numbers.h) - "" when every
+/// value of `from` is a value of `to`. Said on the Cast node the editor puts on a wire, so nothing is lost unseen.
+std::string cast_loss(logic::PinType from, logic::PinType to) {
+  using logic::num::Kind;
+  const Kind f = logic::kind_of(from), t = logic::kind_of(to);
+  if (f == t || f == Kind::boolean) return {};
+  const std::string a = logic::pin_type_name(from), b = logic::pin_type_name(to);
+  if (t == Kind::boolean) return "every " + a + " but 0 becomes true";
+  if (logic::num::is_floating(f) && logic::num::is_floating(t))
+    return logic::num::width(t) < logic::num::width(f) ? "an f64 becomes the nearest f32: fewer digits, beyond the ends of f32 ±inf" : std::string();
+  if (logic::num::is_floating(f)) {
+    const auto [lo, hi] = integer_range(to);
+    return an(a) + " goes toward zero to " + an(b) + ": its fraction is lost, NaN gives 0, beyond " + lo + " ... " + hi + " the nearer end";
+  }
+  // (a whole number: how many bits its value has - its width, less the sign's)
+  const int bits = logic::num::width(f) - (logic::num::is_signed(f) ? 1 : 0);
+  if (logic::num::is_floating(t)) {
+    const int digits = t == Kind::f32 ? 24 : 53;
+    return bits > digits ? an(a) + " beyond 2^" + std::to_string(digits) + " becomes the nearest " + b : std::string();
+  }
+  const bool fs = logic::num::is_signed(f), ts = logic::num::is_signed(t);
+  const int room = logic::num::width(t) - (ts ? 1 : 0);
+  if ((fs && !ts) || room < bits) {
+    const auto [lo, hi] = integer_range(to);
+    if (fs && !ts && logic::num::width(t) >= logic::num::width(f)) return "a negative " + a + " goes round to a large " + b + " (-1 becomes " + hi + ")";
+    return an(b) + " holds " + lo + " ... " + hi + ": beyond, the " + a + " keeps its low " + std::to_string(logic::num::width(t)) + " bits and goes round";
+  }
+  return {};
+}
+
+/// A value typed in for the type `t` as the document holds it - or why it is none. A number is read in its type,
+/// exactly: a whole number must be one its type holds (300 is no u8, 1.5 no i32), a floating number is the nearest
+/// value of its type (strtof for an f32 - never by way of a double; 0.5f says the same), inf, -inf and nan too.
+/// Texts are how a value is typed in on the page (i64 and u64 beyond 2^53 are more than a number of JavaScript
+/// holds); a list's items are each read so (the place of a bad one is said).
+bool read_literal(const json::Value& in, const logic::TypeRef& t, const logic::Graph& g, json::Value& out, std::string& why) {
+  if (logic::is_list(t.type) && (logic::is_number(logic::element_of(t.type)) || logic::element_of(t.type) == logic::PinType::vector) && in.is_array()) {
+    json::Value items = json::Value::array();
+    for (std::size_t k = 0; k < in.size(); ++k) {
+      json::Value x;
+      if (!read_literal(in[k], {logic::element_of(t.type), t.of}, g, x, why)) { why = "item " + std::to_string(k) + ": " + why; return false; }
+      items.push(std::move(x));
+    }
+    out = logic::Value::from_json(items, t.type, g, t.of).to_json(g, t);
+    return true;
+  }
+  if (t.type == logic::PinType::vector && in.is_array()) {
+    // (a Vector: three f32, each read as one - X, Y, Z)
+    json::Value parts = json::Value::array();
+    for (std::size_t k = 0; k < 3; ++k) {
+      json::Value x;
+      if (!read_literal(k < in.size() ? in[k] : json::Value(0.0), {logic::PinType::f32, {}}, g, x, why)) { why = std::string(k == 0 ? "X" : k == 1 ? "Y" : "Z") + ": " + why; return false; }
+      if (!x.is_number()) { why = std::string(k == 0 ? "X" : k == 1 ? "Y" : "Z") + ": a Vector's X, Y and Z are finite numbers here"; return false; }
+      parts.push(x);
+    }
+    out = logic::Value::from_json(parts, t.type, g, t.of).to_json(g, t);
+    return true;
+  }
+  if (!logic::is_number(t.type) || t.type == logic::PinType::boolean) {
+    out = logic::Value::from_json(in, t.type, g, t.of).to_json(g, t);
+    return true;
+  }
+  const std::string name = logic::pin_type_name(t.type);
+  std::string text;
+  if (in.is_string()) text = in.as_string();
+  else if (in.is_number()) {
+    const f64 d = in.as_number();
+    if (logic::is_integer(t.type)) {
+      if (d != std::floor(d)) { why = an(name) + " is a whole number"; return false; }
+      if (std::fabs(d) > 9007199254740992.0) { why = "a whole number beyond 2^53 is written as its digits (a text), not as a number of JSON"; return false; }
+      text = std::to_string(static_cast<i64>(d));
+    } else {
+      out = logic::Value::from_json(in, t.type, g, t.of).to_json(g, t);
+      return true;
+    }
+  } else if (in.is_bool()) {
+    why = an(name) + " is a number - true and false are a bool's (a Cast node makes one of the other)";
+    return false;
+  } else {
+    why = an(name) + " is a number";
+    return false;
+  }
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) text.pop_back();
+  std::size_t lead = 0;
+  while (lead < text.size() && std::isspace(static_cast<unsigned char>(text[lead]))) ++lead;
+  text = text.substr(lead);
+  if (text.empty()) text = "0";
+  if (logic::is_floating(t.type)) {
+    std::string body = text;
+    // (0.5f: an f32 literal as C++ writes it - the f after a digit or a point, not the f of "inf")
+    if (t.type == logic::PinType::f32 && body.size() > 1 && (body.back() == 'f' || body.back() == 'F') && (std::isdigit(static_cast<unsigned char>(body[body.size() - 2])) || body[body.size() - 2] == '.') &&
+        body.find_first_of("xX") == std::string::npos)
+      body.pop_back();
+    const logic::scan::Real r = logic::scan::real(body, t.type == logic::PinType::f32);
+    if (r.end != body.size() || body.find('(') != std::string::npos) {
+      why = "\"" + text + "\" is no " + name + ": a number such as 0.5, -3, 1e-3, inf or nan";
+      return false;
+    }
+    out = logic::Value::from_json(json::Value(body), t.type, g, t.of).to_json(g, t);   // (the same reader: strtof / strtod)
+    return true;
+  }
+  // a whole number: decimal digits, a minus in front for a signed type - and nothing its type cannot hold
+  const auto [lo, hi] = integer_range(t.type);
+  const std::string range = an(name) + " is a whole number from " + lo + " to " + hi;
+  std::size_t at = text[0] == '-' || text[0] == '+' ? 1 : 0;
+  if (at == text.size() || text.find_first_not_of("0123456789", at) != std::string::npos) { why = "\"" + text + "\" is no " + name + ": " + range; return false; }
+  bool fits = false;
+  logic::with_number(t.type, [&](auto tag) {
+    using T = typename decltype(tag)::type;
+    if constexpr (!std::is_same_v<T, bool> && !std::is_floating_point_v<T>) {
+      T x{};
+      const char* begin = text.data() + (text[0] == '+' ? 1 : 0);
+      const auto [end, ec] = std::from_chars(begin, text.data() + text.size(), x);
+      fits = ec == std::errc() && end == text.data() + text.size();
+    }
+    return 0;
+  });
+  if (!fits) { why = "\"" + text + "\" is no " + name + ": " + range; return false; }
+  out = logic::Value::from_json(json::Value(text[0] == '+' ? text.substr(1) : text), t.type, g, t.of).to_json(g, t);
+  return true;
+}
+
+/// A node the editor puts on a wire that carries one type into a pin of another: what converts it, in the open
+/// (no wire converts - kern/docs/blueprint_cpp.md "Zahl-Typen"). Empty `type`: there is none, `why` says so.
+struct Conversion {
+  std::string type, in = "a";             // the node and its input the wire comes into
+  std::vector<std::pair<std::string, std::string>> params;
+  std::string why;
+};
+Conversion conversion_for(const logic::TypeRef& from, const logic::TypeRef& to) {
+  using logic::PinType;
+  Conversion c;
+  const std::string a = logic::type_text(from), b = logic::type_text(to);
+  if (logic::is_number(from.type) && logic::is_number(to.type)) {
+    c.type = "num.cast";
+    c.params = {{"from", logic::pin_type_name(from.type)}, {"to", logic::pin_type_name(to.type)}};
+    return c;
+  }
+  if (logic::is_number(from.type) && to.type == PinType::text) {
+    c.type = "num.text";
+    c.params = {{"type", logic::pin_type_name(from.type)}};
+    return c;
+  }
+  if (logic::is_list(from.type) && from.of.empty() && to.type == PinType::text && logic::element_of(from.type) != PinType::object) {
+    c.type = "list.text";
+    c.in = "list";
+    return c;   // (its Type follows the list it gets: connect)
+  }
+  if (logic::is_number(from.type) && from.type != PinType::boolean && to.type == PinType::vector) {
+    c.type = "vector.make";
+    c.in = "x";
+    return c;
+  }
+  if (from.type == PinType::vector && logic::is_number(to.type)) c.why = "Break Vector gives a Vector's X, Y and Z";
+  else if (from.type == PinType::text && logic::is_number(to.type)) c.why = "a text is read as a number by Scan Text or Text to u64";
+  else if (logic::is_list(from.type) && logic::is_list(to.type)) c.why = "a list is converted item by item: For Each and Cast";
+  else c.why = "no node converts the one into the other";
+  c.why = an(a) + " cannot go into " + an(b) + " pin: " + c.why;
+  return c;
+}
+
+bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const std::string& in, std::string& error, u32* inserted = nullptr);
+
+/// The types a setting Type of the node offers: those the node takes - a node of numbers its numbers (Add: i8 ...
+/// f64; Shift Left: the whole ones), the defaults Float (f32) and Int (i64) first, the other widths below them.
+std::vector<logic::TypeRef> offered_types(const logic::NodeDef& def, const logic::ParamDef& pd, const logic::Node& n, const logic::Graph& g) {
+  std::vector<logic::TypeRef> all = logic::type_choices(pd, g), r;
+  if (!def.problem) return all;
+  auto takes = [&](const std::string& type) {
+    logic::Node probe = n;
+    probe.id = 0;   // (no wire reaches it: what the node takes, not what is wired)
+    probe.set_param(pd.key, type);
+    return def.problem(probe, g).empty();
+  };
+  if (!takes(pd.def)) return all;   // (it says something else of itself: every type is offered)
+  for (const logic::TypeRef& t : all)
+    if (takes(logic::type_text(t))) r.push_back(t);
+  return r.empty() ? all : r;
+}
+
+/// Puts the conversion of a wire from (from, out) into (to, in) between them, in the open: the node(s) halfway, the
+/// wires through them. A number into a Vector: Make Vector with the number in X, Y and Z (a Cast to f32 first where
+/// it is no f32). The id of the node the wire goes into last is `inserted`.
+bool put_conversion(logic::Graph& g, u32 from, const std::string& out, const logic::TypeRef& have, u32 to, const std::string& in, const logic::TypeRef& want,
+                    std::string& error, u32* inserted) {
+  Conversion c = conversion_for(have, want);
+  if (c.type.empty()) { error = c.why; return false; }
+  const logic::Node* a = g.find(from);
+  const logic::Node* b = g.find(to);
+  if (!a || !b) { error = "no such node"; return false; }
+  auto add = [&](const std::string& type, const std::vector<std::pair<std::string, std::string>>& params, f32 x, f32 y) {
+    logic::Node n;
+    n.id = g.next_id++;
+    n.type = type;
+    n.x = std::round(x / 8) * 8;
+    n.y = std::round(y / 8) * 8;
+    for (const auto& [k, v] : params) n.set_param(k, v);
+    g.nodes.push_back(n);
+    return n.id;
+  };
+  const f32 mx = (a->x + b->x) / 2, my = (a->y + b->y) / 2;
+  if (c.type == "vector.make") {
+    u32 source = from;
+    std::string source_pin = out;
+    if (have.type != logic::PinType::f32) {
+      source = add("num.cast", {{"from", logic::pin_type_name(have.type)}, {"to", "f32"}}, mx - 200, my);
+      source_pin = "result";
+      if (!connect(g, from, out, source, "a", error)) return false;
+    }
+    const u32 make = add("vector.make", {}, mx, my);
+    for (const char* p : {"x", "y", "z"})
+      if (!connect(g, source, source_pin, make, p, error)) return false;
+    if (!connect(g, make, "result", to, in, error)) return false;
+    if (inserted) *inserted = make;
+    return true;
+  }
+  const u32 id = add(c.type, c.params, mx, my);
+  if (!connect(g, from, out, id, c.in, error)) return false;   // (a list into List to Text: its Type follows)
+  if (!connect(g, id, "result", to, in, error)) return false;
+  if (inserted) *inserted = id;
+  return true;
+}
+
 /// Adds a link with the editor's rules: an exec output and a data input take one wire
 /// (the new one replaces the old); exec inputs and data outputs fan in / out freely. A generic
 /// node nothing is wired to yet takes the type of the wire (a Text List into Length makes it a
-/// Length of a Text List).
-bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const std::string& in, std::string& error) {
+/// Length of a Text List; an f32 into a fresh Add makes it an Add of f32). A wire of another
+/// type than its input gets the node that converts it, in the open (`inserted`: its id) - f32 into
+/// i64 a Cast "f32 → i64", a number into a Text To Text -, or it is refused with the reason.
+bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const std::string& in, std::string& error, u32* inserted) {
   if (from == to) { error = "a node cannot connect to itself"; return false; }
   logic::PinDef po, pi;
   if (!pin_of(g, from, out, true, po) || !pin_of(g, to, in, false, pi)) { error = "no such pin"; return false; }
@@ -358,6 +613,10 @@ bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const st
     else if (const logic::Node* m = g.find(from); m && !logic::fits(type_of(po), type_of(pi)) && retype(g, from, type_setting_for(g, *m, out, true, type_of(pi)))) pin_of(g, from, out, true, po);
   }
   if (!logic::fits(type_of(po), type_of(pi))) {
+    // (another type: the node that converts it, on the wire - or the reason there is none)
+    auto declared = [](logic::PinType t) { return logic::element_of(t) == logic::PinType::enumeration || logic::element_of(t) == logic::PinType::structure; };
+    if (po.type != logic::PinType::exec && !declared(po.type) && !declared(pi.type))
+      return put_conversion(g, from, out, type_of(po), to, in, type_of(pi), error, inserted);
     error = "a " + logic::type_text(type_of(po)) + " cannot go into a " + logic::type_text(type_of(pi)) + " pin";
     return false;
   }
@@ -585,6 +844,34 @@ json::Value Studio::logic_json() const {
     x.set("y", static_cast<f64>(n.y));
     if (!n.comment.empty()) x.set("comment", n.comment);
     if (const std::string sym = compact_symbol(n); !sym.empty()) x.set("compact", sym);
+    if (d) {
+      // (the type of a node of numbers, said on the node - also on a compact "+": numberType; a Cast that can change
+      // a value says how: loss)
+      for (const logic::ParamDef& pd : d->params)
+        if (pd.kind == logic::ParamDef::Kind::type && pd.key == "type") {
+          logic::PinType t;
+          if (logic::pin_type_from_name(n.param("type", pd.def), t) && logic::is_number(t) && !logic::is_list(t)) x.set("numberType", logic::pin_type_name(t));
+        }
+      if (n.type == "num.cast") {
+        logic::PinType a, b;
+        if (logic::pin_type_from_name(n.param("from", "f32"), a) && logic::pin_type_from_name(n.param("to", "f32"), b) && logic::is_number(a) && logic::is_number(b))
+          if (const std::string loss = cast_loss(a, b); !loss.empty()) x.set("loss", loss);
+      }
+      if (n.type == "math.formula") {
+        // (what the formula's error says and where in its text: the page marks the place in the text)
+        const std::string text = n.param("formula", "a + b"), types = n.param("types", "f32 f32");
+        const logic::Formula& f = logic::Formula::cached(text, types);
+        if (!f.ok()) {
+          std::string why = f.error();
+          const std::size_t at = why.rfind(" (at ");
+          if (at != std::string::npos && why.back() == ')') {
+            x.set("formulaAt", std::atof(why.c_str() + at + 5));
+            why = why.substr(0, at);
+          }
+          x.set("formulaError", why);
+        }
+      }
+    }
     for (const auto& bp : logic_breakpoints_)
       if (bp.first == logic_owner_ && bp.second == n.id) x.set("breakpoint", true);
     if (paused_ && logic_break_hit_.first == logic_owner_ && logic_break_hit_.second == n.id) x.set("hit", true);
@@ -612,8 +899,9 @@ json::Value Studio::logic_json() const {
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
         if (p.of == logic::kAnyWidth) {  // (it reads a list of Ints of each width: List<Int>, List<U8> ...)
-          std::string types = "int_list";
-          for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
+          std::string types;
+          for (logic::PinType t : {logic::PinType::i64, logic::PinType::i32, logic::PinType::i16, logic::PinType::i8, logic::PinType::u64, logic::PinType::u32, logic::PinType::u16, logic::PinType::u8})
+            types += (types.empty() ? "" : " ") + std::string(logic::pin_type_name(logic::list_of(t)));
           pj.set("generic", types);
         }
         pj.set("linked", wired.count(pin_key(n.id, p.id, output)) != 0);
@@ -662,7 +950,7 @@ json::Value Studio::logic_json() const {
         if (pd.kind == K::choice)
           for (std::size_t i = 0; i + 1 < pd.choices.size(); i += 2) choice(pd.choices[i], pd.choices[i + 1]);
         if (pd.kind == K::type)
-          for (const logic::TypeRef& t : logic::type_choices(pd, *g)) choice(logic::type_text(t), logic::type_label(t));
+          for (const logic::TypeRef& t : offered_types(*d, pd, n, *g)) choice(logic::type_text(t), editor_type_label(t));
         if (pd.kind == K::variable) {
           // (the variables of the Blueprint - or, for a node of a function's local variables, those)
           const logic::Function* of = g->function(n.param("scope"));
@@ -1096,7 +1384,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (v.constant) return;  // (a constant is read: nothing changes it)
     consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
     consider({"Take " + v.name, category, "Takes what " + what + " holds and leaves it empty", "var.take", with({{"variable", v.name}})});
-    if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
+    if (logic::is_number(v.type) && v.type != logic::PinType::boolean)
       consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
     // a struct variable: the Set of each of its fields - a Set at that place (Held.Damage)
     if (const logic::StructType* s = v.type == logic::PinType::structure ? g->structure(v.of) : nullptr)
@@ -1138,11 +1426,11 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     // (a list of a fixed length: its entries are set - no step changes its length; Copy Bytes writes the
     // bytes of its numbers where they stand, and only a list of numbers has those)
     const logic::PinType item = logic::element_of(v.type);
-    const bool numbers = item == logic::PinType::integer || item == logic::PinType::int64 || item == logic::PinType::number;
+    const bool numbers = logic::is_number(item) && item != logic::PinType::boolean;
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
       if (d->type == "list.copy_bytes" ? !numbers : v.count != 0) continue;
-      if (d->type == "list.insert_text" && v.type != logic::PinType::integer_list) continue;   // (the bytes of a text go into whole numbers)
+      if (d->type == "list.insert_text" && !(logic::is_list(v.type) && logic::is_integer(item))) continue;   // (the bytes of a text go into whole numbers)
       logic::Node named;
       named.type = d->type;
       name(named);
@@ -1798,7 +2086,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       // New variables nodes on a graph without variables: offer one (Get / Set need a name).
       if ((type == "var.get" || type == "var.set" || type == "var.add" || type == "var.take") && n.param("variable").empty()) {
-        if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::number, json::Value(0.0), {}});
+        if (g.variables.empty()) g.variables.push_back({"Count", logic::kFloat, json::Value(0.0), {}});
         n.set_param("variable", g.variables.front().name);
       }
       if ((type.rfind("event.state", 0) == 0 || type.rfind("state.", 0) == 0) && n.param("machine").empty()) {
@@ -1820,7 +2108,15 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         const bool output = c["from"]["output"].as_bool();
         logic::PinDef p;
         if (pin_of(g, from_node, from_pin, output, p)) {
-          const std::string other = compatible_pin(g, g.nodes.back(), {p.type, p.of}, !output);
+          std::string other = compatible_pin(g, g.nodes.back(), {p.type, p.of}, !output);
+          // (none of its pins is of the wire's type: the first data pin - the node takes the wire's type where it can, else a
+          // conversion goes between them, as on any wire)
+          if (other.empty() && p.type != logic::PinType::exec) {
+            std::vector<logic::PinDef> pin_in, pin_out;
+            logic::library().pins(g.nodes.back(), g, pin_in, pin_out);
+            for (const logic::PinDef& q : output ? pin_in : pin_out)
+              if (q.type != logic::PinType::exec && !q.hidden && (output ? conversion_for({p.type, p.of}, {q.type, q.of}) : conversion_for({q.type, q.of}, {p.type, p.of})).why.empty()) { other = q.id; break; }
+          }
           std::string ignore;
           if (!other.empty()) {
             if (output) connect(g, from_node, from_pin, n.id, other, ignore);
@@ -1929,7 +2225,19 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   }
   if (name == "logicConnect") {
     return graph_edit("Connect", [&](logic::Graph& g, game::Level&) {
-      return connect(g, static_cast<u32>(num("from")), str("out"), static_cast<u32>(num("to")), str("in"), error);
+      u32 inserted = 0;
+      if (!connect(g, static_cast<u32>(num("from")), str("out"), static_cast<u32>(num("to")), str("in"), error, &inserted)) return false;
+      // (a wire of another type: the node that converts it stands on it now - said, with what it can lose)
+      if (const logic::Node* n = inserted ? g.find(inserted) : nullptr) {
+        result.set("inserted", inserted);
+        result.set("title", logic::library().title(*n));
+        if (n->type == "num.cast") {
+          logic::PinType a, b;
+          if (logic::pin_type_from_name(n->param("from"), a) && logic::pin_type_from_name(n->param("to"), b))
+            if (const std::string loss = cast_loss(a, b); !loss.empty()) result.set("loss", loss);
+        }
+      }
+      return true;
     });
   }
   if (name == "logicDisconnect") {
@@ -1972,7 +2280,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       logic::Node* n = g.find(static_cast<u32>(num("node")));
       logic::PinDef p;
       if (!n || !pin_of(g, n->id, str("pin"), false, p)) { error = "no such input"; return false; }
-      n->set_value(p.id, logic::Value::from_json(c["value"], p.type, g, p.of).to_json(g, logic::TypeRef{p.type, p.of}));
+      json::Value v;
+      if (!read_literal(c["value"], logic::TypeRef{p.type, p.of}, g, v, error)) { error = (p.label.empty() ? p.id : p.label) + ": " + error; return false; }
+      n->set_value(p.id, std::move(v));
       return true;
     });
   }
@@ -1981,7 +2291,21 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       logic::Node* n = g.find(static_cast<u32>(num("node")));
       if (!n) { error = "no such node"; return false; }
       const json::Value& v = c["value"];
+      const std::string before_text = n->param("formula", "a + b"), before_types = n->param("types", "f32 f32");
       n->set_param(str("key"), v.is_string() ? v.as_string() : v.is_number() ? std::to_string(static_cast<i64>(v.as_number())) : json::stringify(v));
+      // Another formula: its inputs keep their types by their names, a new one is a Float (f32) - its type is said at the
+      // pin and changed in Details (the setting Types: one for each input, in the order they first appear)
+      if (n->type == "math.formula" && str("key") == "formula") {
+        const logic::Formula was(before_text, before_types), now(n->param("formula"), "");
+        std::string types;
+        for (const std::string& name : now.inputs()) {
+          std::string t = "f32";
+          for (std::size_t k = 0; k < was.inputs().size() && k < was.types().size(); ++k)
+            if (was.inputs()[k] == name) t = std::string(logic::num::kKindNames[static_cast<u8>(was.types()[k])]);
+          types += (types.empty() ? "" : " ") + t;
+        }
+        if (!now.inputs().empty()) n->set_param("types", types);
+      }
       // Another variable: the node's path was a way through the old one - it starts at the new one again.
       if (str("key") == "variable" && !n->param("path").empty()) {
         logic::Variable held;
@@ -2003,6 +2327,27 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
                       return (l.from == n->id && !has(out, l.out)) || (l.to == n->id && !has(in, l.in));
                     }),
                     g.links.end());
+      // Another type of a node (its Type, a Cast's To and From, a formula's Types) never leaves a wire of another
+      // type on it unseen: the change is refused, and the wire named.
+      const logic::NodeDef* def = logic::library().find(n->type);
+      bool typed = n->type == "math.formula" && str("key") == "types";
+      if (def)
+        for (const logic::ParamDef& pd : def->params) typed = typed || (pd.key == str("key") && pd.kind == logic::ParamDef::Kind::type);
+      if (typed)
+        for (const logic::Link& l : g.links) {
+          if (l.from != n->id && l.to != n->id) continue;
+          logic::PinDef po, pi;
+          if (!pin_of(g, l.from, l.out, true, po) || !pin_of(g, l.to, l.in, false, pi) || po.type == logic::PinType::exec) continue;
+          if (logic::fits({po.type, po.of}, {pi.type, pi.of})) continue;
+          const bool mine = l.to == n->id;
+          const std::string now = c["value"].is_string() ? c["value"].as_string() : json::stringify(c["value"]);
+          error = mine ? "the wire into " + (pi.label.empty() ? pi.id : pi.label) + " brings " + an(logic::type_label({po.type, po.of})) + ": with " + str("key") + " " + now +
+                             " the pin is " + an(logic::type_label({pi.type, pi.of}))
+                       : "the wire from " + (po.label.empty() ? std::string("the result") : po.label) + " goes into " + an(logic::type_label({pi.type, pi.of})) + " pin: with " +
+                             str("key") + " " + now + " it is " + an(logic::type_label({po.type, po.of}));
+          error += " - break the wire first, or put a Cast on it";
+          return false;
+        }
       return true;
     });
   }
@@ -2216,7 +2561,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         std::string base = str("pin").empty() ? (locals ? "local" : input_side ? "value" : "result") : str("pin"), pname = base;
         for (int i = 2; !valid_name(pname) && i < 100; ++i) pname = base + std::to_string(i);
         logic::TypeRef t;
-        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(str("type").empty() ? "f32" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         pins.push_back({pname, t.type, logic::zero_of(t, g).to_json(g, t), t.of, t.count});
         result.set("pin", pname);
@@ -2308,7 +2653,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
             n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
         return true;
       }
-      if (op == "pinValue") { it->value = logic::Value::from_json(c["value"], logic::declared(*it), g).to_json(g, logic::declared(*it)); return true; }
+      if (op == "pinValue") {
+        json::Value v;
+        if (!read_literal(c["value"], logic::declared(*it), g, v, error)) { error = it->name + ": " + error; return false; }
+        it->value = std::move(v);
+        return true;
+      }
       if (op == "pinMove") {
         const std::ptrdiff_t at = it - pins.begin(), to = at + (num("by") < 0 ? -1 : 1);
         if (to < 0 || to >= static_cast<std::ptrdiff_t>(pins.size())) return false;
@@ -2333,7 +2683,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, base); !why.empty() && !var.empty()) { error = why; return false; }
         for (int i = 2; g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); ++i) n = base + std::to_string(i);
         logic::TypeRef t;
-        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(str("type").empty() ? "f32" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         g.variables.push_back({n, t.type, logic::zero_of(t, g).to_json(g, t), {}, t.of, t.count});
         result.set("name", n);
@@ -2369,7 +2719,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       if (op == "value") {
-        v->value = logic::Value::from_json(c["value"], logic::declared(*v), g).to_json(g, logic::declared(*v));
+        json::Value x;
+        if (!read_literal(c["value"], logic::declared(*v), g, x, error)) { error = v->name + ": " + error; return false; }
+        v->value = std::move(x);
         return true;
       }
       if (op == "constant") {
@@ -2505,7 +2857,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, base); !why.empty() && !which.empty()) { error = why; return false; }
         if (const std::string why = type_name_problem(g, base); !why.empty()) { error = why; return false; }
         for (int i = 2; taken(n); ++i) n = base + std::to_string(i);
-        g.structs.push_back({n, {{"Field", {logic::PinType::number, {}}, json::Value(0.0)}}, {}});
+        g.structs.push_back({n, {{"Field", {logic::kFloat, {}}, json::Value(0.0)}}, {}});
         result.set("name", n);
         return true;
       }
@@ -2566,7 +2918,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       // one - or a list of one of these. (A struct holds structs declared above it: where the
       // wanted one stands below, this struct moves below it - with the structs that hold it.)
       auto field_type = [&](const std::string& text, logic::TypeRef& t) {
-        if (!logic::type_from_text(text.empty() ? "float" : text, g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(text.empty() ? "f32" : text, g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         for (const logic::TypeRef& named : logic::types_named(t)) {  // (a struct, a list of one, a map of one)
           if (logic::element_of(named.type) != logic::PinType::structure) continue;
@@ -2710,7 +3062,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "fieldValue") {
         const logic::TypeRef t = s->fields[at].type;
-        s->fields[at].value = logic::Value::from_json(c["value"], t, g).to_json(g, t);
+        json::Value v;
+        if (!read_literal(c["value"], t, g, v, error)) { error = s->fields[at].name + ": " + error; return false; }
+        s->fields[at].value = std::move(v);
         settle_struct_values(g);
         return true;
       }
@@ -2946,8 +3300,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         {"id":3,"type":"game.message","x":640,"y":0,"values":{"text":"+10"}},{"id":4,"type":"game.sound","x":960,"y":0,"params":{"sound":"builtin:pickup"}}],
         "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})";
     else if (which == "spawner")
-      text = R"({"variables":[{"name":"Spawned","type":"int","value":0}],"nodes":[{"id":1,"type":"event.every","x":0,"y":0,"params":{"seconds":"3"}},
-        {"id":2,"type":"flow.branch","x":320,"y":0},{"id":3,"type":"math.compare","x":96,"y":176,"params":{"op":"<"},"values":{"b":10}},
+      text = R"({"variables":[{"name":"Spawned","type":"i64","value":0}],"nodes":[{"id":1,"type":"event.every","x":0,"y":0,"params":{"seconds":"3"}},
+        {"id":2,"type":"flow.branch","x":320,"y":0},{"id":3,"type":"math.compare","x":96,"y":176,"params":{"op":"<","type":"i64"},"values":{"b":10}},
         {"id":4,"type":"var.get","x":-128,"y":192,"params":{"variable":"Spawned"}},{"id":5,"type":"actor.spawn","x":576,"y":0,"params":{"template":"Physics Cube"},"values":{"location":[0,0,6]}},
         {"id":6,"type":"var.add","x":960,"y":0,"params":{"variable":"Spawned"}}],
         "links":[[1,"then",2,"exec"],[4,"value",3,"a"],[3,"result",2,"condition"],[2,"true",5,"exec"],[5,"then",6,"exec"]]})";
@@ -2959,7 +3313,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     else if (which == "robot_avoid")
       text = R"({"nodes":[{"id":1,"type":"event.begin","x":0,"y":0},{"id":2,"type":"walker.autonomous","x":320,"y":0,"values":{"enable":false}},
         {"id":3,"type":"event.every","x":0,"y":224,"params":{"seconds":"0.25"}},{"id":4,"type":"flow.branch","x":320,"y":224},
-        {"id":5,"type":"walker.tof","x":-352,"y":416},{"id":6,"type":"math.compare","x":-32,"y":448,"params":{"op":"<"},"values":{"b":1.6}},
+        {"id":5,"type":"walker.tof","x":-352,"y":416},{"id":6,"type":"math.compare","x":-32,"y":448,"params":{"op":"<","type":"f64"},"values":{"b":1.6}},
         {"id":7,"type":"logic.and","x":96,"y":384},
         {"id":8,"type":"walker.move","x":608,"y":160,"values":{"forward":0,"turn":45,"duration":0.6}},
         {"id":9,"type":"walker.move","x":608,"y":400,"values":{"forward":0.3}}],

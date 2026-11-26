@@ -4,7 +4,7 @@
 namespace cases {
 using kern::f32;
 using kern::u32;
-/// A read-only view (`const f32*` of the engine's MeshData::push_extra, a kern::Span<const f32> of the program's
+/// A read-only view (`kern::Span<const f32>` of the engine's MeshData::push_extra and of the program's
 /// own sum_of) handed an array of a fixed length, a list, or a pointer into a list.
 f32 sum_of(kern::Span<const f32> values);
 f32 first_of(const f32* values);

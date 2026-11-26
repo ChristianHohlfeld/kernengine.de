@@ -60,6 +60,7 @@
 #include "kern/core/map.h"
 #include "kern/core/json.h"
 #include "kern/math/math.h"
+#include "kern/logic/numbers.h"
 
 namespace kern::logic {
 
@@ -68,21 +69,22 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
 /// their order). `enumeration`: a value of an enum the Blueprint declares, `structure`: a value of
 /// one of its structs - which one says the name beside the type (PinDef::of, Variable::of ...).
-/// `int64`: 64 bits, as a u64 or an i64 of C++ holds them - which of the two it is says the node
-/// that reads them (Compare Int64 <, <u; Int64 Math /s, /u), as in WebAssembly. `map`: values of
+/// The numbers are the number types of C++ (kern/logic/numbers.h): bool, i8, i16, i32, i64, u8, u16, u32, u64,
+/// f32, f64 - each a type of its own on a wire, in the order of num::Kind (PinType = 1 + Kind). `map`: values of
 /// one type, each under a key of its own, in the order the keys came; `set`: keys in the order
 /// they came - of what types says the name beside it (keyed_of).
 /// `object`: an object of the engine (kern/docs/engine_object.md), Object<I> - TypeRef::of names its class or
 /// interface by the rule of the engine's names in Blueprints (kern::App: "App", kern::physics::World:
 /// "physics_World"); its value is an ObjectRef - a handle in the objects of one world and that world, never a number.
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64, object,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list, object_list,
+  exec, boolean, i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, vector, text, actor, enumeration, structure, object,
+  boolean_list, i8_list, i16_list, i32_list, i64_list, u8_list, u16_list, u32_list, u64_list, f32_list, f64_list,
+  vector_list, text_list, actor_list, enumeration_list, structure_list, object_list,
   map, set,
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
   callback, count
 };
-constexpr u8 kValueTypes = 10;  // boolean ... object
+constexpr u8 kValueTypes = 17;  // boolean ... object
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
 constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::object_list; }
 /// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
@@ -90,73 +92,73 @@ constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::s
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
 constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::object ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",      "object",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list", "object_list",
-                                                     "map",       "set",      "callback"};
+inline constexpr std::string_view kPinTypeNames[] = {
+    "exec",      "bool",     "i8",       "i16",      "i32",      "i64",     "u8",       "u16",       "u32",       "u64",         "f32",         "f64",       "vector", "text", "actor", "enum", "struct", "object",
+    "bool_list", "i8_list", "i16_list", "i32_list", "i64_list", "u8_list", "u16_list", "u32_list", "u64_list", "f32_list", "f64_list",
+    "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "object_list",
+    "map",       "set",      "callback"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
-/// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
+/// "bool", "i64", "f32", "vector", "text", "actor"; a list: "f32_list" ...
 const char* pin_type_name(PinType t);
 /// A class of the engine as a Blueprint names it - the one rule of the engine's names (kern/docs/engine_object.md):
 /// its C++ name under kern::, "::" written "_". kern::App is "App", kern::physics::World "physics_World".
 std::string engine_class_name(std::string_view cpp);
 /// The C++ name of a class of the engine a Blueprint names: "physics_World" is "kern::physics::World".
 std::string engine_class_cpp(std::string_view name);
-/// The type with that name (also "number", "double", "boolean", "integer", "string").
+/// The type with that name (also "boolean", "string"). The names of the numbers are C++'s only: "int", "float",
+/// "number", "int64" name none (a text that says them is of the time before the number types: an error there).
 constexpr bool pin_type_from_name(std::string_view name, PinType& out) {
   for (u32 i = 0; i < static_cast<u32>(PinType::count); ++i)
     if (name == kPinTypeNames[i]) {
       out = static_cast<PinType>(i);
       return true;
     }
-  if (name == "number" || name == "double") out = PinType::number;
-  else if (name == "boolean") out = PinType::boolean;
-  else if (name == "integer") out = PinType::integer;
+  if (name == "boolean") out = PinType::boolean;
   else if (name == "string") out = PinType::text;
   else return false;
   return true;
 }
-/// The type a generic node's setting "Type" names (Select, Reroute): "float" when it names none.
-constexpr PinType pin_type_setting(std::string_view name) {
-  PinType t = PinType::number;
-  return pin_type_from_name(name, t) && t != PinType::exec ? t : PinType::number;
+/// The names numbers had before they had their types (a reader says so where it meets one: an old text).
+constexpr bool old_number_name(std::string_view name) {
+  for (std::string_view old : {"int", "float", "number", "double", "integer", "int64", "int_list", "float_list", "int64_list", "Int", "Float", "Int64", "U8", "U16", "U32", "I8", "I16", "I32"})
+    if (name == old) return true;
+  return false;
 }
-/// The type of a list node's items its setting "Type" names: a value type, "float" when it names none.
+/// The defaults of a new number where none is named (the editor's "Float" and "Int"): f32 - what the engine,
+/// its graphics and its physics compute in - and i64.
+inline constexpr PinType kFloat = PinType::f32;
+inline constexpr PinType kInt = PinType::i64;
+/// Is the type a number (bool included), a whole number (not bool), a floating one?
+constexpr bool is_number(PinType t) { return t >= PinType::boolean && t <= PinType::f64; }
+constexpr bool is_integer(PinType t) { return t >= PinType::i8 && t <= PinType::u64; }
+constexpr bool is_floating(PinType t) { return t == PinType::f32 || t == PinType::f64; }
+/// The kind of a number's type (numbers.h), and the type of a kind.
+constexpr num::Kind kind_of(PinType t) { return is_number(t) ? static_cast<num::Kind>(static_cast<u8>(t) - 1) : num::Kind::count; }
+constexpr PinType pin_type_of(num::Kind k) { return static_cast<PinType>(static_cast<u8>(k) + 1); }
+template <num::Number T> constexpr PinType number_type() { return pin_type_of(num::kind_of<T>()); }
+/// f(std::type_identity<T>{}) with the C++ type T of a number type (bool included; another type: f64's).
+template <class F> constexpr decltype(auto) with_number(PinType t, F&& f) { return num::visit(kind_of(t), std::forward<F>(f)); }
+/// The type a generic node's setting "Type" names (Select, Reroute): f32 when it names none.
+constexpr PinType pin_type_setting(std::string_view name) {
+  PinType t = kFloat;
+  return pin_type_from_name(name, t) && t != PinType::exec ? t : kFloat;
+}
+/// The type of a list node's items its setting "Type" names: a value type, f32 when it names none.
 constexpr PinType item_type_setting(std::string_view name) {
   const PinType t = pin_type_setting(name);
-  return is_list(t) ? PinType::number : t;
+  return is_list(t) ? kFloat : t;
 }
-/// Data that can flow from `from` into an input of type `to` (autocasts).
+/// A number as a text (To Text): a whole number in decimal, a floating one the shortest decimal that gives it again
+/// (std::to_chars), inf, -inf, nan; bool true / false - the same text on every machine.
+std::string number_as_text(const struct Value& v);
+/// Can JSON hold a value of the number type t as it is written (a whole number its type holds; any floating one)?
+bool number_fits(const json::Value& j, PinType t);
+/// Data that can flow from `from` into an input of type `to`: only a value of that type (no wire converts).
 bool convertible(PinType from, PinType to);
 
-/// A number as a whole number (Float to Int, on a wire or in a node): toward zero. Not a number
-/// or endless: 0. Beyond what Int holds: its nearest end. Defined for every number - the same in
-/// the interpreter and in a Blueprint's C++. Int's ends are 2^63 - 1 and its negative: the same
-/// distance from 0, so every Int can be written down in C++ (-2^63 is no literal there).
-inline i64 whole(f64 v) {
-  if (std::fabs(v) < 9223372036854775808.0) [[likely]] return static_cast<i64>(v);  // (one test for what is inside; not a number fails it)
-  if (!std::isfinite(v)) return 0;
-  return v > 0 ? std::numeric_limits<i64>::max() : -std::numeric_limits<i64>::max();
-}
-
-/// A whole number as a Blueprint holds it. Every number of a Blueprint is a double underneath
-/// (the interpreter's variables, the JIT): whole numbers are exact up to 2^53, a larger one is
-/// the nearest a double holds, and none is past Int's ends. Every Int there is - a value on a
-/// pin, a variable of a Blueprint's class - is such a number, so every tier has the same.
-constexpr i64 normal(i64 v) {
-  constexpr i64 exact = i64{1} << 53;
-  if (v >= -exact && v <= exact) return v;
-  const f64 held = static_cast<f64>(v);  // (the nearest a double holds)
-  if (held >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  if (held <= -9223372036854775808.0) return -std::numeric_limits<i64>::max();
-  return static_cast<i64>(held);
-}
-/// Int + Int (Add to Variable): added as numbers - defined for every value, where the
-/// arithmetic of i64 overflows.
-inline i64 whole_add(i64 a, i64 b) {
-  constexpr i64 half = i64{1} << 52;
-  if (a > -half && a < half && b > -half && b < half) return a + b;  // (the same, without the detour)
-  return whole(static_cast<f64>(a) + static_cast<f64>(b));
-}
+/// A floating number as an i64, as numbers.h converts it (toward zero; not a number: 0; beyond: the nearer end) -
+/// for C++ of the engine that needs a count or a place from a value (no wire converts).
+inline i64 whole(f64 v) { return num::cast<i64>(v); }
 
 /// The number of a world: of one collection of objects of the engine (EngineObjects::world) - of a GameWorld, of a
 /// program's runtime. 0 is none. A reference to an object of the engine or (kern/docs/engine_object.md) to an actor
@@ -232,31 +234,25 @@ struct Value;
 /// The entries of a map or a set value (a set's values are none).
 using MapEntries = kern::Map<MapKey, Value>;
 
-/// `Int64` in a Blueprint's C++ (and on an Int64 pin): 64 bits, as a u64 or an i64 of C++ holds
-/// them. What they mean says the node that reads them - Int64 Less (signed) or Int64 Less Unsigned,
-/// Int64 Divide or Divide Unsigned -, as in WebAssembly; adding, subtracting and multiplying go
-/// round at 2^64, as in C++. Written out with its bits: Int64{0x1f}.
-struct Int64 {
-  u64 bits = 0;
-  constexpr Int64() = default;
-  constexpr explicit Int64(u64 b) : bits(b) {}
-  friend constexpr bool operator==(Int64 a, Int64 b) { return a.bits == b.bits; }
-  friend constexpr auto operator<=>(Int64 a, Int64 b) { return a.bits <=> b.bits; }  // (Sort List: as u64)
-  u64 hash() const { return KeyHash<u64>{}(bits); }  // (a key of a Map, a Set)
-};
-
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>,
-                             std::vector<ObjectRef>>;
-/// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
+using ListItems = std::tuple<std::vector<bool>, std::vector<i8>, std::vector<i16>, std::vector<i32>, std::vector<i64>, std::vector<u8>, std::vector<u16>, std::vector<u32>, std::vector<u64>,
+                             std::vector<f32>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<ObjectRef>>;
+/// The list type whose items are T (a number type, Vec3, std::string, ActorHandle, ObjectRef).
 template <class T> constexpr PinType list_type_of() = delete;
 template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
-template <> constexpr PinType list_type_of<i64>() { return PinType::integer_list; }
-template <> constexpr PinType list_type_of<f64>() { return PinType::number_list; }
+template <> constexpr PinType list_type_of<i8>() { return PinType::i8_list; }
+template <> constexpr PinType list_type_of<i16>() { return PinType::i16_list; }
+template <> constexpr PinType list_type_of<i32>() { return PinType::i32_list; }
+template <> constexpr PinType list_type_of<i64>() { return PinType::i64_list; }
+template <> constexpr PinType list_type_of<u8>() { return PinType::u8_list; }
+template <> constexpr PinType list_type_of<u16>() { return PinType::u16_list; }
+template <> constexpr PinType list_type_of<u32>() { return PinType::u32_list; }
+template <> constexpr PinType list_type_of<u64>() { return PinType::u64_list; }
+template <> constexpr PinType list_type_of<f32>() { return PinType::f32_list; }
+template <> constexpr PinType list_type_of<f64>() { return PinType::f64_list; }
 template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list; }
 template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
-template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
 template <> constexpr PinType list_type_of<ObjectRef>() { return PinType::object_list; }
 
 /// What a Callback value calls: a function of a library, with the place it is bound to. Only the engine
@@ -273,10 +269,11 @@ struct Callable {
 
 /// A value on a data pin.
 struct Value {
-  PinType type = PinType::number;
+  PinType type = kFloat;
   bool b = false;
+  /// A number (but bool): its bits as numbers.h holds them (num::bits_of - a whole number sign- or zero-extended,
+  /// f32 its 32 bits, f64 its 64 bits); a value of an enum: its place; an object of the engine: its handle.
   i64 i = 0;
-  f64 n = 0;
   Vec3 v;
   std::string s;
   ActorRef a = 0;
@@ -297,8 +294,26 @@ struct Value {
   std::shared_ptr<const Callable> call;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
-  static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
-  static Value number(f64 x) { Value r; r.type = PinType::number; r.n = x; return r; }
+  /// A number of the type T (the C++ type of x: Value::of_number(0.5f) is an f32, of_number(u32{7}) a u32).
+  template <num::Number T> static Value of_number(T x) {
+    if constexpr (std::is_same_v<T, bool>) return boolean(x);
+    else { Value r; r.type = number_type<T>(); r.i = static_cast<i64>(num::bits_of(x)); return r; }
+  }
+  /// A number of the type t (a number type) with these bits (num::held_bits: the type's low bits).
+  static Value of_bits(PinType t, u64 bits) {
+    if (t == PinType::boolean) return boolean((bits & 1u) != 0);
+    Value r; r.type = t; r.i = static_cast<i64>(num::held_bits(kind_of(t), bits)); return r;
+  }
+  /// An i64, an f64 (shorthands of of_number for C++ of the engine; a number of another type is of_number's).
+  static Value integer(i64 x) { return of_number(x); }
+  static Value number(f64 x) { return of_number(x); }
+  /// The number this is, as T: of a number of T itself its value; of one of another type (C++ of the engine that
+  /// reads a value - no wire converts) as num::cast converts it; of anything else 0.
+  template <num::Number T> T as() const;
+  /// The number as the type T, converted as static_cast<T> does - what the conversion node (num.cast) gives.
+  template <num::Number T> T cast_to() const;
+  /// A number's bits (num::bits_of), of a bool 0 or 1.
+  u64 bits() const { return type == PinType::boolean ? (b ? 1u : 0u) : static_cast<u64>(i); }
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   /// An actor (none: ActorHandle{}).
@@ -307,8 +322,6 @@ struct Value {
   static Value object(ObjectRef x) { Value r; r.type = PinType::object; r.i = x.handle; r.world = x.world; return r; }
   /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
   ObjectRef as_object() const { return type == PinType::object ? ObjectRef{i, world} : ObjectRef{}; }
-  /// An Int64: its 64 bits (held in `i`, as they are).
-  static Value int64(u64 bits) { Value r; r.type = PinType::int64; r.i = static_cast<i64>(bits); return r; }
   /// A value of an enum: its place among the enum's values (the first is 0).
   static Value enumeration(i64 index) { Value r; r.type = PinType::enumeration; r.i = index < 0 ? 0 : index; return r; }
   /// A list of values of an enum.
@@ -335,16 +348,13 @@ struct Value {
   static Value zero(PinType t);
   /// A Callback (none: unbound).
   static Value callback(std::shared_ptr<const Callable> c) { Value r; r.type = PinType::callback; r.call = std::move(c); return r; }
-  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
-  /// Whole numbers are held as every Int is (logic::normal).
+  /// A list of these items (T: a number type, Vec3, std::string, ActorHandle or ObjectRef; Value: structs).
   template <class T> static Value of(std::vector<T> items) {
     if constexpr (std::is_same_v<T, Value>) {
       return structures(std::move(items));
     } else {
       Value r;
       r.type = list_type_of<T>();
-      if constexpr (std::is_same_v<T, i64>)
-        for (std::size_t k = 0; k < items.size(); ++k) items[k] = normal(items[k]);
       if (!items.empty()) {
         auto held = std::make_shared<ListItems>();
         std::get<std::vector<T>>(*held) = std::move(items);
@@ -428,6 +438,22 @@ struct Value {
   json::Value to_json(const struct Graph& g, const struct TypeRef& declared) const;
   bool operator==(const Value& o) const;
 };
+/// How often a number was read as another number type than its own (Value::as) - a node that takes another type than
+/// its pin says, a silent conversion: the tests run every node and ask that it stays 0 (logic_no_node_takes_another_number_type).
+/// A conversion is the conversion node's (Value::cast_to), nowhere else.
+inline u64& numbers_read_as_another_type() {
+  static u64 count = 0;
+  return count;
+}
+template <num::Number T> T Value::cast_to() const {
+  if (type == PinType::boolean) return num::cast<T>(b);
+  if (!is_number(type)) return T(0);
+  return num::visit(kind_of(type), [this](auto t) { return num::cast<T>(num::of_bits<typename decltype(t)::type>(static_cast<u64>(i))); });
+}
+template <num::Number T> T Value::as() const {
+  if (is_number(type) && type != number_type<T>()) ++numbers_read_as_another_type();
+  return cast_to<T>();
+}
 
 // ---------------------------------------------------------------------------
 // graph data
@@ -455,7 +481,7 @@ struct Link {
 
 struct Variable {
   std::string name;
-  PinType type = PinType::number;
+  PinType type = kFloat;
   json::Value value;     // default
   std::string help;
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
@@ -490,7 +516,7 @@ struct EnumType {
 /// A type as pins, variables and settings name it: the pin type, and for an enum or a struct
 /// which one.
 struct TypeRef {
-  PinType type = PinType::number;
+  PinType type = kFloat;
   std::string of;
   /// What a place is declared as - a variable, a field of a struct, an input, an output or a
   /// local variable of a function - can be a list of a fixed length: it always has `count`
@@ -504,43 +530,6 @@ struct TypeRef {
 };
 /// The longest list of a fixed length a place can be declared as.
 inline constexpr u32 kLongestFixed = 65536;
-/// Whole numbers of a fixed width. What a place is declared as - a variable, a field of a struct,
-/// an input, an output or a local variable of a function - can be an Int of a fixed width:
-/// TypeRef::of beside PinType::integer names it - "u8", "u16", "u32" (0 .. 2^w - 1) and "i8",
-/// "i16", "i32" (-2^(w-1) .. 2^(w-1) - 1); in a Blueprint's C++ it is U8 ... I32 (std::uint8_t ...).
-/// What flows through a pin is an Int: a pin has no width. What such a place is given, it holds as
-/// C++ holds it when it stores an integer there (static_cast<u32>(x)): the low w bits of the Int,
-/// of a signed width as two's complement. Every value of a width is a whole number below 2^32 in
-/// size, which a double holds exactly - so the interpreter and the JIT, whose numbers are doubles,
-/// hold it exactly too.
-inline constexpr std::string_view kWidthNames[] = {"u8", "u16", "u32", "i8", "i16", "i32"};
-/// The bits of the width `of` names (8, 16, 32; negative: a signed width); 0: it names none.
-constexpr int width_bits(std::string_view of) {
-  constexpr int kBits[] = {8, 16, 32, -8, -16, -32};
-  for (std::size_t k = 0; k < sizeof kBits / sizeof kBits[0]; ++k)
-    if (of == kWidthNames[k]) return kBits[k];
-  return 0;
-}
-/// The `of` of an input that reads a list of Ints of any width - Int, U8 ... I32 (`List<Int>`, `List<U8>`):
-/// a node that reads the numbers of the list as they are (Text of Bytes, Copy Bytes' Items, Struct of
-/// Bytes) - in C++ a function over the list's items (logic::Items<T>). No place and no value is of it.
-inline constexpr std::string_view kAnyWidth = "*";
-/// Is the place an Int of a fixed width (or a list of such)?
-constexpr bool has_width(PinType t, std::string_view of) { return element_of(t) == PinType::integer && width_bits(of) != 0; }
-inline bool has_width(const TypeRef& t) { return has_width(t.type, t.of); }
-/// What a place of the width `of` holds when it is given the Int x: its low bits (none: x).
-constexpr i64 wrapped(i64 x, std::string_view of) {
-  const u64 bits = static_cast<u64>(x);
-  switch (width_bits(of)) {
-    case 8: return static_cast<i64>(static_cast<u8>(bits));
-    case 16: return static_cast<i64>(static_cast<u16>(bits));
-    case 32: return static_cast<i64>(static_cast<u32>(bits));
-    case -8: return static_cast<i64>(static_cast<i8>(static_cast<u8>(bits)));
-    case -16: return static_cast<i64>(static_cast<i16>(static_cast<u16>(bits)));
-    case -32: return static_cast<i64>(static_cast<i32>(static_cast<u32>(bits)));
-    default: return x;
-  }
-}
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
@@ -557,7 +546,7 @@ std::string keyed_of(const TypeRef& key, const TypeRef* value);
 TypeRef callback_result(const TypeRef& callback);
 std::vector<TypeRef> callback_inputs(const TypeRef& callback);
 std::string callback_of(const TypeRef& result, const std::vector<TypeRef>& inputs);
-constexpr bool callback_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number || t == PinType::vector || t == PinType::int64; }
+constexpr bool callback_type_ok(PinType t) { return is_number(t) || t == PinType::vector; }
 /// The engine calls a Callback: with `args` (the inputs of its signature), `result` its output - the zero
 /// of the result's type where it is unbound or gives none. False: unbound.
 bool call_back(const Value& callback, const TypeRef& type, std::span<const Value> args, Value& result);
@@ -567,7 +556,7 @@ std::vector<TypeRef> types_named(const TypeRef& t);
 /// The type with the enum or struct `from` called `to` wherever it names it (a map's keys, values).
 TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::string& to);
 /// Can a map's or a set's keys be of this type?
-constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::int64 || t == PinType::enumeration || t == PinType::text; }
+constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || is_integer(t) || t == PinType::enumeration || t == PinType::text; }
 /// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
 MapKey key_of(const Value& v);
 Value key_value(const MapKey& k, PinType key);
@@ -631,7 +620,7 @@ struct StateMachine {
 /// call nodes: both).
 struct FunctionPin {
   std::string name;
-  PinType type = PinType::number;
+  PinType type = kFloat;
   json::Value value;     // default: an input nobody wired, an output no Return node set
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
   u32 count = 0;         // a list of a fixed length: that many entries (TypeRef::count)
@@ -844,70 +833,78 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 // ---------------------------------------------------------------------------
 // formulas
 
-/// A formula over named numbers, e.g. "max(9000, 16000 - level * 1300)" - what the Formula node
-/// computes. Parsed once, evaluated on f64 exactly like the maths nodes (the same functions, the
-/// same results in every tier and on every platform).
+/// A formula over named numbers of the number types, e.g. "max(a * 3u, b) + 1u" over the inputs "u32 a, u32 b" -
+/// what the Formula node computes. It is the same computation as the nodes it stands for: every operation is the
+/// function of numbers.h the node of that operation calls (a + b of two u32 the Add node's, going round at 2^32),
+/// in the order it is written, each value in its type - no step is computed in a wider one. Its text is C++ (the
+/// body of the lambda kern::formula has in a Blueprint's C++), and C++ gives it the same bits (numbers.h, Typed).
 ///
-///   numbers      1, 2.5, .5, 1e3            names   letters, digits and _ (each is an input)
-///   operators    + - * / %  ^ (power)       unary - and !
-///                < <= > >= == !=            1 when true, else 0
-///                && ||                      a ? b : c
-///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
-///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
-///                lerp(a, b, t) remainder(x, y) (IEEE 754's: x - n * y, n the whole number nearest x / y)
-///                sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt ldexp(x, n) (x * 2^n, exact) - the
-///                engine's own (kern/src/math), as std:: of a program
-///   constants    pi
-/// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
-/// are those of 0 and of nothing (0).
+///   inputs       the names it reads, each of the type the node names for it ("types", in the order the names
+///                first appear): a + b of a u32 a and an i64 b is an error, num_cast<i64, u32>(a) + b is not
+///   numbers      0.5f an f32, 0.5 / 1e3 an f64; a whole number - 7, 7u - takes the type of what it meets
+///                (a + 7 of an i64 a: an i64; 7u only an unsigned one) and must be one of it; standing alone it is
+///                C++'s: 7 an i32, 7u a u32. true, false. An operation of numbers written out only is refused:
+///                its value is a number written out itself
+///   operators    as C++ binds them: + - * / % (whole numbers), - ~ ! in front, << >> (the amount any whole
+///                number), < <= > >= == != (give a bool), & | ^ (whole numbers), && || ! (bools), c ? a : b
+///   functions    min max abs clamp(x, lo, hi); of floating numbers lerp(a, b, t) sqrt floor ceil trunc round
+///                sin cos tan asin acos atan atan2(y, x) exp expm1 log log10 sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt pow hypot copysign remainder fmin fmax fmod,
+///                isnan isinf isfinite signbit (give a bool)
+///   conversions  num_cast<To, From>(x), num_bit_cast<To, From>(x) - the nodes Cast and Bit Cast
+/// What numbers.h fixes where C++ leaves the result open (a whole number / 0 ...) holds here as well.
 class Formula {
  public:
   static constexpr std::size_t kMaxInputs = 16;
-  explicit Formula(std::string_view text);
+  /// The formula `text` over inputs of the types `types` (their names, "u32 f32": one for each input, in the order
+  /// the inputs first appear in the text).
+  Formula(std::string_view text, std::string_view types);
   bool ok() const { return error_.empty(); }
-  /// Why it could not be parsed (empty when it could).
+  /// Why it could not be read, or does not suit its types, with the place (empty when it could).
   const std::string& error() const { return error_; }
   /// The names the formula reads, in the order they first appear.
   const std::vector<std::string>& inputs() const { return inputs_; }
-  /// Its value for these inputs, in the order of inputs() (missing ones are 0); 0 when !ok().
-  f64 evaluate(const f64* values, std::size_t count) const;
-  /// The parsed formula for a text (parsed once, kept).
-  static const Formula& cached(const std::string& text);
-  /// The formula written the one canonical way (single spaces, no brackets that change nothing,
-  /// / % ^ as operators): what the C++ notation reads a formula back as. Empty when !ok().
+  /// The type of each input (as far as `types` names them).
+  const std::vector<num::Kind>& types() const { return types_; }
+  /// The type of what it gives (f64 when !ok()).
+  num::Kind result() const { return result_; }
+  /// Its value for these inputs (their bits, num::bits_of - in the order of inputs(); missing ones are 0), as bits of
+  /// result(); 0 when !ok().
+  u64 evaluate(const u64* bits, std::size_t count) const;
+  /// The formula for a text and types (read once, kept).
+  static const Formula& cached(const std::string& text, const std::string& types);
+  /// The formula written the one canonical way (single spaces, brackets only where they change something - and
+  /// around & | ^ << >> && of another operation and a comparison in a comparison, as compilers ask): what the
+  /// node holds, and the body of its lambda in a Blueprint's C++. Empty when !ok().
   std::string text() const;
-  /// The formula as a C++ expression over its inputs as doubles, with the same value: functions
-  /// and pi are those of kern::math, / % ^ are its calls div, mod and pow, numbers are double
-  /// literals. Read back by from_cpp (the text without "kern::math::" is a formula again).
-  std::string cpp() const;
-  /// Int inputs and an Int result (docs/blueprint_cpp.md, "Formeln") - one rule on the formula, no
-  /// list of names: which functions give a whole number for whole numbers says the formula's table
-  /// of functions (band bor bxor shl shr wrap32 wrap32s mul32); +, - and * (kWholeOperators) are
-  /// whole where they are given only inputs, numbers written out, such functions and such operators.
-  /// int_input(k): input k is read only as a whole number - as an argument of such a function, as a
-  /// side of a comparison (== != < <= > >=) whose other side is an input, a number written out,
-  /// such a function or such an operator, or through such an operator whose own value is read so
-  /// (or is the formula's value). Never under / % ^ or another function: there it is a Float. In a
-  /// Blueprint's C++ the input is then an Int where its wire comes from an Int: the same value,
-  /// because every Int is exact as a double and the comparison of two of them is that of the doubles.
-  bool int_input(std::size_t k) const;
-  /// whole_result(): every input is int_input, and what the formula gives is a whole number - its root
-  /// is such a function, or such an operator with an input among its operands (result_sum()). -> Int in a Blueprint's C++ where every
-  /// input is a wire from an Int; with result_sum() only where everything that reads the value is an
-  /// Int (past Int's ends the Int is its end, the double is not).
-  bool whole_result() const;
-  bool result_sum() const;
+  /// The types written the one way ("u32 f32").
+  std::string types_text() const;
+  /// A formula without inputs, operations of numbers written out allowed: what the language computes for it (the
+  /// converter asks it for a value it folds - tools/blueprint_cpp.sh --formula "tan(0.5)").
+  static Formula constant(std::string_view text);
 
  private:
   friend struct FormulaParser;
-  struct Op { u8 code = 0; u8 args = 0; u16 index = 0; f64 number = 0; };
-  struct Term { u8 code = 0; u16 index = 0; int a = -1, b = -1, c = -1; f64 number = 0; };  // the formula as a tree
-  std::string print(int term, int outer, bool cpp) const;
-  bool whole_operand(int term) const;  // (an input, a number, a whole function, or +, - or * of those)
+  using Fn = u64 (*)(u64, u64, u64);
+  struct Op { u8 code = 0; u8 args = 0; u16 index = 0; u64 bits = 0; Fn fn = nullptr; };
+  struct Term {
+    u8 code = 0;
+    num::Kind kind = num::Kind::f64;  // (what it gives)
+    num::Kind from = num::Kind::f64;  // (a conversion's From)
+    u16 index = 0;
+    int a = -1, b = -1, c = -1;
+    u64 bits = 0;                     // (a number written out: its bits; a whole one before it has its type: its size)
+    bool loose = false, minus = false, unsigned_ = false;  // (a whole number written out that takes its type from what it meets)
+    u32 at = 0;                       // (where it is in the text)
+  };
+  std::string print(int term, int outer) const;
+  Formula(std::string_view text, std::string_view types, bool constant);
+  bool constant_ = false;
   std::vector<Term> tree_;
   int root_ = -1;
   std::vector<Op> code_;
   std::vector<std::string> inputs_;
+  std::vector<num::Kind> types_;
+  num::Kind result_ = num::Kind::f64;
   std::string error_;
 };
 
@@ -922,7 +919,10 @@ struct PinDef {
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
   u32 count = 0;         // a list of a fixed length: that many entries (a field's, a function's pin: TypeRef::count)
 };
-/// The type a place takes from a pin it is made for (a variable, a function's input): a pin of kAnyWidth's is a List<Int>.
+/// The `of` of an input that reads a list of whole numbers of any of their types (`List<u8>`, `List<i64>` ...: Text of
+/// Bytes, Copy Bytes' Items) - in C++ a function over the list's items (logic::Items<T>). No place and no value is of it.
+inline constexpr std::string_view kAnyWidth = "*";
+/// The type a place takes from a pin it is made for (a variable, a function's input): a pin of kAnyWidth's is its own list type.
 inline TypeRef place_type(const PinDef& p) { return {p.type, p.of == kAnyWidth ? std::string() : p.of}; }
 
 struct ParamDef {
@@ -944,14 +944,7 @@ struct ParamDef {
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
-  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
-  /// Kind::type: Ints of a fixed width are among them - as the type of a list's items (U8 ... I32: what a
-  /// list holds is stored there, a wire of an item is an Int); `with_lists`: a list of them (u8_list), which a
-  /// value of the type is as it is (not a single Int of a width: on a pin it would be another number)
-  bool widths = false;
-  /// Kind::type with `widths` and `with_lists`: a single Int of a width too - the values of a map (Map<Int, U8>: the
-  /// map is the place, a value it gives is what it holds)
-  bool width_values = false;
+  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (bool, a whole number, an enum, Text)
   /// Kind::choice: the setting names a class (an interface) of the engine by the rule of the engine's names
   /// ("App", "physics_World"). In a Blueprint's C++ it is that C++ type: func_engine_object<kern::App>(...).
   bool engine_class = false;

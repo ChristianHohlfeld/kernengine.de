@@ -1,1 +1,1 @@
-{"name":"Cases","nextId":2,"actors":[{"id":1,"name":"Lamps","components":{"logic":{"kind":"kern-logic","version":1,"nextId":1,"variables":[{"name":"PoleRadius","type":"float","value":0.13}],"nodes":[],"links":[],"machines":[],"functions":[]}}}]}
+{"name":"Cases","nextId":2,"actors":[{"id":1,"name":"Lamps","components":{"logic":{"kind":"kern-logic","version":1,"nextId":1,"variables":[{"name":"PoleRadius","type":"f64","value":0.13}],"nodes":[],"links":[],"machines":[],"functions":[]}}}]}

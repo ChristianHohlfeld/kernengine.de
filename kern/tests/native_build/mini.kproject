@@ -29,7 +29,7 @@
         "variables": [
           {
             "name": "Began",
-            "type": "int",
+            "type": "i64",
             "value": 0
           }
         ],

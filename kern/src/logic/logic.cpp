@@ -1,6 +1,7 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
 #include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
 
@@ -8,6 +9,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -21,13 +23,28 @@ namespace kern::logic {
 // pin types and values
 
 namespace {
-std::string number_text(f64 n) {
-  if (std::isfinite(n) && std::fabs(n) < 1e15 && n == std::floor(n)) return std::to_string(static_cast<i64>(n));
-  char b[48];
-  std::snprintf(b, sizeof b, "%.4g", n);
-  return b;
+/// A floating number as a text: the shortest decimal that gives the same number of its type again (std::to_chars) -
+/// the same text on every machine; inf, -inf as C++'s printf writes them, a NaN "nan" (the one NaN - numbers.h, seen).
+template <class T> std::string floating_text(T x) {
+  if (x != x) return "nan";
+  if (std::isinf(x)) return x < 0 ? "-inf" : "inf";
+  char b[64];
+  const auto r = std::to_chars(b, b + sizeof b, x);
+  return std::string(b, r.ptr);
 }
+std::string number_text(f64 n) { return floating_text(n); }
 }  // namespace
+
+std::string number_as_text(const Value& v) {
+  if (v.type == PinType::boolean) return v.b ? "true" : "false";
+  return with_number(v.type, [&](auto t) -> std::string {
+    using T = typename decltype(t)::type;
+    const T x = num::of_bits<T>(v.bits());
+    if constexpr (num::Floating<T>) return floating_text(x);
+    else if constexpr (std::is_same_v<T, bool>) return x ? "true" : "false";
+    else return std::to_string(x);
+  });
+}
 
 std::string engine_class_name(std::string_view cpp) {
   if (cpp.starts_with("::")) cpp.remove_prefix(2);
@@ -59,24 +76,21 @@ bool declared_type(PinType t) { return element_of(t) == PinType::enumeration || 
 std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
   std::vector<TypeRef> r;
   if (pd.keys_only) {
-    for (PinType t : {PinType::integer, PinType::int64, PinType::text, PinType::boolean}) r.push_back({t, {}});
+    for (PinType t : {PinType::i64, PinType::i32, PinType::u64, PinType::u32, PinType::i16, PinType::u16, PinType::i8, PinType::u8, PinType::text, PinType::boolean}) r.push_back({t, {}});
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
     return r;
   }
   if (!pd.enums_only && !pd.structs_only)
-    for (PinType t : {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor, PinType::int64}) r.push_back({t, {}});
+    for (PinType t : {PinType::f32, PinType::i64, PinType::boolean, PinType::vector, PinType::text, PinType::actor, PinType::f64, PinType::i32, PinType::u32, PinType::u64, PinType::i16, PinType::u16, PinType::i8, PinType::u8})
+      r.push_back({t, {}});
   if (!pd.structs_only)
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
     for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
   if (!pd.enums_only && !pd.structs_only)   // (an object of the engine of each of its classes - kern/docs/engine_object.md)
     for (const EngineClass& c : engine_classes()) r.push_back({PinType::object, c.name});
-  if (pd.widths && (!pd.with_lists || pd.width_values))
-    for (std::string_view w : kWidthNames) r.push_back({PinType::integer, std::string(w)});
   if (pd.with_lists)
     for (std::size_t k = 0, n = r.size(); k < n; ++k) r.push_back({list_of(r[k].type), r[k].of});
-  if (pd.widths && pd.with_lists && !pd.width_values)  // (with width_values: the lists of them came above)
-    for (std::string_view w : kWidthNames) r.push_back({PinType::integer_list, std::string(w)});
   return r;
 }
 std::string type_text(const TypeRef& t) {
@@ -85,7 +99,7 @@ std::string type_text(const TypeRef& t) {
   if (is_keyed(t.type)) return std::string(pin_type_name(t.type)) + "<" + t.of + ">";  // ("map<int>float>", "set<text>")
   // (a list of a fixed length says its length: "float_list[16]" - in messages; a setting names no such type)
   const std::string length = t.count ? "[" + std::to_string(t.count) + "]" : std::string();
-  if (!declared_type(t.type) && !has_width(t)) return pin_type_name(t.type) + length;
+  if (!declared_type(t.type)) return pin_type_name(t.type) + length;
   return (is_list(t.type) ? t.of + "_list" : t.of) + length;
 }
 bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
@@ -116,7 +130,7 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
       TypeRef t{keyed, std::string(text.substr(head.size() + 1, text.size() - head.size() - 2))};
       const TypeRef key = key_type(t);
       // (a map's keys are of no fixed width; its values may be - a map is a place: Map<Int, List<U8>>, Map<Int, U8>)
-      if (!key_type_ok(key.type) || has_width(key) || (key.type == PinType::enumeration && !g.enumeration(key.of))) return false;
+      if (!key_type_ok(key.type) || (key.type == PinType::enumeration && !g.enumeration(key.of))) return false;
       if (keyed == PinType::map) {
         const TypeRef value = value_type(t);
         TypeRef named;
@@ -137,10 +151,6 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
   }
   const bool listed = text.size() > 5 && text.substr(text.size() - 5) == "_list";
   const std::string_view item = listed ? text.substr(0, text.size() - 5) : text;
-  if (width_bits(item) != 0) {  // (an Int of a fixed width: "u32", "u8_list")
-    out = {listed ? PinType::integer_list : PinType::integer, std::string(item)};
-    return true;
-  }
   if (g.enumeration(text) || g.structure(text)) {
     out = {g.enumeration(text) ? PinType::enumeration : PinType::structure, std::string(text)};
     return true;
@@ -162,46 +172,28 @@ std::string type_label(const TypeRef& t) {
   if (element_of(t.type) == PinType::object) return (t.of.empty() ? std::string("Object") : t.of + " Object") + (is_list(t.type) ? " List" : "");  // ("App Object")
   if (t.type == PinType::map) return "Map of " + type_label(key_type(t)) + " to " + type_label(value_type(t));
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
-  static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
+  // (a number by its C++ name - f32, u8, bool -, the others by theirs)
+  static const char* const kLabels[] = {"Exec", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "Vector", "Text", "Actor", "Enum", "Struct", "Object"};
   const PinType e = element_of(t.type);
-  std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 10 ? kLabels[static_cast<u32>(e)] : "?";
-  if (has_width(t)) name = std::string(1, static_cast<char>(t.of[0] - 'a' + 'A')) + t.of.substr(1);  // ("U32", "I8")
+  std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < kValueTypes + 1 ? kLabels[static_cast<u32>(e)] : "?";
   return is_list(t.type) ? name + " List" : name;
 }
 
 bool fits(const TypeRef& from, const TypeRef& to) {
   if (from.type == PinType::callback || to.type == PinType::callback) return from.type == to.type && from.of == to.of;  // (the same signature)
   if (is_keyed(from.type) || is_keyed(to.type)) return from.type == to.type && from.of == to.of;  // (the same keys, the same values)
-  if (!convertible(from.type, to.type)) return false;
-  // (a list of Ints of a fixed width is a list of that width and nothing else - U8 is no Int in a list:
-  // in C++ a List<U8> is no List<Int>; one Int of a width is an Int, the place it goes to holds it)
-  // (an input of kAnyWidth reads a list of Ints of each width - in C++ a function over its items)
-  if (from.type == PinType::integer_list && to.type == PinType::integer_list) return to.of == kAnyWidth || width_bits(from.of) == width_bits(to.of);
+  if (to.of == kAnyWidth) return is_list(from.type) && is_integer(element_of(from.type));  // (an input over the items of a list of whole numbers of any type)
   // (an object of the engine goes where an object of its own class is wanted - never where another class is, never
   // from or to anything else)
+  if (!convertible(from.type, to.type)) return false;
   if (element_of(from.type) == PinType::object) return engine_class_is(from.of, to.of);   // (its class, or one it derives from)
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
 bool convertible(PinType from, PinType to) {
-  if (from == to) return true;
-  if (from == PinType::exec || to == PinType::exec) return false;
-  // (a value of an enum is one of its names, a place among them: it is no number and no text
-  // by itself - Enum to Text, Enum to Index say which is meant. A struct is its fields: Break
-  // gives each of them)
-  if (declared_type(from) || declared_type(to)) return false;
-  if (from == PinType::callback || to == PinType::callback) return false;  // (only the engine calls one: it is nothing else)
-  if (element_of(from) == PinType::object || element_of(to) == PinType::object) return false;  // (an object of the engine is no number, no text: Handle of Object says it as an Int)
-  if (is_keyed(from) || is_keyed(to)) return false;  // (a map is a map of its keys and values, a set a set of its keys)
-  if (element_of(from) == PinType::int64 || element_of(to) == PinType::int64) return false;  // (64 bits: the Int64 nodes say what they are as another type)
-  if (to == PinType::text) return true;  // everything prints
-  if (is_list(from) || is_list(to)) return false;  // (a list is a list of its type and nothing else)
-  const bool from_num = from == PinType::integer || from == PinType::number || from == PinType::boolean;
-  const bool to_num = to == PinType::integer || to == PinType::number || to == PinType::boolean;
-  if (from_num && to_num) return true;
-  if (to == PinType::boolean && from == PinType::actor) return true;  // is valid
-  if (to == PinType::vector && (from == PinType::number || from == PinType::integer)) return true;  // splat
-  return false;
+  // No wire turns a value into another type - a conversion is a node of its own (number to number: Cast; a
+  // number to a text: To Text), as nothing in C++ converts without a conversion the compiler names.
+  return from == to;  // (exec to exec: the flow)
 }
 
 namespace {
@@ -282,16 +274,15 @@ TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::strin
 MapKey key_of(const Value& v) {
   MapKey k;
   if (v.type == PinType::text) k.s = v.s;
-  else k.i = v.type == PinType::boolean ? (v.b ? 1 : 0) : v.type == PinType::int64 ? v.i : v.as_int();  // (an Int64: its bits)
+  else k.i = v.type == PinType::boolean ? (v.b ? 1 : 0) : v.i;  // (a whole number: its bits; an enum's value: its place)
   return k;
 }
 Value key_value(const MapKey& k, PinType key) {
   switch (key) {
     case PinType::boolean: return Value::boolean(k.i != 0);
     case PinType::enumeration: return Value::enumeration(k.i);
-    case PinType::int64: return Value::int64(static_cast<u64>(k.i));
     case PinType::text: return Value::text(k.s);
-    default: return Value::integer(k.i);
+    default: return Value::of_bits(is_integer(key) ? key : PinType::i64, static_cast<u64>(k.i));
   }
 }
 
@@ -312,42 +303,33 @@ Value Value::zero(PinType t) {
 }
 
 bool Value::as_bool() const {
+  if (is_number(type)) return as<bool>();
   switch (type) {
-    case PinType::boolean: return b;
-    case PinType::integer: return i != 0;
-    case PinType::number: return n != 0;
     case PinType::vector: return length_sq(v) > 0;
     case PinType::text: return !s.empty() && s != "false" && s != "0";
     case PinType::actor: return a != 0;
-    case PinType::int64: return i != 0;
     case PinType::enumeration: return i != 0;
     default: return false;
   }
 }
 
 i64 Value::as_int() const {
+  if (is_number(type)) return as<i64>();
   switch (type) {
-    case PinType::boolean: return b ? 1 : 0;
-    case PinType::integer: return i;
     case PinType::enumeration: return i;
-    case PinType::number: return whole(n);
     case PinType::text: return std::strtoll(s.c_str(), nullptr, 10);
     case PinType::actor: return a;
-    case PinType::int64: return normal(i);  // (its bits as an i64, as an Int holds that - Int64 to Int says which it is)
     default: return 0;
   }
 }
 
 f64 Value::as_number() const {
+  if (is_number(type)) return as<f64>();
   switch (type) {
-    case PinType::boolean: return b ? 1 : 0;
-    case PinType::integer: return static_cast<f64>(i);
     case PinType::enumeration: return static_cast<f64>(i);
-    case PinType::number: return n;
     case PinType::vector: return length(v);
     case PinType::text: return std::strtod(s.c_str(), nullptr);
     case PinType::actor: return a;
-    case PinType::int64: return static_cast<f64>(i);
     default: return 0;
   }
 }
@@ -359,16 +341,13 @@ Vec3 Value::as_vector() const {
 }
 
 std::string Value::as_text() const {
+  if (is_number(type)) return number_as_text(*this);
   switch (type) {
-    case PinType::boolean: return b ? "true" : "false";
-    case PinType::integer: return std::to_string(i);
-    case PinType::number: return number_text(n);
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";  // (its id: the number of its world is the process's, no text of a Blueprint depends on it)
     case PinType::object: return i ? "object " + std::to_string(i) + " of world " + std::to_string(world) : "no object";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
-    case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)
     case PinType::callback: return call ? "callback" : "unbound";  // (in messages: a Blueprint does not print one)
     case PinType::structure: {
       // (what it holds, in the order of its fields; their names are the struct's to say - Break)
@@ -401,17 +380,15 @@ std::string Value::as_text() const {
 std::size_t Value::size() const {
   if (is_keyed(type)) return entries ? entries->size() : 0;
   if (type == PinType::structure_list) return rows ? rows->size() : 0;
-  if (!list) return 0;
-  switch (type) {
-    case PinType::boolean_list: return std::get<std::vector<bool>>(*list).size();
-    case PinType::integer_list: return std::get<std::vector<i64>>(*list).size();
-    case PinType::number_list: return std::get<std::vector<f64>>(*list).size();
-    case PinType::vector_list: return std::get<std::vector<Vec3>>(*list).size();
-    case PinType::text_list: return std::get<std::vector<std::string>>(*list).size();
-    case PinType::actor_list: return std::get<std::vector<ActorHandle>>(*list).size();
-    case PinType::int64_list: return std::get<std::vector<Int64>>(*list).size();
-    case PinType::object_list: return std::get<std::vector<ObjectRef>>(*list).size();
-    case PinType::enumeration_list: return std::get<std::vector<i64>>(*list).size();
+  if (!list || !is_list(type)) return 0;
+  const PinType e = element_of(type);
+  if (is_number(e)) return with_number(e, [&](auto t) { return std::get<std::vector<typename decltype(t)::type>>(*list).size(); });
+  switch (e) {
+    case PinType::vector: return std::get<std::vector<Vec3>>(*list).size();
+    case PinType::text: return std::get<std::vector<std::string>>(*list).size();
+    case PinType::actor: return std::get<std::vector<ActorHandle>>(*list).size();
+    case PinType::object: return std::get<std::vector<ObjectRef>>(*list).size();
+    case PinType::enumeration: return std::get<std::vector<i64>>(*list).size();
     default: return 0;
   }
 }
@@ -421,35 +398,35 @@ Value Value::item(std::size_t index) const {
   if (type == PinType::set) return Value{};
   if (index >= size()) return zero(element_of(type));
   if (type == PinType::structure_list) return (*rows)[index];
-  switch (type) {
-    case PinType::boolean_list: return boolean(std::get<std::vector<bool>>(*list)[index]);
-    case PinType::integer_list: return integer(std::get<std::vector<i64>>(*list)[index]);
-    case PinType::number_list: return number(std::get<std::vector<f64>>(*list)[index]);
-    case PinType::vector_list: return vector(std::get<std::vector<Vec3>>(*list)[index]);
-    case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
-    case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index]);
-    case PinType::int64_list: return int64(std::get<std::vector<Int64>>(*list)[index].bits);
-    case PinType::object_list: return object(std::get<std::vector<ObjectRef>>(*list)[index]);
-    case PinType::enumeration_list: return enumeration(std::get<std::vector<i64>>(*list)[index]);
-    default: return zero(element_of(type));
+  const PinType e = element_of(type);
+  if (is_number(e)) return with_number(e, [&](auto t) { return of_number<typename decltype(t)::type>(std::get<std::vector<typename decltype(t)::type>>(*list)[index]); });
+  switch (e) {
+    case PinType::vector: return vector(std::get<std::vector<Vec3>>(*list)[index]);
+    case PinType::text: return text(std::get<std::vector<std::string>>(*list)[index]);
+    case PinType::actor: return actor(std::get<std::vector<ActorHandle>>(*list)[index]);
+    case PinType::object: return object(std::get<std::vector<ObjectRef>>(*list)[index]);
+    case PinType::enumeration: return enumeration(std::get<std::vector<i64>>(*list)[index]);
+    default: return zero(e);
   }
 }
 
 Value Value::converted(PinType to) const {
   if (to == type) return *this;
+  // (for C++ of the engine that takes a value as a type - no wire converts: convertible)
+  if (is_number(to)) {
+    if (is_number(type)) return with_number(to, [&](auto t) { return of_number(as<typename decltype(t)::type>()); });
+    if (to == PinType::boolean) return boolean(as_bool());
+    return with_number(to, [&](auto t) { return of_number(num::cast<typename decltype(t)::type>(as_number())); });
+  }
   switch (to) {
-    case PinType::boolean: return boolean(as_bool());
-    case PinType::integer: return integer(as_int());
-    case PinType::number: return number(as_number());
     case PinType::vector: return vector(as_vector());
     case PinType::text: return text(as_text());
     case PinType::actor: return zero(to);  // (nothing but an actor is one: an actor comes from its world, no number becomes one)
-    case PinType::int64: return zero(to);  // (nothing else is one: Int to Int64, Float to Int64 say how)
     case PinType::enumeration: return enumeration(as_int());
     case PinType::structure: return zero(to);  // (nothing but a struct is one: its default - zero_of)
     case PinType::object: return zero(to);  // (nothing but an object of the engine is one: no number becomes one)
     case PinType::enumeration_list:
-      if (type == PinType::integer_list) {  // (what a node computed on the places of an enum's values: those values)
+      if (type == PinType::i64_list) {  // (what a node computed on the places of an enum's values: those values)
         Value r = *this;
         r.type = to;
         return r;
@@ -459,11 +436,71 @@ Value Value::converted(PinType to) const {
   }
 }
 
+namespace {
+/// A number as JSON: a whole number up to 2^53 in size and a finite floating one as a JSON number (exact: a
+/// double holds it), a larger whole number as its decimal digits in a text, inf, -inf, nan as those texts.
+json::Value number_json(const Value& v) {
+  if (v.type == PinType::boolean) return json::Value(v.b);
+  return with_number(v.type, [&](auto t) -> json::Value {
+    using T = typename decltype(t)::type;
+    const T x = num::of_bits<T>(v.bits());
+    if constexpr (num::Floating<T>) {
+      if (std::isfinite(x)) return json::Value(static_cast<f64>(x));
+      return json::Value(floating_text(x));
+    } else {
+      constexpr i64 exact = i64{1} << 53;
+      if constexpr (std::is_signed_v<T>) {
+        if (x >= -exact && x <= exact) return json::Value(static_cast<f64>(x));
+      } else {
+        if (static_cast<u64>(x) <= static_cast<u64>(exact)) return json::Value(static_cast<f64>(x));
+      }
+      return json::Value(std::to_string(x));
+    }
+  });
+}
+/// A number of the type t from JSON (as number_json writes it). A whole number that is no whole number of its
+/// type (2.5 or 300 for a u8) is none: 0 - the check says so where a graph holds one (number_fits).
+Value number_of_json(const json::Value& j, PinType t) {
+  if (t == PinType::boolean) return Value::boolean(j.is_bool() ? j.as_bool() : j.truthy());
+  return with_number(t, [&](auto tag) -> Value {
+    using T = typename decltype(tag)::type;
+    T x{};
+    if constexpr (std::is_same_v<T, bool>) {
+      x = j.truthy();
+    } else if constexpr (num::Floating<T>) {
+      if (j.is_number()) x = static_cast<T>(j.as_number());
+      else if (j.is_string()) {
+        const std::string& w = j.as_string();
+        if (w == "inf") x = std::numeric_limits<T>::infinity();
+        else if (w == "-inf") x = -std::numeric_limits<T>::infinity();
+        else if (w == "nan") x = std::numeric_limits<T>::quiet_NaN();
+        else if (w == "-nan") x = -std::numeric_limits<T>::quiet_NaN();
+        else x = static_cast<T>(scan::real(w, std::is_same_v<T, f32>).value);  // (the engine's own reader, C's strtod/strtof - nodes.h)
+      }
+    } else {
+      if (j.is_number()) {
+        const f64 d = j.as_number();
+        if (d == std::floor(d) && d >= static_cast<f64>(std::numeric_limits<T>::min()) && d <= static_cast<f64>(std::numeric_limits<T>::max())) x = static_cast<T>(d);
+      } else if (j.is_string()) {
+        const std::string& w = j.as_string();
+        std::from_chars(w.data(), w.data() + w.size(), x);
+      }
+    }
+    return Value::of_number(x);
+  });
+}
+}  // namespace
+
+bool number_fits(const json::Value& j, PinType t) {
+  if (!is_number(t) || t == PinType::boolean) return true;
+  if (is_floating(t)) return j.is_number() || (j.is_string() && (j.as_string() == "inf" || j.as_string() == "-inf" || j.as_string() == "nan" || j.as_string() == "-nan"));
+  // (a whole number: one its type holds, written as a number or as its decimal digits)
+  return number_json(number_of_json(j, t)) == (j.is_string() && number_of_json(j, t).bits() == 0 ? json::Value(0.0) : j) || number_json(number_of_json(j, t)) == j;
+}
+
 json::Value Value::to_json() const {
+  if (is_number(type)) return number_json(*this);
   switch (type) {
-    case PinType::boolean: return json::Value(b);
-    case PinType::integer: return json::Value(static_cast<f64>(i));
-    case PinType::number: return json::Value(std::isfinite(n) ? n : 0.0);
     case PinType::vector: {
       json::Value arr = json::Value::array();
       arr.push(static_cast<f64>(v.x));
@@ -473,7 +510,6 @@ json::Value Value::to_json() const {
     }
     case PinType::text: return json::Value(s);
     case PinType::actor: return json::Value(static_cast<f64>(a));
-    case PinType::int64: return json::Value(std::to_string(static_cast<u64>(i)));  // (64 bits: more than a JSON number holds - its decimal digits as a u64)
     case PinType::enumeration: return json::Value(static_cast<f64>(i));
     default: break;
   }
@@ -483,7 +519,7 @@ json::Value Value::to_json() const {
     json::Value arr = json::Value::array();
     for (std::size_t k = 0, n = size(); k < n; ++k) {
       const MapKey& key = entries->key_at(k);
-      const json::Value kj = key.s.empty() ? json::Value(static_cast<f64>(key.i)) : json::Value(key.s);
+      const json::Value kj = key.s.empty() ? json::Value(static_cast<f64>(key.i)) : json::Value(key.s);  // (to_json(g, declared) writes a key of its type)
       if (type == PinType::set) {
         arr.push(kj);
         continue;
@@ -527,15 +563,12 @@ Value read_struct(const json::Value& j, const StructType& s, const Graph& g, int
 /// the zero of its entries.
 void at_length(Value& v, const TypeRef& t, const Graph& g) {
   if (!t.count || !is_list(t.type) || v.type != t.type || v.size() == t.count) return;
+  if (is_number(element_of(t.type))) return with_number(element_of(t.type), [&](auto x) { v.edit<typename decltype(x)::type>().resize(t.count); });
   switch (element_of(t.type)) {
-    case PinType::boolean: v.edit<bool>().resize(t.count); break;
-    case PinType::integer:
     case PinType::enumeration: v.edit<i64>().resize(t.count); break;
-    case PinType::number: v.edit<f64>().resize(t.count); break;
     case PinType::vector: v.edit<Vec3>().resize(t.count); break;
     case PinType::text: v.edit<std::string>().resize(t.count); break;
     case PinType::actor: v.edit<ActorHandle>().resize(t.count); break;
-    case PinType::int64: v.edit<Int64>().resize(t.count); break;
     case PinType::object: v.edit<ObjectRef>().resize(t.count); break;
     case PinType::structure: v.edit<Value>().resize(t.count, zero_of(TypeRef{PinType::structure, t.of}, g)); break;
     default: break;
@@ -573,17 +606,13 @@ Value read_value(const json::Value& j, const TypeRef& t, const Graph& g, int dep
 /// hold is at its declared default.)
 bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g, int depth) {
   if (a.type != b.type) return false;
-  auto bits = [](f64 x, f64 y) { return std::memcmp(&x, &y, sizeof x) == 0; };
   auto bits32 = [](f32 x, f32 y) { return std::memcmp(&x, &y, sizeof x) == 0; };
+  if (is_number(a.type)) return a.bits() == b.bits();
   switch (a.type) {
-    case PinType::boolean: return a.b == b.b;
-    case PinType::integer:
     case PinType::enumeration: return a.i == b.i;
-    case PinType::number: return bits(a.n, b.n);
     case PinType::vector: return bits32(a.v.x, b.v.x) && bits32(a.v.y, b.v.y) && bits32(a.v.z, b.v.z);
     case PinType::text: return a.s == b.s;
     case PinType::actor: return a.a == b.a && a.world == b.world;
-    case PinType::int64: return a.i == b.i;
     case PinType::callback: return !a.call == !b.call;  // (what it calls is compared by calling it: the stand-in of the engine)
     case PinType::object: return a.i == b.i && a.world == b.world;
     default: break;
@@ -620,15 +649,18 @@ std::size_t said_of(const Value& v, const TypeRef& t, const Graph& g, int depth)
   if (!t.count || !is_list(t.type) || v.type != t.type) return n;
   if (n > t.count) n = t.count;
   auto zero = [](f64 x) { return x == 0 && !std::signbit(x); };
+  if (is_number(element_of(t.type))) {
+    with_number(element_of(t.type), [&](auto tag) {
+      using T = typename decltype(tag)::type;
+      for (const auto& x = v.items<T>(); n && num::bits_of(static_cast<T>(x[n - 1])) == 0;) --n;  // (the zero: all bits 0 - not -0)
+    });
+    return n;
+  }
   switch (element_of(t.type)) {
-    case PinType::boolean: for (const auto& x = v.items<bool>(); n && !x[n - 1];) --n; break;
-    case PinType::integer:
     case PinType::enumeration: for (const auto& x = v.items<i64>(); n && x[n - 1] == 0;) --n; break;
-    case PinType::number: for (const auto& x = v.items<f64>(); n && zero(x[n - 1]);) --n; break;
     case PinType::vector: for (const auto& x = v.items<Vec3>(); n && zero(x[n - 1].x) && zero(x[n - 1].y) && zero(x[n - 1].z);) --n; break;
     case PinType::text: for (const auto& x = v.items<std::string>(); n && x[n - 1].empty();) --n; break;
     case PinType::actor: for (const auto& x = v.items<ActorHandle>(); n && x[n - 1] == ActorHandle{};) --n; break;
-    case PinType::int64: for (const auto& x = v.items<Int64>(); n && x[n - 1].bits == 0;) --n; break;
     case PinType::object: for (const auto& x = v.items<ObjectRef>(); n && x[n - 1] == ObjectRef{};) --n; break;
     case PinType::structure: {
       // (the zero of a struct is the struct at its declared defaults: at_length fills up with it)
@@ -731,7 +763,7 @@ Value zero_of(const TypeRef& t, const Graph& g) {
 }
 Value Value::from_json(const json::Value& j, const TypeRef& declared, const Graph& g) { return read_value(j, declared, g, struct_depth(g)); }
 bool has_fixed(const TypeRef& t, const Graph& g) {
-  if (t.count || has_width(t)) return true;
+  if (t.count) return true;
   if (t.type == PinType::map) return has_fixed(value_type(t), g);  // (a map of List<U8>: its values are fitted)
   if (element_of(t.type) != PinType::structure) return false;
   // (a struct holds structs declared above it: no deeper than there are structs)
@@ -739,9 +771,9 @@ bool has_fixed(const TypeRef& t, const Graph& g) {
   if (const StructType* s = g.structure(t.of)) todo.push_back(s);
   for (std::size_t seen = 0; seen < todo.size() && seen <= g.structs.size(); ++seen)
     for (const StructField& f : todo[seen]->fields) {
-      if (f.type.count || has_width(f.type)) return true;
+      if (f.type.count) return true;
       const TypeRef held = f.type.type == PinType::map ? value_type(f.type) : f.type;  // (a field of a map: its values)
-      if (held.count || has_width(held)) return true;
+      if (held.count) return true;
       if (element_of(held.type) != PinType::structure) continue;
       const StructType* inner = g.structure(held.of);
       if (inner && std::find(todo.begin(), todo.end(), inner) == todo.end()) todo.push_back(inner);
@@ -754,33 +786,11 @@ void fit(Value& v, const TypeRef& t, const Graph& g, int depth) {
   if (t.type == PinType::map) {  // (each value as the map holds it: a List<U8>'s items, a U8, a struct's fields)
     const TypeRef value = value_type(t);
     if (!has_fixed(value, g)) return;  // (a map's value is no map: no deeper than its value's type; `depth` counts structs)
-    if (has_width(value)) {  // (Ints of a width that are what the map holds already: nothing to change, nothing copied)
-      bool all = true;
-      const MapEntries& held = v.keyed();
-      for (std::size_t k = 0; all && k < held.size(); ++k) {
-        const Value& x = held.value_at(k);
-        if (x.type != value.type) continue;
-        if (value.type == PinType::integer) all = wrapped(x.i, value.of) == x.i;
-        else
-          for (i64 i : x.items<i64>()) all = all && wrapped(i, value.of) == i;
-      }
-      if (all) return;
-    }
     MapEntries& e = v.own_entries();
     for (std::size_t k = 0; k < e.size(); ++k) fit(e.value_at(k), value, g, depth);
     return;
   }
   at_length(v, t, g);
-  if (has_width(t)) {  // (what a place of a fixed width holds: the low bits, as C++ stores them)
-    if (t.type == PinType::integer) v.i = wrapped(v.i, t.of);
-    else {
-      bool all = true;
-      for (i64 x : v.items<i64>()) all = all && wrapped(x, t.of) == x;
-      if (!all)
-        for (i64& x : v.edit<i64>()) x = wrapped(x, t.of);
-    }
-    return;
-  }
   if (element_of(t.type) != PinType::structure || depth <= 0) return;
   const StructType* s = g.structure(t.of);
   if (!s || !has_fixed(TypeRef{PinType::structure, t.of}, g)) return;
@@ -876,20 +886,14 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g) {
 }
 
 Value Value::from_json(const json::Value& j, PinType t) {
+  if (is_number(t)) return number_of_json(j, t);
   Value v = zero(t);
   switch (t) {
-    case PinType::boolean: v.b = j.is_bool() ? j.as_bool() : j.truthy(); break;
-    case PinType::integer: v.i = normal(j.is_number() ? whole(std::round(j.as_number())) : j.is_string() ? std::strtoll(j.as_string().c_str(), nullptr, 10) : 0); break;
-    case PinType::number: v.n = j.is_number() ? j.as_number() : j.is_string() ? std::strtod(j.as_string().c_str(), nullptr) : 0; break;
     case PinType::vector:
       if (j.is_array() && j.size() >= 3) v.v = {static_cast<f32>(j[0].as_number()), static_cast<f32>(j[1].as_number()), static_cast<f32>(j[2].as_number())};
-      else if (j.is_number()) v.v = Vec3{1, 1, 1} * static_cast<f32>(j.as_number());
       break;
     case PinType::text: v.s = j.is_string() ? j.as_string() : j.is_null() ? std::string() : json::stringify(j); break;
     case PinType::actor: break;  // (an actor written down is none: one comes only from its world - check says so of another)
-    case PinType::int64:  // ("18446744073709551615": its bits as a u64; a number - a small one - as it is)
-      v.i = static_cast<i64>(j.is_string() ? std::strtoull(j.as_string().c_str(), nullptr, 0) : j.is_number() ? static_cast<u64>(whole(j.as_number())) : 0);
-      break;
     case PinType::enumeration: v.i = j.is_number() ? max_of(i64{0}, whole(j.as_number())) : 0; break;
     default: break;
   }
@@ -900,14 +904,14 @@ Value Value::from_json(const json::Value& j, PinType t) {
     auto held = std::make_shared<ListItems>();
     for (std::size_t k = 0; k < j.size(); ++k) {
       const Value x = from_json(j[k], e);
+      if (is_number(e)) {
+        with_number(e, [&](auto tag) { using T = typename decltype(tag)::type; std::get<std::vector<T>>(*held).push_back(x.as<T>()); });
+        continue;
+      }
       switch (e) {
-        case PinType::boolean: std::get<std::vector<bool>>(*held).push_back(x.b); break;
-        case PinType::integer: std::get<std::vector<i64>>(*held).push_back(x.i); break;
-        case PinType::number: std::get<std::vector<f64>>(*held).push_back(x.n); break;
         case PinType::vector: std::get<std::vector<Vec3>>(*held).push_back(x.v); break;
         case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
         case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back(x.as_actor()); break;
-        case PinType::int64: std::get<std::vector<Int64>>(*held).push_back(Int64(static_cast<u64>(x.i))); break;
         case PinType::object: std::get<std::vector<ObjectRef>>(*held).push_back({}); break;   // (a list written down holds no objects: they are the engine's)
         case PinType::enumeration: std::get<std::vector<i64>>(*held).push_back(x.i); break;
         default: break;
@@ -924,21 +928,16 @@ bool Value::operator==(const Value& o) const {
     // struct to a struct)
     if (type == PinType::enumeration || o.type == PinType::enumeration || type == PinType::structure || o.type == PinType::structure) return false;
     if (element_of(type) == PinType::object || element_of(o.type) == PinType::object) return false;  // (an object of the engine is no number)
-    if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
-    if (is_list(type) || is_list(o.type) || is_keyed(type) || is_keyed(o.type)) return false;
-    return as_number() == o.as_number();
+    return false;  // (a value of one type is no value of another: no number equals a text or a number of another type)
   }
   // (the same entries in the same order. Two values that share what they hold are compared like any two: a NaN
   // in them equals nothing, not even itself - as the == of a Blueprint's class says)
   if (is_keyed(type)) return size() == o.size() && (size() == 0 || *entries == *o.entries);
+  if (is_number(type)) return with_number(type, [&](auto t) { using T = typename decltype(t)::type; return as<T>() == o.as<T>(); });  // (as C++ compares them: a NaN equals nothing)
   switch (type) {
-    case PinType::boolean: return b == o.b;
-    case PinType::integer: return i == o.i;
-    case PinType::number: return n == o.n;
     case PinType::vector: return v.x == o.v.x && v.y == o.v.y && v.z == o.v.z;
     case PinType::text: return s == o.s;
     case PinType::actor: return a == o.a && world == o.world;
-    case PinType::int64: return i == o.i;
     case PinType::enumeration: return i == o.i;
     case PinType::callback: return !call == !o.call;  // (bound or not: what it calls, a call says)
     case PinType::object: return i == o.i && world == o.world;
@@ -1855,16 +1854,16 @@ bool export_ok(const Function& f, std::string* why) {
   if (words.size() != f.inputs.size()) return no("the wire \"" + f.wire + "\" names " + std::to_string(words.size()) + " inputs, the function has " + std::to_string(f.inputs.size()));
   if (out.empty() != f.outputs.empty() || f.outputs.size() > 1) return no("an exported function gives one output or none, and its wire says so after ->");
   auto fits = [](const std::string& w, const FunctionPin& p, bool input) {
-    const bool number = (p.type == PinType::integer || p.type == PinType::number || p.type == PinType::boolean) && !p.ref;
-    if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return number;
-    if (w == "len" || w == "at") return input && p.type == PinType::integer && !p.ref;
+    // (a number by its C type: the pin is of that type itself - i32, u32, f32, f64)
+    if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return pin_type_name(p.type) == w && !p.ref;
+    if (w == "len" || w == "at") return input && p.type == PinType::u32 && !p.ref;
     if (w == "text") return p.type == PinType::text && (!p.ref || p.constant);
-    if (w == "bytes") return p.type == PinType::integer_list && (!p.ref || p.constant);
-    if (w == "floats") return p.type == PinType::number_list && (!p.ref || p.constant);
+    if (w == "bytes") return p.type == PinType::u8_list && (!p.ref || p.constant);
+    if (w == "floats") return p.type == PinType::f32_list && (!p.ref || p.constant);
     return false;
   };
   for (std::size_t k = 0; k < words.size(); ++k) {
-    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; floats: a List of Float; len, at: an Int)");
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number of that type by value; text: a Text; bytes: a List<u8>; floats: a List<f32>; len, at: a u32)");
     const std::size_t before = k >= 2 && words[k - 1] == "at" ? k - 2 : k - 1;
     const auto many = [](const std::string& x) { return x == "bytes" || x == "floats"; };
     if (words[k] == "len" && (k == 0 || (words[before] != "text" && !many(words[before])))) return no("len is the length of the text, the bytes or the floats before it (after their at)");
@@ -1872,7 +1871,7 @@ bool export_ok(const Function& f, std::string* why) {
     const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
     if (many(words[k]) && (after >= words.size() || words[after] != "len")) return no(words[k] + " are followed by their length: " + words[k] + " len (or " + words[k] + " at len)");
   }
-  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64, text, bytes: a List of Int, floats: a List of Float)");
+  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64: a number of that type; text: a Text; bytes: a List<u8>; floats: a List<f32>)");
   return true;
 }
 
@@ -1912,16 +1911,21 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     g.enums.push_back(std::move(e));
   }
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
+  std::string old_type;  // (why a type is unknown where it is of an older text: said with the place)
   auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
-    if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
+    if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) {
+      if (old_number_name(v["type"].as_string()) || old_number_name(v["of"].as_string()))
+        old_type = "\"" + v["type"].as_string() + "\" is a number of the time before the number types (bool, i8 ... u64, f32, f64): the text is of an older Kern - write it anew";
+      return false;
+    }
     if (is_keyed(type) || type == PinType::callback || element_of(type) == PinType::object) {  // (an object's: its class; a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
       of = v["of"].as_string();
       TypeRef t;
       return type_from_text(type_text({type, of}), g, t);
     }
-    if (element_of(type) == PinType::integer) {  // (an Int of a fixed width: "of" names it)
-      of = v["of"].as_string();
-      return of.empty() || width_bits(of) != 0;
+    if (is_number(element_of(type)) && !v["of"].as_string().empty()) {
+      old_type = "a number of a width beside its type (\"of\": \"" + v["of"].as_string() + "\") is of the time before the number types: the width is the type itself (\"u8\")";
+      return false;
     }
     if (!declared_type(type)) return true;
     of = v["of"].as_string();
@@ -1943,7 +1947,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       f.name = x["name"].as_string();
       if (f.name.empty() || f.name.size() > 64) return bad("struct \"" + s.name + "\": a field needs a name (1-64 characters)");
       if (s.field(f.name) >= 0) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" exists twice");
-      if (!type_of(x, f.type.type, f.type.of)) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" has an unknown type (a struct holds structs declared above it)");
+      if (!type_of(x, f.type.type, f.type.of)) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" has an unknown type" + (old_type.empty() ? std::string(" (a struct holds structs declared above it)") : ": " + old_type));
       f.type.count = count_of(x);
       f.value = Value::from_json(x["value"], f.type, g).to_json(g, f.type);
       s.fields.push_back(std::move(f));
@@ -1958,7 +1962,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     var.name = v["name"].as_string();
     if (var.name.empty() || var.name.size() > 64) return bad("a variable needs a name (1-64 characters)");
     if (g.variable(var.name)) return bad("variable \"" + var.name + "\" is declared twice");
-    if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type");
+    if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type" + (old_type.empty() ? std::string() : ": " + old_type));
     var.count = count_of(v);
     var.value = Value::from_json(v["value"], declared(var), g).to_json(g, declared(var));
     var.help = v["help"].as_string();
@@ -2072,7 +2076,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
         p.name = x["name"].as_string();
         if (p.name.empty() || p.name.size() > 64 || p.name == "exec" || p.name == "then") return bad(std::string("function \"") + f.name + "\": " + what + " needs a name (not exec / then)");
         for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
-        if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
+        if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type" + (old_type.empty() ? std::string() : ": " + old_type));
         p.count = count_of(x);
         p.value = Value::from_json(x["value"], declared(p), g).to_json(g, declared(p));
         p.constant = x["ref"].is_string() && x["ref"].as_string() == "const";
@@ -2141,7 +2145,7 @@ void Library::pins(const Node& node, const Graph& graph, std::vector<PinDef>& in
       PinDef pin;
       pin.id = path_pin(k);
       pin.label = entries > 1 ? "Index " + std::to_string(k + 1) : std::string("Index");
-      pin.type = PinType::integer;
+      pin.type = PinType::i64;
       pin.def = json::Value(0);
       in.push_back(std::move(pin));
     }
@@ -2315,29 +2319,24 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     if (value.is_array() && value.size() > t.count)
       err(0, what + " is a list of " + std::to_string(t.count) + " entries, its default has " + std::to_string(value.size()));
   };
-  // An Int of a fixed width: its default is one of its values (C++ would store another there).
+  // A number: its default is one of the values of its type (a u8 holds no 300, an i32 no 2.5 - C++ would store another there).
   std::function<void(const std::string&, const TypeRef&, const json::Value&)> width_ok = [&](const std::string& what, const TypeRef& t, const json::Value& value) {
-    if (t.type == PinType::map) {  // (a map of Ints of a width: each value its default holds, [key, value])
+    if (t.type == PinType::map) {  // (a map of numbers: each value its default holds, [key, value])
       const TypeRef held = value_type(t);
-      if (has_width(held) && value.is_array())
+      if (is_number(element_of(held.type)) && value.is_array())
         for (std::size_t k = 0; k < value.size(); ++k)
           if (value[k].is_array() && value[k].size() == 2) width_ok(what + "'s value under the key " + json::stringify(value[k][0]), held, value[k][1]);
       return;
     }
-    if (!has_width(t)) return;
-    if (t.type == PinType::integer_list) {
+    const PinType e = element_of(t.type);
+    if (!is_number(e) || value.is_null()) return;
+    if (is_list(t.type)) {
       if (value.is_array())
-        for (std::size_t k = 0; k < value.size(); ++k) {
-          const Value e = Value::from_json(value[k], PinType::integer);
-          if (wrapped(e.i, t.of) != e.i) { err(0, what + " is a list of " + type_label({PinType::integer, t.of}) + ", its default holds " + std::to_string(e.i) + ", none of its values"); return; }
-        }
+        for (std::size_t k = 0; k < value.size(); ++k)
+          if (!number_fits(value[k], e)) { err(0, what + " is a list of " + type_label({e, {}}) + ", its default holds " + json::stringify(value[k]) + ", none of its values"); return; }
       return;
     }
-    const Value v = Value::from_json(value, PinType::integer);
-    const int bits = width_bits(t.of);
-    const i64 lo = bits > 0 ? 0 : -(i64{1} << (-bits - 1)), hi = bits > 0 ? (i64{1} << bits) - 1 : (i64{1} << (-bits - 1)) - 1;
-    if (wrapped(v.i, t.of) != v.i)
-      err(0, what + " is " + type_label(t) + ", its default " + std::to_string(v.i) + " is none of its values (" + std::to_string(lo) + " .. " + std::to_string(hi) + ")");
+    if (!number_fits(value, e)) err(0, what + " is " + type_label(t) + ", its default " + json::stringify(value) + " is none of its values");
   };
   for (const StructType& st : g.structs)
     for (const StructField& f : st.fields) width_ok("struct \"" + st.name + "\": the field \"" + f.name + "\"", f.type, f.value);
@@ -2774,19 +2773,12 @@ std::vector<Instance*>& instance_registry() {
   static std::vector<Instance*> r{nullptr};  // ids start at 1
   return r;
 }
-bool numeric(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number; }
+bool numeric(PinType t) { return is_number(t); }
 
-
-f64 to_type(f64 v, PinType t) {
-  if (t == PinType::boolean) return v != 0 ? 1.0 : 0.0;
-  if (t == PinType::integer) return static_cast<f64>(whole(v));  // (a whole number as Int holds it: logic::normal)
-  return v;
-}
-Value from_slot(f64 v, PinType t) {
-  if (t == PinType::boolean) return Value::boolean(v != 0);
-  if (t == PinType::integer) return Value::integer(whole(v));
-  return Value::number(v);
-}
+// A number in a slot of the interpreter (and of the JIT): its bits (num::bits_of) in the slot's 8 bytes - never the
+// number as a double (an i64 beyond 2^53, a u64, an f32's NaN keep their bits).
+f64 slot_of(const Value& v) { return std::bit_cast<f64>(v.bits()); }
+Value from_slot(f64 slot, PinType t) { return is_number(t) ? Value::of_bits(t, std::bit_cast<u64>(slot)) : Value(); }
 }  // namespace
 
 std::unordered_map<u64, NativeBlueprintFactory>& blueprint_registry() {
@@ -2877,14 +2869,8 @@ u32 Instance::seed() {
 bool Instance::inline_pure(int node) const {
   const CNode& c = nodes_[static_cast<std::size_t>(node)];
   if (!c.def || c.def->kind != NodeKind::pure || c.fresh) return false;
-  // (only what WebAssembly computes bit for bit as the node does: Modulo (fmod), Round (half away from zero), Min, Max,
-  // Clamp and Square Root (min_of/max_of at a NaN and at -0) are the node's own function - tests/logic_cases.h "number_edges")
-  static const char* kInline[] = {"math.add", "math.sub", "math.mul", "math.div", "math.abs", "math.copysign", "math.negate",
-                                  "math.lerp", "math.floor", "math.compare", "logic.and", "logic.or", "logic.xor", "logic.not",
-                                  "value.float", "value.int", "value.bool"};
-  for (const char* t : kInline) if (c.def->type == t) return true;
-  if (c.def->type == "logic.select") return numeric(c.out[0].type);
-  if (c.def->type == "var.get") return var_slot(*c.node) >= 0 && c.node->param("path").empty();
+  // (no value node: every number is computed by its node's own function - numbers.h -, the JIT inlines the flow)
+  (void)c;
   return false;
 }
 
@@ -2898,12 +2884,7 @@ bool Instance::inline_node(int node) const {
   if (t == "flow.branch" || t == "flow.sequence" || t == "flow.for" || t == "flow.while" || t == "flow.do_once" || t == "flow.do_n" || t == "flow.gate" ||
       t == "flow.flip_flop")
     return true;
-  if (t == "var.set" || t == "var.add") {
-    if (var_slot(*c.node) < 0 || !c.node->param("path").empty()) return false;
-    // (an Int of a fixed width holds the low bits of what it is given: the node's own function stores it)
-    const auto it = var_types_.find(key_of(*c.node));
-    return it == var_types_.end() || !has_width(it->second);
-  }
+  // (Set and Add to Variable: by their node's function - numbers.h's add in the variable's type)
   return false;
 }
 
@@ -2993,7 +2974,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
       var_types_[v.name] = declared(v);
       if (numeric(v.type)) {
         var_slots_[v.name] = k;
-        slots_[static_cast<std::size_t>(k++)] = to_type(init.as_number(), v.type);
+        slots_[static_cast<std::size_t>(k++)] = slot_of(init.converted(v.type));
       } else {
         vars_[v.name] = init;
       }
@@ -3008,7 +2989,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
         var_types_[key] = declared(l);
         if (numeric(l.type)) {
           var_slots_[key] = k;
-          slots_[static_cast<std::size_t>(k++)] = to_type(init.as_number(), l.type);
+          slots_[static_cast<std::size_t>(k++)] = slot_of(init.converted(l.type));
         } else {
           vars_[key] = init;
         }
@@ -3457,7 +3438,7 @@ Value Instance::get(std::string_view variable) const {
 Value Instance::held(const std::string& key) const {
   if (const int k = var_slot(key); k >= 0) {
     auto t = var_types_.find(key);
-    return from_slot(slots_[static_cast<std::size_t>(k)], t != var_types_.end() ? t->second.type : PinType::number);
+    return from_slot(slots_[static_cast<std::size_t>(k)], t != var_types_.end() ? t->second.type : kFloat);
   }
   auto it = vars_.find(key);
   return it == vars_.end() ? Value() : it->second;
@@ -3466,9 +3447,7 @@ bool Instance::hold(const std::string& key, const Value& v) {
   auto t = var_types_.find(key);
   if (t == var_types_.end()) return false;
   if (const int k = var_slot(key); k >= 0) {
-    f64 x = to_type(v.as_number(), t->second.type);
-    if (has_width(t->second)) x = static_cast<f64>(wrapped(whole(x), t->second.of));  // (an Int of a fixed width: its low bits)
-    slots_[static_cast<std::size_t>(k)] = x;
+    slots_[static_cast<std::size_t>(k)] = slot_of(v.converted(t->second.type));
     return true;
   }
   auto it = vars_.find(key);
@@ -3486,14 +3465,14 @@ Value* Instance::variable(const Node& n) {
 namespace {
 /// The entry `at` of a list becomes `x` (a list of structs holds them as values: Value::edit).
 void set_item(Value& list, std::size_t at, const Value& x) {
+  if (is_list(list.type) && is_number(element_of(list.type))) {
+    with_number(element_of(list.type), [&](auto t) { using T = typename decltype(t)::type; list.edit<T>()[at] = x.as<T>(); });
+    return;
+  }
   switch (list.type) {
-    case PinType::boolean_list: list.edit<bool>()[at] = x.as_bool(); break;
-    case PinType::integer_list: list.edit<i64>()[at] = x.as_int(); break;
-    case PinType::number_list: list.edit<f64>()[at] = x.as_number(); break;
     case PinType::vector_list: list.edit<Vec3>()[at] = x.as_vector(); break;
     case PinType::text_list: list.edit<std::string>()[at] = x.as_text(); break;
     case PinType::actor_list: list.edit<ActorHandle>()[at] = x.as_actor(); break;
-    case PinType::int64_list: list.edit<Int64>()[at] = Int64(static_cast<u64>(x.i)); break;
     case PinType::object_list: list.edit<ObjectRef>()[at] = x.as_object(); break;
     case PinType::enumeration_list: list.edit<i64>()[at] = x.i; break;
     default: break;
@@ -4446,6 +4425,9 @@ Value Context::in(std::size_t index) {
   if (index >= c.in.size()) return Value();
   const auto& src = c.data_in[index];
   if (src.node < 0) return c.literal[index];
+  // (a value of the input's type - check() refuses any other wire; an input over the items of a list of whole numbers
+  // of any type takes the list as it is: kAnyWidth)
+  if (c.in[index].of == kAnyWidth) return pull(src.node, src.pin);
   return pull(src.node, src.pin).converted(c.in[index].type);
 }
 
@@ -4490,7 +4472,7 @@ void Context::out(std::size_t index, Value v) {
   // (a struct that holds no fields is its type's default: an item from beyond a list's end)
   if (c.out[index].type == PinType::structure && !c.outputs[index].rows) c.outputs[index] = zero_of({c.out[index].type, c.out[index].of}, inst_.graph_);
   const int s = inst_.out_slot(node_, static_cast<int>(index));
-  if (s >= 0) inst_.slots_[static_cast<std::size_t>(s)] = c.outputs[index].as_number();
+  if (s >= 0) inst_.slots_[static_cast<std::size_t>(s)] = slot_of(c.outputs[index]);
 }
 
 void Context::bind(std::size_t index, std::vector<Value> in) {

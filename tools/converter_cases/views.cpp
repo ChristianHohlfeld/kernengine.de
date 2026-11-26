@@ -18,8 +18,8 @@ u32 extra_from_a_list(f32 shore) {
   kern::MeshData m;
   m.extra_size = 2;
   std::vector<f32> rec = {shore, shore * 2, shore * 3};
-  m.push_extra(rec.data());
-  m.push_extra(rec.data() + 1);
+  m.push_extra(rec);
+  m.push_extra(kern::Span<const f32>(rec.data() + 1, 2));
   return static_cast<u32>(m.extra.size());
 }
 f32 sums() {

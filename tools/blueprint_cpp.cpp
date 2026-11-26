@@ -263,12 +263,16 @@ int main(int argc, char** argv) {
   if (argc == 3 && std::string(argv[1]) == "--formula") {
     // (what a formula without inputs gives: the number as the language computes it - its own sin, cos, tan ... -,
     // said with every bit: C's hexadecimal notation of a double)
-    const logic::Formula f(argv[2]);
-    if (!f.ok() || !f.inputs().empty()) {
-      std::fprintf(stderr, "%s: %s\n", argv[2], f.ok() ? "a formula without inputs is asked for" : f.error().c_str());
+    const logic::Formula f = logic::Formula::constant(argv[2]);
+    if (!f.ok()) {
+      std::fprintf(stderr, "%s: %s\n", argv[2], f.error().c_str());
       return 1;
     }
-    std::printf("%a\n", f.evaluate(nullptr, 0));
+    // (its type, then its value with every bit: C's hexadecimal notation of a floating number, a whole one in decimal)
+    const logic::Value v = logic::Value::of_bits(logic::pin_type_of(f.result()), f.evaluate(nullptr, 0));
+    if (f.result() == logic::num::Kind::f64) std::printf("f64 %a\n", v.as<f64>());
+    else if (f.result() == logic::num::Kind::f32) std::printf("f32 %a\n", static_cast<f64>(v.as<f32>()));
+    else std::printf("%s %s\n", std::string(logic::num::kind_name(f.result())).c_str(), logic::number_as_text(v).c_str());
     return 0;
   }
   // --project <name.kproject>: the project's Blueprints too (the program's - kern/docs/project.md), beside the level's

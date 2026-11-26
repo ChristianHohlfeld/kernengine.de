@@ -81,6 +81,8 @@ struct Span {
   std::size_t size = 0;
   constexpr Span() = default;
   constexpr Span(T* d, std::size_t n) : data(d), size(n) {}
+  /// A C array: all its entries (`const f32 rec[3]` is a Span<const f32> of 3).
+  template <std::size_t N> constexpr Span(T (&a)[N]) : data(a), size(N) {}
   template <class C>
     requires(!std::is_same_v<std::remove_cv_t<C>, Span> && requires(C& c) { c.data(); c.size(); })
   constexpr Span(C& c) : data(c.data()), size(c.size()) {}
