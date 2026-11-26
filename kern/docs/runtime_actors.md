@@ -40,8 +40,11 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
 **Knoten:** „Spawn Actor“ (`actor.spawn`) mit der Einstellung *Template* (der Name der Vorlage, am Knoten zu sehen) und
 den Eingängen Location, Rotation, Scale; Ausgang *Spawned* (der Akteur). C++-Text:
 `actor_spawn<"Coin">(n3, Vector{0.0, 3.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0})`. Unbekannte oder leere
-Vorlage: Fehler an den Host beim Lauf, mit derselben Meldung (welche Vorlagen ein Level hat, weiß erst die laufende Welt; zur
-Bearbeitungszeit ist jeder Knoten mit seinen Vorgaben gültig). Dazu der Knoten der Engine `GameWorld spawn` (aus dem Header).
+Vorlage: ein Fehler der Prüfung des Levels (`validate`, kennt das Level: „the level's graph: Spawn Actor (node 2) names
+no template of the level: "Nothing" - its templates: Crate, Coin“; das Level startet nicht). Der Knoten allein (ein Graph
+ohne Level, die Notation) ist mit seiner Vorgabe gültig. Im Editor ist die Einstellung eine Auswahl der Vorlagen des Levels
+(Art `template`). Ruft C++ `spawn` mit einem unbekannten Namen, ist es ein Fehler beim Lauf mit derselben Liste. Dazu der
+Knoten der Engine `GameWorld spawn` (aus dem Header).
 
 **Rückgabe – die eine Stelle für den Akteur-Verweis:** heute `ActorId` (C++) bzw. der Pin-Typ `actor` (Knoten). Wenn der
 typisierte Verweis `{WorldId, ActorRef}` kommt (project.md 7., engine_object.md), ändert sich nur der Rückgabetyp von

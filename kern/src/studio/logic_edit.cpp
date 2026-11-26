@@ -87,6 +87,7 @@ const char* param_kind_name(logic::ParamDef::Kind k) {
     case K::state: return "state";
     case K::key: return "key";
     case K::sound: return "sound";
+    case K::actor_template: return "template";
     case K::tag: return "tag";
     case K::integer: return "integer";
     case K::function: return "function";
@@ -650,6 +651,7 @@ json::Value Studio::logic_json() const {
         if (pd.kind == K::function) list = "function";
         if (pd.kind == K::event) list = "event";
         if (pd.kind == K::sound) list = "sound";
+        if (pd.kind == K::actor_template) list = "template";
         if (pd.kind == K::variable && !g->function(n.param("scope"))) list = "variable";
         if (pd.kind == K::type) list = type_lists.try_emplace(&pd, "type" + std::to_string(type_lists.size())).first->second;
         if (!list.empty() && shared.has(list)) {
@@ -686,6 +688,8 @@ json::Value Studio::logic_json() const {
         }
         if (pd.kind == K::event)
           for (const std::string& e : event_names(logic_level())) choice(e, e);
+        if (pd.kind == K::actor_template)   // (the level's templates: what Spawn Actor can copy)
+          for (const game::Actor& a : level_.actors) if (a.is_template) choice(a.name, a.name);
         if (pd.kind == K::sound) {
           for (const audio::BuiltinSound& b : audio::builtin_sounds()) choice(std::string("builtin:") + b.name, b.label);
           for (const game::SoundAsset& sa : level_.sounds) choice(sa.id, sa.name);

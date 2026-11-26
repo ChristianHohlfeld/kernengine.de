@@ -132,7 +132,6 @@ struct Level : kern::Blueprint {
     actor_spawn<"Template">(n50, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0}, Vector{1.0, 1.0, 1.0});
     Made = n50.spawned;
     Log = text_append(Log, actor_name(n50.spawned), ";");
-    actor_spawn<"Nothing">(Vector{0.0, 9.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0});
   }
 
   KERN_EVENT(on10, event_custom<"Remove">)

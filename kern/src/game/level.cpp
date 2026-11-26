@@ -1399,6 +1399,27 @@ std::vector<Issue> validate(const Level& level) {
   for (const char* ref : {level.world.music.c_str(), level.world.ambience.c_str()})
     if (!sound_reference_ok(level, ref)) out.push_back({false, 0, std::string("world sound \"") + ref + "\" does not exist (it is silent)"});
   if (players > 1) out.push_back({false, 0, "more than one actor has a player controller; the first one is possessed"});
+  // Spawn Actor names a template of the level (kern/docs/runtime_actors.md): a check that knows the level - the node
+  // alone is valid with its default (it is the library's; which templates there are, the level says).
+  {
+    std::string names;
+    for (const Actor& a : level.actors) if (a.is_template) names += (names.empty() ? "" : ", ") + a.name;
+    auto spawns = [&](const logic::Graph& g, ActorId owner, const std::string& who) {
+      for (const logic::Node& n : g.nodes) {
+        if (n.type != "actor.spawn") continue;
+        const std::string t = n.param("template", "");
+        bool known = false;
+        for (const Actor& a : level.actors) known |= a.is_template && a.name == t;
+        if (known) continue;
+        const std::string have = names.empty() ? "the level has none (an actor with \"template\": true)" : "its templates: " + names;
+        out.push_back({true, owner, who + ": Spawn Actor (node " + std::to_string(n.id) + ") " +
+                                        (t.empty() ? "names no template - " : "names no template of the level: \"" + t + "\" - ") + have});
+      }
+    };
+    spawns(level.logic, 0, "the level's graph");
+    for (const Actor& a : level.actors)
+      if (a.logic) spawns(*a.logic, a.id, "\"" + (a.name.empty() ? "actor " + std::to_string(a.id) : a.name) + "\"");
+  }
   if (!level.world.pawn_template.empty()) {
     const Actor* t = nullptr;
     std::string names;

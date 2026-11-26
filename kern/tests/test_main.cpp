@@ -3789,6 +3789,19 @@ TEST(world_spawn_errors) {
     CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
   }
   {
+    // Spawn Actor names a template of the level: the level's check knows them (the node alone is valid with its default).
+    game::Level x = template_level();
+    x.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.spawn","params":{"template":"Nothing"}},
+      {"id":3,"type":"actor.spawn"},{"id":4,"type":"actor.spawn","params":{"template":"Crate"}}],"links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})");
+    std::vector<std::string> errors;
+    for (const game::Issue& i : game::validate(x)) if (i.error) errors.push_back(i.text);
+    CHECK(errors.size() == 2);
+    CHECK(errors.size() == 2 && errors[0] == "the level's graph: Spawn Actor (node 2) names no template of the level: \"Nothing\" - its templates: Crate, Coin");
+    CHECK(errors.size() == 2 && errors[1] == "the level's graph: Spawn Actor (node 3) names no template - its templates: Crate, Coin");
+    CHECK(!f.world->start(x, game::SimMode::simulate));
+    CHECK(no_errors(logic::check(x.logic)));   // (the graph alone: valid - its nodes with their defaults)
+  }
+  {
     // world.pawnTemplate names a template with a player controller.
     game::Level x = template_level();
     x.world.pawn_template = "Barrel";
@@ -5262,7 +5275,7 @@ TEST(game_blueprints_as_classes) {
   for (const char* happened :
        {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
         "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
-        "event: Logic error: Spawn Actor: no template \"Nothing\" - the level's templates: Template", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
+"event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
     if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
     CHECK(played.text.find(happened) != std::string::npos);
   }
@@ -15527,6 +15540,13 @@ TEST(studio_blueprint_breakpoints_pause_the_game) {
   CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"spawner"})")["ok"].as_bool());
   u32 spawn = 0;
   for (const logic::Node& n : f.s->level().logic.nodes) if (n.type == "actor.spawn") spawn = n.id;
+  // (the spawner copies a template of the level: the Cube is made one, the node names it - else Play is refused,
+  // the level's check names the templates: world_spawn_errors)
+  game::ActorId cube = 0;
+  for (const game::Actor& a : f.s->level().actors) if (a.name == "Cube") cube = a.id;
+  CHECK(f.cmd(("{\"cmd\":\"select\",\"id\":" + std::to_string(cube) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"template","value":true})")["ok"].as_bool());
+  CHECK(f.cmd(("{\"cmd\":\"logicParam\",\"node\":" + std::to_string(spawn) + ",\"key\":\"template\",\"value\":\"Cube\"}").c_str())["ok"].as_bool());
   json::Value bp = json::Value::object();
   bp.set("cmd", "logicBreakpoint");
   bp.set("node", spawn);

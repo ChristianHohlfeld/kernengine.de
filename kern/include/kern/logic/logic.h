@@ -935,7 +935,7 @@ struct ParamDef {
   /// and list entries, ".Wheels[].Slip" (empty: the variable itself). Every "[]" has an index
   /// input of the node (path0, path1 ...). In a Blueprint's C++ it is that place:
   /// Cars[i].Wheels[j].Slip.
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path } kind = Kind::text;
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path, actor_template } kind = Kind::text;   // (actor_template: a template of the level - kern/docs/runtime_actors.md)
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
