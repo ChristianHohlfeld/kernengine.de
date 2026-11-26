@@ -29,7 +29,4 @@ class WaterLook final : public kern::ShaderExtension {
   u32 u_time_ = 0;
 };
 
-/// Its one object.
-WaterLook& water_look();
-
 }  // namespace sc

@@ -31,7 +31,4 @@ class Facades final : public kern::ShaderExtension {
   u32 u_night_ = 0;
 };
 
-/// Its one object.
-Facades& facades();
-
 }  // namespace sc

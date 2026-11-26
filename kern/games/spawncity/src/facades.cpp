@@ -86,9 +86,4 @@ const char* Facades::fragment_surface() const {
 void Facades::bind(const kern::Program& p) { u_night_ = p.location("uNight"); }
 void Facades::frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) { cache.set_float(u_night_, night); }
 
-Facades& facades() {
-  static Facades one;
-  return one;
-}
-
 }  // namespace sc
