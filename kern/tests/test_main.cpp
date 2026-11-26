@@ -8100,7 +8100,7 @@ TEST(engine_interface_overrides_are_said) {
   };
   std::string error;
   const auto typo = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void upadte() {\n  }\n};\n", &error);
-  CHECK(error.empty() && has(typo, true, "function \"upadte\" overrides App::upadte, which App has not (it has configure, extensions, start, update, resized, stop)"));
+  CHECK(error.empty() && has(typo, true, "function \"upadte\" overrides App::upadte, which App has not (it has extensions, start, update, resized, stop)"));
   const auto unsaid = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  void stop(Int engine = 0) {\n  }\n};\n", &error);
   CHECK(error.empty() && has(unsaid, true, "function \"stop\" has the name of App::stop but does not say that it overrides it: KERN_OVERRIDE (the engine calls it), or another name"));
   const auto alone = issues("struct A : kern::Blueprint {\n  // ---- functions ----\n  KERN_OVERRIDE void stop() {\n  }\n};\n", &error);
@@ -8110,7 +8110,7 @@ TEST(engine_interface_overrides_are_said) {
   const char* const said = blueprint_native::kImplementsGame;
   const auto good = issues(said, &error);
   CHECK(error.empty() && no_errors(good) && has(good, false, "it implements App without resized: the interface's own runs there (engine.app.resized)") &&
-        has(good, false, "it implements App without configure: the interface's own runs there (engine.app.configure)"));
+        has(good, false, "it implements App without extensions: the interface's own runs there (engine.app.extensions)"));
   logic::Graph g;
   std::string text;
   CHECK(logic::from_cpp(said, g, nullptr, &error) && g.functions.size() == 3 && g.functions[2].name == "stop" && g.functions[2].overrides &&
@@ -8325,7 +8325,7 @@ TEST(game_world_fixed_step) {
   error.clear();
   CHECK(logic::from_cpp("struct Stepper : kern::Blueprint, kern::Implements<kern::game::FixedStep> {\n"
                         "  // ---- functions ----\n"
-                        "  void fixed_step(Float dt) {\n"
+                        "  KERN_OVERRIDE void fixed_step(Float dt) {\n"
                         "    debug_print(\"step\", false);\n"
                         "  }\n"
                         "};\n", stepper, nullptr, &error));
@@ -8564,9 +8564,9 @@ TEST(program_binds_the_exports) {
   };
   std::string error;
   logic::Graph app, hud;
-  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8576,7 +8576,7 @@ TEST(program_binds_the_exports) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
@@ -8628,9 +8628,9 @@ extern "C" void kern_app_stop();
 TEST(run_the_program_of_a_project) {
   logic::Graph main;
   std::string error;
-  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
-                        "  startResult start(Int engine = 0) {\n"
+                        "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
@@ -8640,7 +8640,7 @@ TEST(run_the_program_of_a_project) {
                         "    Int64 index = Int64{0x0};\n"
                         "  };\n"
                         "\n"
-                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   CHECK(error.empty() && main.implements == "App");
@@ -8657,7 +8657,7 @@ TEST(run_the_program_of_a_project) {
   CHECK(run(pr) == 1);   // (its program runs already)
   struct Other final : App {
     bool start(Engine&) override { return true; }
-    void update(Engine&, const Frame&) override {}
+    KERN_OVERRIDE void update(Engine&, const Frame&) override {}
   } other;
   CHECK(run(other) == 1);   // (an App was given already: the first stays)
   // the renderer the settings start: the profile the launch argument names, else the project's (an unknown name: the

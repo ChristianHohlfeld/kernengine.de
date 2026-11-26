@@ -4,7 +4,7 @@
 // of a level of the project) are runtimes beside it.
 //
 // The App of a program built from its project: the engine's object of the ONE program Blueprint that implements the
-// interface App (kern::Implements<"App">, Graph::implements) - Engine Object of Blueprint (Runtime::engine_object).
+// interface App (kern::Implements<kern::App>, Graph::implements) - Engine Object of Blueprint (Runtime::engine_object).
 // The engine calls it as any App (extensions before the renderer starts, start, update each frame, stop).
 // A game built from its project starts it from its entry: `int kern_main() { return kern::run(kern::game::embedded_project()); }`
 // (kern/docs/project.md 4.; kern/game/embedded.h).
