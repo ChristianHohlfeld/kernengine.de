@@ -443,11 +443,12 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
   }, {capture: true});
   // Losing the pointer lock while playing (the browser's Esc) asks "back to the main menu?"
   // (desktop_controls.mjs pointerlockchange): not for Tab (the menu), the big map or while dead.
-  let hadLock = false;
+  // The lock the game gave back itself for the touch layout (a finger on the glass of a desktop) is no Esc: the
+  // question waits for the game's next HUD, which says whose controls are up (update below).
+  let hadLock = false, lockLost = false;
   document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
-    if (!locked && hadLock && ui.playing && !visible() && !ui.wantMenu && !document.getElementById("mpMap") && !last?.ctl?.dead)
-      setTimeout(() => { if (document.pointerLockElement !== canvas && ui.playing && !visible()) askQuit(); }, 0);
+    lockLost = !locked && hadLock && ui.playing && !visible() && !ui.wantMenu && !document.getElementById("mpMap") && !last?.ctl?.dead;
     ui.wantMenu = false;
     hadLock = locked;
   });
@@ -800,6 +801,10 @@ export function installSpawnCityUi({command, params, canvas, statusEl}) {
       pollPad();
       if (!h) return;
       last = h;
+      if (lockLost) {
+        lockLost = false;
+        if (document.pointerLockElement !== canvas && ui.playing && !visible() && h.ctl?.device !== "touch") askQuit();
+      }
       renderGps(h.gps);
       if (h.ui && h.ui.settings !== ui.settingsSeen) { ui.settingsSeen = h.ui.settings; readSchema(); renderSwitches(); }
       if (h.logbook && h.logbook.serial !== logSerial) { logSerial = h.logbook.serial; if (logSerial > 0) syncLogbook(); }

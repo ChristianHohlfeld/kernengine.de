@@ -89,6 +89,9 @@ await finger("pointerdown", 21, 450, 150);
 await finger("pointerup", 21, 450, 150);
 check(await until(h => h.ctl.device === "touch" && !h.ctl.fingers), "a finger: the touch layout");
 await p.waitForTimeout(1500);
+// the game gave the mouse back for the touch layout: that is no Esc, nobody is asked "back to the main menu?"
+check(await until(h => !h.ctl.locked) && await p.evaluate(() => !document.getElementById("quitConfirmDialog")?.isConnected && document.getElementById("scQuit")?.hidden !== false),
+  "the touch layout gives the mouse back, and no quit question comes up");
 // the left stick's centre: where the page drew it (the original's #soloLeft, Kern's touch overlay), else 168 px bottom left
 const stick = await p.evaluate(() => { const e = [...document.querySelectorAll('#soloLeft, .k-touch [data-stick="move"]')].find(x => x.getBoundingClientRect().width > 20);
   if (!e) return [84, 336]; const r = e.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)]; });
