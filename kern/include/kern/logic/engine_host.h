@@ -26,6 +26,7 @@
 // the class the function takes, or where the engine wrote past the room the table gives it.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <functional>
@@ -102,6 +103,15 @@ class EngineObjects {
         return static_cast<T*>(p);
       }
     return nullptr;
+  }
+  /// Every object of class T these hold now (own and adopt), in the order they came - a program's host finds the worlds
+  /// it runs this way (kern/game/program.h).
+  template <class T> std::vector<T*> all() const {
+    std::vector<T*> out;
+    for (const auto& [handle, at] : order_)
+      if (void* p = find(handle, kind<std::remove_const_t<T>>()))
+        if (std::find(out.begin(), out.end(), static_cast<T*>(p)) == out.end()) out.push_back(static_cast<T*>(p));
+    return out;
   }
   /// The world of these objects: what an ObjectRef of them says.
   WorldId world() const { return world_; }

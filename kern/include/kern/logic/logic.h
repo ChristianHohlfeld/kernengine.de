@@ -1075,6 +1075,11 @@ class Host {
   /// objects of the engine (engine_objects) - a GameWorld's actors and its objects are one world -, and for a host
   /// without them one of its own (new_world, the same for the host's life).
   WorldId world();
+  /// The logic runtime of another world whose actors' Blueprints this host reaches (kern/docs/project.md 7): a program's
+  /// host reaches the worlds the program runs (a GameWorld it made that runs as `world`). Null - `why` says why - where
+  /// it reaches none: a world's host, and every host but a program's, reaches the actors of its own world alone (from a
+  /// world to the program or to another world there is no way through an Actor).
+  virtual class Runtime* world_runtime(WorldId world, std::string& why);
   /// A function of the engine, by the name of its node - what the engine's nodes do in the
   /// interpreter, with the JIT, and in a Blueprint's class that has no objects of the engine
   /// (kern/logic/engine_api.h; see engine_objects below). `in`: the node's inputs in their order; `out`: its outputs, given as
@@ -1695,7 +1700,15 @@ class Runtime {
   /// names nothing here, not the actor of the same id - the host is told why, naming the Blueprint and `node`. The
   /// one check of every node that reaches another actor's Blueprint, in every tier.
   bool actor_here(std::string_view caller, ActorHandle a, std::string_view node, ActorRef& id);
-  /// Has Blueprint and Call Event of a Blueprint (an Actor of it: actor_here first).
+  /// The runtime that runs the Blueprint of the Actor `a` (kern/docs/project.md 7) and its id there (0: none - an empty
+  /// Target, which means what the node says, in this runtime): this one for an actor of its world, the runtime of the
+  /// actor's world where the host reaches it (Host::world_runtime - a program reaches the worlds it runs). Null where
+  /// none: the host is told why, naming the Blueprint `caller` and `node` - an actor of a world that does not run, or of
+  /// a world this host does not reach. The one way of the nodes that reach another actor's Blueprint (Call on Actor, Get
+  /// Variable on Actor, Has Blueprint, Call Event), in every tier. (What uses the actor in its world - the gameplay
+  /// nodes, Engine Object of Blueprint, whose object names nothing outside its world - asks actor_here.)
+  Runtime* runtime_of(std::string_view caller, ActorHandle a, std::string_view node, ActorRef& id);
+  /// Has Blueprint and Call Event of a Blueprint (an Actor of it: runtime_of first).
   bool has_blueprint(const Instance& caller, ActorHandle target);
   void call(const Instance& caller, std::string_view name, ActorHandle target, std::vector<std::pair<std::string, Value>> args);
   /// The one way of Call on Actor, whoever calls: a Blueprint's node (call_on above, with the pins it

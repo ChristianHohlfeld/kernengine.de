@@ -45,7 +45,9 @@ gegangen“ – `func.engine_object` gab bei vier verschiedenen Ursachen still `
 Gebaut nach demselben Muster (docs/project.md 7.): `Actor` ist `{ActorRef id; WorldId world;}`, `world` die Nummer der
 `EngineObjects` der Welt, in der der Akteur lebt (`GameWorld` hat genau eine; `Host::world()`). „Objekt der Engine aus
 Welt A“ und „Akteur aus Welt A“ sind dieselbe Frage: `world` vergleichen, dann das Handle / die Id in dieser Welt
-nachschlagen (`EngineObjects::get`, `Runtime::actor_here`). Der Wert nutzt dafür das Feld `Value::world`.
+nachschlagen (`EngineObjects::get`, `Runtime::actor_here`). Der Wert nutzt dafür das Feld `Value::world`. Ein Unterschied:
+den Blueprint eines Akteurs einer Welt, die sein Programm fährt, erreicht ein Programm-Blueprint (`Runtime::runtime_of`,
+project.md 7. „Vom Programm aus“); ein Objekt der Engine nennt nur in seiner eigenen Welt etwas.
 
 ## Stand
 

@@ -513,6 +513,20 @@ ActorId GameWorld::find_actor(std::string_view name) const {
   return 0;
 }
 
+logic::ActorHandle GameWorld::actor_named(std::string_view name) const {
+  const std::string n(name);
+  if (!running()) {
+    fail("actor named \"%s\": the world does not run", n.c_str());
+    return {};
+  }
+  const ActorId id = find_actor(name);
+  if (!id) {
+    fail("actor named \"%s\": the world has no actor of that name", n.c_str());
+    return {};
+  }
+  return {static_cast<logic::ActorRef>(id), world_id_};
+}
+
 void GameWorld::actors_with_tag(std::string_view tag, std::vector<ActorId>& out) const {
   out.clear();
   for (const Actor& a : level_.actors)

@@ -347,6 +347,11 @@ class GameWorld {
   /// The world of this world's actors and its objects of the engine (0: it never ran): what an Actor of it says (logic::ActorHandle::world, kern/docs/project.md 7). Every start makes a new one - an actor of
   /// the level before names nothing in the next.
   logic::WorldId world_id() const;
+  /// The actor of this name as an Actor of this world (logic::ActorHandle: its id and world_id) - what a program holds
+  /// of a world's actor to reach its Blueprint (kern/docs/project.md 7: Call on Actor, Get Variable on Actor, Call Event
+  /// from a program Blueprint). Actor{} with the reason (last_error): the world does not run, it has no actor of that
+  /// name. (find_actor gives the id within the world.)
+  logic::ActorHandle actor_named(std::string_view name) const;
   /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
   /// Off: the interpreter or the JIT, whatever the program has - read when the game starts.
   bool logic_native = true;

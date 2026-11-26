@@ -223,13 +223,34 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
 - **Same Actor** (`actor.equal`, `actor_equal(a, b)`): dieselbe Welt und dieselbe Id; keiner und keiner sind derselbe.
   Ein Akteur einer anderen Welt ist nie derselbe, auch mit derselben Id. **Is Valid** (Gameplay, `actor.valid`) fragt
   wie bisher, ob der Akteur in dieser Welt lebt.
-- **Ein Verweis aus fremder Welt trifft nie still einen Akteur:** jeder Knoten, der einen Akteur benutzt – die
-  Gameplay-Knoten (Get Location, Set Location, Damage, Spawn Actor mit Template …) und die, die einen anderen
-  Blueprint erreichen (Call on Actor, Get Variable on Actor, Has Blueprint, Call Event, Engine Object of Blueprint) –,
-  fragt `logic::Runtime::actor_here` (die eine Prüfung, im Interpreter und in der Klasse gleich): ist die Welt des
-  Akteurs nicht die der Laufzeit, erreicht der Knoten nichts (nicht den Akteur gleicher Id und nicht Self), gibt seine
-  Vorgaben und sagt dem Host den Grund mit Blueprint und Knoten:
-  `Poker: Call on Actor: actor 3 is of world 7, this Blueprint runs in world 6 - an actor names nothing in another world`.
+- **Ein Verweis aus fremder Welt trifft nie still einen Akteur.** Es gibt genau zwei Prüfungen, im Interpreter und in
+  der Klasse gleich:
+  - Die Knoten, die den **Blueprint** eines anderen Akteurs erreichen – Call on Actor, Get Variable on Actor, Has
+    Blueprint, Call Event –, fragen `logic::Runtime::runtime_of`: ein Akteur der eigenen Welt läuft in dieser Laufzeit;
+    einer einer anderen Welt in der Laufzeit, die der Host dort erreicht (`Host::world_runtime`, siehe „Vom Programm
+    aus“), sonst erreicht der Knoten nichts (nicht den Akteur gleicher Id und nicht Self), gibt seine Vorgaben und sagt
+    dem Host den Grund mit Blueprint und Knoten:
+    `Poker: Call on Actor: actor 3 is of world 7, this Blueprint runs in world 6 - an actor names nothing in another world`.
+  - Was den Akteur **in seiner Welt** benutzt – die Gameplay-Knoten (Get Location, Set Location, Damage, Spawn Actor mit
+    Template …) und Engine Object of Blueprint (ein Objekt der Engine nennt nur in seiner Welt etwas, engine_object.md) –,
+    fragt `logic::Runtime::actor_here`: nur ein Akteur der Welt, in der der Knoten läuft; sonst dieselbe Meldung.
+- **Vom Programm aus** (gebaut 26.11.2026): Ein Programm-Blueprint erreicht die Blueprints der Akteure der Welten, die
+  sein Programm fährt – Variable lesen (Get Variable on Actor), eine Funktion rufen (Call on Actor; gesetzt wird ein
+  Wert eines Blueprints durch seine eigene Funktion), ein Ereignis schicken (Call Event), Has Blueprint. Der Host des
+  Programms schlägt dazu die Welt des Verweises nach: das GameWorld unter seinen Objekten der Engine
+  (`EngineObjects::all<GameWorld>()`), das als diese Welt läuft (`world_id()`), und dessen Logik-Laufzeit. Den Verweis
+  gibt die Welt: `GameWorld::actor_named(name)` (Knoten der Engine „GameWorld actor named“; Actor{} mit Grund in
+  `last_error`, wenn die Welt nicht läuft oder keinen Akteur des Namens hat) oder `GameWorld::spawn`.
+  Ausdrücklich, mit Grund, wenn nichts erreicht wird: läuft die Welt nicht mehr („… - its world does not run any more
+  (the GameWorld was stopped)“), ist sie neu gestartet (eine neue Welt: „… - no world of this program runs as world 7
+  (it ended and started again as a new world, or the program did not make it)“). Eine Welt, die eine App in C++ macht
+  (`GameWorld(Engine&)`), ist kein Objekt des Programm-Hosts – ihre Akteure erreicht die App in C++ selbst
+  (`ActorBlueprint`). **In die andere Richtung**, von einer Welt zum Programm oder zu einer anderen Welt, gibt es
+  **kein** stilles Durchfallen: der Host einer Welt erreicht nur ihre eigenen Akteure; der Weg führt über Objekte der
+  Engine, die das Programm der Welt gibt (den festen Schritt, 6.1, oder eine Schnittstelle).
+  Geprüft: `program_reaches_actors_of_its_worlds` (ein Programm, zwei Welten desselben Levels mit Akteuren gleicher Id:
+  Aufruf, Ereignis, Variable, Has Blueprint treffen nur die Welt des Verweises – auch als Klasse; Welt gestoppt und neu
+  gestartet: nichts erreicht, Grund gesagt; eine Welt erreicht weder das Programm noch die andere Welt).
 - **Konverter:** `kern::logic::ActorHandle` im C++ eines Spiels ist `Actor`; `ActorHandle{}` ist `Actor{}`, `a == b`
   Same Actor, `a.id` Id of Actor; ein `ActorHandle` aus Zahlen wartet mit Grund. Der Testschreiber zieht Akteure als
   Werte der Sprache (keiner oder einer von wenigen Ids in einer von zwei Welten), nicht als Struct
@@ -237,10 +258,6 @@ Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.
 - **Tests:** `actors_know_their_world` (zwei Welten mit Akteuren gleicher Id: einer aus Welt B erreicht in Welt A
   nichts und sagt warum, der eigene schon; die Klasse fragt ebenso; kein Int wird ein Akteur), die Fälle der Stufen
   (blueprint_native: Akteure als Werte mit Welt), `tools/converter_cases/run.sh` (actors).
-- **Offen:** Akteure einer Welt vom Programm aus erreichen (der Host des Programms schlägt die Laufzeit der Welt des
-  Verweises nach, statt abzuweisen). In die andere Richtung, von der Welt zum Programm,
-  gibt es **kein** stilles Durchfallen: der Weg führt nur über Objekte der Engine, die das Programm der Welt gibt (den
-  festen Schritt, 6.1, oder eine Schnittstelle).
 
 ## 7a. Ein Programm aus C++: wohin der Konverter schreibt
 
@@ -297,7 +314,8 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   `EngineObjects::on_made`, `GameWorld(Engine&)`), der Konverter mit Projekt (7a.). Tests: `game_project_round_trip`,
   `game_project_errors`, `program_from_the_project`, `run_the_program_of_a_project`, `program_world_has_the_project`,
   `world_of_an_app_of_cpp_has_the_project`, `program_binds_the_exports`, `program_beside_an_app_of_cpp`,
-  `world_starts_a_level_of_its_project`, `game_world_fixed_step`, `tools/converter_cases/run.sh`.
+  `world_starts_a_level_of_its_project`, `program_reaches_actors_of_its_worlds`, `game_world_fixed_step`,
+  `tools/converter_cases/run.sh`. Akteure einer Welt vom Programm aus (7.).
 - Gebaut im Editor: „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen mit seinen
   Levels (das Start-Level ist das offene Level), speichern, Levels, Start-Level, Einstellungen, Programm-Blueprints im
   Blueprint-Editor; Play spielt das offene Level mit den Bibliotheken des Projekts. Test `studio_project`, e2e.
@@ -305,7 +323,7 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   Browser belegt (CI-Jobs `murmel`, `murmel-web`); seine App als Blueprint wartet noch am Testrahmen der Vergleichstests
   (er gehört heute SpawnCity: Namensraum `sc`).
 - Offen: „Play Project“ im Editor (die Programm-Laufzeit mit der App im Viewport; braucht die Engine – `Engine`,
-  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit), Akteure einer Welt vom Programm aus (7.),
+  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit),
   Feld-Anfangswerte, die keine Konstante sind, im Vergleichstest.
 - SpawnCity: `kern::run(sc::app(), embedded_project())`; seine Programm-Klassen stehen im Projekt.
 

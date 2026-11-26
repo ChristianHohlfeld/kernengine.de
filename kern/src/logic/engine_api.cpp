@@ -90,6 +90,10 @@ WorldId Host::world() {
   if (!own_world_) own_world_ = new_world();
   return own_world_;
 }
+Runtime* Host::world_runtime(WorldId, std::string& why) {
+  why = "an actor names nothing in another world";
+  return nullptr;
+}
 void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {

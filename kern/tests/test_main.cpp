@@ -9052,6 +9052,151 @@ TEST(world_takes_its_device_profile) {
   CHECK(std::string(last_error()) == "start: the device profile \"tablet\" is none of the project's (it has: mobile, laptop)");
 }
 
+// A program reaches the actors of the worlds it runs (kern/docs/project.md 7): its host looks up the runtime of the
+// world an Actor names (Host::world_runtime) - read a variable, call a function, raise an event, ask Has Blueprint -,
+// in the interpreter and in a Blueprint's class alike; an actor of a world that does not run any more reaches nothing
+// and says why; a world reaches no actor of the program and none of another world.
+TEST(program_reaches_actors_of_its_worlds) {
+  game::Level l = game::basic_level();
+  l.name = "Raum";
+  game::Actor door;
+  door.name = "Door";
+  door.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
+                        "  Int Hits = 0;\n"
+                        "  Int Bumps = 0;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  HitResult Hit() {\n"
+                        "    Hits += 1;\n"
+                        "    return {Hits};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Bump\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    Bumps += 1;\n"
+                        "  }\n"
+                        "  KERN_EVENT(on2, event_custom<\"Back\">)\n"
+                        "  void on2(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n3.hits));\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n3;\n"
+                        "};\n", *door.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Door): %s\n", error.c_str());
+  const game::ActorId door_id = l.add(door).id;
+  logic::Graph main;
+  error.clear();
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint {\n"
+                        "  Int Got = -1;\n"
+                        "  Int Seen = -1;\n"
+                        "  Bool Has = false;\n"
+                        "\n"
+                        "  // ---- functions ----\n"
+                        "  struct HitResult { Int hits = 0; };\n"
+                        "  KERN_EXTERN HitResult Hit();\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
+                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
+                        "    Got = n2.hits;\n"
+                        "    flow_call<\"Bump\">(actor, Actor{}, 0.0, \"\");\n"
+                        "    Seen = func_get_on<\"Bumps\", Int>(actor);\n"
+                        "    Has = func_has_blueprint(actor);\n"
+                        "  }\n"
+                        "  struct { Int hits = 0; } n2;\n"
+                        "};\n", main, nullptr, &error));
+  if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Main): %s\n", error.c_str());
+  game::Project pr;
+  pr.name = "Fern";
+  pr.levels = {"raum.klevel"};
+  pr.level_texts = {{"raum.klevel", game::to_text(l)}};
+  pr.blueprints.push_back({"Main", main, ""});
+  struct Cpp final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } cpp;
+  game::Program program;
+  CHECK(program.start(pr, cpp, &error));
+  logic::Runtime* rt = program.runtime();
+  logic::EngineObjects* objects = rt ? rt->host().engine_objects() : nullptr;
+  CHECK(objects != nullptr);
+  if (!rt || !objects) return;
+  // two worlds of the program, of the same level: their doors have the same id
+  Renderer renderer;
+  const auto make = [&]() -> game::GameWorld* {
+    std::vector<logic::Value> out(1);
+    if (!logic::call_engine(*objects, "engine.game_world.make", {logic::Value::object(objects->ref(objects->adopt<Renderer>(renderer))), logic::Value::object({})}, out)) return nullptr;
+    game::GameWorld* w = objects->get<game::GameWorld>(out[0].as_object());
+    return w && w->start_level("raum.klevel", game::SimMode::play) ? w : nullptr;
+  };
+  game::GameWorld* wa = make();
+  game::GameWorld* wb = make();
+  CHECK(wa && wb && wa != wb);
+  if (!wa || !wb) return;
+  CHECK(objects->all<game::GameWorld>() == (std::vector<game::GameWorld*>{wa, wb}));
+  wa->step(1.0f / 60, game::PlayInput{});
+  wb->step(1.0f / 60, game::PlayInput{});
+  const logic::ActorHandle a_door = wa->actor_named("Door"), b_door = wb->actor_named("Door");
+  CHECK(a_door.id == door_id && b_door.id == door_id && a_door.world == wa->world_id() && b_door.world == wb->world_id() && a_door.world != b_door.world);
+  CHECK(wa->actor_named("Nobody") == logic::ActorHandle{} && std::string(last_error()) == "actor named \"Nobody\": the world has no actor of that name");
+  CHECK(rt->host().world() != wa->world_id() && rt->host().world() != wb->world_id());   // (the program is no world of them)
+  const auto var = [](game::GameWorld* w, const char* name) { const logic::Instance* i = w->logic_runtime() ? w->logic_runtime()->find(w->find_actor("Door")) : nullptr; return i ? i->get(name).as_int() : -1; };
+  const auto main_now = [&](const char* name) { const logic::Instance* i = rt->find(1); return i ? i->get(name) : logic::Value{}; };
+  const auto poke = [&](logic::ActorHandle who) { rt->call("Poke", 0, {{"actor", logic::Value::actor(who)}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}}); };
+  program.said();
+  // world A's door from the program: called, its event raised, its variable read - B's door is not touched
+  poke(a_door);
+  CHECK(var(wa, "Hits") == 1 && var(wa, "Bumps") == 1 && var(wb, "Hits") == 0 && var(wb, "Bumps") == 0);
+  CHECK(main_now("Got").as_int() == 1 && main_now("Seen").as_int() == 1 && main_now("Has").as_bool());
+  poke(b_door);
+  CHECK(var(wa, "Hits") == 1 && var(wb, "Hits") == 1 && var(wb, "Bumps") == 1 && main_now("Got").as_int() == 1);
+  CHECK(program.said().empty());
+  // a program Blueprint's class reaches them the same way (BlueprintCore::kern_runtime_of - Runtime::runtime_of)
+  struct Reach : kern::Blueprint {
+    Bool Has = false;
+    Int Hits = -1;
+    void run(Actor x) {
+      Has = func_has_blueprint(x);
+      Hits = func_get_on<"Hits", Int>(x);
+    }
+  } reach;
+  reach.kern_world.host = &rt->host();
+  reach.kern_world.runtime = rt;
+  reach.run(a_door);
+  CHECK(reach.Has && reach.Hits == 1);
+  // world B stops: its door reaches nothing any more, and the program is told why
+  wb->stop();
+  poke(b_door);
+  CHECK(var(wa, "Hits") == 1 && main_now("Got").as_int() == 0 && main_now("Seen").as_int() == 0 && !main_now("Has").as_bool());
+  bool told = false;
+  for (const std::string& e : program.said())
+    told |= e.find("error: Main: Call on Actor: actor " + std::to_string(door_id) + " is of world " + std::to_string(b_door.world) + ", this Blueprint runs in world " +
+                   std::to_string(rt->host().world()) + " - its world does not run any more (the GameWorld was stopped)") != std::string::npos;
+  CHECK(told);
+  reach.run(b_door);
+  CHECK(!reach.Has && reach.Hits == 0);
+  // started again it is a new world: the Actor of the world before names nothing in it
+  CHECK(wb->start_level("raum.klevel", game::SimMode::play) && wb->world_id() != b_door.world);
+  program.said();
+  poke(b_door);
+  told = false;
+  for (const std::string& e : program.said()) told |= e.find("- no world of this program runs as world " + std::to_string(b_door.world)) != std::string::npos;
+  CHECK(told && var(wb, "Hits") == 0);
+  // a world reaches no actor of the program (and none of another world): Door of A, given the program's Main
+  wa->events().clear();
+  wa->logic_runtime()->call("Back", door_id, {{"actor", logic::Value::actor(logic::ActorHandle{1, rt->host().world()})}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+  wa->logic_runtime()->call("Back", door_id, {{"actor", logic::Value::actor(wb->actor_named("Door"))}, {"value", logic::Value::number(0)}, {"text", logic::Value::text("")}});
+  wa->step(1.0f / 60, game::PlayInput{});
+  int refused = 0;
+  for (const std::string& e : wa->events()) refused += e.find("Logic error: Door: Call on Actor: actor ") != std::string::npos && e.find("- an actor names nothing in another world") != std::string::npos;
+  CHECK(refused == 2 && var(wa, "Hits") == 1 && var(wb, "Hits") == 0);
+  wa->stop();
+  wb->stop();
+  program.end();
+}
+
 TEST(world_starts_a_level_of_its_project) {
   game::Level a = game::basic_level(), b = game::basic_level();
   a.name = "Erstes";

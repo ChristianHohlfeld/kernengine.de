@@ -37,6 +37,19 @@ class ProgramHost : public logic::Host {
     return false;
   }
   logic::EngineObjects* engine_objects() override { return &objects; }
+  /// The program reaches the actors of the worlds it runs (kern/docs/project.md 7): the logic runtime of the GameWorld of
+  /// its objects that runs as `world` - none where that world ended (stopped, or started again: a new world) or is none
+  /// the program made.
+  logic::Runtime* world_runtime(logic::WorldId world, std::string& why) override {
+    for (GameWorld* w : objects.all<GameWorld>())
+      if (w->world_id() == world) {
+        if (w->running() && w->logic_runtime()) return w->logic_runtime();
+        why = w->running() ? "its world runs no Blueprints" : "its world does not run any more (the GameWorld was stopped)";
+        return nullptr;
+      }
+    why = "no world of this program runs as world " + std::to_string(world) + " (it ended and started again as a new world, or the program did not make it)";
+    return nullptr;
+  }
   void engine_failed(std::string_view function) override { error(std::string(function) + ": " + objects.error); }
 
   std::vector<std::string> said;

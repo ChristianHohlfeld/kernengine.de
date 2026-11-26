@@ -6611,6 +6611,18 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.game_world.world_id", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
+  /// The actor of this name as an Actor of this world (logic::ActorHandle: its id and world_id) - what a program holds of a world's actor to reach its Blueprint (kern/docs/project.md 7: Call on Actor, Get Variable on Actor, Call Event from a program Blueprint). Actor{} with the reason (last_error): the world does not run, it has no actor of that name. (find_actor gives the id within the world.)
+  Actor engine_game_world_actor_named(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& name) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.actor_named"); return Actor{}; }
+      const std::string_view kern_a0 = name.view();
+      decltype(auto) kern_r = kern_self->actor_named(kern_a0);
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Actor>::template make<Actor>(*kern_o, kern_r);
+    }
+    return from_value<Actor>(this->kern_engine("engine.game_world.actor_named", {to_value(game_world), to_value(name)}, {PinType::actor})[0].converted(pin_type_of<Actor>()));
+  }
   /// A key of this machine's keyboard while playing ("KeyF", "Digit1"...): On Key events.
   void engine_game_world_key_event(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& code, Bool down) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
