@@ -379,12 +379,16 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   }
 
   // ---- the small game (26.11.2026: a drone over the city, BLUEPRINTS.md "Herausgenommen am 26.11."): no multiplayer,
-  // voice, pings or big map (web/mp_host.mjs is gone with them) - the page's buttons of what the game has not are
-  // hidden here (the original's view, web/view/, stays as it is)
+  // voice, pings, big map, weapons, air strike, car radio or foot (web/mp_host.mjs is gone with them) - the page's buttons
+  // of what the game has not are hidden here (the original's view, web/view/, stays as it is). (The weapon buttons by their tag: the game's own
+  // #viewport carries data-drone-weapon too - hidden with them, the page showed no game.)
   const mpPage = null;
   {
     const gone = document.createElement("style");
-    gone.textContent = "#driveModeButton,#playerModeButton,#lanVsButton,#droneWeaponToggle,[data-drone-weapon],#soloLogbook,#mobileGameplayMultiplayer{display:none!important}";
+    // (above the original's own rules: theirs reach six ids - html:not(#hud-a)... body #viewport #x -, these seven)
+    gone.textContent = "html:not(#sc-a):not(#sc-b):not(#sc-c):not(#sc-d):not(#sc-e):not(#sc-f) body :is(#driveModeButton,#playerModeButton,#lanVsButton,#droneWeaponToggle,"
+      + "button[data-drone-weapon],#soloLogbook,#mobileGameplayMultiplayer,#mobileGameplayWeapon,#mobileGameplayMode,#proximityVoiceBar,#airStrikeButton,.sc-radio-btn,#scModeBtn,"
+      + "#worldLookHud .world-look-title button){display:none!important}";
     document.head.appendChild(gone);
   }
 

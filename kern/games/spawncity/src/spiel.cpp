@@ -253,6 +253,13 @@ void SpawnCity::fly(f32 dt) {
 void SpawnCity::read_input(kern::Engine& e, f32 dt) {
   const kern::Input& in = e.input();
   const DroneTelemetry& t = drone_.telemetry();
+  // the pointer lock (desktop_controls.mjs:48-110): desktop only, in the game - a click with LMB or RMB on the play
+  // surface captures the mouse (the page says when it has it: sc_pointer_lock); the touch layout lets it go
+  if (touch_mode_) {
+    if (locked_) e.request_pointer_lock(false);
+  } else if (!locked_ && (in.button_pressed(0) || in.button_pressed(1))) {
+    e.request_pointer_lock(true);
+  }
   // the touch controls of the drone (touch_play.cpp)
   TouchLayout layout;
   if (touch_mode_) layout.mode = TouchMode::drone;
