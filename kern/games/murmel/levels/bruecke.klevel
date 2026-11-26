@@ -339,7 +339,127 @@
        0.6
       ]
      }
-    ]
+    ],
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 7,
+     "variables": [
+      {
+       "name": "Spruenge",
+       "type": "int",
+       "value": 0,
+       "help": "Wie oft das Feld jemanden hochgeworfen hat."
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "game.overlap_begin",
+       "x": 0,
+       "y": 0
+      },
+      {
+       "id": 2,
+       "type": "var.add",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "variable": "Spruenge"
+       },
+       "values": {
+        "amount": 1
+       }
+      },
+      {
+       "id": 3,
+       "type": "actor.impulse",
+       "x": 560,
+       "y": 0,
+       "values": {
+        "impulse": [
+         0,
+         0,
+         6
+        ]
+       }
+      },
+      {
+       "id": 4,
+       "type": "game.sound",
+       "x": 840,
+       "y": 0,
+       "params": {
+        "sound": "builtin:boost"
+       },
+       "values": {
+        "volume": 1,
+        "pitch": 1,
+        "spatial": true
+       }
+      },
+      {
+       "id": 5,
+       "type": "actor.location",
+       "x": 720,
+       "y": 150
+      },
+      {
+       "id": 6,
+       "type": "game.add_score",
+       "x": 1120,
+       "y": 0,
+       "values": {
+        "points": 5
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "actor",
+       5,
+       "target"
+      ],
+      [
+       1,
+       "other",
+       3,
+       "target"
+      ],
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       2,
+       "then",
+       3,
+       "exec"
+      ],
+      [
+       3,
+       "then",
+       4,
+       "exec"
+      ],
+      [
+       4,
+       "then",
+       6,
+       "exec"
+      ],
+      [
+       5,
+       "location",
+       4,
+       "location"
+      ]
+     ],
+     "machines": []
+    }
    }
   },
   {
@@ -382,5 +502,37 @@
     }
    }
   }
- ]
+ ],
+ "logic": {
+  "kind": "kern-logic",
+  "version": 1,
+  "nextId": 3,
+  "variables": [],
+  "nodes": [
+   {
+    "id": 1,
+    "type": "event.begin",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": 2,
+    "type": "game.message",
+    "x": 280,
+    "y": 0,
+    "values": {
+     "text": "Level 2: das blaue Feld wirft dich hoch (+5)"
+    }
+   }
+  ],
+  "links": [
+   [
+    1,
+    "then",
+    2,
+    "exec"
+   ]
+  ],
+  "machines": []
+ }
 }

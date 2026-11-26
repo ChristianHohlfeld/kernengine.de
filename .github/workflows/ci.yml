@@ -451,8 +451,10 @@ jobs:
       - name: Murmel nativ (deterministischer Lauf)
         run: CXX=clang++ CC=clang kern/games/murmel/tests/run.sh
       - name: Die Blueprints der Levels sind ihre Texte
+        if: success() || failure()
         run: kern/games/murmel/tests/blueprints.sh --check
       - name: Der Konverter über die Quelle der App
+        if: success() || failure()
         run: CLANGXX=clang++ kern/games/murmel/tests/convert.sh
 
   # Murmel im Browser: das Modul des Spiels und Kern Studio gebaut, dann spielt der e2e-Test die Seite des Spiels per

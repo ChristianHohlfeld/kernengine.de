@@ -290,5 +290,37 @@
     }
    }
   }
- ]
+ ],
+ "logic": {
+  "kind": "kern-logic",
+  "version": 1,
+  "nextId": 3,
+  "variables": [],
+  "nodes": [
+   {
+    "id": 1,
+    "type": "event.begin",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": 2,
+    "type": "game.message",
+    "x": 280,
+    "y": 0,
+    "values": {
+     "text": "Level 1: sammle alle Muenzen, dann ins Ziel"
+    }
+   }
+  ],
+  "links": [
+   [
+    1,
+    "then",
+    2,
+    "exec"
+   ]
+  ],
+  "machines": []
+ }
 }
