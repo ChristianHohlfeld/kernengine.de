@@ -144,3 +144,10 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 ## Nachtrag 26.11. 20:16 — FREIGABE des Besitzers
 - Wörtlich: „Mach alles final und du hast von mir das Go für main merge fully". → Nach Abschluss darf der Koordinator nach main mischen (ohne Rückfrage). Bedingungen bleiben: ganzes Gate grün (auch SpawnCity-Jobs mit verkleinertem Spiel), Deploy nur bei grüner CI, kein force-push, Changelog-Eintrag (Berliner Zeit) für das, was live geht.
 - Weg: work-konverter(bind an Welt) → work-projekt; work-zahlen(+Editor, Murmel bitgenau) → work-projekt; work-spiel einmischen, voller Lauf auf mag (Kandidat 10), Level neu → Gate ganz grün → Changelog → main.
+
+## Nachtrag 26.11. 21:25 (Kontrolle)
+- work-konverter c2a349c5: ActorBlueprint::bind(world) (CI 45889096694 läuft). work-spiel fee55914 nutzt es (Probe 45889361172 success).
+- leser (work-konverter-leser, lokal a885d6c0): URSACHE n124 = logic::link (kern/src/logic/logic.cpp) schreibt „bound" beim Kopieren von Bibliotheksfunktionen nicht um; Fall placelib alt rot/neu grün.
+- work-projekt f2249a51: acht Mathe-Funktionen (log2, log1p, exp2, cbrt, acosh, atanh, ldexp, remainder), Gate 45887919129 läuft (converter-cases, murmel, build, input, determinism grün; native/e2e laufen).
+- work-zahlen 9c2d1474: push_extra(Span), CI 45888727173 läuft.
+- work-spiel CI 45885597397 (b5e16e81): input ROT (offen), native-spawncity-build/e2e-spawncity rot (Level alt).
