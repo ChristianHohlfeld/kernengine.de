@@ -2,6 +2,7 @@
 #include "murmel.h"
 
 #include <cstdio>
+#include <string>
 
 #include "kern/core/base.h"
 
@@ -55,7 +56,7 @@ bool Murmel::start(Engine& engine) {
   toene_ = 0;
   clear_error();
   bestwert_ = engine.load_int("murmel", "best", 0);   // (keiner: 0; ein Stand, der nicht lesbar ist: 0 und der Grund im Log)
-  if (*last_error()) log(LogLevel::warn, "%s", last_error());
+  if (!std::string(last_error()).empty()) log(LogLevel::warn, "%s", last_error());   // (der Grund als Text: kein Zeiger, den ein Blueprint liest)
   return lade(0);
 }
 
