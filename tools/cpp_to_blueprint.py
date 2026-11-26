@@ -121,6 +121,7 @@ writes anew.
 Needs clang++ (CLANGXX overrides the binary).
 """
 import collections
+import codecs
 import copy
 import io
 import itertools
@@ -408,30 +409,103 @@ def c_string(v):
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
-def run_clang(path, namespace, flags, name=False):
-    """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
-    between runs: a tree of another state of the sources is another tree). `name`: of the declarations whose
-    name has `namespace` in it, as it is (a function outside every namespace - see outside_dumps)."""
-    # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
-    # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
-    # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
-    # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", namespace if name else f"{namespace}::", *flags, path]
-    if STEADY:
-        cmd = ["setarch", "-R", *cmd]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0 and not r.stdout:
-        sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
-        return []
-    s = r.stdout
-    out, dec, i = [], json.JSONDecoder(), 0
+# Where the identity of a declaration comes from (kern/docs/blueprint_cpp.md, "Konverter: woher die Identität einer
+# Deklaration kommt"): a source file is read by ONE run of the compiler - one tree, the declarations of every namespace
+# in it (the program's, its further ones, the engine's, the file's own unnamed one, what stands outside every
+# namespace). clang names a node by its address; such a name is an identity only inside that one tree - two runs are
+# never matched by addresses (they would meet or not by chance: the length of a path moved them).
+def unit_dump(path, flags):
+    """The compiler's tree of a source file - one run, no filter -, as the declarations directly in the translation
+    unit: [(kind, name, object)] in their order, each annotated (annotate). What stands in a system header (the
+    standard library, the C library: a file outside the program's and the engine's folders) is passed over without
+    being read as JSON - only its last place is kept, as clang names a file only where it changes."""
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", *flags, path]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    start, end = "\n    {\n", "\n    }"
+    out, st = [], {"file": ""}
+    dec = codecs.getincrementaldecoder("utf-8")("replace")
+    def last_file(chunk):
+        # (the last place of the chunk that names its file: a location - "offset" on the line before -, not includedFrom)
+        at = len(chunk)
+        while True:
+            at = chunk.rfind('"file": "', 0, at)
+            if at < 0:
+                return None
+            line = chunk.rfind("\n", 0, at)
+            prev = chunk.rfind("\n", 0, line) if line > 0 else -1
+            stop = chunk.find("\n", at)
+            if line > 0 and stop > 0 and '"offset": ' in chunk[prev + 1:line]:
+                return json.loads(chunk[at + 8:stop].rstrip(","))
+    def system(file):
+        f = os.path.abspath(file) if file else ""
+        return bool(f) and not f.startswith((ROOT + os.sep, os.path.dirname(os.path.abspath(path)) + os.sep, os.getcwd() + os.sep))
+    def wanted(head):
+        # (where the child stands: the file of its own location - clang names it only where it changes)
+        a = head.find('\n      "loc": {')
+        b = head.find("\n      }", a + 1) if a >= 0 else -1
+        f = last_file(head[a:b + 1]) if a >= 0 and b > a else None
+        return not system(f or st["file"])
+    # (the children of the unit, one after another: each begins with "    {" and ends with "    }" at their indent -
+    # what is read is never searched again; a child passed over is not kept, only its last place)
+    TAIL = 1 << 12
+    buf, began, child, keep = "", False, None, None
     while True:
-        j = s.find("{", i)
-        if j < 0:
+        data = proc.stdout.read(1 << 22)
+        buf += dec.decode(data, final=not data)
+        if not began:
+            i = buf.find('\n  "inner": [')
+            if i < 0 and data:
+                continue
+            if i < 0:
+                break
+            buf, began = buf[i + len('\n  "inner": ['):], True
+        while True:
+            if child is None:
+                i = buf.find(start)
+                if i < 0:
+                    buf = buf[-len(start):]
+                    break
+                buf, child, keep, seen = buf[i + 1:], [], None, 0
+            if keep is None and (len(buf) >= TAIL or buf.find(end) >= 0):
+                keep = wanted(buf[:TAIL])
+            j = buf.find(end, max(0, seen - len(end)))
+            if j < 0:
+                if keep is False:   # (passed over: only where its places are)
+                    f = last_file(buf)
+                    if f is not None:
+                        st["file"] = f
+                    buf = buf[-TAIL:]
+                elif keep:
+                    child.append(buf[:-len(end)])
+                    buf = buf[-len(end):]
+                seen = len(buf)
+                break
+            piece, buf = buf[:j + len(end)], buf[j + len(end):]
+            if keep is False:
+                f = last_file(piece)
+                if f is not None:
+                    st["file"] = f
+            else:
+                child.append(piece)
+                o = json.loads("".join(child))
+                annotate(o, st)
+                out.append((o.get("kind"), o.get("name"), o))
+            child = None
+        if not data:
             break
-        o, i = dec.raw_decode(s, j)
-        out.append(o)
+    proc.wait()
+    if proc.returncode != 0 and not out:
+        sys.stderr.write(f"{path}: clang failed\n")
     return out
+
+
+def namespace_dumps(unit, space):
+    """What a tree (unit_dump) has in a namespace directly in the translation unit - each time it is opened -, as the
+    declarations in it."""
+    def inside(o):   # (a block `extern "C" { ... }` is no scope: what it declares stands in the namespace)
+        for c in kids(o):
+            yield from (inside(c) if c.get("kind") == "LinkageSpecDecl" else [c])
+    return [c for kind, name, o in unit if kind == "NamespaceDecl" and name == space for c in inside(o)]
 
 
 def exported_names(path):
@@ -444,35 +518,24 @@ def exported_names(path):
     return sorted(set(re.findall(r"\b" + ENGINE.upper() + r"_EXPORT\s*\(\s*([A-Za-z_]\w*)\s*\)", text)))
 
 
-def outside_dumps(path, flags):
-    """What a source file of the program has outside every namespace for its host: each function it exports
-    (C linkage: clang names it by its own name, unmangled), dumped by that name - the dump of a namespace does
-    not have it -, and the file's own unnamed namespace outside every namespace (what those functions use there,
-    `(anonymous namespace)::`, of this file only - a declaration a dump of the program's namespace has at the
-    same place is that one). Annotated (annotate)."""
+def outside_dumps(unit, path):
+    """What a source file of the program has outside every namespace for its host, from its tree (unit_dump): each
+    function it exports (C linkage: clang names it by its own name, unmangled), and the file's own unnamed namespace
+    outside every namespace (what those functions use there, `(anonymous namespace)::`, of this file only)."""
     names = exported_names(path) if not is_header(path) else []
     if not names:
         return []
     me, out = os.path.abspath(path), []
-    for name in names:
-        st = {"file": ""}
-        for o in run_clang(path, name, flags, name=True):
-            annotate(o, st)
-            if o.get("kind") == "FunctionDecl" and o.get("name") == name and o.get("mangledName") == name and os.path.abspath(o.get("_file") or "?") == me:
-                out.append(o)
-    st = {"file": ""}
-    for o in run_clang(path, "(anonymous namespace)", flags):
-        annotate(o, st)
-        mangled = o.get("mangledName")
-        if os.path.abspath(o.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
-            out.append(o)
+    for kind, name, o in unit:
+        for d in ([o] if kind == "FunctionDecl" else kids(o) if kind == "LinkageSpecDecl" else []):
+            if d.get("kind") == "FunctionDecl" and d.get("name") in names and d.get("mangledName") == d.get("name") and os.path.abspath(d.get("_file") or "?") == me:
+                out.append(d)
+    for c in namespace_dumps(unit, None):
+        mangled = c.get("mangledName")
+        if os.path.abspath(c.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
+            out.append(c)
     return out
 
-
-# (clang names a node by its address. With address randomization off the addresses are the same in
-# every run on the same source - the tree of the program and the tree of the engine it uses, dumped
-# by two runs, then name each other's nodes.)
-STEADY = subprocess.run(["setarch", "-R", "true"], capture_output=True).returncode == 0 if os.name == "posix" else False
 
 
 def unit_order(path, flags):
@@ -847,25 +910,16 @@ class Tree:
         self.path = os.path.abspath(path)
         self.namespace = namespace
         self.spaces = tuple(s for s in spaces if s != namespace)
-        self.dumps = run_clang(path, namespace, flags)
-        st = {"file": ""}
-        for o in self.dumps:
-            annotate(o, st)
-        # (the further namespaces of the program, each dumped as the engine's is: by its own name)
-        self.more = [(space, run_clang(path, space, flags) if STEADY else []) for space in self.spaces]
-        for _, dumps in self.more:
-            st = {"file": ""}
-            for o in dumps:
-                annotate(o, st)
-        if STEADY:
-            place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
-            had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
-            self.more.append(("", [o for o in outside_dumps(self.path, flags) if place(o) not in had]))
+        # (one run of the compiler, one tree: the program's namespace, its further ones, the engine's, what stands
+        # outside every namespace - see unit_dump)
+        self.unit = unit_dump(path, flags)
+        self.dumps = namespace_dumps(self.unit, namespace)
+        self.more = [(space, namespace_dumps(self.unit, space)) for space in self.spaces]
+        place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
+        had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
+        self.more.append(("", [o for o in outside_dumps(self.unit, self.path) if place(o) not in had]))
         # the engine the program is written against: its types and the functions its headers define
-        self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
-        st = {"file": ""}
-        for o in self.engine:
-            annotate(o, st)
+        self.engine = namespace_dumps(self.unit, ENGINE) if ENGINE and ENGINE != namespace else []
         self.texts = {}
         self.flags = flags
         self.layouts = None   # (see `layout`: the compiler's layouts of the records, read when one is asked for)
@@ -1355,7 +1409,7 @@ class World:
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
-        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
+        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed": lists of several lengths; "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
         self.not_states = {}  # a class of the program that has objects with static storage and is no state: why (state_classes)
@@ -2095,10 +2149,10 @@ class Unit:
 
     def pointed(self, raw):
         """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
-        whether it is null: a pointer into a list - in the Blueprint the list, read where it stands (a const
-        reference input), and the place in it (an Int; null is the place -1). What a call hands it is that pair:
-        `a.data() + k` is (a, k), an array is (it, 0), nullptr (an empty list, -1). The Blueprint type of its
-        entries; None: the parameter is no such pointer."""
+        whether it is null: a pointer into a list - in the Blueprint the list, an input by value (a view to read
+        is no place: a list of any length or an array of a fixed length goes there), and the place in it (an Int;
+        null is the place -1). What a call hands it is that pair: `a.data() + k` is (a, k), an array is (it, 0),
+        nullptr (an empty list, -1). The Blueprint type of its entries; None: the parameter is no such pointer."""
         m = re.match(r"const\s+(.+?)\s*\*$", raw.strip())
         if m is None or self.object_of(raw) or raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return None
@@ -3993,25 +4047,21 @@ class Emit:
                 continue
             entries = u.pointed(raw)
             if entries is not None:
-                # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
+                # a pointer into a list to read (const T*): the list, as a value, and the place in it (Unit.pointed).
+                # A view only to read is no place: the call hands the entries - a list of any length or an array of a
+                # fixed length (kern/docs/blueprint_cpp.md, "Eine Sicht zum Lesen")
                 if p["id"] in assigned:
                     raise Wait("a pointer that is moved (the place it holds changes)")
                 into = u.world.pointer_lists.get((f.key, [x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"])), "list")
-                if into == "mixed":
-                    raise Wait("a pointer into lists of different lengths (the language has no view of a list: a reference input is one type)")
                 if into == "other":
                     raise Wait("a pointer into something that is no list (the address of a value)")
-                if isinstance(into, int):
-                    f.fixed[len(f.params)] = into   # (the list it points into: of that fixed length, as every call hands it)
                 lname = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
                 self.taken.add(lname)
                 aname = u.fresh(lname + "_at", self.taken)
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
                 f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
-                # (of an export the list is a value: the host's bytes, made into a list for the call - its inputs stay in
-                # the order of the C parameters)
-                f.kinds += ["" if exported else "const", ""]
+                f.kinds += ["", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
             t = u.place(raw)
@@ -4021,8 +4071,13 @@ class Emit:
             by_ref = "&" in raw and "&&" not in raw and not u.object_of(raw)
             const = bool(re.search(r"\bconst\b", raw))
             kind = "ref" if by_ref and not const else "const" if by_ref and (t in u.struct_fields or t.startswith("List<") or t == "Text") else ""
-            if not by_ref and t.startswith("List<") and p["id"] not in assigned and re.match(r"(?:const\s+)?(?:kern::)?Span<\s*const\s", raw.strip()):
-                kind = "const"   # (a view of a list to read - kern::Span<const T> - is that list, read where it stands: nothing is copied)
+            # (a view of a list to read - kern::Span<const T> - is a value: the entries the call hands, of a list or an
+            # array of a fixed length; a view to write through - kern::Span<T> - is the place, a reference input)
+            if not by_ref and t.startswith("List<") and re.match(r"(?:kern::)?Span<(?!\s*const\s)", re.sub(r"^const\s+", "", raw.strip())):
+                if any(n.get("kind") in ("BinaryOperator", "CXXOperatorCallExpr") and (n.get("opcode") == "=" or callee_name(n) == "operator=")
+                       and kids(n) and bare(kids(n)[0 if n.get("kind") == "BinaryOperator" else 1]).get("referencedDecl", {}).get("id") == p["id"] for n in walk(body)):
+                    raise Wait("a view to write through that is set to another list (the place it names changes)")
+                kind = "ref"
             if overrides and kind == "const":
                 kind = ""   # (what the engine hands an interface's function is a value: Graph::implements checks it so)
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
@@ -4887,10 +4942,14 @@ class Emit:
                             if not (x.get("name") or "").startswith("__") and x["id"] not in own:
                                 own.add(x["id"])
                                 grew = True
+        # (the iterators C++ makes for a range-for - __begin1, __end1 - are the loop's own: stepping them changes nothing
+        # else; what is written through them is written through the loop's variable, judged above)
+        stepped = {x["id"] for v in walk(body) if v.get("kind") == "CXXForRangeStmt" for c in kids(v) if c.get("kind") == "DeclStmt"
+                   for x in kids(c) if x.get("kind") == "VarDecl" and re.match(r"__(begin|end)\d*$", x.get("name") or "")}
         for i in sorted(self.assigned(body, steps=True), key=lambda x: (x is not None, str(x))):
             if i is None:
                 return "it changes what is not a variable of its own (through a pointer, a reference, the place a call gives)"
-            if i not in own:
+            if i not in own and i not in stepped:
                 v = next((x for x in [*kids(d), *walk(body)] if x.get("kind") in ("VarDecl", "ParmVarDecl") and x.get("id") == i), None) or self.tree.decl.get(i) or {}
                 what = "an input it is handed by reference or pointer" if v.get("kind") == "ParmVarDecl" else \
                        "a reference it declares" if v.get("kind") == "VarDecl" and qtype(v).rstrip().endswith("&") else \
@@ -8713,8 +8772,8 @@ class Emit:
         return {"kind": "UnaryOperator", "opcode": "*", "type": {"qualType": t}, "inner": [base]}
 
     def pointer_arg(self, a, entries, fixed=None):
-        """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
-        stands, read there (nothing is copied). `fixed`: the input is a list of that fixed length."""
+        """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list's entries,
+        as a value. `fixed`: the input is a list of that fixed length."""
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
@@ -8734,7 +8793,7 @@ class Emit:
             raise Wait("a pointer into a list of entries of another type")
         if lst.get("kind") == "_Text":
             return [lst["_text"], at]
-        return [self.place_arg(lst, lt, "const", []), at]
+        return [self.ex(lst, lt), at]   # (the entries, as a value: a view to read is no place)
 
     def place(self, n):
         """A place in a list as C++ names it (v.begin() + i, v.end(), an array's first entry + n, v.data(), a
@@ -10271,6 +10330,11 @@ class Emit:
                     if e not in u.enum_values or ref.get("name") not in u.enum_values[e]:
                         raise Wait(f"the value {ref.get('name')} of the enum {e} of a Blueprint's class, which the level does not have")
                     return f"{e}::{ref['name']}", e
+                if q is None:
+                    # (the value's own declaration not among the trees' - the dump of another namespace named it by
+                    # another address: its type is its enum)
+                    t = re.sub(r"^const\s+", "", self.ctype(b) or "").strip()
+                    q = t if t in self.tree.enums else None
                 if q is None:
                     raise Wait("an enum value of an enum without a name")
                 e = u.enum(q)
@@ -15717,9 +15781,10 @@ class TestWriter:
                     where.extend((first + x, first + y, k) for x, y, k in inner)
                     continue
                 if key[0] != "record":
-                    own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
+                    # (what an enum or an alias declares: its name - behind `enum class`, also behind a mark like KERN_BLUEPRINT_TYPE)
+                    own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?(?:[A-Z][A-Z0-9_]*\s+)*|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
                     d = tree.decl.get(key[1]) if key[0] == "function" and isinstance(key[1], str) else None
-                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else const_gives.get(key, ())
+                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else [self.absolute(key[1])] if key[0] == "enum" else const_gives.get(key, ())
                     add(key, self.with_usings(wide(text), tu_usings, wide, own_names, gives) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]
@@ -16296,27 +16361,19 @@ def objects_made(tree):
         visit(o, False)
     # (the program's entry, outside every namespace - `int kern_main() { static MyGame app; return kern::run(app); }`,
     # kern/app/run.h: the object made there is the program's one object of its App, as one in a function of the program)
-    for o in entry_dumps(tree.path, tree.flags):
+    for o in entry_dumps(tree):
         visit(o, False)
     return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
 
 
-def entry_dumps(path, flags):
+def entry_dumps(tree):
     """The program's entry `kern_main()` (kern/app/run.h), where this source file defines it - outside every namespace,
-    so the dump of the program's namespace does not have it: dumped by its name, annotated. [] where it has none."""
-    if is_header(path):
+    in the file's tree (unit_dump). [] where it has none."""
+    if is_header(tree.path):
         return []
-    try:
-        if not re.search(r"\bkern_main\s*\(\s*\)\s*\{", open(path, encoding="utf-8", errors="replace").read()):
-            return []
-    except OSError:
-        return []
-    me, out, st = os.path.abspath(path), [], {"file": ""}
-    for o in run_clang(path, "kern_main", flags, name=True):
-        annotate(o, st)
-        if o.get("kind") == "FunctionDecl" and o.get("name") == "kern_main" and os.path.abspath(o.get("_file") or "?") == me:
-            out.append(o)
-    return out
+    me = os.path.abspath(tree.path)
+    return [o for kind, name, o in tree.unit if kind == "FunctionDecl" and name == "kern_main" and os.path.abspath(o.get("_file") or "?") == me
+            and any(c.get("kind") == "CompoundStmt" for c in kids(o))]
 
 
 def engine_interface_of(tree, rec):

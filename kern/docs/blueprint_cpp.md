@@ -1109,6 +1109,18 @@ void on1(Float delta) {
   `<Eingang>.path`, je Listeneintrag ein Index-Eingang `<Eingang>.path0` …; „scope“ nennt die
   Funktion, in der der Aufruf steht). Der Platz hat genau den Typ des Eingangs – nichts wandelt
   sich um.
+- **Eine Sicht zum Lesen ist kein Platz** (Regel des Konverters, der Knoten der Engine und des Lesers
+  gleich): Ein `const T*`, durch den eine Funktion nur liest, und ein `kern::Span<const T>` sind im
+  Blueprint ein **Eingang als Wert** – `List<T> values` (der Zeiger dazu sein Platz darin, `Int
+  values_at`). Dorthin geht eine Liste jeder Länge und ebenso eine Liste fester Länge
+  (`const f32 rec[3]`, `Fixed<Float, 3>`: ihre Einträge als Liste) – ein Referenz-Eingang dagegen hätte
+  genau einen Typ. So ruft das Spiel `m.push_extra(rec)` der Engine (`MeshData::push_extra(const f32*)`)
+  mit einem Array, ein anderes mit `v.data() + k`. Eine Sicht zum **Schreiben** (`kern::Span<T>`) ist
+  der Platz: `List<T>& out`, ein Referenz-Eingang – was die Funktion hineinschreibt, steht beim
+  Aufrufer. Eine solche Sicht auf eine andere Liste zu setzen (`out = other;`) wartet mit Grund.
+  Die Knoten der Engine nehmen ein `Span<const T>` und einen `const T*` mit `Count` ebenso als Liste
+  (`tools/engine_api.py`). In der Klasse ist der Wert eine Liste des Aufrufs (aus einem Array: seine
+  Einträge kopiert); im Interpreter teilt er die Einträge, bis jemand schreibt.
 - **In jeder Stufe dasselbe.** In der Klasse ist der Eingang eine Referenz von C++. Im
   Interpreter ist er für die Dauer des Aufrufs der Platz, den der Aufruf genannt hat
   (`Instance::Spot`): Jeder Knoten, der ihn liest oder ändert, tut es dort. Nennt der Aufruf
@@ -1896,6 +1908,19 @@ Stufe). Was ein Knoten über Aufrufe hinweg behält (Do Once, Gate, Flip Flop, W
 immer ein Member. Der Leser nimmt einen solchen Wert auch als Member an (die Form früherer Texte – derselbe
 Blueprint); geschrieben wird er lokal. Eine Deklaration im Rumpf einer Funktion für einen Knoten, der nicht so
 dieser Funktion gehört, weist er ab.
+
+### Konverter: woher die Identität einer Deklaration kommt
+
+Der Konverter (`tools/cpp_to_blueprint.py`) liest jede Quelldatei mit **einem** Lauf des Compilers – ein Baum
+(`unit_dump`: `clang -ast-dump=json` ohne Filter), darin die Deklarationen jedes Namensraums: der des Programms,
+seine weiteren (`--program`), der der Engine, der eigene unbenannte der Datei, was außerhalb jedes Namensraums steht
+(Exporte, `kern_main`). Was in einem Kopf des Systems steht (Standardbibliothek, C-Bibliothek: außerhalb der Ordner
+des Programms und der Engine), wird überlesen, ohne als JSON gelesen zu werden. clang nennt einen Knoten bei seiner
+Adresse; so ein Name ist eine Identität **nur innerhalb dieses einen Baums** (ein Verweis `referencedDecl` und die
+Deklaration, auf die er zeigt, stehen im selben Lauf). Zwei Läufe werden nie über Adressen verbunden – sie träfen
+sich oder nicht nach Zufall (die Länge eines Pfads verschob sie). Darum ist die Ausgabe dieselbe, wo immer die
+Quellen liegen: `tools/converter_cases/run.sh` wandelt einen Fall aus zwei verschieden langen Ordnern und vergleicht
+Texte und Level Byte für Byte.
 
 ## Regeln: was kein Blueprint sein darf
 
