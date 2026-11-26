@@ -470,6 +470,11 @@ template <class T> struct Conv<Num<T>> {
   template <class C> static constexpr bool fits() {
     if constexpr (std::is_enum_v<C>) return std::is_same_v<std::underlying_type_t<C>, T> || sizeof(C) == sizeof(T);
     else if constexpr (is_count<C>) return std::is_same_v<T, u32>;
+    // (the same number under another name - u64 is unsigned long long on one platform and unsigned long on another; and a
+    // size of the platform, std::size_t, is the language's u64 on every platform - where it is 32 bits, the door widens and
+    // narrows it, which never cuts: no size is beyond the memory - kern/docs/blueprint_cpp.md "Zahl-Typen")
+    else if constexpr (std::is_integral_v<C> && std::is_integral_v<T> && !std::is_same_v<C, bool> && sizeof(C) == sizeof(T) && std::is_signed_v<C> == std::is_signed_v<T>) return true;
+    else if constexpr (std::is_same_v<C, std::size_t>) return std::is_same_v<T, u64>;
     else return std::is_same_v<C, T>;
   }
   template <class C> static void from(EngineObjects&, const Value& v, C& c) {

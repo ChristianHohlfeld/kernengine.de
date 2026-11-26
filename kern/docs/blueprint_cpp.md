@@ -522,6 +522,26 @@ nicht Zahl → Text, Zahl → Vector, bool ↔ Zahl).
 Ein Text, ein Level oder ein Projekt mit den alten Typnamen (`"float"`, `"int"`, `"int64"`, `Float`, `Int`, `U8` …)
 wird nicht gelesen – Fehler mit Ort und Grund; keine Rückwärtskompatibilität.
 
+**Das Datenmodell des Subsets** ist eines, unabhängig von der Plattform: das von 64-Bit-Linux (LP64). `int` ≡ i32,
+`unsigned` ≡ u32, `short` ≡ i16, `char` ≡ i8, `long` und `long long` ≡ i64, `unsigned long` und `unsigned long long` ≡ u64,
+`size_t` ≡ u64, `ptrdiff_t` ≡ i64; `long double`, `intptr_t` und `uintptr_t` sind Fehler des Konverters mit Ort. Der Blueprint
+rechnet auf JEDER Plattform so (auch in WebAssembly, wo die Klassen kern::u64 nutzen); die Bezugs-Übersetzung einer
+Subset-Quelle für den Vergleich ist die mit diesem Datenmodell (64 Bit nativ) - eine Subset-Quelle direkt als wasm32 zu
+bauen, ist nicht die Bezugsgröße.
+
+**Text eines Werts.** Kein Draht macht einen Text: eine Zahl wird Text durch `num_text<T>(x)` (To Text: eine ganze Zahl
+dezimal, eine Fließkommazahl die kürzeste Dezimalzahl, die sie wieder ergibt – `std::to_chars` –, `inf`, `-inf`, `nan`,
+bool `true`/`false`), eine Liste durch `list_text<T>(l)` (List to Text: `[1, 2.5, 3]`, jedes Element wie sein To Text).
+`kern::to<…>` gibt es nicht mehr. Ein Literal hat seinen Typ wie in C++: `0.5f` f32, `0.5` f64, `7` eine ganze Zahl, die
+in jeden Typ geht, der sie genau hält (`u8 x = 200;`), ein u64 jenseits von i64 mit `u` (`18446744073709551615u`); eine
+Liste nennt ihren Typ (`List<f32>{0.5f}`; `List<i64>{1}` ist keine `List<f64>`).
+
+**An der Tür der Engine** hat ein Pin den Typ der Signatur: `f32` bleibt `f32`, `u32` bleibt `u32`, ein `Vec3` sind drei
+f32 (`engine_values::Num<T>` in `engine_host.h`/`engine_direct.h`) – nichts wird an der Tür umgewandelt. Dieselbe Zahl
+unter anderem Namen (u64 ist auf einer Plattform `unsigned long`, auf einer anderen `unsigned long long`) ist dieselbe;
+`std::size_t` ist in der Sprache `u64` auf jeder Plattform – wo er 32 Bit hat (wasm32), wandelt die Tür, was nie
+abschneidet (keine Größe ist größer als der Speicher).
+
 ### Aufzählungen
 
 Ein Blueprint kann Aufzählungen (Enums) deklarieren: einen eigenen Typ mit benannten Werten, etwa

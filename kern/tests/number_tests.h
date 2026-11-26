@@ -4,6 +4,13 @@
 
 #include "number_cases.h"
 
+// The data model of the subset (kern/docs/blueprint_cpp.md "Zahl-Typen"): LP64 - where the engine is built natively (64-bit
+// Linux and macOS) C++ has it so, and the converter maps the types so on every platform.
+#if !defined(__wasm__)
+static_assert(sizeof(int) == 4 && sizeof(long) == 8 && sizeof(long long) == 8 && sizeof(std::size_t) == 8 && sizeof(std::ptrdiff_t) == 8 && sizeof(short) == 2,
+              "the data model of the subset is LP64");
+#endif
+
 TEST(numbers_against_cpp) {
   using namespace number_cases;
   namespace num = kern::logic::num;

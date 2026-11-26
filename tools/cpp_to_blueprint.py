@@ -2142,6 +2142,8 @@ class Unit:
         said = self.language_type(t)   # (a type of a Blueprint's class, or one of the language's own: what it is)
         if said is not None:
             return said
+        if re.fullmatch(r"(?:std::)?u?intptr_t", t.strip()):
+            raise Wait(f"a {t.strip()} (a pointer as a number has no place in the subset: its data model is LP64 without it)")
         if t in NUMBER or t in W64:
             return exact_type(t)
         if re.fullmatch(r"(?:kern::)?Count<\s*\d+\s*[uU]?\s*>", t):
