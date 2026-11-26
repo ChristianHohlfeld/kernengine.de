@@ -103,3 +103,13 @@ Nichts geht als „bitgenau" nach work, bis der ehrliche Durchgang für Murmel u
 **Zahl-Typen (work-zahlen):** Formel getypt, NaN-Regel als Regel der Sprache (kanonisch, wo Bits sichtbar werden), lokal alles grün (kern_tests 62.470, blueprint_native 83 Blueprints, game_native). CI noch nicht ganz grün (zuletzt UBSan: i64-Überlauf bei Add to Variable in der Klasse). Entschieden: KEIN -fwrapv; die Rechnung kommt vom Typ (Plätze der Sprache in Klassen = Typ mit den Operationen aus numbers.h). size_t: LP64 bleibt; Konverter-Prüfung (Hinweis) für Stellen, an denen die Breite das Ergebnis ändern kann — Zählung steht aus. JIT auf work-zahlen 1,0× (Performance-Schritt).
 
 Kandidat 9 (ac491f28) rechnet seit 13:55, noch ohne Ergebnis.
+
+## Nachtrag 26.11. 18:00
+
+Besitzer 17:57: „Du brauchst nichts von mir, do it." Damit entschieden (Koordinator):
+- **Bausteine** (koordination/bausteine_entwurf.md): Name „Bausteine"; strikt Blueprint, keine C++-Anteile; Vorlage im Level als Verweis; Soldat zieht erst mit Replikation von Blueprint-Variablen um; eigene Pakete von Projekten später; Apache 2.0 + Lizenzangabe je Asset mit CI-Prüfung. Reihenfolge 0 Schicht+grund/spielelemente, 1 spielfigur+kamera (Murmel), 2 fahrzeug+sitze, 3 leben/waffen/hud/soldat, 4 ragdoll/sitzung, 5 Micro Duck. Bau nach den Zahl-Typen.
+- **sinh/cosh/tanh/asinh:** musl-Quellen nicht holbar (Hosts gesperrt, Repo-Zugriff abgelehnt — nicht umgangen). Die Engine bekommt eigene Funktionen (neu geschrieben über exp/expm1/log/log1p/sqrt der Engine), eine Implementierung für Quelle/Blueprint/nativ/Wasm, mit Genauigkeits-Test gegen unabhängige Bezugswerte. Agent gate2 auf work-projekt. Daran hängen 31 wartende Funktionen.
+- **Live (main):** bleibt, wie es ist, bis die Zahl-Typen fertig sind.
+
+**MEILENSTEIN Zahl-Typen:** Engine-Suite auf work-zahlen ganz grün, CI 45858436873 (2e13c032): kern_tests 63.340/0, blueprint_native_test 84 Blueprints/46.217 Aufrufe, game_native_test, ASan+UBSan ohne Meldung. Offen dort: Konverter-Ausdrücke (Stufe 5), Engine-Konstanten/Mathe-Knoten, Murmel neu erzeugen, Editor, JIT getypt inline, SpawnCity.
+Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an sinh/tanh/asinh); Suite: noch 21 Compilerfehler statt 3262. Mathe-Test auf dem GCC-Bau rot → behoben (Compiler an Makros erkennen, pow(x,2) nicht als x*x; 4eb11583).
