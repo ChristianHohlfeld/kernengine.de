@@ -1,5 +1,68 @@
 # SpawnCity als Editor-Projekt: der Weg
 
+## Das Spiel seit dem 26.11.2026: eine Drohne über der echten Stadt
+
+Entscheidung des Besitzers (26.11., 18:07): der Umfang wird massiv verkleinert, damit die Engine heute
+vollständig wird und das Spiel lauffähig bleibt. SpawnCity ist jetzt ein kleines Spiel auf der Engine, gebaut
+wie Murmel (`kern/games/murmel`):
+
+- **Die App** `sc::SpawnCity` (`src/spiel.h`, `src/spiel.cpp`) – `kern::run(sc::game(), embedded_project())`
+  in `src/main.cpp`. Sie startet das Start-Level des Projekts (`level/spawncity.kproject`,
+  `level/spawncity.klevel`) als simulierte Welt ohne Spieler und holt die Drohne aus der Vorlage `Drone`
+  (`GameWorld::spawn`). Den festen Schritt der Drohne macht die App selbst: `GameWorld::step_once`, danach
+  `Drone::step`, je 1/240 s, so viele, wie die Zeit des Frames erlaubt. Es gibt kein `FixedStep` und keinen
+  Getter eines anderen Zustands. Die Shader-Erweiterungen (Fassaden: Strom 0, Wasser: Strom 1) sind Felder
+  der App.
+- **Die Drohne**: `drone.*` mit der unveränderten Flugregler-Firmware (`firmware/`), Modell `drone_art.*`.
+- **Die Stadt**: `city_stream`, `city_jobs`, `terrain`, `tiles`, `mvt`, `wire`, `facades`, `water_look`.
+  Kacheln, Höhen und Luftbilder holt die Seite.
+- **Steuerung, Einstellungen, Ton**: `controls`, `touch_play`, `settings`. Die Regel-Blueprints `Controls`
+  und `Settings` stehen im Level. `sound_fx` und Kerns Mixer gelten für `?audio=kern`, sonst spielt die
+  Seite den Ton des Originals aus `audio frame`.
+- **Exporte** (`src/main.cpp`): Kacheln/DEM/Luftbild (requests, data, failed), `sc_offline`, `sc_gamepad`,
+  `sc_mouse`, `sc_pointer_lock`, `sc_touch_frame`, `sc_touch`, `sc_touch_view`, `sc_hud`, `sc_command`,
+  `sc_audio_init`, `sc_audio_render`.
+- **Die Seite** (`web/`): Die 22 Dateien „Unchanged from the original SpawnCity“ (`web/view/`, `web/audio/`)
+  und `view/original.html` bleiben unverändert. `host.mjs` lädt Mehrspieler, VR, Leben und das Lücken-HUD
+  nicht mehr und blendet die Knöpfe entfernter Bereiche aus (CAR, Spieler-Modus, FIND MATE, Waffen,
+  Logbuch). Die Knöpfe TON, MUSIK und RESET bleiben (Einstellungen `audio.on` und `music.on`, Befehl `reset`).
+- **Tests**: `tests/test_spiel.cpp` lässt die App auf einer App-Laufzeit mit ihrem Projekt laufen. Sie bekommt
+  nur Tasten: scharf schalten, steigen, vorwärts fliegen, drehen, landen. Ein zweiter Lauf muss dieselbe
+  Spur fliegen. Dazu kommen die Befehle (TON, MUSIK, Kameras, Pause, Startort, RESET) und die Tests der
+  Bibliotheken (`test_drone`, `test_stream`, `test_terrain`, `test_map`, `test_controls`, `test_settings`,
+  `test_entry`). `tests/input_check.mjs` prüft die Eingabe im Browser an der Drohne.
+- **Level per Skript**: `tools/small_level.py` (hat aus dem Level des großen Spiels das kleine gemacht;
+  ein zweiter Lauf ändert nichts), `tools/level_templates.sh` (nur noch die Drohne).
+
+### Herausgenommen am 26.11. – kommt als Baustein der Engine zurück
+
+Nichts davon ist verloren: der letzte Stand mit allem ist **`d90426f3`** (Zweig `work-spiel`, Basis
+`work-projekt` 0a8f32cb). Herausgenommen in `1845b07c` (Quelle), `2d019e78` (Level/Projekt), `64de83ea` (Tests)
+und dem Commit der Seite. Diese Teile kommen als mitgelieferte Bausteine der Engine zurück (Soldat, Waffen,
+Fahrzeuge …; Entwurf: Zweig `koordination`, `koordination/bausteine_entwurf.md`):
+
+| Bereich | Dateien (`src/`, je `.cpp`/`.h`) | Tests, Seite, Level |
+|---|---|---|
+| Spielablauf des großen Spiels | `game` (Zustand `Game`, >800 Funktionen), `game_ui`, `game_look`, `game_world`, `game_controls`, `game_audio_web`, `game_details`, `game_lamps`, `rules.h` | `test_look`, `test_start`, `test_rules`, `test_main`-Fälle Wanted/CombatDetail/Guided/… |
+| Mehrspieler, Netz, Lobby | `net_session`, `mp_rules`, `mp_art`, `town_sync`, `game_net`, `game_worldsync`, `game_townsync`, `game_destruction_sync`, `game_projsync`, `game_toss`, `game_swarm`, `game_seats`, `nostr`; Programm-Blueprint `qr_code` | `test_mp`, `test_nostr`; `web/mp_host.mjs`; Exporte `sc_net_push`, `sc_net_take`, `sc_voice_push` |
+| Zu Fuß, Soldat, Waffen, Militär, Lenkwaffen, Ausrüstung, Jetpack | `weapons.h`, `game_weapons`, `game_foot_rounds`, `game_equipment`, `equipment`, `game_guided`, `guided`, `game_military`, `game_events`, `combat_rules`, `combat_detail`, `combat_art`, `game_combat.h`; Programm-Blueprint `combat_audio` | `test_combat`, `test_details`, `test_equipment`; Spieler und Kopf im Level; Regeln Military, Zombies, Sandbox, Fun, Race, Guided, CombatDetail, Jetpack |
+| Fahrzeuge, Verkehr, Passanten, Leben, Ragdoll, Zerstörung, Fahndung | `car`, `vehicle_art`, `game_traffic`, `game_traffic_far`, `game_vehicle_damage`, `world_traffic`, `road_graph`, `people`, `people_art`, `life`, `life_art`, `game_life`, `ragdoll`, `interiors`, `destruction`, `game_barricades`, `world_marks`, `world_art`, `lamps`, `wanted`, `game_town`, `game_gaps`, `gaps_rules`, `spawn_guard`; Programm-Blueprint `person_hit` | `test_car`, `test_traffic`, `test_town`, `test_life`, `test_destruction`, `test_gaps`; `web/life.mjs`, `web/gaps_hud.mjs`; Vorlagen Car, Bus; Regeln Wanted, Traffic, Lamps, Sirens, SpawnGuard |
+| Jet, Fallschirm | `jet`, `jet_seats` | `test_jet`; Vorlagen Jet, Parachute; Regel JetSeats |
+| VR | `game_vr` | VR-Teil von `web/host.mjs`; Export `sc_vr_hand` |
+| GPS live, Leistung | `gps_live`, `look`, `perf` | `test_start`, `test_look` |
+
+Die Tests der entfernten Bereiche gingen mit ihnen, ebenso ihre Differenztests (`tests/lowered`) und
+Vergleichstests (`tests/converted`). Es wurde kein Test abgeschwächt.
+
+**Bewusst noch offen (spätere Schritte):** Die Seite bekommt das HUD weiter als JSON (`sc_hud`), den Ton über
+die eigenen Exporte (`sc_audio_*`). Eingabe-Aktionen, Widgets und Mixer der Engine kommen erst, wenn die
+Seite des Originals das zulässt. Die Browser-Tests des großen Spiels in den Workflows auf Abruf
+(`tests/smoke.mjs`, `compare.mjs`, `profile.mjs`, `touch_*.mjs`, `view_check.mjs`, `shotfx_original.mjs`)
+und `tests/bench` (Kopien alter Quellen) sind noch nicht auf das kleine Spiel umgestellt.
+
+---
+
+
 Ziel: SpawnCity ist ein Projekt des Kern-Editors – ein Level, Blueprints und Daten – und wird vom
 Editor geladen und exportiert. Es enthält kein eigenes C++ mehr.
 
