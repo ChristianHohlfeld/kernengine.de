@@ -276,6 +276,68 @@ Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Um
 einer Aufzählung wandelt sich in nichts um, auch nicht mit `kern::to` (siehe „Aufzählungen“);
 für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 
+### Zahlen
+
+Die Sprache hat **eine** Kommazahl: `Float`, 64 Bit (IEEE 754 `double`), in jeder Stufe gleich –
+Interpreter, JIT, Klasse. Ganze Zahlen sind `Int` (mit den Breiten am Platz und `Int64`, unten).
+Ein 32-Bit-Float gibt es in der Sprache nicht. Eine Quelle im C++-Teilsatz und ihr Blueprint
+verhalten sich gleich – auch wenn die Quelle nativ gebaut wird, nicht nur im Vergleichstest.
+
+**Wie es bis zum 26.11.2026 war** (der Grund für diesen Abschnitt): Der Konverter las `float`,
+`double`, `kern::f32` und `kern::f64` einer Quelle still als Float. Der Vergleichstest übersetzt die
+Quelle ein zweites Mal „mit den Zahlen der Sprache“: durch Umschreiben ihres Texts
+(`TestWriter.widen`: `0.5f` → `0.5`, `float` → `double`, die Mathematik von `std::` → `kern::math`)
+und mit gespiegelten Typen (`kern/test/converted.h`, Namensraum `wide`: `f32` ist dort `double`,
+`Vec2`/`Vec3` halten ihre Komponenten als `Num32` – 32 Bit gespeichert, als Float gelesen). Der
+native Bau derselben Quelle rechnete aber mit `float`: Murmel hielt die Sekunden im Ziel als
+`kern::f32` (60 × f32(1/60) ist erst nach 61 Frames > 1, als Float schon nach 60) – nativ Level-Wechsel
+in Frame 349, als Blueprint in 348.
+
+**Der eine Weg:**
+
+1. **Eine Quelle hält und rechnet ihre Kommazahlen als `kern::Float`** (`kern/core/numbers.h`, ein
+   `double`) – der Name der Sprache, kein Typ, der 32 Bit verspricht. `float`, `double`, `kern::f32`,
+   `kern::f64` als Typ eines Felds, einer Variablen, eines Ein- oder Ausgangs, als Ziel einer
+   Umwandlung (`static_cast<f32>(n)`), ein Literal mit `f` (`0.5f`) und eine Rechnung, deren
+   Ergebnis ein `float` ist (`v.x * v.y` zweier Komponenten eines `kern::Vec3`), sind ein **Fehler des
+   Konverters** mit Datei, Zeile und dem richtigen Typ: `murmel.h:61: kern::f32 is no number of the
+   language - write kern::Float (64 bit)`. Nichts wird still umgedeutet.
+2. Damit rechnet der **native Bau** der Quelle mit denselben Zahlen wie ihr Blueprint, ohne
+   Umschreiben: dieselbe Quelle, derselbe Wert. Murmels Spieltest belegt es mit drei Wegen und einem
+   Ergebnis (`kern/games/murmel/tests/run.sh`: die App als Quelle nativ, als Blueprint im
+   Interpreter, als Klasse – derselbe Lauf, Zeile für Zeile).
+3. **Die Engine rechnet intern in 32 Bit.** Der Übergang ist die Grenze zu einem Typ der Engine,
+   nativ und im Blueprint gleich, und nur dort:
+   - eine Zahl der Engine *gelesen* (ein `f32`-Feld oder -Ergebnis, `Frame::dt`, eine Komponente
+     eines `kern::Vec3`): genau der Float desselben Werts – keine Rundung;
+   - ein Float *in* eine Zahl der Engine (ein `f32`-Eingang einer Funktion der Engine, ein `f32`-Feld
+     eines Structs der Engine, eine Komponente eines `kern::Vec3`): zur nächsten `f32` gerundet (zur
+     geraden bei Gleichstand, jenseits des Bereichs ±∞), wie C++ ein `double` zu einem `float` macht –
+     im Blueprint der Knoten der Engine und `Num32` ebenso;
+   - Vektoren und Matrizen des Spiels sind Typen der Engine (`kern::Vec3` ist der `Vector`): ihre
+     Komponenten sind Zahlen der Engine (oben); was sie als Ganzes tun (Addition, Länge, Kreuzprodukt …),
+     tun die Funktionen der Engine in 32 Bit, nativ wie im Blueprint.
+4. **Kosten:** Rechnen mit `double` kostet skalar so viel wie mit `float` (x86-64, WebAssembly).
+   Gemessen an Murmel nativ (2.700 Frames, `-O0`, die Quelle mit `kern::f32` gegen `kern::Float`): 6,0 s
+   und 6,8 s gegen 5,2 s und 6,8 s – im Rauschen. Mehr kosten nur viele Zahlen auf einmal (doppelter
+   Speicher, halbe SIMD-Breite) – Meshes, Physik und Grafik sind Sache der Engine und bleiben dort in
+   32 Bit.
+5. **Bestehende Quellen:** `tools/language_numbers.py` schreibt die Quellen eines Spiels auf
+   `kern::Float` um und berichtet vorher im Trockenlauf (`--dry-run`), wie viele Stellen es sind und
+   wo die Quelle in die Engine übergeht.
+
+**Vorübergehend – bis SpawnCity umgestellt ist:** Die Regel in 1. gilt nur mit der Option
+`--language-numbers` des Konverters (Murmel: `tests/convert.sh`; `tools/converter_cases`). Eingeführt am
+26.11.2026; sie fällt weg und die Regel gilt immer mit dem Schritt, der SpawnCitys Quellen mit
+`tools/language_numbers.py` umstellt (dann prüft der Konverter jede Quelle so).
+
+**Offen:** Eine Funktion aus einem Header der Engine, die der Konverter als Blueprint schreibt (etwa
+`kern/math/math.h` → `engine_math_math`), rechnet dort in 64 Bit, während die nativ gebaute Quelle die
+Funktion der Engine in 32 Bit ruft – dort ist der Übergang noch nicht an der einen Stelle oben. Der
+Trockenlauf von `tools/language_numbers.py` zählt solche Aufrufe. Und `Int` ist heute bis 2^53 genau
+(siehe „Int64“), nicht ein 64-Bit-Zweierkomplement wie `i64` – das zu ändern ist eine eigene
+Umstellung der Sprache (Interpreter, JIT, Web).
+
 ### Listen
 
 Eine Liste hält Werte **eines** Typs, in ihrer Reihenfolge; der erste Eintrag hat den Index 0. In
