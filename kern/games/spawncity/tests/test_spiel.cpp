@@ -58,6 +58,8 @@ Flight fly_once() {
   const double ms = 1000.0 / 60;
   kern::Vec3 start{};
   int settled = 0;   // frames the whole town has stood
+  std::string city_sig;   // what the city looked like the frame before
+  double sig_since = 0;    // since when (the clock, ms)
   unsigned long long steps0 = 0;   // the fixed steps before the flight
   // the autopilot's plan, in seconds after the drone stands on the ground
   for (int frame = 0; frame < 60 * 400; ++frame) {
@@ -71,11 +73,19 @@ Flight fly_once() {
     }
     rt.frame(frame * ms, false);
     sc::SpawnCity& g = sc::game();
-    // The town is built in slices of the frame's time (city_stream.h: a budget of milliseconds), so when it stands
-    // depends on the machine; the flight begins once it stands whole - no tile, no job left - with RESET (the drone
-    // anew at the start): from there on every run is the same.
-    if (f.placed_at < 0 && g.placed() && g.city().stats().tiles_loading == 0 && kern::jobs::pending() == 0) {
-      if (++settled < 60) continue;
+    // When the town stands depends on the clock, not only on the frames: its cells are built in slices of the frame's
+    // milliseconds, chosen again at most every second (CityStream::select_cells), the collision set round the drone
+    // built again at most every 250 ms (world_building_collisions.mjs). So the flight waits until nothing of the city
+    // changes - its triangles, meshes, uploads, layings and colliders, the ground and the walls round the drone whole
+    // (CityStream::ready_at) - for 120 frames and two seconds of the clock; then RESET puts the drone anew at the start
+    // and the flight begins: from there on every run is the same.
+    if (f.placed_at < 0) {
+      const auto& st = g.city().stats();
+      char sig[160];
+      std::snprintf(sig, sizeof sig, "%u %u %u %u %u", st.triangles, st.meshes, st.uploads, st.relays, st.colliders);
+      const bool still = g.placed() && st.tiles_loading == 0 && kern::jobs::pending() == 0 && g.city().ready_at(g.drone_position());
+      if (!still || city_sig != sig) { city_sig = sig; settled = 0; sig_since = kern::now_ms(); continue; }
+      if (++settled < 120 || kern::now_ms() - sig_since < 2000) continue;
       g.command("reset");
       f.placed = true;
       f.placed_at = frame;
@@ -147,6 +157,10 @@ KERN_TEST(spiel_commands) {
   KERN_CHECK(g.command("pause 1") == "paused" && g.command("pause 0") == "running", "pause");
   KERN_CHECK(g.command("start 99 0") == "usage: start <lat> <lon> [name]", "a start place outside the map is refused");
   KERN_CHECK(g.command("net host") == "unknown command" && g.command("mode foot") == "unknown command", "what the small game has not is said, not pretended");
+  const std::string hud = g.hud_json();
+  KERN_CHECK(hud.find("WASD fly · SPACE / SHIFT up / down · MOUSE turn · R arm · C camera · ESC menu") != std::string::npos && hud.find("weapon") == std::string::npos &&
+                 hud.find("on foot") == std::string::npos,
+             "the help line names only the drone's keys");
   const std::string frame = g.command("audio frame");
   KERN_CHECK(frame.front() == '{' && frame.find("\"set\":{\"soundEnabled\":0,\"musicEnabled\":0") != std::string::npos, "the original's sound reads the settings: %s", frame.substr(0, 160).c_str());
   for (int i = 0; i < 60 * 300 && !g.placed(); ++i) rt.frame(i * 1000.0 / 60, false);

@@ -289,8 +289,8 @@
         },
         {
          "Mode": "drone",
-         "Weapon": true,
-         "Line": "WASD fly · SPACE / SHIFT up / down · MOUSE turn · RMB look · LMB fire · R arm · C camera · 1-3 / Q weapon · V on foot · M map · ESC menu"
+         "Weapon": false,
+         "Line": "WASD fly · SPACE / SHIFT up / down · MOUSE turn · R arm · C camera · ESC menu"
         },
         {
          "Mode": "car",
