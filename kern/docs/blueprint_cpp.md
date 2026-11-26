@@ -1225,6 +1225,43 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+#### Die Bibliotheken der Engine
+
+Was die Engine über sich selbst sagt, liefert die Engine und nicht das Level eines Spiels. Jeder Header der Engine, den ein
+Blueprint benutzen kann, ist eine **Bibliothek der Engine**. Ihr Name folgt dem Pfad: `kern/physics/physics.h` heißt
+`engine_physics_physics`. Sie enthält die Funktionen, die der Header definiert, und die Typen, die er für Blueprints
+**ausdrücklich kennzeichnet**:
+
+```cpp
+struct KERN_BLUEPRINT_TYPE Pose { Vec3 position; Quat rotation; };      // kern/core/base.h
+enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
+```
+
+- Nur gekennzeichnete Typen sind Werte eines Blueprints. Die übrigen Typen bleiben in der Engine, etwa `logic::Graph`,
+  `game::Level`, `game::Actor` und die Komponenten. Ein Knoten der Engine, der einen ungekennzeichneten Typ nimmt oder
+  gibt, ist kein Knoten (`tools/engine_api.py --list` nennt ihn mit Grund).
+- **Erzeugt beim Bau der Engine:** `tools/engine_api.py --libraries` übersetzt die Header (`tools/cpp_to_blueprint.py
+  --engine <header>`) und schreibt `kern/src/logic/engine_libraries.gen.cpp`. Die Datei steht wie die anderen `*.gen.*`
+  im Repo, deshalb braucht der Bau kein clang. Jede Bibliothek hat eine **Marke** (Hash ihres Textes).
+- **Da in jeder Laufzeit, in jedem Leser und im Editor**, ohne dass ein Level sie enthält (`kern/logic/engine_libraries.h`).
+  `with_engine(blueprints)` ist der eine Weg, auf dem jeder Leser eine Bibliothek findet: Ein Name der Engine ist immer
+  die Bibliothek der Engine. libraries_of, take_libraries, link, from_cpp und apply_cpp gehen ihn selbst.
+- **Ein Level enthält keine Bibliothek der Engine und keine Kopie ihrer Typen oder Funktionen.** Es nennt sie in `uses`
+  und notiert ihre Marken (`"engine": {"engine_physics_physics": "<marke>"}`). Beim Lesen bekommt jeder Blueprint, was er
+  von ihnen benutzt, aus der Engine (`hold_engine`). Bekommt ein Engine-Struct ein Feld dazu, bleibt das Level gültig.
+  Ein Level, das doch eine Kopie hält (einen Akteur `engine_*` oder einen Typ oder eine Funktion mit
+  `"from": "engine_…"`), wird abgelehnt, mit Akteur, Name und Grund. Einen zweiten Leseweg gibt es nicht.
+- Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
+  und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
+- Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.
+- Ihre Klassen schreibt `tools/blueprint_cpp` aus den Graphen der Engine, nicht aus dem Level. Die Felder binden deshalb immer
+  so, wie der Header der Engine sie deklariert.
+- `tools/engine_api.py --check <level | texte>` nennt, was ein Level oder ein Verzeichnis von Texten von den
+  Bibliotheken der Engine braucht, das diese nicht haben (Typen und Funktionen, mit wer sie nennt). Das geht ohne clang
+  und ohne vollen Lauf.
+- Ein Level notiert die Marken. Passt ein Blueprint beim Lesen nicht mehr zur Engine, nennt die Meldung, was sich seither
+  geändert hat (`engine_physics_physics: written with …, the engine has …`).
+
 ### Exporte: eine Funktion unter festem C-Namen
 Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines
 Programms schreibt dafür `KERN_EXPORT(name)`. Ein Blueprint kann das selbst: Die Funktion trägt den Namen
@@ -1238,8 +1275,7 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
 - Ein Wort je Eingang und je C-Parameter, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner).
   `i32`, `u32`, `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie,
   wie C++ wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger auf die
-  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Zeiger auf die Zeichen,
-  gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
+  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Stück (unten). `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
   der Bytes, so viele, wie das `len` danach sagt (es muss folgen). `len`: ein Int-Eingang, die Länge davor
   (u32) – so kommt das C++ `const char* text, u32 length` eines Programms Wort für Wort herüber.
   `at`: ein Int-Eingang ohne C-Parameter, direkt nach `bytes` – der Platz in der Liste. Ein Zeiger des C++ ist
@@ -1247,13 +1283,30 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   der Anfang, also 0. So wird `const u8* bytes, u32 length` zu `bytes at len`. `floats`: wie `bytes`, ein Zeiger
   auf f32 – eine `List<Float>`, jede Zahl, wie C++ ein f32 wandelt (`const f32* samples, u32 count` wird
   `floats at len`).
-- Heraus geht auch eine Liste: `bytes` (eine `List<Int>`) und `floats` (eine `List<Float>`) geben einen Zeiger auf
-  ihre Einträge als u8 bzw. f32 (wie C++ wandelt), gehalten vom Export selbst bis zu seinem nächsten Aufruf; wie viele
-  es sind, weiß der Host (wie beim C++ eines Programms, das `const f32*` gibt). Eine leere Liste gibt keinen (null).
-- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
-  die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
-  `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
-  keine, gibt sie 0, einen leeren Text, nichts.
+- Heraus geht ein Text oder eine Liste – `bytes` (eine `List<Int>`, jeder Eintrag als u8), `floats` (eine
+  `List<Float>`, jede als f32), wie C++ wandelt – als Stück `{Zeiger, Länge}`: Die C-Funktion hat einen letzten
+  Parameter `u32* out_len`, einen Platz, den der Host gibt; sie gibt den Zeiger zurück und schreibt die Länge dorthin.
+  Leer: null (ein Text: `""`), Länge 0. Das Stück gehört dem Export selbst – jede Export-Funktion hält ihren eigenen
+  Platz (`kern::logic::export_text<&f>`, `export_bytes<&f>`, `export_floats<&f>` in `kern/logic/blueprint_class.h`),
+  bis sie das nächste gibt: Kein Export überschreibt, was ein anderer gab, und ein Aufruf auf einem anderen Faden
+  (der Audio-Rückruf) berührt nur seinen Platz. Hält der Platz schon so viel, fragt der Export keinen Speicher an.
+  Das C++ eines Programms gibt ebenso (`return kern::logic::export_text<&sc_hud>(hud_json(), out_len);`); der
+  Konverter liest so einen Export als Funktion, die den Wert gibt, und `out_len` als keinen Eingang.
+- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen, die die
+  Funktion am Objekt ruft, das das Programm gebunden hat (`kern::logic::bind_blueprint<T>(runtime)` – die erste
+  Instanz, die als T läuft – oder `bind_blueprint<T>(instance)` für genau diese; `kern/logic/blueprint_class.h`).
+  Nichts bindet still, keine Instanz wird „die zuletzt gestartete“; nichts wird beim Namen gesucht. Die
+  Programm-Laufzeit (`kern::game::Program`, `kern/docs/project.md` 4.) bindet beim Start jeden ihrer Blueprints, der als
+  Klasse mit Exporten läuft (`NativeBlueprint::bind_exports`, im Kleber: `bind_blueprint_object`), und löst sie am Ende;
+  zwei Objekte einer solchen Klasse im Programm: der Start wird mit dem Namen abgewiesen (`program_binds_the_exports`).
+  Ein Export in einem Blueprint einer **Welt** wird abgewiesen: beim Lesen des Levels mit Stelle, von `validate`
+  (Play startet nicht) und im Editor als Fehler des offenen Blueprints.
+- **Exporte gehören zum Programm, nicht zu Welten:** je Klasse ist genau ein Objekt gebunden. Ein zweites
+  `bind_blueprint`, solange eines gebunden ist, wird mit Fehler abgewiesen (`kern::fail`: „… is bound already“) – wer
+  umbinden will, sagt es (`rebind_blueprint`) oder löst vorher (`unbind_blueprint`). Ein gebundenes Objekt, das endet,
+  löst sich selbst (Kleber). Wird ein Export gerufen, während nichts gebunden ist, meldet er das über den Fehlerweg der
+  Engine mit seinem Namen und Grund (`kern::logic::export_unbound`: „the export sc_hud: no instance of its Blueprint is
+  bound“) und gibt dann ein leeres Stück – kein stiller Wert.
 - Interpreter und JIT haben keine Exporte: ein Export gibt es im Programm, das die Klassen übersetzt.
 - `logic::export_ok` sagt, was nicht passt (der Leser und das Level weisen es ab).
 
@@ -1503,7 +1556,7 @@ struct Site : virtual kern::Blueprint, virtual Ground {
 
 ### Schnittstellen der Engine (ein Blueprint als Objekt, das die Engine ruft)
 
-Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (configure, extensions, start, update, resized, stop),
+Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (extensions, start, update, resized, stop),
 `kern::ShaderExtension` (name, die Stücke des Shader-Texts, bind, frame_uniforms …) – ist eine **Schnittstelle**: die
 Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheidung E-c2). Anders als ein Callback (eine
 Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.
@@ -1549,19 +1602,20 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
   Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
   `engine_interface_a_class_implements`.
-- **Ein Knotentyp aus einem Objekt** (`kern/logic/node_type.h`): eine Klasse, die `kern::logic::NodeType` ist (`type`,
-  `label`, `event`, `run`), meldet `kern::logic::register_node_type(&objekt)` als Knotentyp an – sein `run` ruft das
-  Objekt (ein Blueprint der Programm-Laufzeit über den Adapter). Der Konverter macht aus einer Anmeldung keinen
-  `NodeDef` und kein Ereignis mehr: der Knoten bleibt im Level-Graphen der Welt (Reihenfolge der Ticks wie heute).
-  Geprüft: `node_type_of_an_object`.
-- **Die App aus dem Level** (`kern/game/level_app.h`): ein Programm ohne eigenes `kern_create_app()` bekommt das der
-  App-Laufzeit (schwach): `kern_level_app` liest das Level, das das Programm trägt (`kern_level_text()`), und startet
-  EINE Logik-Laufzeit nur für die Blueprints des Ordners, den das Projekt als Programm nennt (`"project": {"program":
-  "<Ordner>"}`, `ProjectSettings::program`) – ohne Welt, ohne Renderer; die Bibliotheken, die sie nutzen, kommen aus dem
-  ganzen Level. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints dort, der `App` implementiert.
-  Nennt das Projekt kein Programm, keinen Blueprint im Ordner oder nicht genau eine App, gibt es keine App, und das Log
-  sagt warum (kein Ordner ist das Programm nur durch seinen Namen). Die Welten startet das Programm selbst
-  (GameWorld als Objekt der Engine): jede ist eine Laufzeit neben der des Programms. Geprüft: `app_from_the_level`.
+- **Der feste Schritt einer Welt** (`kern/game/runtime.h`, `kern/docs/project.md` 6.1): ein Objekt, das
+  `kern::game::FixedStep` ist (C++ oder ein Blueprint mit `kern::Implements<kern::game::FixedStep>`), gibt das Programm
+  seiner Welt mit `GameWorld::set_fixed_step`; die Welt ruft `fixed_step(dt)` in jedem festen Schritt nach der Physik
+  und vor dem Event Tick der Blueprints. Geprüft: `game_world_fixed_step`. (Die frühere Anmeldung eines Knotentyps aus
+  einem Objekt, `register_node_type`, ist entfernt.)
+- **Die App aus dem Projekt** (`kern/game/program.h`, `kern/docs/project.md` 4.): der Einstieg des Programms
+  `int kern_main() { return kern::run(kern::game::embedded_project()); }` startet ein `kern::game::Program`: EINE Logik-Laufzeit der
+  Programm-Blueprints des Projekts (`"blueprints"`), in ihrer Reihenfolge – ohne Welt, ohne Renderer; ihre Bibliotheken
+  findet sie nur im Projekt. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints, der `App`
+  implementiert. Keine Programm-Blueprints, keiner oder zwei mit `App` (mit Namen), ein zweiter Start, solange es läuft:
+  kein Start, und die Meldung sagt warum. Die Welten startet das Programm selbst (GameWorld als Objekt der Engine): jede
+  ist eine Laufzeit neben der des Programms; ihre Blueprints finden Bibliotheken erst im Level, dann im Projekt
+  (`GameWorld::set_project`), derselbe Name an beiden Orten ist ein Fehler. Geprüft: `program_from_the_project`,
+  `game_project_library_search`.
 - **Zeiger und Referenzen:** was die Engine durch einen Zeiger mit einem `Count` daneben gibt, ist eine Liste
   (`send(to, const u8* data, Count<1> bytes)`); was die Funktion durch eine Referenz schreibt (`Address& from`), ist ein
   Eingang und ein Ausgang – gesetzt auf das, was der Blueprint gibt; was sie durch einen Zeiger mit Count schreibt

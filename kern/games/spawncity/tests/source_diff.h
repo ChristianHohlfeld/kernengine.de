@@ -66,7 +66,13 @@ template <class K, class H> struct is_set<kern::Set<K, H>> : std::true_type {};
 template <class T> struct is_owned : std::false_type {};
 template <class T, class D> struct is_owned<std::unique_ptr<T, D>> : std::true_type {};
 /// An object held from outside - by a pointer or owned (std::unique_ptr): the engine's physics world, a server.
-template <class T> inline constexpr bool is_held = (std::is_pointer_v<T> && std::is_class_v<std::remove_cv_t<std::remove_pointer_t<T>>>) || is_owned<T>::value;
+/// (only of a class the test sees whole: an object of a class a header only declares - the old program's Terrain::Job,
+/// CityStream::Tile behind a std::unique_ptr - the test can neither make nor read; it is what its file keeps to itself)
+template <class T> concept Complete = requires { sizeof(T); };
+template <class T> struct owned_complete : std::false_type {};
+template <class T, class D> struct owned_complete<std::unique_ptr<T, D>> : std::bool_constant<Complete<T>> {};
+template <class T> inline constexpr bool is_held = (std::is_pointer_v<T> && std::is_class_v<std::remove_cv_t<std::remove_pointer_t<T>>> &&
+                                                    Complete<std::remove_cv_t<std::remove_pointer_t<T>>>) || owned_complete<T>::value;
 /// The class of the object such a value holds.
 template <class T> using Pointee = std::remove_cv_t<std::remove_reference_t<decltype(*std::declval<T&>())>>;
 /// The call the test is at (Tally::more counts): what the test makes for one call lives until the next begins.

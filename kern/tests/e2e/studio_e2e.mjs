@@ -581,6 +581,32 @@ const vpCenter = async (page, i = 0) => {
     await page.click(box("components.colliders.0.mask", 2));
     check(await until(async () => (await bitsOf("components.colliders.0.mask")) === 4294967291), "channels: unticking Drone under Collides with clears only that bit");
   }
+  // The project (kern/docs/project.md) in the outliner: its program Blueprints added and opened in the Blueprint editor,
+  // its levels and start level, saved and opened from a .kproject file; a wrong one says where and why.
+  {
+    // (on a desktop the outliner stands beside the viewport: no tabs)
+    await page.click("#projectBox > summary");
+    await cmd(page, {cmd: "projectSet", levels: ["levels/a.klevel", "levels/b.klevel"]});
+    check(await until(async () => await page.locator('#projectBody input[name="projectStart"]').count() === 2), "project: the outliner lists its levels");
+    await page.check('#projectBody input[name="projectStart"][value="levels/b.klevel"]');
+    check(await until(async () => (await state(page)).project.startLevel === "levels/b.klevel"), "project: a click on a level makes it the start level");
+    await page.fill("#projectBpName", "Spiel");
+    await page.click('#projectBody [data-act="addBp"]');
+    check(await until(async () => (await state(page)).project.blueprints.map(b => b.name).join() === "Spiel"), "project: a program Blueprint is added by name");
+    await page.click('#projectBody .prow[data-name="Spiel"] [data-act="openBp"]');
+    check(await until(async () => { const l = (await state(page)).logic; return l?.open && l.program && l.ownerName === "Spiel"; }), "project: a click opens the program Blueprint in the Blueprint editor");
+    await cmd(page, {cmd: "logicClose"});
+    const saved = await cmd(page, {cmd: "projectSave"});
+    check(saved.ok && saved.file === "Untitled.kproject" && JSON.parse(saved.text).blueprints[0].name === "Spiel", "project: Save gives the .kproject with its Blueprints");
+    await page.fill("#projectBpName", "Spiel");
+    await page.click('#projectBody [data-act="addBp"]');
+    check(await until(async () => /the project has a Blueprint "Spiel" already/.test(await page.locator("#toast").textContent())) &&
+          (await state(page)).project.blueprints.length === 1, "project: a name stands once (the page says so)");
+    await page.setInputFiles("#fileProject", {name: "bad.kproject", mimeType: "application/json", buffer: Buffer.from('{"format":"kern-project","startLevel":"x"}')});
+    check(await until(async () => (await state(page)).log.some(e => /startLevel "x": is none of the project.s levels/.test(e[1]))), "project: a wrong file is refused with where and why");
+    await page.setInputFiles("#fileProject", {name: "Spiel.kproject", mimeType: "application/json", buffer: Buffer.from(saved.text.replace('"Untitled"', '"Zweites"'))});
+    check(await until(async () => (await state(page)).project.name === "Zweites" && !(await state(page)).project.dirty), "project: a .kproject opens from a file");
+  }
   check(errors.length === 0, "no page errors in the module build" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await ctx.close();
 }

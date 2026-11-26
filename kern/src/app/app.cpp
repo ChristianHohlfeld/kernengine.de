@@ -1,7 +1,8 @@
 // Application runtime: Input bookkeeping and the C ABI the platform layer
-// (kern/web/app.mjs) drives. The App is the program's kern_create_app() - or, where it defines none, the App of the
-// level it carries (kern_level_app, kern/game/level_app.h).
+// (kern/web/app.mjs) drives. The App and the project's settings are what the program's kern_main() handed over with
+// kern::run (kern/docs/project.md 4.).
 #include "kern/app/app.h"
+#include "kern/app/run.h"
 
 #include <cmath>
 #include <cstdio>
@@ -154,33 +155,38 @@ u64 g_frame = 0;
 bool g_running = false;
 }  // namespace
 
-/// The text of the level's member "project" (kern/app/project.h): a game built from a level defines it (SpawnCity:
-/// tools/embed_level.py writes it into level_data.cpp); without, the App decides (configure(), start()).
-extern "C" __attribute__((weak)) const char* kern_project_text(u32* length) {
-  *length = 0;
-  return nullptr;
-}
-
 namespace kern {
+/// The renderer the project's settings start: the device profile the launch argument profile=<name> names, else the
+/// project's. A name the project has no profile of: an error in the log with the names it has, and the project's.
+RendererOptions start_renderer(const ProjectSettings& p, const Engine& e) {
+  const std::string want = e.arg("profile", "");
+  if (want.empty()) return p.renderer;
+  if (const DeviceProfile* d = p.profile(want)) return d->renderer;
+  std::string names;
+  for (const DeviceProfile& d : p.profiles) names += (names.empty() ? "" : ", ") + d.name;
+  log(LogLevel::error, "the launch argument profile=%s names no device profile of the project (it has: %s) - the renderer starts with the project's",
+      want.c_str(), names.empty() ? "none" : names.c_str());
+  return p.renderer;
+}
 /// Between the renderer's init and App::start: the heap grown once - one block taken and given back stays in the
-/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece -
-/// and with mobile=1 the phone's shadows and ambient occlusion on the renderer.
-void apply_project_start(const ProjectSettings& p, Engine& e) {
+/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece.
+void reserve_heap(const ProjectSettings& p) {
   if (p.heap_reserve_mb > 0)
     if (void* reserve = std::malloc(static_cast<std::size_t>(p.heap_reserve_mb) << 20)) std::free(reserve);
-  if (p.mobile_set && e.arg_number("mobile", 0) > 0) {
-    ShadowOptions s = p.mobile_shadow;
-    e.renderer().set_shadows(&s);
-    e.renderer().set_ambient_occlusion(p.mobile_ao);
-  }
 }
-/// The project's settings the program carries (kern_project_text()).
-ProjectSettings program_project() {
-  u32 n = 0;
-  const char* text = kern_project_text(&n);
-  ProjectSettings p;
-  if (text) project_from_text(std::string_view(text, n), p);
-  return p;
+namespace {
+/// The project's settings the program's kern_main() handed over with its App (kern::run).
+ProjectSettings g_settings;
+}  // namespace
+
+int run(App& app, const ProjectSettings& settings) {
+  if (g_app) {
+    log(LogLevel::error, "kern::run: the program has given its App already - kern_main hands over one App, once");
+    return 1;
+  }
+  g_app = &app;
+  g_settings = settings;
+  return 0;
 }
 }  // namespace kern
 
@@ -189,27 +195,20 @@ Engine& engine_instance() {
   return engine;
 }
 
-/// The App of a program that makes none itself: the program's level's (kern/game/level_app.h - the engine's object of
-/// the one Blueprint there that implements App), where the game runtime is linked in; else none. A program's own
-/// kern_create_app() wins.
-extern "C" __attribute__((weak)) App* kern_level_app(Engine& engine);
-__attribute__((weak)) App* kern_create_app() { return kern_level_app ? kern_level_app(engine_instance()) : nullptr; }
-
 /// Launch parameters, before kern_app_start ("k=v&k2=v2", URL-encoded).
 KERN_EXPORT(kern_app_set_args) void kern_app_set_args(const char* text, u32 length) { engine_instance().set_args(text, length); }
 
 KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   if (g_running) return 1;
-  g_app = kern_create_app();
-  if (!g_app) { fail("no application"); return 0; }
+  if (!g_app) { fail("no App: the program's kern_main() hands the engine its App with kern::run (kern/docs/project.md 4.)"); return 0; }
   Engine& engine = engine_instance();
   g_engine = &engine;
-  const ProjectSettings project = program_project();
-  RendererOptions options = project.set ? project.renderer : g_app->configure();
+  const ProjectSettings& project = g_settings;
+  RendererOptions options = start_renderer(project, engine);
   options.width = width;
   options.height = height;
   if (!engine.renderer().init(options, g_app->extensions())) return 0;
-  if (project.set) apply_project_start(project, engine);
+  reserve_heap(project);
   if (!g_app->start(engine)) return 0;
   g_running = true;
   g_start_ms = g_last_ms = -1;

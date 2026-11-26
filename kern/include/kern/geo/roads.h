@@ -12,7 +12,7 @@
 
 namespace kern {
 
-struct RoadOptions {
+struct KERN_BLUEPRINT_TYPE RoadOptions {
   f64 center_x = 0, center_y = 0;
   f64 radius = 800;         // segments farther than this (+ margin) are skipped
   f64 chunk_size = 420;
@@ -83,7 +83,7 @@ bool build_terrain_tile(f64 x0, f64 y0, f64 step, u32 cells, Rgb albedo, HeightS
                         f64* max_height = nullptr);
 
 /// WGS84 local tangent plane: metres east/north of an origin (degrees).
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;

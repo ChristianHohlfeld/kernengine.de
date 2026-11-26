@@ -418,6 +418,10 @@ json::Value Studio::menu_json(std::string_view name) const {
     m.push(entry("Save", cmd("ui", "action", "save"), "Ctrl+S"));
     m.push(entry("Save As...", cmd("ui", "action", "saveAs"), "Ctrl+Shift+S"));
     m.push(separator());
+    m.push(entry("New Project", cmd("ui", "action", "newProject"), "", editing));
+    m.push(entry("Open Project...", cmd("ui", "action", "openProject"), "", editing));
+    m.push(entry("Save Project", cmd("ui", "action", "saveProject")));
+    m.push(separator());
     m.push(entry("Import Texture...", cmd("ui", "action", "importTexture"), "", editing));
     m.push(entry("Package Game (HTML)...", cmd("dialog", "name", "export"), "", editing));
     m.push(separator());
@@ -916,6 +920,7 @@ json::Value Studio::state() {
   s.set("prefs", std::move(pr));
   s.set("activeViewport", active_view_);
   s.set("viewports", viewports_json());
+  s.set("project", project_json());
   s.set("outliner", outliner_json());
   s.set("details", details_json());
   s.set("world", world_json());
@@ -1247,6 +1252,9 @@ json::Value Studio::run(const json::Value& c) {
   auto view_index = [&]() { return c["viewport"].is_number() ? clamp(static_cast<u32>(num("viewport")), 0u, 3u) : active_view_; };
   if (name.rfind("logic", 0) == 0) return logic_command(name, c);
   if (name.rfind("trainer", 0) == 0) return trainer_command(name, c);
+  if (name == "projectNew" || name == "projectOpen" || name == "projectSave" || name == "projectSaved" || name == "projectSet" ||
+      name == "projectBlueprint")
+    return project_command(name, c);
 
   // ---- selection ----
   if (name == "select") {

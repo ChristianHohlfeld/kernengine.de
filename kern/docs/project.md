@@ -25,7 +25,7 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   "name": "Mein Spiel",
   "settings": {
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
-    "mobile": { "shadow": { … }, "ao": { … } },
+    "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } } } ],
     "heapReserveMb": 0
   },
   "levels": ["levels/start.klevel", "levels/wald.klevel"],
@@ -38,8 +38,12 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
 }
 ```
 
-- `settings` enthält die heutigen Projekt-Einstellungen (`kern/app/project.h`, `ProjectSettings`). Die Engine wendet sie
-  vor dem Start des Renderers an. Ein Level hat dann keinen Abschnitt `"project"` mehr.
+- `settings` (`kern/app/project.h`, `ProjectSettings`) ist der **eine** Weg, den Renderer einzurichten (die App hat kein
+  `configure`): `renderer`, die Geräteprofile `profiles` (je Name und Renderer – der des Projekts mit den Schlüsseln
+  des Profils darüber; gewählt beim Start mit dem Startparameter `profile=<name>`, ein unbekannter Name ist ein Fehler
+  im Log mit den vorhandenen Namen) und `heapReserveMb` (0–4095). Die Engine wendet sie vor dem Start des Renderers an;
+  `kern::run` übergibt sie (4.). Das feste Telefon-Feld `"mobile"` früherer Dateien, ein Profil ohne Namen oder mit
+  doppeltem Namen: Fehler mit Stelle. Ein Level hat keinen Abschnitt `"project"`.
 - `levels` nennt die Levels des Projekts (Pfade relativ zur Projekt-Datei), `startLevel` das erste davon. Welches Level
   wann läuft, entscheidet das Programm (siehe 4.); `startLevel` ist nur die Vorgabe, die der Editor bei Play öffnet und
   die ein Programm ohne eigene Wahl nimmt.
@@ -56,14 +60,17 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
  └──────────────────────────────┘                 └──────────────────────────────────────┘
           ▲                                                    │
           └──── Welt → Programm nur über Objekte der Engine ───┘
-               (Knotentyp des Projekts, Schnittstellen wie App)
+               (fester Schritt, Schnittstellen wie App)
 ```
 
 - Beim Start entsteht **genau eine Programm-Laufzeit** mit allen Programm-Blueprints des Projekts, in ihrer Reihenfolge.
   Sie hat einen eigenen Host: keine Welt, keine Simulationszeit, eigene Objekte der Engine. Begin Play läuft einmal.
 - Eine **Welt** startet das Programm selbst, über die Knoten der Engine (`GameWorld` machen, ein Level des Projekts
   laden, starten). Der Handle der GameWorld ist ein Wert des Programms. Ein Levelwechsel bedeutet: Welt beenden, nächste
-  Welt starten. Die Programm-Laufzeit bleibt dabei bestehen. Mehrere Welten zugleich sind möglich.
+  Welt starten. Die Programm-Laufzeit bleibt dabei bestehen. Mehrere Welten zugleich sind möglich. Eine Welt, die das
+  Programm macht (ein GameWorld, das ein Knoten im Host des Programms macht), bekommt dabei das Projekt
+  (`GameWorld::set_project`, über `EngineObjects::on_made`): ihre Blueprints finden Bibliotheken erst im Level, dann
+  im Projekt (5.). Sie endet spätestens mit den Objekten des Programms. Geprüft: `program_world_has_the_project`.
 - Jede Welt hat ihre **eigene Logik-Laufzeit** für ihren Level-Graphen und die Blueprints ihrer Akteure, wie heute
   (`GameWorld::start_logic`). Ihre Ticks laufen in der Reihenfolge, die `Runtime::fire` festlegt: zuerst der
   Level-Graph, dann die Akteure in der Reihenfolge des Levels.
@@ -77,16 +84,29 @@ Ein Programm hat **genau einen**, ausdrücklichen Einstieg und keine schwachen S
 int kern_main() { static MeinSpiel app; return kern::run(app); }
 
 // ein Spiel aus seinem Projekt (die App ist ein Programm-Blueprint)
-int kern_main() { return kern::run(kern::Project::embedded()); }
+int kern_main() { return kern::run(kern::game::embedded_project()); }
 ```
 
-- `kern::run(App&)` übergibt der App-Laufzeit die App. Sie ruft configure/extensions vor dem Renderer, danach start,
-  update in jedem Frame und stop.
-- `kern::run(Project)` startet die Programm-Laufzeit des Projekts. Die App ist das Objekt der Engine des **einen**
-  Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder zwei, bricht der Start
-  ab und meldet den Grund mit Namen.
-- Der Bau eines Spiels aus seinem Projekt erzeugt den Einstieg und bettet das Projekt samt seiner Levels ein
-  (`kern::Project::embedded()`). Die Daten sind Daten des Projekts und keine eigenen Symbole.
+- `kern_main()` (`kern/app/run.h`) definiert das Programm; die Plattformschicht (`kern/web/app.mjs`) ruft ihn einmal,
+  vor `kern_app_start`. Ein Modul ohne ihn startet keine App, die Seite sagt es („module has no kern_main“). Die
+  Engine fragt nach keiner Fabrik, und kein Symbol ist schwach.
+- `kern::run(App&, settings)` übergibt der App-Laufzeit die App und die Einstellungen des Projekts (Vorgabe: die der
+  Engine). Sie wendet die Einstellungen vor dem Renderer an, ruft extensions, startet den Renderer, danach start,
+  update in jedem Frame und stop. Ein zweites `run` wird abgewiesen (1, mit Grund im Log); die erste App bleibt.
+- `kern::run(Project)` (`kern/game/program.h`) startet die Programm-Laufzeit des Projekts. Die App ist das Objekt der
+  Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<kern::App>`). Gibt es keinen oder
+  zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
+  `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
+- **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
+  Programm-Blueprint. Die Programm-Laufzeit bindet beim Start jeden ihrer Blueprints, der als Klasse mit Exporten
+  läuft (`NativeBlueprint::bind_exports`), und löst sie am Ende (danach meldet ein Export „no instance … is bound“);
+  zwei Objekte derselben Klasse mit Exporten im Programm: der Start bricht ab und nennt den Blueprint. Ein Export in
+  einem Blueprint einer Welt (Level-Graph oder Akteur) ist ein Fehler mit Ort und Grund: beim Lesen des Levels
+  („actor "X": the function f is an export … - exports belong to the program“), in `game::validate` (Play startet
+  nicht) und im Editor am offenen Blueprint. Geprüft: `program_binds_the_exports`, `studio_logic_implements`.
+- Der Bau eines Spiels aus seinem Projekt bettet das Projekt samt seiner Levels ein (`kern/tools/embed_project.py`):
+  `kern::game::embedded_project()` (`kern/game/embedded.h`) ist das gelesene Projekt. Die Daten sind Daten des
+  Projekts und keine eigenen Symbole. Geprüft: `run_the_program_of_a_project`.
 
 ## 5. Bibliotheken finden
 
@@ -96,25 +116,44 @@ Ein Blueprint nennt seine Bibliotheken in `uses` (beim Namen).
 - Steht derselbe Name im Level und im Projekt, ist das ein Fehler. Er wird beim Laden mit beiden Stellen gemeldet;
   stillschweigend gewinnt keiner.
 
-## 6. Knotentypen des Projekts
+## 6. Der feste Schritt und eigene Knoten
 
-Ein Projekt kann eigene Knotentypen haben, zum Beispiel einen festen Schritt der Physik. Ein Programm-Blueprint, der die
-Schnittstelle **`logic_NodeType`** implementiert, **ist** ein Knotentyp des Projekts:
+### 6.1 Der feste Schritt einer Welt (gebaut)
 
-- Seine Beschreibung sind **Daten des Blueprints**, keine Funktionen:
-  - Typ: `project.<Name des Blueprints>`
-  - Label: der Anzeigename des Blueprints
-  - Ereignis: eine Einstellung des Blueprints, z. B. `logic.tick`; leer heißt, der Knoten ist eine Aktion
-  - Hilfe: die Beschreibung des Blueprints
+Was ein Programm in **jedem festen Schritt** einer Welt tun muss (zum Beispiel Kräfte, die Box3D nach jedem Schritt
+löscht), gibt es der Welt ausdrücklich: ein Objekt, das `kern::game::FixedStep` ist (`kern/game/runtime.h`) – C++ des
+Programms oder das Objekt der Engine eines Programm-Blueprints mit `kern::Implements<kern::game::FixedStep>` –, mit
+`GameWorld::set_fixed_step(objekt)` (eins; `nullptr` nimmt es zurück, bevor das Objekt endet). Die Reihenfolge eines
+festen Schritts ist festgelegt:
 
-  Damit kennt der Editor den Knoten, **sobald das Projekt geladen ist**. Er steht in der Palette, ohne dass etwas läuft.
-- Die Schnittstelle selbst hat nur `run()` (und optional `help()`). Läuft ein Knoten dieses Typs (in einer Welt), ruft er
-  `run` des Blueprints in der Programm-Laufzeit.
-- Die Knotentypen gelten **je Projekt**: Das Projekt baut beim Laden seine Library aus dem Kern der Engine und seinen
-  Knotentypen. Editor, Prüfung (`check`), Notation und alle Laufzeiten des Projekts nutzen diese Library. Eine globale
-  Anmeldung zur Laufzeit gibt es nicht.
-- Wo der Knoten steht, entscheidet das Level (oder das Programm, wenn es eine Welt baut). Steht er im Level-Graphen,
-  läuft er in jedem Tick als Erstes.
+1. Eingaben, Antriebe, Gelenke, dann der Schritt der Physik (`substeps`),
+2. die Ereignisse des Schritts (Kontakte, Trigger, Gesundheit),
+3. **`FixedStep::fixed_step(dt)` des Programms**,
+4. Event Tick der Blueprints der Welt (`Runtime::tick`: der Level-Graph, dann die Akteure in der Reihenfolge des Levels),
+5. Respawns, Ziel und Zeit.
+
+Was `fixed_step` ändert, sieht jeder Blueprint im Tick desselben Schritts; Kräfte wirken im nächsten Schritt der
+Physik. Es hängt nicht davon ab, wo ein Knoten steht. Geprüft: `game_world_fixed_step`. (Ersetzt die frühere Anmeldung
+`register_node_type`, ein globales Register, dessen Typen der Editor erst kannte, wenn das Programm lief, und dessen
+Zeiger nach dem Ende der Programm-Laufzeit hingen – ersatzlos entfernt.)
+
+### 6.2 Eigene Knoten eines Projekts
+
+Einen eigenen Knotentyp als besondere Datenart gibt es nicht – ein Weg je Sache: **Die Funktion einer Bibliothek des
+Projekts ist der eigene Knoten.** Ein Blueprint, der die Bibliothek benutzt (`uses`), hat ihre Funktionen als
+Aufruf-Knoten in der Palette, mit ihren Ein- und Ausgängen; der Editor kennt sie, sobald das Projekt geladen ist.
+
+```cpp
+// im Projekt: die Bibliothek Mathe
+struct Mathe : virtual kern::Library {
+  struct clampedResult { Float value = 0.0; };
+  KERN_PURE clampedResult clamped(Float value = 0.0) { return {math_max(value, 0.0)}; }
+};
+// in einem Level: ein Akteur, der sie benutzt – „Clamped“ ist sein Knoten
+struct Tuer : virtual kern::Blueprint, virtual Mathe { … clamped(Hoehe) … };
+```
+
+Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.1).
 
 ## 7. Akteure einer Welt aus dem Programm erreichen: der Eingang „World“
 
@@ -129,7 +168,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
 - In der Notation steht der Eingang nur, wenn er verbunden oder ungleich 0 ist:
   `func_call_on<"Oeffnen">(kern::in_world(welt, tuer), kern::out())`. Ohne ihn bleibt der Text wie bisher.
 - In die andere Richtung, von der Welt zum Programm, gibt es **kein** stilles Durchfallen. Der Weg führt nur über Objekte
-  der Engine, die das Programm der Welt gibt: einen Knotentyp des Projekts oder eine Schnittstelle.
+  der Engine, die das Programm der Welt gibt: den festen Schritt (6.1) oder eine Schnittstelle.
 
 ## 8. Ein zweites Spiel anlegen – Schritt für Schritt
 
@@ -137,18 +176,29 @@ Eingang **World** (Int, der Handle einer GameWorld):
 2. Im Projekt einen Blueprint „Spiel“ anlegen, „Implements … App“ wählen und `start`, `update`, `stop` schreiben. In
    `start` ein GameWorld machen und `startLevel` laden.
 3. Im Level die Akteure und ihre Blueprints anlegen.
-4. Optional einen Knotentyp: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … logic_NodeType“, Ereignis
-   `logic.tick`, und `run` schreiben. Danach den Knoten „FesterSchritt“ aus der Palette in den Level-Graphen ziehen.
+4. Optional ein fester Schritt: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … game_FixedStep“ und
+   `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
 5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::Project::embedded())`.
 
-## Stand (25.11.2026, Zweig work-einstieg2)
+## Stand (25.11.2026, Zweig work-projekt)
 
-- Gebaut, wird nach diesem Entwurf ersetzt:
-  - `kern/game/level_app.h` (Programm-Laufzeit aus dem Ordner `project.program` eines Levels)
-  - `ProjectSettings::program`
-  - `embed_level.py --split-program`
-  - `kern/logic/node_type.h` mit `register_node_type`, einer globalen Anmeldung zur Laufzeit
-  - schwache `kern_create_app`/`kern_level_app`/`kern_level_text`
-- Diese Teile werden zurückgenommen, nicht neben dem neuen Weg stehen gelassen.
-- Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) Knotentypen je Projekt,
+- Gebaut (Teil 1): die Projekt-Datei (`kern/game/project.h`: `Project`, Leser/Schreiber mit Stelle und Grund,
+  `program_blueprints`, `world_blueprints`, `library_conflicts`), die Programm-Laufzeit aus dem Projekt
+  (`kern/game/program.h`: `kern::game::Program`), die Suche der Bibliotheken einer Welt (`GameWorld::set_project`),
+  das Einbetten (`kern/tools/embed_project.py`, `kern/game/embedded.h`). Ein Level hat keinen Abschnitt `"project"`
+  mehr (Fehler beim Lesen); `ProjectSettings::program`, `kern/game/level_app.h` und `embed_level.py --split-program`
+  sind entfernt.
+- Gebaut (Teil 1b): der Editor „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen,
+  speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
+  `studio_project`, e2e im Modul-Bau.
+- Gebaut (Teil 3): der eine Einstieg `kern_main()` mit `kern::run(App&, settings)` / `kern::run(Project)`; die
+  schwachen Symbole `kern_create_app`, `kern_project_app`, `kern_project_text` und `kern_game_extensions` sind
+  ersatzlos entfernt (Test `run_the_program_of_a_project`). Einstellungen: ein Weg – `App::configure()` ist entfernt,
+  Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`). Welten, die
+  das Programm macht, bekommen das Projekt (`program_world_has_the_project`). Exporte: die Programm-Laufzeit bindet
+  und löst sie; ein Export in einer Welt wird abgewiesen (`program_binds_the_exports`).
+  OFFEN (SpawnCity): `Game::start` bindet die Klassen des Ordners „Program“ noch an die Logik der Welt
+  (`blueprints::bind(*world_->logic_runtime())`) – sie stehen bis zum Schaltschritt im Level und das Spiel hat eine
+  App aus C++; das Binden fällt weg, sobald der Konverter sie ins Projekt schreibt (`spawncity.kproject`).
+- Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

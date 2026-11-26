@@ -2,6 +2,7 @@
 #include "kern/game/project.h"
 
 #include "kern/game/level.h"
+#include "kern/logic/engine_libraries.h"
 
 namespace kern::game {
 namespace {
@@ -36,7 +37,7 @@ json::Value to_json(const Project& p) {
   o.set("format", "kern-project");
   o.set("version", 1);
   o.set("name", p.name);
-  if (p.settings.set) o.set("settings", project_to_json(p.settings));
+  o.set("settings", project_to_json(p.settings));
   json::Value levels = json::Value::array();
   for (const std::string& l : p.levels) levels.push(l);
   o.set("levels", std::move(levels));
@@ -45,7 +46,7 @@ json::Value to_json(const Project& p) {
   for (const ProgramBlueprint& b : p.blueprints) {
     json::Value x = json::Value::object();
     x.set("name", b.name);
-    x.set("logic", logic::graph_to_json(b.logic));
+    x.set("logic", logic::graph_to_level_json(b.logic));  // (without what it holds of the engine: kern/logic/engine_libraries.h)
     bps.push(std::move(x));
   }
   o.set("blueprints", std::move(bps));
@@ -61,8 +62,8 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
   Project p;
   if (doc["name"].is_string()) p.name = doc["name"].as_string();
   if (const json::Value* s = doc.find("settings")) {
-    if (!s->is_object()) return fail(error, "settings: must be an object");
-    project_from_json(*s, p.settings);
+    std::string why;
+    if (!project_from_json(*s, p.settings, &why)) return fail(error, why);
   }
   if (const json::Value* ls = doc.find("levels")) {
     if (!ls->is_array()) return fail(error, "levels: must be a list of paths");
@@ -90,13 +91,20 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
       ProgramBlueprint bp;
       bp.name = b["name"].is_string() ? b["name"].as_string() : std::string();
       if (bp.name.empty()) return fail(error, place(i, "") + ": has no name");
+      if (logic::is_engine_library(bp.name))
+        return fail(error, place(i, bp.name) + ": is called like the engine's library " + bp.name + " - the engine's libraries are the engine's, a project does not hold them");
       for (std::size_t j = 0; j < p.blueprints.size(); ++j)
         if (p.blueprints[j].name == bp.name)
           return fail(error, place(i, bp.name) + ": the name stands twice (also blueprints[" + std::to_string(j) + "])");
       std::string why;
       if (!b["logic"].is_object()) return fail(error, place(i, bp.name) + ": has no logic (its Blueprint)");
-      if (!logic::graph_from_json(b["logic"], bp.logic, &why)) return fail(error, place(i, bp.name) + ": " + why);
+      if (!logic::graph_from_level_json(b["logic"], bp.logic, &why)) return fail(error, place(i, bp.name) + ": " + why);
       p.blueprints.push_back(std::move(bp));
+    }
+    // (each is given what it uses of the engine's libraries, as a level's Blueprints are)
+    for (std::size_t i = 0; i < p.blueprints.size(); ++i) {
+      std::string why;
+      if (!logic::hold_engine(p.blueprints[i].logic, program_blueprints(p), &why)) return fail(error, place(i, p.blueprints[i].name) + ": " + why);
     }
   }
   out = std::move(p);

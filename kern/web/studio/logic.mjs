@@ -767,15 +767,16 @@ export class LogicEditor {
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     // libraries: is this Blueprint one (it keeps nothing: types and functions), and which does it use
-    const canUse = (data.libraries || []).filter(match);
+    const engineLib = new Set(data.engineLibraries || []);   // (the engine's own libraries: read-only, no level holds them)
+    const canUse = [...(data.libraries || []), ...[...engineLib].filter(n => !(data.uses || []).includes(n))].filter(match);
     const libs = `<label class="lg-item lg-libflag" title="A library keeps nothing - no variables, no events: it has types and functions. Other Blueprints of the level use it: they have its types and call its functions directly (in C++ it is one of their bases).">
           <input type="checkbox" data-library${data.library ? " checked" : ""}${data.owner ? "" : " disabled"}><span class="lg-vn">This Blueprint is a library</span></label>` +
       (data.uses || []).filter(match).map(n => `
-        <div class="lg-item lg-lib" data-lib="${lgEsc(n)}" title="This Blueprint uses the library ${lgEsc(n)}: it has its types, and its functions are in the node menu (${lgEsc(n)}::…)">
-          <i class="lg-fni">L</i><span class="lg-vn">${lgEsc(n)}</span><span class="lg-acts"><button data-unuse title="Do not use this library any more">×</button></span>
+        <div class="lg-item lg-lib" data-lib="${lgEsc(n)}" title="This Blueprint uses the library ${lgEsc(n)}${engineLib.has(n) ? " of the engine (read-only: the engine's own, made from its headers - no level holds it)" : ""}: it has its types, and its functions are in the node menu (${lgEsc(n)}::…)">
+          <i class="lg-fni">${engineLib.has(n) ? "E" : "L"}</i><span class="lg-vn">${lgEsc(n)}${engineLib.has(n) ? " (engine, read-only)" : ""}</span><span class="lg-acts"><button data-unuse title="Do not use this library any more">×</button></span>
         </div>`).join("") +
       (canUse.length ? `<div class="lg-declare"><select data-use title="This Blueprint uses a library of this level: it has its types and calls its functions directly">
-        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "") +
+        <option value="">+ Use a library…</option>${canUse.filter(n => !engineLib.has(n)).map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}${canUse.some(n => engineLib.has(n)) ? `<optgroup label="Engine (read-only)">${canUse.filter(n => engineLib.has(n)).map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</optgroup>` : ""}</select></div>` : "") +
       // the interface of the engine it is the object of: the engine calls its functions of the interface's names
       `<div class="lg-declare"><select data-implements title="The engine calls this Blueprint as an object of one of its interfaces: its functions of the names of the interface's (a name with ? it may leave out - the interface's own runs there)">
         <option value=""${data.implements ? "" : " selected"}>Implements no interface of the engine</option>${(data.interfaces || []).map(i =>

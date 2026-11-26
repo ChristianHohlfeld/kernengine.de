@@ -1,4 +1,5 @@
 #include "kern/game/runtime.h"
+#include "kern/game/project.h"
 #include "kern/core/dmath.h"
 
 #include "runtime_internal.h"
@@ -1237,6 +1238,8 @@ bool GameWorld::start(const Level& level, SimMode mode) {
   if (running()) stop();
   for (const Issue& i : validate(level))
     if (i.error) return fail("%s", i.text.c_str());
+  if (project_)
+    for (const std::string& c : library_conflicts(level, *project_)) return fail("%s", c.c_str());
   sync(level);
   level_ = level;
   edit_level_ = level;
@@ -1577,6 +1580,8 @@ void GameWorld::fixed_step(const PlayInput& input, f32 h) {
   }
   handle_events();
   if (hud_.status == GameStatus::playing && !health_.empty()) update_health(h);
+  // The order of a step's end (FixedStep): the program's fixed step, then the Blueprints' Event Tick.
+  if (fixed_step_) fixed_step_->fixed_step(static_cast<f64>(h));
   if (logic_) logic_->tick(h);
   // Respawning pickups.
   for (std::size_t i = 0; i < respawns_.size();) {

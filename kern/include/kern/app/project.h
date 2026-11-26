@@ -1,14 +1,14 @@
-// The project's settings the engine applies when a program starts: the renderer on the desktop and on a phone,
-// and the heap taken ahead (a level's "project", kern/docs/book/12-your-own-games.md "Project settings").
+// The project's settings the engine applies when a program starts - the one way to set up the renderer: the renderer,
+// the device profiles beside it, and the heap taken ahead - the member "settings" of the project file
+// (kern/game/project.h, kern/docs/project.md 2.).
 //
-// The level carries them (game::Level::project, the key "project" after "name"); a game built from a level
-// hands them to the engine as the text of that member (kern_project_text(), written by the build - SpawnCity:
-// tools/embed_level.py). kern_app_start (src/app/app.cpp) reads them before App::configure() and App::start(): with settings,
-// the renderer starts with theirs, the heap is grown once, and with the launch argument mobile=1 the phone's
-// shadows and ambient occlusion replace the desktop's - all before the App starts. Without, the App decides
-// (configure(), start()) as before.
+// The program's kern_main() hands them to the engine with its App (kern::run(app, settings), kern/app/run.h; a project
+// whose App is a program Blueprint: kern::run(project)). kern_app_start (src/app/app.cpp) applies them before the App
+// starts: the renderer starts with `renderer` - or, when the launch argument profile=<name> names a device profile,
+// with that profile's - and the heap is grown once. A profile the argument names that the project does not have is
+// an error in the log (with the names it has); the renderer then starts with `renderer`.
 //
-// Header only: the level (kern/src/game) and the app runtime (kern/src/app) both read it, and either is built
+// Header only: the project (kern/src/game) and the app runtime (kern/src/app) both read it, and either is built
 // without the other.
 #pragma once
 
@@ -16,21 +16,31 @@
 #include <cstdlib>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "kern/core/json.h"
 #include "kern/gfx/renderer.h"
 
 namespace kern {
 
+/// A device profile: the renderer on a kind of device (a phone, a weak laptop), chosen at start by the launch
+/// argument profile=<name>. Its renderer is the project's with the keys the profile names on top.
+struct DeviceProfile {
+  std::string name;
+  RendererOptions renderer;
+};
+
 struct ProjectSettings {
-  bool set = false;            // the level names its settings (else the App's configure() and start() decide)
-  RendererOptions renderer;    // the renderer at start (width and height are the page's)
-  bool mobile_set = false;     // a phone's renderer differs (the launch argument mobile=1)
-  ShadowOptions mobile_shadow;
-  AoOptions mobile_ao;
-  u32 heap_reserve_mb = 0;     // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
-  std::string program;         // the folder of the level whose Blueprints are the program's logic, not the world's - the App
-                               // among them (kern/game/level_app.h); "": the level says none (the program makes its App)
+  RendererOptions renderer;             // the renderer at start (width and height are the page's)
+  std::vector<DeviceProfile> profiles;  // the renderer on other devices, by name (the launch argument profile=<name>)
+  u32 heap_reserve_mb = 0;              // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
+
+  /// The profile of that name (null: none).
+  const DeviceProfile* profile(std::string_view name) const {
+    for (const DeviceProfile& p : profiles)
+      if (p.name == name) return &p;
+    return nullptr;
+  }
 };
 
 namespace project_json {
@@ -88,69 +98,82 @@ inline void ao_from(const json::Value& v, AoOptions& a) {
 }
 }  // namespace project_json
 
-/// The settings as the level file holds them (the member "project").
+namespace project_json {
+inline json::Value renderer_to(const RendererOptions& o) {
+  json::Value r = json::Value::object();
+  r.set("shadows", o.shadows);
+  r.set("shadow", shadow_to(o.shadow));
+  json::Value bloom = json::Value::object();
+  bloom.set("enabled", o.bloom.enabled);
+  bloom.set("forced", o.bloom.forced);
+  r.set("bloom", std::move(bloom));
+  r.set("ao", ao_to(o.ao));
+  r.set("grade", o.grade);
+  return r;
+}
+/// The keys of "renderer" a document names, on top of `o` (missing keys keep what `o` has).
+inline void renderer_from(const json::Value& r, RendererOptions& o) {
+  if (!r.is_object()) return;
+  o.shadows = r["shadows"].as_bool(o.shadows);
+  shadow_from(r["shadow"], o.shadow);
+  const json::Value& bloom = r["bloom"];
+  if (bloom.is_object()) {
+    o.bloom.enabled = bloom["enabled"].as_bool(o.bloom.enabled);
+    o.bloom.forced = bloom["forced"].as_bool(o.bloom.forced);
+  }
+  ao_from(r["ao"], o.ao);
+  o.grade = r["grade"].as_bool(o.grade);
+}
+}  // namespace project_json
+
+/// The settings as the project file holds them (the member "settings"; a profile with its whole renderer).
 inline json::Value project_to_json(const ProjectSettings& p) {
   using namespace project_json;
   json::Value o = json::Value::object();
-  json::Value r = json::Value::object();
-  r.set("shadows", p.renderer.shadows);
-  r.set("shadow", shadow_to(p.renderer.shadow));
-  json::Value bloom = json::Value::object();
-  bloom.set("enabled", p.renderer.bloom.enabled);
-  bloom.set("forced", p.renderer.bloom.forced);
-  r.set("bloom", std::move(bloom));
-  r.set("ao", ao_to(p.renderer.ao));
-  r.set("grade", p.renderer.grade);
-  o.set("renderer", std::move(r));
-  if (p.mobile_set) {
-    json::Value m = json::Value::object();
-    m.set("shadow", shadow_to(p.mobile_shadow));
-    m.set("ao", ao_to(p.mobile_ao));
-    o.set("mobile", std::move(m));
+  o.set("renderer", renderer_to(p.renderer));
+  json::Value profiles = json::Value::array();
+  for (const DeviceProfile& d : p.profiles) {
+    json::Value x = json::Value::object();
+    x.set("name", d.name);
+    x.set("renderer", renderer_to(d.renderer));
+    profiles.push(std::move(x));
   }
+  o.set("profiles", std::move(profiles));
   o.set("heapReserveMb", p.heap_reserve_mb);
-  if (!p.program.empty()) o.set("program", p.program);
   return o;
 }
 
-/// Reads the member "project" (an object; anything else: no settings). Missing keys keep their defaults.
-inline bool project_from_json(const json::Value& v, ProjectSettings& out) {
+/// Reads the member "settings". Missing keys keep the engine's defaults; a profile starts from the project's renderer.
+/// False - `error` says where and why - for settings that are no object, a profile without a name or with a name
+/// twice, "mobile" (the fixed phone profile of before: now one of "profiles"), or a heapReserveMb outside 0..4095.
+inline bool project_from_json(const json::Value& v, ProjectSettings& out, std::string* error = nullptr) {
   using namespace project_json;
+  auto fail = [&](std::string why) {
+    if (error) *error = "settings: " + std::move(why);
+    return false;
+  };
   out = ProjectSettings{};
-  if (!v.is_object()) return false;
-  out.set = true;
-  const json::Value& r = v["renderer"];
-  if (r.is_object()) {
-    out.renderer.shadows = r["shadows"].as_bool(out.renderer.shadows);
-    shadow_from(r["shadow"], out.renderer.shadow);
-    const json::Value& bloom = r["bloom"];
-    if (bloom.is_object()) {
-      out.renderer.bloom.enabled = bloom["enabled"].as_bool(out.renderer.bloom.enabled);
-      out.renderer.bloom.forced = bloom["forced"].as_bool(out.renderer.bloom.forced);
+  if (!v.is_object()) return fail("must be an object");
+  if (v.has("mobile")) return fail("mobile: a device profile is one of \"profiles\" ({\"name\": \"mobile\", \"renderer\": {...}})");
+  renderer_from(v["renderer"], out.renderer);
+  if (const json::Value* list = v.find("profiles")) {
+    if (!list->is_array()) return fail("profiles: must be a list");
+    for (std::size_t i = 0; i < list->size(); ++i) {
+      const json::Value& x = (*list)[i];
+      const std::string at = "profiles[" + std::to_string(i) + "]";
+      if (!x.is_object() || !x["name"].is_string() || x["name"].as_string().empty()) return fail(at + ": a profile has a name");
+      DeviceProfile d;
+      d.name = x["name"].as_string();
+      if (out.profile(d.name)) return fail(at + ": the profile " + d.name + " stands twice");
+      d.renderer = out.renderer;
+      renderer_from(x["renderer"], d.renderer);
+      out.profiles.push_back(std::move(d));
     }
-    ao_from(r["ao"], out.renderer.ao);
-    out.renderer.grade = r["grade"].as_bool(out.renderer.grade);
-  }
-  const json::Value& m = v["mobile"];
-  if (m.is_object()) {
-    out.mobile_set = true;
-    // a phone starts from the desktop's shadows and the default ambient occlusion
-    out.mobile_shadow = out.renderer.shadow;
-    shadow_from(m["shadow"], out.mobile_shadow);
-    ao_from(m["ao"], out.mobile_ao);
   }
   const f64 mb = v["heapReserveMb"].as_number(0);
-  out.heap_reserve_mb = mb > 0 && mb < 4096 ? static_cast<u32>(mb) : 0;
-  out.program = v["program"].is_string() ? v["program"].as_string() : std::string();
+  if (!(mb >= 0 && mb < 4096)) return fail("heapReserveMb: from 0 to 4095");
+  out.heap_reserve_mb = static_cast<u32>(mb);
   return true;
-}
-
-/// The settings from the text of the member "project" (kern_project_text()); empty or broken: none.
-inline bool project_from_text(std::string_view text, ProjectSettings& out) {
-  out = ProjectSettings{};
-  if (text.empty()) return false;
-  json::Value v;
-  return json::parse(text, v) && project_from_json(v, out);
 }
 
 }  // namespace kern

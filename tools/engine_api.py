@@ -2,6 +2,8 @@
 """The engine as nodes: what the engine's headers declare, as nodes of the Blueprint language.
 
   tools/engine_api.py [--list]
+  tools/engine_api.py --check <level.klevel | texts dir>   what it names of the engine's libraries that they do not have
+  tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp
 
 A function a header of the engine declares and does not define there is something only the engine
 can do: cast a ray through the physics world, draw a mesh, play a sound. Each is a node - for
@@ -42,6 +44,8 @@ shares its types) and writes
                                               writes made into its outputs - for the headers of that component
 A function whose types have no place in the language (a callback, a raw pointer) gets no node;
 --list names them with what they wait for.
+--check writes nothing and fails when a generated file is not what the headers give (or one is left that no run
+writes any more); a run removes such a stale file (stale_outputs). --selftest: the tool's own test.
 """
 import collections
 import importlib.util
@@ -61,7 +65,7 @@ KERN = os.path.join(os.path.dirname(HERE), "kern")
 # The headers whose functions are nodes: what a game is written against.
 HEADERS = ["core/base.h", "core/jobs.h", "app/app.h", "audio/audio.h", "audio/synth.h", "physics/physics.h", "gfx/mesh.h", "gfx/renderer.h", "app/project.h",
            "geo/mesh_data.h", "geo/primitives.h", "geo/earcut.h", "geo/buildings.h", "geo/roads.h", "game/level.h", "game/sound.h", "game/runtime.h",
-           "net/client_server.h", "logic/node_type.h"]
+           "net/client_server.h"]
 Api, snake = c2b.Api, c2b.snake   # (the converter's own: a call in a game's source and its node have the same pins)
 
 
@@ -1273,7 +1277,163 @@ def read_engine(flags=()):
     return tree, c2b.Unit(tree, "Engine")
 
 
+# The headers whose types and functions are the engine's libraries (kern/logic/engine_libraries.h): each one library,
+# named by its path (kern/physics/physics.h: engine_physics_physics).
+LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "game/level.h", "game/runtime.h", "geo/buildings.h", "geo/mesh_data.h", "geo/roads.h",
+                   "gfx/mesh.h", "gfx/passes.h", "gfx/renderer.h", "gfx/shader.h", "logic/logic.h", "math/math.h", "net/client_server.h",
+                   "net/connection.h", "net/reliable.h", "net/transport.h", "physics/physics.h"]
+
+
+def libraries_text(level):
+    """The engine's libraries as the build of the engine has them: each library's JSON - with what it holds of the
+    engine's libraries it uses, as every Blueprint holds what it uses (they are written together, from the same
+    headers) -, a library after those it uses, with its mark (the hash of its text: what a level that uses it records)."""
+    import hashlib, json
+    graphs = {a["name"]: a["components"]["logic"] for a in level["actors"] if a.get("components", {}).get("logic")}
+    bad = [n for n in graphs if not n.startswith("engine_")]
+    if bad:
+        raise SystemExit(f"engine_api.py --libraries: the engine's libraries would use {', '.join(sorted(bad))} - a library of the engine uses no library of a level")
+    order, seen = [], set()
+    def visit(n, open_=()):
+        if n in seen:
+            return
+        if n in open_:
+            raise SystemExit(f"engine_api.py --libraries: the engine's libraries {', '.join(open_)} use each other")
+        for u in graphs[n].get("uses", []):
+            if u not in graphs:
+                raise SystemExit(f"engine_api.py --libraries: {n} uses {u}, which is no library of the engine")
+            visit(u, (*open_, n))
+        seen.add(n)
+        order.append(n)
+    for n in sorted(graphs):
+        visit(n)
+    lines = ["// The engine's own libraries: the types and functions of its headers as Blueprints (written by tools/engine_api.py",
+             "// --libraries from the engine's headers - see kern/logic/engine_libraries.h; not edited by hand).",
+             '#include "kern/logic/engine_libraries.h"', "", "namespace kern::logic {", "",
+             "const std::vector<EngineLibraryText>& engine_library_texts() {", "  static const std::vector<EngineLibraryText> all = {"]
+    for n in order:
+        text = json.dumps(graphs[n], separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+        assert ')kl"' not in text
+        mark = hashlib.sha256(text.encode()).hexdigest()[:16]
+        lines.append(f'      {{"{n}", "{mark}", R"kl({text})kl"}},')
+    lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
+    return "\n".join(lines)
+
+
+def write_libraries():
+    """Converts the engine's headers into its libraries (tools/cpp_to_blueprint.py --engine) and writes them."""
+    import json, shutil
+    work = tempfile.mkdtemp(prefix="kern-engine-libraries-")
+    try:
+        driver = os.path.join(work, "program", "engine_libraries.cpp")
+        os.makedirs(os.path.dirname(driver))
+        open(driver, "w").write("".join(f'#include "kern/{h}"\n' for h in LIBRARY_HEADERS))
+        level = os.path.join(work, "engine.klevel")
+        json.dump({"format": "kern-level", "version": 1, "name": "engine", "world": {}, "nextId": 1, "actors": []}, open(level, "w"))
+        cmd = [sys.executable, os.path.join(HERE, "cpp_to_blueprint.py"), "--convert", "kern_engine_libraries", "--level", level]
+        for h in LIBRARY_HEADERS:
+            cmd += ["--engine", os.path.join(KERN, "include", "kern", h)]
+        cmd += [f"-I{KERN}/include", f"-I{KERN}/third_party/box3d/include", "--", driver]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0 or "were not read" in r.stdout + r.stderr:
+            raise SystemExit("engine_api.py --libraries: the engine's headers do not convert:\n" + (r.stdout + r.stderr)[-4000:])
+        text = libraries_text(json.load(open(level)))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    path = os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp")
+    if not os.path.exists(path) or open(path).read() != text:
+        open(path, "w").write(text)
+    print(f"the engine's libraries: {path}")
+
+
+def built_libraries():
+    """The engine's libraries as engine_libraries.gen.cpp has them: name -> their JSON."""
+    import json
+    text = open(os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp"), encoding="utf-8").read()
+    return {m.group(1): json.loads(m.group(2)) for m in re.finditer(r'\{"(engine_\w+)", "\w*", R"kl\((.*?)\)kl"\}', text, re.S)}
+
+
+def check_level(path):
+    """What a level - or a directory of Blueprint texts (tools/cpp_to_blueprint.py --texts) - names of the engine's
+    libraries that they do not have: each type and function, with who names it. 0: all there."""
+    import json
+    have = {}
+    for name, g in built_libraries().items():
+        have[name] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
+                      "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
+    named = collections.defaultdict(set)   # (library, kind, name) -> who names it
+    if os.path.isdir(path):
+        for f in sorted(os.listdir(path)):
+            if not f.endswith(".cpp") or f.startswith("engine_"):
+                continue
+            text = open(os.path.join(path, f), encoding="utf-8").read()
+            who = f[:-4]
+            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", text):
+                if lib in have and fn not in have[lib]["types"] and not fn.endswith("Result"):
+                    named[(lib, "function", fn)].add(who)
+            for lib in re.findall(r"virtual (engine_\w+)\b", text):
+                if lib not in have:
+                    named[(lib, "library", lib)].add(who)
+    else:
+        for a in json.load(open(path, encoding="utf-8")).get("actors", []):
+            g = (a.get("components") or {}).get("logic") or {}
+            if a["name"].startswith("engine_"):
+                continue
+            for lib in g.get("uses", []):
+                if lib.startswith("engine_") and lib not in have:
+                    named[(lib, "library", lib)].add(a["name"])
+            for k, kind in (("structs", "type"), ("enums", "type"), ("functions", "function")):
+                for x in g.get(k, []):
+                    lib = x.get("from", "")
+                    if lib.startswith("engine_"):
+                        n = x["name"].split("::")[-1]
+                        named[(lib, kind, n)].add(a["name"])
+    missing = []
+    for (lib, kind, n), who in sorted(named.items()):
+        if lib not in have:
+            missing.append(f"{lib}: no library of the engine (named by {', '.join(sorted(who)[:5])})")
+        elif kind != "library" and n not in have[lib]["types" if kind == "type" else "functions"]:
+            missing.append(f"{lib}: the {kind} {n} - the engine does not write it (named by {', '.join(sorted(who)[:5])}{' ...' if len(who) > 5 else ''})")
+    for m in missing:
+        print(m)
+    print(f"{len(missing)} of {len(named)} things of the engine's libraries that {path} names are not in them"
+          + ("" if not missing else " (tools/engine_api.py --libraries; a type a game needs is marked KERN_BLUEPRINT_TYPE)"))
+    return 1 if missing else 0
+
+
+def stale_outputs(kern, wanted):
+    """The files an earlier run wrote that this one does not (the calls of a component that has no node of the engine
+    any more: src/<component>/engine_calls.gen.cpp): what this tool writes is exactly the files of its run, so these
+    go. `wanted`: the paths of this run, relative to `kern`."""
+    import glob
+    found = glob.glob(os.path.join(kern, "src", "*", "engine_calls.gen.cpp"))
+    return sorted(p for p in found if os.path.relpath(p, kern).replace(os.sep, "/") not in set(wanted))
+
+
+def selftest():
+    """The tool's own test (python3 tools/engine_api.py --selftest): a component's calls that are no longer written are
+    stale; those written now and other files are not."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as k:
+        for comp in ("game", "logic", "app"):
+            os.makedirs(os.path.join(k, "src", comp))
+            open(os.path.join(k, "src", comp, "engine_calls.gen.cpp"), "w").write("//")
+        open(os.path.join(k, "src", "logic", "logic.cpp"), "w").write("//")
+        got = [os.path.relpath(p, k) for p in stale_outputs(k, ["src/game/engine_calls.gen.cpp", "src/app/engine_calls.gen.cpp"])]
+        assert got == [os.path.join("src", "logic", "engine_calls.gen.cpp")], got
+        assert stale_outputs(k, [f"src/{c}/engine_calls.gen.cpp" for c in ("game", "logic", "app")]) == []
+    print("engine_api.py: selftest ok")
+    return 0
+
+
 def main(argv):
+    if "--selftest" in argv:
+        return selftest()
+    if "--check" in argv:   # (what a level names of the engine's libraries that they do not have - no clang, no run)
+        return check_level(argv[argv.index("--check") + 1])
+    if "--libraries" in argv:   # (the engine's libraries: a run of the converter over the headers - minutes, not seconds)
+        write_libraries()
+        return 0
     tree, unit = read_engine()
     api = Api(tree, unit)
     functions, waiting = [], []
@@ -1317,11 +1477,23 @@ def main(argv):
         calls.default_makers()
         for q, why in sorted(calls.unmade.items()):
             print(f"not made for a handle: {q}: {why}")
-    for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces())), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
-                      ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items()):
+    outputs = (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces())), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
+               ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items())
+    differ = []   # (--check: what a run would change - written anew or removed)
+    for rel, text in outputs:
         path = os.path.join(KERN, rel)
-        if "--list" not in argv and (not os.path.exists(path) or open(path).read() != text):
-            open(path, "w").write(text)
+        if not os.path.exists(path) or open(path).read() != text:
+            differ.append(rel)
+            if "--list" not in argv and "--check" not in argv:
+                open(path, "w").write(text)
+    for path in stale_outputs(KERN, [rel for rel, _ in outputs]):
+        differ.append(os.path.relpath(path, KERN) + " (removed)")
+        if "--list" not in argv and "--check" not in argv:
+            os.remove(path)
+            print(f"removed {os.path.relpath(path, KERN)}: its component has no node of the engine any more")
+    if "--check" in argv and differ:
+        print("engine_api.py --check: the generated files are not those of the headers:\n  " + "\n  ".join(differ))
+        return 1
     print(f"{len(functions)} functions of the engine are nodes; {len(waiting)} have types without a place in the language")
     return 0
 

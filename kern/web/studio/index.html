@@ -90,6 +90,7 @@
         <div class="panel-head"><span>Outliner</span><div class="spacer"></div>
           <button class="ph icon" id="newFolderBtn" title="New folder for the selection" data-icon="folderPlus"></button>
         </div>
+        <details id="projectBox" class="project-box"><summary>Project <span id="projectName"></span></summary><div id="projectBody"></div></details>
         <div class="search"><span data-icon="search"></span><input id="outlinerFilter" placeholder="Search actors" spellcheck="false"></div>
         <div class="outliner-cols"><span class="c-eye" data-icon="eye"></span><span class="c-name">Label</span><span class="c-type">Type</span></div>
         <div id="outliner" tabindex="0"></div>
@@ -151,6 +152,7 @@
   <div id="toast" hidden></div>
   <div id="engineNotice" role="alert"></div>
   <div id="splash"><div class="brand big"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h3.2v7.4L14.7 3h4L11.9 10.6 19.2 21h-4.1l-5.4-7.9-1.5 1.6V21H5z"/></svg></div><div>Kern Studio</div><small>Starting the engine</small></div>
+  <input type="file" id="fileProject" accept=".kproject,.json" hidden>
   <input type="file" id="fileOpen" accept=".klevel,.json,application/json" hidden>
   <input type="file" id="fileTexture" accept="image/png,image/jpeg,image/webp" hidden>
   <input type="file" id="fileSound" accept="audio/*,.wav,.mp3,.ogg,.oga,.m4a,.aac,.flac,.webm,.opus" hidden>

@@ -9,7 +9,7 @@
 
 namespace kern {
 
-struct ParticleSpec {
+struct KERN_BLUEPRINT_TYPE ParticleSpec {
   Vec3 position;
   Vec3 velocity;
   Vec4 color{1, 1, 1, 1};  // rgba, alpha fades over the life time
@@ -21,7 +21,7 @@ struct ParticleSpec {
   f32 fade_extra = 0;      // extra alpha fade (alpha *= 1 - fade_extra * t)
 };
 
-struct ParticleStats {
+struct KERN_BLUEPRINT_TYPE ParticleStats {
   u32 active = 0, dropped = 0, uploaded = 0, expired = 0;
 };
 

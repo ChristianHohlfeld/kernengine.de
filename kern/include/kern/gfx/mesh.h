@@ -28,9 +28,9 @@ enum : u32 {
 };
 }
 
-enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class KERN_BLUEPRINT_TYPE AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 
-struct Material {
+struct KERN_BLUEPRINT_TYPE Material {
   Vec4 color{1, 1, 1, 1};
   AlphaMode alpha = AlphaMode::opaque;
   f32 alpha_cutoff = 0.5f;
@@ -51,7 +51,7 @@ struct Material {
 };
 
 /// Borrowed input for Renderer::upsert. Spans must stay valid for the call only.
-struct MeshInput {
+struct KERN_BLUEPRINT_TYPE MeshInput {
   Span<const f32> positions;             // xyz per vertex (required)
   Span<const f32> normals;               // optional: flat normals for non-indexed meshes, +Z otherwise
   Span<const f32> colors;                // optional rgb per vertex, default white

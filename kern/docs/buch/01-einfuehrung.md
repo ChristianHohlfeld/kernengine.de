@@ -186,21 +186,14 @@ zusammengestellt.
 
 ### Ein Spiel ganz in C++ (`--app`)
 
-Ein Spiel leitet von `kern::App` ab und definiert `kern_create_app()`. Die Plattformschicht
+Ein Spiel leitet von `kern::App` ab und definiert seinen einen Einstieg `kern_main()`, der der Engine die App gibt
+(`kern::run(app)`, `include/kern/app/run.h`). Die Plattformschicht
 `kern/web/app.mjs` (`runKernApp`) betreibt es: Frame-Schleife, Größe des Drawing Buffers, Eingabe,
 Kontextverlust und ein Statuskanal. Das kleinste Beispiel ist `kern/examples/hello/hello.cpp`:
 
 ```cpp
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
-
   bool start(Engine& engine) override {
     Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
@@ -212,9 +205,9 @@ class Hello final : public App {
   // update(): Kamera, Instanzen, Picking, engine.set_status(...)
 };
 
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  return kern::run(app);
 }
 ```
 

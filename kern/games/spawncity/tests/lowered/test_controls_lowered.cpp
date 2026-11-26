@@ -1278,16 +1278,16 @@ SC_TEST(lowered_controls_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // RateStick::step(Vec2, f32)  ->  RateStick::step(Vec2, f32)
-    ::sc::lowered::Tally tally("RateStick::step(Vec2, f32)");
+  {  // RateStick::step(kern::Vec2, f32)  ->  RateStick::step(kern::Vec2, f32)
+    ::sc::lowered::Tally tally("RateStick::step(kern::Vec2, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_controls::sc::controls::RateStick o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
       ::sc_new_controls::sc::controls::RateStick n_self{};
       ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<Vec2> o0;
-      ::sc::lowered::Arg<Vec2> n0;
+      ::sc::lowered::Arg<kern::Vec2> o0;
+      ::sc::lowered::Arg<kern::Vec2> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<f32> o1;
       ::sc::lowered::Arg<f32> n1;

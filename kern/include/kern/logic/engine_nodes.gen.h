@@ -20,7 +20,6 @@
 #include "kern/audio/synth.h"
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
-#include "kern/game/geometry.h"
 #include "kern/game/level.h"
 #include "kern/game/logic_nodes.h"
 #include "kern/game/runtime.h"
@@ -36,7 +35,6 @@
 #include "kern/gfx/program.h"
 #include "kern/gfx/renderer.h"
 #include "kern/gfx/shader.h"
-#include "kern/logic/node_type.h"
 #include "kern/net/client_server.h"
 #include "kern/net/connection.h"
 #include "kern/net/reliable.h"
@@ -64,19 +62,9 @@ struct E_LogLevel { using type = kern::LogLevel; static constexpr type values[] 
 struct E_audio_Bus { using type = kern::audio::Bus; static constexpr type values[] = {kern::audio::Bus::master, kern::audio::Bus::music, kern::audio::Bus::sfx, kern::audio::Bus::ambience, kern::audio::Bus::ui, kern::audio::Bus::voice, kern::audio::Bus::count}; };
 struct E_audio_Rolloff { using type = kern::audio::Rolloff; static constexpr type values[] = {kern::audio::Rolloff::inverse, kern::audio::Rolloff::linear, kern::audio::Rolloff::exponential}; };
 struct E_audio_Wave { using type = kern::audio::Wave; static constexpr type values[] = {kern::audio::Wave::square, kern::audio::Wave::saw, kern::audio::Wave::sine, kern::audio::Wave::triangle, kern::audio::Wave::noise, kern::audio::Wave::pink, kern::audio::Wave::pulse}; };
-struct E_game_CameraMode { using type = kern::game::CameraMode; static constexpr type values[] = {kern::game::CameraMode::chase, kern::game::CameraMode::first_person, kern::game::CameraMode::top_down}; };
-struct E_game_ColliderShape { using type = kern::game::ColliderShape; static constexpr type values[] = {kern::game::ColliderShape::automatic, kern::game::ColliderShape::box, kern::game::ColliderShape::sphere, kern::game::ColliderShape::capsule, kern::game::ColliderShape::hull}; };
-struct E_game_ControlMode { using type = kern::game::ControlMode; static constexpr type values[] = {kern::game::ControlMode::hovercar, kern::game::ControlMode::rolling, kern::game::ControlMode::character, kern::game::ControlMode::flyer, kern::game::ControlMode::vehicle, kern::game::ControlMode::soldier, kern::game::ControlMode::walker}; };
-struct E_game_GameGoal { using type = kern::game::GameGoal; static constexpr type values[] = {kern::game::GameGoal::none, kern::game::GameGoal::collect_all, kern::game::GameGoal::reach_goal, kern::game::GameGoal::survive, kern::game::GameGoal::score}; };
 struct E_game_GameStatus { using type = kern::game::GameStatus; static constexpr type values[] = {kern::game::GameStatus::inactive, kern::game::GameStatus::playing, kern::game::GameStatus::won, kern::game::GameStatus::lost}; };
-struct E_game_JointKind { using type = kern::game::JointKind; static constexpr type values[] = {kern::game::JointKind::hinge, kern::game::JointKind::slider, kern::game::JointKind::ball, kern::game::JointKind::fixed, kern::game::JointKind::distance, kern::game::JointKind::wheel, kern::game::JointKind::motor, kern::game::JointKind::parallel, kern::game::JointKind::no_collision}; };
-struct E_game_Motion { using type = kern::game::Motion; static constexpr type values[] = {kern::game::Motion::fixed, kern::game::Motion::kinematic, kern::game::Motion::dynamic}; };
-struct E_game_MoverMode { using type = kern::game::MoverMode; static constexpr type values[] = {kern::game::MoverMode::sine, kern::game::MoverMode::ping_pong, kern::game::MoverMode::loop}; };
 struct E_game_Shape { using type = kern::game::Shape; static constexpr type values[] = {kern::game::Shape::box, kern::game::Shape::sphere, kern::game::Shape::cylinder, kern::game::Shape::cone, kern::game::Shape::capsule, kern::game::Shape::plane, kern::game::Shape::torus, kern::game::Shape::ramp, kern::game::Shape::mesh}; };
 struct E_game_SimMode { using type = kern::game::SimMode; static constexpr type values[] = {kern::game::SimMode::none, kern::game::SimMode::simulate, kern::game::SimMode::play, kern::game::SimMode::replica}; };
-struct E_game_TriggerAction { using type = kern::game::TriggerAction; static constexpr type values[] = {kern::game::TriggerAction::goal, kern::game::TriggerAction::hazard, kern::game::TriggerAction::checkpoint, kern::game::TriggerAction::message, kern::game::TriggerAction::launch, kern::game::TriggerAction::teleport, kern::game::TriggerAction::damage, kern::game::TriggerAction::event}; };
-struct E_game_WeaponKind { using type = kern::game::WeaponKind; static constexpr type values[] = {kern::game::WeaponKind::rifle, kern::game::WeaponKind::pistol, kern::game::WeaponKind::shotgun, kern::game::WeaponKind::sniper}; };
-struct E_logic_TriggerKind { using type = kern::logic::TriggerKind; static constexpr type values[] = {kern::logic::TriggerKind::event, kern::logic::TriggerKind::timer, kern::logic::TriggerKind::condition, kern::logic::TriggerKind::automatic}; };
 struct E_net_ChannelType { using type = kern::net::ChannelType; static constexpr type values[] = {kern::net::ChannelType::reliable_ordered, kern::net::ChannelType::unreliable_unordered}; };
 struct E_net_ClientState { using type = kern::net::ClientState; static constexpr type values[] = {kern::net::ClientState::denied, kern::net::ClientState::timed_out, kern::net::ClientState::error, kern::net::ClientState::disconnected, kern::net::ClientState::connecting, kern::net::ClientState::challenged, kern::net::ClientState::connected}; };
 struct E_net_ConnectionError { using type = kern::net::ConnectionError; static constexpr type values[] = {kern::net::ConnectionError::none, kern::net::ConnectionError::desync, kern::net::ConnectionError::send_queue_full, kern::net::ConnectionError::message_too_large, kern::net::ConnectionError::bad_packet, kern::net::ConnectionError::out_of_memory}; };
@@ -98,16 +86,11 @@ struct S_Lighting;
 struct S_Mat4;
 struct S_Material;
 struct S_MeshData;
-struct S_MeshGpu;
 struct S_MeshInput;
 struct S_MeshLook;
 struct S_ParticleSpec;
 struct S_ParticleStats;
-struct S_PickHit;
-struct S_PickQuery;
-struct S_PickStats;
 struct S_PointLights;
-struct S_ProjectSettings;
 struct S_Quat;
 struct S_Ray;
 struct S_RenderParams;
@@ -132,56 +115,20 @@ struct S_audio_Meter;
 struct S_audio_PlayParams;
 struct S_audio_Stats;
 struct S_audio_SynthPatch;
-struct S_game_Actor;
-struct S_game_AudioComponent;
 struct S_game_BlueprintRunning;
-struct S_game_BodyComponent;
-struct S_game_BodyPlan;
-struct S_game_CityBox;
-struct S_game_CityComponent;
-struct S_game_CityGeometry;
-struct S_game_ColliderComponent;
-struct S_game_ControllerComponent;
-struct S_game_EditorCamera;
 struct S_game_GameWorld_ArtStats;
 struct S_game_GameWorld_DetectorModel;
 struct S_game_GameWorld_SpawnChange;
 struct S_game_GameWorld_WalkerJoint;
 struct S_game_GameWorld_WalkerProbe;
 struct S_game_GameWorld_WalkerSensors;
-struct S_game_HealthComponent;
 struct S_game_Hud;
-struct S_game_Issue;
-struct S_game_JointComponent;
-struct S_game_Level;
-struct S_game_LightComponent;
-struct S_game_MaterialDesc;
-struct S_game_MeshComponent;
-struct S_game_MotionKey;
-struct S_game_MoverComponent;
-struct S_game_PickupComponent;
 struct S_game_PlayInput;
-struct S_game_Rng;
-struct S_game_RotatorComponent;
-struct S_game_ShapePlan;
 struct S_game_ShotEvent;
 struct S_game_SimStats;
 struct S_game_SoldierState;
 struct S_game_SoundCue;
 struct S_game_Transform;
-struct S_game_TriggerComponent;
-struct S_game_WeaponComponent;
-struct S_game_WorldSettings;
-struct S_logic_CommentBox;
-struct S_logic_EnumType;
-struct S_logic_Function;
-struct S_logic_Graph;
-struct S_logic_Link;
-struct S_logic_Node;
-struct S_logic_State;
-struct S_logic_StateMachine;
-struct S_logic_StructType;
-struct S_logic_Transition;
 struct S_net_Address;
 struct S_net_ChannelConfig;
 struct S_net_ClientServerConfig;
@@ -405,28 +352,6 @@ struct S_MeshData {
     explicit Fields(D* kern_d) : positions(kern_d), normals(kern_d), colors(kern_d), uvs(kern_d), extra(kern_d), extra_size(kern_d), indices(kern_d) { (void)kern_d; }
   };
 };
-struct S_MeshGpu {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::MeshGpu& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; ev::Direct<ev::Int>::from(o, f0, x.vao); ev::Direct<ev::Int>::from(o, f1, x.position); ev::Direct<ev::Int>::from(o, f2, x.normal); ev::Direct<ev::Int>::from(o, f3, x.color); ev::Direct<ev::Int>::from(o, f4, x.uv); ev::Direct<ev::Int>::from(o, f5, x.transforms); ev::Direct<ev::Int>::from(o, f6, x.tints); ev::Direct<ev::Int>::from(o, f7, x.instance_normals); ev::Direct<ev::Int>::from(o, f8, x.joints); ev::Direct<ev::Int>::from(o, f9, x.weights); ev::Direct<ev::List<ev::Int>>::from(o, f10, x.extension); ev::Direct<ev::Int>::from(o, f11, x.element); ev::Direct<ev::Int>::from(o, f12, x.element_type); ev::Direct<ev::List<ev::Int>>::from(o, f13, x.capacity); }
-  template <class B> static B make(EngineObjects& o, const kern::MeshGpu& x) { B b{ev::made<ev::Int>(o, x.vao), ev::made<ev::Int>(o, x.position), ev::made<ev::Int>(o, x.normal), ev::made<ev::Int>(o, x.color), ev::made<ev::Int>(o, x.uv), ev::made<ev::Int>(o, x.transforms), ev::made<ev::Int>(o, x.tints), ev::made<ev::Int>(o, x.instance_normals), ev::made<ev::Int>(o, x.joints), ev::made<ev::Int>(o, x.weights), ev::made<ev::List<ev::Int>>(o, x.extension), ev::made<ev::Int>(o, x.element), ev::made<ev::Int>(o, x.element_type), ev::made<ev::List<ev::Int>>(o, x.capacity)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.vao); ev::Direct<ev::Int>::pass(o, x.position); ev::Direct<ev::Int>::pass(o, x.normal); ev::Direct<ev::Int>::pass(o, x.color); ev::Direct<ev::Int>::pass(o, x.uv); ev::Direct<ev::Int>::pass(o, x.transforms); ev::Direct<ev::Int>::pass(o, x.tints); ev::Direct<ev::Int>::pass(o, x.instance_normals); ev::Direct<ev::Int>::pass(o, x.joints); ev::Direct<ev::Int>::pass(o, x.weights); ev::Direct<ev::List<ev::Int>>::pass(o, x.extension); ev::Direct<ev::Int>::pass(o, x.element); ev::Direct<ev::Int>::pass(o, x.element_type); ev::Direct<ev::List<ev::Int>>::pass(o, x.capacity); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::vao), decltype(B::vao), &kern::MeshGpu::vao, &B::vao> vao;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::position), decltype(B::position), &kern::MeshGpu::position, &B::position> position;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::normal), decltype(B::normal), &kern::MeshGpu::normal, &B::normal> normal;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::color), decltype(B::color), &kern::MeshGpu::color, &B::color> color;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::uv), decltype(B::uv), &kern::MeshGpu::uv, &B::uv> uv;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::transforms), decltype(B::transforms), &kern::MeshGpu::transforms, &B::transforms> transforms;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::tints), decltype(B::tints), &kern::MeshGpu::tints, &B::tints> tints;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::instance_normals), decltype(B::instance_normals), &kern::MeshGpu::instance_normals, &B::instance_normals> instance_normals;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::joints), decltype(B::joints), &kern::MeshGpu::joints, &B::joints> joints;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::weights), decltype(B::weights), &kern::MeshGpu::weights, &B::weights> weights;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::MeshGpu::extension), decltype(B::extension), &kern::MeshGpu::extension, &B::extension> extension;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::element), decltype(B::element), &kern::MeshGpu::element, &B::element> element;
-    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::element_type), decltype(B::element_type), &kern::MeshGpu::element_type, &B::element_type> element_type;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::MeshGpu::capacity), decltype(B::capacity), &kern::MeshGpu::capacity, &B::capacity> capacity;
-    explicit Fields(D* kern_d) : vao(kern_d), position(kern_d), normal(kern_d), color(kern_d), uv(kern_d), transforms(kern_d), tints(kern_d), instance_normals(kern_d), joints(kern_d), weights(kern_d), extension(kern_d), element(kern_d), element_type(kern_d), capacity(kern_d) { (void)kern_d; }
-  };
-};
 struct S_MeshInput {
   template <class B> static void from(EngineObjects& o, const B& b, kern::MeshInput& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15] = b; ev::Direct<ev::List<ev::Float>>::from(o, f0, x.positions); ev::Direct<ev::List<ev::Float>>::from(o, f1, x.normals); ev::Direct<ev::List<ev::Float>>::from(o, f2, x.colors); ev::Direct<ev::List<ev::Float>>::from(o, f3, x.uvs); ev::Direct<ev::List<ev::Int>>::from(o, f4, x.indices); ev::Direct<ev::List<ev::Float>>::from(o, f5, x.joints); ev::Direct<ev::List<ev::Float>>::from(o, f6, x.weights); ev::Direct<ev::List<ev::Float>>::from(o, f7, x.bones); ev::Direct<ev::List<ev::Row<ev::List<ev::Float>>>>::from(o, f8, x.extension); ev::Direct<ev::List<ev::Float>>::from(o, f9, x.transforms); ev::Direct<ev::List<ev::Float>>::from(o, f10, x.tints); ev::Direct<ev::Struct<S_Material>>::from(o, f11, x.material); ev::Direct<ev::Int>::from(o, f12, x.texture); ev::Direct<ev::Bool>::from(o, f13, x.visible); ev::Direct<ev::Int>::from(o, f14, x.layers); ev::Direct<ev::Bool>::from(o, f15, x.pick_bvh); }
   template <class B> static B make(EngineObjects& o, const kern::MeshInput& x) { B b{ev::made<ev::List<ev::Float>>(o, x.positions), ev::made<ev::List<ev::Float>>(o, x.normals), ev::made<ev::List<ev::Float>>(o, x.colors), ev::made<ev::List<ev::Float>>(o, x.uvs), ev::made<ev::List<ev::Int>>(o, x.indices), ev::made<ev::List<ev::Float>>(o, x.joints), ev::made<ev::List<ev::Float>>(o, x.weights), ev::made<ev::List<ev::Float>>(o, x.bones), ev::made<ev::List<ev::Row<ev::List<ev::Float>>>>(o, x.extension), ev::made<ev::List<ev::Float>>(o, x.transforms), ev::made<ev::List<ev::Float>>(o, x.tints), ev::made<ev::Struct<S_Material>>(o, x.material), ev::made<ev::Int>(o, x.texture), ev::made<ev::Bool>(o, x.visible), ev::made<ev::Int>(o, x.layers), ev::made<ev::Bool>(o, x.pick_bvh)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15] = b; return b; }
@@ -494,43 +419,6 @@ struct S_ParticleStats {
     explicit Fields(D* kern_d) : active(kern_d), dropped(kern_d), uploaded(kern_d), expired(kern_d) { (void)kern_d; }
   };
 };
-struct S_PickHit {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::PickHit& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::Int>::from(o, f0, x.mesh); ev::Direct<ev::Int>::from(o, f1, x.instance); ev::Direct<ev::Int>::from(o, f2, x.triangle); ev::Direct<ev::Float>::from(o, f3, x.distance); ev::Direct<ev::Vector>::from(o, f4, x.point); ev::Direct<ev::Vector>::from(o, f5, x.normal); ev::Direct<ev::Vector>::from(o, f6, x.barycentric); }
-  template <class B> static B make(EngineObjects& o, const kern::PickHit& x) { B b{ev::made<ev::Int>(o, x.mesh), ev::made<ev::Int>(o, x.instance), ev::made<ev::Int>(o, x.triangle), ev::made<ev::Float>(o, x.distance), ev::made<ev::Vector>(o, x.point), ev::made<ev::Vector>(o, x.normal), ev::made<ev::Vector>(o, x.barycentric)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.mesh); ev::Direct<ev::Int>::pass(o, x.instance); ev::Direct<ev::Int>::pass(o, x.triangle); ev::Direct<ev::Float>::pass(o, x.distance); ev::Direct<ev::Vector>::pass(o, x.point); ev::Direct<ev::Vector>::pass(o, x.normal); ev::Direct<ev::Vector>::pass(o, x.barycentric); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickHit::mesh), decltype(B::mesh), &kern::PickHit::mesh, &B::mesh> mesh;
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickHit::instance), decltype(B::instance), &kern::PickHit::instance, &B::instance> instance;
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickHit::triangle), decltype(B::triangle), &kern::PickHit::triangle, &B::triangle> triangle;
-    ev::Field<D, ev::Float, C, B, decltype(kern::PickHit::distance), decltype(B::distance), &kern::PickHit::distance, &B::distance> distance;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::PickHit::point), decltype(B::point), &kern::PickHit::point, &B::point> point;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::PickHit::normal), decltype(B::normal), &kern::PickHit::normal, &B::normal> normal;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::PickHit::barycentric), decltype(B::barycentric), &kern::PickHit::barycentric, &B::barycentric> barycentric;
-    explicit Fields(D* kern_d) : mesh(kern_d), instance(kern_d), triangle(kern_d), distance(kern_d), point(kern_d), normal(kern_d), barycentric(kern_d) { (void)kern_d; }
-  };
-};
-struct S_PickQuery {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::PickQuery& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Float>::from(o, f0, x.max_distance); ev::Direct<ev::Int>::from(o, f1, x.ignore_id); ev::Direct<ev::Bool>::from(o, f2, x.include_invisible); ev::Direct<ev::Int>::from(o, f3, x.layers); }
-  template <class B> static B make(EngineObjects& o, const kern::PickQuery& x) { B b{ev::made<ev::Float>(o, x.max_distance), ev::made<ev::Int>(o, x.ignore_id), ev::made<ev::Bool>(o, x.include_invisible), ev::made<ev::Int>(o, x.layers)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.max_distance); ev::Direct<ev::Int>::pass(o, x.ignore_id); ev::Direct<ev::Bool>::pass(o, x.include_invisible); ev::Direct<ev::Int>::pass(o, x.layers); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Float, C, B, decltype(kern::PickQuery::max_distance), decltype(B::max_distance), &kern::PickQuery::max_distance, &B::max_distance> max_distance;
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickQuery::ignore_id), decltype(B::ignore_id), &kern::PickQuery::ignore_id, &B::ignore_id> ignore_id;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::PickQuery::include_invisible), decltype(B::include_invisible), &kern::PickQuery::include_invisible, &B::include_invisible> include_invisible;
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickQuery::layers), decltype(B::layers), &kern::PickQuery::layers, &B::layers> layers;
-    explicit Fields(D* kern_d) : max_distance(kern_d), ignore_id(kern_d), include_invisible(kern_d), layers(kern_d) { (void)kern_d; }
-  };
-};
-struct S_PickStats {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::PickStats& x) { const auto& [f0, f1] = b; ev::Direct<ev::Int>::from(o, f0, x.triangles_examined); ev::Direct<ev::Int>::from(o, f1, x.bounds_rejected); }
-  template <class B> static B make(EngineObjects& o, const kern::PickStats& x) { B b{ev::made<ev::Int>(o, x.triangles_examined), ev::made<ev::Int>(o, x.bounds_rejected)}; [[maybe_unused]] const auto& [f0, f1] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.triangles_examined); ev::Direct<ev::Int>::pass(o, x.bounds_rejected); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickStats::triangles_examined), decltype(B::triangles_examined), &kern::PickStats::triangles_examined, &B::triangles_examined> triangles_examined;
-    ev::Field<D, ev::Int, C, B, decltype(kern::PickStats::bounds_rejected), decltype(B::bounds_rejected), &kern::PickStats::bounds_rejected, &B::bounds_rejected> bounds_rejected;
-    explicit Fields(D* kern_d) : triangles_examined(kern_d), bounds_rejected(kern_d) { (void)kern_d; }
-  };
-};
 struct S_PointLights {
   template <class B> static void from(EngineObjects& o, const B& b, kern::PointLights& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Int>::from(o, f0, x.count); ev::Direct<ev::List<ev::Float>>::from(o, f1, x.pos_range); ev::Direct<ev::List<ev::Float>>::from(o, f2, x.color_intensity); }
   template <class B> static B make(EngineObjects& o, const kern::PointLights& x) { B b{ev::made<ev::Int>(o, x.count), ev::made<ev::List<ev::Float>>(o, x.pos_range), ev::made<ev::List<ev::Float>>(o, x.color_intensity)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
@@ -540,21 +428,6 @@ struct S_PointLights {
     ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::PointLights::pos_range), decltype(B::pos_range), &kern::PointLights::pos_range, &B::pos_range> pos_range;
     ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::PointLights::color_intensity), decltype(B::color_intensity), &kern::PointLights::color_intensity, &B::color_intensity> color_intensity;
     explicit Fields(D* kern_d) : count(kern_d), pos_range(kern_d), color_intensity(kern_d) { (void)kern_d; }
-  };
-};
-struct S_ProjectSettings {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::ProjectSettings& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::Bool>::from(o, f0, x.set); ev::Direct<ev::Struct<S_RendererOptions>>::from(o, f1, x.renderer); ev::Direct<ev::Bool>::from(o, f2, x.mobile_set); ev::Direct<ev::Struct<S_ShadowOptions>>::from(o, f3, x.mobile_shadow); ev::Direct<ev::Struct<S_AoOptions>>::from(o, f4, x.mobile_ao); ev::Direct<ev::Int>::from(o, f5, x.heap_reserve_mb); ev::Direct<ev::Text>::from(o, f6, x.program); }
-  template <class B> static B make(EngineObjects& o, const kern::ProjectSettings& x) { B b{ev::made<ev::Bool>(o, x.set), ev::made<ev::Struct<S_RendererOptions>>(o, x.renderer), ev::made<ev::Bool>(o, x.mobile_set), ev::made<ev::Struct<S_ShadowOptions>>(o, x.mobile_shadow), ev::made<ev::Struct<S_AoOptions>>(o, x.mobile_ao), ev::made<ev::Int>(o, x.heap_reserve_mb), ev::made<ev::Text>(o, x.program)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Bool>::pass(o, x.set); ev::Direct<ev::Struct<S_RendererOptions>>::pass(o, x.renderer); ev::Direct<ev::Bool>::pass(o, x.mobile_set); ev::Direct<ev::Struct<S_ShadowOptions>>::pass(o, x.mobile_shadow); ev::Direct<ev::Struct<S_AoOptions>>::pass(o, x.mobile_ao); ev::Direct<ev::Int>::pass(o, x.heap_reserve_mb); ev::Direct<ev::Text>::pass(o, x.program); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Bool, C, B, decltype(kern::ProjectSettings::set), decltype(B::set), &kern::ProjectSettings::set, &B::set> set;
-    ev::Field<D, ev::Struct<S_RendererOptions>, C, B, decltype(kern::ProjectSettings::renderer), decltype(B::renderer), &kern::ProjectSettings::renderer, &B::renderer> renderer;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::ProjectSettings::mobile_set), decltype(B::mobile_set), &kern::ProjectSettings::mobile_set, &B::mobile_set> mobile_set;
-    ev::Field<D, ev::Struct<S_ShadowOptions>, C, B, decltype(kern::ProjectSettings::mobile_shadow), decltype(B::mobile_shadow), &kern::ProjectSettings::mobile_shadow, &B::mobile_shadow> mobile_shadow;
-    ev::Field<D, ev::Struct<S_AoOptions>, C, B, decltype(kern::ProjectSettings::mobile_ao), decltype(B::mobile_ao), &kern::ProjectSettings::mobile_ao, &B::mobile_ao> mobile_ao;
-    ev::Field<D, ev::Int, C, B, decltype(kern::ProjectSettings::heap_reserve_mb), decltype(B::heap_reserve_mb), &kern::ProjectSettings::heap_reserve_mb, &B::heap_reserve_mb> heap_reserve_mb;
-    ev::Field<D, ev::Text, C, B, decltype(kern::ProjectSettings::program), decltype(B::program), &kern::ProjectSettings::program, &B::program> program;
-    explicit Fields(D* kern_d) : set(kern_d), renderer(kern_d), mobile_set(kern_d), mobile_shadow(kern_d), mobile_ao(kern_d), heap_reserve_mb(kern_d), program(kern_d) { (void)kern_d; }
   };
 };
 struct S_Quat {
@@ -915,58 +788,6 @@ struct S_audio_SynthPatch {
     explicit Fields(D* kern_d) : wave(kern_d), volume(kern_d), attack(kern_d), sustain(kern_d), punch(kern_d), release(kern_d), frequency(kern_d), slide(kern_d), slide_accel(kern_d), min_frequency(kern_d), vibrato_depth(kern_d), vibrato_rate(kern_d), arp_ratio(kern_d), arp_time(kern_d), duty(kern_d), duty_sweep(kern_d), fm_ratio(kern_d), fm_depth(kern_d), lowpass(kern_d), lowpass_sweep(kern_d), resonance(kern_d), highpass(kern_d), tremolo_depth(kern_d), tremolo_rate(kern_d), repeat(kern_d), bitcrush(kern_d), seed(kern_d) { (void)kern_d; }
   };
 };
-struct S_game_Actor {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Actor& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Text>::from(o, f1, x.name); ev::Direct<ev::Int>::from(o, f2, x.parent); ev::Direct<ev::Text>::from(o, f3, x.folder); ev::Direct<ev::Bool>::from(o, f4, x.hidden); ev::Direct<ev::Bool>::from(o, f5, x.locked); ev::Direct<ev::Struct<S_game_Transform>>::from(o, f6, x.transform); ev::Direct<ev::List<ev::Text>>::from(o, f7, x.tags); ev::Direct<ev::List<ev::Struct<S_game_MeshComponent>>>::from(o, f8, x.mesh); ev::Direct<ev::List<ev::Struct<S_game_LightComponent>>>::from(o, f9, x.light); ev::Direct<ev::List<ev::Struct<S_game_BodyComponent>>>::from(o, f10, x.body); ev::Direct<ev::List<ev::Struct<S_game_ColliderComponent>>>::from(o, f11, x.colliders); ev::Direct<ev::List<ev::Struct<S_game_JointComponent>>>::from(o, f12, x.joints); ev::Direct<ev::List<ev::Struct<S_game_ControllerComponent>>>::from(o, f13, x.controller); ev::Direct<ev::List<ev::Struct<S_game_PickupComponent>>>::from(o, f14, x.pickup); ev::Direct<ev::List<ev::Struct<S_game_TriggerComponent>>>::from(o, f15, x.trigger); ev::Direct<ev::List<ev::Struct<S_game_RotatorComponent>>>::from(o, f16, x.rotator); ev::Direct<ev::List<ev::Struct<S_game_MoverComponent>>>::from(o, f17, x.mover); ev::Direct<ev::List<ev::Struct<S_game_CityComponent>>>::from(o, f18, x.city); ev::Direct<ev::List<ev::Struct<S_game_AudioComponent>>>::from(o, f19, x.audio); ev::Direct<ev::List<ev::Struct<S_game_WeaponComponent>>>::from(o, f20, x.weapon); ev::Direct<ev::List<ev::Struct<S_game_HealthComponent>>>::from(o, f21, x.health); ev::Direct<ev::List<ev::Struct<S_logic_Graph>>>::from(o, f22, x.logic); }
-  template <class B> static B make(EngineObjects& o, const kern::game::Actor& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Text>(o, x.name), ev::made<ev::Int>(o, x.parent), ev::made<ev::Text>(o, x.folder), ev::made<ev::Bool>(o, x.hidden), ev::made<ev::Bool>(o, x.locked), ev::made<ev::Struct<S_game_Transform>>(o, x.transform), ev::made<ev::List<ev::Text>>(o, x.tags), ev::made<ev::List<ev::Struct<S_game_MeshComponent>>>(o, x.mesh), ev::made<ev::List<ev::Struct<S_game_LightComponent>>>(o, x.light), ev::made<ev::List<ev::Struct<S_game_BodyComponent>>>(o, x.body), ev::made<ev::List<ev::Struct<S_game_ColliderComponent>>>(o, x.colliders), ev::made<ev::List<ev::Struct<S_game_JointComponent>>>(o, x.joints), ev::made<ev::List<ev::Struct<S_game_ControllerComponent>>>(o, x.controller), ev::made<ev::List<ev::Struct<S_game_PickupComponent>>>(o, x.pickup), ev::made<ev::List<ev::Struct<S_game_TriggerComponent>>>(o, x.trigger), ev::made<ev::List<ev::Struct<S_game_RotatorComponent>>>(o, x.rotator), ev::made<ev::List<ev::Struct<S_game_MoverComponent>>>(o, x.mover), ev::made<ev::List<ev::Struct<S_game_CityComponent>>>(o, x.city), ev::made<ev::List<ev::Struct<S_game_AudioComponent>>>(o, x.audio), ev::made<ev::List<ev::Struct<S_game_WeaponComponent>>>(o, x.weapon), ev::made<ev::List<ev::Struct<S_game_HealthComponent>>>(o, x.health), ev::made<ev::List<ev::Struct<S_logic_Graph>>>(o, x.logic)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Int>::pass(o, x.parent); ev::Direct<ev::Text>::pass(o, x.folder); ev::Direct<ev::Bool>::pass(o, x.hidden); ev::Direct<ev::Bool>::pass(o, x.locked); ev::Direct<ev::Struct<S_game_Transform>>::pass(o, x.transform); ev::Direct<ev::List<ev::Text>>::pass(o, x.tags); ev::Direct<ev::List<ev::Struct<S_game_MeshComponent>>>::pass(o, x.mesh); ev::Direct<ev::List<ev::Struct<S_game_LightComponent>>>::pass(o, x.light); ev::Direct<ev::List<ev::Struct<S_game_BodyComponent>>>::pass(o, x.body); ev::Direct<ev::List<ev::Struct<S_game_ColliderComponent>>>::pass(o, x.colliders); ev::Direct<ev::List<ev::Struct<S_game_JointComponent>>>::pass(o, x.joints); ev::Direct<ev::List<ev::Struct<S_game_ControllerComponent>>>::pass(o, x.controller); ev::Direct<ev::List<ev::Struct<S_game_PickupComponent>>>::pass(o, x.pickup); ev::Direct<ev::List<ev::Struct<S_game_TriggerComponent>>>::pass(o, x.trigger); ev::Direct<ev::List<ev::Struct<S_game_RotatorComponent>>>::pass(o, x.rotator); ev::Direct<ev::List<ev::Struct<S_game_MoverComponent>>>::pass(o, x.mover); ev::Direct<ev::List<ev::Struct<S_game_CityComponent>>>::pass(o, x.city); ev::Direct<ev::List<ev::Struct<S_game_AudioComponent>>>::pass(o, x.audio); ev::Direct<ev::List<ev::Struct<S_game_WeaponComponent>>>::pass(o, x.weapon); ev::Direct<ev::List<ev::Struct<S_game_HealthComponent>>>::pass(o, x.health); ev::Direct<ev::List<ev::Struct<S_logic_Graph>>>::pass(o, x.logic); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::Actor::id), decltype(B::id), &kern::game::Actor::id, &B::id> id;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::Actor::name), decltype(B::name), &kern::game::Actor::name, &B::name> name;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::Actor::parent), decltype(B::parent), &kern::game::Actor::parent, &B::parent> parent;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::Actor::folder), decltype(B::folder), &kern::game::Actor::folder, &B::folder> folder;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::Actor::hidden), decltype(B::hidden), &kern::game::Actor::hidden, &B::hidden> hidden;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::Actor::locked), decltype(B::locked), &kern::game::Actor::locked, &B::locked> locked;
-    ev::Field<D, ev::Struct<S_game_Transform>, C, B, decltype(kern::game::Actor::transform), decltype(B::transform), &kern::game::Actor::transform, &B::transform> transform;
-    ev::Field<D, ev::List<ev::Text>, C, B, decltype(kern::game::Actor::tags), decltype(B::tags), &kern::game::Actor::tags, &B::tags> tags;
-    ev::Field<D, ev::List<ev::Struct<S_game_MeshComponent>>, C, B, decltype(kern::game::Actor::mesh), decltype(B::mesh), &kern::game::Actor::mesh, &B::mesh> mesh;
-    ev::Field<D, ev::List<ev::Struct<S_game_LightComponent>>, C, B, decltype(kern::game::Actor::light), decltype(B::light), &kern::game::Actor::light, &B::light> light;
-    ev::Field<D, ev::List<ev::Struct<S_game_BodyComponent>>, C, B, decltype(kern::game::Actor::body), decltype(B::body), &kern::game::Actor::body, &B::body> body;
-    ev::Field<D, ev::List<ev::Struct<S_game_ColliderComponent>>, C, B, decltype(kern::game::Actor::colliders), decltype(B::colliders), &kern::game::Actor::colliders, &B::colliders> colliders;
-    ev::Field<D, ev::List<ev::Struct<S_game_JointComponent>>, C, B, decltype(kern::game::Actor::joints), decltype(B::joints), &kern::game::Actor::joints, &B::joints> joints;
-    ev::Field<D, ev::List<ev::Struct<S_game_ControllerComponent>>, C, B, decltype(kern::game::Actor::controller), decltype(B::controller), &kern::game::Actor::controller, &B::controller> controller;
-    ev::Field<D, ev::List<ev::Struct<S_game_PickupComponent>>, C, B, decltype(kern::game::Actor::pickup), decltype(B::pickup), &kern::game::Actor::pickup, &B::pickup> pickup;
-    ev::Field<D, ev::List<ev::Struct<S_game_TriggerComponent>>, C, B, decltype(kern::game::Actor::trigger), decltype(B::trigger), &kern::game::Actor::trigger, &B::trigger> trigger;
-    ev::Field<D, ev::List<ev::Struct<S_game_RotatorComponent>>, C, B, decltype(kern::game::Actor::rotator), decltype(B::rotator), &kern::game::Actor::rotator, &B::rotator> rotator;
-    ev::Field<D, ev::List<ev::Struct<S_game_MoverComponent>>, C, B, decltype(kern::game::Actor::mover), decltype(B::mover), &kern::game::Actor::mover, &B::mover> mover;
-    ev::Field<D, ev::List<ev::Struct<S_game_CityComponent>>, C, B, decltype(kern::game::Actor::city), decltype(B::city), &kern::game::Actor::city, &B::city> city;
-    ev::Field<D, ev::List<ev::Struct<S_game_AudioComponent>>, C, B, decltype(kern::game::Actor::audio), decltype(B::audio), &kern::game::Actor::audio, &B::audio> audio;
-    ev::Field<D, ev::List<ev::Struct<S_game_WeaponComponent>>, C, B, decltype(kern::game::Actor::weapon), decltype(B::weapon), &kern::game::Actor::weapon, &B::weapon> weapon;
-    ev::Field<D, ev::List<ev::Struct<S_game_HealthComponent>>, C, B, decltype(kern::game::Actor::health), decltype(B::health), &kern::game::Actor::health, &B::health> health;
-    ev::Field<D, ev::List<ev::Struct<S_logic_Graph>>, C, B, decltype(kern::game::Actor::logic), decltype(B::logic), &kern::game::Actor::logic, &B::logic> logic;
-    explicit Fields(D* kern_d) : id(kern_d), name(kern_d), parent(kern_d), folder(kern_d), hidden(kern_d), locked(kern_d), transform(kern_d), tags(kern_d), mesh(kern_d), light(kern_d), body(kern_d), colliders(kern_d), joints(kern_d), controller(kern_d), pickup(kern_d), trigger(kern_d), rotator(kern_d), mover(kern_d), city(kern_d), audio(kern_d), weapon(kern_d), health(kern_d), logic(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_AudioComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::AudioComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12] = b; ev::Direct<ev::Text>::from(o, f0, x.sound); ev::Direct<ev::Float>::from(o, f1, x.volume); ev::Direct<ev::Float>::from(o, f2, x.pitch); ev::Direct<ev::Bool>::from(o, f3, x.loop); ev::Direct<ev::Bool>::from(o, f4, x.autoplay); ev::Direct<ev::Bool>::from(o, f5, x.spatial); ev::Direct<ev::Float>::from(o, f6, x.min_distance); ev::Direct<ev::Float>::from(o, f7, x.max_distance); ev::Direct<ev::Enum<E_audio_Rolloff>>::from(o, f8, x.rolloff); ev::Direct<ev::Enum<E_audio_Bus>>::from(o, f9, x.bus); ev::Direct<ev::Float>::from(o, f10, x.doppler); ev::Direct<ev::Float>::from(o, f11, x.pitch_by_speed); ev::Direct<ev::Float>::from(o, f12, x.delay); }
-  template <class B> static B make(EngineObjects& o, const kern::game::AudioComponent& x) { B b{ev::made<ev::Text>(o, x.sound), ev::made<ev::Float>(o, x.volume), ev::made<ev::Float>(o, x.pitch), ev::made<ev::Bool>(o, x.loop), ev::made<ev::Bool>(o, x.autoplay), ev::made<ev::Bool>(o, x.spatial), ev::made<ev::Float>(o, x.min_distance), ev::made<ev::Float>(o, x.max_distance), ev::made<ev::Enum<E_audio_Rolloff>>(o, x.rolloff), ev::made<ev::Enum<E_audio_Bus>>(o, x.bus), ev::made<ev::Float>(o, x.doppler), ev::made<ev::Float>(o, x.pitch_by_speed), ev::made<ev::Float>(o, x.delay)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.sound); ev::Direct<ev::Float>::pass(o, x.volume); ev::Direct<ev::Float>::pass(o, x.pitch); ev::Direct<ev::Bool>::pass(o, x.loop); ev::Direct<ev::Bool>::pass(o, x.autoplay); ev::Direct<ev::Bool>::pass(o, x.spatial); ev::Direct<ev::Float>::pass(o, x.min_distance); ev::Direct<ev::Float>::pass(o, x.max_distance); ev::Direct<ev::Enum<E_audio_Rolloff>>::pass(o, x.rolloff); ev::Direct<ev::Enum<E_audio_Bus>>::pass(o, x.bus); ev::Direct<ev::Float>::pass(o, x.doppler); ev::Direct<ev::Float>::pass(o, x.pitch_by_speed); ev::Direct<ev::Float>::pass(o, x.delay); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::AudioComponent::sound), decltype(B::sound), &kern::game::AudioComponent::sound, &B::sound> sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::volume), decltype(B::volume), &kern::game::AudioComponent::volume, &B::volume> volume;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::pitch), decltype(B::pitch), &kern::game::AudioComponent::pitch, &B::pitch> pitch;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::AudioComponent::loop), decltype(B::the_loop), &kern::game::AudioComponent::loop, &B::the_loop> the_loop;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::AudioComponent::autoplay), decltype(B::autoplay), &kern::game::AudioComponent::autoplay, &B::autoplay> autoplay;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::AudioComponent::spatial), decltype(B::spatial), &kern::game::AudioComponent::spatial, &B::spatial> spatial;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::min_distance), decltype(B::min_distance), &kern::game::AudioComponent::min_distance, &B::min_distance> min_distance;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::max_distance), decltype(B::max_distance), &kern::game::AudioComponent::max_distance, &B::max_distance> max_distance;
-    ev::Field<D, ev::Enum<E_audio_Rolloff>, C, B, decltype(kern::game::AudioComponent::rolloff), decltype(B::rolloff), &kern::game::AudioComponent::rolloff, &B::rolloff> rolloff;
-    ev::Field<D, ev::Enum<E_audio_Bus>, C, B, decltype(kern::game::AudioComponent::bus), decltype(B::bus), &kern::game::AudioComponent::bus, &B::bus> bus;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::doppler), decltype(B::doppler), &kern::game::AudioComponent::doppler, &B::doppler> doppler;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::pitch_by_speed), decltype(B::pitch_by_speed), &kern::game::AudioComponent::pitch_by_speed, &B::pitch_by_speed> pitch_by_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::delay), decltype(B::delay), &kern::game::AudioComponent::delay, &B::delay> delay;
-    explicit Fields(D* kern_d) : sound(kern_d), volume(kern_d), pitch(kern_d), the_loop(kern_d), autoplay(kern_d), spatial(kern_d), min_distance(kern_d), max_distance(kern_d), rolloff(kern_d), bus(kern_d), doppler(kern_d), pitch_by_speed(kern_d), delay(kern_d) { (void)kern_d; }
-  };
-};
 struct S_game_BlueprintRunning {
   template <class B> static void from(EngineObjects& o, const B& b, kern::game::BlueprintRunning& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::Text>::from(o, f1, x.tier); ev::Direct<ev::Int>::from(o, f2, x.functions); ev::Direct<ev::Int>::from(o, f3, x.nodes); ev::Direct<ev::Bool>::from(o, f4, x.disabled); }
   template <class B> static B make(EngineObjects& o, const kern::game::BlueprintRunning& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::Text>(o, x.tier), ev::made<ev::Int>(o, x.functions), ev::made<ev::Int>(o, x.nodes), ev::made<ev::Bool>(o, x.disabled)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
@@ -978,158 +799,6 @@ struct S_game_BlueprintRunning {
     ev::Field<D, ev::Int, C, B, decltype(kern::game::BlueprintRunning::nodes), decltype(B::nodes), &kern::game::BlueprintRunning::nodes, &B::nodes> nodes;
     ev::Field<D, ev::Bool, C, B, decltype(kern::game::BlueprintRunning::disabled), decltype(B::disabled), &kern::game::BlueprintRunning::disabled, &B::disabled> disabled;
     explicit Fields(D* kern_d) : name(kern_d), tier(kern_d), functions(kern_d), nodes(kern_d), disabled(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_BodyComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::BodyComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15] = b; ev::Direct<ev::Enum<E_game_Motion>>::from(o, f0, x.motion); ev::Direct<ev::Float>::from(o, f1, x.mass); ev::Direct<ev::Float>::from(o, f2, x.linear_damping); ev::Direct<ev::Float>::from(o, f3, x.angular_damping); ev::Direct<ev::Float>::from(o, f4, x.gravity_scale); ev::Direct<ev::Bool>::from(o, f5, x.bullet); ev::Direct<ev::Bool>::from(o, f6, x.start_awake); ev::Direct<ev::Bool>::from(o, f7, x.allow_sleep); ev::Direct<ev::List<ev::Bool>>::from(o, f8, x.lock_linear); ev::Direct<ev::List<ev::Bool>>::from(o, f9, x.lock_angular); ev::Direct<ev::Vector>::from(o, f10, x.linear_velocity); ev::Direct<ev::Vector>::from(o, f11, x.angular_velocity); ev::Direct<ev::Text>::from(o, f12, x.impact_sound); ev::Direct<ev::Float>::from(o, f13, x.impact_threshold); ev::Direct<ev::Vector>::from(o, f14, x.center_of_mass); ev::Direct<ev::List<ev::Float>>::from(o, f15, x.inertia); }
-  template <class B> static B make(EngineObjects& o, const kern::game::BodyComponent& x) { B b{ev::made<ev::Enum<E_game_Motion>>(o, x.motion), ev::made<ev::Float>(o, x.mass), ev::made<ev::Float>(o, x.linear_damping), ev::made<ev::Float>(o, x.angular_damping), ev::made<ev::Float>(o, x.gravity_scale), ev::made<ev::Bool>(o, x.bullet), ev::made<ev::Bool>(o, x.start_awake), ev::made<ev::Bool>(o, x.allow_sleep), ev::made<ev::List<ev::Bool>>(o, x.lock_linear), ev::made<ev::List<ev::Bool>>(o, x.lock_angular), ev::made<ev::Vector>(o, x.linear_velocity), ev::made<ev::Vector>(o, x.angular_velocity), ev::made<ev::Text>(o, x.impact_sound), ev::made<ev::Float>(o, x.impact_threshold), ev::made<ev::Vector>(o, x.center_of_mass), ev::made<ev::List<ev::Float>>(o, x.inertia)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_Motion>>::pass(o, x.motion); ev::Direct<ev::Float>::pass(o, x.mass); ev::Direct<ev::Float>::pass(o, x.linear_damping); ev::Direct<ev::Float>::pass(o, x.angular_damping); ev::Direct<ev::Float>::pass(o, x.gravity_scale); ev::Direct<ev::Bool>::pass(o, x.bullet); ev::Direct<ev::Bool>::pass(o, x.start_awake); ev::Direct<ev::Bool>::pass(o, x.allow_sleep); ev::Direct<ev::List<ev::Bool>>::pass(o, x.lock_linear); ev::Direct<ev::List<ev::Bool>>::pass(o, x.lock_angular); ev::Direct<ev::Vector>::pass(o, x.linear_velocity); ev::Direct<ev::Vector>::pass(o, x.angular_velocity); ev::Direct<ev::Text>::pass(o, x.impact_sound); ev::Direct<ev::Float>::pass(o, x.impact_threshold); ev::Direct<ev::Vector>::pass(o, x.center_of_mass); ev::Direct<ev::List<ev::Float>>::pass(o, x.inertia); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_Motion>, C, B, decltype(kern::game::BodyComponent::motion), decltype(B::motion), &kern::game::BodyComponent::motion, &B::motion> motion;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::BodyComponent::mass), decltype(B::mass), &kern::game::BodyComponent::mass, &B::mass> mass;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::BodyComponent::linear_damping), decltype(B::linear_damping), &kern::game::BodyComponent::linear_damping, &B::linear_damping> linear_damping;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::BodyComponent::angular_damping), decltype(B::angular_damping), &kern::game::BodyComponent::angular_damping, &B::angular_damping> angular_damping;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::BodyComponent::gravity_scale), decltype(B::gravity_scale), &kern::game::BodyComponent::gravity_scale, &B::gravity_scale> gravity_scale;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::BodyComponent::bullet), decltype(B::bullet), &kern::game::BodyComponent::bullet, &B::bullet> bullet;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::BodyComponent::start_awake), decltype(B::start_awake), &kern::game::BodyComponent::start_awake, &B::start_awake> start_awake;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::BodyComponent::allow_sleep), decltype(B::allow_sleep), &kern::game::BodyComponent::allow_sleep, &B::allow_sleep> allow_sleep;
-    ev::Field<D, ev::List<ev::Bool>, C, B, decltype(kern::game::BodyComponent::lock_linear), decltype(B::lock_linear), &kern::game::BodyComponent::lock_linear, &B::lock_linear> lock_linear;
-    ev::Field<D, ev::List<ev::Bool>, C, B, decltype(kern::game::BodyComponent::lock_angular), decltype(B::lock_angular), &kern::game::BodyComponent::lock_angular, &B::lock_angular> lock_angular;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::BodyComponent::linear_velocity), decltype(B::linear_velocity), &kern::game::BodyComponent::linear_velocity, &B::linear_velocity> linear_velocity;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::BodyComponent::angular_velocity), decltype(B::angular_velocity), &kern::game::BodyComponent::angular_velocity, &B::angular_velocity> angular_velocity;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::BodyComponent::impact_sound), decltype(B::impact_sound), &kern::game::BodyComponent::impact_sound, &B::impact_sound> impact_sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::BodyComponent::impact_threshold), decltype(B::impact_threshold), &kern::game::BodyComponent::impact_threshold, &B::impact_threshold> impact_threshold;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::BodyComponent::center_of_mass), decltype(B::center_of_mass), &kern::game::BodyComponent::center_of_mass, &B::center_of_mass> center_of_mass;
-    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::BodyComponent::inertia), decltype(B::inertia), &kern::game::BodyComponent::inertia, &B::inertia> inertia;
-    explicit Fields(D* kern_d) : motion(kern_d), mass(kern_d), linear_damping(kern_d), angular_damping(kern_d), gravity_scale(kern_d), bullet(kern_d), start_awake(kern_d), allow_sleep(kern_d), lock_linear(kern_d), lock_angular(kern_d), linear_velocity(kern_d), angular_velocity(kern_d), impact_sound(kern_d), impact_threshold(kern_d), center_of_mass(kern_d), inertia(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_BodyPlan {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::BodyPlan& x) { const auto& [f0, f1, f2, f3, f4, f5] = b; ev::Direct<ev::Int>::from(o, f0, x.owner); ev::Direct<ev::Enum<E_game_Motion>>::from(o, f1, x.motion); ev::Direct<ev::Bool>::from(o, f2, x.implicit); ev::Direct<ev::Vector>::from(o, f3, x.position); ev::Direct<ev::Struct<S_Quat>>::from(o, f4, x.rotation); ev::Direct<ev::List<ev::Struct<S_game_ShapePlan>>>::from(o, f5, x.shapes); }
-  template <class B> static B make(EngineObjects& o, const kern::game::BodyPlan& x) { B b{ev::made<ev::Int>(o, x.owner), ev::made<ev::Enum<E_game_Motion>>(o, x.motion), ev::made<ev::Bool>(o, x.implicit), ev::made<ev::Vector>(o, x.position), ev::made<ev::Struct<S_Quat>>(o, x.rotation), ev::made<ev::List<ev::Struct<S_game_ShapePlan>>>(o, x.shapes)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.owner); ev::Direct<ev::Enum<E_game_Motion>>::pass(o, x.motion); ev::Direct<ev::Bool>::pass(o, x.implicit); ev::Direct<ev::Vector>::pass(o, x.position); ev::Direct<ev::Struct<S_Quat>>::pass(o, x.rotation); ev::Direct<ev::List<ev::Struct<S_game_ShapePlan>>>::pass(o, x.shapes); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::BodyPlan::owner), decltype(B::owner), &kern::game::BodyPlan::owner, &B::owner> owner;
-    ev::Field<D, ev::Enum<E_game_Motion>, C, B, decltype(kern::game::BodyPlan::motion), decltype(B::motion), &kern::game::BodyPlan::motion, &B::motion> motion;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::BodyPlan::implicit), decltype(B::implicit), &kern::game::BodyPlan::implicit, &B::implicit> implicit;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::BodyPlan::position), decltype(B::position), &kern::game::BodyPlan::position, &B::position> position;
-    ev::Field<D, ev::Struct<S_Quat>, C, B, decltype(kern::game::BodyPlan::rotation), decltype(B::rotation), &kern::game::BodyPlan::rotation, &B::rotation> rotation;
-    ev::Field<D, ev::List<ev::Struct<S_game_ShapePlan>>, C, B, decltype(kern::game::BodyPlan::shapes), decltype(B::shapes), &kern::game::BodyPlan::shapes, &B::shapes> shapes;
-    explicit Fields(D* kern_d) : owner(kern_d), motion(kern_d), implicit(kern_d), position(kern_d), rotation(kern_d), shapes(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_CityBox {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::CityBox& x) { const auto& [f0, f1] = b; ev::Direct<ev::Vector>::from(o, f0, x.center); ev::Direct<ev::Vector>::from(o, f1, x.size); }
-  template <class B> static B make(EngineObjects& o, const kern::game::CityBox& x) { B b{ev::made<ev::Vector>(o, x.center), ev::made<ev::Vector>(o, x.size)}; [[maybe_unused]] const auto& [f0, f1] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.center); ev::Direct<ev::Vector>::pass(o, x.size); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::CityBox::center), decltype(B::center), &kern::game::CityBox::center, &B::center> center;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::CityBox::size), decltype(B::size), &kern::game::CityBox::size, &B::size> size;
-    explicit Fields(D* kern_d) : center(kern_d), size(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_CityComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::CityComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; ev::Direct<ev::Int>::from(o, f0, x.seed); ev::Direct<ev::Int>::from(o, f1, x.blocks); ev::Direct<ev::Float>::from(o, f2, x.pitch); ev::Direct<ev::Float>::from(o, f3, x.street); ev::Direct<ev::Float>::from(o, f4, x.max_height); ev::Direct<ev::Bool>::from(o, f5, x.trees); ev::Direct<ev::Int>::from(o, f6, x.traffic); ev::Direct<ev::Bool>::from(o, f7, x.night_windows); }
-  template <class B> static B make(EngineObjects& o, const kern::game::CityComponent& x) { B b{ev::made<ev::Int>(o, x.seed), ev::made<ev::Int>(o, x.blocks), ev::made<ev::Float>(o, x.pitch), ev::made<ev::Float>(o, x.street), ev::made<ev::Float>(o, x.max_height), ev::made<ev::Bool>(o, x.trees), ev::made<ev::Int>(o, x.traffic), ev::made<ev::Bool>(o, x.night_windows)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.seed); ev::Direct<ev::Int>::pass(o, x.blocks); ev::Direct<ev::Float>::pass(o, x.pitch); ev::Direct<ev::Float>::pass(o, x.street); ev::Direct<ev::Float>::pass(o, x.max_height); ev::Direct<ev::Bool>::pass(o, x.trees); ev::Direct<ev::Int>::pass(o, x.traffic); ev::Direct<ev::Bool>::pass(o, x.night_windows); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::CityComponent::seed), decltype(B::seed), &kern::game::CityComponent::seed, &B::seed> seed;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::CityComponent::blocks), decltype(B::blocks), &kern::game::CityComponent::blocks, &B::blocks> blocks;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::CityComponent::pitch), decltype(B::pitch), &kern::game::CityComponent::pitch, &B::pitch> pitch;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::CityComponent::street), decltype(B::street), &kern::game::CityComponent::street, &B::street> street;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::CityComponent::max_height), decltype(B::max_height), &kern::game::CityComponent::max_height, &B::max_height> max_height;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::CityComponent::trees), decltype(B::trees), &kern::game::CityComponent::trees, &B::trees> trees;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::CityComponent::traffic), decltype(B::traffic), &kern::game::CityComponent::traffic, &B::traffic> traffic;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::CityComponent::night_windows), decltype(B::night_windows), &kern::game::CityComponent::night_windows, &B::night_windows> night_windows;
-    explicit Fields(D* kern_d) : seed(kern_d), blocks(kern_d), pitch(kern_d), street(kern_d), max_height(kern_d), trees(kern_d), traffic(kern_d), night_windows(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_CityGeometry {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::CityGeometry& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; ev::Direct<ev::List<ev::Struct<S_MeshData>>>::from(o, f0, x.buildings); ev::Direct<ev::List<ev::Struct<S_MeshData>>>::from(o, f1, x.roads); ev::Direct<ev::Struct<S_MeshData>>::from(o, f2, x.plates); ev::Direct<ev::Struct<S_MeshData>>::from(o, f3, x.trunk); ev::Direct<ev::Struct<S_MeshData>>::from(o, f4, x.crown); ev::Direct<ev::List<ev::Float>>::from(o, f5, x.trunk_transforms); ev::Direct<ev::List<ev::Float>>::from(o, f6, x.crown_transforms); ev::Direct<ev::List<ev::Float>>::from(o, f7, x.crown_tints); ev::Direct<ev::List<ev::Struct<S_game_CityBox>>>::from(o, f8, x.colliders); ev::Direct<ev::Float>::from(o, f9, x.half); ev::Direct<ev::Int>::from(o, f10, x.building_count); }
-  template <class B> static B make(EngineObjects& o, const kern::game::CityGeometry& x) { B b{ev::made<ev::List<ev::Struct<S_MeshData>>>(o, x.buildings), ev::made<ev::List<ev::Struct<S_MeshData>>>(o, x.roads), ev::made<ev::Struct<S_MeshData>>(o, x.plates), ev::made<ev::Struct<S_MeshData>>(o, x.trunk), ev::made<ev::Struct<S_MeshData>>(o, x.crown), ev::made<ev::List<ev::Float>>(o, x.trunk_transforms), ev::made<ev::List<ev::Float>>(o, x.crown_transforms), ev::made<ev::List<ev::Float>>(o, x.crown_tints), ev::made<ev::List<ev::Struct<S_game_CityBox>>>(o, x.colliders), ev::made<ev::Float>(o, x.half), ev::made<ev::Int>(o, x.building_count)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::List<ev::Struct<S_MeshData>>>::pass(o, x.buildings); ev::Direct<ev::List<ev::Struct<S_MeshData>>>::pass(o, x.roads); ev::Direct<ev::Struct<S_MeshData>>::pass(o, x.plates); ev::Direct<ev::Struct<S_MeshData>>::pass(o, x.trunk); ev::Direct<ev::Struct<S_MeshData>>::pass(o, x.crown); ev::Direct<ev::List<ev::Float>>::pass(o, x.trunk_transforms); ev::Direct<ev::List<ev::Float>>::pass(o, x.crown_transforms); ev::Direct<ev::List<ev::Float>>::pass(o, x.crown_tints); ev::Direct<ev::List<ev::Struct<S_game_CityBox>>>::pass(o, x.colliders); ev::Direct<ev::Float>::pass(o, x.half); ev::Direct<ev::Int>::pass(o, x.building_count); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::List<ev::Struct<S_MeshData>>, C, B, decltype(kern::game::CityGeometry::buildings), decltype(B::buildings), &kern::game::CityGeometry::buildings, &B::buildings> buildings;
-    ev::Field<D, ev::List<ev::Struct<S_MeshData>>, C, B, decltype(kern::game::CityGeometry::roads), decltype(B::roads), &kern::game::CityGeometry::roads, &B::roads> roads;
-    ev::Field<D, ev::Struct<S_MeshData>, C, B, decltype(kern::game::CityGeometry::plates), decltype(B::plates), &kern::game::CityGeometry::plates, &B::plates> plates;
-    ev::Field<D, ev::Struct<S_MeshData>, C, B, decltype(kern::game::CityGeometry::trunk), decltype(B::trunk), &kern::game::CityGeometry::trunk, &B::trunk> trunk;
-    ev::Field<D, ev::Struct<S_MeshData>, C, B, decltype(kern::game::CityGeometry::crown), decltype(B::crown), &kern::game::CityGeometry::crown, &B::crown> crown;
-    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::CityGeometry::trunk_transforms), decltype(B::trunk_transforms), &kern::game::CityGeometry::trunk_transforms, &B::trunk_transforms> trunk_transforms;
-    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::CityGeometry::crown_transforms), decltype(B::crown_transforms), &kern::game::CityGeometry::crown_transforms, &B::crown_transforms> crown_transforms;
-    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::CityGeometry::crown_tints), decltype(B::crown_tints), &kern::game::CityGeometry::crown_tints, &B::crown_tints> crown_tints;
-    ev::Field<D, ev::List<ev::Struct<S_game_CityBox>>, C, B, decltype(kern::game::CityGeometry::colliders), decltype(B::colliders), &kern::game::CityGeometry::colliders, &B::colliders> colliders;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::CityGeometry::half), decltype(B::half), &kern::game::CityGeometry::half, &B::half> half;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::CityGeometry::building_count), decltype(B::building_count), &kern::game::CityGeometry::building_count, &B::building_count> building_count;
-    explicit Fields(D* kern_d) : buildings(kern_d), roads(kern_d), plates(kern_d), trunk(kern_d), crown(kern_d), trunk_transforms(kern_d), crown_transforms(kern_d), crown_tints(kern_d), colliders(kern_d), half(kern_d), building_count(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_ColliderComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::ColliderComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16] = b; ev::Direct<ev::Enum<E_game_ColliderShape>>::from(o, f0, x.shape); ev::Direct<ev::Vector>::from(o, f1, x.center); ev::Direct<ev::Vector>::from(o, f2, x.rotation); ev::Direct<ev::Vector>::from(o, f3, x.size); ev::Direct<ev::Float>::from(o, f4, x.radius); ev::Direct<ev::Float>::from(o, f5, x.length); ev::Direct<ev::List<ev::Vector>>::from(o, f6, x.points); ev::Direct<ev::Float>::from(o, f7, x.density); ev::Direct<ev::Float>::from(o, f8, x.friction); ev::Direct<ev::Float>::from(o, f9, x.restitution); ev::Direct<ev::Float>::from(o, f10, x.rolling_resistance); ev::Direct<ev::Text>::from(o, f11, x.surface); ev::Direct<ev::Bool>::from(o, f12, x.sensor); ev::Direct<ev::Int>::from(o, f13, x.category); ev::Direct<ev::Int>::from(o, f14, x.mask); ev::Direct<ev::Int>::from(o, f15, x.group); ev::Direct<ev::Text>::from(o, f16, x.impact_sound); }
-  template <class B> static B make(EngineObjects& o, const kern::game::ColliderComponent& x) { B b{ev::made<ev::Enum<E_game_ColliderShape>>(o, x.shape), ev::made<ev::Vector>(o, x.center), ev::made<ev::Vector>(o, x.rotation), ev::made<ev::Vector>(o, x.size), ev::made<ev::Float>(o, x.radius), ev::made<ev::Float>(o, x.length), ev::made<ev::List<ev::Vector>>(o, x.points), ev::made<ev::Float>(o, x.density), ev::made<ev::Float>(o, x.friction), ev::made<ev::Float>(o, x.restitution), ev::made<ev::Float>(o, x.rolling_resistance), ev::made<ev::Text>(o, x.surface), ev::made<ev::Bool>(o, x.sensor), ev::made<ev::Int>(o, x.category), ev::made<ev::Int>(o, x.mask), ev::made<ev::Int>(o, x.group), ev::made<ev::Text>(o, x.impact_sound)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_ColliderShape>>::pass(o, x.shape); ev::Direct<ev::Vector>::pass(o, x.center); ev::Direct<ev::Vector>::pass(o, x.rotation); ev::Direct<ev::Vector>::pass(o, x.size); ev::Direct<ev::Float>::pass(o, x.radius); ev::Direct<ev::Float>::pass(o, x.length); ev::Direct<ev::List<ev::Vector>>::pass(o, x.points); ev::Direct<ev::Float>::pass(o, x.density); ev::Direct<ev::Float>::pass(o, x.friction); ev::Direct<ev::Float>::pass(o, x.restitution); ev::Direct<ev::Float>::pass(o, x.rolling_resistance); ev::Direct<ev::Text>::pass(o, x.surface); ev::Direct<ev::Bool>::pass(o, x.sensor); ev::Direct<ev::Int>::pass(o, x.category); ev::Direct<ev::Int>::pass(o, x.mask); ev::Direct<ev::Int>::pass(o, x.group); ev::Direct<ev::Text>::pass(o, x.impact_sound); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_ColliderShape>, C, B, decltype(kern::game::ColliderComponent::shape), decltype(B::shape), &kern::game::ColliderComponent::shape, &B::shape> shape;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::ColliderComponent::center), decltype(B::center), &kern::game::ColliderComponent::center, &B::center> center;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::ColliderComponent::rotation), decltype(B::rotation), &kern::game::ColliderComponent::rotation, &B::rotation> rotation;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::ColliderComponent::size), decltype(B::size), &kern::game::ColliderComponent::size, &B::size> size;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::radius), decltype(B::radius), &kern::game::ColliderComponent::radius, &B::radius> radius;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::length), decltype(B::length), &kern::game::ColliderComponent::length, &B::length> length;
-    ev::Field<D, ev::List<ev::Vector>, C, B, decltype(kern::game::ColliderComponent::points), decltype(B::points), &kern::game::ColliderComponent::points, &B::points> points;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::density), decltype(B::density), &kern::game::ColliderComponent::density, &B::density> density;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::friction), decltype(B::friction), &kern::game::ColliderComponent::friction, &B::friction> friction;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::restitution), decltype(B::restitution), &kern::game::ColliderComponent::restitution, &B::restitution> restitution;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ColliderComponent::rolling_resistance), decltype(B::rolling_resistance), &kern::game::ColliderComponent::rolling_resistance, &B::rolling_resistance> rolling_resistance;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ColliderComponent::surface), decltype(B::surface), &kern::game::ColliderComponent::surface, &B::surface> surface;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ColliderComponent::sensor), decltype(B::sensor), &kern::game::ColliderComponent::sensor, &B::sensor> sensor;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::ColliderComponent::category), decltype(B::category), &kern::game::ColliderComponent::category, &B::category> category;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::ColliderComponent::mask), decltype(B::mask), &kern::game::ColliderComponent::mask, &B::mask> mask;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::ColliderComponent::group), decltype(B::group), &kern::game::ColliderComponent::group, &B::group> group;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ColliderComponent::impact_sound), decltype(B::impact_sound), &kern::game::ColliderComponent::impact_sound, &B::impact_sound> impact_sound;
-    explicit Fields(D* kern_d) : shape(kern_d), center(kern_d), rotation(kern_d), size(kern_d), radius(kern_d), length(kern_d), points(kern_d), density(kern_d), friction(kern_d), restitution(kern_d), rolling_resistance(kern_d), surface(kern_d), sensor(kern_d), category(kern_d), mask(kern_d), group(kern_d), impact_sound(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_ControllerComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::ControllerComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24] = b; ev::Direct<ev::Enum<E_game_ControlMode>>::from(o, f0, x.mode); ev::Direct<ev::Float>::from(o, f1, x.max_speed); ev::Direct<ev::Float>::from(o, f2, x.acceleration); ev::Direct<ev::Float>::from(o, f3, x.turn_rate); ev::Direct<ev::Float>::from(o, f4, x.jump_speed); ev::Direct<ev::Bool>::from(o, f5, x.boost); ev::Direct<ev::Float>::from(o, f6, x.boost_speed); ev::Direct<ev::Float>::from(o, f7, x.hover_height); ev::Direct<ev::Enum<E_game_CameraMode>>::from(o, f8, x.camera); ev::Direct<ev::Float>::from(o, f9, x.camera_distance); ev::Direct<ev::Float>::from(o, f10, x.camera_height); ev::Direct<ev::Float>::from(o, f11, x.camera_fov); ev::Direct<ev::Text>::from(o, f12, x.engine_sound); ev::Direct<ev::Text>::from(o, f13, x.jump_sound); ev::Direct<ev::Text>::from(o, f14, x.boost_sound); ev::Direct<ev::Float>::from(o, f15, x.crouch_speed); ev::Direct<ev::Float>::from(o, f16, x.eye_height); ev::Direct<ev::Float>::from(o, f17, x.look_sensitivity); ev::Direct<ev::Bool>::from(o, f18, x.head_bob); ev::Direct<ev::Bool>::from(o, f19, x.autonomous); ev::Direct<ev::Text>::from(o, f20, x.gait); ev::Direct<ev::Bool>::from(o, f21, x.rollers); ev::Direct<ev::Text>::from(o, f22, x.actions); ev::Direct<ev::Bool>::from(o, f23, x.kern_extras); ev::Direct<ev::Float>::from(o, f24, x.servo_delay); }
-  template <class B> static B make(EngineObjects& o, const kern::game::ControllerComponent& x) { B b{ev::made<ev::Enum<E_game_ControlMode>>(o, x.mode), ev::made<ev::Float>(o, x.max_speed), ev::made<ev::Float>(o, x.acceleration), ev::made<ev::Float>(o, x.turn_rate), ev::made<ev::Float>(o, x.jump_speed), ev::made<ev::Bool>(o, x.boost), ev::made<ev::Float>(o, x.boost_speed), ev::made<ev::Float>(o, x.hover_height), ev::made<ev::Enum<E_game_CameraMode>>(o, x.camera), ev::made<ev::Float>(o, x.camera_distance), ev::made<ev::Float>(o, x.camera_height), ev::made<ev::Float>(o, x.camera_fov), ev::made<ev::Text>(o, x.engine_sound), ev::made<ev::Text>(o, x.jump_sound), ev::made<ev::Text>(o, x.boost_sound), ev::made<ev::Float>(o, x.crouch_speed), ev::made<ev::Float>(o, x.eye_height), ev::made<ev::Float>(o, x.look_sensitivity), ev::made<ev::Bool>(o, x.head_bob), ev::made<ev::Bool>(o, x.autonomous), ev::made<ev::Text>(o, x.gait), ev::made<ev::Bool>(o, x.rollers), ev::made<ev::Text>(o, x.actions), ev::made<ev::Bool>(o, x.kern_extras), ev::made<ev::Float>(o, x.servo_delay)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_ControlMode>>::pass(o, x.mode); ev::Direct<ev::Float>::pass(o, x.max_speed); ev::Direct<ev::Float>::pass(o, x.acceleration); ev::Direct<ev::Float>::pass(o, x.turn_rate); ev::Direct<ev::Float>::pass(o, x.jump_speed); ev::Direct<ev::Bool>::pass(o, x.boost); ev::Direct<ev::Float>::pass(o, x.boost_speed); ev::Direct<ev::Float>::pass(o, x.hover_height); ev::Direct<ev::Enum<E_game_CameraMode>>::pass(o, x.camera); ev::Direct<ev::Float>::pass(o, x.camera_distance); ev::Direct<ev::Float>::pass(o, x.camera_height); ev::Direct<ev::Float>::pass(o, x.camera_fov); ev::Direct<ev::Text>::pass(o, x.engine_sound); ev::Direct<ev::Text>::pass(o, x.jump_sound); ev::Direct<ev::Text>::pass(o, x.boost_sound); ev::Direct<ev::Float>::pass(o, x.crouch_speed); ev::Direct<ev::Float>::pass(o, x.eye_height); ev::Direct<ev::Float>::pass(o, x.look_sensitivity); ev::Direct<ev::Bool>::pass(o, x.head_bob); ev::Direct<ev::Bool>::pass(o, x.autonomous); ev::Direct<ev::Text>::pass(o, x.gait); ev::Direct<ev::Bool>::pass(o, x.rollers); ev::Direct<ev::Text>::pass(o, x.actions); ev::Direct<ev::Bool>::pass(o, x.kern_extras); ev::Direct<ev::Float>::pass(o, x.servo_delay); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_ControlMode>, C, B, decltype(kern::game::ControllerComponent::mode), decltype(B::mode), &kern::game::ControllerComponent::mode, &B::mode> mode;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::max_speed), decltype(B::max_speed), &kern::game::ControllerComponent::max_speed, &B::max_speed> max_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::acceleration), decltype(B::acceleration), &kern::game::ControllerComponent::acceleration, &B::acceleration> acceleration;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::turn_rate), decltype(B::turn_rate), &kern::game::ControllerComponent::turn_rate, &B::turn_rate> turn_rate;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::jump_speed), decltype(B::jump_speed), &kern::game::ControllerComponent::jump_speed, &B::jump_speed> jump_speed;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ControllerComponent::boost), decltype(B::boost), &kern::game::ControllerComponent::boost, &B::boost> boost;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::boost_speed), decltype(B::boost_speed), &kern::game::ControllerComponent::boost_speed, &B::boost_speed> boost_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::hover_height), decltype(B::hover_height), &kern::game::ControllerComponent::hover_height, &B::hover_height> hover_height;
-    ev::Field<D, ev::Enum<E_game_CameraMode>, C, B, decltype(kern::game::ControllerComponent::camera), decltype(B::camera), &kern::game::ControllerComponent::camera, &B::camera> camera;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::camera_distance), decltype(B::camera_distance), &kern::game::ControllerComponent::camera_distance, &B::camera_distance> camera_distance;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::camera_height), decltype(B::camera_height), &kern::game::ControllerComponent::camera_height, &B::camera_height> camera_height;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::camera_fov), decltype(B::camera_fov), &kern::game::ControllerComponent::camera_fov, &B::camera_fov> camera_fov;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ControllerComponent::engine_sound), decltype(B::engine_sound), &kern::game::ControllerComponent::engine_sound, &B::engine_sound> engine_sound;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ControllerComponent::jump_sound), decltype(B::jump_sound), &kern::game::ControllerComponent::jump_sound, &B::jump_sound> jump_sound;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ControllerComponent::boost_sound), decltype(B::boost_sound), &kern::game::ControllerComponent::boost_sound, &B::boost_sound> boost_sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::crouch_speed), decltype(B::crouch_speed), &kern::game::ControllerComponent::crouch_speed, &B::crouch_speed> crouch_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::eye_height), decltype(B::eye_height), &kern::game::ControllerComponent::eye_height, &B::eye_height> eye_height;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::look_sensitivity), decltype(B::look_sensitivity), &kern::game::ControllerComponent::look_sensitivity, &B::look_sensitivity> look_sensitivity;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ControllerComponent::head_bob), decltype(B::head_bob), &kern::game::ControllerComponent::head_bob, &B::head_bob> head_bob;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ControllerComponent::autonomous), decltype(B::autonomous), &kern::game::ControllerComponent::autonomous, &B::autonomous> autonomous;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ControllerComponent::gait), decltype(B::gait), &kern::game::ControllerComponent::gait, &B::gait> gait;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ControllerComponent::rollers), decltype(B::rollers), &kern::game::ControllerComponent::rollers, &B::rollers> rollers;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::ControllerComponent::actions), decltype(B::actions), &kern::game::ControllerComponent::actions, &B::actions> actions;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ControllerComponent::kern_extras), decltype(B::Kern_extras), &kern::game::ControllerComponent::kern_extras, &B::Kern_extras> Kern_extras;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ControllerComponent::servo_delay), decltype(B::servo_delay), &kern::game::ControllerComponent::servo_delay, &B::servo_delay> servo_delay;
-    explicit Fields(D* kern_d) : mode(kern_d), max_speed(kern_d), acceleration(kern_d), turn_rate(kern_d), jump_speed(kern_d), boost(kern_d), boost_speed(kern_d), hover_height(kern_d), camera(kern_d), camera_distance(kern_d), camera_height(kern_d), camera_fov(kern_d), engine_sound(kern_d), jump_sound(kern_d), boost_sound(kern_d), crouch_speed(kern_d), eye_height(kern_d), look_sensitivity(kern_d), head_bob(kern_d), autonomous(kern_d), gait(kern_d), rollers(kern_d), actions(kern_d), Kern_extras(kern_d), servo_delay(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_EditorCamera {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::EditorCamera& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Vector>::from(o, f0, x.position); ev::Direct<ev::Float>::from(o, f1, x.yaw); ev::Direct<ev::Float>::from(o, f2, x.pitch); }
-  template <class B> static B make(EngineObjects& o, const kern::game::EditorCamera& x) { B b{ev::made<ev::Vector>(o, x.position), ev::made<ev::Float>(o, x.yaw), ev::made<ev::Float>(o, x.pitch)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.position); ev::Direct<ev::Float>::pass(o, x.yaw); ev::Direct<ev::Float>::pass(o, x.pitch); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::EditorCamera::position), decltype(B::position), &kern::game::EditorCamera::position, &B::position> position;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::EditorCamera::yaw), decltype(B::yaw), &kern::game::EditorCamera::yaw, &B::yaw> yaw;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::EditorCamera::pitch), decltype(B::pitch), &kern::game::EditorCamera::pitch, &B::pitch> pitch;
-    explicit Fields(D* kern_d) : position(kern_d), yaw(kern_d), pitch(kern_d) { (void)kern_d; }
   };
 };
 struct S_game_GameWorld_ArtStats {
@@ -1222,25 +891,6 @@ struct S_game_GameWorld_WalkerSensors {
     explicit Fields(D* kern_d) : range(kern_d), zone(kern_d), nearest(kern_d), nearest_bearing(kern_d), free_left(kern_d), free_right(kern_d), gravity(kern_d), fallen(kern_d), speed(kern_d), tof_time(kern_d), hits(kern_d), hit(kern_d), forward_observed(kern_d) { (void)kern_d; }
   };
 };
-struct S_game_HealthComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::HealthComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; ev::Direct<ev::Float>::from(o, f0, x.max_health); ev::Direct<ev::Float>::from(o, f1, x.armor); ev::Direct<ev::Float>::from(o, f2, x.regen_delay); ev::Direct<ev::Float>::from(o, f3, x.regen_rate); ev::Direct<ev::Bool>::from(o, f4, x.respawn); ev::Direct<ev::Float>::from(o, f5, x.respawn_delay); ev::Direct<ev::Float>::from(o, f6, x.points); ev::Direct<ev::Text>::from(o, f7, x.hit_sound); ev::Direct<ev::Text>::from(o, f8, x.death_sound); ev::Direct<ev::Float>::from(o, f9, x.explode_radius); ev::Direct<ev::Float>::from(o, f10, x.explode_damage); }
-  template <class B> static B make(EngineObjects& o, const kern::game::HealthComponent& x) { B b{ev::made<ev::Float>(o, x.max_health), ev::made<ev::Float>(o, x.armor), ev::made<ev::Float>(o, x.regen_delay), ev::made<ev::Float>(o, x.regen_rate), ev::made<ev::Bool>(o, x.respawn), ev::made<ev::Float>(o, x.respawn_delay), ev::made<ev::Float>(o, x.points), ev::made<ev::Text>(o, x.hit_sound), ev::made<ev::Text>(o, x.death_sound), ev::made<ev::Float>(o, x.explode_radius), ev::made<ev::Float>(o, x.explode_damage)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.max_health); ev::Direct<ev::Float>::pass(o, x.armor); ev::Direct<ev::Float>::pass(o, x.regen_delay); ev::Direct<ev::Float>::pass(o, x.regen_rate); ev::Direct<ev::Bool>::pass(o, x.respawn); ev::Direct<ev::Float>::pass(o, x.respawn_delay); ev::Direct<ev::Float>::pass(o, x.points); ev::Direct<ev::Text>::pass(o, x.hit_sound); ev::Direct<ev::Text>::pass(o, x.death_sound); ev::Direct<ev::Float>::pass(o, x.explode_radius); ev::Direct<ev::Float>::pass(o, x.explode_damage); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::max_health), decltype(B::max_health), &kern::game::HealthComponent::max_health, &B::max_health> max_health;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::armor), decltype(B::armor), &kern::game::HealthComponent::armor, &B::armor> armor;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::regen_delay), decltype(B::regen_delay), &kern::game::HealthComponent::regen_delay, &B::regen_delay> regen_delay;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::regen_rate), decltype(B::regen_rate), &kern::game::HealthComponent::regen_rate, &B::regen_rate> regen_rate;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::HealthComponent::respawn), decltype(B::respawn), &kern::game::HealthComponent::respawn, &B::respawn> respawn;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::respawn_delay), decltype(B::respawn_delay), &kern::game::HealthComponent::respawn_delay, &B::respawn_delay> respawn_delay;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::points), decltype(B::points), &kern::game::HealthComponent::points, &B::points> points;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::HealthComponent::hit_sound), decltype(B::hit_sound), &kern::game::HealthComponent::hit_sound, &B::hit_sound> hit_sound;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::HealthComponent::death_sound), decltype(B::death_sound), &kern::game::HealthComponent::death_sound, &B::death_sound> death_sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::explode_radius), decltype(B::explode_radius), &kern::game::HealthComponent::explode_radius, &B::explode_radius> explode_radius;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::HealthComponent::explode_damage), decltype(B::explode_damage), &kern::game::HealthComponent::explode_damage, &B::explode_damage> explode_damage;
-    explicit Fields(D* kern_d) : max_health(kern_d), armor(kern_d), regen_delay(kern_d), regen_rate(kern_d), respawn(kern_d), respawn_delay(kern_d), points(kern_d), hit_sound(kern_d), death_sound(kern_d), explode_radius(kern_d), explode_damage(kern_d) { (void)kern_d; }
-  };
-};
 struct S_game_Hud {
   template <class B> static void from(EngineObjects& o, const B& b, kern::game::Hud& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30] = b; ev::Direct<ev::Enum<E_game_GameStatus>>::from(o, f0, x.status); ev::Direct<ev::Text>::from(o, f1, x.title); ev::Direct<ev::Text>::from(o, f2, x.message); ev::Direct<ev::Float>::from(o, f3, x.message_age); ev::Direct<ev::Float>::from(o, f4, x.score); ev::Direct<ev::Int>::from(o, f5, x.pickups); ev::Direct<ev::Int>::from(o, f6, x.pickups_total); ev::Direct<ev::Float>::from(o, f7, x.elapsed); ev::Direct<ev::Float>::from(o, f8, x.remaining); ev::Direct<ev::Float>::from(o, f9, x.speed); ev::Direct<ev::Float>::from(o, f10, x.boost); ev::Direct<ev::Bool>::from(o, f11, x.boosting); ev::Direct<ev::Bool>::from(o, f12, x.interior); ev::Direct<ev::Float>::from(o, f13, x.best); ev::Direct<ev::Bool>::from(o, f14, x.soldier); ev::Direct<ev::Float>::from(o, f15, x.health); ev::Direct<ev::Float>::from(o, f16, x.max_health); ev::Direct<ev::Float>::from(o, f17, x.armor); ev::Direct<ev::Int>::from(o, f18, x.ammo); ev::Direct<ev::Int>::from(o, f19, x.magazine); ev::Direct<ev::Int>::from(o, f20, x.reserve); ev::Direct<ev::Float>::from(o, f21, x.reload); ev::Direct<ev::Float>::from(o, f22, x.spread); ev::Direct<ev::Float>::from(o, f23, x.hit_age); ev::Direct<ev::Bool>::from(o, f24, x.hit_head); ev::Direct<ev::Bool>::from(o, f25, x.hit_kill); ev::Direct<ev::Float>::from(o, f26, x.damage_age); ev::Direct<ev::Float>::from(o, f27, x.damage_yaw); ev::Direct<ev::Float>::from(o, f28, x.respawn_in); ev::Direct<ev::Bool>::from(o, f29, x.aiming); ev::Direct<ev::Float>::from(o, f30, x.fov); }
   template <class B> static B make(EngineObjects& o, const kern::game::Hud& x) { B b{ev::made<ev::Enum<E_game_GameStatus>>(o, x.status), ev::made<ev::Text>(o, x.title), ev::made<ev::Text>(o, x.message), ev::made<ev::Float>(o, x.message_age), ev::made<ev::Float>(o, x.score), ev::made<ev::Int>(o, x.pickups), ev::made<ev::Int>(o, x.pickups_total), ev::made<ev::Float>(o, x.elapsed), ev::made<ev::Float>(o, x.remaining), ev::made<ev::Float>(o, x.speed), ev::made<ev::Float>(o, x.boost), ev::made<ev::Bool>(o, x.boosting), ev::made<ev::Bool>(o, x.interior), ev::made<ev::Float>(o, x.best), ev::made<ev::Bool>(o, x.soldier), ev::made<ev::Float>(o, x.health), ev::made<ev::Float>(o, x.max_health), ev::made<ev::Float>(o, x.armor), ev::made<ev::Int>(o, x.ammo), ev::made<ev::Int>(o, x.magazine), ev::made<ev::Int>(o, x.reserve), ev::made<ev::Float>(o, x.reload), ev::made<ev::Float>(o, x.spread), ev::made<ev::Float>(o, x.hit_age), ev::made<ev::Bool>(o, x.hit_head), ev::made<ev::Bool>(o, x.hit_kill), ev::made<ev::Float>(o, x.damage_age), ev::made<ev::Float>(o, x.damage_yaw), ev::made<ev::Float>(o, x.respawn_in), ev::made<ev::Bool>(o, x.aiming), ev::made<ev::Float>(o, x.fov)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30] = b; return b; }
@@ -1280,153 +930,6 @@ struct S_game_Hud {
     explicit Fields(D* kern_d) : status(kern_d), title(kern_d), message(kern_d), message_age(kern_d), score(kern_d), pickups(kern_d), pickups_total(kern_d), elapsed(kern_d), remaining(kern_d), speed(kern_d), boost(kern_d), boosting(kern_d), interior(kern_d), best(kern_d), soldier(kern_d), health(kern_d), max_health(kern_d), armor(kern_d), ammo(kern_d), magazine(kern_d), reserve(kern_d), reload(kern_d), spread(kern_d), hit_age(kern_d), hit_head(kern_d), hit_kill(kern_d), damage_age(kern_d), damage_yaw(kern_d), respawn_in(kern_d), aiming(kern_d), fov(kern_d) { (void)kern_d; }
   };
 };
-struct S_game_Issue {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Issue& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Bool>::from(o, f0, x.error); ev::Direct<ev::Int>::from(o, f1, x.actor); ev::Direct<ev::Text>::from(o, f2, x.text); }
-  template <class B> static B make(EngineObjects& o, const kern::game::Issue& x) { B b{ev::made<ev::Bool>(o, x.error), ev::made<ev::Int>(o, x.actor), ev::made<ev::Text>(o, x.text)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Bool>::pass(o, x.error); ev::Direct<ev::Int>::pass(o, x.actor); ev::Direct<ev::Text>::pass(o, x.text); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::Issue::error), decltype(B::error), &kern::game::Issue::error, &B::error> error;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::Issue::actor), decltype(B::actor), &kern::game::Issue::actor, &B::actor> actor;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::Issue::text), decltype(B::text), &kern::game::Issue::text, &B::text> text;
-    explicit Fields(D* kern_d) : error(kern_d), actor(kern_d), text(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_JointComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::JointComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23] = b; ev::Direct<ev::Enum<E_game_JointKind>>::from(o, f0, x.kind); ev::Direct<ev::Int>::from(o, f1, x.target); ev::Direct<ev::Vector>::from(o, f2, x.anchor); ev::Direct<ev::Vector>::from(o, f3, x.axis); ev::Direct<ev::Bool>::from(o, f4, x.collide_connected); ev::Direct<ev::Bool>::from(o, f5, x.enable_limit); ev::Direct<ev::Float>::from(o, f6, x.lower); ev::Direct<ev::Float>::from(o, f7, x.upper); ev::Direct<ev::Float>::from(o, f8, x.reference); ev::Direct<ev::Bool>::from(o, f9, x.enable_motor); ev::Direct<ev::Float>::from(o, f10, x.motor_speed); ev::Direct<ev::Float>::from(o, f11, x.max_motor_force); ev::Direct<ev::Bool>::from(o, f12, x.enable_spring); ev::Direct<ev::Float>::from(o, f13, x.spring_hertz); ev::Direct<ev::Float>::from(o, f14, x.spring_damping); ev::Direct<ev::Float>::from(o, f15, x.length); ev::Direct<ev::Float>::from(o, f16, x.break_force); ev::Direct<ev::Float>::from(o, f17, x.break_torque); ev::Direct<ev::Bool>::from(o, f18, x.servo); ev::Direct<ev::Float>::from(o, f19, x.servo_target); ev::Direct<ev::Float>::from(o, f20, x.servo_stiffness); ev::Direct<ev::Float>::from(o, f21, x.servo_damping); ev::Direct<ev::Float>::from(o, f22, x.servo_friction); ev::Direct<ev::Text>::from(o, f23, x.break_sound); }
-  template <class B> static B make(EngineObjects& o, const kern::game::JointComponent& x) { B b{ev::made<ev::Enum<E_game_JointKind>>(o, x.kind), ev::made<ev::Int>(o, x.target), ev::made<ev::Vector>(o, x.anchor), ev::made<ev::Vector>(o, x.axis), ev::made<ev::Bool>(o, x.collide_connected), ev::made<ev::Bool>(o, x.enable_limit), ev::made<ev::Float>(o, x.lower), ev::made<ev::Float>(o, x.upper), ev::made<ev::Float>(o, x.reference), ev::made<ev::Bool>(o, x.enable_motor), ev::made<ev::Float>(o, x.motor_speed), ev::made<ev::Float>(o, x.max_motor_force), ev::made<ev::Bool>(o, x.enable_spring), ev::made<ev::Float>(o, x.spring_hertz), ev::made<ev::Float>(o, x.spring_damping), ev::made<ev::Float>(o, x.length), ev::made<ev::Float>(o, x.break_force), ev::made<ev::Float>(o, x.break_torque), ev::made<ev::Bool>(o, x.servo), ev::made<ev::Float>(o, x.servo_target), ev::made<ev::Float>(o, x.servo_stiffness), ev::made<ev::Float>(o, x.servo_damping), ev::made<ev::Float>(o, x.servo_friction), ev::made<ev::Text>(o, x.break_sound)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_JointKind>>::pass(o, x.kind); ev::Direct<ev::Int>::pass(o, x.target); ev::Direct<ev::Vector>::pass(o, x.anchor); ev::Direct<ev::Vector>::pass(o, x.axis); ev::Direct<ev::Bool>::pass(o, x.collide_connected); ev::Direct<ev::Bool>::pass(o, x.enable_limit); ev::Direct<ev::Float>::pass(o, x.lower); ev::Direct<ev::Float>::pass(o, x.upper); ev::Direct<ev::Float>::pass(o, x.reference); ev::Direct<ev::Bool>::pass(o, x.enable_motor); ev::Direct<ev::Float>::pass(o, x.motor_speed); ev::Direct<ev::Float>::pass(o, x.max_motor_force); ev::Direct<ev::Bool>::pass(o, x.enable_spring); ev::Direct<ev::Float>::pass(o, x.spring_hertz); ev::Direct<ev::Float>::pass(o, x.spring_damping); ev::Direct<ev::Float>::pass(o, x.length); ev::Direct<ev::Float>::pass(o, x.break_force); ev::Direct<ev::Float>::pass(o, x.break_torque); ev::Direct<ev::Bool>::pass(o, x.servo); ev::Direct<ev::Float>::pass(o, x.servo_target); ev::Direct<ev::Float>::pass(o, x.servo_stiffness); ev::Direct<ev::Float>::pass(o, x.servo_damping); ev::Direct<ev::Float>::pass(o, x.servo_friction); ev::Direct<ev::Text>::pass(o, x.break_sound); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_JointKind>, C, B, decltype(kern::game::JointComponent::kind), decltype(B::kind), &kern::game::JointComponent::kind, &B::kind> kind;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::JointComponent::target), decltype(B::target), &kern::game::JointComponent::target, &B::target> target;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::JointComponent::anchor), decltype(B::anchor), &kern::game::JointComponent::anchor, &B::anchor> anchor;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::JointComponent::axis), decltype(B::axis), &kern::game::JointComponent::axis, &B::axis> axis;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::JointComponent::collide_connected), decltype(B::collide_connected), &kern::game::JointComponent::collide_connected, &B::collide_connected> collide_connected;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::JointComponent::enable_limit), decltype(B::enable_limit), &kern::game::JointComponent::enable_limit, &B::enable_limit> enable_limit;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::lower), decltype(B::lower), &kern::game::JointComponent::lower, &B::lower> lower;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::upper), decltype(B::upper), &kern::game::JointComponent::upper, &B::upper> upper;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::reference), decltype(B::reference), &kern::game::JointComponent::reference, &B::reference> reference;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::JointComponent::enable_motor), decltype(B::enable_motor), &kern::game::JointComponent::enable_motor, &B::enable_motor> enable_motor;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::motor_speed), decltype(B::motor_speed), &kern::game::JointComponent::motor_speed, &B::motor_speed> motor_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::max_motor_force), decltype(B::max_motor_force), &kern::game::JointComponent::max_motor_force, &B::max_motor_force> max_motor_force;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::JointComponent::enable_spring), decltype(B::enable_spring), &kern::game::JointComponent::enable_spring, &B::enable_spring> enable_spring;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::spring_hertz), decltype(B::spring_hertz), &kern::game::JointComponent::spring_hertz, &B::spring_hertz> spring_hertz;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::spring_damping), decltype(B::spring_damping), &kern::game::JointComponent::spring_damping, &B::spring_damping> spring_damping;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::length), decltype(B::length), &kern::game::JointComponent::length, &B::length> length;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::break_force), decltype(B::break_force), &kern::game::JointComponent::break_force, &B::break_force> break_force;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::break_torque), decltype(B::break_torque), &kern::game::JointComponent::break_torque, &B::break_torque> break_torque;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::JointComponent::servo), decltype(B::servo), &kern::game::JointComponent::servo, &B::servo> servo;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::servo_target), decltype(B::servo_target), &kern::game::JointComponent::servo_target, &B::servo_target> servo_target;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::servo_stiffness), decltype(B::servo_stiffness), &kern::game::JointComponent::servo_stiffness, &B::servo_stiffness> servo_stiffness;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::servo_damping), decltype(B::servo_damping), &kern::game::JointComponent::servo_damping, &B::servo_damping> servo_damping;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::JointComponent::servo_friction), decltype(B::servo_friction), &kern::game::JointComponent::servo_friction, &B::servo_friction> servo_friction;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::JointComponent::break_sound), decltype(B::break_sound), &kern::game::JointComponent::break_sound, &B::break_sound> break_sound;
-    explicit Fields(D* kern_d) : kind(kern_d), target(kern_d), anchor(kern_d), axis(kern_d), collide_connected(kern_d), enable_limit(kern_d), lower(kern_d), upper(kern_d), reference(kern_d), enable_motor(kern_d), motor_speed(kern_d), max_motor_force(kern_d), enable_spring(kern_d), spring_hertz(kern_d), spring_damping(kern_d), length(kern_d), break_force(kern_d), break_torque(kern_d), servo(kern_d), servo_target(kern_d), servo_stiffness(kern_d), servo_damping(kern_d), servo_friction(kern_d), break_sound(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_Level {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Level& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::from(o, f1, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::from(o, f2, x.actors); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.textures); ev::Direct<ev::List<ev::Int>>::from(o, f4, x.sounds); ev::Direct<ev::List<ev::Int>>::from(o, f5, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::from(o, f6, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::from(o, f7, x.camera); ev::Direct<ev::Int>::from(o, f8, x.next_id); ev::Direct<ev::Struct<S_ProjectSettings>>::from(o, f9, x.project); }
-  template <class B> static B make(EngineObjects& o, const kern::game::Level& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::Struct<S_game_WorldSettings>>(o, x.world), ev::made<ev::List<ev::Struct<S_game_Actor>>>(o, x.actors), ev::made<ev::List<ev::Int>>(o, x.textures), ev::made<ev::List<ev::Int>>(o, x.sounds), ev::made<ev::List<ev::Int>>(o, x.motions), ev::made<ev::Struct<S_logic_Graph>>(o, x.logic), ev::made<ev::Struct<S_game_EditorCamera>>(o, x.camera), ev::made<ev::Int>(o, x.next_id), ev::made<ev::Struct<S_ProjectSettings>>(o, x.project)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::pass(o, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::pass(o, x.actors); ev::Direct<ev::List<ev::Int>>::pass(o, x.textures); ev::Direct<ev::List<ev::Int>>::pass(o, x.sounds); ev::Direct<ev::List<ev::Int>>::pass(o, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::pass(o, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::pass(o, x.camera); ev::Direct<ev::Int>::pass(o, x.next_id); ev::Direct<ev::Struct<S_ProjectSettings>>::pass(o, x.project); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::Level::name), decltype(B::name), &kern::game::Level::name, &B::name> name;
-    ev::Field<D, ev::Struct<S_game_WorldSettings>, C, B, decltype(kern::game::Level::world), decltype(B::world), &kern::game::Level::world, &B::world> world;
-    ev::Field<D, ev::List<ev::Struct<S_game_Actor>>, C, B, decltype(kern::game::Level::actors), decltype(B::actors), &kern::game::Level::actors, &B::actors> actors;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::game::Level::textures), decltype(B::textures), &kern::game::Level::textures, &B::textures> textures;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::game::Level::sounds), decltype(B::sounds), &kern::game::Level::sounds, &B::sounds> sounds;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::game::Level::motions), decltype(B::motions), &kern::game::Level::motions, &B::motions> motions;
-    ev::Field<D, ev::Struct<S_logic_Graph>, C, B, decltype(kern::game::Level::logic), decltype(B::logic), &kern::game::Level::logic, &B::logic> logic;
-    ev::Field<D, ev::Struct<S_game_EditorCamera>, C, B, decltype(kern::game::Level::camera), decltype(B::camera), &kern::game::Level::camera, &B::camera> camera;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::Level::next_id), decltype(B::next_id), &kern::game::Level::next_id, &B::next_id> next_id;
-    ev::Field<D, ev::Struct<S_ProjectSettings>, C, B, decltype(kern::game::Level::project), decltype(B::project), &kern::game::Level::project, &B::project> project;
-    explicit Fields(D* kern_d) : name(kern_d), world(kern_d), actors(kern_d), textures(kern_d), sounds(kern_d), motions(kern_d), logic(kern_d), camera(kern_d), next_id(kern_d), project(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_LightComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::LightComponent& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Vector>::from(o, f0, x.color); ev::Direct<ev::Float>::from(o, f1, x.intensity); ev::Direct<ev::Float>::from(o, f2, x.range); }
-  template <class B> static B make(EngineObjects& o, const kern::game::LightComponent& x) { B b{ev::made<ev::Vector>(o, x.color), ev::made<ev::Float>(o, x.intensity), ev::made<ev::Float>(o, x.range)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.color); ev::Direct<ev::Float>::pass(o, x.intensity); ev::Direct<ev::Float>::pass(o, x.range); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::LightComponent::color), decltype(B::color), &kern::game::LightComponent::color, &B::color> color;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::LightComponent::intensity), decltype(B::intensity), &kern::game::LightComponent::intensity, &B::intensity> intensity;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::LightComponent::range), decltype(B::range), &kern::game::LightComponent::range, &B::range> range;
-    explicit Fields(D* kern_d) : color(kern_d), intensity(kern_d), range(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_MaterialDesc {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::MaterialDesc& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; ev::Direct<ev::Vector>::from(o, f0, x.color); ev::Direct<ev::Float>::from(o, f1, x.roughness); ev::Direct<ev::Float>::from(o, f2, x.metalness); ev::Direct<ev::Vector>::from(o, f3, x.emissive); ev::Direct<ev::Float>::from(o, f4, x.emissive_strength); ev::Direct<ev::Float>::from(o, f5, x.opacity); ev::Direct<ev::Bool>::from(o, f6, x.unlit); ev::Direct<ev::Bool>::from(o, f7, x.cast_shadow); ev::Direct<ev::Bool>::from(o, f8, x.double_sided); ev::Direct<ev::Text>::from(o, f9, x.texture); ev::Direct<ev::Float>::from(o, f10, x.tiling); }
-  template <class B> static B make(EngineObjects& o, const kern::game::MaterialDesc& x) { B b{ev::made<ev::Vector>(o, x.color), ev::made<ev::Float>(o, x.roughness), ev::made<ev::Float>(o, x.metalness), ev::made<ev::Vector>(o, x.emissive), ev::made<ev::Float>(o, x.emissive_strength), ev::made<ev::Float>(o, x.opacity), ev::made<ev::Bool>(o, x.unlit), ev::made<ev::Bool>(o, x.cast_shadow), ev::made<ev::Bool>(o, x.double_sided), ev::made<ev::Text>(o, x.texture), ev::made<ev::Float>(o, x.tiling)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.color); ev::Direct<ev::Float>::pass(o, x.roughness); ev::Direct<ev::Float>::pass(o, x.metalness); ev::Direct<ev::Vector>::pass(o, x.emissive); ev::Direct<ev::Float>::pass(o, x.emissive_strength); ev::Direct<ev::Float>::pass(o, x.opacity); ev::Direct<ev::Bool>::pass(o, x.unlit); ev::Direct<ev::Bool>::pass(o, x.cast_shadow); ev::Direct<ev::Bool>::pass(o, x.double_sided); ev::Direct<ev::Text>::pass(o, x.texture); ev::Direct<ev::Float>::pass(o, x.tiling); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::MaterialDesc::color), decltype(B::color), &kern::game::MaterialDesc::color, &B::color> color;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MaterialDesc::roughness), decltype(B::roughness), &kern::game::MaterialDesc::roughness, &B::roughness> roughness;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MaterialDesc::metalness), decltype(B::metalness), &kern::game::MaterialDesc::metalness, &B::metalness> metalness;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::MaterialDesc::emissive), decltype(B::emissive), &kern::game::MaterialDesc::emissive, &B::emissive> emissive;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MaterialDesc::emissive_strength), decltype(B::emissive_strength), &kern::game::MaterialDesc::emissive_strength, &B::emissive_strength> emissive_strength;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MaterialDesc::opacity), decltype(B::opacity), &kern::game::MaterialDesc::opacity, &B::opacity> opacity;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::MaterialDesc::unlit), decltype(B::unlit), &kern::game::MaterialDesc::unlit, &B::unlit> unlit;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::MaterialDesc::cast_shadow), decltype(B::cast_shadow), &kern::game::MaterialDesc::cast_shadow, &B::cast_shadow> cast_shadow;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::MaterialDesc::double_sided), decltype(B::double_sided), &kern::game::MaterialDesc::double_sided, &B::double_sided> double_sided;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::MaterialDesc::texture), decltype(B::texture), &kern::game::MaterialDesc::texture, &B::texture> texture;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MaterialDesc::tiling), decltype(B::tiling), &kern::game::MaterialDesc::tiling, &B::tiling> tiling;
-    explicit Fields(D* kern_d) : color(kern_d), roughness(kern_d), metalness(kern_d), emissive(kern_d), emissive_strength(kern_d), opacity(kern_d), unlit(kern_d), cast_shadow(kern_d), double_sided(kern_d), texture(kern_d), tiling(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_MeshComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::MeshComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; ev::Direct<ev::Enum<E_game_Shape>>::from(o, f0, x.shape); ev::Direct<ev::Vector>::from(o, f1, x.size); ev::Direct<ev::Float>::from(o, f2, x.radius); ev::Direct<ev::Float>::from(o, f3, x.height); ev::Direct<ev::Int>::from(o, f4, x.segments); ev::Direct<ev::Text>::from(o, f5, x.asset); ev::Direct<ev::Bool>::from(o, f6, x.collision); ev::Direct<ev::Float>::from(o, f7, x.friction); ev::Direct<ev::Float>::from(o, f8, x.restitution); ev::Direct<ev::Float>::from(o, f9, x.rolling_resistance); ev::Direct<ev::Text>::from(o, f10, x.surface); ev::Direct<ev::Struct<S_game_MaterialDesc>>::from(o, f11, x.material); }
-  template <class B> static B make(EngineObjects& o, const kern::game::MeshComponent& x) { B b{ev::made<ev::Enum<E_game_Shape>>(o, x.shape), ev::made<ev::Vector>(o, x.size), ev::made<ev::Float>(o, x.radius), ev::made<ev::Float>(o, x.height), ev::made<ev::Int>(o, x.segments), ev::made<ev::Text>(o, x.asset), ev::made<ev::Bool>(o, x.collision), ev::made<ev::Float>(o, x.friction), ev::made<ev::Float>(o, x.restitution), ev::made<ev::Float>(o, x.rolling_resistance), ev::made<ev::Text>(o, x.surface), ev::made<ev::Struct<S_game_MaterialDesc>>(o, x.material)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_Shape>>::pass(o, x.shape); ev::Direct<ev::Vector>::pass(o, x.size); ev::Direct<ev::Float>::pass(o, x.radius); ev::Direct<ev::Float>::pass(o, x.height); ev::Direct<ev::Int>::pass(o, x.segments); ev::Direct<ev::Text>::pass(o, x.asset); ev::Direct<ev::Bool>::pass(o, x.collision); ev::Direct<ev::Float>::pass(o, x.friction); ev::Direct<ev::Float>::pass(o, x.restitution); ev::Direct<ev::Float>::pass(o, x.rolling_resistance); ev::Direct<ev::Text>::pass(o, x.surface); ev::Direct<ev::Struct<S_game_MaterialDesc>>::pass(o, x.material); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_Shape>, C, B, decltype(kern::game::MeshComponent::shape), decltype(B::shape), &kern::game::MeshComponent::shape, &B::shape> shape;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::MeshComponent::size), decltype(B::size), &kern::game::MeshComponent::size, &B::size> size;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MeshComponent::radius), decltype(B::radius), &kern::game::MeshComponent::radius, &B::radius> radius;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MeshComponent::height), decltype(B::height), &kern::game::MeshComponent::height, &B::height> height;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::MeshComponent::segments), decltype(B::segments), &kern::game::MeshComponent::segments, &B::segments> segments;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::MeshComponent::asset), decltype(B::asset), &kern::game::MeshComponent::asset, &B::asset> asset;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::MeshComponent::collision), decltype(B::collision), &kern::game::MeshComponent::collision, &B::collision> collision;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MeshComponent::friction), decltype(B::friction), &kern::game::MeshComponent::friction, &B::friction> friction;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MeshComponent::restitution), decltype(B::restitution), &kern::game::MeshComponent::restitution, &B::restitution> restitution;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MeshComponent::rolling_resistance), decltype(B::rolling_resistance), &kern::game::MeshComponent::rolling_resistance, &B::rolling_resistance> rolling_resistance;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::MeshComponent::surface), decltype(B::surface), &kern::game::MeshComponent::surface, &B::surface> surface;
-    ev::Field<D, ev::Struct<S_game_MaterialDesc>, C, B, decltype(kern::game::MeshComponent::material), decltype(B::material), &kern::game::MeshComponent::material, &B::material> material;
-    explicit Fields(D* kern_d) : shape(kern_d), size(kern_d), radius(kern_d), height(kern_d), segments(kern_d), asset(kern_d), collision(kern_d), friction(kern_d), restitution(kern_d), rolling_resistance(kern_d), surface(kern_d), material(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_MotionKey {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::MotionKey& x) { const auto& [f0, f1] = b; ev::Direct<ev::Float>::from(o, f0, x.time); ev::Direct<ev::List<ev::Float>>::from(o, f1, x.joints); }
-  template <class B> static B make(EngineObjects& o, const kern::game::MotionKey& x) { B b{ev::made<ev::Float>(o, x.time), ev::made<ev::List<ev::Float>>(o, x.joints)}; [[maybe_unused]] const auto& [f0, f1] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.time); ev::Direct<ev::List<ev::Float>>::pass(o, x.joints); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MotionKey::time), decltype(B::time), &kern::game::MotionKey::time, &B::time> time;
-    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::MotionKey::joints), decltype(B::joints), &kern::game::MotionKey::joints, &B::joints> joints;
-    explicit Fields(D* kern_d) : time(kern_d), joints(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_MoverComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::MoverComponent& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Vector>::from(o, f0, x.offset); ev::Direct<ev::Float>::from(o, f1, x.period); ev::Direct<ev::Float>::from(o, f2, x.phase); ev::Direct<ev::Enum<E_game_MoverMode>>::from(o, f3, x.mode); }
-  template <class B> static B make(EngineObjects& o, const kern::game::MoverComponent& x) { B b{ev::made<ev::Vector>(o, x.offset), ev::made<ev::Float>(o, x.period), ev::made<ev::Float>(o, x.phase), ev::made<ev::Enum<E_game_MoverMode>>(o, x.mode)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.offset); ev::Direct<ev::Float>::pass(o, x.period); ev::Direct<ev::Float>::pass(o, x.phase); ev::Direct<ev::Enum<E_game_MoverMode>>::pass(o, x.mode); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::MoverComponent::offset), decltype(B::offset), &kern::game::MoverComponent::offset, &B::offset> offset;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MoverComponent::period), decltype(B::period), &kern::game::MoverComponent::period, &B::period> period;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::MoverComponent::phase), decltype(B::phase), &kern::game::MoverComponent::phase, &B::phase> phase;
-    ev::Field<D, ev::Enum<E_game_MoverMode>, C, B, decltype(kern::game::MoverComponent::mode), decltype(B::mode), &kern::game::MoverComponent::mode, &B::mode> mode;
-    explicit Fields(D* kern_d) : offset(kern_d), period(kern_d), phase(kern_d), mode(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_PickupComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::PickupComponent& x) { const auto& [f0, f1, f2, f3, f4, f5] = b; ev::Direct<ev::Float>::from(o, f0, x.points); ev::Direct<ev::Vector>::from(o, f1, x.burst_color); ev::Direct<ev::Float>::from(o, f2, x.respawn); ev::Direct<ev::Text>::from(o, f3, x.sound); ev::Direct<ev::Float>::from(o, f4, x.heal); ev::Direct<ev::Int>::from(o, f5, x.ammo); }
-  template <class B> static B make(EngineObjects& o, const kern::game::PickupComponent& x) { B b{ev::made<ev::Float>(o, x.points), ev::made<ev::Vector>(o, x.burst_color), ev::made<ev::Float>(o, x.respawn), ev::made<ev::Text>(o, x.sound), ev::made<ev::Float>(o, x.heal), ev::made<ev::Int>(o, x.ammo)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.points); ev::Direct<ev::Vector>::pass(o, x.burst_color); ev::Direct<ev::Float>::pass(o, x.respawn); ev::Direct<ev::Text>::pass(o, x.sound); ev::Direct<ev::Float>::pass(o, x.heal); ev::Direct<ev::Int>::pass(o, x.ammo); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::PickupComponent::points), decltype(B::points), &kern::game::PickupComponent::points, &B::points> points;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::PickupComponent::burst_color), decltype(B::burst_color), &kern::game::PickupComponent::burst_color, &B::burst_color> burst_color;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::PickupComponent::respawn), decltype(B::respawn), &kern::game::PickupComponent::respawn, &B::respawn> respawn;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::PickupComponent::sound), decltype(B::sound), &kern::game::PickupComponent::sound, &B::sound> sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::PickupComponent::heal), decltype(B::heal), &kern::game::PickupComponent::heal, &B::heal> heal;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::PickupComponent::ammo), decltype(B::ammo), &kern::game::PickupComponent::ammo, &B::ammo> ammo;
-    explicit Fields(D* kern_d) : points(kern_d), burst_color(kern_d), respawn(kern_d), sound(kern_d), heal(kern_d), ammo(kern_d) { (void)kern_d; }
-  };
-};
 struct S_game_PlayInput {
   template <class B> static void from(EngineObjects& o, const B& b, kern::game::PlayInput& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24] = b; ev::Direct<ev::Float>::from(o, f0, x.move_x); ev::Direct<ev::Float>::from(o, f1, x.move_y); ev::Direct<ev::Float>::from(o, f2, x.up); ev::Direct<ev::Bool>::from(o, f3, x.jump); ev::Direct<ev::Bool>::from(o, f4, x.boost); ev::Direct<ev::Bool>::from(o, f5, x.camera); ev::Direct<ev::Bool>::from(o, f6, x.handbrake); ev::Direct<ev::Int>::from(o, f7, x.robot); ev::Direct<ev::Float>::from(o, f8, x.look_x); ev::Direct<ev::Float>::from(o, f9, x.look_y); ev::Direct<ev::Float>::from(o, f10, x.turn_deg); ev::Direct<ev::Float>::from(o, f11, x.speed_scale); ev::Direct<ev::Float>::from(o, f12, x.zoom); ev::Direct<ev::Float>::from(o, f13, x.view_yaw); ev::Direct<ev::Bool>::from(o, f14, x.has_view_yaw); ev::Direct<ev::Float>::from(o, f15, x.view_pitch); ev::Direct<ev::Bool>::from(o, f16, x.fire); ev::Direct<ev::Bool>::from(o, f17, x.aim); ev::Direct<ev::Bool>::from(o, f18, x.reload); ev::Direct<ev::Bool>::from(o, f19, x.crouch); ev::Direct<ev::Bool>::from(o, f20, x.interact); ev::Direct<ev::Float>::from(o, f21, x.look_stick_x); ev::Direct<ev::Float>::from(o, f22, x.look_stick_y); ev::Direct<ev::Bool>::from(o, f23, x.gamepad); ev::Direct<ev::Float>::from(o, f24, x.rewind); }
   template <class B> static B make(EngineObjects& o, const kern::game::PlayInput& x) { B b{ev::made<ev::Float>(o, x.move_x), ev::made<ev::Float>(o, x.move_y), ev::made<ev::Float>(o, x.up), ev::made<ev::Bool>(o, x.jump), ev::made<ev::Bool>(o, x.boost), ev::made<ev::Bool>(o, x.camera), ev::made<ev::Bool>(o, x.handbrake), ev::made<ev::Int>(o, x.robot), ev::made<ev::Float>(o, x.look_x), ev::made<ev::Float>(o, x.look_y), ev::made<ev::Float>(o, x.turn_deg), ev::made<ev::Float>(o, x.speed_scale), ev::made<ev::Float>(o, x.zoom), ev::made<ev::Float>(o, x.view_yaw), ev::made<ev::Bool>(o, x.has_view_yaw), ev::made<ev::Float>(o, x.view_pitch), ev::made<ev::Bool>(o, x.fire), ev::made<ev::Bool>(o, x.aim), ev::made<ev::Bool>(o, x.reload), ev::made<ev::Bool>(o, x.crouch), ev::made<ev::Bool>(o, x.interact), ev::made<ev::Float>(o, x.look_stick_x), ev::made<ev::Float>(o, x.look_stick_y), ev::made<ev::Bool>(o, x.gamepad), ev::made<ev::Float>(o, x.rewind)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24] = b; return b; }
@@ -1458,43 +961,6 @@ struct S_game_PlayInput {
     ev::Field<D, ev::Bool, C, B, decltype(kern::game::PlayInput::gamepad), decltype(B::gamepad), &kern::game::PlayInput::gamepad, &B::gamepad> gamepad;
     ev::Field<D, ev::Float, C, B, decltype(kern::game::PlayInput::rewind), decltype(B::rewind), &kern::game::PlayInput::rewind, &B::rewind> rewind;
     explicit Fields(D* kern_d) : move_x(kern_d), move_y(kern_d), up(kern_d), jump(kern_d), boost(kern_d), camera(kern_d), handbrake(kern_d), robot(kern_d), look_x(kern_d), look_y(kern_d), turn_deg(kern_d), speed_scale(kern_d), zoom(kern_d), view_yaw(kern_d), has_view_yaw(kern_d), view_pitch(kern_d), fire(kern_d), aim(kern_d), reload(kern_d), crouch(kern_d), interact(kern_d), look_stick_x(kern_d), look_stick_y(kern_d), gamepad(kern_d), rewind(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_Rng {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Rng& x) { const auto& [f0] = b; ev::Direct<ev::Int>::from(o, f0, x.s); }
-  template <class B> static B make(EngineObjects& o, const kern::game::Rng& x) { B b{ev::made<ev::Int>(o, x.s)}; [[maybe_unused]] const auto& [f0] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.s); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::Rng::s), decltype(B::s), &kern::game::Rng::s, &B::s> s;
-    explicit Fields(D* kern_d) : s(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_RotatorComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::RotatorComponent& x) { const auto& [f0] = b; ev::Direct<ev::Vector>::from(o, f0, x.rate); }
-  template <class B> static B make(EngineObjects& o, const kern::game::RotatorComponent& x) { B b{ev::made<ev::Vector>(o, x.rate)}; [[maybe_unused]] const auto& [f0] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Vector>::pass(o, x.rate); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::RotatorComponent::rate), decltype(B::rate), &kern::game::RotatorComponent::rate, &B::rate> rate;
-    explicit Fields(D* kern_d) : rate(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_ShapePlan {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::ShapePlan& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; ev::Direct<ev::Int>::from(o, f0, x.actor); ev::Direct<ev::Enum<E_physics_ShapeKind>>::from(o, f1, x.kind); ev::Direct<ev::Vector>::from(o, f2, x.center); ev::Direct<ev::Struct<S_Quat>>::from(o, f3, x.rotation); ev::Direct<ev::Vector>::from(o, f4, x.size); ev::Direct<ev::Float>::from(o, f5, x.radius); ev::Direct<ev::Float>::from(o, f6, x.length); ev::Direct<ev::List<ev::Vector>>::from(o, f7, x.points); ev::Direct<ev::List<ev::Int>>::from(o, f8, x.indices); ev::Direct<ev::Struct<S_game_ColliderComponent>>::from(o, f9, x.source); ev::Direct<ev::Bool>::from(o, f10, x.automatic); }
-  template <class B> static B make(EngineObjects& o, const kern::game::ShapePlan& x) { B b{ev::made<ev::Int>(o, x.actor), ev::made<ev::Enum<E_physics_ShapeKind>>(o, x.kind), ev::made<ev::Vector>(o, x.center), ev::made<ev::Struct<S_Quat>>(o, x.rotation), ev::made<ev::Vector>(o, x.size), ev::made<ev::Float>(o, x.radius), ev::made<ev::Float>(o, x.length), ev::made<ev::List<ev::Vector>>(o, x.points), ev::made<ev::List<ev::Int>>(o, x.indices), ev::made<ev::Struct<S_game_ColliderComponent>>(o, x.source), ev::made<ev::Bool>(o, x.automatic)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.actor); ev::Direct<ev::Enum<E_physics_ShapeKind>>::pass(o, x.kind); ev::Direct<ev::Vector>::pass(o, x.center); ev::Direct<ev::Struct<S_Quat>>::pass(o, x.rotation); ev::Direct<ev::Vector>::pass(o, x.size); ev::Direct<ev::Float>::pass(o, x.radius); ev::Direct<ev::Float>::pass(o, x.length); ev::Direct<ev::List<ev::Vector>>::pass(o, x.points); ev::Direct<ev::List<ev::Int>>::pass(o, x.indices); ev::Direct<ev::Struct<S_game_ColliderComponent>>::pass(o, x.source); ev::Direct<ev::Bool>::pass(o, x.automatic); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::ShapePlan::actor), decltype(B::actor), &kern::game::ShapePlan::actor, &B::actor> actor;
-    ev::Field<D, ev::Enum<E_physics_ShapeKind>, C, B, decltype(kern::game::ShapePlan::kind), decltype(B::kind), &kern::game::ShapePlan::kind, &B::kind> kind;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::ShapePlan::center), decltype(B::center), &kern::game::ShapePlan::center, &B::center> center;
-    ev::Field<D, ev::Struct<S_Quat>, C, B, decltype(kern::game::ShapePlan::rotation), decltype(B::rotation), &kern::game::ShapePlan::rotation, &B::rotation> rotation;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::ShapePlan::size), decltype(B::size), &kern::game::ShapePlan::size, &B::size> size;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ShapePlan::radius), decltype(B::radius), &kern::game::ShapePlan::radius, &B::radius> radius;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::ShapePlan::length), decltype(B::length), &kern::game::ShapePlan::length, &B::length> length;
-    ev::Field<D, ev::List<ev::Vector>, C, B, decltype(kern::game::ShapePlan::points), decltype(B::points), &kern::game::ShapePlan::points, &B::points> points;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::game::ShapePlan::indices), decltype(B::indices), &kern::game::ShapePlan::indices, &B::indices> indices;
-    ev::Field<D, ev::Struct<S_game_ColliderComponent>, C, B, decltype(kern::game::ShapePlan::source), decltype(B::source), &kern::game::ShapePlan::source, &B::source> source;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::ShapePlan::automatic), decltype(B::automatic), &kern::game::ShapePlan::automatic, &B::automatic> automatic;
-    explicit Fields(D* kern_d) : actor(kern_d), kind(kern_d), center(kern_d), rotation(kern_d), size(kern_d), radius(kern_d), length(kern_d), points(kern_d), indices(kern_d), source(kern_d), automatic(kern_d) { (void)kern_d; }
   };
 };
 struct S_game_ShotEvent {
@@ -1577,236 +1043,6 @@ struct S_game_Transform {
     ev::Field<D, ev::Vector, C, B, decltype(kern::game::Transform::rotation), decltype(B::rotation), &kern::game::Transform::rotation, &B::rotation> rotation;
     ev::Field<D, ev::Vector, C, B, decltype(kern::game::Transform::scale), decltype(B::scale), &kern::game::Transform::scale, &B::scale> scale;
     explicit Fields(D* kern_d) : position(kern_d), rotation(kern_d), scale(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_TriggerComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::TriggerComponent& x) { const auto& [f0, f1, f2, f3, f4, f5] = b; ev::Direct<ev::Enum<E_game_TriggerAction>>::from(o, f0, x.action); ev::Direct<ev::Text>::from(o, f1, x.message); ev::Direct<ev::Bool>::from(o, f2, x.once); ev::Direct<ev::Text>::from(o, f3, x.sound); ev::Direct<ev::Float>::from(o, f4, x.strength); ev::Direct<ev::Int>::from(o, f5, x.target); }
-  template <class B> static B make(EngineObjects& o, const kern::game::TriggerComponent& x) { B b{ev::made<ev::Enum<E_game_TriggerAction>>(o, x.action), ev::made<ev::Text>(o, x.message), ev::made<ev::Bool>(o, x.once), ev::made<ev::Text>(o, x.sound), ev::made<ev::Float>(o, x.strength), ev::made<ev::Int>(o, x.target)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_TriggerAction>>::pass(o, x.action); ev::Direct<ev::Text>::pass(o, x.message); ev::Direct<ev::Bool>::pass(o, x.once); ev::Direct<ev::Text>::pass(o, x.sound); ev::Direct<ev::Float>::pass(o, x.strength); ev::Direct<ev::Int>::pass(o, x.target); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_TriggerAction>, C, B, decltype(kern::game::TriggerComponent::action), decltype(B::action), &kern::game::TriggerComponent::action, &B::action> action;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::TriggerComponent::message), decltype(B::message), &kern::game::TriggerComponent::message, &B::message> message;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::TriggerComponent::once), decltype(B::once), &kern::game::TriggerComponent::once, &B::once> once;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::TriggerComponent::sound), decltype(B::sound), &kern::game::TriggerComponent::sound, &B::sound> sound;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::TriggerComponent::strength), decltype(B::strength), &kern::game::TriggerComponent::strength, &B::strength> strength;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::TriggerComponent::target), decltype(B::target), &kern::game::TriggerComponent::target, &B::target> target;
-    explicit Fields(D* kern_d) : action(kern_d), message(kern_d), once(kern_d), sound(kern_d), strength(kern_d), target(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_WeaponComponent {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::WeaponComponent& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16] = b; ev::Direct<ev::Enum<E_game_WeaponKind>>::from(o, f0, x.kind); ev::Direct<ev::Float>::from(o, f1, x.damage); ev::Direct<ev::Float>::from(o, f2, x.fire_rate); ev::Direct<ev::Bool>::from(o, f3, x.automatic); ev::Direct<ev::Int>::from(o, f4, x.magazine); ev::Direct<ev::Int>::from(o, f5, x.reserve); ev::Direct<ev::Float>::from(o, f6, x.reload_time); ev::Direct<ev::Float>::from(o, f7, x.spread); ev::Direct<ev::Float>::from(o, f8, x.aim_spread); ev::Direct<ev::Float>::from(o, f9, x.recoil); ev::Direct<ev::Float>::from(o, f10, x.range); ev::Direct<ev::Float>::from(o, f11, x.headshot); ev::Direct<ev::Float>::from(o, f12, x.impulse); ev::Direct<ev::Int>::from(o, f13, x.pellets); ev::Direct<ev::Float>::from(o, f14, x.aim_fov); ev::Direct<ev::Text>::from(o, f15, x.fire_sound); ev::Direct<ev::Text>::from(o, f16, x.reload_sound); }
-  template <class B> static B make(EngineObjects& o, const kern::game::WeaponComponent& x) { B b{ev::made<ev::Enum<E_game_WeaponKind>>(o, x.kind), ev::made<ev::Float>(o, x.damage), ev::made<ev::Float>(o, x.fire_rate), ev::made<ev::Bool>(o, x.automatic), ev::made<ev::Int>(o, x.magazine), ev::made<ev::Int>(o, x.reserve), ev::made<ev::Float>(o, x.reload_time), ev::made<ev::Float>(o, x.spread), ev::made<ev::Float>(o, x.aim_spread), ev::made<ev::Float>(o, x.recoil), ev::made<ev::Float>(o, x.range), ev::made<ev::Float>(o, x.headshot), ev::made<ev::Float>(o, x.impulse), ev::made<ev::Int>(o, x.pellets), ev::made<ev::Float>(o, x.aim_fov), ev::made<ev::Text>(o, x.fire_sound), ev::made<ev::Text>(o, x.reload_sound)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Enum<E_game_WeaponKind>>::pass(o, x.kind); ev::Direct<ev::Float>::pass(o, x.damage); ev::Direct<ev::Float>::pass(o, x.fire_rate); ev::Direct<ev::Bool>::pass(o, x.automatic); ev::Direct<ev::Int>::pass(o, x.magazine); ev::Direct<ev::Int>::pass(o, x.reserve); ev::Direct<ev::Float>::pass(o, x.reload_time); ev::Direct<ev::Float>::pass(o, x.spread); ev::Direct<ev::Float>::pass(o, x.aim_spread); ev::Direct<ev::Float>::pass(o, x.recoil); ev::Direct<ev::Float>::pass(o, x.range); ev::Direct<ev::Float>::pass(o, x.headshot); ev::Direct<ev::Float>::pass(o, x.impulse); ev::Direct<ev::Int>::pass(o, x.pellets); ev::Direct<ev::Float>::pass(o, x.aim_fov); ev::Direct<ev::Text>::pass(o, x.fire_sound); ev::Direct<ev::Text>::pass(o, x.reload_sound); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Enum<E_game_WeaponKind>, C, B, decltype(kern::game::WeaponComponent::kind), decltype(B::kind), &kern::game::WeaponComponent::kind, &B::kind> kind;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::damage), decltype(B::damage), &kern::game::WeaponComponent::damage, &B::damage> damage;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::fire_rate), decltype(B::fire_rate), &kern::game::WeaponComponent::fire_rate, &B::fire_rate> fire_rate;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::WeaponComponent::automatic), decltype(B::automatic), &kern::game::WeaponComponent::automatic, &B::automatic> automatic;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::WeaponComponent::magazine), decltype(B::magazine), &kern::game::WeaponComponent::magazine, &B::magazine> magazine;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::WeaponComponent::reserve), decltype(B::reserve), &kern::game::WeaponComponent::reserve, &B::reserve> reserve;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::reload_time), decltype(B::reload_time), &kern::game::WeaponComponent::reload_time, &B::reload_time> reload_time;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::spread), decltype(B::spread), &kern::game::WeaponComponent::spread, &B::spread> spread;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::aim_spread), decltype(B::aim_spread), &kern::game::WeaponComponent::aim_spread, &B::aim_spread> aim_spread;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::recoil), decltype(B::recoil), &kern::game::WeaponComponent::recoil, &B::recoil> recoil;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::range), decltype(B::range), &kern::game::WeaponComponent::range, &B::range> range;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::headshot), decltype(B::headshot), &kern::game::WeaponComponent::headshot, &B::headshot> headshot;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::impulse), decltype(B::impulse), &kern::game::WeaponComponent::impulse, &B::impulse> impulse;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::WeaponComponent::pellets), decltype(B::pellets), &kern::game::WeaponComponent::pellets, &B::pellets> pellets;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WeaponComponent::aim_fov), decltype(B::aim_fov), &kern::game::WeaponComponent::aim_fov, &B::aim_fov> aim_fov;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WeaponComponent::fire_sound), decltype(B::fire_sound), &kern::game::WeaponComponent::fire_sound, &B::fire_sound> fire_sound;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WeaponComponent::reload_sound), decltype(B::reload_sound), &kern::game::WeaponComponent::reload_sound, &B::reload_sound> reload_sound;
-    explicit Fields(D* kern_d) : kind(kern_d), damage(kern_d), fire_rate(kern_d), automatic(kern_d), magazine(kern_d), reserve(kern_d), reload_time(kern_d), spread(kern_d), aim_spread(kern_d), recoil(kern_d), range(kern_d), headshot(kern_d), impulse(kern_d), pellets(kern_d), aim_fov(kern_d), fire_sound(kern_d), reload_sound(kern_d) { (void)kern_d; }
-  };
-};
-struct S_game_WorldSettings {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::WorldSettings& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31, f32, f33] = b; ev::Direct<ev::Text>::from(o, f0, x.channels); ev::Direct<ev::Vector>::from(o, f1, x.gravity); ev::Direct<ev::Int>::from(o, f2, x.substeps); ev::Direct<ev::Float>::from(o, f3, x.step_hz); ev::Direct<ev::Float>::from(o, f4, x.time_of_day); ev::Direct<ev::Float>::from(o, f5, x.day_length); ev::Direct<ev::Float>::from(o, f6, x.sun_azimuth); ev::Direct<ev::Float>::from(o, f7, x.fog_density); ev::Direct<ev::Float>::from(o, f8, x.exposure); ev::Direct<ev::Float>::from(o, f9, x.ao_radius); ev::Direct<ev::Float>::from(o, f10, x.shadow_distance); ev::Direct<ev::Bool>::from(o, f11, x.clouds); ev::Direct<ev::Vector>::from(o, f12, x.ground_color); ev::Direct<ev::Bool>::from(o, f13, x.ground); ev::Direct<ev::Float>::from(o, f14, x.ground_friction); ev::Direct<ev::Float>::from(o, f15, x.ground_restitution); ev::Direct<ev::Text>::from(o, f16, x.ground_surface); ev::Direct<ev::Float>::from(o, f17, x.contact_hertz); ev::Direct<ev::Float>::from(o, f18, x.contact_damping); ev::Direct<ev::Float>::from(o, f19, x.contact_speed); ev::Direct<ev::Float>::from(o, f20, x.kill_z); ev::Direct<ev::Text>::from(o, f21, x.title); ev::Direct<ev::Enum<E_game_GameGoal>>::from(o, f22, x.goal); ev::Direct<ev::Float>::from(o, f23, x.time_limit); ev::Direct<ev::Float>::from(o, f24, x.score_target); ev::Direct<ev::Int>::from(o, f25, x.player); ev::Direct<ev::Bool>::from(o, f26, x.observer); ev::Direct<ev::Float>::from(o, f27, x.master_volume); ev::Direct<ev::Text>::from(o, f28, x.music); ev::Direct<ev::Float>::from(o, f29, x.music_volume); ev::Direct<ev::Text>::from(o, f30, x.ambience); ev::Direct<ev::Float>::from(o, f31, x.ambience_volume); ev::Direct<ev::Float>::from(o, f32, x.reverb); ev::Direct<ev::Float>::from(o, f33, x.doppler); }
-  template <class B> static B make(EngineObjects& o, const kern::game::WorldSettings& x) { B b{ev::made<ev::Text>(o, x.channels), ev::made<ev::Vector>(o, x.gravity), ev::made<ev::Int>(o, x.substeps), ev::made<ev::Float>(o, x.step_hz), ev::made<ev::Float>(o, x.time_of_day), ev::made<ev::Float>(o, x.day_length), ev::made<ev::Float>(o, x.sun_azimuth), ev::made<ev::Float>(o, x.fog_density), ev::made<ev::Float>(o, x.exposure), ev::made<ev::Float>(o, x.ao_radius), ev::made<ev::Float>(o, x.shadow_distance), ev::made<ev::Bool>(o, x.clouds), ev::made<ev::Vector>(o, x.ground_color), ev::made<ev::Bool>(o, x.ground), ev::made<ev::Float>(o, x.ground_friction), ev::made<ev::Float>(o, x.ground_restitution), ev::made<ev::Text>(o, x.ground_surface), ev::made<ev::Float>(o, x.contact_hertz), ev::made<ev::Float>(o, x.contact_damping), ev::made<ev::Float>(o, x.contact_speed), ev::made<ev::Float>(o, x.kill_z), ev::made<ev::Text>(o, x.title), ev::made<ev::Enum<E_game_GameGoal>>(o, x.goal), ev::made<ev::Float>(o, x.time_limit), ev::made<ev::Float>(o, x.score_target), ev::made<ev::Int>(o, x.player), ev::made<ev::Bool>(o, x.observer), ev::made<ev::Float>(o, x.master_volume), ev::made<ev::Text>(o, x.music), ev::made<ev::Float>(o, x.music_volume), ev::made<ev::Text>(o, x.ambience), ev::made<ev::Float>(o, x.ambience_volume), ev::made<ev::Float>(o, x.reverb), ev::made<ev::Float>(o, x.doppler)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31, f32, f33] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.channels); ev::Direct<ev::Vector>::pass(o, x.gravity); ev::Direct<ev::Int>::pass(o, x.substeps); ev::Direct<ev::Float>::pass(o, x.step_hz); ev::Direct<ev::Float>::pass(o, x.time_of_day); ev::Direct<ev::Float>::pass(o, x.day_length); ev::Direct<ev::Float>::pass(o, x.sun_azimuth); ev::Direct<ev::Float>::pass(o, x.fog_density); ev::Direct<ev::Float>::pass(o, x.exposure); ev::Direct<ev::Float>::pass(o, x.ao_radius); ev::Direct<ev::Float>::pass(o, x.shadow_distance); ev::Direct<ev::Bool>::pass(o, x.clouds); ev::Direct<ev::Vector>::pass(o, x.ground_color); ev::Direct<ev::Bool>::pass(o, x.ground); ev::Direct<ev::Float>::pass(o, x.ground_friction); ev::Direct<ev::Float>::pass(o, x.ground_restitution); ev::Direct<ev::Text>::pass(o, x.ground_surface); ev::Direct<ev::Float>::pass(o, x.contact_hertz); ev::Direct<ev::Float>::pass(o, x.contact_damping); ev::Direct<ev::Float>::pass(o, x.contact_speed); ev::Direct<ev::Float>::pass(o, x.kill_z); ev::Direct<ev::Text>::pass(o, x.title); ev::Direct<ev::Enum<E_game_GameGoal>>::pass(o, x.goal); ev::Direct<ev::Float>::pass(o, x.time_limit); ev::Direct<ev::Float>::pass(o, x.score_target); ev::Direct<ev::Int>::pass(o, x.player); ev::Direct<ev::Bool>::pass(o, x.observer); ev::Direct<ev::Float>::pass(o, x.master_volume); ev::Direct<ev::Text>::pass(o, x.music); ev::Direct<ev::Float>::pass(o, x.music_volume); ev::Direct<ev::Text>::pass(o, x.ambience); ev::Direct<ev::Float>::pass(o, x.ambience_volume); ev::Direct<ev::Float>::pass(o, x.reverb); ev::Direct<ev::Float>::pass(o, x.doppler); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WorldSettings::channels), decltype(B::channels), &kern::game::WorldSettings::channels, &B::channels> channels;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::WorldSettings::gravity), decltype(B::gravity), &kern::game::WorldSettings::gravity, &B::gravity> gravity;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::WorldSettings::substeps), decltype(B::substeps), &kern::game::WorldSettings::substeps, &B::substeps> substeps;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::step_hz), decltype(B::step_hz), &kern::game::WorldSettings::step_hz, &B::step_hz> step_hz;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::time_of_day), decltype(B::time_of_day), &kern::game::WorldSettings::time_of_day, &B::time_of_day> time_of_day;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::day_length), decltype(B::day_length), &kern::game::WorldSettings::day_length, &B::day_length> day_length;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::sun_azimuth), decltype(B::sun_azimuth), &kern::game::WorldSettings::sun_azimuth, &B::sun_azimuth> sun_azimuth;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::fog_density), decltype(B::fog_density), &kern::game::WorldSettings::fog_density, &B::fog_density> fog_density;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::exposure), decltype(B::exposure), &kern::game::WorldSettings::exposure, &B::exposure> exposure;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::ao_radius), decltype(B::ao_radius), &kern::game::WorldSettings::ao_radius, &B::ao_radius> ao_radius;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::shadow_distance), decltype(B::shadow_distance), &kern::game::WorldSettings::shadow_distance, &B::shadow_distance> shadow_distance;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::WorldSettings::clouds), decltype(B::clouds), &kern::game::WorldSettings::clouds, &B::clouds> clouds;
-    ev::Field<D, ev::Vector, C, B, decltype(kern::game::WorldSettings::ground_color), decltype(B::ground_color), &kern::game::WorldSettings::ground_color, &B::ground_color> ground_color;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::WorldSettings::ground), decltype(B::ground), &kern::game::WorldSettings::ground, &B::ground> ground;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::ground_friction), decltype(B::ground_friction), &kern::game::WorldSettings::ground_friction, &B::ground_friction> ground_friction;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::ground_restitution), decltype(B::ground_restitution), &kern::game::WorldSettings::ground_restitution, &B::ground_restitution> ground_restitution;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WorldSettings::ground_surface), decltype(B::ground_surface), &kern::game::WorldSettings::ground_surface, &B::ground_surface> ground_surface;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::contact_hertz), decltype(B::contact_hertz), &kern::game::WorldSettings::contact_hertz, &B::contact_hertz> contact_hertz;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::contact_damping), decltype(B::contact_damping), &kern::game::WorldSettings::contact_damping, &B::contact_damping> contact_damping;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::contact_speed), decltype(B::contact_speed), &kern::game::WorldSettings::contact_speed, &B::contact_speed> contact_speed;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::kill_z), decltype(B::kill_z), &kern::game::WorldSettings::kill_z, &B::kill_z> kill_z;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WorldSettings::title), decltype(B::title), &kern::game::WorldSettings::title, &B::title> title;
-    ev::Field<D, ev::Enum<E_game_GameGoal>, C, B, decltype(kern::game::WorldSettings::goal), decltype(B::goal), &kern::game::WorldSettings::goal, &B::goal> goal;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::time_limit), decltype(B::time_limit), &kern::game::WorldSettings::time_limit, &B::time_limit> time_limit;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::score_target), decltype(B::score_target), &kern::game::WorldSettings::score_target, &B::score_target> score_target;
-    ev::Field<D, ev::Int, C, B, decltype(kern::game::WorldSettings::player), decltype(B::player), &kern::game::WorldSettings::player, &B::player> player;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::game::WorldSettings::observer), decltype(B::observer), &kern::game::WorldSettings::observer, &B::observer> observer;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::master_volume), decltype(B::master_volume), &kern::game::WorldSettings::master_volume, &B::master_volume> master_volume;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WorldSettings::music), decltype(B::music), &kern::game::WorldSettings::music, &B::music> music;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::music_volume), decltype(B::music_volume), &kern::game::WorldSettings::music_volume, &B::music_volume> music_volume;
-    ev::Field<D, ev::Text, C, B, decltype(kern::game::WorldSettings::ambience), decltype(B::ambience), &kern::game::WorldSettings::ambience, &B::ambience> ambience;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::ambience_volume), decltype(B::ambience_volume), &kern::game::WorldSettings::ambience_volume, &B::ambience_volume> ambience_volume;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::reverb), decltype(B::reverb), &kern::game::WorldSettings::reverb, &B::reverb> reverb;
-    ev::Field<D, ev::Float, C, B, decltype(kern::game::WorldSettings::doppler), decltype(B::doppler), &kern::game::WorldSettings::doppler, &B::doppler> doppler;
-    explicit Fields(D* kern_d) : channels(kern_d), gravity(kern_d), substeps(kern_d), step_hz(kern_d), time_of_day(kern_d), day_length(kern_d), sun_azimuth(kern_d), fog_density(kern_d), exposure(kern_d), ao_radius(kern_d), shadow_distance(kern_d), clouds(kern_d), ground_color(kern_d), ground(kern_d), ground_friction(kern_d), ground_restitution(kern_d), ground_surface(kern_d), contact_hertz(kern_d), contact_damping(kern_d), contact_speed(kern_d), kill_z(kern_d), title(kern_d), goal(kern_d), time_limit(kern_d), score_target(kern_d), player(kern_d), observer(kern_d), master_volume(kern_d), music(kern_d), music_volume(kern_d), ambience(kern_d), ambience_volume(kern_d), reverb(kern_d), doppler(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_CommentBox {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::CommentBox& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Float>::from(o, f1, x.x); ev::Direct<ev::Float>::from(o, f2, x.y); ev::Direct<ev::Float>::from(o, f3, x.w); ev::Direct<ev::Float>::from(o, f4, x.h); ev::Direct<ev::Text>::from(o, f5, x.text); ev::Direct<ev::Int>::from(o, f6, x.color); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::CommentBox& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Float>(o, x.x), ev::made<ev::Float>(o, x.y), ev::made<ev::Float>(o, x.w), ev::made<ev::Float>(o, x.h), ev::made<ev::Text>(o, x.text), ev::made<ev::Int>(o, x.color)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Float>::pass(o, x.x); ev::Direct<ev::Float>::pass(o, x.y); ev::Direct<ev::Float>::pass(o, x.w); ev::Direct<ev::Float>::pass(o, x.h); ev::Direct<ev::Text>::pass(o, x.text); ev::Direct<ev::Int>::pass(o, x.color); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::CommentBox::id), decltype(B::id), &kern::logic::CommentBox::id, &B::id> id;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::CommentBox::x), decltype(B::x), &kern::logic::CommentBox::x, &B::x> x;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::CommentBox::y), decltype(B::y), &kern::logic::CommentBox::y, &B::y> y;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::CommentBox::w), decltype(B::w), &kern::logic::CommentBox::w, &B::w> w;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::CommentBox::h), decltype(B::h), &kern::logic::CommentBox::h, &B::h> h;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::CommentBox::text), decltype(B::text), &kern::logic::CommentBox::text, &B::text> text;
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::CommentBox::color), decltype(B::color), &kern::logic::CommentBox::color, &B::color> color;
-    explicit Fields(D* kern_d) : id(kern_d), x(kern_d), y(kern_d), w(kern_d), h(kern_d), text(kern_d), color(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_EnumType {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::EnumType& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::List<ev::Text>>::from(o, f1, x.values); ev::Direct<ev::Text>::from(o, f2, x.help); ev::Direct<ev::Bool>::from(o, f3, x.project); ev::Direct<ev::Text>::from(o, f4, x.from); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::EnumType& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Text>>(o, x.values), ev::made<ev::Text>(o, x.help), ev::made<ev::Bool>(o, x.project), ev::made<ev::Text>(o, x.from)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Text>>::pass(o, x.values); ev::Direct<ev::Text>::pass(o, x.help); ev::Direct<ev::Bool>::pass(o, x.project); ev::Direct<ev::Text>::pass(o, x.from); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::EnumType::name), decltype(B::name), &kern::logic::EnumType::name, &B::name> name;
-    ev::Field<D, ev::List<ev::Text>, C, B, decltype(kern::logic::EnumType::values), decltype(B::values), &kern::logic::EnumType::values, &B::values> values;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::EnumType::help), decltype(B::help), &kern::logic::EnumType::help, &B::help> help;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::EnumType::project), decltype(B::project), &kern::logic::EnumType::project, &B::project> project;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::EnumType::from), decltype(B::from), &kern::logic::EnumType::from, &B::from> from;
-    explicit Fields(D* kern_d) : name(kern_d), values(kern_d), help(kern_d), project(kern_d), from(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_Function {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Function& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::List<ev::Int>>::from(o, f1, x.inputs); ev::Direct<ev::List<ev::Int>>::from(o, f2, x.outputs); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.locals); ev::Direct<ev::Bool>::from(o, f4, x.pure); ev::Direct<ev::Bool>::from(o, f5, x.overrides); ev::Direct<ev::Bool>::from(o, f6, x.external); ev::Direct<ev::Text>::from(o, f7, x.remote); ev::Direct<ev::Text>::from(o, f8, x.from); ev::Direct<ev::Text>::from(o, f9, x.exported); ev::Direct<ev::Text>::from(o, f10, x.wire); ev::Direct<ev::Text>::from(o, f11, x.help); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Function& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Int>>(o, x.inputs), ev::made<ev::List<ev::Int>>(o, x.outputs), ev::made<ev::List<ev::Int>>(o, x.locals), ev::made<ev::Bool>(o, x.pure), ev::made<ev::Bool>(o, x.overrides), ev::made<ev::Bool>(o, x.external), ev::made<ev::Text>(o, x.remote), ev::made<ev::Text>(o, x.from), ev::made<ev::Text>(o, x.exported), ev::made<ev::Text>(o, x.wire), ev::made<ev::Text>(o, x.help)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Int>>::pass(o, x.inputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.outputs); ev::Direct<ev::List<ev::Int>>::pass(o, x.locals); ev::Direct<ev::Bool>::pass(o, x.pure); ev::Direct<ev::Bool>::pass(o, x.overrides); ev::Direct<ev::Bool>::pass(o, x.external); ev::Direct<ev::Text>::pass(o, x.remote); ev::Direct<ev::Text>::pass(o, x.from); ev::Direct<ev::Text>::pass(o, x.exported); ev::Direct<ev::Text>::pass(o, x.wire); ev::Direct<ev::Text>::pass(o, x.help); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::name), decltype(B::name), &kern::logic::Function::name, &B::name> name;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::inputs), decltype(B::inputs), &kern::logic::Function::inputs, &B::inputs> inputs;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::outputs), decltype(B::outputs), &kern::logic::Function::outputs, &B::outputs> outputs;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Function::locals), decltype(B::locals), &kern::logic::Function::locals, &B::locals> locals;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::pure), decltype(B::pure), &kern::logic::Function::pure, &B::pure> pure;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::overrides), decltype(B::overrides), &kern::logic::Function::overrides, &B::overrides> overrides;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Function::external), decltype(B::external), &kern::logic::Function::external, &B::external> external;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::remote), decltype(B::remote), &kern::logic::Function::remote, &B::remote> remote;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::from), decltype(B::from), &kern::logic::Function::from, &B::from> from;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::exported), decltype(B::exported), &kern::logic::Function::exported, &B::exported> exported;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::wire), decltype(B::wire), &kern::logic::Function::wire, &B::wire> wire;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Function::help), decltype(B::help), &kern::logic::Function::help, &B::help> help;
-    explicit Fields(D* kern_d) : name(kern_d), inputs(kern_d), outputs(kern_d), locals(kern_d), pure(kern_d), overrides(kern_d), external(kern_d), remote(kern_d), from(kern_d), exported(kern_d), wire(kern_d), help(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_Graph {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Graph& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; ev::Direct<ev::List<ev::Struct<S_logic_Node>>>::from(o, f0, x.nodes); ev::Direct<ev::List<ev::Struct<S_logic_Link>>>::from(o, f1, x.links); ev::Direct<ev::List<ev::Int>>::from(o, f2, x.variables); ev::Direct<ev::List<ev::Struct<S_logic_StateMachine>>>::from(o, f3, x.machines); ev::Direct<ev::List<ev::Struct<S_logic_Function>>>::from(o, f4, x.functions); ev::Direct<ev::List<ev::Struct<S_logic_EnumType>>>::from(o, f5, x.enums); ev::Direct<ev::List<ev::Struct<S_logic_StructType>>>::from(o, f6, x.structs); ev::Direct<ev::List<ev::Struct<S_logic_CommentBox>>>::from(o, f7, x.comments); ev::Direct<ev::Int>::from(o, f8, x.next_id); ev::Direct<ev::Bool>::from(o, f9, x.library); ev::Direct<ev::List<ev::Text>>::from(o, f10, x.uses); ev::Direct<ev::Text>::from(o, f11, x.implements); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Graph& x) { B b{ev::made<ev::List<ev::Struct<S_logic_Node>>>(o, x.nodes), ev::made<ev::List<ev::Struct<S_logic_Link>>>(o, x.links), ev::made<ev::List<ev::Int>>(o, x.variables), ev::made<ev::List<ev::Struct<S_logic_StateMachine>>>(o, x.machines), ev::made<ev::List<ev::Struct<S_logic_Function>>>(o, x.functions), ev::made<ev::List<ev::Struct<S_logic_EnumType>>>(o, x.enums), ev::made<ev::List<ev::Struct<S_logic_StructType>>>(o, x.structs), ev::made<ev::List<ev::Struct<S_logic_CommentBox>>>(o, x.comments), ev::made<ev::Int>(o, x.next_id), ev::made<ev::Bool>(o, x.library), ev::made<ev::List<ev::Text>>(o, x.uses), ev::made<ev::Text>(o, x.implements)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::List<ev::Struct<S_logic_Node>>>::pass(o, x.nodes); ev::Direct<ev::List<ev::Struct<S_logic_Link>>>::pass(o, x.links); ev::Direct<ev::List<ev::Int>>::pass(o, x.variables); ev::Direct<ev::List<ev::Struct<S_logic_StateMachine>>>::pass(o, x.machines); ev::Direct<ev::List<ev::Struct<S_logic_Function>>>::pass(o, x.functions); ev::Direct<ev::List<ev::Struct<S_logic_EnumType>>>::pass(o, x.enums); ev::Direct<ev::List<ev::Struct<S_logic_StructType>>>::pass(o, x.structs); ev::Direct<ev::List<ev::Struct<S_logic_CommentBox>>>::pass(o, x.comments); ev::Direct<ev::Int>::pass(o, x.next_id); ev::Direct<ev::Bool>::pass(o, x.library); ev::Direct<ev::List<ev::Text>>::pass(o, x.uses); ev::Direct<ev::Text>::pass(o, x.implements); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::List<ev::Struct<S_logic_Node>>, C, B, decltype(kern::logic::Graph::nodes), decltype(B::nodes), &kern::logic::Graph::nodes, &B::nodes> nodes;
-    ev::Field<D, ev::List<ev::Struct<S_logic_Link>>, C, B, decltype(kern::logic::Graph::links), decltype(B::links), &kern::logic::Graph::links, &B::links> links;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::Graph::variables), decltype(B::variables), &kern::logic::Graph::variables, &B::variables> variables;
-    ev::Field<D, ev::List<ev::Struct<S_logic_StateMachine>>, C, B, decltype(kern::logic::Graph::machines), decltype(B::machines), &kern::logic::Graph::machines, &B::machines> machines;
-    ev::Field<D, ev::List<ev::Struct<S_logic_Function>>, C, B, decltype(kern::logic::Graph::functions), decltype(B::functions), &kern::logic::Graph::functions, &B::functions> functions;
-    ev::Field<D, ev::List<ev::Struct<S_logic_EnumType>>, C, B, decltype(kern::logic::Graph::enums), decltype(B::enums), &kern::logic::Graph::enums, &B::enums> enums;
-    ev::Field<D, ev::List<ev::Struct<S_logic_StructType>>, C, B, decltype(kern::logic::Graph::structs), decltype(B::structs), &kern::logic::Graph::structs, &B::structs> structs;
-    ev::Field<D, ev::List<ev::Struct<S_logic_CommentBox>>, C, B, decltype(kern::logic::Graph::comments), decltype(B::comments), &kern::logic::Graph::comments, &B::comments> comments;
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Graph::next_id), decltype(B::next_id), &kern::logic::Graph::next_id, &B::next_id> next_id;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::Graph::library), decltype(B::library), &kern::logic::Graph::library, &B::library> library;
-    ev::Field<D, ev::List<ev::Text>, C, B, decltype(kern::logic::Graph::uses), decltype(B::uses), &kern::logic::Graph::uses, &B::uses> uses;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Graph::implements), decltype(B::implements), &kern::logic::Graph::implements, &B::implements> implements;
-    explicit Fields(D* kern_d) : nodes(kern_d), links(kern_d), variables(kern_d), machines(kern_d), functions(kern_d), enums(kern_d), structs(kern_d), comments(kern_d), next_id(kern_d), library(kern_d), uses(kern_d), implements(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_Link {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Link& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Int>::from(o, f0, x.from); ev::Direct<ev::Text>::from(o, f1, x.out); ev::Direct<ev::Int>::from(o, f2, x.to); ev::Direct<ev::Text>::from(o, f3, x.in); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Link& x) { B b{ev::made<ev::Int>(o, x.from), ev::made<ev::Text>(o, x.out), ev::made<ev::Int>(o, x.to), ev::made<ev::Text>(o, x.in)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.from); ev::Direct<ev::Text>::pass(o, x.out); ev::Direct<ev::Int>::pass(o, x.to); ev::Direct<ev::Text>::pass(o, x.in); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Link::from), decltype(B::from), &kern::logic::Link::from, &B::from> from;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Link::out), decltype(B::out), &kern::logic::Link::out, &B::out> out;
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Link::to), decltype(B::to), &kern::logic::Link::to, &B::to> to;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Link::in), decltype(B::in), &kern::logic::Link::in, &B::in> in;
-    explicit Fields(D* kern_d) : from(kern_d), out(kern_d), to(kern_d), in(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_Node {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Node& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Text>::from(o, f1, x.type); ev::Direct<ev::Float>::from(o, f2, x.x); ev::Direct<ev::Float>::from(o, f3, x.y); ev::Direct<ev::List<ev::Pair<ev::Text, ev::Int>>>::from(o, f4, x.values); ev::Direct<ev::List<ev::Pair<ev::Text, ev::Text>>>::from(o, f5, x.params); ev::Direct<ev::Text>::from(o, f6, x.comment); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Node& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Text>(o, x.type), ev::made<ev::Float>(o, x.x), ev::made<ev::Float>(o, x.y), ev::made<ev::List<ev::Pair<ev::Text, ev::Int>>>(o, x.values), ev::made<ev::List<ev::Pair<ev::Text, ev::Text>>>(o, x.params), ev::made<ev::Text>(o, x.comment)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Text>::pass(o, x.type); ev::Direct<ev::Float>::pass(o, x.x); ev::Direct<ev::Float>::pass(o, x.y); ev::Direct<ev::List<ev::Pair<ev::Text, ev::Int>>>::pass(o, x.values); ev::Direct<ev::List<ev::Pair<ev::Text, ev::Text>>>::pass(o, x.params); ev::Direct<ev::Text>::pass(o, x.comment); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Node::id), decltype(B::id), &kern::logic::Node::id, &B::id> id;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Node::type), decltype(B::type), &kern::logic::Node::type, &B::type> type;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::Node::x), decltype(B::x), &kern::logic::Node::x, &B::x> x;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::Node::y), decltype(B::y), &kern::logic::Node::y, &B::y> y;
-    ev::Field<D, ev::List<ev::Pair<ev::Text, ev::Int>>, C, B, decltype(kern::logic::Node::values), decltype(B::values), &kern::logic::Node::values, &B::values> values;
-    ev::Field<D, ev::List<ev::Pair<ev::Text, ev::Text>>, C, B, decltype(kern::logic::Node::params), decltype(B::params), &kern::logic::Node::params, &B::params> params;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Node::comment), decltype(B::comment), &kern::logic::Node::comment, &B::comment> comment;
-    explicit Fields(D* kern_d) : id(kern_d), type(kern_d), x(kern_d), y(kern_d), values(kern_d), params(kern_d), comment(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_State {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::State& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Text>::from(o, f1, x.name); ev::Direct<ev::Float>::from(o, f2, x.x); ev::Direct<ev::Float>::from(o, f3, x.y); ev::Direct<ev::Bool>::from(o, f4, x.initial); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::State& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Text>(o, x.name), ev::made<ev::Float>(o, x.x), ev::made<ev::Float>(o, x.y), ev::made<ev::Bool>(o, x.initial)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Float>::pass(o, x.x); ev::Direct<ev::Float>::pass(o, x.y); ev::Direct<ev::Bool>::pass(o, x.initial); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::State::id), decltype(B::id), &kern::logic::State::id, &B::id> id;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::State::name), decltype(B::name), &kern::logic::State::name, &B::name> name;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::State::x), decltype(B::x), &kern::logic::State::x, &B::x> x;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::State::y), decltype(B::y), &kern::logic::State::y, &B::y> y;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::State::initial), decltype(B::initial), &kern::logic::State::initial, &B::initial> initial;
-    explicit Fields(D* kern_d) : id(kern_d), name(kern_d), x(kern_d), y(kern_d), initial(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_StateMachine {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::StateMachine& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Text>::from(o, f1, x.name); ev::Direct<ev::List<ev::Struct<S_logic_State>>>::from(o, f2, x.states); ev::Direct<ev::List<ev::Struct<S_logic_Transition>>>::from(o, f3, x.transitions); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::StateMachine& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Struct<S_logic_State>>>(o, x.states), ev::made<ev::List<ev::Struct<S_logic_Transition>>>(o, x.transitions)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Struct<S_logic_State>>>::pass(o, x.states); ev::Direct<ev::List<ev::Struct<S_logic_Transition>>>::pass(o, x.transitions); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::StateMachine::id), decltype(B::id), &kern::logic::StateMachine::id, &B::id> id;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::StateMachine::name), decltype(B::name), &kern::logic::StateMachine::name, &B::name> name;
-    ev::Field<D, ev::List<ev::Struct<S_logic_State>>, C, B, decltype(kern::logic::StateMachine::states), decltype(B::states), &kern::logic::StateMachine::states, &B::states> states;
-    ev::Field<D, ev::List<ev::Struct<S_logic_Transition>>, C, B, decltype(kern::logic::StateMachine::transitions), decltype(B::transitions), &kern::logic::StateMachine::transitions, &B::transitions> transitions;
-    explicit Fields(D* kern_d) : id(kern_d), name(kern_d), states(kern_d), transitions(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_StructType {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::StructType& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::List<ev::Int>>::from(o, f1, x.fields); ev::Direct<ev::Text>::from(o, f2, x.help); ev::Direct<ev::Bool>::from(o, f3, x.project); ev::Direct<ev::Text>::from(o, f4, x.from); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::StructType& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::List<ev::Int>>(o, x.fields), ev::made<ev::Text>(o, x.help), ev::made<ev::Bool>(o, x.project), ev::made<ev::Text>(o, x.from)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::List<ev::Int>>::pass(o, x.fields); ev::Direct<ev::Text>::pass(o, x.help); ev::Direct<ev::Bool>::pass(o, x.project); ev::Direct<ev::Text>::pass(o, x.from); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::StructType::name), decltype(B::name), &kern::logic::StructType::name, &B::name> name;
-    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::logic::StructType::fields), decltype(B::fields), &kern::logic::StructType::fields, &B::fields> fields;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::StructType::help), decltype(B::help), &kern::logic::StructType::help, &B::help> help;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::logic::StructType::project), decltype(B::project), &kern::logic::StructType::project, &B::project> project;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::StructType::from), decltype(B::from), &kern::logic::StructType::from, &B::from> from;
-    explicit Fields(D* kern_d) : name(kern_d), fields(kern_d), help(kern_d), project(kern_d), from(kern_d) { (void)kern_d; }
-  };
-};
-struct S_logic_Transition {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::logic::Transition& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; ev::Direct<ev::Int>::from(o, f0, x.id); ev::Direct<ev::Int>::from(o, f1, x.from); ev::Direct<ev::Int>::from(o, f2, x.to); ev::Direct<ev::Enum<E_logic_TriggerKind>>::from(o, f3, x.trigger); ev::Direct<ev::Text>::from(o, f4, x.event); ev::Direct<ev::Float>::from(o, f5, x.seconds); ev::Direct<ev::Text>::from(o, f6, x.variable); ev::Direct<ev::Text>::from(o, f7, x.label); }
-  template <class B> static B make(EngineObjects& o, const kern::logic::Transition& x) { B b{ev::made<ev::Int>(o, x.id), ev::made<ev::Int>(o, x.from), ev::made<ev::Int>(o, x.to), ev::made<ev::Enum<E_logic_TriggerKind>>(o, x.trigger), ev::made<ev::Text>(o, x.event), ev::made<ev::Float>(o, x.seconds), ev::made<ev::Text>(o, x.variable), ev::made<ev::Text>(o, x.label)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.id); ev::Direct<ev::Int>::pass(o, x.from); ev::Direct<ev::Int>::pass(o, x.to); ev::Direct<ev::Enum<E_logic_TriggerKind>>::pass(o, x.trigger); ev::Direct<ev::Text>::pass(o, x.event); ev::Direct<ev::Float>::pass(o, x.seconds); ev::Direct<ev::Text>::pass(o, x.variable); ev::Direct<ev::Text>::pass(o, x.label); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Transition::id), decltype(B::id), &kern::logic::Transition::id, &B::id> id;
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Transition::from), decltype(B::from), &kern::logic::Transition::from, &B::from> from;
-    ev::Field<D, ev::Int, C, B, decltype(kern::logic::Transition::to), decltype(B::to), &kern::logic::Transition::to, &B::to> to;
-    ev::Field<D, ev::Enum<E_logic_TriggerKind>, C, B, decltype(kern::logic::Transition::trigger), decltype(B::trigger), &kern::logic::Transition::trigger, &B::trigger> trigger;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Transition::event), decltype(B::event), &kern::logic::Transition::event, &B::event> event;
-    ev::Field<D, ev::Float, C, B, decltype(kern::logic::Transition::seconds), decltype(B::seconds), &kern::logic::Transition::seconds, &B::seconds> seconds;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Transition::variable), decltype(B::variable), &kern::logic::Transition::variable, &B::variable> variable;
-    ev::Field<D, ev::Text, C, B, decltype(kern::logic::Transition::label), decltype(B::label), &kern::logic::Transition::label, &B::label> label;
-    explicit Fields(D* kern_d) : id(kern_d), from(kern_d), to(kern_d), trigger(kern_d), event(kern_d), seconds(kern_d), variable(kern_d), label(kern_d) { (void)kern_d; }
   };
 };
 struct S_net_Address {
@@ -2528,16 +1764,6 @@ struct P_engine_mesh_world_bounds {
   static constexpr const char* set = "engine.mesh.world_bounds@set";
   static C* at(EngineObjects&, Object& self, const In&) { return &self.world_bounds; }
 };
-struct P_engine_mesh_gpu {
-  using Object = kern::Mesh;
-  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().gpu))>;
-  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshGpu>;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "mesh";
-  static constexpr const char* get = "engine.mesh.gpu@get";
-  static constexpr const char* set = "engine.mesh.gpu@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.gpu; }
-};
 struct P_engine_mesh_sort_distance {
   using Object = kern::Mesh;
   using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().sort_distance))>;
@@ -2678,36 +1904,6 @@ struct P_engine_property_change_path {
   static constexpr const char* set = "engine.property_change.path@set";
   static C* at(EngineObjects&, Object& self, const In&) { return &self.path; }
 };
-struct P_engine_motion_asset_name {
-  using Object = kern::game::MotionAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().name))>;
-  using Tag = ::kern::logic::engine_values::Text;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "motion_asset";
-  static constexpr const char* get = "engine.motion_asset.name@get";
-  static constexpr const char* set = "engine.motion_asset.name@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.name; }
-};
-struct P_engine_motion_asset_duration {
-  using Object = kern::game::MotionAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().duration))>;
-  using Tag = ::kern::logic::engine_values::Float;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "motion_asset";
-  static constexpr const char* get = "engine.motion_asset.duration@get";
-  static constexpr const char* set = "engine.motion_asset.duration@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.duration; }
-};
-struct P_engine_motion_asset_keys {
-  using Object = kern::game::MotionAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().keys))>;
-  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MotionKey>>;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "motion_asset";
-  static constexpr const char* get = "engine.motion_asset.keys@get";
-  static constexpr const char* set = "engine.motion_asset.keys@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.keys; }
-};
 struct P_engine_night_windows_night {
   using Object = kern::game::NightWindows;
   using C = std::remove_reference_t<decltype((std::declval<kern::game::NightWindows&>().night))>;
@@ -2717,76 +1913,6 @@ struct P_engine_night_windows_night {
   static constexpr const char* get = "engine.night_windows.night@get";
   static constexpr const char* set = "engine.night_windows.night@set";
   static C* at(EngineObjects&, Object& self, const In&) { return &self.night; }
-};
-struct P_engine_sound_asset_id {
-  using Object = kern::game::SoundAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().id))>;
-  using Tag = ::kern::logic::engine_values::Text;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "sound_asset";
-  static constexpr const char* get = "engine.sound_asset.id@get";
-  static constexpr const char* set = "engine.sound_asset.id@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.id; }
-};
-struct P_engine_sound_asset_name {
-  using Object = kern::game::SoundAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().name))>;
-  using Tag = ::kern::logic::engine_values::Text;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "sound_asset";
-  static constexpr const char* get = "engine.sound_asset.name@get";
-  static constexpr const char* set = "engine.sound_asset.name@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.name; }
-};
-struct P_engine_sound_asset_duration {
-  using Object = kern::game::SoundAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().duration))>;
-  using Tag = ::kern::logic::engine_values::Float;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "sound_asset";
-  static constexpr const char* get = "engine.sound_asset.duration@get";
-  static constexpr const char* set = "engine.sound_asset.duration@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.duration; }
-};
-struct P_engine_texture_asset_id {
-  using Object = kern::game::TextureAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().id))>;
-  using Tag = ::kern::logic::engine_values::Text;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "texture_asset";
-  static constexpr const char* get = "engine.texture_asset.id@get";
-  static constexpr const char* set = "engine.texture_asset.id@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.id; }
-};
-struct P_engine_texture_asset_name {
-  using Object = kern::game::TextureAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().name))>;
-  using Tag = ::kern::logic::engine_values::Text;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "texture_asset";
-  static constexpr const char* get = "engine.texture_asset.name@get";
-  static constexpr const char* set = "engine.texture_asset.name@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.name; }
-};
-struct P_engine_texture_asset_width {
-  using Object = kern::game::TextureAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().width))>;
-  using Tag = ::kern::logic::engine_values::Int;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "texture_asset";
-  static constexpr const char* get = "engine.texture_asset.width@get";
-  static constexpr const char* set = "engine.texture_asset.width@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.width; }
-};
-struct P_engine_texture_asset_height {
-  using Object = kern::game::TextureAsset;
-  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().height))>;
-  using Tag = ::kern::logic::engine_values::Int;
-  using In = std::tuple<>;
-  static constexpr const char* pin = "texture_asset";
-  static constexpr const char* get = "engine.texture_asset.height@get";
-  static constexpr const char* set = "engine.texture_asset.height@set";
-  static C* at(EngineObjects&, Object& self, const In&) { return &self.height; }
 };
 struct P_engine_simulator_settings {
   using Object = kern::net::Simulator;
@@ -2814,23 +1940,11 @@ struct P_engine_character_mover_settings {
 template <class B> class ClassImplements_App final : public kern::App {
  public:
   explicit ClassImplements_App(B& b) : b_(b) {}
-  template <class X> static constexpr bool kern_has_configure = requires { requires std::is_same_v<typename MemberOf<decltype(&X::configure)>::type, X>; };
   template <class X> static constexpr bool kern_has_extensions = requires { requires std::is_same_v<typename MemberOf<decltype(&X::extensions)>::type, X>; };
   template <class X> static constexpr bool kern_has_start = requires { requires std::is_same_v<typename MemberOf<decltype(&X::start)>::type, X>; };
   template <class X> static constexpr bool kern_has_update = requires { requires std::is_same_v<typename MemberOf<decltype(&X::update)>::type, X>; };
   template <class X> static constexpr bool kern_has_resized = requires { requires std::is_same_v<typename MemberOf<decltype(&X::resized)>::type, X>; };
   template <class X> static constexpr bool kern_has_stop = requires { requires std::is_same_v<typename MemberOf<decltype(&X::stop)>::type, X>; };
-  decltype(std::declval<kern::App&>().configure()) configure() override {
-    if constexpr (!kern_has_configure<B>) {
-      return kern::App::configure();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.configure();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().configure())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
   decltype(std::declval<kern::App&>().extensions()) extensions() override {
     if constexpr (!kern_has_extensions<B>) {
       return kern::App::extensions();
@@ -2884,6 +1998,28 @@ template <class B> class ClassImplements_App final : public kern::App {
 };
 template <> struct InterfaceOf<kern::App> {
   template <class B> using adapter = ClassImplements_App<B>;
+};
+
+// kern::game::FixedStep that a Blueprint's class is (kern::Implements<kern::game::FixedStep>: kern::logic::implementation)
+template <class B> class ClassImplements_game_FixedStep final : public kern::game::FixedStep {
+ public:
+  explicit ClassImplements_game_FixedStep(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_fixed_step = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fixed_step)>::type, X>; };
+  decltype(std::declval<kern::game::FixedStep&>().fixed_step(std::declval<double>())) fixed_step(double kern_p0) override {
+    static_assert(kern_has_fixed_step<B>, "a Blueprint that implements game_FixedStep has its function fixed_step");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.fixed_step(::kern::logic::engine_values::Given<::kern::logic::engine_values::Float, double const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<kern::game::FixedStep> {
+  template <class B> using adapter = ClassImplements_game_FixedStep<B>;
 };
 
 // kern::ShaderExtension that a Blueprint's class is (kern::Implements<kern::ShaderExtension>: kern::logic::implementation)
@@ -3016,85 +2152,6 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
 };
 template <> struct InterfaceOf<kern::ShaderExtension> {
   template <class B> using adapter = ClassImplements_ShaderExtension<B>;
-};
-
-// kern::logic::NodeType that a Blueprint's class is (kern::Implements<kern::logic::NodeType>: kern::logic::implementation)
-template <class B> class ClassImplements_logic_NodeType final : public kern::logic::NodeType {
- public:
-  explicit ClassImplements_logic_NodeType(B& b) : b_(b) {}
-  template <class X> static constexpr bool kern_has_type = requires { requires std::is_same_v<typename MemberOf<decltype(&X::type)>::type, X>; };
-  template <class X> static constexpr bool kern_has_label = requires { requires std::is_same_v<typename MemberOf<decltype(&X::label)>::type, X>; };
-  template <class X> static constexpr bool kern_has_event = requires { requires std::is_same_v<typename MemberOf<decltype(&X::event)>::type, X>; };
-  template <class X> static constexpr bool kern_has_category = requires { requires std::is_same_v<typename MemberOf<decltype(&X::category)>::type, X>; };
-  template <class X> static constexpr bool kern_has_help = requires { requires std::is_same_v<typename MemberOf<decltype(&X::help)>::type, X>; };
-  template <class X> static constexpr bool kern_has_run = requires { requires std::is_same_v<typename MemberOf<decltype(&X::run)>::type, X>; };
-  decltype(std::declval<const kern::logic::NodeType&>().type()) type() const override {
-    static_assert(kern_has_type<B>, "a Blueprint that implements logic_NodeType has its function type");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.type();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().type())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().label()) label() const override {
-    static_assert(kern_has_label<B>, "a Blueprint that implements logic_NodeType has its function label");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.label();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().label())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().event()) event() const override {
-    static_assert(kern_has_event<B>, "a Blueprint that implements logic_NodeType has its function event");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.event();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().event())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().category()) category() const override {
-    if constexpr (!kern_has_category<B>) {
-      return kern::logic::NodeType::category();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.category();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().category())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().help()) help() const override {
-    if constexpr (!kern_has_help<B>) {
-      return kern::logic::NodeType::help();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.help();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().help())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<kern::logic::NodeType&>().run()) run() override {
-    static_assert(kern_has_run<B>, "a Blueprint that implements logic_NodeType has its function run");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      b_.run();
-    }
-  }
-
- private:
-  B& b_;
-  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
-  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
-};
-template <> struct InterfaceOf<kern::logic::NodeType> {
-  template <class B> using adapter = ClassImplements_logic_NodeType<B>;
 };
 
 // kern::net::Transport that a Blueprint's class is (kern::Implements<kern::net::Transport>: kern::logic::implementation)
@@ -3988,30 +3045,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.engine.set_stereo_cross", {to_value(engine), to_value(on)}, {});
-  }
-  /// Renderer configuration, asked once before start().
-  void engine_app_configure(Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-  }
-  template <class KernNode> void engine_app_configure(KernNode& kern_n, Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Shader extensions the game uses (must outlive the app).
   void engine_app_extensions(Int app) {
@@ -5223,110 +4256,6 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.jobs.done", {to_value(id), to_value(::kern::logic::engine_values::input_value(output))}, {});
   }
-  /// Mesh of a shape, centred on the actor origin, white vertex colours (the material colour tints it). UVs: metres * tiling on planar faces.
-  using kern_given_engine_game_shape_mesh = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, decltype(kern::game::shape_mesh(std::declval<kern::game::MeshComponent const&>()))>;
-  template <class T1> kern_given_engine_game_shape_mesh engine_game_shape_mesh(const T1& mesh) const {
-    using kern_G = kern_given_engine_game_shape_mesh;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
-      decltype(auto) kern_r = kern::game::shape_mesh(kern_a0);
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.shape_mesh", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
-  }
-  /// Local bounds of a shape (centred on the origin).
-  using kern_given_engine_game_shape_bounds = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>, decltype(kern::game::shape_bounds(std::declval<kern::game::MeshComponent const&>()))>;
-  template <class T1> kern_given_engine_game_shape_bounds engine_game_shape_bounds(const T1& mesh) const {
-    using kern_G = kern_given_engine_game_shape_bounds;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
-      decltype(auto) kern_r = kern::game::shape_bounds(kern_a0);
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.shape_bounds", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
-  }
-  /// A concrete collider (box, sphere, capsule or hull) matching a mesh.
-  using kern_given_engine_game_fit_collider = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ColliderComponent>, decltype(kern::game::fit_collider(std::declval<kern::game::MeshComponent const&>()))>;
-  template <class T1> kern_given_engine_game_fit_collider engine_game_fit_collider(const T1& mesh) const {
-    using kern_G = kern_given_engine_game_fit_collider;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
-      decltype(auto) kern_r = kern::game::fit_collider(kern_a0);
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.fit_collider", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
-  }
-  /// Hull points of a shape (used for automatic colliders of cylinders, cones, ramps, tori).
-  template <class T1> List<Vector> engine_game_shape_hull_points(const T1& mesh) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
-      decltype(auto) kern_r = kern::game::shape_hull_points(kern_a0);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>>::template make<List<Vector>>(*kern_o, kern_r);
-    }
-    return from_value<List<Vector>>(this->kern_engine("engine.game.shape_hull_points", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::vector_list})[0].converted(pin_type_of<List<Vector>>()));
-  }
-  /// Builds the city (deterministic for a seed). Fails only for invalid parameters.
-  template <class T1, class T2> void engine_game_build_city(const T1& city, const T2& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CityGeometry&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      decltype(auto) kern_r = kern::game::build_city(kern_a0, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::pass(*kern_o, kern_a1);
-      return;
-    }
-    this->kern_engine("engine.game.build_city", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2> void engine_game_build_city(KernNode& kern_n, const T1& city, const T2& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CityGeometry&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      decltype(auto) kern_r = kern::game::build_city(kern_a0, kern_a1);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.build_city", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
-  }
-  /// A street position on the grid lines (city-local).
-  template <class T1, class T2> void engine_game_city_street_point(const T1& city, const T2& rng) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Rng&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, ::kern::logic::engine_values::input_value(rng), kern_a1);
-      decltype(auto) kern_r = kern::game::city_street_point(kern_a0, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::pass(*kern_o, kern_a1);
-      return;
-    }
-    this->kern_engine("engine.game.city_street_point", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(rng))}, {PinType::vector, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2> void engine_game_city_street_point(KernNode& kern_n, const T1& city, const T2& rng) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Rng&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, ::kern::logic::engine_values::input_value(rng), kern_a1);
-      decltype(auto) kern_r = kern::game::city_street_point(kern_a0, kern_a1);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.rng = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::template make<std::remove_cvref_t<decltype(kern_n.rng)>>(*kern_o, kern_a1);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.city_street_point", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(rng))}, {PinType::vector, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.rng = from_value<std::remove_cvref_t<decltype(kern_n.rng)>>(kern_out[1]);
-  }
   /// Quaternion of an Euler rotation in degrees (yaw * pitch * roll).
   using kern_given_engine_game_euler_to_quat = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Quat>, decltype(kern::game::euler_to_quat(std::declval<kern::Vec3>()))>;
   kern_given_engine_game_euler_to_quat engine_game_euler_to_quat(Vector degrees) const {
@@ -5413,109 +4342,6 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
-  template <class T1> Text engine_game_motion_name(const T1& m) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Motion>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Motion>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
-      decltype(auto) kern_r = kern::game::motion_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.motion_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_collider_shape_name(const T1& s) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::ColliderShape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ColliderShape>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
-      decltype(auto) kern_r = kern::game::collider_shape_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.collider_shape_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_joint_kind_name(const T1& k) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::JointKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_JointKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
-      decltype(auto) kern_r = kern::game::joint_kind_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.joint_kind_name", {to_value(::kern::logic::engine_values::input_value(k))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_control_mode_name(const T1& m) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::ControlMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ControlMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
-      decltype(auto) kern_r = kern::game::control_mode_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.control_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_camera_mode_name(const T1& m) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CameraMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_CameraMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
-      decltype(auto) kern_r = kern::game::camera_mode_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.camera_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_weapon_kind_name(const T1& k) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WeaponKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
-      decltype(auto) kern_r = kern::game::weapon_kind_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.weapon_kind_name", {to_value(::kern::logic::engine_values::input_value(k))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// Hit points: actors with health take damage from weapons (and falls for players). Handling of a weapon type: damage, rate, magazine, spread and recoil.
-  using kern_given_engine_game_weapon_preset = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WeaponComponent>, decltype(kern::game::weapon_preset(std::declval<kern::game::WeaponKind>()))>;
-  template <class T1> kern_given_engine_game_weapon_preset engine_game_weapon_preset(const T1& kind) const {
-    using kern_G = kern_given_engine_game_weapon_preset;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WeaponKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(kind), kern_a0);
-      decltype(auto) kern_r = kern::game::weapon_preset(std::move(kern_a0));
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.weapon_preset", {to_value(::kern::logic::engine_values::input_value(kind))}, {PinType::structure})[0]);
-  }
-  template <class T1> Text engine_game_trigger_action_name(const T1& a) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::TriggerAction>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_TriggerAction>>::from(*kern_o, ::kern::logic::engine_values::input_value(a), kern_a0);
-      decltype(auto) kern_r = kern::game::trigger_action_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.trigger_action_name", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_mover_mode_name(const T1& m) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::MoverMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_MoverMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
-      decltype(auto) kern_r = kern::game::mover_mode_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.mover_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  template <class T1> Text engine_game_game_goal_name(const T1& g) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameGoal>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_GameGoal>>::from(*kern_o, ::kern::logic::engine_values::input_value(g), kern_a0);
-      decltype(auto) kern_r = kern::game::game_goal_name(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.game_goal_name", {to_value(::kern::logic::engine_values::input_value(g))}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
   /// What a motion may be called: a-z, 0-9, _ and -, 1 to 38 characters.
   Bool engine_game_motion_name_ok(const Text& name) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5525,398 +4351,6 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
     return from_value<Bool>(this->kern_engine("engine.game.motion_name_ok", {to_value(name)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
-  }
-  template <class T1> Int engine_game_default_player(const T1& level) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern::game::default_player(kern_a0);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.game.default_player", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  /// The names of a level's collision channels, in the order of their bits (WorldSettings::channels).
-  template <class T1> List<Text> engine_game_channel_names(const T1& w) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
-      decltype(auto) kern_r = kern::game::channel_names(kern_a0);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Text>>::template make<List<Text>>(*kern_o, kern_r);
-    }
-    return from_value<List<Text>>(this->kern_engine("engine.game.channel_names", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
-  }
-  /// The bits of the channels a text names ("World, Vehicle"); a name the level does not have is no bit. "*" or "All": every bit.
-  template <class T1> Int engine_game_channel_bits(const T1& w, const Text& names) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
-      const std::string_view kern_a1 = names.view();
-      decltype(auto) kern_r = kern::game::channel_bits(kern_a0, kern_a1);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.game.channel_bits", {to_value(::kern::logic::engine_values::input_value(w)), to_value(names)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  using kern_given_engine_level_find_2 = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>, decltype(std::declval<kern::game::Level&>().find(std::declval<unsigned int>()))>;
-  template <class T1> kern_given_engine_level_find_2 engine_level_find_2(const T1& self, Int id) const {
-    using kern_G = kern_given_engine_level_find_2;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_r = kern_self.find(std::move(kern_a0));
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.level.find_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::structure_list})[0]);
-  }
-  /// assigns an id when actor.id == 0
-  template <class T1, class T2> void engine_level_add(const T1& self, const T2& actor) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(actor), kern_a0);
-      decltype(auto) kern_r = kern_self.add(std::move(kern_a0));
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_self);
-      return;
-    }
-    this->kern_engine("engine.level.add", {to_value(::kern::logic::engine_values::input_value(self)), to_value(::kern::logic::engine_values::input_value(actor))}, {PinType::structure, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2> void engine_level_add(KernNode& kern_n, const T1& self, const T2& actor) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(actor), kern_a0);
-      decltype(auto) kern_r = kern_self.add(std::move(kern_a0));
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.self = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.self)>>(*kern_o, kern_self);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.level.add", {to_value(::kern::logic::engine_values::input_value(self)), to_value(::kern::logic::engine_values::input_value(actor))}, {PinType::structure, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[1]);
-  }
-  /// Children of `parent` in document order (0 = top level).
-  using kern_given_engine_level_children = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::Level&>().children(std::declval<unsigned int>()))>;
-  template <class T1> kern_given_engine_level_children engine_level_children(const T1& self, Int parent) const {
-    using kern_G = kern_given_engine_level_children;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, parent, kern_a0);
-      decltype(auto) kern_r = kern_self.children(std::move(kern_a0));
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.level.children", {to_value(::kern::logic::engine_values::input_value(self)), to_value(parent)}, {PinType::integer_list})[0]);
-  }
-  /// Matrix from actor space to world space (parents applied).
-  using kern_given_engine_level_world_matrix = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, decltype(std::declval<kern::game::Level&>().world_matrix(std::declval<unsigned int>()))>;
-  template <class T1> kern_given_engine_level_world_matrix engine_level_world_matrix(const T1& self, Int id) const {
-    using kern_G = kern_given_engine_level_world_matrix;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_r = kern_self.world_matrix(std::move(kern_a0));
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.level.world_matrix", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::structure})[0]);
-  }
-  /// The nearest ancestor (or the actor itself) with a body, 0 = none.
-  template <class T1> Int engine_level_body_owner(const T1& self, Int id) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_r = kern_self.body_owner(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.level.body_owner", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> Bool engine_level_is_ancestor(const T1& self, Int ancestor, Int id) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, ancestor, kern_a0);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_r = kern_self.is_ancestor(std::move(kern_a0), std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
-    }
-    return from_value<Bool>(this->kern_engine("engine.level.is_ancestor", {to_value(::kern::logic::engine_values::input_value(self)), to_value(ancestor), to_value(id)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
-  }
-  template <class T1> Int engine_level_texture(const T1& self, const Text& id) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_r = kern_self.texture(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::TextureAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.level.texture", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> Int engine_level_sound(const T1& self, const Text& id) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_r = kern_self.sound(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::SoundAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.level.sound", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> Int engine_level_motion(const T1& self, const Text& name) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      const std::string_view kern_a0 = name.view();
-      decltype(auto) kern_r = kern_self.motion(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.level.motion", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> void engine_level_motion_2(const T1& self, const Text& name) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      const std::string_view kern_a0 = name.view();
-      decltype(auto) kern_r = kern_self.motion(kern_a0);
-      (void)::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_self);
-      return;
-    }
-    this->kern_engine("engine.level.motion_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer, PinType::structure});
-  }
-  template <class KernNode, class T1> void engine_level_motion_2(KernNode& kern_n, const T1& self, const Text& name) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
-      const std::string_view kern_a0 = name.view();
-      decltype(auto) kern_r = kern_self.motion(kern_a0);
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-      kern_n.self = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.self)>>(*kern_o, kern_self);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.level.motion_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[1]);
-  }
-  template <class T1> Int engine_game_to_json(const T1& level) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern::game::to_json(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.game.to_json", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> Text engine_game_to_text(const T1& level, Int indent) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, indent, kern_a1);
-      decltype(auto) kern_r = kern::game::to_text(kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.to_text", {to_value(::kern::logic::engine_values::input_value(level)), to_value(indent)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// Reads a level; unknown keys are ignored, missing ones take defaults.
-  template <class T1> void engine_game_from_json(Int doc, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
-      return;
-    }
-    this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-  }
-  template <class KernNode, class T1> void engine_game_from_json(KernNode& kern_n, Int doc, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
-      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
-      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
-    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
-  }
-  template <class T1> void engine_game_from_text(const Text& text, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      const std::string_view kern_a0 = text.view();
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
-      return;
-    }
-    this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-  }
-  template <class KernNode, class T1> void engine_game_from_text(KernNode& kern_n, const Text& text, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      const std::string_view kern_a0 = text.view();
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
-      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
-    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
-  }
-  template <class T1> Int engine_game_actor_to_json(const T1& a) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>, std::remove_cvref_t<kern::game::Actor const&>>(*kern_o, ::kern::logic::engine_values::input_value(a));
-      decltype(auto) kern_r = kern::game::actor_to_json(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.game.actor_to_json", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> void engine_game_actor_from_json(Int v, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.actor_from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::pass(*kern_o, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
-      return;
-    }
-    this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-  }
-  template <class KernNode, class T1> void engine_game_actor_from_json(KernNode& kern_n, Int v, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
-      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.actor_from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
-      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
-    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
-  }
-  template <class T1> Int engine_game_world_to_json(const T1& w) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
-      decltype(auto) kern_r = kern::game::world_to_json(kern_a0);
-      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
-    }
-    return from_value<Int>(this->kern_engine("engine.game.world_to_json", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  template <class T1> void engine_game_world_from_json(Int v, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.world_from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::pass(*kern_o, kern_a1);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
-      return;
-    }
-    this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-  }
-  template <class KernNode, class T1> void engine_game_world_from_json(KernNode& kern_n, Int v, const T1& out) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
-      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.world_from_json"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
-      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
-      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
-    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
-  }
-  /// Problems of a level: errors keep it from playing (dangling references, bad values), warnings point at likely mistakes. True for "", "none", "auto", a known "builtin:<name>" or an imported sound id.
-  template <class T1> Bool engine_game_sound_reference_ok(const T1& level, const Text& ref) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      const std::string_view kern_a1 = ref.view();
-      decltype(auto) kern_r = kern::game::sound_reference_ok(kern_a0, kern_a1);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
-    }
-    return from_value<Bool>(this->kern_engine("engine.game.sound_reference_ok", {to_value(::kern::logic::engine_values::input_value(level)), to_value(ref)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
-  }
-  using kern_given_engine_game_validate = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Issue>>, decltype(kern::game::validate(std::declval<kern::game::Level const&>()))>;
-  template <class T1> kern_given_engine_game_validate engine_game_validate(const T1& level) const {
-    using kern_G = kern_given_engine_game_validate;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern::game::validate(kern_a0);
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.validate", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::structure_list})[0]);
   }
   /// "#rrggbb" <-> sRGB 0..1.
   Text engine_game_hex_color(Vector c) const {
@@ -6083,18 +4517,6 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.night_windows.frame_uniforms", {to_value(night_windows), to_value(cache), to_value(value2)}, {});
   }
-  /// The bodies and compound shapes a level simulates with: actors with a body component own one, children without a body are welded into the nearest ancestor's body, and mesh/pickup/trigger actors outside any body get an implicit one (static, or kinematic when they are animated).
-  using kern_given_engine_game_plan_bodies = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_BodyPlan>>, decltype(kern::game::plan_bodies(std::declval<kern::game::Level const&>()))>;
-  template <class T1> kern_given_engine_game_plan_bodies engine_game_plan_bodies(const T1& level) const {
-    using kern_G = kern_given_engine_game_plan_bodies;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern::game::plan_bodies(kern_a0);
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game.plan_bodies", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::structure_list})[0]);
-  }
   template <class T1> Text engine_game_game_status_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -6104,6 +4526,19 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
     return from_value<Text>(this->kern_engine("engine.game.game_status_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
+  }
+  /// One fixed step of `dt` seconds. The world calls it after the physics step and the step's events (contacts, triggers, health), right before the Blueprints' Event Tick of the same step - so what it changes, every Blueprint of the world sees in that tick, and forces it applies act in the next physics step.
+  void engine_fixed_step_fixed_step(Int fixed_step, Float dt) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(fixed_step), "fixed_step");
+      if (!kern_self) { this->kern_engine_failed("engine.fixed_step.fixed_step"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a0);
+      kern_self->fixed_step(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.fixed_step.fixed_step", {to_value(fixed_step), to_value(dt)}, {});
   }
   /// Renderer layer bits for the scene meshes (default 1).
   void engine_game_world_set_layers(Int game_world, Int layers) {
@@ -6117,18 +4552,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.game_world.set_layers", {to_value(game_world), to_value(layers)}, {});
-  }
-  /// ---- presentation ---- Brings the renderer's meshes in line with `level` (only what changed is re-uploaded). Ignored while a simulation runs.
-  template <class T1> void engine_game_world_sync(Int game_world, const T1& level) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.sync"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      kern_self->sync(kern_a0);
-      return;
-    }
-    this->kern_engine("engine.game_world.sync", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {});
   }
   void engine_game_world_clear(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6355,35 +4778,28 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.present", {to_value(game_world), to_value(now_ms), to_value(eye)}, {});
   }
-  /// ---- simulation ---- Builds the Box3D world from `level` and starts Simulate or Play.
-  template <class T1, class T2> void engine_game_world_start(Int game_world, const T1& level, const T2& mode) {
+  /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs or be taken back (set_fixed_step(nullptr)) before it ends.
+  void engine_game_world_set_fixed_step(Int game_world, Int step) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.start"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
-      decltype(auto) kern_r = kern_self->start(kern_a0, std::move(kern_a1));
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern::game::FixedStep* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(step), "step");
+      if (!kern_o->error.empty()) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern_self->set_fixed_step(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level)), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
+    this->kern_engine("engine.game_world.set_fixed_step", {to_value(game_world), to_value(step)}, {});
   }
-  template <class KernNode, class T1, class T2> void engine_game_world_start(KernNode& kern_n, Int game_world, const T1& level, const T2& mode) {
+  Int engine_game_world_fixed_step_handler(Int game_world) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.start"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
-      decltype(auto) kern_r = kern_self->start(kern_a0, std::move(kern_a1));
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.fixed_step_handler"); return Int{}; }
+      decltype(auto) kern_r = kern_self->fixed_step_handler();
+      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::FixedStep>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level)), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    return from_value<Int>(this->kern_engine("engine.game_world.fixed_step_handler", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   void engine_game_world_stop(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6833,32 +5249,6 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.game_world.hud_mut", {to_value(game_world)}, {PinType::structure});
     kern_n.result.kern_bind(this->kern_world, {to_value(game_world)});
   }
-  /// ---- replica (network client) ---- Starts `level` as a replica: bodies only follow the poses set here, rules run on the server.
-  template <class T1> void engine_game_world_start_replica(Int game_world, const T1& level) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.start_replica"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern_self->start_replica(kern_a0);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {PinType::boolean});
-  }
-  template <class KernNode, class T1> void engine_game_world_start_replica(KernNode& kern_n, Int game_world, const T1& level) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.start_replica"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      decltype(auto) kern_r = kern_self->start_replica(kern_a0);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {PinType::boolean});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
   template <class T1> void engine_game_world_set_replica_pose(Int game_world, Int id, Vector position, const T1& rotation) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -6925,19 +5315,6 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.game_world.stats", {to_value(game_world)}, {PinType::structure})[0]);
-  }
-  /// the level being presented or simulated
-  using kern_given_engine_game_world_level = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, decltype(std::declval<kern::game::GameWorld&>().level())>;
-  kern_given_engine_game_world_level engine_game_world_level(Int game_world) const {
-    using kern_G = kern_given_engine_game_world_level;
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.level"); return kern_G(*kern_o); }
-      decltype(auto) kern_r = kern_self->level();
-      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
-    }
-    return kern_G(this->kern_engine("engine.game_world.level", {to_value(game_world)}, {PinType::structure})[0]);
   }
   void engine_game_world_physics(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9011,30 +7388,6 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.sound_bank.request", {to_value(sound_bank), to_value(ref)}, {});
   }
-  /// Requests every sound a level uses (so Play starts with everything in place).
-  template <class T1> void engine_sound_bank_request_level(Int sound_bank, const T1& level) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
-      if (!kern_self) { this->kern_engine_failed("engine.sound_bank.request_level"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      kern_self->request_level(kern_a0);
-      return;
-    }
-    this->kern_engine("engine.sound_bank.request_level", {to_value(sound_bank), to_value(::kern::logic::engine_values::input_value(level))}, {});
-  }
-  /// Tracks the level's imported assets: clips of removed or replaced assets are dropped.
-  template <class T1> void engine_sound_bank_sync_assets(Int sound_bank, const T1& level) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
-      if (!kern_self) { this->kern_engine_failed("engine.sound_bank.sync_assets"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
-      kern_self->sync_assets(kern_a0);
-      return;
-    }
-    this->kern_engine("engine.sound_bank.sync_assets", {to_value(sound_bank), to_value(::kern::logic::engine_values::input_value(level))}, {});
-  }
   /// Renders queued built-in sounds for about `budget_ms` (0 = all now). True when none is queued.
   void engine_sound_bank_prepare(Int sound_bank, Float budget_ms) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9248,18 +7601,6 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Bool>(this->kern_engine("engine.game_audio.active", {to_value(game_audio)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
-  /// Applies the world's master / music / ambience volumes, reverb and Doppler.
-  template <class T1> void engine_game_audio_apply_settings(Int game_audio, const T1& w) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameAudio>(*kern_o, static_cast<::kern::i64>(game_audio), "game_audio");
-      if (!kern_self) { this->kern_engine_failed("engine.game_audio.apply_settings"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
-      kern_self->apply_settings(kern_a0);
-      return;
-    }
-    this->kern_engine("engine.game_audio.apply_settings", {to_value(game_audio), to_value(::kern::logic::engine_values::input_value(w))}, {});
-  }
   /// Editor master mute (kept across begin/end).
   void engine_game_audio_set_muted(Int game_audio, Bool muted) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9302,16 +7643,6 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
     return from_value<Int>(this->kern_engine("engine.game_audio.cues_dropped", {to_value(game_audio)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  /// The engine loop a controller uses ("" when it has none).
-  template <class T1> Text engine_game_engine_sound_for(const T1& c) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ControllerComponent>, std::remove_cvref_t<kern::game::ControllerComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(c));
-      decltype(auto) kern_r = kern::game::engine_sound_for(kern_a0);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.engine_sound_for", {to_value(::kern::logic::engine_values::input_value(c))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_building_builder_begin(Int building_builder, const List<Float>& stream, Int length, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12008,90 +10339,6 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.ray = from_value<std::remove_cvref_t<decltype(kern_n.ray)>>(kern_out[1]);
   }
-  template <class T1, class T2> void engine_renderer_pick(Int renderer, Float x, Float y, const T1& query, const T2& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
-      if (!kern_self) { this->kern_engine_failed("engine.renderer.pick"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a0);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
-      auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern_self->pick(std::move(kern_a0), std::move(kern_a1), kern_a2, kern_a3, &kern_a4);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::pass(*kern_o, kern_a3);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a4);
-      return;
-    }
-    this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2> void engine_renderer_pick(KernNode& kern_n, Int renderer, Float x, Float y, const T1& query, const T2& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.hit); ::kern::logic::engine_values::none(kern_n.stats); this->kern_engine_failed("engine.renderer.pick"); return; }
-      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a0);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
-      auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern_self->pick(std::move(kern_a0), std::move(kern_a1), kern_a2, kern_a3, &kern_a4);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.hit = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::template make<std::remove_cvref_t<decltype(kern_n.hit)>>(*kern_o, kern_a3);
-      kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a4);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
-    kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
-  }
-  template <class T1, class T2, class T3> void engine_renderer_pick_ray(Int renderer, const T1& ray, const T2& query, const T3& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
-      if (!kern_self) { this->kern_engine_failed("engine.renderer.pick_ray"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a2);
-      auto kern_a3 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern_self->pick_ray(kern_a0, kern_a1, kern_a2, &kern_a3);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::pass(*kern_o, kern_a2);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a3);
-      return;
-    }
-    this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2, class T3> void engine_renderer_pick_ray(KernNode& kern_n, Int renderer, const T1& ray, const T2& query, const T3& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.hit); ::kern::logic::engine_values::none(kern_n.stats); this->kern_engine_failed("engine.renderer.pick_ray"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a2);
-      auto kern_a3 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern_self->pick_ray(kern_a0, kern_a1, kern_a2, &kern_a3);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.hit = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::template make<std::remove_cvref_t<decltype(kern_n.hit)>>(*kern_o, kern_a2);
-      kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a3);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
-    kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
-  }
   /// ---- context loss ----
   void engine_renderer_context_lost(Int renderer) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12294,95 +10541,6 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.build_standard_shader", {to_value(extensions)}, {PinType::structure})[0]);
-  }
-  /// The node type's name ("spawncity.fixed_step"): what a node of the graph names (Node::type).
-  Text engine_node_type_type(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.type"); return Text{}; }
-      decltype(auto) kern_r = kern_self->type();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.type", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// What the editor shows ("SpawnCity Fixed Step").
-  Text engine_node_type_label(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.label"); return Text{}; }
-      decltype(auto) kern_r = kern_self->label();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.label", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// The event its nodes handle ("logic.tick"), or "": an action.
-  Text engine_node_type_event(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.event"); return Text{}; }
-      decltype(auto) kern_r = kern_self->event();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.event", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// Where it stands in the editor's list, and what it says it does ("" each: none).
-  Text engine_node_type_category(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.category"); return Text{}; }
-      decltype(auto) kern_r = kern_self->category();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.category", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  Text engine_node_type_help(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.help"); return Text{}; }
-      decltype(auto) kern_r = kern_self->help();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.help", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// What a node of it does where it runs.
-  void engine_node_type_run(Int node_type) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.run"); return; }
-      kern_self->run();
-      return;
-    }
-    this->kern_engine("engine.node_type.run", {to_value(node_type)}, {});
-  }
-  /// Adds the node type `object` is to library() (its NodeDef: library().find(object->type())). False: no object, one without a type, or a type that is there already of another object (the first stays). The object must outlive every graph that runs a node of it; registered once - the same object again is true and changes nothing.
-  void engine_logic_register_node_type(Int object) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::NodeType* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(object), "object");
-      if (!kern_o->error.empty()) { this->kern_engine_failed("engine.logic.register_node_type"); return; }
-      decltype(auto) kern_r = kern::logic::register_node_type(kern_a0);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.logic.register_node_type", {to_value(object)}, {PinType::boolean});
-  }
-  template <class KernNode> void engine_logic_register_node_type(KernNode& kern_n, Int object) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::NodeType* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(object), "object");
-      if (!kern_o->error.empty()) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.logic.register_node_type"); return; }
-      decltype(auto) kern_r = kern::logic::register_node_type(kern_a0);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.logic.register_node_type", {to_value(object)}, {PinType::boolean});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> Text engine_net_client_state_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -16044,44 +14202,6 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
-  /// Nearest hit over `meshes`. Returns false when nothing was hit.
-  template <class T1, class T2, class T3> void engine_pick_meshes(const List<Int>& meshes, const T1& ray, const T2& query, const T3& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::Mesh*>>(*kern_o, meshes);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
-      auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern::pick_meshes(kern::Span<kern::Mesh* const>(kern_a0.data(), kern_a0.size()), kern_a1, kern_a2, kern_a3, &kern_a4);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::pass(*kern_o, kern_a3);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a4);
-      return;
-    }
-    this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-  }
-  template <class KernNode, class T1, class T2, class T3> void engine_pick_meshes(KernNode& kern_n, const List<Int>& meshes, const T1& ray, const T2& query, const T3& hit) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::Mesh*>>(*kern_o, meshes);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
-      auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
-      decltype(auto) kern_r = kern::pick_meshes(kern::Span<kern::Mesh* const>(kern_a0.data(), kern_a0.size()), kern_a1, kern_a2, kern_a3, &kern_a4);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      kern_n.hit = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::template make<std::remove_cvref_t<decltype(kern_n.hit)>>(*kern_o, kern_a3);
-      kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a4);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-    kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
-    kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
-  }
   /// Makes a AmbientOcclusionPass of the engine: its handle (the host keeps it until it is released).
   void engine_ambient_occlusion_pass_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -16474,11 +14594,6 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::Mesh::world_bounds gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_world_bounds_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_world_bounds, B>;
   template <class KernNode> void engine_mesh_world_bounds(KernNode& kern_n, Int mesh) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), {}, nullptr);
-  }
-  /// The place kern::Mesh::gpu gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_mesh_gpu_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_gpu, B>;
-  template <class KernNode> void engine_mesh_gpu(KernNode& kern_n, Int mesh) {
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), {}, nullptr);
   }
   /// The place kern::Mesh::sort_distance gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
@@ -16953,51 +15068,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_property_change_path(KernNode& kern_n, Int property_change) {
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), {}, nullptr);
   }
-  /// Makes a MotionAsset of the engine: its handle (the host keeps it until it is released).
-  void engine_motion_asset_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::game::MotionAsset>(std::unique_ptr<kern::game::MotionAsset>(new kern::game::MotionAsset()));
-      return;
-    }
-    this->kern_engine("engine.motion_asset.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_motion_asset_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::game::MotionAsset>(std::unique_ptr<kern::game::MotionAsset>(new kern::game::MotionAsset())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.motion_asset.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the MotionAsset (its destructor): the handle is none after it.
-  void engine_motion_asset_release(Int motion_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::game::MotionAsset>(static_cast<::kern::i64>(motion_asset))) { kern_o->error = "the handle names no MotionAsset that was made"; { this->kern_engine_failed("engine.motion_asset.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.motion_asset.release", {to_value(motion_asset)}, {});
-  }
-  /// the move's name (motion_name_ok)
-  /// The place kern::game::MotionAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_motion_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_name, B>;
-  template <class KernNode> void engine_motion_asset_name(KernNode& kern_n, Int motion_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), {}, nullptr);
-  }
-  /// seconds, kMotionMinSeconds .. kMotionMaxSeconds
-  /// The place kern::game::MotionAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_motion_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_duration, B>;
-  template <class KernNode> void engine_motion_asset_duration(KernNode& kern_n, Int motion_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), {}, nullptr);
-  }
-  /// in time order (none: taught from something else, as the jump is)
-  /// The place kern::game::MotionAsset::keys gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_motion_asset_keys_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_keys, B>;
-  template <class KernNode> void engine_motion_asset_keys(KernNode& kern_n, Int motion_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), {}, nullptr);
-  }
   /// Makes a NightWindows of the engine: its handle (the host keeps it until it is released).
   void engine_night_windows_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -17030,76 +15100,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_night_windows_night(KernNode& kern_n, Int night_windows) {
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(night_windows), {}, nullptr);
   }
-  /// Makes a SoldierArtDelete of the engine: its handle (the host keeps it until it is released).
-  void engine_soldier_art_delete_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::game::SoldierArtDelete>(std::unique_ptr<kern::game::SoldierArtDelete>(new kern::game::SoldierArtDelete()));
-      return;
-    }
-    this->kern_engine("engine.soldier_art_delete.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_soldier_art_delete_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::game::SoldierArtDelete>(std::unique_ptr<kern::game::SoldierArtDelete>(new kern::game::SoldierArtDelete())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.soldier_art_delete.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the SoldierArtDelete (its destructor): the handle is none after it.
-  void engine_soldier_art_delete_release(Int soldier_art_delete) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::game::SoldierArtDelete>(static_cast<::kern::i64>(soldier_art_delete))) { kern_o->error = "the handle names no SoldierArtDelete that was made"; { this->kern_engine_failed("engine.soldier_art_delete.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.soldier_art_delete.release", {to_value(soldier_art_delete)}, {});
-  }
-  /// Makes a SoundAsset of the engine: its handle (the host keeps it until it is released).
-  void engine_sound_asset_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::game::SoundAsset>(std::unique_ptr<kern::game::SoundAsset>(new kern::game::SoundAsset()));
-      return;
-    }
-    this->kern_engine("engine.sound_asset.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_sound_asset_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::game::SoundAsset>(std::unique_ptr<kern::game::SoundAsset>(new kern::game::SoundAsset())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.sound_asset.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the SoundAsset (its destructor): the handle is none after it.
-  void engine_sound_asset_release(Int sound_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::game::SoundAsset>(static_cast<::kern::i64>(sound_asset))) { kern_o->error = "the handle names no SoundAsset that was made"; { this->kern_engine_failed("engine.sound_asset.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.sound_asset.release", {to_value(sound_asset)}, {});
-  }
-  /// The place kern::game::SoundAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_sound_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_id, B>;
-  template <class KernNode> void engine_sound_asset_id(KernNode& kern_n, Int sound_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), {}, nullptr);
-  }
-  /// The place kern::game::SoundAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_sound_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_name, B>;
-  template <class KernNode> void engine_sound_asset_name(KernNode& kern_n, Int sound_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), {}, nullptr);
-  }
-  /// seconds (informational)
-  /// The place kern::game::SoundAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_sound_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_duration, B>;
-  template <class KernNode> void engine_sound_asset_duration(KernNode& kern_n, Int sound_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), {}, nullptr);
-  }
   /// Makes a SoundBank of the engine: its handle (the host keeps it until it is released).
   void engine_sound_bank_make(Int mixer) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -17130,53 +15130,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.sound_bank.release", {to_value(sound_bank)}, {});
-  }
-  /// Makes a TextureAsset of the engine: its handle (the host keeps it until it is released).
-  void engine_texture_asset_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::game::TextureAsset>(std::unique_ptr<kern::game::TextureAsset>(new kern::game::TextureAsset()));
-      return;
-    }
-    this->kern_engine("engine.texture_asset.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_texture_asset_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::game::TextureAsset>(std::unique_ptr<kern::game::TextureAsset>(new kern::game::TextureAsset())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.texture_asset.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the TextureAsset (its destructor): the handle is none after it.
-  void engine_texture_asset_release(Int texture_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::game::TextureAsset>(static_cast<::kern::i64>(texture_asset))) { kern_o->error = "the handle names no TextureAsset that was made"; { this->kern_engine_failed("engine.texture_asset.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.texture_asset.release", {to_value(texture_asset)}, {});
-  }
-  /// The place kern::game::TextureAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_texture_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_id, B>;
-  template <class KernNode> void engine_texture_asset_id(KernNode& kern_n, Int texture_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), {}, nullptr);
-  }
-  /// The place kern::game::TextureAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_texture_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_name, B>;
-  template <class KernNode> void engine_texture_asset_name(KernNode& kern_n, Int texture_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), {}, nullptr);
-  }
-  /// The place kern::game::TextureAsset::width gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_texture_asset_width_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_width, B>;
-  template <class KernNode> void engine_texture_asset_width(KernNode& kern_n, Int texture_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), {}, nullptr);
-  }
-  /// The place kern::game::TextureAsset::height gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
-  template <class B> using engine_texture_asset_height_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_height, B>;
-  template <class KernNode> void engine_texture_asset_height(KernNode& kern_n, Int texture_asset) {
-    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), {}, nullptr);
   }
   /// Makes a Client of the engine: its handle (the host keeps it until it is released).
   template <class T1> void engine_client_make(Int transport, const T1& config, Int64 salt_seed) {

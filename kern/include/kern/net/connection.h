@@ -27,9 +27,9 @@
 
 namespace kern::net {
 
-enum class ChannelType : u8 { reliable_ordered, unreliable_unordered };
+enum class KERN_BLUEPRINT_TYPE ChannelType : u8 { reliable_ordered, unreliable_unordered };
 
-struct ChannelConfig {
+struct KERN_BLUEPRINT_TYPE ChannelConfig {
   ChannelType type = ChannelType::reliable_ordered;
   int send_queue_size = 1024;            // messages (reliable: window)
   int receive_queue_size = 1024;
@@ -41,14 +41,14 @@ struct ChannelConfig {
   f32 resend_time = 0.1f;                // seconds (at least; RTT * 1.25 when known)
 };
 
-struct ConnectionConfig {
+struct KERN_BLUEPRINT_TYPE ConnectionConfig {
   std::vector<ChannelConfig> channels{ChannelConfig{}, ChannelConfig{ChannelType::unreliable_unordered}};
   int max_packet_size = 8 * 1024;        // message payload per packet
   int max_message_types = 256;
   EndpointConfig endpoint;
 };
 
-struct Message {
+struct KERN_BLUEPRINT_TYPE Message {
   u16 id = 0;                            // reliable: sequence within the channel
   u16 type = 0;
   std::vector<u8> data;
@@ -72,7 +72,7 @@ bool read(const Message& m, T& out) {
   return out.serialize(r);
 }
 
-enum class ConnectionError : u8 { none, desync, send_queue_full, message_too_large, bad_packet, out_of_memory };
+enum class KERN_BLUEPRINT_TYPE ConnectionError : u8 { none, desync, send_queue_full, message_too_large, bad_packet, out_of_memory };
 const char* connection_error_name(ConnectionError e);
 
 class Channel;

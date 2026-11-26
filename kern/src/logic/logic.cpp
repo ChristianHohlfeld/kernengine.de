@@ -1,4 +1,5 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
@@ -1343,7 +1344,8 @@ bool say(std::string* error, const std::string& why) {
 }
 }  // namespace
 
-bool libraries_of(const Graph& g, const Blueprints& all, std::vector<std::string>& out, std::string* error) {
+bool libraries_of(const Graph& g, const Blueprints& project, std::vector<std::string>& out, std::string* error) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's: kern/logic/engine_libraries.h)
   out.clear();
   std::vector<std::string> open;  // (the libraries being followed: one of them again is a library that uses itself)
   std::function<bool(const std::vector<std::string>&)> follow = [&](const std::vector<std::string>& names) {
@@ -1457,7 +1459,8 @@ bool take_types(Graph& g, const std::vector<std::string>& libraries, const Bluep
 }
 }  // namespace
 
-bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool whole, const Library* lib_) {
+bool take_libraries(Graph& g, const Blueprints& project, std::string* error, bool whole, const Library* lib_) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's: kern/logic/engine_libraries.h)
   std::vector<std::string> libraries;
   if (!libraries_of(g, all, libraries, error)) return false;
   // How the functions look that it calls of them.
@@ -1489,7 +1492,8 @@ bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool wh
   return take_types(g, libraries, all, error, whole, lib_ ? *lib_ : library());
 }
 
-bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error, const Library* lib_) {
+bool link(const Graph& g, const Blueprints& project, Graph& out, std::string* error, const Library* lib_) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   out = g;
   if (g.uses.empty()) return true;
   const Library& lib = lib_ ? *lib_ : library();

@@ -529,18 +529,18 @@ SC_TEST(lowered_guided_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // update_dodge(Dodge, Vec2, Vec2, f32, bool)  ->  update_dodge(Dodge, Vec2, Vec2, f32, bool)
-    ::sc::lowered::Tally tally("update_dodge(Dodge, Vec2, Vec2, f32, bool)");
+  {  // update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)  ->  update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)
+    ::sc::lowered::Tally tally("update_dodge(Dodge, kern::Vec2, kern::Vec2, f32, bool)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_guided::sc::guided::Dodge> o0;
       ::sc::lowered::Arg<::sc_new_guided::sc::guided::Dodge> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec2> o1;
-      ::sc::lowered::Arg<Vec2> n1;
+      ::sc::lowered::Arg<kern::Vec2> o1;
+      ::sc::lowered::Arg<kern::Vec2> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
-      ::sc::lowered::Arg<Vec2> o2;
-      ::sc::lowered::Arg<Vec2> n2;
+      ::sc::lowered::Arg<kern::Vec2> o2;
+      ::sc::lowered::Arg<kern::Vec2> n2;
       ::sc::lowered::draw_pair(draw, o2, n2);
       ::sc::lowered::Arg<f32> o3;
       ::sc::lowered::Arg<f32> n3;
@@ -560,15 +560,15 @@ SC_TEST(lowered_guided_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // pick_score(Vec3, Vec3, f32, f32, Vec3)  ->  pick_score(Vec3, Vec3, f32, f32, Vec3)
-    ::sc::lowered::Tally tally("pick_score(Vec3, Vec3, f32, f32, Vec3)");
+  {  // pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)  ->  pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)
+    ::sc::lowered::Tally tally("pick_score(kern::Vec3, kern::Vec3, f32, f32, kern::Vec3)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
-      ::sc::lowered::Arg<Vec3> o0;
-      ::sc::lowered::Arg<Vec3> n0;
+      ::sc::lowered::Arg<kern::Vec3> o0;
+      ::sc::lowered::Arg<kern::Vec3> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;
@@ -576,8 +576,8 @@ SC_TEST(lowered_guided_cpp) {
       ::sc::lowered::Arg<f32> o3;
       ::sc::lowered::Arg<f32> n3;
       ::sc::lowered::draw_pair(draw, o3, n3);
-      ::sc::lowered::Arg<Vec3> o4;
-      ::sc::lowered::Arg<Vec3> n4;
+      ::sc::lowered::Arg<kern::Vec3> o4;
+      ::sc::lowered::Arg<kern::Vec3> n4;
       ::sc::lowered::draw_pair(draw, o4, n4);
       std::optional<std::remove_cvref_t<decltype(::sc_old_guided::sc::guided::pick_score(o0.get(), o1.get(), o2.get(), o3.get(), o4.get()))>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_guided::sc::guided::pick_score(n0.get(), n1.get(), n2.get(), n3.get(), n4.get()))>> n_r;
@@ -591,15 +591,15 @@ SC_TEST(lowered_guided_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // launch(Vec3, Vec3, f32, bool)  ->  launch(Vec3, Vec3, f32, bool)
-    ::sc::lowered::Tally tally("launch(Vec3, Vec3, f32, bool)");
+  {  // launch(kern::Vec3, kern::Vec3, f32, bool)  ->  launch(kern::Vec3, kern::Vec3, f32, bool)
+    ::sc::lowered::Tally tally("launch(kern::Vec3, kern::Vec3, f32, bool)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
-      ::sc::lowered::Arg<Vec3> o0;
-      ::sc::lowered::Arg<Vec3> n0;
+      ::sc::lowered::Arg<kern::Vec3> o0;
+      ::sc::lowered::Arg<kern::Vec3> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;
@@ -619,15 +619,15 @@ SC_TEST(lowered_guided_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // track(Missile &, Vec3, f32)  ->  track(Missile &, Vec3, f32)
-    ::sc::lowered::Tally tally("track(Missile &, Vec3, f32)");
+  {  // track(Missile &, kern::Vec3, f32)  ->  track(Missile &, kern::Vec3, f32)
+    ::sc::lowered::Tally tally("track(Missile &, kern::Vec3, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<::sc_old_guided::sc::guided::Missile &> o0;
       ::sc::lowered::Arg<::sc_new_guided::sc::guided::Missile &> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;

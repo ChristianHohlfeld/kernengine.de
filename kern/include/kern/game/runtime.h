@@ -24,6 +24,7 @@
 #include "kern/physics/physics.h"
 
 namespace kern::game {
+struct Project;  // kern/game/project.h
 
 /// Lit night windows on city buildings, driven by the buildings' wall records.
 /// Register it with Renderer::init; GameWorld sets its night factor.
@@ -36,7 +37,7 @@ class NightWindows final : public ShaderExtension {
   const char* vertex() const override;
   const char* fragment_declarations() const override;
   const char* fragment_surface() const override;
-  void bind(const Program& p) override;
+  void bind(const kern::Program& p) override;
   void frame_uniforms(UniformCache& cache, const Renderer&) override;
 
  private:
@@ -75,7 +76,7 @@ std::vector<BodyPlan> plan_bodies(const Level& level);
 
 // ---- play state ----
 
-struct PlayInput {
+struct KERN_BLUEPRINT_TYPE PlayInput {
   f32 move_x = 0, move_y = 0, up = 0;  // -1..1 (right, forward, up)
   bool jump = false, boost = false;
   bool camera = false;                 // held: switches the vehicle view (chase / low interior) on press
@@ -97,11 +98,11 @@ struct PlayInput {
 };
 
 /// replica: a network client's copy of a server's game (poses come from snapshots, see net_game.h).
-enum class SimMode : u8 { none, simulate, play, replica };
-enum class GameStatus : u8 { inactive, playing, won, lost };
+enum class KERN_BLUEPRINT_TYPE SimMode : u8 { none, simulate, play, replica };
+enum class KERN_BLUEPRINT_TYPE GameStatus : u8 { inactive, playing, won, lost };
 const char* game_status_name(GameStatus s);
 
-struct Hud {
+struct KERN_BLUEPRINT_TYPE Hud {
   GameStatus status = GameStatus::inactive;
   std::string title, message;
   f32 message_age = 0;            // seconds since the message appeared
@@ -132,7 +133,7 @@ struct Hud {
 struct SoldierArt;  // soldier_art.cpp
 struct SoldierArtDelete { void operator()(SoldierArt* a) const; };
 
-struct ShotEvent {
+struct KERN_BLUEPRINT_TYPE ShotEvent {
   Vec3 from, to;
   ActorId shooter = 0, hit = 0;
   bool impact = false, head = false;
@@ -142,7 +143,7 @@ struct ShotEvent {
 
 /// A sound the simulation asks for (GameAudio plays it). Cues are produced in
 /// fixed steps and so are deterministic; the caller drains them every frame.
-struct SoundCue {
+struct KERN_BLUEPRINT_TYPE SoundCue {
   std::string sound;              // "builtin:<name>" or an imported sound id
   Vec3 position;
   f32 volume = 1, pitch = 1;
@@ -155,7 +156,7 @@ struct SoundCue {
 };
 
 /// What a network client needs to show its own soldier's HUD (sent by the server per client).
-struct SoldierState {
+struct KERN_BLUEPRINT_TYPE SoldierState {
   f32 health = 100, max_health = 100, armor = 0;
   i32 ammo = 0, magazine = 0, reserve = 0;
   f32 reload = -1, spread = 0, respawn_in = -1;
@@ -164,12 +165,23 @@ struct SoldierState {
   f32 damage_yaw = 0;              // world yaw (degrees) the last damage came from
 };
 
-struct SimStats {
+struct KERN_BLUEPRINT_TYPE SimStats {
   u32 bodies = 0, awake = 0, shapes = 0, joints = 0, broken_joints = 0, contacts = 0;
   u64 steps = 0;
 };
 
 struct WalkerMove;  // a walker's one-shot move (runtime_internal.h)
+
+/// What a program does in every fixed step of a world (kern/docs/project.md 6., GameWorld::set_fixed_step): the
+/// program's C++, or the object of the engine of a program Blueprint that implements it (kern::Implements<"game_FixedStep">).
+class FixedStep {
+ public:
+  virtual ~FixedStep() = default;
+  /// One fixed step of `dt` seconds. The world calls it after the physics step and the step's events (contacts,
+  /// triggers, health), right before the Blueprints' Event Tick of the same step - so what it changes, every Blueprint
+  /// of the world sees in that tick, and forces it applies act in the next physics step.
+  virtual void fixed_step(f64 dt) = 0;
+};
 
 class GameWorld {
  public:
@@ -205,8 +217,17 @@ class GameWorld {
   void present(f64 now_ms, Vec3 eye);
 
   // ---- simulation ----
-  /// Builds the Box3D world from `level` and starts Simulate or Play.
+  /// Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that
+  /// stands in the level and in the project (library_conflicts) keeps it from starting.
   bool start(const Level& level, SimMode mode);
+  /// The project the level belongs to (kern/game/project.h; null: none): its Blueprints' libraries are found in the
+  /// level first, then in the project. It must outlive the world's runs.
+  void set_project(const Project* project) { project_ = project; }
+  /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs
+  /// or be taken back (set_fixed_step(nullptr)) before it ends.
+  void set_fixed_step(FixedStep* step) { fixed_step_ = step; }
+  FixedStep* fixed_step_handler() const { return fixed_step_; }
+  const Project* project() const { return project_; }
   void stop();
   bool running() const { return mode_ != SimMode::none; }
   /// Counts start() calls (restart included): listeners notice a fresh run.
@@ -310,7 +331,7 @@ class GameWorld {
   void key_event(const std::string& code, bool down);
   /// Replicated changes made by logic (the network server sends them; clients apply them).
   struct PropertyChange { ActorId actor = 0; std::string path; json::Value value; };
-  struct SpawnChange { ActorId source = 0, id = 0; Vec3 position, rotation; };
+  struct KERN_BLUEPRINT_TYPE SpawnChange { ActorId source = 0, id = 0; Vec3 position, rotation; };
   void take_replicated_changes(std::vector<PropertyChange>& props, std::vector<SpawnChange>& spawns);
   /// Everything changed so far (for players who join later).
   void replicated_state(std::vector<PropertyChange>& props, std::vector<SpawnChange>& spawns) const;
@@ -359,7 +380,7 @@ class GameWorld {
   // ---- walkers (articulated robots on their policies; src/game/walker.cpp) ----
   /// What a walker's sensors report, like the real Micro Duck's: the head ToF (VL53L8CX, 8 x 8
   /// zones over 45 x 45 degrees) classified as the robot does (kinematics/src/tof.rs), the trunk IMU.
-  struct WalkerSensors {
+  struct KERN_BLUEPRINT_TYPE WalkerSensors {
     static constexpr int kZones = 64;
     f32 range[kZones] = {};           // slant range per zone, metres in the robot's own scale; < 0 = no return
     u8 zone[kZones] = {};             // 0 empty, 1 too close, 2 floor, 3 obstacle
@@ -434,7 +455,7 @@ class GameWorld {
   bool walker_last_observation(ActorId id, f32 observation[61]) const;
   /// What a Lehrer's reward and its critic read, in real units (the robot's size and time, not the
   /// world's kWalkerScale): the trunk's pose and velocity, the soles on the ground, a link on a link.
-  struct WalkerProbe {
+  struct KERN_BLUEPRINT_TYPE WalkerProbe {
     Vec3 position;                  // trunk origin, real metres (world position / scale)
     Quat rotation;
     Vec3 velocity, spin;            // world frame, real m/s and rad/s
@@ -453,7 +474,7 @@ class GameWorld {
   /// The last call its voice made ("greet", "chirp", "wheee", ...), "" before the first.
   std::string walker_said(ActorId id) const;
   /// Its servo joints now (radians, the MJCF angle) with their ranges: the policy's 14, the mouth.
-  struct WalkerJoint { std::string name; f32 angle = 0, lower = 0, upper = 0; };
+  struct KERN_BLUEPRINT_TYPE WalkerJoint { std::string name; f32 angle = 0, lower = 0, upper = 0; };
   std::vector<WalkerJoint> walker_joints(ActorId id) const;
   // ---- Kern's play layer (walker_play.cpp): ball and sock, a learned network (docs/lehrer.md) ------
   static constexpr i32 kPlayObs = 23, kPlayActions = 9;
@@ -466,7 +487,7 @@ class GameWorld {
   bool set_walker_play_action(ActorId id, const f32 action[kPlayActions]);
   /// The camera's detector as a device model: position noise (sd = abs + rel x distance, real
   /// metres) and the share of frames it misses an object.
-  struct DetectorModel { f32 sigma_abs = 0, sigma_rel = 0, dropout = 0; u64 seed = 1; };
+  struct KERN_BLUEPRINT_TYPE DetectorModel { f32 sigma_abs = 0, sigma_rel = 0, dropout = 0; u64 seed = 1; };
   bool set_walker_detector(ActorId id, const DetectorModel& model);
   /// True when the next fixed step starts a control tick that is also a play decision (25 Hz).
   bool walker_play_due(ActorId id) const;
@@ -540,7 +561,7 @@ class GameWorld {
   /// and arms, muzzle flashes, tracers, decals, chips and brass (soldier_art.cpp).
   void present_soldier_art(f64 now_ms, f32 dt);
  public:
-  struct ArtStats { u32 rigs = 0, decals = 0, tracers = 0, chips = 0; bool view_model = false; };
+  struct KERN_BLUEPRINT_TYPE ArtStats { u32 rigs = 0, decals = 0, tracers = 0, chips = 0; bool view_model = false; };
   /// What the soldier art draws right now (tests, stats).
   ArtStats art_stats() const;
  private:
@@ -561,6 +582,8 @@ class GameWorld {
 
   // presentation
   Level level_;                  // edited level (sync) or the running copy (start)
+  const Project* project_ = nullptr;  // where the libraries the level does not have are found (set_project)
+  FixedStep* fixed_step_ = nullptr;   // the program's fixed step (set_fixed_step)
   Level edit_level_;             // what sync() last saw (restored by stop())
   std::unordered_map<ActorId, std::unique_ptr<Visual>> visuals_;
   std::unordered_map<ActorId, std::unique_ptr<CityVisual>> cities_;
@@ -709,7 +732,7 @@ class GameWorld {
 };
 
 /// A Blueprint running in a world's logic, as the logic shows it (blueprints_running).
-struct BlueprintRunning {
+struct KERN_BLUEPRINT_TYPE BlueprintRunning {
   std::string name;             // its actor's name ("Level": the level's own)
   std::string tier;             // how it runs: "interpreter", "compiled (WebAssembly)", "compiling", "native C++"
   std::size_t functions = 0;    // the functions of its graph

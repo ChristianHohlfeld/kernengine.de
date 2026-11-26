@@ -17,7 +17,6 @@
 #include <string>
 #include <vector>
 
-#include "kern/app/project.h"
 #include "kern/audio/audio.h"
 #include "kern/core/json.h"
 #include "kern/math/math.h"
@@ -26,7 +25,7 @@ namespace kern::game {
 
 using ActorId = u32;  // unique within a level, 0 = none
 
-struct Transform {
+struct KERN_BLUEPRINT_TYPE Transform {
   Vec3 position;
   Vec3 rotation;        // Euler degrees (x roll, y pitch, z yaw)
   Vec3 scale{1, 1, 1};
@@ -43,7 +42,7 @@ Transform matrix_transform(const Mat4& m);
 
 // ---- components ----
 
-enum class Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh };
+enum class KERN_BLUEPRINT_TYPE Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh };
 const char* shape_name(Shape s);
 bool parse_shape(std::string_view s, Shape& out);
 
@@ -429,8 +428,6 @@ struct Level {
   logic::Graph logic;            // the level graph (Self = none; sees every actor's events)
   EditorCamera camera;
   ActorId next_id = 1;
-  ProjectSettings project;  // what the engine applies when the program starts (kern/app/project.h; at the end: the
-                            // Blueprints' copies of the struct take a field at their end, games/spawncity/tools/all_program.sh)
 
   Actor* find(ActorId id);
   const Actor* find(ActorId id) const;

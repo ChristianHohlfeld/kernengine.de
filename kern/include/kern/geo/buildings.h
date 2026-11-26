@@ -17,19 +17,19 @@ namespace kern {
 
 /// Colours are kept in double precision so derived colours (the cornice mix)
 /// round to exactly the same float values as a double-precision reference.
-struct Rgb {
+struct KERN_BLUEPRINT_TYPE Rgb {
   f64 r = 1, g = 1, b = 1;
   Vec3 f() const { return {static_cast<f32>(r), static_cast<f32>(g), static_cast<f32>(b)}; }
 };
 
-struct BuildingStyle {
+struct KERN_BLUEPRINT_TYPE BuildingStyle {
   std::vector<Rgb> walls{{0.75, 0.73, 0.70}};
   std::vector<Rgb> roofs{{0.30, 0.30, 0.32}};
   Rgb trim{0.957, 0.937, 0.894};
   f64 trim_mix = 0.45;  // cornice colour = mix(wall, trim, trim_mix)
 };
 
-struct BuildingOptions {
+struct KERN_BLUEPRINT_TYPE BuildingOptions {
   f64 chunk_size = 320;
   u32 max_buildings = 2600;
   bool cornice = true;
@@ -37,7 +37,7 @@ struct BuildingOptions {
   BuildingStyle style;
 };
 
-struct GeoChunk {
+struct KERN_BLUEPRINT_TYPE GeoChunk {
   i32 x = 0, y = 0;  // chunk grid coordinates
   u32 items = 0;     // buildings / roads in the chunk
   u32 triangles = 0;

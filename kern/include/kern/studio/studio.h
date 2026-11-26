@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "kern/core/json.h"
+#include "kern/game/project.h"
 #include "kern/game/runtime.h"
 #include "kern/game/net_game.h"
 #include "kern/game/touch.h"
@@ -135,6 +136,8 @@ struct GizmoDrag {
 struct HistoryEntry {
   std::string label;
   game::Level level;                       // document after this step
+  game::Project project;                   // the project after this step (its settings, levels, program Blueprints)
+  u64 project_rev = 0;                     // which state of the project that is (Studio::project_rev_)
   std::vector<ActorId> selection_before;   // selection when the step began (restored by undo)
   std::vector<ActorId> selection_after;    // selection after the step (restored by redo)
   std::string merge_key;                   // property edits: path + targets
@@ -279,22 +282,36 @@ class Studio {
   bool load_level(game::Level level, bool reset_history = true);
   bool load_level_text(std::string_view text, std::string_view name);
   std::string level_text() const;
+  /// The project the open level belongs to (kern/game/project.h): its settings, levels, start level and the
+  /// program's Blueprints. A new Studio has a project "Untitled" without levels.
+  const game::Project& project() const { return project_; }
+  /// Opens a project (.kproject text). False - `error` says where and why - and nothing changes for one that does
+  /// not read, or whose program Blueprints share a name with a Blueprint of the open level (game::library_conflicts).
+  bool load_project_text(std::string_view text, std::string* error = nullptr);
+  std::string project_text() const { return game::to_text(project_); }
+  /// The project has changes since it was opened, made or saved.
+  bool project_dirty() const { return project_rev_ != project_saved_rev_; }
   /// Applies a modification as one undo step (label shows in the history). `fn`
   /// edits the level in place and may change the selection; returning false
   /// rolls both back. A change that leaves the document identical adds no step.
   template <typename F> bool edit(const char* label, F&& fn) {
     if (!editable()) { report("Stop playing to edit the level", "warn"); return false; }
     game::Level before = level_;
+    game::Project project_before = project_;
     std::vector<ActorId> selection_before = selection_;
+    project_touched_ = false;
     if (!fn(level_)) {
       level_ = std::move(before);
+      project_ = std::move(project_before);
+      project_touched_ = false;
+      program_view_stale_ = true;
       selection_ = std::move(selection_before);
       coalesce_.clear();
       transaction_.clear();
       changed();
       return false;
     }
-    commit(label, std::move(before), std::move(selection_before));
+    commit(label, std::move(before), std::move(selection_before), &project_before);
     return true;
   }
   /// The document takes changes: while editing, and in the Lehrer's workspace (its stage is a
@@ -398,7 +415,7 @@ class Studio {
 
  private:
   /// Records the step; false (and no step) when the document did not change.
-  bool commit(const char* label, game::Level before, std::vector<ActorId> selection_before);
+  bool commit(const char* label, game::Level before, std::vector<ActorId> selection_before, const game::Project* project_before = nullptr);
   void touch() { ++revision_; }
   void changed();
   void step_history(bool forward);
@@ -444,6 +461,32 @@ class Studio {
   json::Value logic_trace_json() const;
   json::Value logic_palette(const json::Value& c) const;
   u32 logic_owner_ = 0;
+  /// The logic editor shows a program Blueprint (logic_owner_ is then its place in project_.blueprints + 1), not one
+  /// of the level. The editor sees the program's Blueprints as owners like a level's: logic_level() is then a level
+  /// without a world whose actors are the program's Blueprints (id = place + 1, name = the Blueprint's), so finding
+  /// libraries, types of the project and other Blueprints is one way for both.
+  bool logic_program_ = false;
+  mutable game::Level program_view_;
+  mutable bool program_view_stale_ = true;
+  /// The Blueprints the logic editor works in: the level's, or the program's (program_view_).
+  const game::Level& logic_level() const;
+  /// Where a Blueprint of logic_level() finds libraries besides its own document: a world's also in the project.
+  const game::Project* logic_project() const { return logic_program_ ? nullptr : &project_; }
+  /// An edit of the Blueprints the logic editor works in, as one undo step: of the level, or of the program
+  /// (then written back into project_).
+  template <typename F> bool edit_logic(const char* label, F&& fn) {
+    if (!logic_program_) return edit(label, fn);
+    return edit(label, [&](game::Level&) {
+      logic_level();
+      if (!fn(program_view_)) return false;
+      for (std::size_t i = 0; i < project_.blueprints.size() && i < program_view_.actors.size(); ++i)
+        project_.blueprints[i].logic = *program_view_.actors[i].logic;
+      project_touched_ = true;
+      return true;
+    });
+  }
+  json::Value project_command(const std::string& name, const json::Value& c);
+  json::Value project_json() const;
   bool logic_open_ = false;
   std::string logic_view_ = "graph";
   /// The sheet the graph view shows, for each owner (0: the level's Blueprint): the function whose body it is, or ""
@@ -505,6 +548,11 @@ class Studio {
   std::unique_ptr<game::GameWorld> world_;
   bool ready_ = false, player_only_ = false;
   game::Level level_;
+  game::Project project_;
+  // Which state the project is in: a new number for each change (an edit that touched it says so: project_touched_),
+  // so neither the history nor "dirty" compares projects (a program of many Blueprints is large).
+  bool project_touched_ = false;
+  u64 project_rev_ = 0, project_saved_rev_ = 0, next_project_rev_ = 1;
   std::vector<HistoryEntry> history_;
   std::size_t history_index_ = 0;
   std::string coalesce_;                  // merge key of the edit being committed

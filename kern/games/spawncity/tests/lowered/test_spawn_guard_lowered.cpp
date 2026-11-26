@@ -286,15 +286,15 @@ SC_TEST(lowered_spawn_guard_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // seen_by(const Viewer &, Vec3, f32, f32)  ->  seen_by(const Viewer &, Vec3, f32, f32)
-    ::sc::lowered::Tally tally("seen_by(const Viewer &, Vec3, f32, f32)");
+  {  // seen_by(const Viewer &, kern::Vec3, f32, f32)  ->  seen_by(const Viewer &, kern::Vec3, f32, f32)
+    ::sc::lowered::Tally tally("seen_by(const Viewer &, kern::Vec3, f32, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const ::sc_old_spawn_guard::sc::spawn::Viewer &> o0;
       ::sc::lowered::Arg<const ::sc_new_spawn_guard::sc::spawn::Viewer &> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;
@@ -314,15 +314,15 @@ SC_TEST(lowered_spawn_guard_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // can_spawn(const std::vector<Viewer> &, Vec3, f32, f32)  ->  can_spawn(const std::vector<Viewer> &, Vec3, f32, f32)
-    ::sc::lowered::Tally tally("can_spawn(const std::vector<Viewer> &, Vec3, f32, f32)");
+  {  // can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)  ->  can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)
+    ::sc::lowered::Tally tally("can_spawn(const std::vector<Viewer> &, kern::Vec3, f32, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::Arg<const std::vector<::sc_old_spawn_guard::sc::spawn::Viewer> &> o0;
       ::sc::lowered::Arg<const std::vector<::sc_new_spawn_guard::sc::spawn::Viewer> &> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;

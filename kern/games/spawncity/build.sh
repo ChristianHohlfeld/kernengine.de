@@ -39,12 +39,14 @@ out="${1:-$root/generated/spawncity.html}"
 mkdir -p "$(dirname "$out")"
 wasm="$here/web/spawncity.wasm"
 if [ "$skip_wasm" = 0 ]; then
-  # The level file (the project: world settings, actors, their Blueprints) as a source the game links.
-  # The built game carries what it runs: not the folder "Source" - the Blueprints written from the game's C++, which
-  # stand beside it until their file switches (BLUEPRINTS.md; tools/embed_level.py) - but for the libraries the
-  # Blueprints that stay use (those of "Program" call libraries of "Source"). The tests take the whole level.
+  # The project (level/spawncity.kproject: the settings) and its level (world settings, actors, their Blueprints) as
+  # a source the game links (kern/tools/embed_project.py). The built game carries what it runs: not the folder
+  # "Source" - the Blueprints written from the game's C++, which stand beside it until their file switches
+  # (BLUEPRINTS.md; tools/ship_level.py) - but for the libraries the Blueprints that stay use (those of "Program"
+  # call libraries of "Source"). The tests take the whole level.
   shipped="${TMPDIR:-/tmp}/spawncity-level-$(printf '%s' "$here" | sha256sum | cut -c1-12).klevel"
-  python3 "$here/tools/embed_level.py" "$here/level/spawncity.klevel" "$here/src/level_data.cpp" --without Source --level-out "$shipped"
+  python3 "$here/tools/ship_level.py" "$here/level/spawncity.klevel" "$shipped" --without Source
+  python3 "$root/kern/tools/embed_project.py" "$here/level/spawncity.kproject" "$here/src/level_data.cpp" --level spawncity.klevel "$shipped"
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
   # Those of the folder "Program" - files of the game that are Blueprints now - the game's C++ calls as their
   # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").

@@ -459,6 +459,9 @@ class StudioPage {
       case "save": this.save(false); break;
       case "saveAs": this.save(true); break;
       case "open": this.openFile(); break;
+      case "newProject": this.projectCommand({cmd: "projectNew"}); break;
+      case "openProject": $("#fileProject").click(); break;
+      case "saveProject": this.saveProject(); break;
       case "importTexture": $("#fileTexture").click(); break;
       case "packageGame":
         if (a.text) this.packageGame(a.text, a.title);
@@ -888,6 +891,7 @@ class StudioPage {
       this.engine.command({cmd: "setFolder", folder: name});
     };
     this.initOutliner();
+    this.initProject();
     // Details editors (delegated).
     this.initProps($("#details"));
     this.initProps($("#worldSettings"));
@@ -942,7 +946,8 @@ class StudioPage {
       const f = e.dataTransfer.files?.[0];
       if (!f) return;
       e.preventDefault();
-      if (/\.(klevel|json)$/i.test(f.name)) this.engine.command({cmd: "open", text: await f.text(), name: f.name});
+      if (/\.kproject$/i.test(f.name)) this.projectCommand({cmd: "projectOpen", text: await f.text()});
+      else if (/\.(klevel|json)$/i.test(f.name)) this.engine.command({cmd: "open", text: await f.text(), name: f.name});
       else if (f.type.startsWith("image/")) this.importTexture(f);
       else if (f.type.startsWith("audio/") || /\.(wav|mp3|ogg|oga|m4a|aac|flac|opus|webm)$/i.test(f.name)) for (const file of e.dataTransfer.files) await this.importSound(file);
     });
@@ -971,6 +976,7 @@ class StudioPage {
     this.trainer.render(s);
     this.renderToolbar(s);
     this.renderViewports(s);
+    this.renderProject(s.project);
     this.renderOutliner(s.outliner);
     this.renderDetails(s);
     this.renderWorld(s.world);
@@ -984,6 +990,105 @@ class StudioPage {
       mb.innerHTML = icon(muted ? "speakerOff" : "speaker");
       mb.classList.toggle("off", muted);
       mb.title = muted ? "Sound is off - click to turn it on" : "Sound on / off";
+    }
+  }
+
+  // ---- project (kern/docs/project.md): name, levels and start level, settings, program Blueprints -----------------
+  projectCommand(c) {
+    const r = this.engine.command(c);
+    if (r && r.ok === false && r.error) this.toast(r.error);
+    return r;
+  }
+  initProject() {
+    $("#fileProject").onchange = async e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (f) this.projectCommand({cmd: "projectOpen", text: await f.text()});
+    };
+    const body = $("#projectBody");
+    body.addEventListener("click", e => {
+      const b = e.target.closest("[data-act]");
+      if (!b) return;
+      const p = this.state.project, row = b.closest("[data-name]"), name = row?.dataset.name;
+      switch (b.dataset.act) {
+        case "openBp": this.projectCommand({cmd: "logicOpen", program: name}); break;
+        case "removeBp": this.projectCommand({cmd: "projectBlueprint", op: "remove", name}); break;
+        case "renameBp": {
+          const to = row.querySelector("input.rename")?.value.trim();
+          if (to && to !== name) this.projectCommand({cmd: "projectBlueprint", op: "rename", name, to});
+          break;
+        }
+        case "addBp": {
+          const input = $("#projectBpName"), lib = $("#projectBpLibrary").checked;
+          if (this.projectCommand({cmd: "projectBlueprint", op: "add", name: input.value.trim(), library: lib})?.ok) input.value = "";
+          break;
+        }
+        case "removeLevel": this.projectCommand({cmd: "projectSet", levels: p.levels.filter(l => l !== name),
+                                                 ...(p.startLevel === name ? {startLevel: null} : {})}); break;
+        case "addLevel": {
+          const input = $("#projectLevelPath"), path = input.value.trim();
+          if (path && this.projectCommand({cmd: "projectSet", levels: [...p.levels, path]})?.ok) input.value = "";
+          break;
+        }
+        case "settings": {
+          let settings;
+          try { settings = JSON.parse($("#projectSettings").value || "{}"); } catch (error) { this.toast("settings: not JSON - " + error.message); break; }
+          this.projectCommand({cmd: "projectSet", settings});
+          break;
+        }
+        case "save": this.saveProject(); break;
+        case "open": $("#fileProject").click(); break;
+        case "new": this.projectCommand({cmd: "projectNew"}); break;
+      }
+    });
+    body.addEventListener("change", e => {
+      if (e.target.name === "projectStart") this.projectCommand({cmd: "projectSet", startLevel: e.target.value});
+      else if (e.target.id === "projectNameInput") this.projectCommand({cmd: "projectSet", name: e.target.value.trim() || "Untitled"});
+    });
+  }
+  renderProject(p) {
+    if (!p) return;
+    const key = JSON.stringify(p);
+    $("#projectName").textContent = p.name + (p.dirty ? " *" : "");
+    // (not while a field of it is being typed in - a button or a box that has the focus does not hold it back)
+    const typing = document.activeElement?.matches?.('#projectBody textarea, #projectBody input:not([type="radio"]):not([type="checkbox"])');
+    if (key === this.panelKeys.project || typing) return;
+    this.panelKeys.project = key;
+    const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+    const levels = p.levels.map(l => `<div class="prow" data-name="${esc(l)}"><label><input type="radio" name="projectStart" value="${esc(l)}"${l === p.startLevel ? " checked" : ""}> ${esc(l)}</label>
+        <button class="ph icon" data-act="removeLevel" title="Remove from the project" data-icon="close"></button></div>`).join("");
+    const bps = p.blueprints.map(b => `<div class="prow${b.open ? " open" : ""}" data-name="${esc(b.name)}">
+        <button class="ph link" data-act="openBp" title="Edit in the Blueprint editor">${esc(b.name)}</button>
+        <span class="muted">${b.library ? "library" : b.implements ? "implements " + esc(b.implements) : ""}</span>
+        <input class="rename" value="${esc(b.name)}" spellcheck="false" title="New name"><button class="ph" data-act="renameBp">Rename</button>
+        <button class="ph icon" data-act="removeBp" title="Remove" data-icon="close"></button></div>`).join("");
+    $("#projectBody").innerHTML = `
+      <div class="prow"><label>Name <input id="projectNameInput" value="${esc(p.name)}" spellcheck="false"></label>
+        <button class="ph" data-act="new">New</button><button class="ph" data-act="open">Open</button><button class="ph" data-act="save">Save</button></div>
+      <div class="phead">Levels (start level checked)</div>${levels || '<div class="muted">none</div>'}
+      <div class="prow"><input id="projectLevelPath" placeholder="levels/name.klevel" spellcheck="false"><button class="ph" data-act="addLevel">Add</button></div>
+      <div class="phead">Program Blueprints</div>${bps || '<div class="muted">none</div>'}
+      <div class="prow"><input id="projectBpName" placeholder="Name" spellcheck="false"><label><input type="checkbox" id="projectBpLibrary"> library</label>
+        <button class="ph" data-act="addBp">Add</button></div>
+      <div class="phead">Settings</div>
+      <textarea id="projectSettings" rows="4" spellcheck="false">${esc(JSON.stringify(p.settings, null, 1))}</textarea>
+      <div class="prow"><button class="ph" data-act="settings">Apply settings</button></div>`;
+  }
+  async saveProject() {
+    const r = this.engine.command({cmd: "projectSave"});
+    if (!r?.ok) return;
+    try {
+      if (window.showSaveFilePicker) {
+        const h = await window.showSaveFilePicker({suggestedName: r.file, types: [{description: "Kern project", accept: {"application/json": [".kproject"]}}]});
+        const w = await h.createWritable();
+        await w.write(r.text);
+        await w.close();
+      } else {
+        download(r.file, r.text, "application/json");
+      }
+      this.engine.command({cmd: "projectSaved"});
+    } catch (error) {
+      if (error?.name !== "AbortError") this.toast("Saving the project failed: " + error.message);
     }
   }
 

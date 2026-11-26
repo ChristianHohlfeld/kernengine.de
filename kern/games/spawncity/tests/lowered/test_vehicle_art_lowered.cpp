@@ -707,8 +707,8 @@ template <> struct Values<::kern::AlphaMode> { static constexpr long long all[] 
 
 namespace sc {
 SC_TEST(lowered_vehicle_art_cpp) {
-  {  // VehicleArt::make(kern::Renderer &, Part &, const MeshData &, const kern::Material &, bool)  ->  VehicleArt::make(kern::Renderer &, Part &, const MeshData &, const kern::Material &, bool)
-    ::sc::lowered::Tally tally("VehicleArt::make(kern::Renderer &, Part &, const MeshData &, const kern::Material &, bool)");
+  {  // VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)  ->  VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)
+    ::sc::lowered::Tally tally("VehicleArt::make(kern::Renderer &, Part &, const kern::MeshData &, const kern::Material &, bool)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
@@ -721,8 +721,8 @@ SC_TEST(lowered_vehicle_art_cpp) {
       ::sc::lowered::Arg<::sc_old_vehicle_art::sc::VehicleArt::Part &> o1;
       ::sc::lowered::Arg<::sc_new_vehicle_art::sc::VehicleArt::Part &> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
-      ::sc::lowered::Arg<const MeshData &> o2;
-      ::sc::lowered::Arg<const MeshData &> n2;
+      ::sc::lowered::Arg<const kern::MeshData &> o2;
+      ::sc::lowered::Arg<const kern::MeshData &> n2;
       ::sc::lowered::draw_pair(draw, o2, n2);
       ::sc::lowered::Arg<const kern::Material &> o3;
       ::sc::lowered::Arg<const kern::Material &> n3;
@@ -759,16 +759,16 @@ SC_TEST(lowered_vehicle_art_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // VehicleArt::drone(const Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)  ->  VehicleArt::drone(const Mat4 &, const std::array<Vec3, 4> &, const std::array<f32, 4> &, f32, bool, bool)
-    ::sc::lowered::Tally tally("VehicleArt::drone(const Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)");
+  {  // VehicleArt::drone(const kern::Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)  ->  VehicleArt::drone(const kern::Mat4 &, const std::array<Vec3, 4> &, const std::array<f32, 4> &, f32, bool, bool)
+    ::sc::lowered::Tally tally("VehicleArt::drone(const kern::Mat4 &, const Vec3 *, const f32 *, f32, bool, bool)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_vehicle_art::sc::VehicleArt o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
       ::sc_new_vehicle_art::sc::VehicleArt n_self{};
       ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<const Mat4 &> o0;
-      ::sc::lowered::Arg<const Mat4 &> n0;
+      ::sc::lowered::Arg<const kern::Mat4 &> o0;
+      ::sc::lowered::Arg<const kern::Mat4 &> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<std::array<Vec3, 4>> o1;
       ::sc::lowered::Arg<const std::array<Vec3, 4> &> n1;

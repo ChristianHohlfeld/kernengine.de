@@ -56,8 +56,8 @@ Einsprungpunkt muss in `gl.h` **und** im `kern_gl`-Importobjekt von `kern.mjs` e
 
 | Symbol | Bedeutung |
 |---|---|
-| `extern "C" u32 kern_game_extensions(ShaderExtension*** out)` | Ein Spiel im Modul kann seine Shader-Erweiterungen liefern; schwache Standardversion: keine (`src/api/c_api.cpp`). Wird von `kern_renderer_init` abgefragt. |
-| `kern::App* kern_create_app()` | Muss ein Spiel mit `--app` definieren (`include/kern/app/app.h`); `kern_app_start` ruft sie. |
+| `extern "C" int kern_main()` | Der eine Einstieg des Programms, definiert von einem Spiel mit `--app` (`include/kern/app/run.h`); die Plattformschicht ruft ihn einmal vor `kern_app_start`; er gibt die App mit `kern::run`. |
+| `int kern::run(App&, const ProjectSettings& = {})` | Gibt der App-Laufzeit die App und die Einstellungen des Projekts, einmal (ein zweiter Aufruf: 1). `kern::run(const game::Project&)` (`include/kern/game/program.h`): die App des Programms des Projekts. |
 | `extern "C" void kern_set_native_height_sampler(f64 (*)(f64, f64))` | **nur nativ**: ersetzt den Import `terrain_height` (Tests, Werkzeuge). |
 
 ---
@@ -78,7 +78,7 @@ Alle Funktionen wirken auf den prozessweiten Renderer `c_api_renderer()` (genutz
 
 | Funktion | Beschreibung |
 |---|---|
-| `i32 kern_renderer_init(const u32* d)` | Initialisierung aus einem `KERN_ID_*`-Deskriptor; fragt `kern_game_extensions` ab |
+| `i32 kern_renderer_init(const u32* d)` | Initialisierung aus einem `KERN_ID_*`-Deskriptor (ohne Shader-Erweiterungen: die sind einer App) |
 | `void kern_renderer_shutdown()` | Renderer abbauen |
 | `i32 kern_renderer_resize(i32 w, i32 h)` | Größe des Drawing Buffers |
 | `u32 kern_material_key_count()`, `const char* kern_material_key(u32 i)` | Namen der Materialparameter der Erweiterungen |
@@ -228,7 +228,7 @@ Vom Host `kern/web/app.mjs` getrieben ([Kapitel 12](12-eigene-spiele.md)).
 | Funktion | Beschreibung |
 |---|---|
 | `void kern_app_set_args(const char* text, u32 length)` | Startparameter vor dem Start (`k=v&k2=v2`, URL-kodiert) |
-| `i32 kern_app_start(i32 width, i32 height)` | `kern_create_app()`, `configure()`, Renderer-Init, `start()` |
+| `i32 kern_app_start(i32 width, i32 height)` | die App, die `kern_main` gab: ihre Einstellungen (das Profil des Startparameters `profile`), Renderer-Init, `start()` |
 | `i32 kern_app_frame(f64 now_ms, i32 page_hidden)` | ein Frame: `update()` (dt auf 0…0,1 s begrenzt), dann Rendern; 0, wenn das Rendern scheitert |
 | `i32 kern_app_resize(i32 width, i32 height)` | Größe; ruft `resized()` |
 | `void kern_app_key(u32 key, i32 down)` | Taste (`kern::Key`) |

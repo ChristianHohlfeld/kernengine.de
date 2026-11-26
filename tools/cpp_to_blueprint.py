@@ -79,7 +79,10 @@ value: by its constructor (X_new), in the order of the fields, before the constr
 makes of a field itself too, and of the fields of a value inside it -, and it is released where C++ ends
 the value, in the reverse order: at the end of the block of a local variable, where what owns such a value
 (std::unique_ptr, std::optional) gets another one or is reset. The struct's default is the handle 0. The
-one object of a state is made when its Blueprint begins (Begin Play calls its constructor). What C++ does
+one object of a state is made when its Blueprint begins (Begin Play calls its constructor - the one it
+declares, or C++'s own where it declares none: own_maker), before anything else of it: in the order of the fields,
+what C++ makes of them - and a field whose initializer is computed, no constant (`T* p[2] = {&a(), &b()};`, a call),
+starts at zero and is set there (Unit.computed_init) -, then the constructor's body. What C++ does
 with such values that one handle cannot do the same way - a copy, a move or a temporary of one, one handed
 in or given back by value, a list or a map of them changed - waits (Emit.lifetimes).
 
@@ -138,13 +141,26 @@ CPP_WORDS = set("""alignas alignof and and_eq asm auto bitand bitor bool break c
 constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
-Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
+Bool Int Float Vector Text Actor U8 U16 U32 I8 I16 I32 List Fixed Callback callback loop machine entry detached kern""".split())   # (kOwnWords, kern/src/logic/notation.cpp)
 FORMULA_WORDS = set("min max clamp abs sign copysign remainder floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
 NODES = set()
 NODE_SHAPE = re.compile(r"^(n|go|on|it|machine)\d+$")
+
+
+# --engine <header>: the run writes the engine's own libraries (tools/engine_api.py --libraries) - of each header
+# named so, every function and every type a Blueprint can hold, not only what a program calls. The program is
+# then a file that only includes them.
+ENGINE_RUN = [False]
+ENGINE_HEADERS = set()
+ENGINE_HEADERS_DIR = os.path.join(ROOT, "kern", "include", "kern")   # (the engine's headers: their types are Blueprints' only where marked)
+
+
+def engine_only(field):
+    """A field marked KERN_ENGINE_ONLY (kern/core/base.h): the engine's own, no part of a Blueprint's value."""
+    return any(isinstance(c, dict) and c.get("kind") == "AnnotateAttr" for c in field.get("inner", ()))
 
 
 def is_word(name):
@@ -1408,6 +1424,16 @@ def defaulted_maker(d):
             and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
 
 
+def own_maker(d, tree, world):
+    """C++'s own constructor of a state (one the class does not declare - the compiler's, defined where the program
+    makes the one object): what C++ does when it makes the object - the fields' initializers, in their order, then
+    nothing - is a step like a declared constructor's: it runs when the state's Blueprint begins (Begin Play), before
+    anything else of it. (A constant initializer is the variable's default; a computed one - `&getter()`, a call - is
+    set there: Unit.computed_init.)"""
+    return (d.get("kind") == "CXXConstructorDecl" and d.get("isImplicit") and tree.owner.get(d["id"]) in world.states
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)) and any(c.get("kind") == "CompoundStmt" for c in kids(d)))
+
+
 def ends_itself(d):
     """Does this destructor do something of its own: a body with statements (not `= default`, not C++'s)?"""
     if d.get("kind") != "CXXDestructorDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted"):
@@ -1540,6 +1566,7 @@ class Unit:
         self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
         self.lives, self.deciding_life = {}, set()       # the program's classes -> what ends with a value of one (life)
         self.makings, self.deciding_making = {}, set()   # the program's classes -> does C++ make more of one than its defaults (needs_making)
+        self.computed_inits = {}   # field id -> is its in-class initializer computed, no constant (computed_init)
         self.interface = set()      # the constants of its header it holds whether a function uses them or not (interface_constants)
         self.interface_waits = []   # (a constant of its header it cannot hold, why)
         self.class_constants = {}   # (a Blueprint called as its class, a constant of it) -> (its name here, its type)
@@ -1715,7 +1742,7 @@ class Unit:
         """std::pair<A, B>: a struct of its two parts."""
         key = ("pair", a, b)
         if key not in self.structs:
-            name = re.sub(r"\W+", "_", f"{a}_{b}").strip("_") + "_pair"
+            name = re.sub(r"_+", "_", re.sub(r"\W+", "_", f"{a}_{b}")).strip("_") + "_pair"   # (one _ between parts: __ is C++'s own)
             if name in self.type_line:
                 raise Wait(f"two types would be called {name}")
             self.structs[key] = name
@@ -1846,7 +1873,7 @@ class Unit:
             # engine itself - as a value or owned (std::unique_ptr): an object too (Mesh: its Bvh)
             if c.get("kind") == "CXXConstructorDecl" and c.get("explicitlyDeleted") and re.fullmatch(r"\s*\w+\s*\(\s*const\s+[\w:]+\s*&\s*\)\s*", qtype(c)):
                 return True
-            if c.get("kind") == "FieldDecl":
+            if c.get("kind") == "FieldDecl" and not engine_only(c):
                 raw = qtype(c).strip()
                 if not re.search(r"(&|\*\s*(const)?)$", raw) and q not in self.deciding:
                     self.deciding.add(q)
@@ -1855,6 +1882,8 @@ class Unit:
                             return True
                     finally:
                         self.deciding.discard(q)
+        if not self.marked(rec):
+            return False   # (plain data the engine keeps to itself: neither a struct of a Blueprint nor an object - see for_blueprints)
         try:
             self.struct(q)
             return False   # (plain data: a struct of the Blueprint)
@@ -2024,10 +2053,23 @@ class Unit:
         t = self.pointed(qtype(p))
         return [f"List<{t}>", "Int"] if t is not None else [self.place(qtype(p))]
 
+    @staticmethod
+    def marked(o):
+        """Is a type marked for Blueprints - or not one of the engine's headers at all?"""
+        f = os.path.abspath(o.get("_file", "") or "")
+        return not f.startswith(ENGINE_HEADERS_DIR + os.sep) or any(isinstance(c, dict) and c.get("kind") == "AnnotateAttr" for c in o.get("inner", ()))
+
+    def for_blueprints(self, q, o):
+        """A type of the engine is a value of a Blueprint only where its header says so (KERN_BLUEPRINT_TYPE,
+        kern/core/base.h): the engine's other types stay inside it."""
+        if not self.marked(o):
+            raise Wait(f"the engine's type {q.split('::')[-1]}, which is not one for Blueprints (its header does not mark it KERN_BLUEPRINT_TYPE)")
+
     def enum(self, q):
         if q in self.enums:
             return self.enums[q]
         o = self.tree.enums[q]
+        self.for_blueprints(q, o)
         numbered, first = [], {}
         for n, x in enum_numbers(o):
             # a value with the number of an earlier one is that value under another name (`kLast = vehicle`)
@@ -2113,6 +2155,7 @@ class Unit:
                 raise Wait(f"the struct {q.split('::')[-1]} contains itself")
             return self.structs[q]
         o = self.tree.records[q]
+        self.for_blueprints(q, o)
         if o.get("bases"):
             raise Wait(f"the class {q.split('::')[-1]} (a base class)")
         self.structs[q] = None
@@ -2122,6 +2165,8 @@ class Unit:
                 if c.get("kind") in ("CXXMethodDecl", "CXXDestructorDecl") and c.get("virtual"):
                     raise Wait(f"the class {q.split('::')[-1]} (virtual functions)")
                 if c.get("kind") != "FieldDecl":
+                    continue
+                if engine_only(c):   # (KERN_ENGINE_ONLY: the engine's own field - not part of the type as a Blueprint holds it)
                     continue
                 if self.state_pointer(o, c):
                     self.state_pointers.add(c["id"])
@@ -2553,6 +2598,25 @@ class Unit:
         held = self.held_life(raw)
         return self.making(raw) is not None or (held is not None and held[0] in ("owned", "box") and not is_nothing(init))
 
+    def computed_init(self, c):
+        """Is a field's in-class initializer computed - no constant (`T* p[2] = {&a(), &b()};`, a call, another
+        field) and nothing C++ makes itself (made_by_cpp)? Then its variable starts at zero, and the making of the
+        object sets it: a step where the value is made (Emit.made_parts) - for the one object of a state, its
+        constructor, which runs when its Blueprint begins (C++'s own one too, where the program makes the object)."""
+        if c.get("kind") != "FieldDecl" or not c.get("hasInClassInitializer") or not kids(c):
+            return False
+        init = kids(c)[-1]
+        if self.made_by_cpp(qtype(c), init):
+            return False
+        key = c["id"]
+        if key not in self.computed_inits:
+            try:
+                Const(self).literal(init, self.place(qtype(c)))
+                self.computed_inits[key] = False
+            except Wait:
+                self.computed_inits[key] = True
+        return self.computed_inits[key]
+
     def needs_making(self, q):
         """Does C++ make more of a value of the program's class `q` than the struct's defaults - when its
         constructor is C++'s own: an object of the engine it holds, a value of a class with a constructor of its
@@ -2570,7 +2634,7 @@ class Unit:
                     continue
                 init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
                 held = self.held_life(qtype(c))
-                if self.making(qtype(c)) is not None or (init is not None and held is not None and held[0] in ("owned", "box") and not is_nothing(init)):
+                if self.making(qtype(c)) is not None or (init is not None and held is not None and held[0] in ("owned", "box") and not is_nothing(init)) or self.computed_init(c):
                     need = True
                     break
         finally:
@@ -2710,7 +2774,8 @@ class Unit:
         try:
             t = self.place(qtype(c))
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
-            default = Const(self).literal(init, t) if init is not None and not self.made_by_cpp(qtype(c), init) else self.zero(t)
+            computed = init is not None and self.computed_init(c)   # (set where the object is made: its constructor)
+            default = Const(self).literal(init, t) if init is not None and not computed and not self.made_by_cpp(qtype(c), init) else self.zero(t)
         except Wait as w:
             raise Wait(f"the variable {name} of {self.name}: {w}")
         if c.get("mutable"):
@@ -3030,6 +3095,7 @@ class Unit:
         used = set()
         for f in self.order:
             used.update(word.findall(f.text))
+        used |= getattr(self, "engine_types", set())   # (--engine: every type of the header)
         for name, (_, _, lines) in self.externs.items():   # (what a function of an actor's Blueprint looks like: where it is called)
             if name in used:
                 used.update(word.findall(" ".join(lines)))
@@ -3053,6 +3119,12 @@ class Unit:
                 variables += pending + [line]
                 used.update(word.findall(line))
             pending = []
+        # (what the nodes give and keep names types of its own - a place of the engine, `engine_mixer_bus_place<audio_BusSettings>
+        # result = {};`, whose type no function names where it only sets a field of it: the text declares them too, else
+        # the reader does not know the type)
+        members = [line for line in self.members if name_of(line) in used]
+        for line in members:
+            used.update(word.findall(line))
         keep = [False] * len(self.types)
         changed = True
         while changed:   # (a type another kept type is made of is kept too)
@@ -3066,7 +3138,6 @@ class Unit:
             if keep[i]:
                 name = name_of(line)
                 types[name] = (self.type_home[name], line, self.type_parts[name])
-        members = [line for line in self.members if name_of(line) in used]
         externs = ["\n".join(lines) for name, (_, _, lines) in self.externs.items() if name in used]
         return variables, externs + [f.text for f in self.order], members, types
 
@@ -3702,6 +3773,17 @@ class Emit:
             given = next(returns(d), None)
             if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
                 ret = qtype(kids(given)[0]).strip()
+        self.export_gives = None
+        if export_name(d) and re.search(r"\*\s*(?:const\s*)?$", ret):
+            # an export that gives a text, bytes or floats by a pointer: through the place the program keeps them in
+            # (export_given) - every return gives it so, and the function gives what is kept
+            body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+            returns = [x for x in walk(body or {}) if x.get("kind") == "ReturnStmt"]
+            given = [export_given(self.tree, kids(r)[0]) if kids(r) else None for r in returns]
+            if not returns or any(g is None for g in given):
+                raise Wait(f"the export {export_name(d)} gives a pointer not through kern::logic::export_text, export_bytes or export_floats")
+            self.export_gives = {r["id"]: g for r, g in zip(returns, given)}
+            ret = re.sub(r"^const\s+|\s*&$", "", qtype(given[0]).strip())
         f.value = u.place(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
@@ -3719,6 +3801,18 @@ class Emit:
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
             # (what it keeps from one call to the next, or of the file - changed or not: it may be)
+            if not method and not f.mutates:
+                # (a function of its Blueprint that is no method - an export of main - changes the one object where it
+                # sets a field of it, reached through the object's getter: `game().pad.lx = lx`)
+                def written(x):
+                    if x.get("kind") == "CompoundAssignOperator" or (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or \
+                            (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--")):
+                        n = kids(x)[0] if kids(x) else {}
+                        while bare(n).get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(bare(n)):
+                            n = kids(bare(n))[0]
+                        return n is not kids(x)[0] and self.is_this(n)
+                    return False
+                f.mutates = any(written(x) for x in walk(d))
             f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
                 or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
@@ -3771,6 +3865,11 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if exported and getattr(self, "export_gives", None) and p is [x for x in kids(d) if x.get("kind") == "ParmVarDecl"][-1] and \
+                    re.fullmatch(r"unsigned int \*", c_type(p, self.tree.aliases)):
+                # (the place the host gives for the length of the piece an export gives - out_len: the glue's, no input)
+                self.export_len_param = p["id"]
+                continue
             if exported:
                 words += wire_words(p, words, self.tree.aliases)
             if u.is_logic(raw):
@@ -4745,8 +4844,8 @@ class Emit:
                 node, e, how = e, None, "default"
             if how == "default" and c.get("hasInClassInitializer") and kids(c):
                 e, how = kids(c)[-1], "in_class"
-                if made is None and not (held is not None and held[0] in ("owned", "box") and not is_nothing(e)):
-                    continue   # (the struct's default: what the initializer says)
+                if made is None and not (held is not None and held[0] in ("owned", "box") and not is_nothing(e)) and not u.computed_init(c):
+                    continue   # (the struct's default: what the initializer says - a constant)
                 if not own and any(x.get("kind") == "CXXThisExpr" for x in walk(e)):
                     raise Wait(f"the field {c['name']} of a {q.split('::')[-1]} is made of its other fields, inside another value")
             if how == "default" and made is None:
@@ -5446,6 +5545,8 @@ class Emit:
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
+            if c and getattr(self, "export_gives", None) and s.get("id") in self.export_gives:
+                c = [self.export_gives[s["id"]]]   # (what an export gives by a pointer: the value kept - export_given)
             made = [x for scope in self.scopes for x in scope]
             if not made:
                 if not c:
@@ -11430,9 +11531,8 @@ class Emit:
 # ---- the engine as nodes -----------------------------------------------------------------------------
 # Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
-# ... but what of them is the engine's like any other part: the type of node an object is (kern/logic/node_type.h) - a
-# program's class or a Blueprint implements it, the program registers it
-ENGINE_KEEP = ("kern::logic::NodeType", "kern::logic::register_node_type")
+# ... but what of them is the engine's like any other part (none today)
+ENGINE_KEEP = ()
 
 
 def engine_skipped(q):
@@ -15743,9 +15843,35 @@ def wire_out(d, aliases):
         return None
     if t in ("const char *", "const char *const"):
         return "text"
+    if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
+        return "bytes"
+    if re.fullmatch(r"const float \*(?: ?const)?", t):
+        return "floats"
     if t in C_WORDS:
         return C_WORDS[t]
-    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)")
+    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes, floats)")
+
+
+EXPORT_GIVES = {"export_text": "text", "export_bytes": "bytes", "export_floats": "floats"}
+
+
+def export_given(tree, n):
+    """In an exported function: `return kern::logic::export_text<&f>(x, out_len);` (export_bytes, export_floats -
+    kern/logic/blueprint_class.h) gives x as the export's own piece {pointer, length}, the glue of a Blueprint's class
+    as the program's C++ - so the Blueprint's function gives x. The x, or None."""
+    b = bare(n)
+    while b.get("kind") in ("ImplicitCastExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and kids(b):
+        b = bare(kids(b)[0])
+    if b.get("kind") != "CallExpr" or len(kids(b)) != 3:
+        return None
+    ref = callee(b).get("referencedDecl") or {}
+    decl = tree.decl.get(ref.get("id"))
+    if ref.get("name") not in EXPORT_GIVES or (decl is not None and not (decl.get("_file") or "").replace("\\", "/").endswith("kern/logic/blueprint_class.h")):
+        return None
+    x = bare(kids(b)[1])
+    while x.get("kind") in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ExprWithCleanups") and kids(x):
+        x = bare(kids(x)[0])
+    return x
 
 
 def gives_kept(d):
@@ -15925,7 +16051,7 @@ def convert_unit(job):
         # the functions of its header that need the source file), then the source file's
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                and not ((d.get("isImplicit") and not own_maker(d, tree, world)) or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
@@ -15953,6 +16079,21 @@ def convert_unit(job):
             for f in unit.functions.values():   # (and what those call of it)
                 if f not in unit.all and not f.lifted and f.decl["id"] in unit.function_names:
                     unit.all.append(f)
+            if ENGINE_RUN[0]:   # (a library of the engine has every type its header declares that a Blueprint can hold - not only those its functions name)
+                own = {os.path.abspath(f) for f in files} & ENGINE_HEADERS
+                unit.engine_types = set()
+                for q in sorted(tree.enums):
+                    if os.path.abspath(tree.enums[q].get("_file", "")) in own and not tree.enums[q].get("_local"):
+                        try:
+                            unit.engine_types.add(unit.enum(q))
+                        except Wait:
+                            pass
+                for q in sorted(tree.records):
+                    if os.path.abspath(tree.records[q].get("_file", "")) in own and not tree.records[q].get("_local"):
+                        try:
+                            unit.engine_types.add(unit.struct(q))
+                        except Wait:
+                            pass
             held = (unit.names - world.taken) | set(unit.type_line)
             clash = {n for f in unit.order for n in getattr(f, "local_names", ()) if n in held}
             if clash - reserved:
@@ -16042,6 +16183,10 @@ def apply_to_level(level, folder, blueprints, prune=False):
     """Writes the Blueprints into the level: each is the Blueprint of the actor of its name (made when
     the level has none), read from its text by the engine's own reader - in the order given: a library
     before the Blueprints that use it. All of them, or nothing."""
+    if not ENGINE_RUN[0]:
+        # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
+        # engine has, written by tools/engine_api.py --libraries; a level holds none of them)
+        blueprints = [(name, text) for name, text in blueprints if not name.startswith("engine_")]
     raw = open(level, encoding="utf-8").read()
     doc = json.loads(raw)
     names = {a["name"]: a for a in doc["actors"]}
@@ -16216,6 +16361,11 @@ def main(argv):
                 more.append((d, spaces.split(",")))
             else: texts = v
             i += 2
+        elif opts[i] == "--engine":
+            ENGINE_RUN[0] = True
+            ENGINE_HEADERS.add(os.path.abspath(opts[i + 1]))
+            os.environ["KERN_ENGINE_LIBRARIES"] = "off"   # (tools/blueprint_cpp: the level holds the engine's new libraries, not the built ones)
+            i += 2
         else:
             flags.append(opts[i])
             i += 1
@@ -16388,7 +16538,7 @@ def main(argv):
     program = {world.unit_of(f["file"]) for f in functions.values() if world.program(f["file"])} | set(sources) | set(world.parts)
     # of the Blueprints that are not the program's own (headers of the engine): what the program calls
     wanted = collections.defaultdict(set)
-    todo, seen = [k for k, f in functions.items() if world.program(f["file"])], set()
+    todo, seen = [k for k, f in functions.items() if world.program(f["file"]) or os.path.abspath(f["file"]) in ENGINE_HEADERS], set()
     while todo:
         k = todo.pop()
         if k in seen:
@@ -16405,6 +16555,8 @@ def main(argv):
             unit_files[unit_of[k]].add(functions[k]["file"])
     for u, path in sources.items():
         unit_files[u].add(path)
+    for h in sorted(ENGINE_HEADERS):   # (--engine: a library of the engine also where the header has types only)
+        unit_files[world.unit_of(h)].add(h)
     for p, u in part_of.items():   # (a part is converted in the tree of its file)
         unit_files[p] |= {sources[u]} if u in sources else set()
     for u in set(sources) - set(unit_of.values()):   # (a source file all of whose functions stand in parts has no Blueprint of its own)
@@ -16722,6 +16874,12 @@ def main(argv):
         if home is not None:
             return home
         below = components(name)
+        if not below and ENGINE_RUN[0]:   # (the engine uses no library of a level: a shape of its own stands in the lowest library of the engine that names it)
+            users = sorted(u for u in blue if name in blue[u]["types"])
+            if users:
+                return min(users, key=lambda h: (depth_of(h), h))
+        if not ENGINE_RUN[0]:   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
+            below = {h for h in below if not h.startswith("engine_")}
         return max(below, key=lambda h: (depth_of(h), h)) if below else SHAPES
     homes = collections.defaultdict(list)
     for name in declared:

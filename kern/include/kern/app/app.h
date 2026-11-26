@@ -6,9 +6,12 @@
 //     bool start(kern::Engine& engine) override { ...create meshes... }
 //     void update(kern::Engine& engine, const kern::Frame& frame) override { ...move things... }
 //   };
-//   kern::App* kern_create_app() { static MyGame game; return &game; }
+//   int kern_main() { static MyGame game; return kern::run(game); }
 //
-// update() runs once per display frame; the engine renders right after it.
+// kern_main() is the program's one entry (kern/app/run.h, kern/docs/project.md 4.): the platform layer calls it once,
+// before the app starts; it hands the engine the App (kern::run - or kern::run(project) of kern/game/program.h for a
+// game whose App is a Blueprint of its project). update() runs once per display frame; the engine renders right
+// after it.
 #pragma once
 
 #include <string>
@@ -20,7 +23,7 @@
 namespace kern {
 
 /// Keyboard keys (KeyboardEvent.code order in kern/web/app.mjs KEY_CODES).
-enum class Key : u8 {
+enum class KERN_BLUEPRINT_TYPE Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
   digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
@@ -30,7 +33,7 @@ enum class Key : u8 {
 
 constexpr u32 kMaxTouches = 10;
 
-struct Touch {
+struct KERN_BLUEPRINT_TYPE Touch {
   i32 id = -1;  // < 0: slot unused
   Vec2 start, position, previous;
 };
@@ -71,7 +74,7 @@ class Input {
   bool focused_ = true;
 };
 
-struct Frame {
+struct KERN_BLUEPRINT_TYPE Frame {
   f64 time = 0;   // seconds since start
   f32 dt = 0;     // seconds since the previous frame (clamped to 0.1)
   u64 index = 0;
@@ -183,8 +186,6 @@ class Engine {
 class App {
  public:
   virtual ~App() = default;
-  /// Renderer configuration, asked once before start().
-  virtual RendererOptions configure() { return {}; }
   /// Shader extensions the game uses (must outlive the app).
   virtual Span<ShaderExtension* const> extensions() { return {}; }
   virtual bool start(Engine& engine) = 0;
@@ -194,6 +195,3 @@ class App {
 };
 
 }  // namespace kern
-
-/// Implemented by the game: returns its App instance (called once).
-kern::App* kern_create_app();

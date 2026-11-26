@@ -44,6 +44,7 @@
 // <out.cpp> and <out.h> are only rewritten when they change, so nothing recompiles for an unchanged level.
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -53,6 +54,7 @@
 
 #include "kern/core/json.h"
 #include "kern/game/logic_nodes.h"
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 
 using namespace kern;
@@ -117,7 +119,7 @@ int apply_one(json::Value& doc, const char* level_path, const std::string& actor
   }
   logic::Graph before, g;
   std::string error;
-  if (held->is_object() && held->find("nodes")) logic::graph_from_json(*held, before, &error);
+  if (held->is_object() && held->find("nodes")) logic::graph_from_level_json(*held, before, &error);
   // (the libraries the text names: the Blueprints of the level's other actors, by their names)
   std::map<std::string, std::unique_ptr<logic::Graph>> others;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
@@ -129,7 +131,7 @@ int apply_one(json::Value& doc, const char* level_path, const std::string& actor
         const json::Value* logic = a["components"].find("logic");
         if (a["name"].as_string() != name || !logic || !logic->is_object()) continue;
         found = std::make_unique<logic::Graph>();
-        if (!logic::graph_from_json(*logic, *found)) found.reset();
+        if (!logic::graph_from_level_json(*logic, *found)) found.reset();
         break;
       }
     return (others[std::string(name)] = std::move(found)).get();
@@ -150,7 +152,7 @@ int apply_one(json::Value& doc, const char* level_path, const std::string& actor
     errors += i.error ? 1 : 0;
   }
   if (errors) return 1;
-  *held = logic::graph_to_json(g);
+  *held = logic::graph_to_level_json(g);
   std::printf("%s: the Blueprint of %s is %s (%zu nodes, %zu functions)\n", level_path, actor.c_str(), text_path, g.nodes.size(), g.functions.size());
   return 0;
 }
@@ -182,6 +184,8 @@ int apply(const char* level_path, int count, char** pairs) {
 
 int main(int argc, char** argv) {
   (void)game::logic_node_shapes_registered();  // the gameplay nodes, as the library knows them
+  // (the run that writes the engine's libraries: its level holds the new ones - kern/logic/engine_libraries.h)
+  if (const char* off = std::getenv("KERN_ENGINE_LIBRARIES"); off && std::string(off) == "off") logic::engine_libraries_off();
   if (argc >= 5 && argc % 2 == 1 && std::string(argv[1]) == "--apply") return apply(argv[2], argc - 3, argv + 3);
   if (argc == 2 && std::string(argv[1]) == "--node-names") {
     // (the names the nodes have in a Blueprint's C++ - math_add, list_get ...: nothing else of a Blueprint is called so)
@@ -278,13 +282,47 @@ int main(int argc, char** argv) {
     h.owner = owner;
     h.name = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
     std::string error;
-    if (!logic::graph_from_json(*json, h.g, &error)) {
+    if (!logic::graph_from_level_json(*json, h.g, &error)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
     if (h.g.empty()) continue;
     logic::cpp_names(h.g);  // (as the level loader does for levels from before names had to be C++ names)
     held.push_back(std::move(h));
+  }
+  // The engine's libraries are the engine's (kern/logic/engine_libraries.h): no actor of a level is one, a library
+  // of the engine a Blueprint uses is there without an actor (its class written from the engine's graph: the fields
+  // bind as the engine's header declares them), and each Blueprint is given what it uses of them - as the level loader does.
+  {
+    for (const Held& h : held)
+      if (h.owner != "the level" && logic::is_engine_library(h.name)) {
+        std::fprintf(stderr, "%s: the Blueprint of %s is called like the engine's library %s - the engine's libraries are the engine's, a level does not hold them\n",
+                     argv[1], h.owner.c_str(), h.name.c_str());
+        return 1;
+      }
+    for (std::size_t k = 0; k < held.size(); ++k) {
+      const std::vector<std::string> uses = held[k].g.uses;
+      for (const std::string& used : uses)
+        if (logic::is_engine_library(used) && std::none_of(held.begin(), held.end(), [&](const Held& o) { return o.owner != "the level" && o.name == used; })) {
+          Held e;
+          e.owner = "actor \"" + used + "\"";
+          e.name = used;
+          e.g = *logic::engine_library(used);
+          held.push_back(std::move(e));
+        }
+    }
+    const logic::Blueprints project = [&](std::string_view name) -> const logic::Graph* {
+      for (const Held& h : held)
+        if (h.owner != "the level" && h.name == name) return &h.g;
+      return nullptr;
+    };
+    for (Held& h : held) {
+      std::string why;
+      if (!logic::is_engine_library(h.name) && !logic::hold_engine(h.g, project, &why)) {
+        std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], h.owner.c_str(), why.c_str());
+        return 1;
+      }
+    }
   }
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     for (const Held& h : held)
@@ -423,7 +461,7 @@ int main(int argc, char** argv) {
                             "\n// (its class: " + piece + "). Change the Blueprint in the level; the build writes this file again.\n"
                             "#include \"kern/logic/blueprint.h\"\n#include \"kern/logic/blueprint_class.h\"  // (the exports of Blueprints: KERN_EXPORT_AS)\n"
                             "#include \"" + piece + "\"\n\n" + std::string("namespace ") + space + " {\n\n" + glue + "\n}  // namespace " + space + "\n\n"
-                            "// (how blueprints::bind binds it)\nnamespace blueprints {\nbool bind_" + space + "(kern::logic::Runtime& logic) { return kern::logic::bind_blueprint<::" + space + "::" + cls + ">(logic); }\n}  // namespace blueprints\n"});
+                            "// (how blueprints::bind binds it)\nnamespace blueprints {\nbool bind_" + space + "(kern::logic::Runtime& logic) { return kern::logic::bind_blueprint<::" + space + "::" + cls + ">(logic, \"" + cls + "\"); }\n}  // namespace blueprints\n"});
       binds.push_back(space);
       out += " (its class: " + piece + ", its glue: " + glue_stem.substr(glue_stem.find_last_of("/\\") + 1) + "_" + space + ".cpp)\n";
     } else {

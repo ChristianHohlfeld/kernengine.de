@@ -2,20 +2,21 @@
 // (BLUEPRINTS.md, "Absenkung"): the old text and the new, each in a namespace of its own, compiled as the game compiles them;
 // every function the lowering changed is called in both with the same drawn state and arguments, and what they give and leave
 // must be the same, bit for bit (../source_diff.h). The old text sees the game as it stood at the base: the old program,
-// built by run_tests.sh in the namespace sc_base_fb6cf4c28186 - the engine and the level's Blueprints as they stand.
-// base: fb6cf4c2818626a533004e3c5b8fe53766e14162
+// built by run_tests.sh in the namespace sc_base_0f319a5811f6 - the engine and the level's Blueprints as they stand.
+// base: 0f319a5811f6ba001eac0b670b07914182505949
 #include "../source_diff.h"
 #include "kern/gfx/shader.h"
 #include "kern/gfx/program.h"
+#include "kern/gfx/renderer.h"
 #define private public
 #define protected public
-#define sc sc_base_fb6cf4c28186
-#include "sc_base_fb6cf4c28186/common.h"
+#define sc sc_base_0f319a5811f6
+#include "sc_base_0f319a5811f6/common.h"
 #undef sc
 #include "common.h"
 
-namespace sc_base_fb6cf4c28186 {}
-namespace sc_old_facades::sc { using namespace ::sc_base_fb6cf4c28186; }
+namespace sc_base_0f319a5811f6 {}
+namespace sc_old_facades::sc { using namespace ::sc_base_0f319a5811f6; }
 namespace sc_new_facades::sc { using namespace ::sc; }
 
 #pragma GCC diagnostic push
@@ -38,17 +39,19 @@ namespace sc_old_facades {
 
 namespace sc {
 
-class Facades final : public kern::ShaderExtension {
+// Plain state with the functions of a shader extension: the renderer gets it as
+// LookExtension<Facades> (shader_look.h).
+class Facades final {
  public:
   f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
-  const char* name() const override { return "spawncity-facades"; }
-  kern::Span<const kern::ExtensionAttribute> attributes() const override;
-  const char* vertex_declarations() const override;
-  const char* vertex() const override;
-  const char* fragment_declarations() const override;
-  const char* fragment_surface() const override;
-  void bind(const kern::Program& p) override;
-  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) override;
+  const char* name() const { return "spawncity-facades"; }
+  kern::Span<const kern::ExtensionAttribute> attributes() const;
+  const char* vertex_declarations() const;
+  const char* vertex() const;
+  const char* fragment_declarations() const;
+  const char* fragment_surface() const;
+  void bind(const kern::Program& p);
+  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&);
 
  private:
   u32 u_night_ = 0;
@@ -58,6 +61,7 @@ class Facades final : public kern::ShaderExtension {
 
 // ---- facades.cpp, as it stood before ----
 // The original's facade shader on Kern's standard surface shader (see facades.h).
+
 
 
 
@@ -165,28 +169,33 @@ namespace sc_new_facades {
 
 namespace sc {
 
-// Plain state with the functions of a shader extension: the renderer gets it as
-// LookExtension<Facades> (shader_look.h).
-class Facades final {
+// The shader extension the renderer is given (main.cpp, SpawnCityApp::extensions): one object, the state of its
+// Blueprint, which implements kern::ShaderExtension (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+class Facades final : public kern::ShaderExtension {
  public:
-  f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
-  const char* name() const { return "spawncity-facades"; }
-  kern::Span<const kern::ExtensionAttribute> attributes() const;
-  const char* vertex_declarations() const;
-  const char* vertex() const;
-  const char* fragment_declarations() const;
-  const char* fragment_surface() const;
-  void bind(const kern::Program& p);
-  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&);
+  f32 night = 0;  // 0 day .. 1 night (game_look.cpp: set_night)
+  const char* name() const override { return "spawncity-facades"; }
+  kern::Span<const kern::ExtensionAttribute> attributes() const override;
+  const char* vertex_declarations() const override;
+  const char* vertex() const override;
+  const char* fragment_declarations() const override;
+  const char* fragment_surface() const override;
+  void bind(const kern::Program& p) override;
+  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) override;
+  void set_night(f32 n) { night = n; }
 
  private:
   u32 u_night_ = 0;
 };
 
+/// Its one object.
+Facades& facades();
+
 }  // namespace sc
 
 // ---- facades.cpp, as it stands ----
 // The original's facade shader on Kern's standard surface shader (see facades.h).
+
 
 
 
@@ -272,6 +281,11 @@ const char* Facades::fragment_surface() const {
 
 void Facades::bind(const kern::Program& p) { u_night_ = p.location("uNight"); }
 void Facades::frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) { cache.set_float(u_night_, night); }
+
+Facades& facades() {
+  static Facades one;
+  return one;
+}
 
 }  // namespace sc
 

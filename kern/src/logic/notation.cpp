@@ -17,6 +17,7 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/nodes.h"
@@ -2290,9 +2291,17 @@ struct Reader {
   const Graph* before = nullptr;  // apply_cpp: the Blueprint this text changes
 
   const Blueprints* all = nullptr;  // the Blueprints of the project: where the libraries the text names are found
+  bool project_given = false;       // (the project's Blueprints were given - not only the engine's libraries)
   Reader(std::string_view t, const Library& l, const Blueprints* blueprints = nullptr) : text(t), lib(l), all(blueprints) {}
 
   // ---- tokens ----
+  /// Where the reader stands: for the one case it gives up without having said why (a mistake of the reader - the
+  /// text's author at least learns where).
+  std::string where() const {
+    if (toks.empty()) return "its first character";
+    const Tok& t = toks[std::min(p, toks.size() - 1)];
+    return "line " + std::to_string(t.line) + ", column " + std::to_string(t.col);
+  }
   bool fail(std::size_t tok, const std::string& why) {
     if (error.empty()) {
       const Tok& t = toks[std::min(tok, toks.size() - 1)];
@@ -2804,7 +2813,12 @@ struct Reader {
       std::string field;
       if (const Tok& w = peek(); places && w.kind == Tok::id && w.s.size() > 6 && w.s.ends_with("_place") && is("<", 1)) {
         p += 2;
-        if (!type_here(t) || !expect(">") || !word(field, "the name") || !expect("=") || !expect("{") || !expect("}") || !expect(";")) return false;
+        // (the type of the place: one the Blueprint knows - a struct or an enum of the engine is declared by the
+        // library of the engine it uses, KERN_STRUCT(audio_BusSettings) {...} - else the reader says so)
+        if (!type_here(t) && !failed())
+          return fail(p, what + ": " + w.s + "<...> is the place of a node of the engine, of a type: " + kTypes + shown(peek()) +
+                             (peek().kind == Tok::id ? " (a struct or an enum the engine's place is of is declared by the Blueprint or a library it uses)" : ""));
+        if (failed() || !expect(">") || !word(field, "the name") || !expect("=") || !expect("{") || !expect("}") || !expect(";")) return false;
         out.push_back({field, t});
         places->resize(out.size());
         places->back() = w.s.substr(0, w.s.size() - 6);
@@ -3295,7 +3309,8 @@ struct Reader {
           if (!(is("struct") && (is("{", 1) || is(":", 1)))) break;
           ++p;
           if (accept(":") && !node_base(d.memory, base)) return false;
-          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+          // (a place of the engine the node binds - engine_mixer_bus_place<audio_BusSettings> result = {}; - as among the members)
+          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives", &d.places) || !member_name(std::move(d), base)) return false;
         }
       }
       it.open = p;
@@ -4738,7 +4753,9 @@ struct Reader {
     if (g.uses.empty()) return true;
     // What the text may name of its libraries: their types, and every function of theirs.
     std::string why;
-    if (!all || !*all) return fail(base, "the text uses the library " + g.uses[0] + ": reading it needs the project's Blueprints (as a C++ compiler needs the library's text)");
+    for (const std::string& used : g.uses)  // (the engine's own libraries every reader has: kern/logic/engine_libraries.h)
+      if (!project_given && !is_engine_library(used))
+        return fail(base, "the text uses the library " + used + ": reading it needs the project's Blueprints (as a C++ compiler needs the library's text)");
     if (!take_libraries(g, *all, &why, true)) return fail(base, why);
     // A name of a library is written with it - Random::range(...), Random::rangeResult n5; -: one name.
     std::vector<Tok> merged;
@@ -5577,11 +5594,13 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
                   "  " + name + " self;\n" +
                   running +
-                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on this object - the\n"
-                             "  // instance that started last as this class)\n"
-                             "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; kern::logic::blueprint_object<" + name + "> = &self; }\n"
-                             "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::blueprint_object<" + name + "> = nullptr; }\n"
-                           : "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n") +
+                  "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n" +
+                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on the object the program\n"
+                             "  // bound - kern::logic::bind_blueprint, said once, never the instance that happened to start)\n" : "") +
+                  "  // (an object the program bound and that ends is bound no more: kern/logic/blueprint_class.h)\n"
+                  "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::unbind_blueprint<" + name + ">(); }\n" +
+                  (exports ? "  bool bind_exports() override { return kern::logic::bind_blueprint_object<" + name + ">(self, \"" + name + "\"); }\n"
+                             "  void unbind_exports() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::unbind_blueprint<" + name + ">(); }\n" : "") +
                   "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
@@ -5689,16 +5708,18 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
       else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
     }
-    // (a list that goes out - bytes, floats: a pointer to its entries in the C type, kept until that export gives the next; none when it is empty)
+    // (a text or a list that goes out - bytes, floats: a piece {pointer, length}; the pointer is returned, the length
+    // written where the host says - a last C parameter out_len -, both of the export's own place: kern/logic/blueprint_class.h)
     const bool listed = out_word == "bytes" || out_word == "floats";
+    const bool piece = listed || out_word == "text";
+    if (piece) params += std::string(params.empty() ? "" : ", ") + "kern::u32* out_len";
     const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : out_word == "bytes" ? "const kern::u8*" : out_word == "floats" ? "const kern::f32*" : "kern::" + out_word;
-    const std::string none = out_word.empty() ? "return;" : out_word == "text" ? "return \"\";" : listed ? "return nullptr;" : "return 0;";
+    const std::string none = out_word.empty() ? "return;" : piece ? std::string("{ if (out_len) *out_len = 0; return ") + (out_word == "text" ? "\"\"" : "nullptr") + "; }" : "return 0;";
     s += "KERN_EXPORT(" + f.exported + ") " + ret + " " + f.exported + "(" + params + ") {\n"
          "  " + name + "* const object = kern::logic::blueprint_object<" + name + ">;\n"
-         "  if (!object) " + none + "\n";
+         "  if (!object) { kern::logic::export_unbound(\"" + f.exported + "\"); " + none + " }\n";
     if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
-    else if (out_word == "text") s += "  return kern::logic::export_text_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
-    else if (listed) s += std::string("  static std::vector<") + (out_word == "bytes" ? "kern::u8" : "kern::f32") + "> held;\n  return kern::logic::export_" + out_word + "_out(held, object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    else if (piece) s += "  return kern::logic::export_" + out_word + "_out<&" + f.exported + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ", out_len);\n";
     else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
     s += "}\n";
   }
@@ -5725,10 +5746,12 @@ bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::stri
   return true;
 }
 
-bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& all) {
+bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& project) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
+  r.project_given = static_cast<bool>(project);
   if (!r.read()) {
-    if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;
+    if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
     return false;
   }
   out = std::move(r.g);
@@ -5736,11 +5759,13 @@ bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string*
   return true;
 }
 
-bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& all) {
+bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& project) {
+  const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
+  r.project_given = static_cast<bool>(project);
   r.before = &before;
   if (!r.read()) {
-    if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;
+    if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
     return false;
   }
   out = std::move(r.g);

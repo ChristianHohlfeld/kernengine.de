@@ -968,8 +968,8 @@ SC_TEST(lowered_world_traffic_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // TrafficRules::light(const Junction &, Vec2, f32)  ->  TrafficRules::light(const Junction &, Vec2, f32)
-    ::sc::lowered::Tally tally("TrafficRules::light(const Junction &, Vec2, f32)");
+  {  // TrafficRules::light(const Junction &, kern::Vec2, f32)  ->  TrafficRules::light(const Junction &, kern::Vec2, f32)
+    ::sc::lowered::Tally tally("TrafficRules::light(const Junction &, kern::Vec2, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
@@ -981,8 +981,8 @@ SC_TEST(lowered_world_traffic_cpp) {
       ::sc::lowered::Arg<const ::sc_old_world_traffic::sc::TrafficRules::Junction &> o0;
       ::sc::lowered::Arg<const ::sc_new_world_traffic::sc::TrafficRules::Junction &> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec2> o1;
-      ::sc::lowered::Arg<Vec2> n1;
+      ::sc::lowered::Arg<kern::Vec2> o1;
+      ::sc::lowered::Arg<kern::Vec2> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
       ::sc::lowered::Arg<f32> o2;
       ::sc::lowered::Arg<f32> n2;
@@ -1001,8 +1001,8 @@ SC_TEST(lowered_world_traffic_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // TrafficRules::gap_speed(i32, Vec2, Vec2, bool, const std::vector<Vehicle> &, i32 *)  ->  TrafficRules::gap_speed(i32, Vec2, Vec2, bool, const std::vector<Vehicle> &, i32 &)
-    ::sc::lowered::Tally tally("TrafficRules::gap_speed(i32, Vec2, Vec2, bool, const std::vector<Vehicle> &, i32 *)");
+  {  // TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 *)  ->  TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 &)
+    ::sc::lowered::Tally tally("TrafficRules::gap_speed(i32, kern::Vec2, kern::Vec2, bool, const std::vector<Vehicle> &, i32 *)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
@@ -1012,11 +1012,11 @@ SC_TEST(lowered_world_traffic_cpp) {
       ::sc::lowered::Arg<i32> o0;
       ::sc::lowered::Arg<i32> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec2> o1;
-      ::sc::lowered::Arg<Vec2> n1;
+      ::sc::lowered::Arg<kern::Vec2> o1;
+      ::sc::lowered::Arg<kern::Vec2> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
-      ::sc::lowered::Arg<Vec2> o2;
-      ::sc::lowered::Arg<Vec2> n2;
+      ::sc::lowered::Arg<kern::Vec2> o2;
+      ::sc::lowered::Arg<kern::Vec2> n2;
       ::sc::lowered::draw_pair(draw, o2, n2);
       ::sc::lowered::Arg<bool> o3;
       ::sc::lowered::Arg<bool> n3;
@@ -1042,8 +1042,8 @@ SC_TEST(lowered_world_traffic_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // TrafficRules::limit(i32, Vec2, Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, Vec2, bool, View &)  ->  TrafficRules::limit(i32, Vec2, Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, Vec2, bool, View &)
-    ::sc::lowered::Tally tally("TrafficRules::limit(i32, Vec2, Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, Vec2, bool, View &)");
+  {  // TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)  ->  TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)
+    ::sc::lowered::Tally tally("TrafficRules::limit(i32, kern::Vec2, kern::Vec2, f32, bool, f32, const std::vector<Vec3> &, const std::vector<Vec2> &, kern::Vec2, bool, View &)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw(draw, ::sc_old_world_traffic::sc::g_laws);
@@ -1055,11 +1055,11 @@ SC_TEST(lowered_world_traffic_cpp) {
       ::sc::lowered::Arg<i32> o0;
       ::sc::lowered::Arg<i32> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec2> o1;
-      ::sc::lowered::Arg<Vec2> n1;
+      ::sc::lowered::Arg<kern::Vec2> o1;
+      ::sc::lowered::Arg<kern::Vec2> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
-      ::sc::lowered::Arg<Vec2> o2;
-      ::sc::lowered::Arg<Vec2> n2;
+      ::sc::lowered::Arg<kern::Vec2> o2;
+      ::sc::lowered::Arg<kern::Vec2> n2;
       ::sc::lowered::draw_pair(draw, o2, n2);
       ::sc::lowered::Arg<f32> o3;
       ::sc::lowered::Arg<f32> n3;
@@ -1076,8 +1076,8 @@ SC_TEST(lowered_world_traffic_cpp) {
       ::sc::lowered::Arg<const std::vector<Vec2> &> o7;
       ::sc::lowered::Arg<const std::vector<Vec2> &> n7;
       ::sc::lowered::draw_pair(draw, o7, n7);
-      ::sc::lowered::Arg<Vec2> o8;
-      ::sc::lowered::Arg<Vec2> n8;
+      ::sc::lowered::Arg<kern::Vec2> o8;
+      ::sc::lowered::Arg<kern::Vec2> n8;
       ::sc::lowered::draw_pair(draw, o8, n8);
       ::sc::lowered::Arg<bool> o9;
       ::sc::lowered::Arg<bool> n9;

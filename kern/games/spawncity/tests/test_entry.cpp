@@ -1,10 +1,8 @@
-// The entry: where the game's fixed step runs in the level's logic (BLUEPRINTS.md, "5 - Umschalten").
-// The game registers a type of node that an object is (game.cpp register_node: FixedStepNode, a kern::logic::NodeType,
-// "spawncity.fixed_step", event logic.tick) and build_level adds one node of it to the level's graph of the world. Runtime::fire
-// runs a tick's handlers instance by instance - the level's graph first, then the actors in their order - and within one by
-// node id: so fixed_step runs first in every tick. It stays so while the level file has no graph of its own and no actor
-// before Game handles logic.tick: this test holds that (also when Game's Blueprint lives in the program's logic runtime,
-// not in the world - the node stays in the world's level graph).
+// The entry: where the game's fixed step runs (BLUEPRINTS.md, "5 - Umschalten"). The game gives its world a FixedStep
+// (game.cpp take_fixed_step: FixedStepper, kern/game/runtime.h): the world runs it in every fixed step after the physics
+// step and before the Blueprints' Event Tick - a place of the engine, not a node that has to stand first. So the level
+// file holds no graph of its own, and no node of a type the engine does not know (the old node type of the fixed step,
+// a node of an engine function that is gone): this test holds that.
 #include <string>
 
 #include "kern/game/level.h"
@@ -12,29 +10,21 @@
 #include "rules.h"
 #include "test_util.h"
 
-SC_TEST(entry_fixed_step_first) {
+SC_TEST(entry_fixed_step_of_the_world) {
   kern::game::Level l;
   std::string error;
   SC_CHECK(kern::game::from_text(sc::rules::level_text(), l, &error), "the level file reads: %s", error.c_str());
-  // (the level's own graph is the game's: build_level puts the one node there - the file has none)
-  SC_CHECK(l.logic.empty(), "the level file has no graph of its own (build_level adds the fixed step's node)");
+  SC_CHECK(l.logic.empty(), "the level file has no graph of its own (the fixed step is the world's)");
   const kern::logic::Library& lib = kern::logic::library();
-  std::size_t game = l.actors.size(), before = 0;
-  for (std::size_t i = 0; i < l.actors.size(); ++i)
-    if (l.actors[i].name == "Game") { game = i; break; }
-  SC_CHECK(game < l.actors.size(), "the level has the Blueprint Game");
-  std::string ticking;
-  for (std::size_t i = 0; i < game && i < l.actors.size(); ++i) {
-    const kern::game::Actor& a = l.actors[i];
+  std::size_t unknown = 0;
+  std::string which;
+  for (const kern::game::Actor& a : l.actors) {
     if (!a.logic) continue;
-    for (const kern::logic::Node& n : a.logic->nodes) {
-      const kern::logic::NodeDef* d = lib.find(n.type);
-      if (d && d->event == "logic.tick") {
-        ++before;
-        ticking = a.name + " (" + n.type + ")";
+    for (const kern::logic::Node& n : a.logic->nodes)
+      if (!lib.find(n.type)) {
+        ++unknown;
+        which = a.name + " (" + n.type + ")";
       }
-    }
   }
-  SC_CHECK(before == 0, "no actor before Game handles logic.tick (%zu, e.g. %s): its Event Tick runs where the level's node runs today",
-           before, ticking.c_str());
+  SC_CHECK(unknown == 0, "every node of the level's Blueprints is of a type the engine knows (%zu are not, e.g. %s)", unknown, which.c_str());
 }
