@@ -1841,6 +1841,9 @@ class Unit:
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
+        named = t[len(self.tree.namespace) + 2:] if self.tree.namespace and t.startswith(self.tree.namespace + "::") else None
+        if named is not None and (named in self.tree.records or named in self.tree.enums):
+            return named   # (a name the compiler writes in full - <program>::LookState::Blast: that one, from wherever it is read)
         if self.lookup_scope and not t.startswith("::"):
             # (as C++ looks a name up from where it is written: the innermost namespace or class around it that
             # has it first - `Mode` in a method of Jet is Jet::Mode, also where the program has a Mode of its own)
@@ -15796,16 +15799,27 @@ class TestWriter:
         system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
         if self.pointed:
             system.append("#include <cstdint>")
-        for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', src, re.M):
-            if m.group(1) == "<":
-                if f"#include <{m.group(2)}>" not in system:
-                    system.append(f"#include <{m.group(2)}>")
-            elif m.group(2).startswith("kern/"):
-                own.append(f'#include "{m.group(2)}"')
-            elif CLASSES[0] and m.group(2) == os.path.basename(CLASSES[0]):
-                own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
-            else:
-                own.append(f'#include "{self.source_dir}/{m.group(2)}"')
+        # what the source includes - and what each file includes whose pieces the test holds (G.foreign: a piece of
+        # another file of the program names what its own file includes - a class of the engine it derives from, a
+        # header of the program the source does not include): a piece stands in the test with the headers of its file
+        there = sorted({place[0] for place, piece in G.foreign.items() if isinstance(place, tuple) and place and isinstance(place[0], str)
+                        and piece.get("kind") != "engine" and os.path.abspath(place[0]) != os.path.abspath(self.path) and self.u.world.program(place[0])})
+        for file, text in [(self.path, src), *((f, self.tree.text(f)) for f in there)]:
+            rel = os.path.relpath(os.path.dirname(os.path.abspath(file)), os.path.dirname(os.path.abspath(self.path)))
+            for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', text, re.M):
+                if m.group(1) == "<":
+                    line = f"#include <{m.group(2)}>"
+                    if line not in system:
+                        system.append(line)
+                    continue
+                if m.group(2).startswith("kern/"):
+                    line = f'#include "{m.group(2)}"'
+                elif CLASSES[0] and m.group(2) == os.path.basename(CLASSES[0]):
+                    line = f'#include "{m.group(2)}"'   # (the build's header of the Blueprints' classes: by its name, on the include path)
+                else:
+                    line = f'#include "{self.source_dir}/{m.group(2) if rel == "." else os.path.normpath(os.path.join(rel, m.group(2)))}"'
+                if line not in own:
+                    own.append(line)
         # of the file's own `using` lines only those of the standard library: the program's names are the test's own here
         usings = [m.group(0).strip() for m in re.finditer(r"^using\s+[^;=\n]+;", src, re.M) if re.match(r"using\s+(?:namespace\s+)?std\b", m.group(0))]
         # what a class declares in itself: a piece of its own (see `assemble`). A function of the class that
