@@ -124,6 +124,8 @@ bool SpawnCity::place() {
       if (!city_.building_at(p)) { at = {p.x, p.y, 0}; found = true; }
     }
   }
+  // the collision round the start, all of it, before the first step (CityStream::collide)
+  city_.collide(at, true);
   const f32 ground = city_.ground_height(at.x, at.y);
   const RayResult g = cast(world_->physics(), {at.x, at.y, ground + 60}, {0, 0, -1}, 80, world_->actor_body(drone_actor_));
   at.z = (g.hit ? g.point.z : ground) + 0.0225f;
@@ -189,7 +191,7 @@ void SpawnCity::update(kern::Engine& e, const kern::Frame& f) {
     city_.update({0, 0, 0}, 24);  // loading behind the title: nothing to keep smooth
     ground_changes_.clear();
     city_.take_ground_changes(ground_changes_);
-    if (city_.ready_at({0, 0, 0})) place();
+    if (city_.loaded_at({0, 0, 0})) place();
     else {
       char buf[128];
       std::snprintf(buf, sizeof buf, "SpawnCity: %s ... %u Gebaeude", city_.offline() ? "Ersatzstadt wird gebaut" : "die Stadt wird geladen", city_.stats().buildings);
@@ -239,6 +241,9 @@ void SpawnCity::fly(f32 dt) {
   accumulator_ += kern::clamp(static_cast<f64>(dt), 0.0, 0.25);
   u32 n = 0;
   while (accumulator_ >= h && n < kMaxSteps) {
+    // what the drone collides with is written before the step and by the steps alone, never by the clock
+    // (CityStream::collide): a second flight with the same keys is the same to the bit, however busy the machine is
+    city_.collide(drone_position(), false);
     world_->step_once({});
     drone_.step(world_->physics(), world_->actor_body(drone_actor_), static_cast<f32>(h), sticks_);
     accumulator_ -= h;

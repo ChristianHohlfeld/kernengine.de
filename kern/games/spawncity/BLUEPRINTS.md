@@ -32,6 +32,15 @@ wie Murmel (`kern/games/murmel`):
   Spur fliegen. Dazu kommen die Befehle (TON, MUSIK, Kameras, Pause, Startort, RESET) und die Tests der
   Bibliotheken (`test_drone`, `test_stream`, `test_terrain`, `test_map`, `test_controls`, `test_settings`,
   `test_entry`). `tests/input_check.mjs` prüft die Eingabe im Browser an der Drohne.
+- **Determinismus** (Vorgabe des Besitzers): Was die Simulation beeinflusst, hängt nicht von der Wanduhr ab. Die
+  Stadt baut Kacheln, Zellen und Straßen in Zeitscheiben (Millisekunden des Frames) – das ist nur Bild und Daten. In
+  die Physik schreibt allein `CityStream::collide`, und das ruft die App vor jedem festen Schritt mit dem Ort der
+  Drohne: der Boden unter ihr und um sie steht vor dem Schritt (koste es, was es wolle), je Schritt eine weitere
+  Bodenkachel, der Gebäudesatz um den Weg voraus wird höchstens alle 60 Schritte (250 ms Spielzeit statt 250 ms Uhr)
+  neu gewählt und mit 16 Gebäuden je Schritt gebaut; beim Start (`place`) alles auf einmal. Eine Bodenkachel mit
+  gleichen Höhen wird nicht neu geschrieben. Vorher (bis `fee55914`) baute `update` die Kollision nach der Uhr: die
+  Folge der Körper in Box3D (und damit die Kontakte) hing von der Last der Maschine ab, ein zweiter Flug wich um
+  ~1e-5 m ab. `test_spiel` fliegt jetzt ohne Warten auf die Uhr zweimal bitgleich, auch unter Last.
 - **Level per Skript**: `tools/small_level.py` (hat aus dem Level des großen Spiels das kleine gemacht;
   ein zweiter Lauf ändert nichts), `tools/level_templates.sh` (nur noch die Drohne).
 

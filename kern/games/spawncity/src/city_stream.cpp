@@ -277,19 +277,32 @@ const MapFeatures& CityStream::features(u64 tile) const {
   return it != tiles_.end() ? it->second->features : kNoFeatures;
 }
 
-bool CityStream::ready_at(Vec3 p) const {
-  if (!terrain_.ready_at(p)) return false;
-  const bool solid = near_.built && !near_.building && !near_.dirty && std::hypot(near_.at.x - p.x, near_.at.y - p.y) < 140;
+bool CityStream::loaded_at(Vec3 p) const {
+  if (!terrain_.settled()) return false;
   if (offline_) {
     for (const auto& [k, t] : tiles_)
-      if (t->procedural) return t->state == Tile::State::ready && solid;
+      if (t->procedural) return t->state == Tile::State::ready;
     return false;
   }
-  (void)solid;
   // As the original: the game starts as soon as the ground under the player is there - its
   // elevation and the streets that level it (terrain.h set_corridors); the city (drawn set,
   // collision set) streams in around him (world_spawn_guard: see Game::spawn_guard).
   return terrain_.corridors_at(p.x, p.y);
+}
+
+bool CityStream::ready_at(Vec3 p) const {
+  if (!loaded_at(p) || !terrain_.ready_at(p)) return false;
+  const bool solid = near_.built && !near_.building && !near_.dirty && std::hypot(near_.at.x - p.x, near_.at.y - p.y) < 140;
+  return !offline_ || solid;
+}
+
+void CityStream::collide(Vec3 focus, bool whole) {
+  if (!world_) return;
+  terrain_.collide(focus, anchor, whole ? 1000000u : 1u);
+  if (near_.steps < kNearSteps) ++near_.steps;
+  update_collision(focus, whole);
+  stats_.colliders = near_.colliders;
+  stats_.t_collision = ms_.t_collision;
 }
 
 void CityStream::feed_terrain(Tile& t) {
@@ -490,9 +503,8 @@ void CityStream::relay(const kern::Vec4& rect) {
   }
 }
 
-void CityStream::update_collision(Vec3 focus, f64 deadline) {
+void CityStream::update_collision(Vec3 focus, bool whole) {
   NearCollision& n = near_;
-  const f64 now = kern::now_ms();
   // (along the way ahead - view_lead: a fast car has its walls before it gets there)
   const Vec2 way_a{focus.x, focus.y}, way_ab{view_lead.x, view_lead.y};
   const f32 way_l2 = way_ab.x * way_ab.x + way_ab.y * way_ab.y;
@@ -504,7 +516,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
   bool moved = std::hypot(focus.x - n.at.x, focus.y - n.at.y) >= 140 || std::hypot(focus.x + view_lead.x - n.ahead.x, focus.y + view_lead.y - n.ahead.y) >= 140 ||
                extra_foci.size() != n.mates_at.size();
   for (std::size_t i = 0; !moved && i < extra_foci.size(); ++i) moved = std::hypot(extra_foci[i].x - n.mates_at[i].x, extra_foci[i].y - n.mates_at[i].y) >= 140;
-  if (!n.building && (moved || (n.dirty && now - n.at_ms >= 250))) {
+  if (!n.building && (moved || (n.dirty && n.steps >= kNearSteps))) {
     // world_building_collisions.mjs: the nearest MAX_FOOTPRINTS 480 within RADIUS_M 340
     struct Pick { f32 d2; u64 tile; u32 i; };
     std::vector<Pick> all;
@@ -534,9 +546,9 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
     n.at = {focus.x, focus.y};
     n.ahead = {focus.x + view_lead.x, focus.y + view_lead.y};
     n.mates_at = extra_foci;
-    n.at_ms = now;
+    n.steps = 0;
   }
-  if (n.building && build_near(deadline)) {
+  if (n.building && build_near(whole)) {
     if (n.old_body.valid() && world_->body_valid(n.old_body)) world_->destroy_body(n.old_body);
     n.old_body = {};
     n.building = false;
@@ -545,8 +557,9 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
   }
 }
 
-bool CityStream::build_near(f64 deadline) {
+bool CityStream::build_near(bool whole) {
   NearCollision& n = near_;
+  u32 built = 0;
   if (!n.body.valid()) {
     kern::physics::BodySettings bs;
     bs.type = kern::physics::BodyType::fixed;
@@ -560,7 +573,7 @@ bool CityStream::build_near(f64 deadline) {
     if (it == tiles_.end() || bi >= it->second->features.buildings.size()) continue;
     n.shapes[slot] = building_shape(n.body, it->second->features.buildings[bi]);
     if (n.shapes[slot].valid()) ++n.colliders;
-    if (kern::now_ms() > deadline) return false;
+    if (!whole && ++built >= kNearPerStep) return n.next >= n.list.size();
   }
   return true;
 }
@@ -940,11 +953,7 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   for (const kern::Vec4& r : terrain_changes_) { relay(r); ground_changes_.push_back(r); }
   terrain_changes_.clear();
   step_time("relay", t0);
-  // The collision around the player first (the player must never stand where no wall is): half
-  // the budget while a set is built, at least 1.5 ms.
-  t0 = kern::now_ms();
-  update_collision(focus, kern::now_ms() + std::fmax(1.5, budget_ms * 0.5));
-  step_time("collision", t0);
+  // (the collision round the player: collide, in the game's fixed step)
   // Nearest unfinished tile first: each tile by its key, with its distance (squared) - stably, so tiles as far
   // keep the order of the map.
   std::vector<std::pair<f32, u64>> order;
@@ -961,10 +970,6 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
     step_time(name, t0);
     if (!more) break;
   }
-  // what is left of the budget goes on with the collision set
-  t0 = kern::now_ms();
-  if (kern::now_ms() < deadline) update_collision(focus, deadline);
-  step_time("collision", t0);
   stats_ = {};
   for (auto& [k, t] : tiles_) {
     if (t->state == Tile::State::ready) ++stats_.tiles_ready;
@@ -1109,7 +1114,7 @@ void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaR
 void CityStream::recollide(Tile&) {
   // the collision is the working set around the player: a new set without the entered building
   near_.dirty = true;
-  near_.at_ms = -1e9;
+  near_.steps = kNearSteps;
 }
 
 void CityStream::exclude_building(u64 tile, i32 index) {

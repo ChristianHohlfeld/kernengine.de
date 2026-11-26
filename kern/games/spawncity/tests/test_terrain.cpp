@@ -138,7 +138,8 @@ KERN_TEST(terrain_dem_tiles) {
   int frames = 0;
   // the elevation grid is built in a job (another thread here): wait for it by the clock
   const f64 give_up = kern::now_ms() + 60000;
-  while (!tr.Terrain_ready_at(t, {0, 0, 0}).Result && kern::now_ms() < give_up) { tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 3); ++frames; }
+  // (its collision: collide, as the game's fixed step writes it - one tile more a step)
+  while (!tr.Terrain_ready_at(t, {0, 0, 0}).Result && kern::now_ms() < give_up) { tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 3); tr.Terrain_collide(t, {0, 0, 0}, {0, 0, 0}, 1); ++frames; }
   KERN_CHECK(tr.Terrain_settled(t).Result && tr.Terrain_has_dem(t).Result, "elevation loaded after %d frames", frames);
   const f64 origin = tr.Terrain_elevation(t, 0, 0).Result;
   KERN_CHECK(std::fabs(origin) < 0.05f, "origin at z = 0 (%.3f)", origin);
@@ -179,7 +180,7 @@ KERN_TEST(terrain_water) {
   KERN_CHECK(f.x > 1.2f && std::fabs(f.y) < 0.01f, "the river flows east (%.2f, %.2f)", f.x, f.y);
   tr.Terrain_add_crater(t, {300, 300, 0}, 8, 2);
   KERN_CHECK(height(300, 300) < -1.9f && tr.Terrain_surface_at(t, 300, 300).Result == 2, "a crater (%.2f)", height(300, 300));
-  for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4);
+  for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) { tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4); tr.Terrain_collide(t, {40, 30, 0}, {40, 30, 0}, 1); }
   const Common::the_RayResult_ h = rig.down(20, 20, 50, 100);
   KERN_CHECK(h.hit && std::fabs(h.point.z + Tr::kWaterBed) < 0.1f, "the lake bed is solid (%.2f)", static_cast<f64>(h.point.z));
 }

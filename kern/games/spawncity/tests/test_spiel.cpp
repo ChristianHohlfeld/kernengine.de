@@ -1,10 +1,10 @@
 // The small game, played natively: the game (sc::game(), spiel.h) as its App runs on an app runtime of the engine with its project
 // (the embedded one: level/spawncity.kproject and its level), as kern::run runs it - offline, in the stand-in town, a
 // fixed frame time - and gets ONLY keys, as a player gives them. An autopilot presses them: it waits for the ground,
-// waits for the whole town, puts the drone at the start (RESET), arms it (R), climbs (Space), flies forward (W), turns (D under the right stick: the arrows), and lands (R in
-// the air). At the end stands an expected state - placed, armed in the air, height and way flown, the city built, the
+// waits two seconds after the drone stands, puts it at the start (RESET), arms it (R), climbs (Space), flies forward (W), turns (D under the right stick: the arrows), and lands
+// (R in the air). At the end stands an expected state - placed, armed in the air, height and way flown, the city built, the
 // drone down and disarmed after the landing - and a second run gives the same track to the bit from that start on (when the town stands depends on the
-// machine: it is built in slices of the frame's time).
+// machine: it is built in slices of the frame's time; what the drone collides with does not - CityStream::collide).
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -57,9 +57,7 @@ Flight fly_once() {
   kern::Input& in = rt.engine().input();
   const double ms = 1000.0 / 60;
   kern::Vec3 start{};
-  int settled = 0;   // frames the whole town has stood
-  std::string city_sig;   // what the city looked like the frame before
-  double sig_since = 0;    // since when (the clock, ms)
+  int settled = 0;   // frames since the drone stands
   unsigned long long steps0 = 0;   // the fixed steps before the flight
   // the autopilot's plan, in seconds after the drone stands on the ground
   for (int frame = 0; frame < 60 * 400; ++frame) {
@@ -73,19 +71,15 @@ Flight fly_once() {
     }
     rt.frame(frame * ms, false);
     sc::SpawnCity& g = sc::game();
-    // When the town stands depends on the clock, not only on the frames: its cells are built in slices of the frame's
-    // milliseconds, chosen again at most every second (CityStream::select_cells), the collision set round the drone
-    // built again at most every 250 ms (world_building_collisions.mjs). So the flight waits until nothing of the city
-    // changes - its triangles, meshes, uploads, layings and colliders, the ground and the walls round the drone whole
-    // (CityStream::ready_at) - for 120 frames and two seconds of the clock; then RESET puts the drone anew at the start
-    // and the flight begins: from there on every run is the same.
+    // The game puts the drone down as soon as the stand-in town is loaded - when that is depends on the machine (the
+    // town is built in slices of the frame's milliseconds). What the drone collides with does not: the city writes its
+    // collision only in the fixed steps (CityStream::collide), all of it at the start. So two seconds after it stands
+    // RESET puts it anew at the start, and the flight begins: from there on every run is the same to the bit, however
+    // busy the machine is (no waiting for the clock).
     if (f.placed_at < 0) {
-      const auto& st = g.city().stats();
-      char sig[160];
-      std::snprintf(sig, sizeof sig, "%u %u %u %u %u", st.triangles, st.meshes, st.uploads, st.relays, st.colliders);
-      const bool still = g.placed() && st.tiles_loading == 0 && kern::jobs::pending() == 0 && g.city().ready_at(g.drone_position());
-      if (!still || city_sig != sig) { city_sig = sig; settled = 0; sig_since = kern::now_ms(); continue; }
-      if (++settled < 120 || kern::now_ms() - sig_since < 2000) continue;
+      if (!g.placed()) continue;
+      if (++settled < 120) continue;
+      KERN_CHECK(g.city().ready_at(g.drone_position()), "the collision round the drone stands");
       g.command("reset");
       f.placed = true;
       f.placed_at = frame;
@@ -99,7 +93,7 @@ Flight fly_once() {
     if (t > 15 && t < 16 && g.drone().telemetry().armed && p.z - start.z > 3) f.armed_high = true;
     if ((frame - f.placed_at) % 60 == 0) {
       char line[160];
-      std::snprintf(line, sizeof line, "%d %.6f %.6f %.6f %d %llu", frame - f.placed_at, p.x, p.y, p.z, g.drone().telemetry().armed ? 1 : 0, static_cast<unsigned long long>(g.steps()) - steps0);
+      std::snprintf(line, sizeof line, "%d %.9g %.9g %.9g %d %llu", frame - f.placed_at, p.x, p.y, p.z, g.drone().telemetry().armed ? 1 : 0, static_cast<unsigned long long>(g.steps()) - steps0);
       f.track.push_back(line);
     }
     if (t > 40) {

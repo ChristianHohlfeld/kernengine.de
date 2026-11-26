@@ -148,8 +148,15 @@ class Terrain {
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
   void take_changes(std::vector<kern::Vec4>& out) { out.insert(out.end(), changes_.begin(), changes_.end()); changes_.clear(); }
 
-  /// Builds elevation, collision tiles around focus and anchor, render tiles, water meshes.
+  /// Builds elevation, render tiles and water meshes in slices of `budget_ms` - nothing of the physics: the
+  /// collision is written by collide() alone.
   void update(Vec3 focus, Vec3 anchor, f64 budget_ms);
+  /// Writes the ground's collision into the physics world - only here, in a fixed step of the world, never by
+  /// the clock (what the bodies stand on must not depend on how fast the machine is): the tiles under the
+  /// focus and the anchor (and their neighbours) before the step, whatever they cost; of the other wanted
+  /// tiles `more` (the nearest first); what is no longer wanted goes once every wanted tile stands. A tile
+  /// whose ground did not change is not written again (a re-laid street, the same heights).
+  void collide(Vec3 focus, Vec3 anchor, u32 more);
   /// Where the focus will be in a while (its velocity x 12 s): the elevation window is loaded
   /// around there, so a fast jet never flies past the edge of the known ground.
   Vec3 lead;
@@ -174,7 +181,7 @@ class Terrain {
     i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
   };
   struct RenderTile { u32 mesh = 0; bool skirt = true; };
-  struct CollisionTile { kern::physics::Body body; };
+  struct CollisionTile { kern::physics::Body body; std::vector<Vec3> pts; };  // (pts: the ground it was built of)
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };

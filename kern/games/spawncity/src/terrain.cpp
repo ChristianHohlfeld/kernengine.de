@@ -1181,6 +1181,14 @@ void Terrain::build_collision_tile(i32 ti, i32 tj) {
       const u32 a = static_cast<u32>(r * N + c), b = a + 1, cc = a + static_cast<u32>(N), d = cc + 1;
       idx.insert(idx.end(), {a, b, d, a, d, cc});
     }
+  // the same ground as the tile already has (a street laid again, a change beside it): nothing is written - the
+  // physics world sees a change of the ground only when there is one
+  CollisionTile& t = collision_[key2(ti, tj)];
+  if (t.body.valid() && world_->body_valid(t.body) && t.pts.size() == pts.size()) {
+    bool same = true;
+    for (std::size_t q = 0; q < pts.size() && same; ++q) same = t.pts[q].x == pts[q].x && t.pts[q].y == pts[q].y && t.pts[q].z == pts[q].z;
+    if (same) return;
+  }
   kern::physics::BodySettings bs;
   bs.type = kern::physics::BodyType::fixed;
   const kern::physics::Body body = world_->create_body(bs);
@@ -1192,9 +1200,9 @@ void Terrain::build_collision_tile(i32 ti, i32 tj) {
   ss.material.category_bits = kCatWorld;
   world_->create_shape(body, ss);
   // New field first, then the old one goes (terrain_tiles.mjs writeTile order).
-  CollisionTile& t = collision_[key2(ti, tj)];
   if (t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
   t.body = body;
+  t.pts = std::move(pts);
 }
 
 void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
@@ -1341,29 +1349,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
       std::hypot(anchor.x - planned_anchor_.x, anchor.y - planned_anchor_.y) > 40)
     want_tiles(focus, anchor);
   bool missing = false;
-  // 0. the ground right under the focus and the anchor (and their neighbours) at once, whatever
-  // the budget: a jet at 250 m/s or a reload of the elevation never leaves a hole under anybody
-  std::vector<Vec3> under{focus, anchor};
-  under.insert(under.end(), extra.begin(), extra.end());
-  for (const Vec3& at : under) {
-    const i32 ci = static_cast<i32>(std::floor(at.x / kTile)), cj = static_cast<i32>(std::floor(at.y / kTile));
-    for (i32 j = cj - 1; j <= cj + 1; ++j)
-      for (i32 i = ci - 1; i <= ci + 1; ++i) {
-        const u64 k = key2(i, j);
-        if (collision_.count(k) && !dirty_collision_.count(k)) continue;
-        build_collision_tile(i, j);
-        dirty_collision_.erase(k);
-        ++stats_.rebuilds;
-      }
-  }
-  // 1. collision (what stands on it must not fall), 2. render, 3. water
-  for (u64 k : want_collision_) {
-    if (collision_.count(k) && !dirty_collision_.count(k)) continue;
-    if (kern::now_ms() > deadline) { missing = true; break; }
-    build_collision_tile(static_cast<i32>(k >> 32), static_cast<i32>(k & 0xffffffffu));
-    dirty_collision_.erase(k);
-    ++stats_.rebuilds;
-  }
+  // 1. render, 2. water (the collision: collide, in the fixed step)
   for (u64 k : want_render_) {
     if (render_.count(k) && !dirty_render_.count(k)) continue;
     if (kern::now_ms() > deadline) { missing = true; break; }
@@ -1388,14 +1374,6 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
       if (!keep.count(it->first)) { if (it->second.mesh) r_->remove(it->second.mesh); dirty_render_.erase(it->first); it = render_.erase(it); }
       else ++it;
     }
-    keep = kern::Set<u64>(want_collision_.begin(), want_collision_.end());
-    for (auto it = collision_.begin(); it != collision_.end();) {
-      if (!keep.count(it->first)) {
-        if (it->second.body.valid() && world_->body_valid(it->second.body)) world_->destroy_body(it->second.body);
-        dirty_collision_.erase(it->first);
-        it = collision_.erase(it);
-      } else ++it;
-    }
     keep = kern::Set<u64>(want_water_.begin(), want_water_.end());
     for (auto it = water_meshes_.begin(); it != water_meshes_.end();) {
       if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); water_detail_.erase(it->first); it = water_meshes_.erase(it); }
@@ -1403,11 +1381,57 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
     }
   }
   stats_.render_tiles = static_cast<u32>(render_.size());
-  stats_.collision_tiles = static_cast<u32>(collision_.size());
   stats_.dem = grid_ready_;
   stats_.settled = settled_;
   stats_.dem_tiles = 0;
   for (const auto& [k, t] : dem_tiles_) stats_.dem_tiles += t.h.empty() ? 0 : 1;
+}
+
+void Terrain::collide(Vec3 focus, Vec3 anchor, u32 more) {
+  if (!world_ || !settled_) return;
+  bool extra_moved = extra.size() != planned_extra_.size();
+  for (std::size_t i = 0; !extra_moved && i < extra.size(); ++i) extra_moved = std::hypot(extra[i].x - planned_extra_[i].x, extra[i].y - planned_extra_[i].y) > 40;
+  if (replan_ || extra_moved || std::hypot(focus.x - planned_focus_.x, focus.y - planned_focus_.y) > 40 ||
+      std::hypot(anchor.x - planned_anchor_.x, anchor.y - planned_anchor_.y) > 40)
+    want_tiles(focus, anchor);
+  // the ground right under the focus and the anchor (and their neighbours) before the step, whatever it costs: a
+  // jet at 250 m/s or a reload of the elevation never leaves a hole under anybody
+  std::vector<Vec3> under{focus, anchor};
+  under.insert(under.end(), extra.begin(), extra.end());
+  for (const Vec3& at : under) {
+    const i32 ci = static_cast<i32>(std::floor(at.x / kTile)), cj = static_cast<i32>(std::floor(at.y / kTile));
+    for (i32 j = cj - 1; j <= cj + 1; ++j)
+      for (i32 i = ci - 1; i <= ci + 1; ++i) {
+        const u64 k = key2(i, j);
+        if (collision_.count(k) && !dirty_collision_.count(k)) continue;
+        build_collision_tile(i, j);
+        dirty_collision_.erase(k);
+        ++stats_.rebuilds;
+      }
+  }
+  // the other wanted tiles (what stands on them must not fall): `more` in this step, the nearest first
+  bool missing = false;
+  u32 built = 0;
+  for (u64 k : want_collision_) {
+    if (collision_.count(k) && !dirty_collision_.count(k)) continue;
+    if (built >= more) { missing = true; break; }
+    build_collision_tile(static_cast<i32>(k >> 32), static_cast<i32>(k & 0xffffffffu));
+    dirty_collision_.erase(k);
+    ++stats_.rebuilds;
+    ++built;
+  }
+  if (!missing) {
+    // every wanted tile stands: what is no longer wanted goes (never before - no holes)
+    const kern::Set<u64> keep(want_collision_.begin(), want_collision_.end());
+    for (auto it = collision_.begin(); it != collision_.end();) {
+      if (!keep.count(it->first)) {
+        if (it->second.body.valid() && world_->body_valid(it->second.body)) world_->destroy_body(it->second.body);
+        dirty_collision_.erase(it->first);
+        it = collision_.erase(it);
+      } else ++it;
+    }
+  }
+  stats_.collision_tiles = static_cast<u32>(collision_.size());
 }
 
 }  // namespace sc
