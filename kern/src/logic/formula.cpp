@@ -475,15 +475,16 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kRad: r = math::rad(a); break;
       case kDeg: r = math::deg(a); break;
       case kLerp: r = math::lerp(a, b, c); break;
-      case kBand: r = math::band(a, b); break;
-      case kBor: r = math::bor(a, b); break;
-      case kBxor: r = math::bxor(a, b); break;
-      case kShl: r = math::shl(a, b); break;
-      case kShr: r = math::shr(a, b); break;
-      case kWrap32: r = math::wrap32(a); break;
-      case kWrap32s: r = math::wrap32s(a); break;
-      case kMul32: r = math::mul32(a, b); break;
-      case kSingle: r = math::single(a); break;
+      case kBand: r = static_cast<f64>(math::band(num::cast<i64>(a), num::cast<i64>(b))); break;
+      case kBor: r = static_cast<f64>(math::bor(num::cast<i64>(a), num::cast<i64>(b))); break;
+      case kBxor: r = static_cast<f64>(math::bxor(num::cast<i64>(a), num::cast<i64>(b))); break;
+      case kShl: r = static_cast<f64>(math::shl(num::cast<i64>(a), num::cast<i64>(b))); break;
+      case kShr: r = static_cast<f64>(math::shr(num::cast<i64>(a), num::cast<i64>(b))); break;
+      // (the formula is rebuilt on numbers.h - stage 3 of the number types; until then its old functions here)
+      case kWrap32: r = static_cast<f64>(num::cast<u32>(num::cast<i64>(a))); break;
+      case kWrap32s: r = static_cast<f64>(num::cast<i32>(num::cast<i64>(a))); break;
+      case kMul32: r = static_cast<f64>(num::mul(num::cast<u32>(num::cast<i64>(a)), num::cast<u32>(num::cast<i64>(b)))); break;
+      case kSingle: r = static_cast<f64>(static_cast<f32>(a)); break;
       case kRemainder: r = math::remainder(a, b); break;
     }
     st[n++] = r;

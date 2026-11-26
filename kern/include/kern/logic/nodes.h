@@ -43,16 +43,6 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
-namespace logic {
-struct Whole;
-template <char Op, class A, class B> struct Sum;
-template <class T> inline constexpr bool is_sum = false;
-template <char Op, class A, class B> inline constexpr bool is_sum<Sum<Op, A, B>> = true;
-template <class T> struct Sized;
-template <class T> inline constexpr bool is_sized = false;
-template <class T> inline constexpr bool is_sized<Sized<T>> = true;
-}  // namespace logic
-
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
@@ -88,181 +78,14 @@ inline f64 atan2(f64 y, f64 x) { return dm::atan2(y, x); }
 inline f64 rad(f64 degrees) { return degrees * (pi / 180); }
 inline f64 deg(f64 radians) { return radians * (180 / pi); }
 inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
-// Whole numbers as a machine has them (a formula's band, bor, bxor, shl, shr, wrap32, wrap32s,
-// mul32). A number is taken as the whole number it is (what stands after the point is cut off);
-// its bits are those of a 64-bit number in two's complement. wrap32 is the number a 32-bit
-// unsigned number holds of it (0 .. 4294967295: what a sum or a shift wraps around to), wrap32s
-// the one a signed 32-bit number holds; mul32 is the product of two 32-bit numbers as 32 bits
-// hold it (their full product does not fit a formula's number exactly).
-inline i64 bits_of(f64 a) {
-  if (std::fabs(a) < 9223372036854775808.0) [[likely]] return static_cast<i64>(a);  // (one test for what is inside; not a number fails it)
-  if (!(a == a)) return 0;
-  return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
-}
-inline i64 bits_of(const logic::Whole& a);  // (an Int: as the double it is - below, where Whole is)
-template <class T> inline i64 bits_of(logic::Sized<T> a);  // (an Int of a fixed width: the Int it is)
-/// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
-/// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
-/// asked for. Handed on to another of these functions, the number is taken as it is where that
-/// double holds it exactly (|v| <= 2^53: bits_of of the double gives v), and as bits_of of the
-/// double anywhere else: the same bits as through the double, without the way through it.
-struct Exact {
-  i64 v;
-  constexpr operator f64() const { return static_cast<f64>(v); }  // NOLINT (implicit: it is that number)
-};
-inline i64 bits_of(Exact a) {
-  constexpr i64 exact = i64{1} << 53;
-  return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
-}
-/// (what these functions take: a number, or the whole number another of them gave)
-template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || logic::is_sized<T> || std::is_arithmetic_v<T>;
-template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
-template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
-template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
-template <Bits A, Bits N> inline Exact shl(A a, N n) {
-  const f64 m = static_cast<f64>(n);
-  return {m >= 0 && m < 64 ? static_cast<i64>(static_cast<u64>(bits_of(a)) << static_cast<int>(m)) : 0};
-}
-template <Bits A, Bits N> inline Exact shr(A a, N n) {
-  const f64 m = static_cast<f64>(n);
-  return {m >= 0 && m < 64 ? bits_of(a) >> static_cast<int>(m) : (bits_of(a) < 0 ? -1 : 0)};
-}
-template <Bits A> inline Exact wrap32(A a) { return {static_cast<i64>(static_cast<u32>(static_cast<u64>(bits_of(a))))}; }
-template <Bits A> inline Exact wrap32s(A a) { return {static_cast<i64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a)))))}; }
-/// The number as a 32-bit float holds it (a formula's single): what a vector's component is.
-inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
-template <Bits A, Bits B> inline Exact mul32(A a, B b) { return {static_cast<i64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b)))))}; }
+// (Formula's bit functions - the Formula node is rebuilt on numbers.h, stage 3 of the number types: until then on i64)
+inline i64 band(i64 a, i64 b) { return a & b; }
+inline i64 bor(i64 a, i64 b) { return a | b; }
+inline i64 bxor(i64 a, i64 b) { return a ^ b; }
+inline i64 shl(i64 a, i64 n) { return logic::num::shl(a, n); }
+inline i64 shr(i64 a, i64 n) { return logic::num::shr(a, n); }
 }  // namespace math
 
-namespace logic {
-
-/// `Int` in a Blueprint's C++: a whole number as a Blueprint holds it (logic::normal). It is an
-/// i64 to every function that takes one. Adding to it - Add to Variable, `Count += 1` - adds as
-/// the interpreter and the JIT add: as numbers, defined for every value.
-struct Whole {
-  i64 v = 0;
-  constexpr Whole() = default;
-  constexpr Whole(i64 x) : v(normal(x)) {}       // NOLINT (implicit: an i64 is one)
-  /// (what a formula of whole numbers gives as an Int: the number its double holds as an Int -
-  /// whole(double(v)), which is normal(v): -> Int in a formula of whole numbers)
-  constexpr Whole(math::Exact x) : v(normal(x.v)) {}  // NOLINT
-  /// (what a formula of whole numbers whose value is +, - or * gives as an Int - -> Int: whole of the
-  /// double the formula's arithmetic gives, the whole number itself where that is exact; below, at Sum)
-  template <char Op, class A, class B> Whole(const Sum<Op, A, B>& s);  // NOLINT
-  constexpr operator i64() const { return v; }   // NOLINT
-  Whole& operator+=(Whole amount) {
-    v = whole_add(v, amount.v);
-    return *this;
-  }
-  u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
-};
-}  // namespace logic
-namespace logic {
-/// `U8` ... `I32` in a Blueprint's C++: an Int place of a fixed width (logic::kWidthNames). It holds
-/// what it is given as C++ stores an integer in a T (static_cast<T>: the low bits, two's complement
-/// for a signed T) - from any whole number, an Int, another width; read, it is an Int (Whole). Adding
-/// to it (Add to Variable, `Count += 1`) adds the low bits, as C++'s += on a T stores the sum.
-template <class T> struct Sized {
-  static_assert(std::is_integral_v<T> && sizeof(T) <= 4);
-  T v = 0;
-  constexpr Sized() = default;
-  template <class I>
-    requires std::is_integral_v<I>
-  constexpr Sized(I x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x)))) {}  // NOLINT (implicit: C++ stores it so)
-  constexpr Sized(Whole x) : v(static_cast<T>(static_cast<u64>(x.v))) {}            // NOLINT
-  template <class U> constexpr Sized(Sized<U> x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x.v)))) {}  // NOLINT
-  constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
-  template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
-  constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
-  // (its number, as a std::uint8_t converts to one: handed to every function of whole numbers that takes an i64)
-  constexpr operator i64() const { return static_cast<i64>(v); }  // NOLINT
-  Sized& operator+=(Whole amount) {
-    v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
-    return *this;
-  }
-  u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
-  friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
-  // (compared with a whole number: as their numbers - one way, not two)
-  friend constexpr bool operator==(Sized a, Whole b) { return static_cast<i64>(a.v) == b.v; }
-  template <class U> friend constexpr bool operator==(Sized a, Sized<U> b) { return static_cast<i64>(a.v) == static_cast<i64>(b.v); }
-  template <class I>
-    requires std::is_integral_v<I>
-  friend constexpr bool operator==(Sized a, I b) { return static_cast<i64>(a.v) == static_cast<i64>(b); }
-};
-/// What a pin reads from a value it is handed (a Formula's input): an Int of a fixed width is the Int it holds,
-/// anything else is itself.
-template <class X> constexpr decltype(auto) pinned(X&& x) {
-  if constexpr (is_sized<std::remove_cvref_t<X>>) return Whole(x);
-  else return std::forward<X>(x);
-}
-}  // namespace logic
-namespace math {
-template <class T> inline i64 bits_of(logic::Sized<T> a) { return static_cast<i64>(a.v); }
-/// An Int handed to band ... mul32 (a formula of whole numbers): its bits are those of the double
-/// it is (bits_of(double(v))) - as Exact's, without the way through the double.
-inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
-}  // namespace math
-namespace logic {
-/// +, - and * in a formula of whole numbers (docs/blueprint_cpp.md, "Formeln"): where one side is
-/// an Int (or such a sum) and the other an Int, what band ... mul32 give, or a number. Its value
-/// is what the formula's arithmetic of doubles gives - the two numbers as doubles (an Int and
-/// what band ... mul32 give: static_cast<f64>(v)), added, subtracted or multiplied as doubles -,
-/// worked out where it is asked for: as a number (f64) exactly that way; handed to band ...
-/// mul32 as the whole number it is, by the arithmetic of i64 where that is the same - every
-/// number in it is a whole number of at most 2^53 and so is every result on the way (then each
-/// double operation is exact: its double is that whole number) -, and else through the doubles.
-/// So it is the same value for every number, and the way through the double only where it
-/// makes a difference.
-template <class T> concept SumSide = std::same_as<T, Whole> || is_sum<T>;
-template <class T> concept SumOperand = SumSide<T> || std::same_as<T, math::Exact> || std::is_floating_point_v<T>;
-inline constexpr i64 kSumExact = i64{1} << 53;
-/// (a side as the formula's double)
-inline f64 sum_number(f64 x) { return x; }
-inline f64 sum_number(math::Exact x) { return static_cast<f64>(x.v); }
-inline f64 sum_number(Whole x) { return static_cast<f64>(x.v); }
-template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s);
-/// (a side as a whole number of at most 2^53 that its double is exactly - false where it is none)
-inline bool sum_exact(f64 x, i64& r) {
-  if (!(x >= -0x1p53 && x <= 0x1p53)) return false;  // (not a number fails it too)
-  r = static_cast<i64>(x);
-  return static_cast<f64>(r) == x;
-}
-inline bool sum_exact(math::Exact x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
-inline bool sum_exact(Whole x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
-template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r);
-template <char Op, class A, class B> struct Sum {
-  A a;
-  B b;
-  operator f64() const {  // NOLINT (implicit: it is that number)
-    const f64 x = sum_number(a), y = sum_number(b);
-    if constexpr (Op == '+') return x + y;
-    else if constexpr (Op == '-') return x - y;
-    else return x * y;
-  }
-};
-template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s) { return static_cast<f64>(s); }
-template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r) {
-  i64 x = 0, y = 0;
-  if (!sum_exact(s.a, x) || !sum_exact(s.b, y)) return false;
-  if constexpr (Op == '+') r = x + y;  // (|x|, |y| <= 2^53: no overflow)
-  else if constexpr (Op == '-') r = x - y;
-  else if (__builtin_mul_overflow(x, y, &r)) return false;
-  return r >= -kSumExact && r <= kSumExact;
-}
-/// (handed to band ... mul32: the whole number where it is exact, else bits_of of the double)
-template <char Op, class A, class B> inline i64 bits_of(const Sum<Op, A, B>& s) {
-  i64 r = 0;
-  return sum_exact(s, r) ? r : math::bits_of(static_cast<f64>(s));
-}
-/// (-> Int: every number on the way a whole number of at most 2^53 - then it is the double -, else whole(double))
-template <char Op, class A, class B> Whole::Whole(const Sum<Op, A, B>& s) {
-  i64 r = 0;
-  v = sum_exact(s, r) ? r : whole(static_cast<f64>(s));
-}
-template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'+', A, B> operator+(A a, B b) { return {a, b}; }
-template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'-', A, B> operator-(A a, B b) { return {a, b}; }
-template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'*', A, B> operator*(A a, B b) { return {a, b}; }
-}  // namespace logic
 namespace logic {
 
 /// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
@@ -407,14 +230,10 @@ namespace detail {
 template <class T> struct Entry { using type = T; };
 template <> struct Entry<bool> { using type = Truth; };
 template <class T> struct Sought { using type = T; };
-template <class T> struct Sought<Sized<T>> { using type = Whole; };
 }  // namespace detail
-/// What an item of a list of T is compared with (Find, Contains, Remove Item): a T - for a list of Ints
-/// of a fixed width an Int, as C++ compares a std::uint8_t with an int: the number, not what a U8 would
-/// hold of it (std::find of 256 in a std::vector<u8> finds nothing).
+/// What an item of a list of T is compared with (Find, Contains, Remove Item): a T.
 template <class T> using Sought = typename detail::Sought<T>::type;
 template <class A, class B> constexpr bool equal_item(const A& a, const B& b) { return a == b; }
-template <class T> constexpr bool equal_item(const Sized<T>& a, const Whole& b) { return static_cast<i64>(a.v) == b.v; }
 
 /// Beside the lists. A place that is named beside a list (Cars[9] of two cars) is an entry of
 /// its own, with the zero of the items' type - a struct with its defaults: read, it is that
@@ -444,14 +263,14 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
   List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
@@ -487,14 +306,14 @@ template <class T, std::size_t N> struct Fixed {
   operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
   operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
@@ -536,9 +355,8 @@ template <class T> Items<T> items_of(const List<T>& list) { return list; }
 template <class T, std::size_t N> Items<T> items_of(const Fixed<T, N>& list) { return list; }
 template <class T> Items<T> items_of(Items<T> list) { return list; }
 
-/// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
-/// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
-/// Blueprint's class.
+/// A value of the interpreter as the C++ type of its pin, and back. A number is the number of its type (the
+/// C++ type itself), a list the vector of its items.
 namespace detail {
 template <class T> struct Held;  // (no such pin type)
 /// A struct of a Blueprint's class (KERN_STRUCT). How its value is held says the class's glue,
@@ -554,21 +372,11 @@ template <> struct Held<bool> {
   static constexpr PinType type = PinType::boolean;
   static bool from(const Value& v) { return v.as_bool(); }
 };
-template <> struct Held<i64> {
-  static constexpr PinType type = PinType::integer;
-  static i64 from(const Value& v) { return v.as_int(); }
-};
-template <> struct Held<Whole> {
-  static constexpr PinType type = PinType::integer;
-  static Whole from(const Value& v) { return v.as_int(); }
-};
-template <class T> struct Held<Sized<T>> {
-  static constexpr PinType type = PinType::integer;
-  static Sized<T> from(const Value& v) { return Sized<T>(v.as_int()); }
-};
-template <> struct Held<f64> {
-  static constexpr PinType type = PinType::number;
-  static f64 from(const Value& v) { return v.as_number(); }
+template <class T>
+  requires(num::Number<T> && !std::is_same_v<T, bool>)
+struct Held<T> {
+  static constexpr PinType type = number_type<T>();
+  static T from(const Value& v) { return v.as<T>(); }
 };
 template <> struct Held<Vec3> {
   static constexpr PinType type = PinType::vector;
@@ -603,27 +411,9 @@ template <class I> struct Held<std::vector<Object<I>>> {
     return r;
   }
 };
-template <> struct Held<Int64> {
-  static constexpr PinType type = PinType::int64;
-  static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
-};
 template <class T> struct Held<std::vector<T>> {
   static constexpr PinType type = list_type_of<T>();
   static std::vector<T> from(const Value& v) { return v.items<T>(); }
-};
-template <> struct Held<std::vector<Whole>> {
-  static constexpr PinType type = PinType::integer_list;
-  static std::vector<Whole> from(const Value& v) {
-    const std::vector<i64>& items = v.items<i64>();
-    return std::vector<Whole>(items.begin(), items.end());
-  }
-};
-template <class T> struct Held<std::vector<Sized<T>>> {
-  static constexpr PinType type = PinType::integer_list;
-  static std::vector<Sized<T>> from(const Value& v) {
-    const std::vector<i64>& items = v.items<i64>();
-    return std::vector<Sized<T>>(items.begin(), items.end());
-  }
 };
 template <> struct Held<std::vector<Text>> {
   static constexpr PinType type = PinType::text_list;
@@ -712,16 +502,16 @@ template <class T> bool is_value(const Value& v) {
   else return v.type == pin_type_of<T>();
 }
 inline Value to_value(bool v) { return Value::boolean(v); }
-inline Value to_value(i64 v) { return Value::integer(v); }
-inline Value to_value(Whole v) { return Value::integer(v); }
-template <class T> Value to_value(Sized<T> v) { return Value::integer(static_cast<i64>(v.v)); }
-inline Value to_value(f64 v) { return Value::number(v); }
+template <class T>
+  requires(num::Number<T> && !std::is_same_v<T, bool>)
+Value to_value(T v) {
+  return Value::of_number(v);
+}
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(const Text& v) { return Value::text(v.str()); }
 inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v); }
-inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 template <class I> Value to_value(Object<I> v) { return Value::object(v.ref); }
 inline Value to_value(ObjectRef v) { return Value::object(v); }
 template <class I> Value to_value(std::vector<Object<I>> v) {
@@ -749,9 +539,7 @@ Value to_value(std::vector<E> v) {
   for (E e : v) places.push_back(static_cast<i64>(e));
   return Value::enumerations(std::move(places));
 }
-inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
-template <class T> Value to_value(const std::vector<Sized<T>>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Text>& v) {
   std::vector<std::string> items;
   items.reserve(v.size());
@@ -878,14 +666,14 @@ template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>:
   using Entries::Entries;
   Map() = default;
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+    requires num::Integer<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
@@ -1096,8 +884,13 @@ struct Arg {
   std::string_view s;
 };
 inline Arg arg(i64 v) { return {Arg::Kind::whole, v, 0, {}}; }
-inline Arg arg(Whole v) { return arg(static_cast<i64>(v)); }
-template <class T> Arg arg(Sized<T> v) { return arg(static_cast<i64>(v.v)); }
+/// (a whole number of another type: its bits as an i64 - what %d, %u, %x read of them as C's varargs do; f32 is promoted to double, as there)
+template <class T>
+  requires(num::Integer<T> && !std::is_same_v<T, i64>)
+Arg arg(T v) {
+  return arg(static_cast<i64>(num::bits_of(v)));
+}
+inline Arg arg(f32 v) { return {Arg::Kind::number, 0, static_cast<f64>(v), {}}; }
 inline Arg arg(f64 v) { return {Arg::Kind::number, 0, v, {}}; }
 inline Arg arg(std::string_view v) { return {Arg::Kind::text, 0, 0, v}; }
 /// One conversion of a format.
@@ -2186,9 +1979,7 @@ constexpr u32 width(Code c) {
     default: return 0;
   }
 }
-constexpr bool whole(Code c) { return c >= Code::u8 && c <= Code::i32; }    // (an Int's field)
-constexpr bool wide(Code c) { return c == Code::u64 || c == Code::i64; }    // (an Int64's)
-constexpr bool floating(Code c) { return c == Code::f32 || c == Code::f64; }  // (a Float's)
+constexpr bool floating(Code c) { return c == Code::f32 || c == Code::f64; }
 constexpr bool is_signed(Code c) { return c == Code::i8 || c == Code::i16 || c == Code::i32 || c == Code::i64; }
 constexpr Code code_of(std::string_view w) {
   constexpr std::pair<std::string_view, Code> kCodes[] = {{"bool", Code::boolean}, {"u8", Code::u8},   {"i8", Code::i8},   {"u16", Code::u16},
@@ -2233,22 +2024,6 @@ constexpr Layout layout(std::string_view s) {
   if (r.count == 0) r.error = "a layout has a field at least";
   return r;
 }
-/// The bits a Float is as a 32-bit float (a NaN: its sign, the upper bits of its payload, quiet).
-inline u32 single_bits(f64 x) {
-  if (x != x) {
-    const u64 b = std::bit_cast<u64>(x);
-    return (static_cast<u32>(b >> 32) & 0x80000000u) | 0x7fc00000u | static_cast<u32>((b >> 29) & 0x003fffffu);
-  }
-  return std::bit_cast<u32>(static_cast<f32>(x));
-}
-/// The Float 32 bits are as a float (a NaN: its sign, its payload in the upper bits, quiet).
-inline f64 single_value(u32 b) {
-  if ((b & 0x7f800000u) == 0x7f800000u && (b & 0x007fffffu) != 0)
-    return std::bit_cast<f64>((static_cast<u64>(b & 0x80000000u) << 32) | 0x7ff8000000000000ull | (static_cast<u64>(b & 0x003fffffu) << 29));
-  return static_cast<f64>(std::bit_cast<f32>(b));
-}
-/// The bits a field writes: of a whole number (cut by `put`), of a Float.
-inline u64 bits(Code c, f64 x) { return c == Code::f32 ? single_bits(x) : std::bit_cast<u64>(x); }
 /// The field's bits into the bytes, little-endian.
 template <class B> void put(B* out, const Field& f, u64 v) {
   for (u32 k = 0; k < width(f.code); ++k) out[f.at + k] = B(static_cast<i64>((v >> (8 * k)) & 0xffu));
@@ -2261,11 +2036,25 @@ template <class Byte> u64 take(const Field& f, Byte&& byte) {
   if (is_signed(f.code) && n < 8 && (v >> (8 * n - 1)) & 1u) v |= ~u64{0} << (8 * n);
   return v;
 }
-/// What a field of a struct is, for a layout: which numbers suit it (Bool: bool; Int: u8 .. i32;
-/// Int64: u64, i64; Float: f32, f64).
-constexpr bool suits(Code c, PinType t) {
-  return t == PinType::boolean ? c == Code::boolean : t == PinType::integer ? whole(c) : t == PinType::int64 ? wide(c) : t == PinType::number ? floating(c) : false;
+/// The number type a code is (Code::none: exec, none).
+constexpr PinType type_of(Code c) {
+  switch (c) {
+    case Code::boolean: return PinType::boolean;
+    case Code::u8: return PinType::u8;
+    case Code::i8: return PinType::i8;
+    case Code::u16: return PinType::u16;
+    case Code::i16: return PinType::i16;
+    case Code::u32: return PinType::u32;
+    case Code::i32: return PinType::i32;
+    case Code::u64: return PinType::u64;
+    case Code::i64: return PinType::i64;
+    case Code::f32: return PinType::f32;
+    case Code::f64: return PinType::f64;
+    default: return PinType::exec;
+  }
 }
+/// Does a field of a struct of the type t suit the code (a layout's field is the number type of its field itself)?
+constexpr bool suits(Code c, PinType t) { return c != Code::none && type_of(c) == t; }
 /// The byte of a number of a list of bytes: its last 8 bits.
 inline u64 byte_of(i64 v) { return static_cast<u64>(v) & 0xffu; }
 /// The i-th byte from `from` on of `count` entries (before them, beyond them: 0).
@@ -2276,11 +2065,8 @@ template <class E> u64 byte_at(const E* items, std::size_t count, i64 from, u32 
 }
 
 // ---- the bytes of a list of numbers (Copy Bytes) ----
-/// Which numbers an entry of a list of this type can be held as in C++ (Copy Bytes: Int u8 .. i32,
-/// Int64 u64 i64, Float f32 f64).
-constexpr bool suits_list(Code c, PinType element) {
-  return element == PinType::integer ? whole(c) : element == PinType::int64 ? wide(c) : element == PinType::number ? floating(c) : false;
-}
+/// Is a list of this type one of entries of the number `c` (Copy Bytes: the list's own type)?
+constexpr bool suits_list(Code c, PinType element) { return suits(c, element) && c != Code::boolean; }
 /// The bits `w` holds of a number `c` is wide - the rest 0, or 1 where `c` has a sign and its
 /// highest bit is one (as C++ reads a number of that width).
 constexpr u64 widened(Code c, u64 w) {
@@ -2290,19 +2076,10 @@ constexpr u64 widened(Code c, u64 w) {
   if (is_signed(c) && ((w >> (8 * n - 1)) & 1u)) w |= ~u64{0} << (8 * n);
   return w;
 }
-/// The bits of an entry as the number `c` holds it: an Int's 64 bits (of which `c` takes as many
-/// as it is wide - as C++ converts), an Int64's, a Float's as a float or a double.
-inline u64 entry_bits(Code, i64 v) { return static_cast<u64>(v); }
-inline u64 entry_bits(Code, Whole v) { return static_cast<u64>(static_cast<i64>(v)); }
-template <class T> u64 entry_bits(Code, Sized<T> v) { return static_cast<u64>(static_cast<i64>(v.v)); }
-inline u64 entry_bits(Code, Int64 v) { return v.bits; }
-inline u64 entry_bits(Code c, f64 v) { return bits(c, v); }
+/// The bits of an entry as the number `c` holds it (num::bits_of).
+template <num::Number T> u64 entry_bits(Code, T v) { return num::bits_of(v); }
 /// The entry those bits of the number `c` are.
-inline void set_entry(i64& to, Code c, u64 w) { to = static_cast<i64>(widened(c, w)); }
-inline void set_entry(Whole& to, Code c, u64 w) { to = Whole(static_cast<i64>(widened(c, w))); }
-template <class T> void set_entry(Sized<T>& to, Code c, u64 w) { to = Sized<T>(static_cast<i64>(widened(c, w))); }
-inline void set_entry(Int64& to, Code, u64 w) { to = Int64(w); }
-inline void set_entry(f64& to, Code c, u64 w) { to = c == Code::f32 ? single_value(static_cast<u32>(w)) : std::bit_cast<f64>(w); }
+template <num::Number T> void set_entry(T& to, Code c, u64 w) { to = num::of_bits<T>(widened(c, w)); }
 /// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list
 /// has at most 2^24 entries, of at most 8 bytes) is the same as one further out - what is beyond
 /// that is cut to it, so that no sum leaves an i64.
@@ -2412,11 +2189,11 @@ template <class T> T native_arg(std::span<const Value> args, std::size_t i, cons
 template <class T> T native_out(const Instance& instance, int node, int out) { return from_value<T>(instance.output(node, out).converted(pin_type_of<T>())); }
 /// Instance::set for a variable that is a member of a Blueprint's class: the conversions the
 /// interpreter's variables make.
-inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }
-inline void native_set(i64& variable, const Value& v) { variable = whole(v.as_number()); }
-inline void native_set(Whole& variable, const Value& v) { variable = whole(v.as_number()); }
-template <class T> void native_set(Sized<T>& variable, const Value& v) { variable = Sized<T>(whole(v.as_number())); }
-inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
+template <class T>
+  requires num::Number<T>
+void native_set(T& variable, const Value& v) {
+  variable = v.as<T>();
+}
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
@@ -2430,7 +2207,6 @@ void native_set(E& variable, const Value& v) {
   variable = from_value<E>(v.converted(PinType::enumeration));
 }
 template <detail::NativeStruct S> void native_set(S& variable, const Value& v) { variable = from_value<S>(v); }
-inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
 template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
 template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
 template <class R, class... A> void native_set(Callback<R(A...)>& variable, const Value& v) { variable = from_value<Callback<R(A...)>>(v); }
@@ -2473,135 +2249,110 @@ inline bool chance(f64* m, u32 seed, u32 node, f64 chance) { return unit(next(m,
 /// wraps each as a node, a Blueprint's C++ calls it by this name.
 struct PureNodes {
   using Bool = bool;
+  /// The defaults of the editor's "Int" and "Float" (logic::kInt, kFloat): i64, f32 - what the vectors are of.
   using Int = i64;
-  using Float = f64;
+  using Float = f32;
   using Vector = Vec3;
   using Text = std::string;
   using Actor = ActorHandle;
   /// An object of the engine of the class I (kern/docs/engine_object.md): Object<kern::App>.
   template <class I> using Object = logic::Object<I>;
-  static constexpr f64 kDegrees = 3.14159265358979323846 / 180.0;
 
-  // ---- Int64: 64 bits, as u64 and i64 of C++ (WebAssembly's i64) ----
-  // Adding, subtracting, multiplying and shifting left go round at 2^64; what C++ leaves open is
-  // defined here for every value, the same in every tier: dividing by 0 gives 0 (and the
-  // smallest i64 by -1 itself), a shift goes by the amount's last 6 bits, a Float that is no
-  // number is 0 as an Int64, beyond its ends it is the nearest end.
-  using Int64 = logic::Int64;
-  static Int64 int64_add(Int64 a, Int64 b) { return Int64(a.bits + b.bits); }
-  static Int64 int64_sub(Int64 a, Int64 b) { return Int64(a.bits - b.bits); }
-  static Int64 int64_mul(Int64 a, Int64 b) { return Int64(a.bits * b.bits); }
-  static Int64 int64_div(Int64 a, Int64 b) {
-    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
-    if (y == 0) return Int64(0);
-    if (y == -1) return Int64(0 - a.bits);  // (the smallest i64 by -1: itself, as it goes round)
-    return Int64(static_cast<u64>(x / y));
+  // ---- numbers: every operation of every number type, as C++ computes it (kern/logic/numbers.h) ----
+  // A node of these has the number type as its setting "Type" (math_add<f32>): its pins are of that type. Where C++
+  // leaves the result open, numbers.h fixes one (there: why and which).
+  template <num::Arithmetic T> static T math_add(T a, T b) { return num::add(a, b); }
+  template <num::Arithmetic T> static T math_sub(T a, T b) { return num::sub(a, b); }
+  template <num::Arithmetic T> static T math_mul(T a, T b) { return num::mul(a, b); }
+  template <num::Arithmetic T> static T math_div(T a, T b) { return num::div(a, b); }
+  template <num::Arithmetic T> static T math_rem(T a, T b) { return num::rem(a, b); }
+  template <num::Arithmetic T> static T math_negate(T a) { return num::neg(a); }
+  template <num::Arithmetic T> static T math_abs(T a) { return num::abs(a); }
+  template <num::Arithmetic T> static T math_min(T a, T b) { return num::min(a, b); }
+  template <num::Arithmetic T> static T math_max(T a, T b) { return num::max(a, b); }
+  /// Value between Min and Max (the two in either order): max(min(value, hi), lo) of numbers.h.
+  template <num::Arithmetic T> static T math_clamp(T value, T min, T max) { return num::min(num::max(value, num::min(min, max)), num::max(min, max)); }
+  /// A + (B - A) × Alpha, each step in T.
+  template <num::Floating T> static T math_lerp(T a, T b, T alpha) { return num::add(a, num::mul(num::sub(b, a), alpha)); }
+  // (comparisons: of one type, as C++ compares them - a NaN is unequal to everything)
+  template <num::Number T> static Bool math_equal(T a, T b) { return num::eq(a, b); }
+  template <num::Number T> static Bool math_not_equal(T a, T b) { return num::ne(a, b); }
+  template <num::Arithmetic T> static Bool math_less(T a, T b) { return num::lt(a, b); }
+  template <num::Arithmetic T> static Bool math_less_equal(T a, T b) { return num::le(a, b); }
+  template <num::Arithmetic T> static Bool math_greater(T a, T b) { return num::gt(a, b); }
+  template <num::Arithmetic T> static Bool math_greater_equal(T a, T b) { return num::ge(a, b); }
+  /// Compare with the operator of the node's setting (== != < <= > >=), as C++ compares.
+  template <num::Arithmetic T> static Bool compare(std::string_view op, T a, T b) {
+    if (op == "==" || op == "=") return num::eq(a, b);
+    if (op == "!=" || op == "≠") return num::ne(a, b);
+    if (op == "<") return num::lt(a, b);
+    if (op == "<=" || op == "≤") return num::le(a, b);
+    if (op == ">") return num::gt(a, b);
+    return num::ge(a, b);
   }
-  static Int64 int64_div_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits / b.bits : 0); }
-  static Int64 int64_rem(Int64 a, Int64 b) {
-    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
-    if (y == 0 || y == -1) return Int64(0);
-    return Int64(static_cast<u64>(x % y));
-  }
-  static Int64 int64_rem_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits % b.bits : 0); }
-  static Int64 int64_and(Int64 a, Int64 b) { return Int64(a.bits & b.bits); }
-  static Int64 int64_or(Int64 a, Int64 b) { return Int64(a.bits | b.bits); }
-  static Int64 int64_xor(Int64 a, Int64 b) { return Int64(a.bits ^ b.bits); }
-  static Int64 int64_not(Int64 a) { return Int64(~a.bits); }
-  static Int64 int64_shift_left(Int64 a, Int by) { return Int64(a.bits << (static_cast<u64>(by) & 63)); }
-  static Int64 int64_shift_right(Int64 a, Int by) { return Int64(static_cast<u64>(static_cast<i64>(a.bits) >> (static_cast<u64>(by) & 63))); }
-  static Int64 int64_shift_right_unsigned(Int64 a, Int by) { return Int64(a.bits >> (static_cast<u64>(by) & 63)); }
-  static Int64 int64_rotate_left(Int64 a, Int by) { return Int64(std::rotl(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
-  static Int64 int64_rotate_right(Int64 a, Int by) { return Int64(std::rotr(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
-  static Bool int64_equal(Int64 a, Int64 b) { return a.bits == b.bits; }
-  static Bool int64_less(Int64 a, Int64 b) { return static_cast<i64>(a.bits) < static_cast<i64>(b.bits); }
-  static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
-  /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
-  static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
-  /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
-  static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
-  static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }
-  static Float int64_to_float(Int64 a) { return static_cast<f64>(static_cast<i64>(a.bits)); }
-  static Float int64_to_float_unsigned(Int64 a) { return static_cast<f64>(a.bits); }
-  /// A Float toward zero as an i64 / a u64 (no number: 0; beyond the ends: the nearest end).
-  static Int64 int64_of_float(Float a) {
-    if (!(a == a)) return Int64(0);
-    if (a >= 9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::max()));
-    if (a < -9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::min()));
-    return Int64(static_cast<u64>(static_cast<i64>(a)));
-  }
-  static Int64 int64_of_float_unsigned(Float a) {
-    if (!(a > 0)) return Int64(0);
-    if (a >= 18446744073709551616.0) return Int64(~u64{0});
-    return Int64(static_cast<u64>(a));
-  }
-  /// A Float's 64 bits (IEEE 754), and the Float of 64 bits.
-  static Int64 int64_bits_of_float(Float a) { return Int64(std::bit_cast<u64>(a)); }
-  static Float int64_float_of_bits(Int64 a) { return std::bit_cast<f64>(a.bits); }
-  /// A float's 32 bits (IEEE 754, std::bit_cast of a float): of the float the Float is as a 32-bit number
-  /// (static_cast<f32>), 0 .. 2^32 - 1 - and the Float the 32 bits are (the Int's last 32 bits).
-  static Int math_bits_of_float32(Float a) { return static_cast<i64>(bytes::single_bits(a)); }
-  static Float math_float32_of_bits(Int a) { return bytes::single_value(static_cast<u32>(static_cast<u64>(a))); }
-  /// Two halves of 32 bits each (an Int each, cut to its last 32 bits), and the halves again (0 .. 2^32 - 1).
-  static Int64 int64_of_halves(Int high, Int low) { return Int64((static_cast<u64>(static_cast<u32>(high)) << 32) | static_cast<u32>(low)); }
-  static Int int64_high(Int64 a) { return static_cast<i64>(a.bits >> 32); }
-  static Int int64_low(Int64 a) { return static_cast<i64>(a.bits & 0xffffffffu); }
-  static Int int64_count_ones(Int64 a) { return static_cast<i64>(std::popcount(a.bits)); }
-  static Int int64_leading_zeros(Int64 a) { return static_cast<i64>(std::countl_zero(a.bits)); }
-  static Int int64_trailing_zeros(Int64 a) { return static_cast<i64>(std::countr_zero(a.bits)); }
-  /// The bits as a text: a u64 in decimal, an i64 in decimal, hexadecimal (lower case, no 0x).
-  static std::string int64_text(Int64 a) { return std::to_string(a.bits); }
-  static std::string int64_text_signed(Int64 a) { return std::to_string(static_cast<i64>(a.bits)); }
-  static std::string int64_text_hex(Int64 a) {
+  // (bits of whole numbers; a shift's amount is a whole number of any type, taken mod the width)
+  template <num::Integer T> static T math_and(T a, T b) { return num::bit_and(a, b); }
+  template <num::Integer T> static T math_or(T a, T b) { return num::bit_or(a, b); }
+  template <num::Integer T> static T math_xor(T a, T b) { return num::bit_xor(a, b); }
+  template <num::Integer T> static T math_not(T a) { return num::bit_not(a); }
+  template <num::Integer T> static T math_shift_left(T a, i64 by) { return num::shl(a, by); }
+  template <num::Integer T> static T math_shift_right(T a, i64 by) { return num::shr(a, by); }
+  template <num::Integer T> static T math_rotate_left(T a, i64 by) { return num::rotl(a, by); }
+  template <num::Integer T> static T math_rotate_right(T a, i64 by) { return num::rotr(a, by); }
+  template <num::Integer T> static i32 math_count_ones(T a) { return num::popcount(a); }
+  template <num::Integer T> static i32 math_leading_zeros(T a) { return num::countl_zero(a); }
+  template <num::Integer T> static i32 math_trailing_zeros(T a) { return num::countr_zero(a); }
+  // (the functions of <cmath>: radians, as C++'s; the engine's own sin, exp ... - kern::dm, musl)
+  template <num::Floating T> static T math_sqrt(T a) { return num::sqrt(a); }
+  template <num::Floating T> static T math_floor(T a) { return num::floor(a); }
+  template <num::Floating T> static T math_ceil(T a) { return num::ceil(a); }
+  template <num::Floating T> static T math_trunc(T a) { return num::trunc(a); }
+  template <num::Floating T> static T math_round(T a) { return num::round(a); }
+  template <num::Floating T> static T math_copysign(T a, T b) { return num::copysign(a, b); }
+  template <num::Floating T> static T math_fmin(T a, T b) { return num::fmin(a, b); }
+  template <num::Floating T> static T math_fmax(T a, T b) { return num::fmax(a, b); }
+  template <num::Floating T> static T math_sin(T a) { return num::sin(a); }
+  template <num::Floating T> static T math_cos(T a) { return num::cos(a); }
+  template <num::Floating T> static T math_tan(T a) { return num::tan(a); }
+  template <num::Floating T> static T math_asin(T a) { return num::asin(a); }
+  template <num::Floating T> static T math_acos(T a) { return num::acos(a); }
+  template <num::Floating T> static T math_atan(T a) { return num::atan(a); }
+  template <num::Floating T> static T math_atan2(T y, T x) { return num::atan2(y, x); }
+  template <num::Floating T> static T math_exp(T a) { return num::exp(a); }
+  template <num::Floating T> static T math_expm1(T a) { return num::expm1(a); }
+  template <num::Floating T> static T math_log(T a) { return num::log(a); }
+  template <num::Floating T> static T math_log10(T a) { return num::log10(a); }
+  template <num::Floating T> static T math_pow(T a, T b) { return num::pow(a, b); }
+  template <num::Floating T> static T math_hypot(T a, T b) { return num::hypot(a, b); }
+  template <num::Floating T> static Bool math_isnan(T a) { return num::isnan(a); }
+  template <num::Floating T> static Bool math_isinf(T a) { return num::isinf(a); }
+  template <num::Floating T> static Bool math_isfinite(T a) { return num::isfinite(a); }
+  template <num::Floating T> static Bool math_signbit(T a) { return num::signbit(a); }
+  // (conversions: one node for each, From and To its settings - static_cast<To>(x), numbers.h's cast)
+  template <num::Number To, num::Number From> static To num_cast(From x) { return num::cast<To>(x); }
+  /// The bits of x as the type To of the same size (std::bit_cast: f32 <-> u32, f64 <-> u64 ...).
+  template <num::Number To, num::Number From> static To num_bit_cast(From x) { return num::reinterpret<To>(x); }
+  /// A number as a text (To Text): logic::number_as_text - a whole number in decimal, a floating one the shortest
+  /// decimal that gives it again, inf, -inf, nan.
+  template <num::Number T> static Text num_text(T x) { return number_as_text(Value::of_number(x)); }
+  /// A whole number's bits in hexadecimal (lower case, no 0x) - std::to_chars(..., 16) of the unsigned bits of its type.
+  template <num::Integer T> static Text num_text_hex(T x) {
     char b[20];
-    auto [end, ec] = std::to_chars(b, b + sizeof b, a.bits, 16);
+    auto [end, ec] = std::to_chars(b, b + sizeof b, static_cast<std::make_unsigned_t<T>>(x), 16);
     (void)ec;
-    return std::string(b, end);
+    return Text(b, end);
   }
   /// A text as 64 bits: its whole number (decimal, 0x hexadecimal; a - in front: two's complement), 0 if it is none.
-  static Int64 int64_of_text(const std::string& text) { return int64_parse(text); }
-  static Int64 int64_parse(std::string_view a) {
+  static u64 text_to_u64(const std::string& text) { return int64_parse(text); }
+  static u64 int64_parse(std::string_view a) {
     bool minus = !a.empty() && a.front() == '-';
     if (minus) a.remove_prefix(1);
     int base = 10;
     if (a.size() > 2 && a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) base = 16, a.remove_prefix(2);
     u64 v = 0;
     const auto [end, ec] = std::from_chars(a.data(), a.data() + a.size(), v, base);
-    if (ec != std::errc() || end != a.data() + a.size()) return Int64(0);
-    return Int64(minus ? 0 - v : v);
-  }
-
-  // ---- math ----
-  static Float math_add(Float a, Float b) { return a + b; }
-  static Float math_sub(Float a, Float b) { return a - b; }
-  static Float math_mul(Float a, Float b) { return a * b; }
-  static Float math_div(Float a, Float b) { return b != 0 ? a / b : 0.0; }
-  static Float math_mod(Float a, Float b) { return b != 0 ? std::fmod(a, b) : 0.0; }
-  static Float math_min(Float a, Float b) { return min_of(a, b); }
-  static Float math_max(Float a, Float b) { return max_of(a, b); }
-  static Float math_clamp(Float value, Float min, Float max) { return kern::clamp(value, min_of(min, max), max_of(min, max)); }
-  static Float math_abs(Float a) { return std::fabs(a); }
-  static Float math_copysign(Float a, Float b) { return std::copysign(a, b); }  // (the formula's copysign)
-  static Float math_negate(Float a) { return -a; }
-  static Float math_lerp(Float a, Float b, Float alpha) { return a + (b - a) * alpha; }
-  static Float math_sin(Float degrees) { return dm::sin(degrees * kDegrees); }
-  static Float math_cos(Float degrees) { return dm::cos(degrees * kDegrees); }
-  static Float math_atan2(Float y, Float x) { return dm::atan2(y, x) / kDegrees; }
-  static Float math_sqrt(Float a) { return std::sqrt(max_of(0.0, a)); }
-  static Float math_pow(Float a, Float b) {
-    const f64 r = dm::pow(a, b);
-    return std::isfinite(r) ? r : 0.0;
-  }
-  static Int math_round(Float a) { return whole(std::round(a)); }  // (half away from zero)
-  static Int math_floor(Float a) { return whole(std::floor(a)); }
-  /// Compare with the operator of the node's setting (== and != within 1e-9).
-  static Bool compare(std::string_view op, Float a, Float b) {
-    if (op == "==") return std::fabs(a - b) <= 1e-9;
-    if (op == "!=") return std::fabs(a - b) > 1e-9;
-    if (op == "<") return a < b;
-    if (op == "<=") return a <= b;
-    if (op == ">") return a > b;
-    return a >= b;
+    if (ec != std::errc() || end != a.data() + a.size()) return 0;
+    return minus ? 0 - v : v;
   }
 
   // ---- logic ----
@@ -2611,26 +2362,26 @@ struct PureNodes {
   static Bool logic_not(Bool a) { return !a; }
 
   // ---- values ----
-  static Float value_float(Float value) { return value; }
-  static Int value_int(Int value) { return value; }
+  /// A number written out, of the type of the node's setting.
+  template <num::Number T> static T value_number(T value) { return value; }
   static Bool value_bool(Bool value) { return value; }
   static Text value_text(Text value) { return value; }
 
   // ---- vectors ----
   struct Broken {
-    Float x = 0, y = 0, z = 0;
+    f32 x = 0, y = 0, z = 0;
   };
-  static Vector vector_make(Float x, Float y, Float z) { return {static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z)}; }
+  static Vector vector_make(f32 x, f32 y, f32 z) { return {x, y, z}; }
   static Broken vector_break(Vector v) { return {v.x, v.y, v.z}; }
   static Vector vector_add(Vector a, Vector b) { return a + b; }
   static Vector vector_sub(Vector a, Vector b) { return a - b; }
   static Vector vector_cross(Vector a, Vector b) { return cross(a, b); }
-  static Vector vector_scale(Vector a, Float b) { return a * static_cast<f32>(b); }
+  static Vector vector_scale(Vector a, f32 b) { return a * b; }
   static Float vector_length(Vector a) { return length(a); }
   static Vector vector_normalize(Vector a) { return normalize(a, {0, 0, 0}); }
   static Float vector_distance(Vector a, Vector b) { return distance(a, b); }
   static Float vector_dot(Vector a, Vector b) { return dot(a, b); }
-  static Vector vector_lerp(Vector a, Vector b, Float alpha) { return lerp(a, b, static_cast<f32>(alpha)); }
+  static Vector vector_lerp(Vector a, Vector b, f32 alpha) { return lerp(a, b, alpha); }
 
   // ---- text ----
   static Text text_append(Text a, Text b, Text c) { return a + b + c; }
@@ -2667,20 +2418,29 @@ struct PureNodes {
   }
   // (numbers read from a text at a place, as C reads them there - scan, nodes.h: the value and the place
   // just after what was read; nothing read: the place itself, as C's end pointer is the one it was given)
+  // (strtod: an f64, strtof: an f32, strtoll: an i64, strtoull: a u64)
   struct ParsedFloat {
-    Float value = 0;
+    f64 value = 0;
+    Int end = 0;
+  };
+  struct ParsedFloat32 {
+    f32 value = 0;
     Int end = 0;
   };
   struct ParsedWhole {
-    Int64 value{};
+    i64 value = 0;
+    Int end = 0;
+  };
+  struct ParsedUnsigned {
+    u64 value = 0;
     Int end = 0;
   };
   /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
   /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
-  static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
-  /// Bytes of Text: its bytes as whole numbers 0 .. 255 - std::vector<u8>(text.begin(), text.end()).
-  static std::vector<i64> text_bytes(Text a) {
-    std::vector<i64> r;
+  template <num::Integer T> static Text text_of_bytes(const std::vector<T>& bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
+  /// Bytes of Text: its bytes - std::vector<u8>(text.begin(), text.end()).
+  static std::vector<u8> text_bytes(Text a) {
+    std::vector<u8> r;
     texts::insert_bytes(r, 0, a);
     return r;
   }
@@ -2696,17 +2456,17 @@ struct PureNodes {
     const scan::Real r = scan::real(scan::c_string(a, at), false);
     return {r.value, at + static_cast<i64>(r.end)};
   }
-  static ParsedFloat text_parse_float32(Text a, Int at) {
+  static ParsedFloat32 text_parse_float32(Text a, Int at) {
     const scan::Real r = scan::real(scan::c_string(a, at), true);
-    return {r.value, at + static_cast<i64>(r.end)};
+    return {static_cast<f32>(r.value), at + static_cast<i64>(r.end)};  // (exact: scan gives the f32 it read)
   }
   static ParsedWhole text_parse_int(Text a, Int at, Int base) {
     const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), true);
-    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+    return {static_cast<i64>(r.bits), at + static_cast<i64>(r.end)};
   }
-  static ParsedWhole text_parse_uint(Text a, Int at, Int base) {
+  static ParsedUnsigned text_parse_uint(Text a, Int at, Int base) {
     const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), false);
-    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+    return {r.bits, at + static_cast<i64>(r.end)};
   }
 };
 
@@ -2826,67 +2586,12 @@ inline int switch_text(std::string_view cases, std::string_view selection) {
 
 }  // namespace logic
 
-namespace logic::detail {
-/// The conversions of Value::converted, type by type (only the pairs a wire can make).
-template <class T> struct To;
-template <> struct To<bool> {
-  static bool from(bool v) { return v; }
-  static bool from(i64 v) { return v != 0; }
-  static bool from(f64 v) { return v != 0; }
-  static bool from(ActorHandle v) { return v.id != 0; }
-};
-template <> struct To<i64> {
-  static i64 from(bool v) { return v ? 1 : 0; }
-  static i64 from(i64 v) { return v; }
-  static i64 from(f64 v) { return whole(v); }
-};
-template <> struct To<Whole> : To<i64> {
-  using To<i64>::from;
-  // (a number made whole is already as a Blueprint holds it: whole gives a number within 2^53, a
-  // number above 2^53 - which a double holds exactly, and logic::normal leaves - or one of Int's
-  // ends; so logic::normal, which Whole(i64) applies, is left out - the same Int, without the detour)
-  static Whole from(f64 v) {
-    Whole r;
-    r.v = whole(v);
-    return r;
-  }
-  static Whole from(math::Exact v) { return Whole(v); }  // (a formula of whole numbers: whole(double(v)) is normal(v))
-};
-template <> struct To<f64> {
-  template <class T> static f64 from(Sized<T> v) { return static_cast<f64>(v.v); }
-  static f64 from(bool v) { return v ? 1 : 0; }
-  static f64 from(i64 v) { return static_cast<f64>(v); }
-  static f64 from(f64 v) { return v; }
-};
-template <> struct To<Vec3> {
-  static Vec3 from(Vec3 v) { return v; }
-  static Vec3 from(f64 v) {
-    const f32 x = static_cast<f32>(v);
-    return {x, x, x};
-  }
-  static Vec3 from(i64 v) { return from(static_cast<f64>(v)); }
-};
-template <> struct To<std::string> {
-  template <class S> static std::string from(const S& v) { return to_value(v).as_text(); }  // (everything prints, as the interpreter prints it)
-  static std::string from(math::Exact v) { return from(static_cast<f64>(v)); }
-};
-template <> struct To<Text> {
-  static Text from(const Text& v) { return v; }
-  template <class S> static Text from(const S& v) { return Text(to_value(v).as_text()); }  // (everything prints, as the interpreter prints it)
-  static Text from(math::Exact v) { return from(static_cast<f64>(v)); }
-};
-template <> struct To<ActorHandle> {
-  static ActorHandle from(ActorHandle v) { return v; }
-};
-}  // namespace logic::detail
 
-/// What a wire does when its ends have different types: kern::to<Float>(index). The same
-/// conversions the interpreter makes (Value::converted).
+/// What a wire from a place of the engine gives: what stands there, as its own type (engine_direct.h). No wire converts
+/// a value into another type (a conversion is a node: num_cast<To, From>).
 template <class T, class S> T to(const S& v) {
-  if constexpr (requires { typename S::kern_place_value; })
-    return to<T>(static_cast<typename S::kern_place_value>(v));   // (a place of the engine: what stands there - engine_direct.h)
-  else
-    return logic::detail::To<T>::from(v);
+  if constexpr (requires { typename S::kern_place_value; }) return to<T>(static_cast<typename S::kern_place_value>(v));
+  else return static_cast<const T&>(v);
 }
 
 }  // namespace kern

@@ -110,13 +110,13 @@ void add_events(logic::Library& lib) {
   lib.add(event("game.touched_sensor", "On Entered Sensor", "game.overlapped_begin", {actor_out, data("other", "Sensor Actor", PinType::actor)},
                 "This actor (e.g. a player) walked into someone else's sensor.", "overlap volume"));
   lib.add(event("game.hit", "On Hit", "game.hit",
-                {actor_out, other_out, data("speed", "Impact Speed", PinType::number), data("point", "Point", PinType::vector), data("normal", "Normal", PinType::vector)},
+                {actor_out, other_out, data("speed", "Impact Speed", PinType::f64), data("point", "Point", PinType::vector), data("normal", "Normal", PinType::vector)},
                 "This actor's body hit something hard enough (Box3D hit event).", "collide collision bump impact"));
-  lib.add(event("game.pickup", "On Collected", "game.pickup", {actor_out, data("other", "Collector", PinType::actor), data("points", "Points", PinType::number)},
+  lib.add(event("game.pickup", "On Collected", "game.pickup", {actor_out, data("other", "Collector", PinType::actor), data("points", "Points", PinType::f64)},
                 "A pickup was collected.", "pickup orb"));
   lib.add(event("game.trigger", "On Trigger", "game.trigger", {actor_out, data("other", "Player", PinType::actor)}, "A player touched this trigger.", "goal checkpoint"));
   lib.add(event("game.damaged", "On Damaged", "game.damaged",
-                {actor_out, data("other", "Attacker", PinType::actor), data("amount", "Damage", PinType::number), data("head", "Headshot", PinType::boolean)},
+                {actor_out, data("other", "Attacker", PinType::actor), data("amount", "Damage", PinType::f64), data("head", "Headshot", PinType::boolean)},
                 "This actor took damage (needs a Health component).", "hurt shot"));
   lib.add(event("game.death", "On Death", "game.death", {actor_out, data("other", "Killer", PinType::actor), data("head", "Headshot", PinType::boolean)},
                 "This actor's health reached 0.", "die killed destroyed"));
@@ -168,12 +168,12 @@ void add_actor_nodes(logic::Library& lib) {
   const json::Value zero3 = vec3(0, 0, 0);
   const PinDef actor_in = data("target", "Actor", PinType::actor, 0);
   lib.add(value("actor.self", "Self", "Actors", {}, {data("actor", "Self", PinType::actor)}, "The actor this graph belongs to (none in the level graph).", "this me owner"));
-  lib.add(value("actor.player", "Get Player", "Actors", {data("index", "Player Index", PinType::integer, 0)}, {data("actor", "Player", PinType::actor)},
+  lib.add(value("actor.player", "Get Player", "Actors", {data("index", "Player Index", PinType::i64, 0)}, {data("actor", "Player", PinType::actor)},
                 "The player's actor (0 = this machine's player; 1, 2... other players).", "pawn character me"));
-  lib.add(value("actor.player_count", "Player Count", "Actors", {}, {data("count", "Count", PinType::integer)}, "How many players are in the game.", "players number"));
+  lib.add(value("actor.player_count", "Player Count", "Actors", {}, {data("count", "Count", PinType::i64)}, "How many players are in the game.", "players number"));
   lib.add(value("actor.find", "Find Actor by Name", "Actors", {data("name", "Name", PinType::text, "Cube")}, {data("actor", "Actor", PinType::actor)},
                 "The actor with this name (as in the Outliner).", "get lookup named"));
-  lib.add(value("actor.find_tag", "Find Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actor", "Actor", PinType::actor), data("count", "Count", PinType::integer)},
+  lib.add(value("actor.find_tag", "Find Actor with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actor", "Actor", PinType::actor), data("count", "Count", PinType::i64)},
                 "The first living actor with the tag, and how many have it.", "get tagged"));
   lib.add(value("actor.all_with_tag", "All Actors with Tag", "Actors", {data("tag", "Tag", PinType::text, "target")}, {data("actors", "Actors", PinType::actor_list)},
                 "Every living actor with the tag, as a list (For Each goes through it).", "get tagged every list array"));
@@ -189,13 +189,13 @@ void add_actor_nodes(logic::Library& lib) {
   lib.add(value("actor.location", "Get Location", "Actors", {actor_in}, {data("location", "Location", PinType::vector)}, "World position of the actor.", "position where"));
   lib.add(value("actor.rotation", "Get Rotation", "Actors", {actor_in}, {data("rotation", "Rotation", PinType::vector)}, "World rotation in degrees (X roll, Y pitch, Z yaw).", "orientation angle"));
   lib.add(value("actor.forward", "Get Forward Vector", "Actors", {actor_in}, {data("forward", "Forward", PinType::vector)}, "The direction the actor faces (its X axis).", "direction facing"));
-  lib.add(value("actor.velocity", "Get Velocity", "Actors", {actor_in}, {data("velocity", "Velocity", PinType::vector), data("speed", "Speed", PinType::number)}, "Linear velocity (m/s) and speed.",
+  lib.add(value("actor.velocity", "Get Velocity", "Actors", {actor_in}, {data("velocity", "Velocity", PinType::vector), data("speed", "Speed", PinType::f64)}, "Linear velocity (m/s) and speed.",
                 "speed motion"));
-  lib.add(value("actor.distance", "Distance Between", "Actors", {data("a", "A", PinType::actor, 0), data("b", "B", PinType::actor, 0)}, {data("distance", "Distance", PinType::number)},
+  lib.add(value("actor.distance", "Distance Between", "Actors", {data("a", "A", PinType::actor, 0), data("b", "B", PinType::actor, 0)}, {data("distance", "Distance", PinType::f64)},
                 "Metres between two actors (A defaults to Self).", "near far range"));
-  lib.add(value("actor.health", "Get Health", "Combat", {actor_in}, {data("health", "Health", PinType::number), data("dead", "Is Dead", PinType::boolean)},
+  lib.add(value("actor.health", "Get Health", "Combat", {actor_in}, {data("health", "Health", PinType::f64), data("dead", "Is Dead", PinType::boolean)},
                 "Hit points (-1 without a Health component).", "hp life"));
-  lib.add(value("game.score", "Get Score", "Game", {}, {data("score", "Score", PinType::number), data("pickups", "Collected", PinType::integer)}, "Score and collected pickups.", "points"));
+  lib.add(value("game.score", "Get Score", "Game", {}, {data("score", "Score", PinType::f64), data("pickups", "Collected", PinType::i64)}, "Score and collected pickups.", "points"));
 
   // ---- steps ----
   lib.add(step("actor.set_location", "Set Location", "Actors", {actor_in, data("location", "Location", PinType::vector, zero3)}, {}, "Teleports the actor (bodies included).",
@@ -212,12 +212,12 @@ void add_actor_nodes(logic::Library& lib) {
   lib.add(step("actor.simulate", "Set Simulate Physics", "Physics", {actor_in, data("simulate", "Simulate", PinType::boolean, true)}, {}, "Lets the body fall (on) or holds it (off).",
                "dynamic kinematic freeze"));
   lib.add(step("actor.joint_motor", "Set Joint Motor", "Physics",
-               {actor_in, data("joint", "Joint Index", PinType::integer, 0), data("enable", "Enable", PinType::boolean, true), data("speed", "Speed (°/s or m/s)", PinType::number, 90.0),
-                data("force", "Max Force", PinType::number, 1000.0)},
+               {actor_in, data("joint", "Joint Index", PinType::i64, 0), data("enable", "Enable", PinType::boolean, true), data("speed", "Speed (°/s or m/s)", PinType::f64, 90.0),
+                data("force", "Max Force", PinType::f64, 1000.0)},
                {}, "Drives a hinge, slider or rope of the actor (doors, lifts, winches).", "constraint hinge slider drive"));
   lib.add(step("actor.explode", "Explosion", "Physics",
-               {data("location", "Location", PinType::vector, zero3), data("radius", "Radius", PinType::number, 6.0), data("impulse", "Strength", PinType::number, 6.0),
-                data("damage", "Damage", PinType::number, 50.0)},
+               {data("location", "Location", PinType::vector, zero3), data("radius", "Radius", PinType::f64, 6.0), data("impulse", "Strength", PinType::f64, 6.0),
+                data("damage", "Damage", PinType::f64, 50.0)},
                {}, "Box3D radial impulse with flash, sound and damage falling off with distance.", "blast bomb radial"));
   {
     NodeDef d = step("actor.spawn", "Spawn Actor", "Actors",
@@ -235,7 +235,7 @@ void add_actor_nodes(logic::Library& lib) {
   lib.add(step("actor.set_property", "Set Property", "Actors", {actor_in, data("path", "Property", PinType::text, "components.light.intensity"), data("value", "Value", PinType::text, "20")}, {},
                "Changes any component value by its path in the level file (e.g. components.light.intensity) - replicated. A path the actor does not have or a value of another kind is an error with the reason.", "component field details"));
   lib.add(step("actor.set_light", "Set Light", "Effects",
-               {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.9f, 0.7f)), data("intensity", "Intensity", PinType::number, 10.0), data("range", "Range", PinType::number, 10.0)}, {},
+               {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.9f, 0.7f)), data("intensity", "Intensity", PinType::f64, 10.0), data("range", "Range", PinType::f64, 10.0)}, {},
                "Colour (0..1 each), brightness and reach of the actor's point light.", "lamp brightness"));
   lib.add(step("actor.set_color", "Set Color", "Effects", {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.2f, 0.2f))}, {}, "The colour of the actor's mesh material (0..1 each) - GameWorld::set_material_color.", "material paint tint"));
 }
@@ -245,22 +245,22 @@ void add_actor_nodes(logic::Library& lib) {
 void add_walker_nodes(logic::Library& lib) {
   const PinDef robot = data("target", "Robot", PinType::actor, 0);
   lib.add(step("walker.move", "Walk", "Robots",
-               {robot, data("forward", "Forward (m/s)", PinType::number, 0.3), data("strafe", "Sideways (m/s)", PinType::number, 0.0), data("turn", "Turn (°/s)", PinType::number, 0.0),
-                data("duration", "Duration (s, 0 = keep)", PinType::number, 0.0)},
+               {robot, data("forward", "Forward (m/s)", PinType::f64, 0.3), data("strafe", "Sideways (m/s)", PinType::f64, 0.0), data("turn", "Turn (°/s)", PinType::f64, 0.0),
+                data("duration", "Duration (s, 0 = keep)", PinType::f64, 0.0)},
                {},
                "Walks the robot like its gamepad: forward up to 0.4 m/s, sideways 0.3, turning 57 °/s (its trained ranges). Overrides its own behaviour "
                "for the duration (0: until the next Walk; Set Autonomous gives it back).",
                "drive move go duck robot walker twist"));
   lib.add(step("walker.look", "Look", "Robots",
-               {robot, data("yaw", "Yaw (°, + left)", PinType::number, 0.0), data("pitch", "Pitch (°, + down)", PinType::number, 0.0), data("duration", "Duration (s, 0 = keep)", PinType::number, 0.0)},
+               {robot, data("yaw", "Yaw (°, + left)", PinType::f64, 0.0), data("pitch", "Pitch (°, + down)", PinType::f64, 0.0), data("duration", "Duration (s, 0 = keep)", PinType::f64, 0.0)},
                {}, "Turns the robot's head (its camera and ToF look there): yaw up to 80°, pitch up to 63°.", "head camera gaze duck robot"));
   lib.add(step("walker.autonomous", "Set Autonomous", "Robots", {robot, data("enable", "Autonomous", PinType::boolean, true)}, {},
                "On: the robot roams on its own (camera, ToF, exploration memory) whenever nobody drives it. Off: it stands until driven.", "brain behaviour wander ai duck robot"));
   lib.add(step("walker.skill", "Robot Move", "Robots", {robot, data("move", "Move", PinType::text, "pick")}, {},
                "One of the robot's moves, as its daemon runs them: sit (toggles), pick (ground pick; the crouch on rollers), kick_left, kick_right, roulade; and jump, Kern's own (trained in Kern Lehrer).",
                "skill sit kick roll pick duck robot"));
-  lib.add(step("walker.beak", "Robot Beak", "Robots", {robot, data("open", "Open (0-1)", PinType::number, 1.0)}, {}, "Opens (1) or closes (0) the beak.", "mouth jaw duck robot"));
-  lib.add(step("walker.pet", "Pet Robot", "Robots", {robot, data("seconds", "Seconds", PinType::number, 3.0)}, {},
+  lib.add(step("walker.beak", "Robot Beak", "Robots", {robot, data("open", "Open (0-1)", PinType::f64, 1.0)}, {}, "Opens (1) or closes (0) the beak.", "mouth jaw duck robot"));
+  lib.add(step("walker.pet", "Pet Robot", "Robots", {robot, data("seconds", "Seconds", PinType::f64, 3.0)}, {},
                "A hand on the duck for a while: it melts, wiggles or falls asleep, as Pollen's brain does it.", "petting stroke touch duck robot"));
   lib.add(step("walker.hear", "Robot Hears", "Robots", {robot, data("voice", "Voice (else a noise)", PinType::boolean, true)}, {},
                "The duck hears someone talk (it perks up and answers) or a noise (it stirs from a doze).", "sound voice listen duck robot"));
@@ -268,15 +268,15 @@ void add_walker_nodes(logic::Library& lib) {
                 "The beak is told to shut and its servo reads it open: something is in it (a sock).", "sock beak carry duck robot"));
   lib.add(step("walker.quack", "Chirp", "Robots", {robot}, {}, "The duck chirps (its own voice, the robot's synth) and opens its beak.", "sound duck robot"));
   lib.add(value("walker.tof", "Robot ToF", "Robots", {robot},
-                {data("blocked", "Obstacle Seen", PinType::boolean), data("distance", "Nearest (m)", PinType::number), data("bearing", "Bearing (°, + left)", PinType::number),
-                 data("left", "Free Left (0-1)", PinType::number), data("right", "Free Right (0-1)", PinType::number)},
+                {data("blocked", "Obstacle Seen", PinType::boolean), data("distance", "Nearest (m)", PinType::f64), data("bearing", "Bearing (°, + left)", PinType::f64),
+                 data("left", "Free Left (0-1)", PinType::f64), data("right", "Free Right (0-1)", PinType::f64)},
                 "The head time-of-flight sensor (8 x 8 zones, 45°): the nearest obstacle with the robot's own floor filter. -1 = nothing in range (4 m real).",
                 "distance sensor depth obstacle duck robot"));
   lib.add(value("walker.sees", "Robot Camera Sees", "Robots", {robot, data("other", "Actor", PinType::actor, 0)},
-                {data("visible", "Visible", PinType::boolean), data("bearing", "Bearing (°, + left)", PinType::number), data("distance", "Distance (m)", PinType::number)},
+                {data("visible", "Visible", PinType::boolean), data("bearing", "Bearing (°, + left)", PinType::f64), data("distance", "Distance (m)", PinType::f64)},
                 "Whether the actor is in the head camera's picture (62° x 37°) with nothing in between.", "vision see detect camera duck robot"));
   lib.add(value("walker.state", "Robot State", "Robots", {robot},
-                {data("state", "Behaviour", PinType::text), data("fallen", "Fallen", PinType::boolean), data("speed", "Speed (m/s)", PinType::number)},
+                {data("state", "Behaviour", PinType::text), data("fallen", "Fallen", PinType::boolean), data("speed", "Speed (m/s)", PinType::f64)},
                 "What the robot is doing (Chill, LookAround, Wander, TurnInPlace, BackOff, Zoomies, GetUp; Driven / Logic when someone drives it).", "behaviour status fallen duck robot"));
 }
 
@@ -284,12 +284,12 @@ void add_game_nodes(logic::Library& lib) {
   const json::Value zero3 = vec3(0, 0, 0);
   const PinDef actor_in = data("target", "Actor", PinType::actor, 0);
   lib.add(step("game.message", "Show Message", "Game", {data("text", "Text", PinType::text, "Hello!")}, {}, "A message in the middle of the screen (every player sees it).", "say hud print notify"));
-  lib.add(step("game.add_score", "Add Score", "Game", {data("points", "Points", PinType::number, 10.0)}, {}, "Adds points (wins at the target score when the goal is Score).", "points reward"));
+  lib.add(step("game.add_score", "Add Score", "Game", {data("points", "Points", PinType::f64, 10.0)}, {}, "Adds points (wins at the target score when the goal is Score).", "points reward"));
   lib.add(step("game.win", "Win Game", "Game", {data("message", "Message", PinType::text, "You win!")}, {}, "Ends the game as won.", "victory finish complete"));
   lib.add(step("game.lose", "Lose Game", "Game", {data("message", "Message", PinType::text, "Game over")}, {}, "Ends the game as lost.", "fail defeat"));
   {
     NodeDef d = step("game.sound", "Play Sound", "Audio",
-                     {data("location", "Location", PinType::vector, zero3), data("volume", "Volume", PinType::number, 1.0), data("pitch", "Pitch", PinType::number, 1.0),
+                     {data("location", "Location", PinType::vector, zero3), data("volume", "Volume", PinType::f64, 1.0), data("pitch", "Pitch", PinType::f64, 1.0),
                       data("spatial", "3D", PinType::boolean, true)},
                      {}, "Plays a sound once (3D at the location, or Self's position; or flat when 3D is off).", "audio sfx noise");
     d.params = {param("sound", "Sound", ParamDef::Kind::sound, "builtin:confirm")};
@@ -302,12 +302,12 @@ void add_game_nodes(logic::Library& lib) {
   }
   lib.add(step("game.particles", "Spawn Sparks", "Effects", {data("location", "Location", PinType::vector, zero3), data("color", "Color", PinType::vector, vec3(1, 0.8f, 0.3f))}, {},
                "A burst of glowing particles.", "fx effect burst confetti"));
-  lib.add(step("game.shake", "Camera Shake", "Effects", {data("amount", "Amount", PinType::number, 0.5)}, {}, "Shakes this machine's camera (0..1).", "rumble"));
-  lib.add(step("combat.damage", "Apply Damage", "Combat", {actor_in, data("amount", "Damage", PinType::number, 25.0), data("instigator", "Instigator", PinType::actor, 0)}, {},
+  lib.add(step("game.shake", "Camera Shake", "Effects", {data("amount", "Amount", PinType::f64, 0.5)}, {}, "Shakes this machine's camera (0..1).", "rumble"));
+  lib.add(step("combat.damage", "Apply Damage", "Combat", {actor_in, data("amount", "Damage", PinType::f64, 25.0), data("instigator", "Instigator", PinType::actor, 0)}, {},
                "Hurts an actor with a Health component (armor first, death, score).", "hurt hit attack"));
-  lib.add(step("combat.heal", "Heal", "Combat", {actor_in, data("amount", "Amount", PinType::number, 25.0)}, {}, "Gives health back (up to the maximum).", "health restore medkit"));
+  lib.add(step("combat.heal", "Heal", "Combat", {actor_in, data("amount", "Amount", PinType::f64, 25.0)}, {}, "Gives health back (up to the maximum).", "health restore medkit"));
   lib.add(step("combat.kill", "Kill", "Combat", {actor_in}, {}, "Takes all health (respawns like any death).", "die"));
-  lib.add(step("combat.ammo", "Give Ammo", "Combat", {data("target", "Player", PinType::actor, 0), data("rounds", "Rounds", PinType::integer, 30)}, {}, "Adds rounds to a soldier's reserve.",
+  lib.add(step("combat.ammo", "Give Ammo", "Combat", {data("target", "Player", PinType::actor, 0), data("rounds", "Rounds", PinType::i64, 30)}, {}, "Adds rounds to a soldier's reserve.",
                "bullets reload"));
   // Line trace (a step like Unreal's, so the hit is taken once).
   lib.add(step("physics.trace", "Line Trace", "Physics",
@@ -317,12 +317,12 @@ void add_game_nodes(logic::Library& lib) {
   // The same with Box3D's query filter: which collision channels the ray meets, and its own.
   lib.add(step("physics.trace_channels", "Line Trace by Channels", "Physics",
                {data("start", "Start", PinType::vector, zero3), data("end", "End", PinType::vector, vec3(10, 0, 0)), data("ignore", "Ignore", PinType::actor, 0),
-                data("mask", "Channels", PinType::integer, 4294967295.0), data("category", "Own Channels", PinType::integer, 4294967295.0)},
+                data("mask", "Channels", PinType::i64, 4294967295.0), data("category", "Own Channels", PinType::i64, 4294967295.0)},
                {data("hit", "Hit", PinType::boolean), data("actor", "Hit Actor", PinType::actor), data("location", "Location", PinType::vector), data("normal", "Normal", PinType::vector)},
                "First thing between Start and End that is of one of Channels - the bits of the level's collision channels (the node Channels gives them by name). A collider that does "
                "not collide with Own Channels is left out too: so a collider can ignore certain rays. (Box3D: a ray meets a shape when shape.category & Channels and shape.mask & Own Channels.)",
                "raycast ray line of sight filter category mask layer"));
-  lib.add(value("physics.channels", "Channels", "Physics", {data("names", "Names", PinType::text, "World")}, {data("mask", "Channels", PinType::integer)},
+  lib.add(value("physics.channels", "Channels", "Physics", {data("names", "Names", PinType::text, "World")}, {data("mask", "Channels", PinType::i64)},
                 "The bits of the level's collision channels with these names, separated by commas (World Settings: Collision channels). \"All\": every channel. For a collider's "
                 "channels and for Line Trace by Channels.",
                 "collision channel category mask layer bits filter"));
@@ -330,7 +330,7 @@ void add_game_nodes(logic::Library& lib) {
   {
     NodeDef d = make("flow.for_each_tag", "For Each Actor with Tag", "Flow", NodeKind::flow, "Runs Loop Body for every living actor with the tag, then Completed.", "loop all every");
     d.inputs = {exec_in(), data("tag", "Tag", PinType::text, "target")};
-    d.outputs = {exec_out("body", "Loop Body"), data("actor", "Actor", PinType::actor), data("index", "Index", PinType::integer), exec_out("completed", "Completed")};
+    d.outputs = {exec_out("body", "Loop Body"), data("actor", "Actor", PinType::actor), data("index", "Index", PinType::i64), exec_out("completed", "Completed")};
     d.loop = true;
     d.memory = true;
     d.native = true;

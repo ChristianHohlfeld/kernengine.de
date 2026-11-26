@@ -456,11 +456,11 @@ template <> struct Conv<Actor> {
 template <> struct Conv<Int64> {
   template <class C> static void from(EngineObjects&, const Value& v, C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    c = static_cast<C>(static_cast<u64>(v.i));
+    c = static_cast<C>(v.as<u64>());
   }
   template <class C> static Value to(EngineObjects&, const C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    return Value::int64(static_cast<u64>(c));
+    return Value::of_number(static_cast<u64>(c));
   }
 };
 template <class E> struct Conv<Enum<E>> {
@@ -543,7 +543,7 @@ template <> struct Held<Handle> { using type = ObjectRef; };
 template <> struct Held<Float> { using type = f64; };
 template <> struct Held<Vector> { using type = Vec3; };
 template <> struct Held<Text> { using type = std::string; };
-template <> struct Held<Int64> { using type = logic::Int64; };
+template <> struct Held<Int64> { using type = u64; };
 template <class E> struct Held<Enum<E>> { using type = i64; };
 
 /// One item of a list of T as the list holds it, and back.
@@ -551,23 +551,17 @@ template <class T, class C> typename Held<T>::type held_of(EngineObjects& o, con
   const Value v = Conv<T>::to(o, c);
   using H = typename Held<T>::type;
   if constexpr (std::is_same_v<H, Value>) return v;
-  else if constexpr (std::is_same_v<H, bool>) return v.b;
-  else if constexpr (std::is_same_v<H, i64>) return v.i;
-  else if constexpr (std::is_same_v<H, f64>) return v.n;
+  else if constexpr (num::Number<H>) return v.as<H>();
   else if constexpr (std::is_same_v<H, Vec3>) return v.v;
   else if constexpr (std::is_same_v<H, std::string>) return v.s;
-  else if constexpr (std::is_same_v<H, ObjectRef>) return v.as_object();
-  else return logic::Int64(static_cast<u64>(v.i));
+  else return v.as_object();
 }
 template <class T, class C, class H> void from_held(EngineObjects& o, const H& h, C& c) {
   if constexpr (std::is_same_v<H, Value>) Conv<T>::from(o, h, c);
-  else if constexpr (std::is_same_v<H, bool>) Conv<T>::from(o, Value::boolean(h), c);
-  else if constexpr (std::is_same_v<H, i64>) Conv<T>::from(o, Value::integer(h), c);
-  else if constexpr (std::is_same_v<H, f64>) Conv<T>::from(o, Value::number(h), c);
+  else if constexpr (num::Number<H>) Conv<T>::from(o, Value::of_number(h), c);
   else if constexpr (std::is_same_v<H, Vec3>) Conv<T>::from(o, Value::vector(h), c);
   else if constexpr (std::is_same_v<H, std::string>) Conv<T>::from(o, Value::text(h), c);
-  else if constexpr (std::is_same_v<H, ObjectRef>) Conv<T>::from(o, Value::object(h), c);
-  else Conv<T>::from(o, Value::int64(h.bits), c);
+  else Conv<T>::from(o, Value::object(h), c);
 }
 
 /// Entry k of a list the value holds, as the type it holds (a std::vector<bool> gives a proxy for an entry -

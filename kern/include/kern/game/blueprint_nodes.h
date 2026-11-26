@@ -121,7 +121,7 @@ Robot walker_state(GameWorld& w, Self self, Actor target);
 /// gets nothing (the values' zeros).
 template <class Core> struct BlueprintNodesOf : Core {
   using Bool = bool;
-  using Int = logic::Whole;
+  using Int = i64;
   using Float = f64;
   using Vector = Vec3;
   using Text = logic::Text;

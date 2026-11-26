@@ -73,14 +73,14 @@ struct Bytes {
 enum Op : u8 {
   kBlock = 0x02, kLoop = 0x03, kIf = 0x04, kElse = 0x05, kEnd = 0x0b, kBr = 0x0c, kBrTable = 0x0e, kReturn = 0x0f, kCall = 0x10, kSelect = 0x1b, kDrop = 0x1a,
   kLocalGet = 0x20, kLocalSet = 0x21, kLocalTee = 0x22,
-  kI32Load = 0x28, kF64Load = 0x2b, kI32Store = 0x36, kF64Store = 0x39,
+  kI32Load = 0x28, kI64Load = 0x29, kF32Load = 0x2a, kF64Load = 0x2b, kI32Store = 0x36, kI64Store = 0x37, kF64Store = 0x39,
   kI32Const = 0x41, kF64Const = 0x44,
   kI32Eqz = 0x45, kI32Eq = 0x46, kI32Ne = 0x47, kI32LtS = 0x48, kI32GtS = 0x4a, kI32LeS = 0x4c, kI32GeS = 0x4e, kI32GeU = 0x4f,
   kF64Eq = 0x61, kF64Ne = 0x62, kF64Lt = 0x63, kF64Gt = 0x64, kF64Le = 0x65, kF64Ge = 0x66,
   kI32Add = 0x6a, kI32Sub = 0x6b, kI32And = 0x71, kI32Or = 0x72, kI32Xor = 0x73, kI32Shl = 0x74,
   kF64Abs = 0x99, kF64Neg = 0x9a, kF64Floor = 0x9c, kF64Trunc = 0x9d, kF64Sqrt = 0x9f,
   kF64Add = 0xa0, kF64Sub = 0xa1, kF64Mul = 0xa2, kF64Div = 0xa3, kF64Min = 0xa4, kF64Max = 0xa5, kF64Copysign = 0xa6,
-  kF64ConvertI32U = 0xb8,
+  kF64ConvertI32U = 0xb8, kF64ConvertI64S = 0xb9, kF64ConvertI64U = 0xba, kF64PromoteF32 = 0xbb, kI64ExtendI32U = 0xad,
 };
 constexpr u8 kVoid = 0x40, kTypeI32 = 0x7f, kTypeF64 = 0x7c;
 
@@ -194,19 +194,23 @@ class WasmGen {
   void store_slot_from_f0(int slot) { i32c(slot_addr(slot)); lget(kF0); mem(kF64Store, 3, 0); }
   void bool_of_f64() { f64c(0); op(kF64Ne); }  // f64 -> i32 0/1
   void to_f64_from_bool() { op(kF64ConvertI32U); }
-  void convert(PinType t) {
-    if (t == PinType::integer) {
-      // A whole number as Int holds it (logic::whole): toward zero; not a number or endless: 0;
-      // beyond Int: its nearest end. (kF3 is this conversion's own.)
-      op(kF64Trunc);
-      lset(kF3);
-      lget(kF3); f64c(0);
-      lget(kF3); lget(kF3); op(kF64Sub); f64c(0); op(kF64Eq);  // finite: x - x is 0
-      op(kSelect);
-      f64c(-9223372036854775808.0); op(kF64Max);
-      f64c(9223372036854775808.0); op(kF64Min);
-    }
-    else if (t == PinType::boolean) { bool_of_f64(); to_f64_from_bool(); }
+  // A number in a slot is its bits (logic.cpp, slot_of). Where the code here works with a number - a condition, a
+  // loop's bounds and its counter -, it is an f64 on the stack: these turn the bits of a slot of the type t into
+  // that f64, and an f64 (kF0) into the bits of an output of the type t. (The loop's own counters are its node's
+  // memory: f64, as the interpreter's flow functions hold them - nodes.h, flow.)
+  void load_number(int slot, PinType t) {
+    i32c(slot_addr(slot));
+    if (t == PinType::f64) { mem(kF64Load, 3, 0); return; }
+    if (t == PinType::f32) { mem(kF32Load, 2, 0); op(kF64PromoteF32); return; }
+    mem(kI64Load, 3, 0);
+    op(t == PinType::u64 ? kF64ConvertI64U : kF64ConvertI64S);  // (bool, and every whole number but u64: its value as an i64)
+  }
+  void store_number_from_f0(int slot, PinType t) {
+    if (t == PinType::f64 || !is_number(t)) { store_slot_from_f0(slot); return; }
+    i32c(slot_addr(slot));
+    if (t == PinType::boolean) { lget(kF0); bool_of_f64(); op(kI64ExtendI32U); }
+    else { lget(kF0); o_->byte(0xfc); o_->uleb(t == PinType::u64 ? 7 : 6); }  // (i64.trunc_sat_f64_s / _u: a counter of the loop, a whole number)
+    mem(kI64Store, 3, 0);
   }
 
   // ---- values ----
@@ -218,17 +222,9 @@ class WasmGen {
       f64c(in_.literal_of(node, k).as_number());
       return;
     }
-    if (depth < 24 && in_.inline_pure(s.node)) {
-      // (a value that is an Int - Round, Floor - is one as the node gives it, whatever reads it)
-      const PinType gives = in_.outputs_at(s.node)[static_cast<std::size_t>(s.pin)].type;
-      pure(s.node, s.pin, depth + 1);
-      if (gives == PinType::integer) convert(gives);
-      if (pin.type != gives) convert(pin.type);
-      return;
-    }
+    (void)depth;
     if (const int slot = in_.out_slot(s.node, s.pin); slot >= 0 && in_.def_at(s.node)->kind != NodeKind::pure) {
-      load_slot(slot);
-      convert(pin.type);
+      load_number(slot, pin.type);
       return;
     }
     // Anything else: the C++ side evaluates the input (events' outputs, text, vectors...).
@@ -249,79 +245,8 @@ class WasmGen {
     else value(node, k, depth);
   }
 
-  void pure(int node, int pin, int depth) {
-    (void)pin;
-    const std::string& t = in_.def_at(node)->type;
-    auto two = [&](const char* a, const char* b) {
-      value(node, a, depth);
-      value(node, b, depth);
-      lset(kF1);
-      lset(kF0);
-    };
-    if (t == "var.get") { load_slot(in_.var_slot(in_.node_at(node))); return; }
-    if (t == "value.float" || t == "value.int" || t == "value.bool") { value(node, "value", depth); return; }
-    if (t == "math.add") { value(node, "a", depth); value(node, "b", depth); op(kF64Add); return; }
-    if (t == "math.sub") { value(node, "a", depth); value(node, "b", depth); op(kF64Sub); return; }
-    if (t == "math.mul") { value(node, "a", depth); value(node, "b", depth); op(kF64Mul); return; }
-    if (t == "math.min") { value(node, "a", depth); value(node, "b", depth); op(kF64Min); return; }
-    if (t == "math.max") { value(node, "a", depth); value(node, "b", depth); op(kF64Max); return; }
-    if (t == "math.abs") { value(node, "a", depth); op(kF64Abs); return; }
-    if (t == "math.copysign") { value(node, "a", depth); value(node, "b", depth); op(kF64Copysign); return; }  // (WebAssembly's f64.copysign: the same bit operation)
-    if (t == "math.negate") { value(node, "a", depth); op(kF64Neg); return; }
-    if (t == "math.sqrt") { value(node, "a", depth); f64c(0); op(kF64Max); op(kF64Sqrt); return; }
-    if (t == "math.floor") { value(node, "a", depth); op(kF64Floor); return; }
-    if (t == "math.round") {  // llround: half away from zero
-      value(node, "a", depth);
-      lset(kF0);
-      lget(kF0); op(kF64Abs); f64c(0.5); op(kF64Add); op(kF64Floor); lget(kF0); op(kF64Copysign);
-      return;
-    }
-    if (t == "math.div" || t == "math.mod") {
-      two("a", "b");
-      if (t == "math.div") { lget(kF0); lget(kF1); op(kF64Div); }
-      else { lget(kF0); lget(kF1); lget(kF0); lget(kF1); op(kF64Div); op(kF64Trunc); op(kF64Mul); op(kF64Sub); }
-      f64c(0);
-      lget(kF1); f64c(0); op(kF64Ne);
-      op(kSelect);
-      return;
-    }
-    if (t == "math.clamp") {
-      value(node, "value", depth); value(node, "min", depth); value(node, "max", depth);
-      lset(kF2); lset(kF1); lset(kF0);
-      lget(kF1); lget(kF2); op(kF64Min);
-      lget(kF0); lget(kF1); lget(kF2); op(kF64Max); op(kF64Min);
-      op(kF64Max);
-      return;
-    }
-    if (t == "math.lerp") {
-      value(node, "a", depth); value(node, "b", depth); value(node, "alpha", depth);
-      lset(kF2); lset(kF1); lset(kF0);
-      lget(kF0); lget(kF1); lget(kF0); op(kF64Sub); lget(kF2); op(kF64Mul); op(kF64Add);
-      return;
-    }
-    if (t == "math.compare") {
-      two("a", "b");
-      const std::string o = in_.node_at(node).param("op", "==");
-      if (o == "==" || o == "!=") { lget(kF0); lget(kF1); op(kF64Sub); op(kF64Abs); f64c(1e-9); op(o == "==" ? kF64Le : kF64Gt); }
-      else { lget(kF0); lget(kF1); op(o == "<" ? kF64Lt : o == "<=" ? kF64Le : o == ">" ? kF64Gt : kF64Ge); }
-      to_f64_from_bool();
-      return;
-    }
-    if (t == "logic.not") { value(node, "a", depth); f64c(0); op(kF64Eq); to_f64_from_bool(); return; }
-    if (t == "logic.and" || t == "logic.or" || t == "logic.xor") {
-      value(node, "a", depth); bool_of_f64();
-      value(node, "b", depth); bool_of_f64();
-      op(t == "logic.and" ? kI32And : t == "logic.or" ? kI32Or : kI32Xor);
-      to_f64_from_bool();
-      return;
-    }
-    if (t == "logic.select") {
-      value(node, "a", depth); value(node, "b", depth); value(node, "pick", depth); bool_of_f64();
-      op(kSelect);
-      return;
-    }
-    f64c(0);
-  }
+  // (No value node is computed here: every number is computed by its node's own function - PureNodes, numbers.h -
+  // which the code above reaches through read_pin. The JIT inlines the flow only - Instance::inline_pure.)
 
   // ---- exec helpers ----
   void next(int node, int ordinal) {
@@ -418,7 +343,7 @@ class WasmGen {
       may_pass();
       if_void();
       count_pass();
-      load_slot(base + 0); lset(kF0); store_slot_from_f0(in_.out_slot(i, 1));
+      load_slot(base + 0); lset(kF0); store_number_from_f0(in_.out_slot(i, 1), in_.outputs_at(i)[1].type);
       push(i, kResume);
       next(i, 0);
       op(kElse);
@@ -456,7 +381,7 @@ class WasmGen {
       load_slot(base + 0); value(i, "n", 0); op(kF64Ge);
       if_void(); stop();
       op(kElse);
-      load_slot(base + 0); f64c(1); op(kF64Add); lset(kF0); store_slot_from_f0(base + 0); store_slot_from_f0(in_.out_slot(i, 1));
+      load_slot(base + 0); f64c(1); op(kF64Add); lset(kF0); store_slot_from_f0(base + 0); store_number_from_f0(in_.out_slot(i, 1), in_.outputs_at(i)[1].type);
       next(i, 0);
       op(kEnd);
       op(kEnd);
@@ -477,23 +402,9 @@ class WasmGen {
     if (t == "flow.flip_flop") {
       load_slot(base + 0); f64c(0); op(kF64Eq); to_f64_from_bool(); lset(kF0);
       store_slot_from_f0(base + 0);
-      if (const int o = in_.out_slot(i, 2); o >= 0) store_slot_from_f0(o);
+      if (const int o = in_.out_slot(i, 2); o >= 0) store_number_from_f0(o, in_.outputs_at(i)[2].type);
       lget(kF0); bool_of_f64();
       if_void(); next(i, 0); op(kElse); next(i, 1); op(kEnd);
-      return;
-    }
-    if (t == "var.set" || t == "var.add") {
-      Variable named;
-      const Variable* v = in_.graph().variable_of(in_.node_at(i), named) ? &named : nullptr;
-      const int vs = in_.var_slot(in_.node_at(i));
-      if (t == "var.set") value(i, "value", 0);
-      else { load_slot(vs); value(i, "amount", 0); op(kF64Add); }
-      convert(v ? v->type : PinType::number);
-      lset(kF0);
-      store_slot_from_f0(vs);
-      for (int o = 0; o < static_cast<int>(in_.outputs_at(i).size()); ++o)
-        if (const int s = in_.out_slot(i, o); s >= 0) store_slot_from_f0(s);
-      next(i, 0);
       return;
     }
     stop();

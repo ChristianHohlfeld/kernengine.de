@@ -612,8 +612,9 @@ json::Value Studio::logic_json() const {
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
         if (p.of == logic::kAnyWidth) {  // (it reads a list of Ints of each width: List<Int>, List<U8> ...)
-          std::string types = "int_list";
-          for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
+          std::string types;
+          for (logic::PinType t : {logic::PinType::i64, logic::PinType::i32, logic::PinType::i16, logic::PinType::i8, logic::PinType::u64, logic::PinType::u32, logic::PinType::u16, logic::PinType::u8})
+            types += (types.empty() ? "" : " ") + std::string(logic::pin_type_name(logic::list_of(t)));
           pj.set("generic", types);
         }
         pj.set("linked", wired.count(pin_key(n.id, p.id, output)) != 0);
@@ -1096,7 +1097,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (v.constant) return;  // (a constant is read: nothing changes it)
     consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
     consider({"Take " + v.name, category, "Takes what " + what + " holds and leaves it empty", "var.take", with({{"variable", v.name}})});
-    if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
+    if (v.type == logic::PinType::f64 || v.type == logic::PinType::i64)
       consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
     // a struct variable: the Set of each of its fields - a Set at that place (Held.Damage)
     if (const logic::StructType* s = v.type == logic::PinType::structure ? g->structure(v.of) : nullptr)
@@ -1138,11 +1139,11 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     // (a list of a fixed length: its entries are set - no step changes its length; Copy Bytes writes the
     // bytes of its numbers where they stand, and only a list of numbers has those)
     const logic::PinType item = logic::element_of(v.type);
-    const bool numbers = item == logic::PinType::integer || item == logic::PinType::int64 || item == logic::PinType::number;
+    const bool numbers = logic::is_number(item) && item != logic::PinType::boolean;
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
       if (d->type == "list.copy_bytes" ? !numbers : v.count != 0) continue;
-      if (d->type == "list.insert_text" && v.type != logic::PinType::integer_list) continue;   // (the bytes of a text go into whole numbers)
+      if (d->type == "list.insert_text" && !(logic::is_list(v.type) && logic::is_integer(item))) continue;   // (the bytes of a text go into whole numbers)
       logic::Node named;
       named.type = d->type;
       name(named);
@@ -1798,7 +1799,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       // New variables nodes on a graph without variables: offer one (Get / Set need a name).
       if ((type == "var.get" || type == "var.set" || type == "var.add" || type == "var.take") && n.param("variable").empty()) {
-        if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::number, json::Value(0.0), {}});
+        if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::f64, json::Value(0.0), {}});
         n.set_param("variable", g.variables.front().name);
       }
       if ((type.rfind("event.state", 0) == 0 || type.rfind("state.", 0) == 0) && n.param("machine").empty()) {
@@ -2505,7 +2506,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, base); !why.empty() && !which.empty()) { error = why; return false; }
         if (const std::string why = type_name_problem(g, base); !why.empty()) { error = why; return false; }
         for (int i = 2; taken(n); ++i) n = base + std::to_string(i);
-        g.structs.push_back({n, {{"Field", {logic::PinType::number, {}}, json::Value(0.0)}}, {}});
+        g.structs.push_back({n, {{"Field", {logic::PinType::f64, {}}, json::Value(0.0)}}, {}});
         result.set("name", n);
         return true;
       }

@@ -100,17 +100,17 @@ template <> struct Direct<Actor> {
 };
 template <> struct Direct<Int> {
   template <class B, class C> static void from(EngineObjects&, const B& b, C& c) {
-    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
+    static_assert(num::Integer<B>, "an Int pin the class holds as something else than a whole number (i64; an entry of a List<u8> ...: its own type)");
     static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
-    const i64 v = normal(static_cast<i64>(b));
+    const i64 v = static_cast<i64>(b);
     if constexpr (is_count<C>) c = C(static_cast<u32>(v));
     else c = static_cast<C>(v);
   }
   template <class B, class C> static B make(EngineObjects&, const C& c) {
-    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
+    static_assert(num::Integer<B>, "an Int pin the class holds as something else than a whole number (i64; an entry of a List<u8> ...: its own type)");
     static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number (an object of the engine is an Object<I>)");
-    if constexpr (is_count<C>) return B(normal(static_cast<i64>(static_cast<u32>(c))));
-    else return B(normal(static_cast<i64>(c)));
+    if constexpr (is_count<C>) return static_cast<B>(static_cast<u32>(c));
+    else return static_cast<B>(static_cast<i64>(c));
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -186,14 +186,14 @@ template <> struct Direct<Text> {
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
 template <> struct Direct<Int64> {
-  template <class C> static void from(EngineObjects&, logic::Int64 b, C& c) {
+  template <class C> static void from(EngineObjects&, u64 b, C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    c = static_cast<C>(b.bits);
+    c = static_cast<C>(b);
   }
   template <class B, class C> static B make(EngineObjects&, const C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    static_assert(std::is_same_v<B, logic::Int64>, "an Int64 pin the class holds as something else than an Int64");
-    return logic::Int64(static_cast<u64>(c));
+    static_assert(std::is_same_v<B, u64>, "an Int64 pin the class holds as something else than a u64");
+    return static_cast<u64>(c);
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };

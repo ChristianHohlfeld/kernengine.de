@@ -11882,7 +11882,9 @@ def engine_skipped(q):
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
 # bits, as C++ has them; a list of them a List<Int64>)
-ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64", "Actor": "actor"}
+# (the pin types of the engine's door until its pins have the types of their signatures - stage 6 of the number types:
+# Int an i64, Float an f64, Int64 a u64; an entry of a fixed width - of a List<U8> - its own type, u8)
+ENGINE_PIN = {"Bool": "boolean", "Int": "i64", "Float": "f64", "Vector": "vector", "Text": "text", "Int64": "u64", "Actor": "actor"}
 
 
 def snake(name):
@@ -11971,8 +11973,8 @@ class Api:
             return ENGINE_PIN[bt], ""
         if object_class(bt):
             return "object", engine_class_name(object_class(bt))
-        if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is an int list of "u8")
-            return "integer", bt.lower()
+        if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is a list of u8)
+            return bt.lower(), ""
         if callback_parts(bt):
             return "callback", callback_of(bt)
         if bt in self.u.enum_values:
