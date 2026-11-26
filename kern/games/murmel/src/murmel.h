@@ -8,7 +8,6 @@
 #include <string>
 
 #include "kern/app/app.h"
-#include "kern/core/numbers.h"
 #include "kern/game/level.h"
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
@@ -25,7 +24,7 @@ const char* level_pfad(int nummer);
 kern::game::PlayInput steuerung(const kern::Engine& engine);
 
 /// Der Text des Stands (das Widget "stand" oben links): Level, Punkte und Bestwert - am Ende "Geschafft!".
-std::string anzeige(int level, kern::Float punkte, bool fertig, kern::i64 bestwert);
+std::string anzeige(int level, kern::f32 punkte, bool fertig, kern::i64 bestwert);
 
 /// Das Spiel: eine App der Engine.
 class Murmel final : public kern::App {
@@ -36,7 +35,7 @@ class Murmel final : public kern::App {
 
   /// Das laufende Level (0, 1), die Punkte aller fertigen Levels und des laufenden, ob alles geschafft ist.
   int level() const { return level_; }
-  kern::Float punkte() const;
+  kern::f32 punkte() const;
   bool fertig() const { return fertig_; }
   /// Wie viele Töne die Welt bisher verlangt hat.
   kern::u32 toene() const { return toene_; }
@@ -57,17 +56,15 @@ class Murmel final : public kern::App {
   std::unique_ptr<kern::game::GameAudio> audio_;
   kern::Camera kamera_;
   int level_ = 0;
-  kern::Float vorher_ = 0;   // die Punkte der fertigen Levels
+  kern::f32 vorher_ = 0;   // die Punkte der fertigen Levels
   bool fertig_ = false;
-  kern::Float gewonnen_seit_ = -1;   // Sekunden seit dem Ziel (< 0: noch nicht)
+  kern::f32 gewonnen_seit_ = -1;   // Sekunden seit dem Ziel (< 0: noch nicht)
   kern::u32 toene_ = 0;
   kern::i64 bestwert_ = 0;
   std::string text_;
 };
 
-/// Das eine Objekt des Spiels: mit ihm ist die Klasse Murmel der Zustand eines Blueprints - der Programm-Blueprint
-/// Murmel, die App des Projekts (der Konverter schreibt ihn, kern/docs/blueprint_cpp.md; der Einstieg src/main.cpp
-/// startet das Programm des Projekts).
+/// Das eine Objekt des Spiels (der Einstieg gibt es der Engine).
 Murmel& spiel();
 
 }  // namespace murmel

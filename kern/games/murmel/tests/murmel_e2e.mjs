@@ -1,7 +1,6 @@
 // Murmel im Browser (Playwright, Software-WebGL): (1) die Seite des Spiels lädt das Modul, eine gedrückte Pfeiltaste
 // rollt die Murmel über die erste Münze, der Punktestand der Anzeige steigt, der Ton läuft (der Mixer der Engine); (2) Kern Studio öffnet das Projekt und
-// sein Start-Level, Play spielt es: der Level-Graph meldet sich, die Pfeiltaste rollt, die Punkte steigen; (2b) Play Project
-// spielt die App des Projekts (den Programm-Blueprint Murmel): ihre Widgets, die Pfeiltaste rollt, ihre Punkte steigen.
+// sein Start-Level, Play spielt es: der Level-Graph meldet sich, die Pfeiltaste rollt, die Punkte steigen.
 //
 //   node kern/games/murmel/tests/murmel_e2e.mjs <base-url>     (die Wurzel des Repos, mit generated/studio.html und
 //                                                                kern/games/murmel/web/murmel.wasm)
@@ -111,38 +110,6 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(rolled, "an arrow key rolls the marble over a coin in the editor (score " + ((await status()).hud?.score ?? "-") + ")");
   await page.keyboard.up("ArrowUp");
   check(errors.length === 0, "no page errors in the editor" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
-  await page.close();
-}
-// (2b) im Editor: Play Project - die App ist der Programm-Blueprint Murmel des Projekts; sie startet Level 1, zeigt ihre
-// Widgets über dem Viewport, die Pfeiltaste rollt die Murmel über eine Münze, die Punkte der App steigen; Escape beendet
-{
-  const page = await browser.newPage({viewport: {width: 1024, height: 640}});
-  const errors = [];
-  page.on("pageerror", e => errors.push(e.message));
-  await page.goto(base + "/generated/studio.html");
-  await page.waitForFunction(() => window.KernStudio && window.KernStudio.frames() > 5, null, {timeout: 90000});
-  const cmd = c => page.evaluate(c => window.KernStudio.command(c), c);
-  const state = () => page.evaluate(() => window.KernStudio.state);
-  const project = JSON.parse(fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"));
-  const levels = Object.fromEntries(project.levels.map(l => [l, fs.readFileSync(path.join(game, l), "utf8")]));
-  await cmd({cmd: "projectOpen", text: fs.readFileSync(path.join(game, "murmel.kproject"), "utf8"), levels});
-  check(await until(async () => (await state()).project?.blueprints?.some(b => b.name === "Murmel" && /App/.test(b.implements ?? "")) ?? false),
-        "the project has the App Murmel as its program Blueprint (" + JSON.stringify((await state()).project?.blueprints ?? null).slice(0, 160) + ")");
-  const played = await cmd({cmd: "playProject"});
-  check(played?.ok, "Play Project starts Murmel" + (played?.ok ? "" : ": " + (played?.error ?? "-")));
-  const stand = () => page.evaluate(() => document.querySelector('.kern-ui [data-id="stand"]')?.textContent ?? "");
-  const coins = () => page.evaluate(() => document.querySelector('.kern-ui [data-id="muenzen"][data-kind="bar"]')?.textContent ?? "");
-  const punkte = async () => Number((/Punkte (\d+)/.exec(await stand()) ?? [0, -1])[1]);
-  check(await until(async () => /Level 1\/2/.test(await stand()), 90000), "the App's widget shows level 1 over the viewport (" + (await stand()) + ")");
-  check(await punkte() === 0 && /Bestwert/.test(await stand()), "it starts with 0 points and names the best score");
-  await page.keyboard.down("ArrowUp");
-  check(await until(async () => await punkte() >= 10, 90000), "an arrow key rolls the marble over a coin: the App's points go up (" + (await stand()) + ")");
-  await page.keyboard.up("ArrowUp");
-  check(await until(async () => /Muenzen [1-3]\/3/.test(await coins())), "the App's bar counts the coin (" + (await coins()) + ")");
-  await page.keyboard.press("Escape");
-  check(await until(async () => (await page.locator('.kern-ui [data-id="stand"]').count()) === 0 && (await page.evaluate(() => window.KernStudio.status.projectPlay)) === undefined),
-        "Escape stops it, the widgets are gone");
-  check(errors.length === 0, "no page errors in Play Project" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await page.close();
 }
 // (3) the export of the project (tools/export_game.sh murmel.kproject): a page for itself starts the game

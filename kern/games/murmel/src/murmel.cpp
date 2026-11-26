@@ -23,7 +23,7 @@ game::PlayInput steuerung(const Engine& engine) {
   return in;
 }
 
-std::string anzeige(int level, Float punkte, bool fertig, i64 bestwert) {
+std::string anzeige(int level, f32 punkte, bool fertig, i64 bestwert) {
   char zeile[200];
   if (fertig) {
     std::snprintf(zeile, sizeof zeile, "Geschafft! %d Punkte (Bestwert %lld)", static_cast<int>(punkte), static_cast<long long>(bestwert));
@@ -38,7 +38,7 @@ Murmel& spiel() {
   return s;
 }
 
-Float Murmel::punkte() const {
+f32 Murmel::punkte() const {
   if (!welt_ || fertig_) return vorher_;   // (fertig: die Punkte des letzten Levels sind schon in vorher_)
   return vorher_ + welt_->hud().score;
 }
@@ -49,7 +49,7 @@ bool Murmel::start(Engine& engine) {
   bank_ = std::make_unique<game::SoundBank>(engine.mixer());
   audio_ = std::make_unique<game::GameAudio>(engine.mixer(), *bank_);
   kamera_ = engine.renderer().camera();
-  kamera_.fov = 60 * Float(kPi) / 180;   // (kPi ist eine Zahl der Engine: als Float gelesen, gerundet erst in fov)
+  kamera_.fov = 60 * kPi / 180;
   level_ = 0;
   vorher_ = 0;
   fertig_ = false;
@@ -78,7 +78,7 @@ void Murmel::update(Engine& engine, const Frame& frame) {
   const game::PlayInput in = steuerung(engine);
   if (fertig_) {
     // das Menü am Ende (kern/docs/app.md 6.: gewählt im Frame davor) - oder die Aktion again
-    const i32 wahl = engine.ui_menu("weiter", "Noch einmal\nNur Level 2", 0.5, 0.6);
+    const i32 wahl = engine.ui_menu("weiter", "Noch einmal\nNur Level 2", 0.5f, 0.6f);
     if (wahl >= 0 || engine.action_pressed("again")) {
       vorher_ = 0;
       fertig_ = false;
@@ -91,7 +91,7 @@ void Murmel::update(Engine& engine, const Frame& frame) {
       if (gewonnen_seit_ < 0) gewonnen_seit_ = 0;
       gewonnen_seit_ += frame.dt;
       // (einen Augenblick im Ziel, dann das nächste Level - die Punkte bleiben)
-      if (gewonnen_seit_ > 1.0) {
+      if (gewonnen_seit_ > 1.0f) {
         vorher_ += hud.score;
         if (level_ + 1 < kLevels) {
           if (!lade(level_ + 1)) log(LogLevel::error, "%s", last_error());
@@ -122,8 +122,8 @@ void Murmel::update(Engine& engine, const Frame& frame) {
   if (!fertig_) {
     char muenzen[64];
     std::snprintf(muenzen, sizeof muenzen, "Muenzen %u/%u", hud.pickups, hud.pickups_total);
-    engine.ui_bar("muenzen", muenzen, hud.pickups_total ? static_cast<Float>(hud.pickups) / static_cast<Float>(hud.pickups_total) : 0.0, 1, 0, 0.25);
-    if (hud.message_age < 3.0 && !hud.message.empty()) engine.ui_text("meldung", hud.message.c_str(), 0.5, 0.2);
+    engine.ui_bar("muenzen", muenzen, hud.pickups_total ? static_cast<f32>(hud.pickups) / static_cast<f32>(hud.pickups_total) : 0.0f, 1, 0, 0.25f);
+    if (hud.message_age < 3.0f && !hud.message.empty()) engine.ui_text("meldung", hud.message.c_str(), 0.5f, 0.2f);
   }
 }
 
