@@ -220,6 +220,9 @@ inline kern::logic::Runtime& no_logic() {
 /// null: only those others.)
 struct BlueprintRun {
   struct Host : kern::logic::Host {
+    /// (its actors are of the test's world, kTestWorld, as its objects of the engine are: every side a test compares
+    /// names an actor of it with the same Actor - an ActorBlueprint of the source bound to it, a Blueprint's variable)
+    Host() : kern::logic::Host(kTestWorld) {}
     std::string errors;
     kern::f64 time() const override { return 0; }
     void print(const std::string&, bool) override {}
@@ -301,6 +304,15 @@ struct BlueprintRun {
   /// An object of the test given to the Blueprints on the engine itself (Engine::direct): the Object<T> they hold of it - an
   /// object of the engine is never a number (kern/docs/engine_object.md). The same object, the same Object<T>.
   template <class T> kern::logic::Object<T> object(const T& o) { return kern::logic::Object<T>(host.objects.ref(host.objects.adopt(o))); }
+  /// The run as a world of actors (kern::logic::WorldOfActors), as a GameWorld is one: the source's ActorBlueprints bound to
+  /// a world are bound to it (ActorBlueprint::bind(world)) - the Actor of the actor of its name, of the test's world.
+  kern::logic::ActorHandle actor_named(std::string_view name) const {
+    const auto at = host.actors.find(name);
+    return at == host.actors.end() ? kern::logic::ActorHandle{} : kern::logic::ActorHandle{at->second, kTestWorld};
+  }
+  kern::logic::WorldId world_id() const { return kTestWorld; }
+  bool running() const { return true; }
+  kern::logic::Runtime* logic_runtime() { return &rt; }
   /// The running Blueprint of the actor of this name (null: none here).
   kern::logic::Instance* find(std::string_view name) {
     const kern::logic::ActorRef id = host.find_actor(name);

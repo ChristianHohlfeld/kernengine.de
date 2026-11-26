@@ -1820,6 +1820,40 @@ der die Funktion läuft, und die gibt der Aufruf nicht noch einmal mit (der Konv
 Funktion mit einem solchen Parameter, wo jeder Aufruf ihr die Logik weitergibt, die er selbst
 bekommen hat).
 
+**An einen Actor einer Welt gebunden.** Das C++ eines Programms, das eine Welt fährt (ein
+`kern::game::GameWorld`, das es selbst macht – die Blueprints des Programms sind keine ihrer Actors),
+bindet den `ActorBlueprint` an **die Welt**: `bool bind(World&)` für jede Welt von Actors
+(`kern::logic::WorldOfActors`: `actor_named`, `world_id`, `running`, `logic_runtime` – `GameWorld` ist
+eine, ein Test hat eine eigene). `bind` nimmt einmal den Actor seines Namens in dieser Welt
+(`GameWorld::actor_named`: seine Id und die Welt, project.md 7) und gibt Has Blueprint von ihm; jeder
+Aufruf geht danach an den Blueprint genau dieses Actors in genau dieser Welt
+(`Runtime::call_on`/`get_on` ihrer Logik). Läuft die Welt nicht mehr oder ist sie neu gestartet (eine
+neue Welt, in der der Actor der alten nichts nennt), erreicht ein Aufruf nichts: die Nullen, und der
+Grund wird gesagt (`log`, `last_error`: „the program's C++: Call on Actor: actor 1 (Door) is of world 5
+- its world does not run any more (the GameWorld was stopped)“) – kein Zeiger auf eine beendete Logik
+wird gehalten. Die Welt selbst hält er bei ihrer Adresse: Sie lebt, solange das Programm an sie
+bindet, wie jedes Objekt, das C++ als Referenz hält.
+
+```cpp
+kern::logic::ActorBlueprint g_rules{"Controls"};
+bool bind(kern::game::GameWorld& world) { return g_rules.bind(world); }   // (nach world.start…)
+f64 smoothstep01(f64 t) { return g_rules.number("Smoothstep01", t); }
+```
+
+ist als Blueprint des Programms eine Variable vom Typ Actor, die der Konverter
+`<datei>_<name>` nennt (`Actor controls_g_rules = Actor{};`), und `bind` ist
+`controls_g_rules = engine_game_world_actor_named(world, "Controls");` mit
+`func_has_blueprint(controls_g_rules)`; die Aufrufe sind `func_call_on<…>(controls_g_rules, …)`,
+`func_get_on<…>(controls_g_rules)` – die Logik des Programms reicht sie an die Welt des Actors weiter
+(`Host::world_runtime`, project.md 7). Die Funktionen, die ihn rufen, sind darum Funktionen des
+Blueprints des einen Objekts des Programms (des Zustands), wie jede, die eine Variable des Programms
+teilt. Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
+Ein Blueprint hält den Actor einer Welt oder nennt den Actor dort, wo seine Logik läuft – nicht
+beides. Geprüft: `cpp_reaches_actors_of_its_worlds` (kern/tests: zwei Welten mit Actors gleicher Id,
+Interpreter und Klasse, Welt gestoppt und neu gestartet), `tools/converter_cases` (`worldrules`,
+`worldmix`): der Test vergleicht die Quelle – ihr `ActorBlueprint` an die Welt des Tests gebunden
+(`kern::test::BlueprintRun` ist eine) – mit dem Blueprint im Interpreter und als Klasse.
+
 **Ein Weg.** Call on Actor und Get Variable on Actor gehen durch denselben Weg der Laufzeit, gleich wer
 ruft – ein Knoten (mit den Pins, die sein Blueprint erklärt) oder das C++ des Programms (mit seinen
 Typen), in jeder Stufe: `Runtime::call_on(target, function, args, got, caller)` und

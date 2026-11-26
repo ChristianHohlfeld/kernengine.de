@@ -1472,7 +1472,7 @@ def selftest():
 def main(argv):
     if "--selftest" in argv:
         return selftest()
-    if "--check" in argv:   # (what a level names of the engine's libraries that they do not have - no clang, no run)
+    if "--check" in argv and argv.index("--check") + 1 < len(argv):   # (what a level names of the engine's libraries that they do not have - no clang, no run)
         return check_level(argv[argv.index("--check") + 1])
     if "--libraries" in argv:   # (the engine's libraries: a run of the converter over the headers - minutes, not seconds)
         write_libraries()
