@@ -202,8 +202,9 @@ KERN_LAYOUT(Demo) {
 | Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
 | Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
 | Engine Object of Blueprint | `func_engine_object<kern::App>(target)` – das Objekt der Engine, das der Blueprint auf Target als die Schnittstelle der Einstellung ist (App, ShaderExtension …), als `Object<kern::App>` (kern/docs/engine_object.md) – einmal gemacht, jedes Mal dasselbe. Kein Objekt, und das Log sagt den Grund: Target hat keinen laufenden Blueprint, er implementiert keine oder eine andere Schnittstelle, der Host hat keine Objekte der Engine, der Build hat die Schnittstelle nicht (`Runtime::engine_object`); ein Wert-Knoten |
-| Is Valid Object | `object_valid<kern::App>(x)` – verweist es auf ein Objekt der Engine (nicht `Object<…>{}`)? |
-| Handle of Object | `object_handle<kern::App>(x)` – sein Handle als Int: der eine Übergang, solange die Funktionen der Engine ihre Objekte als Int nehmen; kein Int wird ein Objekt |
+| Is Valid Object | `object_valid<kern::audio::Mixer>(x)` – verweist es auf ein Objekt der Engine (nicht `Object<…>{}`)? Die Einstellung Class ist jede Klasse der Engine mit Objekten (`engine_classes`); C++ fragt so einen Zeiger (`if (p)`, `p != nullptr`) |
+| Same Object | `object_equal<kern::audio::Mixer>(a, b)` – dasselbe Objekt (dieselbe Welt, dasselbe Handle; keins und keins sind dasselbe)? C++ vergleicht so zwei Zeiger (`a == b`) |
+| Handle of Object | `object_handle<kern::App>(x)` – sein Handle in seiner Welt als Int (zum Zeigen, zum Zählen): der eine ausdrückliche Übergang zu Int; keine Funktion der Engine nimmt eins, und kein Int wird ein Objekt |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
@@ -1363,7 +1364,7 @@ selbst“).
 
 - **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
   eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
-  oder ein solches Objekt hält; im Blueprint ein Handle). Das gilt auch, wo ihr Header sie
+  oder ein solches Objekt hält; im Blueprint ein `Object<I>` seiner Klasse, kern/docs/engine_object.md). Das gilt auch, wo ihr Header sie
   definiert (`int width() const { return width_; }`, `bool ready() const`): was das Objekt hält,
   ist das der Engine. Der Konverter schreibt einen Aufruf von ihr als den Knoten, und keine Funktion
   eines Blueprints – der Plan des Programms folgt ihm nicht, kein Blueprint eines Headers der Engine
@@ -1568,7 +1569,9 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Float Time = 0.0;
   struct nameResult { Text result = ""; };
   KERN_OVERRIDE KERN_PURE nameResult name() { return {"water"}; }
-  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
+  KERN_OVERRIDE void frame_uniforms(Object<kern::UniformCache> cache = Object<kern::UniformCache>{}, Object<kern::Renderer> renderer = Object<kern::Renderer>{}) {
+    engine_uniform_cache_set_float(cache, 3, Time);
+  }
 };
 ```
 
@@ -1579,7 +1582,7 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   und in der Klasse ein `static_assert` mit Grund). Welche Funktionen des Blueprints die Engine ruft, sagt jede selbst:
   `KERN_OVERRIDE` (`Function::overrides`, JSON `"overrides"`) – nicht der Name allein. Sie sind, was die Engine ruft: jede hat die Eingänge des
   Knotens dieser Funktion nach dem ersten (das Objekt ist der Blueprint selbst) und seine Ausgänge, in ihrer Reihenfolge,
-  von ihren Typen – ein Objekt der Engine als Handle (`Int engine`), ein Struct der Engine als Struct des Blueprints
+  von ihren Typen – ein Objekt der Engine als `Object<I>` seiner Klasse (`Object<kern::Engine> engine`, kern/docs/engine_object.md), ein Struct der Engine als Struct des Blueprints
   (`Frame frame`), `const char*` als Text.
 - **Regeln (check):** die Schnittstelle gibt es; jede reine virtuelle Funktion hat der Blueprint; jede Funktion mit dem
   Namen einer virtuellen hat deren Eingänge und Ausgänge (keine Referenz: die Engine übergibt Werte) und ist seine eigene;

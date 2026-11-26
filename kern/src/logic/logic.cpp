@@ -69,8 +69,8 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
     for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
-  if (!pd.enums_only && !pd.structs_only)   // (an object of the engine of each of its interfaces - kern/docs/engine_object.md)
-    for (const EngineInterface& i : engine_interfaces()) r.push_back({PinType::object, i.name});
+  if (!pd.enums_only && !pd.structs_only)   // (an object of the engine of each of its classes - kern/docs/engine_object.md)
+    for (const EngineClass& c : engine_classes()) r.push_back({PinType::object, c.name});
   if (pd.widths && (!pd.with_lists || pd.width_values))
     for (std::string_view w : kWidthNames) r.push_back({PinType::integer, std::string(w)});
   if (pd.with_lists)
@@ -106,7 +106,7 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     const bool listed = text.ends_with(">_list");
     if (!listed && text.back() != '>') return false;
     const std::string of(text.substr(7, text.size() - 8 - (listed ? 5 : 0)));
-    if (!engine_interface(of)) return false;
+    if (!engine_class(of)) return false;
     out = {listed ? PinType::object_list : PinType::object, of};
     return true;
   }
@@ -179,7 +179,7 @@ bool fits(const TypeRef& from, const TypeRef& to) {
   if (from.type == PinType::integer_list && to.type == PinType::integer_list) return to.of == kAnyWidth || width_bits(from.of) == width_bits(to.of);
   // (an object of the engine goes where an object of its own class is wanted - never where another class is, never
   // from or to anything else)
-  if (element_of(from.type) == PinType::object) return from.of == to.of;
+  if (element_of(from.type) == PinType::object) return engine_class_is(from.of, to.of);   // (its class, or one it derives from)
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 

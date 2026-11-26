@@ -45,6 +45,7 @@
 
 #include <cmath>
 #include <compare>
+#include <type_traits>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -195,6 +196,12 @@ template <class T> constexpr std::string_view cpp_name_of() {
 }
 template <class I> struct Object {
   ObjectRef ref;
+  constexpr Object() = default;
+  constexpr explicit Object(ObjectRef r) : ref(r) {}
+  /// One of a class that derives from I is one of I (a HostTransport is a Transport), as in C++.
+  template <class J>
+    requires(!std::is_same_v<I, J> && std::is_base_of_v<I, J>)
+  constexpr Object(const Object<J>& o) : ref(o.ref) {}
   constexpr bool valid() const { return ref.valid(); }
   friend constexpr bool operator==(const Object&, const Object&) = default;
   friend constexpr auto operator<=>(const Object& a, const Object& b) { return a.ref <=> b.ref; }

@@ -1326,11 +1326,14 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::type) {
       // (a generic node in every type it can have; an enum node for the enum, Make and Break for every struct)
       variants.clear();
-      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph))
+        if (logic::element_of(t.type) != PinType::object || t.of == "App")   // (every class of the engine is the same Object<I>: one of them)
+          variants.push_back({{d->params[0].key, logic::type_text(t)}});
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();
-      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{"type", logic::type_text(t)}, {"count", "3"}});
+      for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph))
+        if (logic::element_of(t.type) != PinType::object || t.of == "App") variants.push_back({{"type", logic::type_text(t)}, {"count", "3"}});
       for (const char* count : {"0", "1", "16"}) variants.push_back({{"type", "int"}, {"count", count}});
     }
     for (const auto& params : variants) {
@@ -1411,7 +1414,7 @@ struct EnginePlaces : kern::Blueprint {
   };
 
   // ---- variables ----
-  Int Builder = 0;
+  Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
   Int Length = 0;
   Int At = 0;
   Int X = 0;
@@ -1506,7 +1509,7 @@ struct EnginePlaces : kern::Blueprint {
   }
 
   // ---- what nodes give and keep ----
-  struct { Int result = 0; } n1;
+  struct { Object<kern::BuildingBuilder> result = Object<kern::BuildingBuilder>{}; } n1;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
   struct { Int index = 0; } n3;
   struct { Bool removed = false; } n4;
@@ -1530,8 +1533,8 @@ inline const char* kImplementsWater = R"kn(
 struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
   Float Time = 0.25;
-  Int Program = 0;
-  Int Cache = 0;
+  Object<kern::Program> Program = Object<kern::Program>{};
+  Object<kern::UniformCache> Cache = Object<kern::UniformCache>{};
   Int Frames = 0;
 
   // ---- functions ----
@@ -1545,11 +1548,11 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
     return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
   }
 
-  KERN_OVERRIDE void bind(Int program = 0) {
+  KERN_OVERRIDE void bind(Object<kern::Program> program = Object<kern::Program>{}) {
     Program = program;
   }
 
-  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) {
+  KERN_OVERRIDE void frame_uniforms(Object<kern::UniformCache> cache = Object<kern::UniformCache>{}, Object<kern::Renderer> renderer = Object<kern::Renderer>{}) {
     Cache = cache;
     Frames += 1;
   }
@@ -1566,24 +1569,24 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
   };
 
   // ---- variables ----
-  Int Engine = 0;
+  Object<kern::Engine> Engine = Object<kern::Engine>{};
   Int Updates = 0;
   Float Last = 0.0;
   Bool Stopped = false;
 
   // ---- functions ----
   struct startResult { Bool result = false; };
-  KERN_OVERRIDE startResult start(Int engine = 0) {
+  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Engine = engine;
     return {true};
   }
 
-  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
     Updates += 1;
     Last = frame.time;
   }
 
-  KERN_OVERRIDE void stop(Int engine = 0) {
+  KERN_OVERRIDE void stop(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Stopped = true;
   }
 };

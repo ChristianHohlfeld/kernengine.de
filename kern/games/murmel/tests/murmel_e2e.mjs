@@ -66,17 +66,15 @@ const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swi
   check(await until(async () => (await state()).project?.name === "Murmel"), "the editor opens murmel.kproject with its levels");
   const start = project.startLevel;
   check(await until(async () => (await state()).level?.name === "Wiese" || /Wiese/.test(JSON.stringify((await state()).level ?? {}).slice(0, 400))), "opening the project opens its start level " + start);
-  // The mouse rests over the viewport before Play: in Play the pointer is locked (as soon as the browser grants it -
-  // with or without the click below), and every movement of a locked mouse turns the camera, so the arrow would roll
-  // the marble elsewhere (seen: the click's move to the viewport, 340 px under the lock). The player clicks into the
-  // game where the mouse is.
-  const box = await page.locator(".vp canvas, #gl").first().boundingBox();
-  if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  // The player of this check uses the keyboard only (the keys reach the editor from the window, the page has the
+  // focus). In Play the pointer is locked - headless Chromium grants it without a gesture -, every movement of a locked
+  // mouse turns the camera, and a mouse event the test sends under the lock comes with a movement of its own (seen in
+  // CI 45742664680 and 45743657968: the click's move, then -340/-341 px with each press and release), so the arrow
+  // would roll the marble past the coin. So the test sends no mouse event in Play.
   await cmd({cmd: "play", mode: "play"});
   check(await until(async () => /Level 1/.test((await status()).hud?.message ?? "")), "Play runs the level's Blueprint (its message: " + ((await status()).hud?.message ?? "-") + ")");
   // (every mouse movement the page sees from here on, and whether the pointer was locked: printed with the state below)
   await page.evaluate(() => { window.__moves = []; document.addEventListener("mousemove", e => window.__moves.push([e.movementX, e.movementY, !!document.pointerLockElement])); });
-  if (box) { await page.mouse.down(); await page.mouse.up(); }
   // (the world takes input once it steps: its first fixed step)
   check(await until(async () => ((await status()).sim?.steps ?? 0) > 0), "the world steps (" + ((await status()).sim?.steps ?? "-") + " steps)");
   // (what the editor knows while the key is held: printed when the marble does not reach the coin)

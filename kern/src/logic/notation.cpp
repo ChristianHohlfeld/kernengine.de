@@ -2726,7 +2726,7 @@ struct Reader {
       p += 2;
       std::string of;
       if (!engine_class_here(of)) return false;
-      if (!engine_interface(of)) return fail(p - 1, "Object<" + engine_class_cpp(of) + ">: the engine has no interface " + of + " (" + interface_names() + ")");
+      if (!engine_class(of)) return fail(p - 1, "Object<" + engine_class_cpp(of) + ">: the engine has no class " + of + " a Blueprint holds objects of");
       t = {PinType::object, of};
       return expect(">");
     }
@@ -3270,7 +3270,7 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set") || is("Callback")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set") || is("Callback") || is("Object")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
@@ -3444,8 +3444,12 @@ struct Reader {
       const ParamDef& pd = def->params[k];
       if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
       bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type || pd.engine_class);
-      if (fits && pd.engine_class && !engine_interface(given[at])) {
+      if (fits && pd.engine_class && pd.key == "interface" && !engine_interface(given[at])) {
         fail(tok, node_name(def->type) + ": the engine has no interface " + engine_class_cpp(given[at]) + " (" + interface_names() + ")");
+        return -1;
+      }
+      if (fits && pd.engine_class && pd.key != "interface" && !engine_class(given[at])) {   // (any class of the engine: object_valid<kern::audio::Mixer>)
+        fail(tok, node_name(def->type) + ": the engine has no class " + engine_class_cpp(given[at]) + " (one with objects in a Blueprint: kern/docs/engine_object.md)");
         return -1;
       }
       if (fits && pd.kind == ParamDef::Kind::type) {
@@ -4995,7 +4999,8 @@ struct Reader {
       // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
       // (an input that reads a list of Ints of any width takes each as it is: kAnyWidth)
       const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer) ||
-                        (to_type.of == kAnyWidth && fits(from_type, to_type));
+                        (to_type.of == kAnyWidth && fits(from_type, to_type)) ||
+                        (element_of(to_type.type) == PinType::object && from_type.type == to_type.type && fits(from_type, to_type));   // (an object where one of a class it derives from goes, as in C++)
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
         return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
       if (int_inputs.count({w.to, w.in})) {

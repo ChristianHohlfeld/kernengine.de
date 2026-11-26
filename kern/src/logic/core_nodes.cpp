@@ -2162,6 +2162,25 @@ std::string interface_problem(const Node& n, const Graph&) {
   return {};
 }
 
+/// The setting of a node that works on an Object of any class of the engine (Is Valid Object, Handle of Object, Same
+/// Object): the class, written as its C++ type - object_valid<kern::audio::Mixer>. Its default is said on the node (App).
+ParamDef class_param() {
+  std::vector<std::string> classes;
+  for (const EngineClass& c : engine_classes()) {
+    classes.push_back(c.name);
+    classes.push_back(c.name);
+  }
+  ParamDef p = param("class", "Class", ParamDef::Kind::choice, "App", std::move(classes));
+  p.engine_class = true;
+  return p;
+}
+std::string class_problem(const Node& n, const Graph&) {
+  const std::string c = n.param("class", "App");
+  if (c.empty()) return "names no class of the engine (its setting Class: App, audio_Mixer ...)";
+  if (!engine_class(c)) return "the engine has no class " + c;
+  return {};
+}
+
 void add_functions(Library& lib) {
   // which == 0: the inputs as outputs (entry); 1: the outputs as inputs (return); 2: both (calls)
   auto shape = [](int which) {
@@ -2336,12 +2355,12 @@ void add_functions(Library& lib) {
     NodeDef d = make("object.valid", "Is Valid Object", "Engine", NodeKind::pure,
                      "Does it refer to an object of the engine (and not to none)? Whether that object is still there, the engine "
                      "says where it is used.");
-    d.params = {interface_param()};
+    d.params = {class_param()};
     d.inputs = {data("object", "Object", PinType::object)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
-    d.problem = interface_problem;
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("class", "App"); };   // (unset: its default, as the node shows it)
+    d.problem = class_problem;
     d.outputs = {data("result", "Is Valid", PinType::boolean)};
-    d.keywords = "object valid none engine handle";
+    d.keywords = "object valid none engine handle null pointer";
     d.run = [](Context& c) {
       c.out(std::size_t{0}, Value::boolean(c.in("object").as_object().valid()));
       return kStop;
@@ -2349,14 +2368,31 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Same Object: do two Objects refer to the same object of the engine - the same world and the same handle (none and
+    // none are the same; C++ compares two pointers so)
+    NodeDef d = make("object.equal", "Same Object", "Engine", NodeKind::pure,
+                     "Do A and B refer to the same object of the engine (or both to none)? An object of another world is never the same.");
+    d.params = {class_param()};
+    d.inputs = {data("a", "A", PinType::object), data("b", "B", PinType::object)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = in[1].of = n.param("class", "App"); };
+    d.problem = class_problem;
+    d.outputs = {data("result", "Same", PinType::boolean)};
+    d.keywords = "object same equal identical == engine handle pointer";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.in("a").as_object() == c.in("b").as_object()));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("object.handle", "Handle of Object", "Engine", NodeKind::pure,
-                     "The handle of an object of the engine, as an Int - what a function of the engine takes as long as it names its "
-                     "objects as Ints (kern/docs/engine_object.md). 0: it refers to none. There is no way back: no Int becomes an "
-                     "Object.");
-    d.params = {interface_param()};
+                     "The handle of an object of the engine in its world, as an Int (0: it refers to none) - to show it or to count "
+                     "with it; no function of the engine takes one (they take Objects, kern/docs/engine_object.md). There is no way "
+                     "back: no Int becomes an Object.");
+    d.params = {class_param()};
     d.inputs = {data("object", "Object", PinType::object)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
-    d.problem = interface_problem;
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("class", "App"); };   // (unset: its default, as the node shows it)
+    d.problem = class_problem;
     d.outputs = {data("result", "Handle", PinType::integer)};
     d.keywords = "object handle int engine";
     d.run = [](Context& c) {

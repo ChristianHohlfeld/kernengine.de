@@ -221,7 +221,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->renderer();
-  out[0] = Value::integer(ev::handle_of<kern::Renderer>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::Renderer>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -230,7 +230,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->input();
-  out[0] = Value::integer(ev::handle_of<kern::Input>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::Input>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -239,7 +239,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->input();
-  out[0] = Value::integer(ev::handle_of<kern::Input>(o, std::forward<decltype(r)>(r)));
+  out[0] = Value::object(o.ref(ev::handle_of<kern::Input>(o, std::forward<decltype(r)>(r))));
   return true;
 }
 
@@ -714,7 +714,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::App>(o, in, 0, "app");
   if (!self) return false;
   decltype(auto) r = self->extensions();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Handle>>(o, out, 0, r);
   return true;
 }
 
@@ -765,32 +765,28 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
-  out[0] = Value::integer(o.own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*a0))));
+  out[0] = Value::object(o.ref(o.own<kern::Engine>(std::unique_ptr<kern::Engine>(new kern::Engine(*a0)))));
   return true;
 }
 
 // engine.engine.release: kern::Engine::~Engine
 bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Engine>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Engine that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "engine", r)) return false;
+  return ev::release_of<kern::Engine>(o, r, "engine", "Engine");
 }
 
 // engine.input.make: kern::Input::Input
 bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::Input>(std::unique_ptr<kern::Input>(new kern::Input())));
+  out[0] = Value::object(o.ref(o.own<kern::Input>(std::unique_ptr<kern::Input>(new kern::Input()))));
   return true;
 }
 
 // engine.input.release: kern::Input::~Input
 bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::Input>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no Input that was made";
-    return false;
-  }
-  return true;
+  ObjectRef r;
+  if (!ev::object_ref(o, in, 0, "input", r)) return false;
+  return ev::release_of<kern::Input>(o, r, "input", "Input");
 }
 
 // kern::App: the object of the engine a Blueprint is (Graph::implements "App")
@@ -803,11 +799,11 @@ class Implements_App final : public kern::App {
     std::vector<Value> kern_out;
     const bool kern_given = by_->call("extensions", kern_in, kern_out) && !kern_out.empty();
     kern_kept_extensions.clear();
-    if (kern_given) ev::Conv<ev::List<ev::Int>>::from(o_, kern_out[0], kern_kept_extensions);
+    if (kern_given) ev::Conv<ev::List<ev::Handle>>::from(o_, kern_out[0], kern_kept_extensions);
     return decltype(std::declval<kern::App&>().extensions())(kern_kept_extensions.data(), kern_kept_extensions.size());
   }
   decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) start(kern::Engine& kern_p0) override {
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Engine>(kern_p0)))};
     std::vector<Value> kern_out;
     const bool kern_given = by_->call("start", kern_in, kern_out) && !kern_out.empty();
     decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) kern_r = ev::blank<decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>()))>();
@@ -815,19 +811,19 @@ class Implements_App final : public kern::App {
     return kern_r;
   }
   decltype(std::declval<kern::App&>().update(std::declval<kern::Engine&>(), std::declval<kern::Frame const&>())) update(kern::Engine& kern_p0, kern::Frame const& kern_p1) override {
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0)), ev::Conv<ev::Struct<S_Frame>>::to(o_, kern_p1)};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Engine>(kern_p0))), ev::Conv<ev::Struct<S_Frame>>::to(o_, kern_p1)};
     std::vector<Value> kern_out;
     by_->call("update", kern_in, kern_out);
   }
   decltype(std::declval<kern::App&>().resized(std::declval<kern::Engine&>())) resized(kern::Engine& kern_p0) override {
     if (!by_->has("resized")) return kern::App::resized(kern_p0);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Engine>(kern_p0)))};
     std::vector<Value> kern_out;
     by_->call("resized", kern_in, kern_out);
   }
   decltype(std::declval<kern::App&>().stop(std::declval<kern::Engine&>())) stop(kern::Engine& kern_p0) override {
     if (!by_->has("stop")) return kern::App::stop(kern_p0);
-    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Engine>(kern_p0))};
+    const std::vector<Value> kern_in{Value::object(o_.ref(o_.adopt<kern::Engine>(kern_p0)))};
     std::vector<Value> kern_out;
     by_->call("stop", kern_in, kern_out);
   }
