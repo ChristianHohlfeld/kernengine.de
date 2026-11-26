@@ -336,6 +336,9 @@ struct Float {};
 struct Vector {};
 struct Text {};
 struct Int64 {};
+/// A number of the type T of the engine's signature (i8 ... u64, f32, f64): on the pin a value of T itself - nothing is
+/// converted at the door (kern/docs/blueprint_cpp.md "Zahl-Typen"). The C++ type is T, or an enum or a kern::Count of it.
+template <class T> struct Num {};
 /// An actor (kern::logic::ActorHandle: its id and its world - kern/docs/project.md 7); whose world it must be, the
 /// function of the engine that takes it says (GameWorld: its own).
 struct Actor {};
@@ -463,6 +466,23 @@ template <> struct Conv<Int64> {
     return Value::of_number(static_cast<u64>(c));
   }
 };
+template <class T> struct Conv<Num<T>> {
+  template <class C> static constexpr bool fits() {
+    if constexpr (std::is_enum_v<C>) return std::is_same_v<std::underlying_type_t<C>, T> || sizeof(C) == sizeof(T);
+    else if constexpr (is_count<C>) return std::is_same_v<T, u32>;
+    else return std::is_same_v<C, T>;
+  }
+  template <class C> static void from(EngineObjects&, const Value& v, C& c) {
+    static_assert(fits<C>(), "a pin of a number type of something else than that type (no number is converted at the door)");
+    if constexpr (is_count<C>) c = C(v.as<T>());
+    else c = static_cast<C>(v.as<T>());
+  }
+  template <class C> static Value to(EngineObjects&, const C& c) {
+    static_assert(fits<C>(), "a pin of a number type of something else than that type (no number is converted at the door)");
+    if constexpr (is_count<C>) return Value::of_number<T>(static_cast<u32>(c));
+    else return Value::of_number<T>(static_cast<T>(c));
+  }
+};
 template <class E> struct Conv<Enum<E>> {
   static constexpr std::size_t count = sizeof(E::values) / sizeof(E::values[0]);
   template <class C> static void from(EngineObjects&, const Value& v, C& c) {
@@ -544,6 +564,7 @@ template <> struct Held<Float> { using type = f64; };
 template <> struct Held<Vector> { using type = Vec3; };
 template <> struct Held<Text> { using type = std::string; };
 template <> struct Held<Int64> { using type = u64; };
+template <class T> struct Held<Num<T>> { using type = T; };
 template <class E> struct Held<Enum<E>> { using type = i64; };
 
 /// One item of a list of T as the list holds it, and back.

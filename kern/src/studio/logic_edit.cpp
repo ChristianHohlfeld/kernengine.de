@@ -334,7 +334,7 @@ bool keyed_settings(logic::Graph& g, u32 id, const std::string& pin, const logic
   std::string key, value;
   if (!def || !keyed_params(*def, pin, want, key, value)) return false;
   const bool has_value = !value.empty();
-  if (node->param("key", "int") == key && (!has_value || node->param("value", "float") == value)) return false;
+  if (node->param("key", "i64") == key && (!has_value || node->param("value", "f32") == value)) return false;
   node->set_param("key", key);
   if (has_value) node->set_param("value", value);
   node->values.erase(std::remove_if(node->values.begin(), node->values.end(), [](const auto& v) { return v.first == "key" || v.first == "value"; }), node->values.end());
@@ -2217,7 +2217,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         std::string base = str("pin").empty() ? (locals ? "local" : input_side ? "value" : "result") : str("pin"), pname = base;
         for (int i = 2; !valid_name(pname) && i < 100; ++i) pname = base + std::to_string(i);
         logic::TypeRef t;
-        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(str("type").empty() ? "f32" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         pins.push_back({pname, t.type, logic::zero_of(t, g).to_json(g, t), t.of, t.count});
         result.set("pin", pname);
@@ -2334,7 +2334,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, base); !why.empty() && !var.empty()) { error = why; return false; }
         for (int i = 2; g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); ++i) n = base + std::to_string(i);
         logic::TypeRef t;
-        if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(str("type").empty() ? "f32" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         g.variables.push_back({n, t.type, logic::zero_of(t, g).to_json(g, t), {}, t.of, t.count});
         result.set("name", n);
@@ -2567,7 +2567,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       // one - or a list of one of these. (A struct holds structs declared above it: where the
       // wanted one stands below, this struct moves below it - with the structs that hold it.)
       auto field_type = [&](const std::string& text, logic::TypeRef& t) {
-        if (!logic::type_from_text(text.empty() ? "float" : text, g, t)) { error = "unknown type"; return false; }
+        if (!logic::type_from_text(text.empty() ? "f32" : text, g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
         for (const logic::TypeRef& named : logic::types_named(t)) {  // (a struct, a list of one, a map of one)
           if (logic::element_of(named.type) != logic::PinType::structure) continue;
@@ -2947,8 +2947,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         {"id":3,"type":"game.message","x":640,"y":0,"values":{"text":"+10"}},{"id":4,"type":"game.sound","x":960,"y":0,"params":{"sound":"builtin:pickup"}}],
         "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})";
     else if (which == "spawner")
-      text = R"({"variables":[{"name":"Spawned","type":"int","value":0}],"nodes":[{"id":1,"type":"event.every","x":0,"y":0,"params":{"seconds":"3"}},
-        {"id":2,"type":"flow.branch","x":320,"y":0},{"id":3,"type":"math.compare","x":96,"y":176,"params":{"op":"<"},"values":{"b":10}},
+      text = R"({"variables":[{"name":"Spawned","type":"i64","value":0}],"nodes":[{"id":1,"type":"event.every","x":0,"y":0,"params":{"seconds":"3"}},
+        {"id":2,"type":"flow.branch","x":320,"y":0},{"id":3,"type":"math.compare","x":96,"y":176,"params":{"op":"<","type":"i64"},"values":{"b":10}},
         {"id":4,"type":"var.get","x":-128,"y":192,"params":{"variable":"Spawned"}},{"id":5,"type":"actor.spawn","x":576,"y":0,"params":{"template":"Physics Cube"},"values":{"location":[0,0,6]}},
         {"id":6,"type":"var.add","x":960,"y":0,"params":{"variable":"Spawned"}}],
         "links":[[1,"then",2,"exec"],[4,"value",3,"a"],[3,"result",2,"condition"],[2,"true",5,"exec"],[5,"then",6,"exec"]]})";
@@ -2960,7 +2960,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     else if (which == "robot_avoid")
       text = R"({"nodes":[{"id":1,"type":"event.begin","x":0,"y":0},{"id":2,"type":"walker.autonomous","x":320,"y":0,"values":{"enable":false}},
         {"id":3,"type":"event.every","x":0,"y":224,"params":{"seconds":"0.25"}},{"id":4,"type":"flow.branch","x":320,"y":224},
-        {"id":5,"type":"walker.tof","x":-352,"y":416},{"id":6,"type":"math.compare","x":-32,"y":448,"params":{"op":"<"},"values":{"b":1.6}},
+        {"id":5,"type":"walker.tof","x":-352,"y":416},{"id":6,"type":"math.compare","x":-32,"y":448,"params":{"op":"<","type":"f64"},"values":{"b":1.6}},
         {"id":7,"type":"logic.and","x":96,"y":384},
         {"id":8,"type":"walker.move","x":608,"y":160,"values":{"forward":0,"turn":45,"duration":0.6}},
         {"id":9,"type":"walker.move","x":608,"y":400,"values":{"forward":0.3}}],

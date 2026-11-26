@@ -41,46 +41,46 @@ struct S_physics_Body { [[maybe_unused]] static Value to(EngineObjects& o, const
 struct S_physics_QueryFilter { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::QueryFilter& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x); };
 Value S_Aabb::to(EngineObjects& o, const kern::Aabb& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.min), ev::Conv<ev::Vector>::to(o, x.max)}); }
 void S_Aabb::from(EngineObjects& o, const Value& v, kern::Aabb& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.min); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.max); }
-Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Float>::to(o, x.fov), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Float>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
-void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
-Value S_ExtensionAttribute::to(EngineObjects& o, const kern::ExtensionAttribute& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.key), ev::Conv<ev::Int>::to(o, x.size), ev::Conv<ev::Text>::to(o, x.glsl)}); }
-void S_ExtensionAttribute::from(EngineObjects& o, const Value& v, kern::ExtensionAttribute& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.key); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.size); if (const Value* f = v.field(2)) ev::Conv<ev::Text>::from(o, *f, x.glsl); }
-Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.m)}); }
-void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.m); }
-Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.x), ev::Conv<ev::Float>::to(o, x.y), ev::Conv<ev::Float>::to(o, x.z), ev::Conv<ev::Float>::to(o, x.w)}); }
-void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.w); }
-Value S_game_BlueprintRunning::to(EngineObjects& o, const kern::game::BlueprintRunning& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.name), ev::Conv<ev::Text>::to(o, x.tier), ev::Conv<ev::Int>::to(o, x.functions), ev::Conv<ev::Int>::to(o, x.nodes), ev::Conv<ev::Bool>::to(o, x.disabled)}); }
-void S_game_BlueprintRunning::from(EngineObjects& o, const Value& v, kern::game::BlueprintRunning& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.name); if (const Value* f = v.field(1)) ev::Conv<ev::Text>::from(o, *f, x.tier); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.functions); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.nodes); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.disabled); }
-Value S_game_GameWorld_ArtStats::to(EngineObjects& o, const kern::game::GameWorld::ArtStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.rigs), ev::Conv<ev::Int>::to(o, x.decals), ev::Conv<ev::Int>::to(o, x.tracers), ev::Conv<ev::Int>::to(o, x.chips), ev::Conv<ev::Bool>::to(o, x.view_model)}); }
-void S_game_GameWorld_ArtStats::from(EngineObjects& o, const Value& v, kern::game::GameWorld::ArtStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.rigs); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.decals); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.tracers); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.chips); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.view_model); }
-Value S_game_GameWorld_DetectorModel::to(EngineObjects& o, const kern::game::GameWorld::DetectorModel& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.sigma_abs), ev::Conv<ev::Float>::to(o, x.sigma_rel), ev::Conv<ev::Float>::to(o, x.dropout), ev::Conv<ev::Int64>::to(o, x.seed)}); }
-void S_game_GameWorld_DetectorModel::from(EngineObjects& o, const Value& v, kern::game::GameWorld::DetectorModel& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.sigma_abs); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.sigma_rel); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.dropout); if (const Value* f = v.field(3)) ev::Conv<ev::Int64>::from(o, *f, x.seed); }
-Value S_game_GameWorld_SpawnChange::to(EngineObjects& o, const kern::game::GameWorld::SpawnChange& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.template_name), ev::Conv<ev::Int>::to(o, x.id), ev::Conv<ev::Struct<S_game_Transform>>::to(o, x.at)}); }
-void S_game_GameWorld_SpawnChange::from(EngineObjects& o, const Value& v, kern::game::GameWorld::SpawnChange& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.template_name); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.id); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_game_Transform>>::from(o, *f, x.at); }
-Value S_game_GameWorld_WalkerJoint::to(EngineObjects& o, const kern::game::GameWorld::WalkerJoint& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.name), ev::Conv<ev::Float>::to(o, x.angle), ev::Conv<ev::Float>::to(o, x.lower), ev::Conv<ev::Float>::to(o, x.upper)}); }
-void S_game_GameWorld_WalkerJoint::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerJoint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.name); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.angle); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.lower); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.upper); }
-Value S_game_GameWorld_WalkerProbe::to(EngineObjects& o, const kern::game::GameWorld::WalkerProbe& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.velocity), ev::Conv<ev::Vector>::to(o, x.spin), ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::List<ev::Bool>>::to(o, x.foot_contact), ev::Conv<ev::List<ev::Float>>::to(o, x.foot_height), ev::Conv<ev::Bool>::to(o, x.self_contact), ev::Conv<ev::Bool>::to(o, x.body_contact), ev::Conv<ev::List<ev::Float>>::to(o, x.joint), ev::Conv<ev::List<ev::Float>>::to(o, x.joint_speed), ev::Conv<ev::List<ev::Float>>::to(o, x.action)}); }
-void S_game_GameWorld_WalkerProbe::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerProbe& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.velocity); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.spin); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(5)) ev::Conv<ev::List<ev::Bool>>::from(o, *f, x.foot_contact); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.foot_height); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.self_contact); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.body_contact); if (const Value* f = v.field(9)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.joint); if (const Value* f = v.field(10)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.joint_speed); if (const Value* f = v.field(11)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.action); }
-Value S_game_GameWorld_WalkerSensors::to(EngineObjects& o, const kern::game::GameWorld::WalkerSensors& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.range), ev::Conv<ev::List<ev::Int>>::to(o, x.zone), ev::Conv<ev::Float>::to(o, x.nearest), ev::Conv<ev::Float>::to(o, x.nearest_bearing), ev::Conv<ev::Float>::to(o, x.free_left), ev::Conv<ev::Float>::to(o, x.free_right), ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::Bool>::to(o, x.fallen), ev::Conv<ev::Float>::to(o, x.speed), ev::Conv<ev::Float>::to(o, x.tof_time), ev::Conv<ev::Int>::to(o, x.hits), ev::Conv<ev::List<ev::Vector>>::to(o, x.hit), ev::Conv<ev::Int>::to(o, x.forward_observed)}); }
-void S_game_GameWorld_WalkerSensors::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerSensors& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.range); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.zone); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.nearest); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.nearest_bearing); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.free_left); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.free_right); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.fallen); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.speed); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.tof_time); if (const Value* f = v.field(10)) ev::Conv<ev::Int>::from(o, *f, x.hits); if (const Value* f = v.field(11)) ev::Conv<ev::List<ev::Vector>>::from(o, *f, x.hit); if (const Value* f = v.field(12)) ev::Conv<ev::Int>::from(o, *f, x.forward_observed); }
-Value S_game_Hud::to(EngineObjects& o, const kern::game::Hud& x) { return Value::structure({ev::Conv<ev::Enum<E_game_GameStatus>>::to(o, x.status), ev::Conv<ev::Text>::to(o, x.title), ev::Conv<ev::Text>::to(o, x.message), ev::Conv<ev::Float>::to(o, x.message_age), ev::Conv<ev::Float>::to(o, x.score), ev::Conv<ev::Int>::to(o, x.pickups), ev::Conv<ev::Int>::to(o, x.pickups_total), ev::Conv<ev::Float>::to(o, x.elapsed), ev::Conv<ev::Float>::to(o, x.remaining), ev::Conv<ev::Float>::to(o, x.speed), ev::Conv<ev::Float>::to(o, x.boost), ev::Conv<ev::Bool>::to(o, x.boosting), ev::Conv<ev::Bool>::to(o, x.interior), ev::Conv<ev::Float>::to(o, x.best), ev::Conv<ev::Bool>::to(o, x.soldier), ev::Conv<ev::Float>::to(o, x.health), ev::Conv<ev::Float>::to(o, x.max_health), ev::Conv<ev::Float>::to(o, x.armor), ev::Conv<ev::Int>::to(o, x.ammo), ev::Conv<ev::Int>::to(o, x.magazine), ev::Conv<ev::Int>::to(o, x.reserve), ev::Conv<ev::Float>::to(o, x.reload), ev::Conv<ev::Float>::to(o, x.spread), ev::Conv<ev::Float>::to(o, x.hit_age), ev::Conv<ev::Bool>::to(o, x.hit_head), ev::Conv<ev::Bool>::to(o, x.hit_kill), ev::Conv<ev::Float>::to(o, x.damage_age), ev::Conv<ev::Float>::to(o, x.damage_yaw), ev::Conv<ev::Float>::to(o, x.respawn_in), ev::Conv<ev::Bool>::to(o, x.aiming), ev::Conv<ev::Float>::to(o, x.fov)}); }
-void S_game_Hud::from(EngineObjects& o, const Value& v, kern::game::Hud& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_game_GameStatus>>::from(o, *f, x.status); if (const Value* f = v.field(1)) ev::Conv<ev::Text>::from(o, *f, x.title); if (const Value* f = v.field(2)) ev::Conv<ev::Text>::from(o, *f, x.message); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.message_age); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.score); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.pickups); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.pickups_total); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.elapsed); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.remaining); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.speed); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.boost); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.boosting); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.interior); if (const Value* f = v.field(13)) ev::Conv<ev::Float>::from(o, *f, x.best); if (const Value* f = v.field(14)) ev::Conv<ev::Bool>::from(o, *f, x.soldier); if (const Value* f = v.field(15)) ev::Conv<ev::Float>::from(o, *f, x.health); if (const Value* f = v.field(16)) ev::Conv<ev::Float>::from(o, *f, x.max_health); if (const Value* f = v.field(17)) ev::Conv<ev::Float>::from(o, *f, x.armor); if (const Value* f = v.field(18)) ev::Conv<ev::Int>::from(o, *f, x.ammo); if (const Value* f = v.field(19)) ev::Conv<ev::Int>::from(o, *f, x.magazine); if (const Value* f = v.field(20)) ev::Conv<ev::Int>::from(o, *f, x.reserve); if (const Value* f = v.field(21)) ev::Conv<ev::Float>::from(o, *f, x.reload); if (const Value* f = v.field(22)) ev::Conv<ev::Float>::from(o, *f, x.spread); if (const Value* f = v.field(23)) ev::Conv<ev::Float>::from(o, *f, x.hit_age); if (const Value* f = v.field(24)) ev::Conv<ev::Bool>::from(o, *f, x.hit_head); if (const Value* f = v.field(25)) ev::Conv<ev::Bool>::from(o, *f, x.hit_kill); if (const Value* f = v.field(26)) ev::Conv<ev::Float>::from(o, *f, x.damage_age); if (const Value* f = v.field(27)) ev::Conv<ev::Float>::from(o, *f, x.damage_yaw); if (const Value* f = v.field(28)) ev::Conv<ev::Float>::from(o, *f, x.respawn_in); if (const Value* f = v.field(29)) ev::Conv<ev::Bool>::from(o, *f, x.aiming); if (const Value* f = v.field(30)) ev::Conv<ev::Float>::from(o, *f, x.fov); }
-Value S_game_PlayInput::to(EngineObjects& o, const kern::game::PlayInput& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.move_x), ev::Conv<ev::Float>::to(o, x.move_y), ev::Conv<ev::Float>::to(o, x.up), ev::Conv<ev::Bool>::to(o, x.jump), ev::Conv<ev::Bool>::to(o, x.boost), ev::Conv<ev::Bool>::to(o, x.camera), ev::Conv<ev::Bool>::to(o, x.handbrake), ev::Conv<ev::Int>::to(o, x.robot), ev::Conv<ev::Float>::to(o, x.look_x), ev::Conv<ev::Float>::to(o, x.look_y), ev::Conv<ev::Float>::to(o, x.turn_deg), ev::Conv<ev::Float>::to(o, x.speed_scale), ev::Conv<ev::Float>::to(o, x.zoom), ev::Conv<ev::Float>::to(o, x.view_yaw), ev::Conv<ev::Bool>::to(o, x.has_view_yaw), ev::Conv<ev::Float>::to(o, x.view_pitch), ev::Conv<ev::Bool>::to(o, x.fire), ev::Conv<ev::Bool>::to(o, x.aim), ev::Conv<ev::Bool>::to(o, x.reload), ev::Conv<ev::Bool>::to(o, x.crouch), ev::Conv<ev::Bool>::to(o, x.interact), ev::Conv<ev::Float>::to(o, x.look_stick_x), ev::Conv<ev::Float>::to(o, x.look_stick_y), ev::Conv<ev::Bool>::to(o, x.gamepad), ev::Conv<ev::Float>::to(o, x.rewind)}); }
-void S_game_PlayInput::from(EngineObjects& o, const Value& v, kern::game::PlayInput& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.move_x); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.move_y); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.jump); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.boost); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.camera); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.handbrake); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.robot); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.look_x); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.look_y); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.turn_deg); if (const Value* f = v.field(11)) ev::Conv<ev::Float>::from(o, *f, x.speed_scale); if (const Value* f = v.field(12)) ev::Conv<ev::Float>::from(o, *f, x.zoom); if (const Value* f = v.field(13)) ev::Conv<ev::Float>::from(o, *f, x.view_yaw); if (const Value* f = v.field(14)) ev::Conv<ev::Bool>::from(o, *f, x.has_view_yaw); if (const Value* f = v.field(15)) ev::Conv<ev::Float>::from(o, *f, x.view_pitch); if (const Value* f = v.field(16)) ev::Conv<ev::Bool>::from(o, *f, x.fire); if (const Value* f = v.field(17)) ev::Conv<ev::Bool>::from(o, *f, x.aim); if (const Value* f = v.field(18)) ev::Conv<ev::Bool>::from(o, *f, x.reload); if (const Value* f = v.field(19)) ev::Conv<ev::Bool>::from(o, *f, x.crouch); if (const Value* f = v.field(20)) ev::Conv<ev::Bool>::from(o, *f, x.interact); if (const Value* f = v.field(21)) ev::Conv<ev::Float>::from(o, *f, x.look_stick_x); if (const Value* f = v.field(22)) ev::Conv<ev::Float>::from(o, *f, x.look_stick_y); if (const Value* f = v.field(23)) ev::Conv<ev::Bool>::from(o, *f, x.gamepad); if (const Value* f = v.field(24)) ev::Conv<ev::Float>::from(o, *f, x.rewind); }
-Value S_game_ShotEvent::to(EngineObjects& o, const kern::game::ShotEvent& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.from), ev::Conv<ev::Vector>::to(o, x.to), ev::Conv<ev::Int>::to(o, x.shooter), ev::Conv<ev::Int>::to(o, x.hit), ev::Conv<ev::Bool>::to(o, x.impact), ev::Conv<ev::Bool>::to(o, x.head), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Int>::to(o, x.surface)}); }
-void S_game_ShotEvent::from(EngineObjects& o, const Value& v, kern::game::ShotEvent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.from); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.to); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.shooter); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.hit); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.impact); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.head); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.surface); }
-Value S_game_SimStats::to(EngineObjects& o, const kern::game::SimStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.bodies), ev::Conv<ev::Int>::to(o, x.awake), ev::Conv<ev::Int>::to(o, x.shapes), ev::Conv<ev::Int>::to(o, x.joints), ev::Conv<ev::Int>::to(o, x.broken_joints), ev::Conv<ev::Int>::to(o, x.contacts), ev::Conv<ev::Int64>::to(o, x.steps)}); }
-void S_game_SimStats::from(EngineObjects& o, const Value& v, kern::game::SimStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.bodies); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.awake); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.shapes); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.joints); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.broken_joints); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.contacts); if (const Value* f = v.field(6)) ev::Conv<ev::Int64>::from(o, *f, x.steps); }
-Value S_game_SoldierState::to(EngineObjects& o, const kern::game::SoldierState& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.health), ev::Conv<ev::Float>::to(o, x.max_health), ev::Conv<ev::Float>::to(o, x.armor), ev::Conv<ev::Int>::to(o, x.ammo), ev::Conv<ev::Int>::to(o, x.magazine), ev::Conv<ev::Int>::to(o, x.reserve), ev::Conv<ev::Float>::to(o, x.reload), ev::Conv<ev::Float>::to(o, x.spread), ev::Conv<ev::Float>::to(o, x.respawn_in), ev::Conv<ev::Int>::to(o, x.hits), ev::Conv<ev::Int>::to(o, x.damages), ev::Conv<ev::Bool>::to(o, x.hit_head), ev::Conv<ev::Bool>::to(o, x.hit_kill), ev::Conv<ev::Bool>::to(o, x.dead), ev::Conv<ev::Float>::to(o, x.damage_yaw)}); }
-void S_game_SoldierState::from(EngineObjects& o, const Value& v, kern::game::SoldierState& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.health); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.max_health); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.armor); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.ammo); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.magazine); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.reserve); if (const Value* f = v.field(6)) ev::Conv<ev::Float>::from(o, *f, x.reload); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.spread); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.respawn_in); if (const Value* f = v.field(9)) ev::Conv<ev::Int>::from(o, *f, x.hits); if (const Value* f = v.field(10)) ev::Conv<ev::Int>::from(o, *f, x.damages); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.hit_head); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.hit_kill); if (const Value* f = v.field(13)) ev::Conv<ev::Bool>::from(o, *f, x.dead); if (const Value* f = v.field(14)) ev::Conv<ev::Float>::from(o, *f, x.damage_yaw); }
-Value S_game_SoundCue::to(EngineObjects& o, const kern::game::SoundCue& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.sound), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Float>::to(o, x.volume), ev::Conv<ev::Float>::to(o, x.pitch), ev::Conv<ev::Bool>::to(o, x.spatial), ev::Conv<ev::Enum<E_audio_Bus>>::to(o, x.bus), ev::Conv<ev::Int>::to(o, x.actor), ev::Conv<ev::Bool>::to(o, x.voice), ev::Conv<ev::Bool>::to(o, x.silence)}); }
-void S_game_SoundCue::from(EngineObjects& o, const Value& v, kern::game::SoundCue& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.sound); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.volume); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.pitch); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.spatial); if (const Value* f = v.field(5)) ev::Conv<ev::Enum<E_audio_Bus>>::from(o, *f, x.bus); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.actor); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.voice); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.silence); }
+Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Num<f32>>::to(o, x.fov), ev::Conv<ev::Num<f32>>::to(o, x.near), ev::Conv<ev::Num<f32>>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Num<f32>>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
+void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
+Value S_ExtensionAttribute::to(EngineObjects& o, const kern::ExtensionAttribute& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.key), ev::Conv<ev::Num<u32>>::to(o, x.size), ev::Conv<ev::Text>::to(o, x.glsl)}); }
+void S_ExtensionAttribute::from(EngineObjects& o, const Value& v, kern::ExtensionAttribute& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.key); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u32>>::from(o, *f, x.size); if (const Value* f = v.field(2)) ev::Conv<ev::Text>::from(o, *f, x.glsl); }
+Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.m)}); }
+void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.m); }
+Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.x), ev::Conv<ev::Num<f32>>::to(o, x.y), ev::Conv<ev::Num<f32>>::to(o, x.z), ev::Conv<ev::Num<f32>>::to(o, x.w)}); }
+void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.w); }
+Value S_game_BlueprintRunning::to(EngineObjects& o, const kern::game::BlueprintRunning& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.name), ev::Conv<ev::Text>::to(o, x.tier), ev::Conv<ev::Num<u64>>::to(o, x.functions), ev::Conv<ev::Num<u64>>::to(o, x.nodes), ev::Conv<ev::Bool>::to(o, x.disabled)}); }
+void S_game_BlueprintRunning::from(EngineObjects& o, const Value& v, kern::game::BlueprintRunning& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.name); if (const Value* f = v.field(1)) ev::Conv<ev::Text>::from(o, *f, x.tier); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u64>>::from(o, *f, x.functions); if (const Value* f = v.field(3)) ev::Conv<ev::Num<u64>>::from(o, *f, x.nodes); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.disabled); }
+Value S_game_GameWorld_ArtStats::to(EngineObjects& o, const kern::game::GameWorld::ArtStats& x) { return Value::structure({ev::Conv<ev::Num<u32>>::to(o, x.rigs), ev::Conv<ev::Num<u32>>::to(o, x.decals), ev::Conv<ev::Num<u32>>::to(o, x.tracers), ev::Conv<ev::Num<u32>>::to(o, x.chips), ev::Conv<ev::Bool>::to(o, x.view_model)}); }
+void S_game_GameWorld_ArtStats::from(EngineObjects& o, const Value& v, kern::game::GameWorld::ArtStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u32>>::from(o, *f, x.rigs); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u32>>::from(o, *f, x.decals); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u32>>::from(o, *f, x.tracers); if (const Value* f = v.field(3)) ev::Conv<ev::Num<u32>>::from(o, *f, x.chips); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.view_model); }
+Value S_game_GameWorld_DetectorModel::to(EngineObjects& o, const kern::game::GameWorld::DetectorModel& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.sigma_abs), ev::Conv<ev::Num<f32>>::to(o, x.sigma_rel), ev::Conv<ev::Num<f32>>::to(o, x.dropout), ev::Conv<ev::Num<u64>>::to(o, x.seed)}); }
+void S_game_GameWorld_DetectorModel::from(EngineObjects& o, const Value& v, kern::game::GameWorld::DetectorModel& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.sigma_abs); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.sigma_rel); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.dropout); if (const Value* f = v.field(3)) ev::Conv<ev::Num<u64>>::from(o, *f, x.seed); }
+Value S_game_GameWorld_SpawnChange::to(EngineObjects& o, const kern::game::GameWorld::SpawnChange& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.template_name), ev::Conv<ev::Num<u32>>::to(o, x.id), ev::Conv<ev::Struct<S_game_Transform>>::to(o, x.at)}); }
+void S_game_GameWorld_SpawnChange::from(EngineObjects& o, const Value& v, kern::game::GameWorld::SpawnChange& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.template_name); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u32>>::from(o, *f, x.id); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_game_Transform>>::from(o, *f, x.at); }
+Value S_game_GameWorld_WalkerJoint::to(EngineObjects& o, const kern::game::GameWorld::WalkerJoint& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.name), ev::Conv<ev::Num<f32>>::to(o, x.angle), ev::Conv<ev::Num<f32>>::to(o, x.lower), ev::Conv<ev::Num<f32>>::to(o, x.upper)}); }
+void S_game_GameWorld_WalkerJoint::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerJoint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.name); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.angle); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.lower); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.upper); }
+Value S_game_GameWorld_WalkerProbe::to(EngineObjects& o, const kern::game::GameWorld::WalkerProbe& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.velocity), ev::Conv<ev::Vector>::to(o, x.spin), ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::List<ev::Bool>>::to(o, x.foot_contact), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.foot_height), ev::Conv<ev::Bool>::to(o, x.self_contact), ev::Conv<ev::Bool>::to(o, x.body_contact), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.joint), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.joint_speed), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.action)}); }
+void S_game_GameWorld_WalkerProbe::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerProbe& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.velocity); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.spin); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(5)) ev::Conv<ev::List<ev::Bool>>::from(o, *f, x.foot_contact); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.foot_height); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.self_contact); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.body_contact); if (const Value* f = v.field(9)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.joint); if (const Value* f = v.field(10)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.joint_speed); if (const Value* f = v.field(11)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.action); }
+Value S_game_GameWorld_WalkerSensors::to(EngineObjects& o, const kern::game::GameWorld::WalkerSensors& x) { return Value::structure({ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.range), ev::Conv<ev::List<ev::Num<u8>>>::to(o, x.zone), ev::Conv<ev::Num<f32>>::to(o, x.nearest), ev::Conv<ev::Num<f32>>::to(o, x.nearest_bearing), ev::Conv<ev::Num<f32>>::to(o, x.free_left), ev::Conv<ev::Num<f32>>::to(o, x.free_right), ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::Bool>::to(o, x.fallen), ev::Conv<ev::Num<f32>>::to(o, x.speed), ev::Conv<ev::Num<f64>>::to(o, x.tof_time), ev::Conv<ev::Num<i32>>::to(o, x.hits), ev::Conv<ev::List<ev::Vector>>::to(o, x.hit), ev::Conv<ev::Num<i32>>::to(o, x.forward_observed)}); }
+void S_game_GameWorld_WalkerSensors::from(EngineObjects& o, const Value& v, kern::game::GameWorld::WalkerSensors& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.range); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Num<u8>>>::from(o, *f, x.zone); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.nearest); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.nearest_bearing); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.free_left); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.free_right); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.fallen); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.speed); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f64>>::from(o, *f, x.tof_time); if (const Value* f = v.field(10)) ev::Conv<ev::Num<i32>>::from(o, *f, x.hits); if (const Value* f = v.field(11)) ev::Conv<ev::List<ev::Vector>>::from(o, *f, x.hit); if (const Value* f = v.field(12)) ev::Conv<ev::Num<i32>>::from(o, *f, x.forward_observed); }
+Value S_game_Hud::to(EngineObjects& o, const kern::game::Hud& x) { return Value::structure({ev::Conv<ev::Enum<E_game_GameStatus>>::to(o, x.status), ev::Conv<ev::Text>::to(o, x.title), ev::Conv<ev::Text>::to(o, x.message), ev::Conv<ev::Num<f32>>::to(o, x.message_age), ev::Conv<ev::Num<f32>>::to(o, x.score), ev::Conv<ev::Num<u32>>::to(o, x.pickups), ev::Conv<ev::Num<u32>>::to(o, x.pickups_total), ev::Conv<ev::Num<f32>>::to(o, x.elapsed), ev::Conv<ev::Num<f32>>::to(o, x.remaining), ev::Conv<ev::Num<f32>>::to(o, x.speed), ev::Conv<ev::Num<f32>>::to(o, x.boost), ev::Conv<ev::Bool>::to(o, x.boosting), ev::Conv<ev::Bool>::to(o, x.interior), ev::Conv<ev::Num<f32>>::to(o, x.best), ev::Conv<ev::Bool>::to(o, x.soldier), ev::Conv<ev::Num<f32>>::to(o, x.health), ev::Conv<ev::Num<f32>>::to(o, x.max_health), ev::Conv<ev::Num<f32>>::to(o, x.armor), ev::Conv<ev::Num<i32>>::to(o, x.ammo), ev::Conv<ev::Num<i32>>::to(o, x.magazine), ev::Conv<ev::Num<i32>>::to(o, x.reserve), ev::Conv<ev::Num<f32>>::to(o, x.reload), ev::Conv<ev::Num<f32>>::to(o, x.spread), ev::Conv<ev::Num<f32>>::to(o, x.hit_age), ev::Conv<ev::Bool>::to(o, x.hit_head), ev::Conv<ev::Bool>::to(o, x.hit_kill), ev::Conv<ev::Num<f32>>::to(o, x.damage_age), ev::Conv<ev::Num<f32>>::to(o, x.damage_yaw), ev::Conv<ev::Num<f32>>::to(o, x.respawn_in), ev::Conv<ev::Bool>::to(o, x.aiming), ev::Conv<ev::Num<f32>>::to(o, x.fov)}); }
+void S_game_Hud::from(EngineObjects& o, const Value& v, kern::game::Hud& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_game_GameStatus>>::from(o, *f, x.status); if (const Value* f = v.field(1)) ev::Conv<ev::Text>::from(o, *f, x.title); if (const Value* f = v.field(2)) ev::Conv<ev::Text>::from(o, *f, x.message); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.message_age); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.score); if (const Value* f = v.field(5)) ev::Conv<ev::Num<u32>>::from(o, *f, x.pickups); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u32>>::from(o, *f, x.pickups_total); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.elapsed); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.remaining); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f32>>::from(o, *f, x.speed); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.boost); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.boosting); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.interior); if (const Value* f = v.field(13)) ev::Conv<ev::Num<f32>>::from(o, *f, x.best); if (const Value* f = v.field(14)) ev::Conv<ev::Bool>::from(o, *f, x.soldier); if (const Value* f = v.field(15)) ev::Conv<ev::Num<f32>>::from(o, *f, x.health); if (const Value* f = v.field(16)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_health); if (const Value* f = v.field(17)) ev::Conv<ev::Num<f32>>::from(o, *f, x.armor); if (const Value* f = v.field(18)) ev::Conv<ev::Num<i32>>::from(o, *f, x.ammo); if (const Value* f = v.field(19)) ev::Conv<ev::Num<i32>>::from(o, *f, x.magazine); if (const Value* f = v.field(20)) ev::Conv<ev::Num<i32>>::from(o, *f, x.reserve); if (const Value* f = v.field(21)) ev::Conv<ev::Num<f32>>::from(o, *f, x.reload); if (const Value* f = v.field(22)) ev::Conv<ev::Num<f32>>::from(o, *f, x.spread); if (const Value* f = v.field(23)) ev::Conv<ev::Num<f32>>::from(o, *f, x.hit_age); if (const Value* f = v.field(24)) ev::Conv<ev::Bool>::from(o, *f, x.hit_head); if (const Value* f = v.field(25)) ev::Conv<ev::Bool>::from(o, *f, x.hit_kill); if (const Value* f = v.field(26)) ev::Conv<ev::Num<f32>>::from(o, *f, x.damage_age); if (const Value* f = v.field(27)) ev::Conv<ev::Num<f32>>::from(o, *f, x.damage_yaw); if (const Value* f = v.field(28)) ev::Conv<ev::Num<f32>>::from(o, *f, x.respawn_in); if (const Value* f = v.field(29)) ev::Conv<ev::Bool>::from(o, *f, x.aiming); if (const Value* f = v.field(30)) ev::Conv<ev::Num<f32>>::from(o, *f, x.fov); }
+Value S_game_PlayInput::to(EngineObjects& o, const kern::game::PlayInput& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.move_x), ev::Conv<ev::Num<f32>>::to(o, x.move_y), ev::Conv<ev::Num<f32>>::to(o, x.up), ev::Conv<ev::Bool>::to(o, x.jump), ev::Conv<ev::Bool>::to(o, x.boost), ev::Conv<ev::Bool>::to(o, x.camera), ev::Conv<ev::Bool>::to(o, x.handbrake), ev::Conv<ev::Num<u32>>::to(o, x.robot), ev::Conv<ev::Num<f32>>::to(o, x.look_x), ev::Conv<ev::Num<f32>>::to(o, x.look_y), ev::Conv<ev::Num<f32>>::to(o, x.turn_deg), ev::Conv<ev::Num<f32>>::to(o, x.speed_scale), ev::Conv<ev::Num<f32>>::to(o, x.zoom), ev::Conv<ev::Num<f32>>::to(o, x.view_yaw), ev::Conv<ev::Bool>::to(o, x.has_view_yaw), ev::Conv<ev::Num<f32>>::to(o, x.view_pitch), ev::Conv<ev::Bool>::to(o, x.fire), ev::Conv<ev::Bool>::to(o, x.aim), ev::Conv<ev::Bool>::to(o, x.reload), ev::Conv<ev::Bool>::to(o, x.crouch), ev::Conv<ev::Bool>::to(o, x.interact), ev::Conv<ev::Num<f32>>::to(o, x.look_stick_x), ev::Conv<ev::Num<f32>>::to(o, x.look_stick_y), ev::Conv<ev::Bool>::to(o, x.gamepad), ev::Conv<ev::Num<f32>>::to(o, x.rewind)}); }
+void S_game_PlayInput::from(EngineObjects& o, const Value& v, kern::game::PlayInput& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.move_x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.move_y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.jump); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.boost); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.camera); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.handbrake); if (const Value* f = v.field(7)) ev::Conv<ev::Num<u32>>::from(o, *f, x.robot); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.look_x); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f32>>::from(o, *f, x.look_y); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.turn_deg); if (const Value* f = v.field(11)) ev::Conv<ev::Num<f32>>::from(o, *f, x.speed_scale); if (const Value* f = v.field(12)) ev::Conv<ev::Num<f32>>::from(o, *f, x.zoom); if (const Value* f = v.field(13)) ev::Conv<ev::Num<f32>>::from(o, *f, x.view_yaw); if (const Value* f = v.field(14)) ev::Conv<ev::Bool>::from(o, *f, x.has_view_yaw); if (const Value* f = v.field(15)) ev::Conv<ev::Num<f32>>::from(o, *f, x.view_pitch); if (const Value* f = v.field(16)) ev::Conv<ev::Bool>::from(o, *f, x.fire); if (const Value* f = v.field(17)) ev::Conv<ev::Bool>::from(o, *f, x.aim); if (const Value* f = v.field(18)) ev::Conv<ev::Bool>::from(o, *f, x.reload); if (const Value* f = v.field(19)) ev::Conv<ev::Bool>::from(o, *f, x.crouch); if (const Value* f = v.field(20)) ev::Conv<ev::Bool>::from(o, *f, x.interact); if (const Value* f = v.field(21)) ev::Conv<ev::Num<f32>>::from(o, *f, x.look_stick_x); if (const Value* f = v.field(22)) ev::Conv<ev::Num<f32>>::from(o, *f, x.look_stick_y); if (const Value* f = v.field(23)) ev::Conv<ev::Bool>::from(o, *f, x.gamepad); if (const Value* f = v.field(24)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rewind); }
+Value S_game_ShotEvent::to(EngineObjects& o, const kern::game::ShotEvent& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.from), ev::Conv<ev::Vector>::to(o, x.to), ev::Conv<ev::Num<u32>>::to(o, x.shooter), ev::Conv<ev::Num<u32>>::to(o, x.hit), ev::Conv<ev::Bool>::to(o, x.impact), ev::Conv<ev::Bool>::to(o, x.head), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<u8>>::to(o, x.surface)}); }
+void S_game_ShotEvent::from(EngineObjects& o, const Value& v, kern::game::ShotEvent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.from); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.to); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u32>>::from(o, *f, x.shooter); if (const Value* f = v.field(3)) ev::Conv<ev::Num<u32>>::from(o, *f, x.hit); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.impact); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.head); if (const Value* f = v.field(6)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(7)) ev::Conv<ev::Num<u8>>::from(o, *f, x.surface); }
+Value S_game_SimStats::to(EngineObjects& o, const kern::game::SimStats& x) { return Value::structure({ev::Conv<ev::Num<u32>>::to(o, x.bodies), ev::Conv<ev::Num<u32>>::to(o, x.awake), ev::Conv<ev::Num<u32>>::to(o, x.shapes), ev::Conv<ev::Num<u32>>::to(o, x.joints), ev::Conv<ev::Num<u32>>::to(o, x.broken_joints), ev::Conv<ev::Num<u32>>::to(o, x.contacts), ev::Conv<ev::Num<u64>>::to(o, x.steps)}); }
+void S_game_SimStats::from(EngineObjects& o, const Value& v, kern::game::SimStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u32>>::from(o, *f, x.bodies); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u32>>::from(o, *f, x.awake); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u32>>::from(o, *f, x.shapes); if (const Value* f = v.field(3)) ev::Conv<ev::Num<u32>>::from(o, *f, x.joints); if (const Value* f = v.field(4)) ev::Conv<ev::Num<u32>>::from(o, *f, x.broken_joints); if (const Value* f = v.field(5)) ev::Conv<ev::Num<u32>>::from(o, *f, x.contacts); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u64>>::from(o, *f, x.steps); }
+Value S_game_SoldierState::to(EngineObjects& o, const kern::game::SoldierState& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.health), ev::Conv<ev::Num<f32>>::to(o, x.max_health), ev::Conv<ev::Num<f32>>::to(o, x.armor), ev::Conv<ev::Num<i32>>::to(o, x.ammo), ev::Conv<ev::Num<i32>>::to(o, x.magazine), ev::Conv<ev::Num<i32>>::to(o, x.reserve), ev::Conv<ev::Num<f32>>::to(o, x.reload), ev::Conv<ev::Num<f32>>::to(o, x.spread), ev::Conv<ev::Num<f32>>::to(o, x.respawn_in), ev::Conv<ev::Num<u8>>::to(o, x.hits), ev::Conv<ev::Num<u8>>::to(o, x.damages), ev::Conv<ev::Bool>::to(o, x.hit_head), ev::Conv<ev::Bool>::to(o, x.hit_kill), ev::Conv<ev::Bool>::to(o, x.dead), ev::Conv<ev::Num<f32>>::to(o, x.damage_yaw)}); }
+void S_game_SoldierState::from(EngineObjects& o, const Value& v, kern::game::SoldierState& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.health); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_health); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.armor); if (const Value* f = v.field(3)) ev::Conv<ev::Num<i32>>::from(o, *f, x.ammo); if (const Value* f = v.field(4)) ev::Conv<ev::Num<i32>>::from(o, *f, x.magazine); if (const Value* f = v.field(5)) ev::Conv<ev::Num<i32>>::from(o, *f, x.reserve); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.reload); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.spread); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.respawn_in); if (const Value* f = v.field(9)) ev::Conv<ev::Num<u8>>::from(o, *f, x.hits); if (const Value* f = v.field(10)) ev::Conv<ev::Num<u8>>::from(o, *f, x.damages); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.hit_head); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.hit_kill); if (const Value* f = v.field(13)) ev::Conv<ev::Bool>::from(o, *f, x.dead); if (const Value* f = v.field(14)) ev::Conv<ev::Num<f32>>::from(o, *f, x.damage_yaw); }
+Value S_game_SoundCue::to(EngineObjects& o, const kern::game::SoundCue& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.sound), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Num<f32>>::to(o, x.volume), ev::Conv<ev::Num<f32>>::to(o, x.pitch), ev::Conv<ev::Bool>::to(o, x.spatial), ev::Conv<ev::Enum<E_audio_Bus>>::to(o, x.bus), ev::Conv<ev::Num<u32>>::to(o, x.actor), ev::Conv<ev::Bool>::to(o, x.voice), ev::Conv<ev::Bool>::to(o, x.silence)}); }
+void S_game_SoundCue::from(EngineObjects& o, const Value& v, kern::game::SoundCue& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.sound); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.volume); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.pitch); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.spatial); if (const Value* f = v.field(5)) ev::Conv<ev::Enum<E_audio_Bus>>::from(o, *f, x.bus); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u32>>::from(o, *f, x.actor); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.voice); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.silence); }
 Value S_game_Transform::to(EngineObjects& o, const kern::game::Transform& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Vector>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.scale)}); }
 void S_game_Transform::from(EngineObjects& o, const Value& v, kern::game::Transform& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.rotation); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.scale); }
-Value S_physics_Body::to(EngineObjects& o, const kern::physics::Body& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.id)}); }
-void S_physics_Body::from(EngineObjects& o, const Value& v, kern::physics::Body& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.id); }
-Value S_physics_QueryFilter::to(EngineObjects& o, const kern::physics::QueryFilter& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.mask_bits), ev::Conv<ev::Int64>::to(o, x.category_bits)}); }
-void S_physics_QueryFilter::from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.mask_bits); if (const Value* f = v.field(1)) ev::Conv<ev::Int64>::from(o, *f, x.category_bits); }
+Value S_physics_Body::to(EngineObjects& o, const kern::physics::Body& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.id)}); }
+void S_physics_Body::from(EngineObjects& o, const Value& v, kern::physics::Body& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.id); }
+Value S_physics_QueryFilter::to(EngineObjects& o, const kern::physics::QueryFilter& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.mask_bits), ev::Conv<ev::Num<u64>>::to(o, x.category_bits)}); }
+void S_physics_QueryFilter::from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.mask_bits); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u64>>::from(o, *f, x.category_bits); }
 
 // engine.game.euler_to_quat: kern::game::euler_to_quat
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
@@ -289,7 +289,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::FixedStep>(o, in, 0, "fixed_step");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->fixed_step(std::move(a0));
   return true;
 }
@@ -299,7 +299,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   self->set_layers(std::move(a0));
   return true;
 }
@@ -317,9 +317,9 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->actor_for_mesh(std::move(a0));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -328,7 +328,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Mat4&>>();
   ev::take<ev::Struct<S_Mat4>>(o, in, 2, a1);
   decltype(auto) r = self->actor_matrix(std::move(a0), a1);
@@ -342,7 +342,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Aabb&>>();
   ev::take<ev::Struct<S_Aabb>>(o, in, 2, a1);
   decltype(auto) r = self->actor_bounds(std::move(a0), a1);
@@ -356,11 +356,11 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u32>>>(o, in, 2, a1);
   self->actor_meshes(std::move(a0), a1);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a1);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, a1);
   return true;
 }
 
@@ -380,11 +380,11 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<i32>>(o, in, 3, a2);
   std::vector<unsigned char> a3;
-  ev::take<ev::List<ev::Int>>(o, in, 4, a3);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 4, a3);
   decltype(auto) r = self->set_texture_pixels(a0, std::move(a1), std::move(a2), a3.empty() ? nullptr : a3.data());
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -397,7 +397,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a0);
   decltype(auto) r = self->apply_lighting(std::move(a0));
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -406,7 +406,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->time_of_day();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -415,7 +415,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   self->present(std::move(a0), std::move(a1));
@@ -495,7 +495,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->session();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -543,7 +543,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::PlayInput const&>>();
   ev::take<ev::Struct<S_game_PlayInput>>(o, in, 2, a1);
   self->step(std::move(a0), a1);
@@ -576,7 +576,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera&>>();
   ev::take<ev::Struct<S_Camera>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::game::PlayInput const&>>();
   ev::take<ev::Struct<S_game_PlayInput>>(o, in, 3, a2);
   decltype(auto) r = self->update_camera(a0, std::move(a1), a2);
@@ -590,7 +590,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->player();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -599,7 +599,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->camera_yaw();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -617,7 +617,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->camera_pitch();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -626,7 +626,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->sim_time();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -637,9 +637,9 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   decltype(auto) r = self->add_pawn(a0, std::move(a1));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -648,7 +648,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->remove_pawn(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -659,9 +659,9 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->pawn_source(std::move(a0));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -670,7 +670,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::PlayInput const&>>();
   ev::take<ev::Struct<S_game_PlayInput>>(o, in, 2, a1);
   self->set_pawn_input(std::move(a0), a1);
@@ -682,7 +682,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   self->set_local_pawn(std::move(a0));
   return true;
 }
@@ -692,7 +692,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->pawns();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, r);
   return true;
 }
 
@@ -701,9 +701,9 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<std::pair<unsigned int, bool>, std::allocator<std::pair<unsigned int, bool> > >&>>();
-  ev::take<ev::List<ev::Pair<ev::Int, ev::Bool>>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Pair<ev::Num<u32>, ev::Bool>>>(o, in, 1, a0);
   self->take_alive_changes(a0);
-  ev::give<ev::List<ev::Pair<ev::Int, ev::Bool>>>(o, out, 0, a0);
+  ev::give<ev::List<ev::Pair<ev::Num<u32>, ev::Bool>>>(o, out, 0, a0);
   return true;
 }
 
@@ -712,7 +712,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->dead_actors();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, r);
   return true;
 }
 
@@ -721,7 +721,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   self->set_alive(std::move(a0), std::move(a1));
@@ -733,9 +733,9 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u32>>>(o, in, 1, a0);
   self->networked_actors(a0);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a0);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, a0);
   return true;
 }
 
@@ -761,7 +761,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Quat>>();
@@ -775,9 +775,9 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::game::PlayInput const&>>();
   ev::take<ev::Struct<S_game_PlayInput>>(o, in, 3, a2);
   self->step_replica(std::move(a0), std::move(a1), a2);
@@ -798,7 +798,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->aim_blend();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -825,7 +825,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->actor_body(std::move(a0));
   ev::give<ev::Struct<S_physics_Body>>(o, out, 0, r);
   return true;
@@ -836,7 +836,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   decltype(auto) r = self->begin_grab(std::move(a0), std::move(a1));
@@ -882,12 +882,12 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a2 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >&>>();
-  ev::take<ev::List<ev::Float>>(o, in, 4, a3);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<std::vector<float, std::allocator<float> >&>>();
-  ev::take<ev::List<ev::Float>>(o, in, 5, a4);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 5, a4);
   self->debug_lines(std::move(a0), std::move(a1), std::move(a2), a3, a4);
-  ev::give<ev::List<ev::Float>>(o, out, 0, a3);
-  ev::give<ev::List<ev::Float>>(o, out, 1, a4);
+  ev::give<ev::List<ev::Num<f32>>>(o, out, 0, a3);
+  ev::give<ev::List<ev::Num<f32>>>(o, out, 1, a4);
   return true;
 }
 
@@ -947,11 +947,11 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -965,9 +965,9 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->health_of(std::move(a0));
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -976,11 +976,11 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 4, a3);
   self->set_health(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
@@ -992,7 +992,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::SoldierState&>>();
   ev::take<ev::Struct<S_game_SoldierState>>(o, in, 2, a1);
   decltype(auto) r = self->soldier_state(std::move(a0), a1);
@@ -1006,7 +1006,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->respawn_now(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1047,7 +1047,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->actor_alive(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1076,7 +1076,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->world_id();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -1138,7 +1138,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 2, a1);
   kern::json::Value* a2 = ev::object<kern::json::Value>(o, in, 3, "value");
@@ -1153,7 +1153,7 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   decltype(auto) r = self->set_material_color(std::move(a0), std::move(a1));
@@ -1166,11 +1166,11 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f64>>(o, in, 3, a2);
   decltype(auto) r = self->set_property_number(std::move(a0), a1, std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1181,7 +1181,7 @@ bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<bool>>();
@@ -1196,7 +1196,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -1215,7 +1215,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::Transform const&>>();
   ev::take<ev::Struct<S_game_Transform>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   decltype(auto) r = self->spawn(a0, a1, std::move(a2));
   ev::give<ev::Actor>(o, out, 0, r);
   return true;
@@ -1226,7 +1226,7 @@ bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   std::vector<kern::Vec3> a2;
@@ -1241,7 +1241,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->actor_velocity(std::move(a0));
   ev::give<ev::Vector>(o, out, 0, r);
   return true;
@@ -1252,7 +1252,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   decltype(auto) r = self->set_actor_velocity(std::move(a0), std::move(a1));
@@ -1265,7 +1265,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<bool>>();
@@ -1280,7 +1280,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->set_simulate_physics(std::move(a0), std::move(a1));
@@ -1293,15 +1293,15 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 5, a4);
+  ev::take<ev::Num<f32>>(o, in, 5, a4);
   decltype(auto) r = self->set_joint_motor(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1314,7 +1314,7 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   decltype(auto) r = self->find_actor(a0);
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -1325,9 +1325,9 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u32>>>(o, in, 2, a1);
   self->actors_with_tag(a0, a1);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a1);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, a1);
   return true;
 }
 
@@ -1336,7 +1336,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   decltype(auto) r = self->has_tag(std::move(a0), a1);
@@ -1353,9 +1353,9 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<unsigned int&>>();
-  ev::take<ev::Int>(o, in, 4, a3);
+  ev::take<ev::Num<u32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<kern::Vec3&>>();
   ev::take<ev::Vector>(o, in, 5, a4);
   auto a5 = ev::blank<std::remove_cvref_t<kern::Vec3&>>();
@@ -1364,7 +1364,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_physics_QueryFilter>>(o, in, 7, a6);
   decltype(auto) r = self->line_trace(std::move(a0), std::move(a1), std::move(a2), a3, a4, a5, std::move(a6));
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Int>(o, out, 1, a3);
+  ev::give<ev::Num<u32>>(o, out, 1, a3);
   ev::give<ev::Vector>(o, out, 2, a4);
   ev::give<ev::Vector>(o, out, 3, a5);
   return true;
@@ -1375,7 +1375,7 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f32>>(o, in, 1, a0);
   self->add_score(std::move(a0));
   return true;
 }
@@ -1411,13 +1411,13 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 5, a4);
   auto a5 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 6, a5);
+  ev::take<ev::Num<u32>>(o, in, 6, a5);
   self->play_sound(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
   return true;
 }
@@ -1439,7 +1439,7 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f32>>(o, in, 1, a0);
   self->shake_camera(std::move(a0));
   return true;
 }
@@ -1451,7 +1451,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 3, a2);
   self->aim_view_model(std::move(a0), std::move(a1), std::move(a2));
@@ -1463,7 +1463,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   self->destroy_actor(std::move(a0));
   return true;
 }
@@ -1473,9 +1473,9 @@ bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   self->heal(std::move(a0), std::move(a1));
   return true;
 }
@@ -1485,9 +1485,9 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   self->give_ammo(std::move(a0), std::move(a1));
   return true;
 }
@@ -1499,7 +1499,7 @@ bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   self->call_logic_event(a0, std::move(a1));
   return true;
 }
@@ -1509,7 +1509,7 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerSensors&>>();
   ev::take<ev::Struct<S_game_GameWorld_WalkerSensors>>(o, in, 2, a1);
   decltype(auto) r = self->walker_sensors(std::move(a0), a1);
@@ -1523,7 +1523,7 @@ bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Camera&>>();
   ev::take<ev::Struct<S_Camera>>(o, in, 2, a1);
   decltype(auto) r = self->walker_camera(std::move(a0), a1);
@@ -1537,15 +1537,15 @@ bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 5, a4);
+  ev::take<ev::Num<f32>>(o, in, 5, a4);
   decltype(auto) r = self->walker_command(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1556,15 +1556,15 @@ bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 5, a4);
+  ev::take<ev::Num<f32>>(o, in, 5, a4);
   decltype(auto) r = self->walker_look(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1575,7 +1575,7 @@ bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->walker_set_autonomous(std::move(a0), std::move(a1));
@@ -1588,7 +1588,7 @@ bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_quack(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1599,7 +1599,7 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   decltype(auto) r = self->walker_skill(std::move(a0), a1);
@@ -1612,9 +1612,9 @@ bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   decltype(auto) r = self->walker_mouth(std::move(a0), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1625,7 +1625,7 @@ bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_holding(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1636,9 +1636,9 @@ bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   decltype(auto) r = self->walker_pet(std::move(a0), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1649,7 +1649,7 @@ bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->walker_hear(std::move(a0), std::move(a1));
@@ -1662,18 +1662,18 @@ bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float&>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float&>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float&>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   decltype(auto) r = self->walker_servo_load(std::move(a0), a1, a2, a3);
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Float>(o, out, 1, a1);
-  ev::give<ev::Float>(o, out, 2, a2);
-  ev::give<ev::Float>(o, out, 3, a3);
+  ev::give<ev::Num<f32>>(o, out, 1, a1);
+  ev::give<ev::Num<f32>>(o, out, 2, a2);
+  ev::give<ev::Num<f32>>(o, out, 3, a3);
   return true;
 }
 
@@ -1682,7 +1682,7 @@ bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_driving(std::move(a0));
   ev::give<ev::Text>(o, out, 0, r);
   return true;
@@ -1693,7 +1693,7 @@ bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->set_walker_external(std::move(a0), std::move(a1));
@@ -1706,7 +1706,7 @@ bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->set_walker_pose_edit(std::move(a0), std::move(a1));
@@ -1719,9 +1719,9 @@ bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   std::vector<float> a1;
-  ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 2, a1);
   if (a1.size() < 14) { o.error = "the list joints has fewer than 14 entries"; return false; }
   decltype(auto) r = self->set_walker_pose(std::move(a0), a1.empty() ? nullptr : a1.data());
   ev::give<ev::Bool>(o, out, 0, r);
@@ -1733,9 +1733,9 @@ bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   std::vector<float> a1;
-  ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 2, a1);
   if (a1.size() < 14) { o.error = "the list action has fewer than 14 entries"; return false; }
   decltype(auto) r = self->set_walker_action(std::move(a0), a1.empty() ? nullptr : a1.data());
   ev::give<ev::Bool>(o, out, 0, r);
@@ -1747,7 +1747,7 @@ bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_tick_due(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1758,7 +1758,7 @@ bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerProbe&>>();
   ev::take<ev::Struct<S_game_GameWorld_WalkerProbe>>(o, in, 2, a1);
   decltype(auto) r = self->walker_probe(std::move(a0), a1);
@@ -1772,7 +1772,7 @@ bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   decltype(auto) r = self->walker_push(std::move(a0), std::move(a1));
@@ -1785,7 +1785,7 @@ bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_said(std::move(a0));
   ev::give<ev::Text>(o, out, 0, r);
   return true;
@@ -1796,7 +1796,7 @@ bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_joints(std::move(a0));
   ev::give<ev::List<ev::Struct<S_game_GameWorld_WalkerJoint>>>(o, out, 0, r);
   return true;
@@ -1807,7 +1807,7 @@ bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   decltype(auto) r = self->set_walker_play_external(std::move(a0), std::move(a1));
@@ -1820,9 +1820,9 @@ bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   std::vector<float> a1;
-  ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 2, a1);
   decltype(auto) r = self->set_walker_play_action(std::move(a0), a1.empty() ? nullptr : a1.data());
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1833,7 +1833,7 @@ bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::game::GameWorld::DetectorModel const&>>();
   ev::take<ev::Struct<S_game_GameWorld_DetectorModel>>(o, in, 2, a1);
   decltype(auto) r = self->set_walker_detector(std::move(a0), a1);
@@ -1846,7 +1846,7 @@ bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_play_due(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1857,7 +1857,7 @@ bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_playing(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1868,20 +1868,20 @@ bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<bool&>>();
   ev::take<ev::Bool>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float&>>();
-  ev::take<ev::Float>(o, in, 4, a3);
+  ev::take<ev::Num<f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float&>>();
-  ev::take<ev::Float>(o, in, 5, a4);
+  ev::take<ev::Num<f32>>(o, in, 5, a4);
   decltype(auto) r = self->walker_sees(std::move(a0), std::move(a1), a2, a3, a4);
   ev::give<ev::Bool>(o, out, 0, r);
   ev::give<ev::Bool>(o, out, 1, a2);
-  ev::give<ev::Float>(o, out, 2, a3);
-  ev::give<ev::Float>(o, out, 3, a4);
+  ev::give<ev::Num<f32>>(o, out, 2, a3);
+  ev::give<ev::Num<f32>>(o, out, 3, a4);
   return true;
 }
 
@@ -1890,7 +1890,7 @@ bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->walker_state(std::move(a0));
   ev::give<ev::Text>(o, out, 0, r);
   return true;
@@ -1901,7 +1901,7 @@ bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->walkers();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<u32>>>(o, out, 0, r);
   return true;
 }
 
@@ -1939,7 +1939,7 @@ bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   decltype(auto) r = self->clip(a0);
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -1968,7 +1968,7 @@ bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   decltype(auto) r = self->prepare(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -2023,13 +2023,13 @@ bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   std::vector<float> a1;
-  ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<f32>>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 4, a3);
+  ev::take<ev::Num<u32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 5, a4);
+  ev::take<ev::Num<u32>>(o, in, 5, a4);
   if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than samples says"; return false; }
   decltype(auto) r = self->set_pcm(a0, a1.empty() ? nullptr : a1.data(), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -2055,7 +2055,7 @@ bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   decltype(auto) r = self->duration(a0);
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f32>>(o, out, 0, r);
   return true;
 }
 
@@ -2072,7 +2072,7 @@ bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   decltype(auto) r = self->queued();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -2095,7 +2095,7 @@ bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
   ev::take<ev::Struct<S_Camera>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 3, a2);
+  ev::take<ev::Num<f32>>(o, in, 3, a2);
   self->update(*a0, a1, std::move(a2));
   return true;
 }
@@ -2105,7 +2105,7 @@ bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f32>>(o, in, 1, a0);
   self->end(std::move(a0));
   return true;
 }
@@ -2143,7 +2143,7 @@ bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->cues_played();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -2152,7 +2152,7 @@ bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->cues_dropped();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -2231,7 +2231,7 @@ bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
-  ev::give<ev::Int>(o, out, 0, self->actor);
+  ev::give<ev::Num<u32>>(o, out, 0, self->actor);
   return true;
 }
 
@@ -2239,7 +2239,7 @@ bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 bool c186_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
-  ev::take<ev::Int>(o, in, 1, self->actor);
+  ev::take<ev::Num<u32>>(o, in, 1, self->actor);
   return true;
 }
 
@@ -2276,7 +2276,7 @@ bool c189(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 bool c190(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
-  ev::give<ev::Float>(o, out, 0, self->night);
+  ev::give<ev::Num<f32>>(o, out, 0, self->night);
   return true;
 }
 
@@ -2284,7 +2284,7 @@ bool c190(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 bool c190_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
-  ev::take<ev::Float>(o, in, 1, self->night);
+  ev::take<ev::Num<f32>>(o, in, 1, self->night);
   return true;
 }
 
@@ -2308,7 +2308,7 @@ class Implements_game_FixedStep final : public kern::game::FixedStep {
  public:
   Implements_game_FixedStep(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {}
   decltype(std::declval<kern::game::FixedStep&>().fixed_step(std::declval<double>())) fixed_step(double kern_p0) override {
-    const std::vector<Value> kern_in{ev::Conv<ev::Float>::to(o_, kern_p0)};
+    const std::vector<Value> kern_in{ev::Conv<ev::Num<f64>>::to(o_, kern_p0)};
     std::vector<Value> kern_out;
     by_->call("fixed_step", kern_in, kern_out);
   }

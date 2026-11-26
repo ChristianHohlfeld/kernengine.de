@@ -74,7 +74,7 @@ struct Level : kern::Blueprint {
   KERN_EVENT(on3, event_custom<"Moves">)
   void on3(Actor actor, f64 value, Text text) {
     actor_set_location(actor, Vector{3.0, 3.0, 2.0});
-    actor_set_rotation(actor, vector_make(0.0, 0.0, value));
+    actor_set_rotation(actor, vector_make(0.0f, 0.0f, num_cast<f32, f64>(value)));
     actor_move_by(actor, Vector{0.0, 1.0, 0.0});
     actor_set_property(actor, "components.mesh.material.roughness", text);
     actor_set_light(actor_find("Lamp"), Vector{0.2, 0.4, 0.8}, 3.0, 7.0);
@@ -85,7 +85,7 @@ struct Level : kern::Blueprint {
   KERN_EVENT(on4, event_custom<"Physics">)
   void on4(Actor actor, f64 value, Text text) {
     actor_set_velocity(actor, Vector{1.0, 0.0, 0.0});
-    actor_impulse(actor, vector_make(0.0, 0.0, value));
+    actor_impulse(actor, vector_make(0.0f, 0.0f, num_cast<f32, f64>(value)));
     actor_force(actor, Vector{0.0, 50.0, 0.0});
     actor_launch(actor_find(text), Vector{0.0, 0.0, 4.0});
     actor_simulate(actor_find("Sleeper"), true);
@@ -97,8 +97,8 @@ struct Level : kern::Blueprint {
     physics_trace(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor);
     physics_trace_channels(n41, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{}, physics_channels("World"), 4294967295);
     physics_trace_channels(n42, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{}, physics_channels("Nothing"), 4294967295);
-    Log = text_append(Log, kern::to<Text>(n41.hit), kern::to<Text>(n42.hit));
-    Log = text_append(Log, kern::to<Text>(physics_channels("All")), actor_name(n41.actor));
+    Log = text_append(Log, num_text<bool>(n41.hit), num_text<bool>(n42.hit));
+    Log = text_append(Log, num_text<i64>(physics_channels("All")), actor_name(n41.actor));
     physics_trace_channels(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor, 1, 1);
   }
 
@@ -129,7 +129,7 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on9, event_custom<"Spawn">)
   void on9(Actor actor, f64 value, Text text) {
-    actor_spawn<"Template">(n50, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0}, Vector{1.0, 1.0, 1.0});
+    actor_spawn<"Template">(n50, vector_make(num_cast<f32, f64>(value), 5.0f, 0.5f), Vector{0.0, 0.0, 45.0}, Vector{1.0, 1.0, 1.0});
     Made = n50.spawned;
     Log = text_append(Log, actor_name(n50.spawned), ";");
   }
@@ -142,14 +142,14 @@ struct Level : kern::Blueprint {
   KERN_EVENT(on11, event_custom<"Each">)
   void on11(Actor actor, f64 value, Text text) {
     for (auto it60 = flow_for_each_tag(n60, text); it60.next();) {
-      actor_move_by(n60.actor, vector_make(0.0, 0.0, num_cast<f64, i64>(n60.index)));
+      actor_move_by(n60.actor, vector_make(0.0f, 0.0f, num_cast<f32, i64>(n60.index)));
       Moved += 1;
     }
     Tagged = actor_all_with_tag(text);
     for (auto it61 = flow_for_each<Actor>(n61, Tagged); it61.next();) {
-      Log = text_append(Log, actor_name(n61.item), kern::to<Text>(n61.index));
+      Log = text_append(Log, actor_name(n61.item), num_text<i64>(n61.index));
     }
-    Log = text_append(Log, "each", kern::to<Text>(list_length<Actor>(Tagged)));
+    Log = text_append(Log, "each", num_text<i64>(list_length<Actor>(Tagged)));
   }
 
   KERN_EVENT(on12, event_custom<"Win">)
@@ -186,7 +186,7 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on74, game_pickup)
   void on74(Actor actor, Actor other, f64 points) {
-    Log = text_append(Log, "pickup:", kern::to<Text>(points));
+    Log = text_append(Log, "pickup:", num_text<f64>(points));
   }
 
   KERN_EVENT(on75, game_trigger)
@@ -234,7 +234,7 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on83, game_key<"F", "both">)
   void on83(bool pressed, Actor actor) {
-    Log = text_append(Log, "key:", kern::to<Text>(pressed));
+    Log = text_append(Log, "key:", num_text<bool>(pressed));
   }
 
   kern::Node<20> n20;
@@ -271,7 +271,7 @@ struct Door : kern::Blueprint {
     Opener = actor_name(actor);
     flow_tween<"linear">(n2, "play", 1.0, {
       {"update", [this] {
-        actor_set_location(Actor{}, vector_lerp(Vector{10.0, 0.0, 1.5}, Vector{10.0, 0.0, 4.5}, n2.alpha));
+        actor_set_location(Actor{}, vector_lerp(Vector{10.0, 0.0, 1.5}, Vector{10.0, 0.0, 4.5}, num_cast<f32, f64>(n2.alpha)));
       }},
       {"finished", [this] {
         actor_set_color(actor_self(), Vector{0.2, 0.8, 0.2});

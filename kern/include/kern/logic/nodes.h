@@ -376,7 +376,12 @@ template <class T>
   requires(num::Number<T> && !std::is_same_v<T, bool>)
 struct Held<T> {
   static constexpr PinType type = number_type<T>();
-  static T from(const Value& v) { return v.as<T>(); }
+  static T from(const Value& v) {
+    // (a list of an enum holds its values' places as i64s: an enum's value is its place - no number is converted)
+    if constexpr (std::is_same_v<T, i64>)
+      if (v.type == PinType::enumeration) return v.i;
+    return v.as<T>();
+  }
 };
 template <> struct Held<Vec3> {
   static constexpr PinType type = PinType::vector;

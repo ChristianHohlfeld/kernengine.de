@@ -1394,28 +1394,28 @@ inline const char* kEnginePlaces = R"kn(
 struct EnginePlaces : kern::Blueprint {
   // ---- types ----
   KERN_STRUCT(MeshData) {
-    List<f64> positions = List<f64>{};
-    List<f64> normals = List<f64>{};
-    List<f64> colors = List<f64>{};
-    List<f64> uvs = List<f64>{};
-    List<f64> extra = List<f64>{};
-    i64 extra_size = 0;
-    List<i64> indices = List<i64>{};
+    List<f32> positions = List<f32>{};
+    List<f32> normals = List<f32>{};
+    List<f32> colors = List<f32>{};
+    List<f32> uvs = List<f32>{};
+    List<f32> extra = List<f32>{};
+    u32 extra_size = 0;
+    List<u32> indices = List<u32>{};
   };
   KERN_STRUCT(GeoChunk) {
-    i64 x = 0;
-    i64 y = 0;
-    i64 items = 0;
-    i64 triangles = 0;
-    i64 hash = 0;
+    i32 x = 0;
+    i32 y = 0;
+    u32 items = 0;
+    u32 triangles = 0;
+    u32 hash = 0;
     bool welded = false;
-    MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
+    MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
   };
   KERN_STRUCT(WeldStats) {
     u32 source_vertices = 0;
     u32 unique_vertices = 0;
-    i64 bytes_before = 0;
-    i64 bytes_after = 0;
+    u64 bytes_before = 0;
+    u64 bytes_after = 0;
     bool indexed = false;
   };
 
@@ -1423,24 +1423,24 @@ struct EnginePlaces : kern::Blueprint {
   Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
   i64 Length = 0;
   i64 At = 0;
-  i64 X = 0;
-  i64 Items = 0;
-  f64 P0 = 0.0;
-  i64 Beside = 0;
-  i64 Set = 0;
+  i32 X = 0;
+  u32 Items = 0;
+  f32 P0 = 0.0f;
+  i32 Beside = 0;
+  i32 Set = 0;
   List<GeoChunk> Chunks = List<GeoChunk>{};
   i64 LengthAfter = 0;
   bool Removed = false;
-  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}};
-  i64 Before = 0;
-  i64 Gone = 0;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}};
+  i32 Before = 0;
+  i32 Gone = 0;
   i64 GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
   i64 AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
-  MeshData Soup = MeshData{List<f64>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<f64>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<f64>{}, 0, List<i64>{}};
+  MeshData Soup = MeshData{List<f32>{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, List<f32>{1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, List<f32>{}, 0, List<u32>{}};
   WeldStats Stats = WeldStats{0, 0, 0, 0, false};
-  MeshData Welded = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
+  MeshData Welded = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
 
   // ---- functions ----
   void Bind() {
@@ -1452,20 +1452,20 @@ struct EnginePlaces : kern::Blueprint {
 
   void Change() {
     engine_building_builder_chunks(n7, Builder);
-    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f64>{0.1, 2.5}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 2, List<i64>{1, 2}}});
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f32>{0.1f, 2.5f}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 2, List<u32>{1, 2}}});
     At = n3.index;
-    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     n7.result[0].items = 7;
     n5.value = (n7.result[0].x += 3);
     X = n5.value;
-    n7.result[1].mesh.positions = List<f64>{0.3333333333333333, 4.0};
+    n7.result[1].mesh.positions = List<f32>{0.33333334f, 4.0f};
     P0 = n7.result[1].mesh.positions[0];
-    n7.result[1].mesh.positions[1] = 0.1;
+    n7.result[1].mesh.positions[1] = 0.1f;
     Items = n7.result[0].items;
     Removed = list_contains<GeoChunk>(n7.result, First);
     First = list_get<GeoChunk>(n7.result, 1);
-    P0 = math_mul<f64>(n7.result[1].mesh.positions[0], 2.0);
-    LengthAfter = list_length<f64>(n7.result[1].mesh.positions);
+    P0 = math_mul<f32>(n7.result[1].mesh.positions[0], 2.0f);
+    LengthAfter = list_length<f32>(n7.result[1].mesh.positions);
     Beside = n7.result[5].x;
     n6.value = (n7.result[5].x = 9);
     Set = n6.value;
@@ -1502,7 +1502,7 @@ struct EnginePlaces : kern::Blueprint {
     engine_building_builder_release(Builder);
     Gone = n8.result[0].x;
     n8.result[0].x = 4;
-    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     GoneLength = list_length<GeoChunk>(n8.result);
     GoneChunks = n8.result;
   }
@@ -1519,15 +1519,15 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
   struct { i64 index = 0; } n3;
   struct { bool removed = false; } n4;
-  struct { i64 value = 0; } n5;
-  struct { i64 value = 0; } n6;
+  struct { i32 value = 0; } n5;
+  struct { i32 value = 0; } n6;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
-  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}; } n13;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}; } n13;
 };
 )kn";
 
@@ -1570,8 +1570,8 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
     f64 time = 0.0;
-    f64 dt = 0.0;
-    u64 index = 0x0u;
+    f32 dt = 0.0f;
+    u64 index = 0;
   };
 
   // ---- variables ----
@@ -1587,7 +1587,7 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
     return {true};
   }
 
-  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {
     Updates += 1;
     Last = frame.time;
   }
@@ -1604,31 +1604,31 @@ inline const char* kImplementsLoop = R"kn(
 struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
-    u64 id = 0x0u;
+    u64 id = 0;
   };
 
   // ---- variables ----
-  net_Address Last = net_Address{0x0u};
-  i64 Bytes = 0;
+  net_Address Last = net_Address{0};
+  u32 Bytes = 0;
   i64 Sent = 0;
 
   // ---- functions ----
-  struct addressResult { net_Address result = net_Address{0x0u}; };
+  struct addressResult { net_Address result = net_Address{0}; };
   KERN_OVERRIDE KERN_PURE addressResult address() {
-    return {net_Address{0x7u}};
+    return {net_Address{7}};
   }
 
   struct sendResult { bool result = false; };
-  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0x0u}, List<u8> data = List<u8>{}, i64 bytes = 0) {
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0}, List<u8> data = List<u8>{}, u32 bytes = 0) {
     Last = to;
     Bytes = bytes;
     Sent = list_length<u8>(data);
     return {true};
   }
 
-  struct receiveResult { i64 result = 0; net_Address from = net_Address{0x0u}; List<i64> data = List<i64>{}; };
-  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0x0u}, i64 max_bytes = 0) {
-    return {Bytes, Last, List<i64>{1, 2, 3}};
+  struct receiveResult { i32 result = 0; net_Address from = net_Address{0}; List<u8> data = List<u8>{}; };
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0}, u32 max_bytes = 0) {
+    return {num_cast<i32, u32>(Bytes), Last, List<u8>{1, 2, 3}};
   }
 };
 )kn";

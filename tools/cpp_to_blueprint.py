@@ -1346,8 +1346,8 @@ def count_per(t):
     return int(m.group(1)) if m else None
 
 
-CALLBACK_VALUES = ("bool", "Int", "Float", "Vector", "Int64")   # (what the engine hands a Callback and what it gives: values C++ passes as values)
-CALLBACK_PIN = {"bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Int64": "int64"}
+CALLBACK_VALUES = NUMS + ("Vector",)   # (what the engine hands a Callback and what it gives: values C++ passes as values)
+CALLBACK_PIN = {**{t: t for t in NUMS}, "Vector": "vector"}
 
 
 def split_top(text):
@@ -2048,9 +2048,9 @@ class Unit:
                 return "void"
             bt = self.btype(raw)
             if bt not in CALLBACK_VALUES:
-                raise Wait(f"a callback that is handed or gives a {bt} (a Callback: Bool, Int, Float, Vector, Int64)")
-            if same and (bt in ("Int", "Int64") or (bt == "Float" and t not in ("double", "f64", "kern::f64")) or (bt == "Vector" and t != "kern::Vec3")):
-                raise Wait(f"a callback through a function pointer that is handed or gives a {t} (the class's thunk has f64, bool, Vec3)")
+                raise Wait(f"a callback that is handed or gives a {bt} (a Callback: a number, a bool or a Vector)")
+            if same and bt == "Vector" and t != "kern::Vec3":
+                raise Wait(f"a callback through a function pointer that is handed or gives a {t} (the class's thunk has Vec3)")
             return bt
         r = one(result)
         ins = [one(a) for a in args if a.strip() not in ("", "void")]
@@ -11981,6 +11981,8 @@ ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (the pin types of the engine's door until its pins have the types of their signatures - stage 6 of the number types:
 # Int an i64, Float an f64, Int64 a u64; an entry of a fixed width - of a List<U8> - its own type, u8)
 ENGINE_PIN = {"bool": "boolean", "Int": "i64", "Float": "f64", "Vector": "vector", "Text": "text", "Int64": "u64", "Actor": "actor"}
+# (the form of a number of each type - EnginePin::shape, kern/logic/engine_api.h: a letter each)
+NUM_SHAPE = {"bool": "b", "f64": "n", "f32": "f", "i64": "i", "u64": "l", "i32": "w", "u32": "u", "i16": "s", "u16": "r", "i8": "k", "u8": "y"}
 
 
 def snake(name):
@@ -12065,6 +12067,8 @@ class Api:
 
     def pin(self, bt):
         """(pin type, the struct, enum or class of the engine it names) of a Blueprint type."""
+        if bt in NUMS:   # (a number: the type of the signature itself - f32 stays f32, u32 u32)
+            return ("boolean" if bt == "bool" else bt), ""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
         if object_class(bt):
@@ -12089,6 +12093,8 @@ class Api:
         result, its "shapes"), e<values>, {fields}, [items] - [N items] for a list of a fixed
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
+        if bt in NUM_SHAPE:
+            return NUM_SHAPE[bt]
         if bt in ENGINE_PIN or bt in WIDTHS:
             return {"bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l", "Actor": "a"}[wire(bt)]
         if object_class(bt):
@@ -12511,7 +12517,7 @@ class Api:
             bt = self.u.btype(inner)
         except Wait:
             return None
-        if bt not in ("Int", "Float", "Int64"):
+        if bt not in NUMS or bt == "bool":
             return None   # (numbers: a pointer to anything else the function writes through has no node)
         return f"List<{bt}>"
 

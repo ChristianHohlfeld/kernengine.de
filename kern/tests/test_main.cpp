@@ -2104,8 +2104,13 @@ TEST(game_soldier_moves_shoots_and_respawns) {
 
 template <class V>
 bool no_errors(const V& issues) {
-  for (const auto& i : issues) if (i.error) return false;
-  return true;
+  bool none = true;
+  for (const auto& i : issues)
+    if (i.error) {
+      if constexpr (requires { i.text; }) std::printf("    error: %s\n", i.text.c_str());   // (what a failing check says: its reason)
+      none = false;
+    }
+  return none;
 }
 
 namespace {
@@ -2243,7 +2248,7 @@ TEST(logic_formulas) {
   CHECK(value("remainder(-190, 360)") == 170 && value("remainder(5.5, 2)") == -0.5 && value("remainder(7, 0)") == 0 && std::signbit(value("remainder(-720, 360)")));
   // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
   CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
-  CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);
+  CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 1);  // (a shift by the width or more: by its rest, numbers.h - as x86 and wasm)
   CHECK(value("wrap32(4294967296 + 5)") == 5 && value("wrap32(-1)") == 4294967295.0 && value("wrap32s(4294967295)") == -1 && value("wrap32s(2147483648)") == -2147483648.0);
   CHECK(value("mul32(2654435769, 2654435769)") == static_cast<f64>(static_cast<u32>(2654435769u * 2654435769u)) && value("mul32(65536, 65536)") == 0);
   CHECK(value("wrap32(shl(4294967295, 4))") == 4294967280.0 && value("band(7.9, 3.9)") == 3);
@@ -2595,19 +2600,19 @@ TEST(logic_function_export) {
   const char* text = R"kn(
 struct Host : kern::Blueprint {
   struct game_hudResult { Text Result = ""; };
-  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", i64 ask_length = 0, List<i64> data = List<i64>{}, i64 data_length = 0, i64 view = 0, f64 scale = 0.0) {
+  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", u32 ask_length = 0, List<u8> data = List<u8>{}, u32 data_length = 0, i32 view = 0, f32 scale = 0.0f) {
     return {ask};
   }
   KERN_EXPORT_AS("game_tick", "f64") void game_tick(f64 dt = 0.0) {
   }
-  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<i64>& data, i64 data_at = 0, i64 length = 0) {
+  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<u8>& data, u32 data_at = 0, u32 length = 0) {
   }
-  struct game_takeResult { List<i64> Result = List<i64>{}; };
+  struct game_takeResult { List<u8> Result = List<u8>{}; };
   KERN_EXPORT_AS("game_take", "-> bytes") game_takeResult game_take() {
-    return {List<i64>{}};
+    return {List<u8>{}};
   }
-  struct game_audioResult { List<f64> Result = List<f64>{}; };
-  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<f64>& samples, i64 samples_at = 0, i64 count = 0, i64 rate = 0) {
+  struct game_audioResult { List<f32> Result = List<f32>{}; };
+  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<f32>& samples, u32 samples_at = 0, u32 count = 0, u32 rate = 0) {
     return {samples};
   }
 };
@@ -2632,8 +2637,8 @@ struct Host : kern::Blueprint {
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
         glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
-  // floats: a pointer to f32 (in: a List of f64, its at and len; out: the entries as f32, kept until the next - none
-  // when the list is empty); bytes go out the same way, as u8
+  // floats: a pointer to f32 (in: a List<f32>, its at and len; out: its entries, kept until the next - none when the
+  // list is empty); bytes go out the same way, as u8
   CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
         glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3, kern::u32* out_len) {") != std::string::npos &&
         glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out<&game_audio>(object->") != std::string::npos);
@@ -2651,11 +2656,11 @@ struct Host : kern::Blueprint {
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes i32 i32 f32 -> text";   // (bytes without their len)
   CHECK(!logic::export_ok(f));
-  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an i64 is)
+  f.wire = "text text bytes len i32 f32 -> text";   // (a text where a u32 is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of i64, not of a Text)
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List<u8>, not of a Text)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of f64, not of i64)
+  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List<f32>, not of u8)
   CHECK(!logic::export_ok(f));
   f.wire = "text len floats i32 i32 f32 -> text";   // (floats without their len)
   CHECK(!logic::export_ok(f));
@@ -3105,10 +3110,11 @@ struct Caller : kern::Blueprint {
     CHECK(c->get("AtLevel").as_number() == 0 && lost.number("Twice", 4.0) == 0);
     // the variables: as their reader reads them - a whole number as a decimal one, a text as none (the zero)
     CHECK(c->get("Speed").as_number() == 2.5 && rules.get<f64>("Speed") == 2.5);
-    CHECK(c->get("LapsRead").as_number() == 4 && rules.get<f64>("Laps") == 6);
+    // (a variable of another number type than the reader's: its zero - no number is converted)
+    CHECK(c->get("LapsRead").as_number() == 0 && rules.get<f64>("Laps") == 0);
     CHECK(c->get("Nobody").as_number() == 0 && rules.get<f64>("Missing") == 0);
     CHECK(c->get("Wrong").as_number() == 0 && rules.get<f64>("Name") == 0);
-    CHECK(c->get("Name").as_text() == "fast" && rules.get<std::string>("Name") == "fast" && rules.get<i64>("Speed") == 2);
+    CHECK(c->get("Name").as_text() == "fast" && rules.get<std::string>("Name") == "fast" && rules.get<i64>("Speed") == 0);
     // a Blueprint in the middle of a call of the function: the call it is in has its own values back
     host.rules = &rules;
     host.keep_once = true;
@@ -3228,18 +3234,18 @@ TEST(logic_lists) {
   CHECK(Value::zero(PinType::f64_list) == Value::of(std::vector<f64>{}) && Value::zero(PinType::f64_list).size() == 0);
   CHECK(!(Value::of(std::vector<f64>{}) == Value::of(std::vector<i64>{})));  // (lists of different types)
   CHECK(a.item(1) == Value::number(2.5) && a.item(7) == Value::number(0) && Value::of(std::vector<std::string>{"x"}).item(3) == Value::text(""));
-  // (whole numbers in a list are held as every i64 is)
-  CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).i == -std::numeric_limits<i64>::max());
+  // (whole numbers in a list are held as C++ holds them: i64's smallest too)
+  CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).as<i64>() == std::numeric_limits<i64>::min());
   const Value every[] = {Value::of(std::vector<bool>{true, false}),      Value::of(std::vector<i64>{-3, 9007199254740992}),   Value::of(std::vector<f64>{0.1, -1e300}),
                          Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{}, {}})};
   for (const Value& v : every) {
     CHECK(logic::is_list(v.type) && logic::list_of(logic::element_of(v.type)) == v.type && Value::from_json(v.to_json(), v.type) == v);
     PinType named = PinType::exec;
     CHECK(logic::pin_type_from_name(logic::pin_type_name(v.type), named) && named == v.type);
-    // a list becomes text and nothing else; nothing becomes a list
-    CHECK(logic::convertible(v.type, PinType::text) && !logic::convertible(logic::element_of(v.type), v.type));
-    CHECK(v.type == PinType::text_list || !logic::convertible(v.type, logic::element_of(v.type)));
-    CHECK(v.converted(PinType::text).s == v.as_text() && v.converted(v.type) == v);
+    // no wire converts a list (its text is the node List to Text: as_text); nothing becomes a list
+    CHECK(!logic::convertible(v.type, PinType::text) && !logic::convertible(logic::element_of(v.type), v.type));
+    CHECK(!logic::convertible(v.type, logic::element_of(v.type)));
+    CHECK(v.converted(v.type) == v);
   }
   CHECK(!logic::convertible(PinType::i64_list, PinType::f64_list) && a.converted(PinType::i64_list).size() == 0);
   CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[none, none]" && every[0].as_text() == "[true, false]");
@@ -3265,11 +3271,11 @@ struct L : kern::Blueprint {
     for (auto it7 = flow_for_each<f64>(n7, Items); it7.next();) {
       Sum += n7.item;
       list_clear(Items);
-      list_add(n9, Names, kern::to<Text>(n7.index));
+      list_add(n9, Names, num_text<i64>(n7.index));
     }
     Length = list_length<f64>(Items);
     At = n9.index;
-    debug_print(kern::to<Text>(list_make<Text, "2">("a", list_get<Text>(Names, 2))), false);
+    debug_print(list_text<Text>(list_make<Text, "2">("a", list_get<Text>(Names, 2))), false);
   }
   struct : kern::Node<7> { f64 item = 0.0; i64 index = 0; } n7;
   struct { i64 index = 0; } n9;
@@ -3307,7 +3313,7 @@ struct L : kern::Blueprint {
   };
   problem(R"({"variables":[{"name":"Sum","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.add","params":{"variable":"Sum"}}],
             "links":[[1,"then",2,"exec"]]})",
-          "needs a list variable: \"Sum\" is float");
+          "needs a list variable: \"Sum\" is f64");
   problem(R"({"variables":[{"name":"L","type":"f64_list","value":[1]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"L"}}],
             "links":[[1,"then",2,"exec"]]})",
           "needs a number variable");
@@ -3317,8 +3323,8 @@ struct L : kern::Blueprint {
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"var.set","params":{"variable":"X"}}],
     "links":[[1,"then",3,"exec"],[2,"value",3,"value"]]})"))));
   CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"f64_list","value":[]}],
-    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"list.length","params":{"type":"i64"}},{"id":4,"type":"debug.print"}],
-    "links":[[1,"then",4,"exec"],[2,"value",3,"list"],[3,"length",4,"text"]]})"))));
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"list.length","params":{"type":"i64"}},{"id":4,"type":"debug.print"},{"id":5,"type":"num.text","params":{"type":"i64"}}],
+    "links":[[1,"then",4,"exec"],[2,"value",3,"list"],[3,"length",5,"a"],[5,"result",4,"text"]]})"))));
 }
 
 TEST(logic_enums) {
@@ -3347,7 +3353,7 @@ TEST(logic_enums) {
   // ... and a value of one enum is none of another.
   const TypeRef mode{PinType::enumeration, "Mode"}, light{PinType::enumeration, "Light"}, modes{PinType::enumeration_list, "Mode"}, lights{PinType::enumeration_list, "Light"};
   CHECK(logic::fits(mode, mode) && !logic::fits(mode, light) && logic::fits(modes, modes) && !logic::fits(modes, lights) && !logic::fits(mode, modes));
-  CHECK(logic::fits({PinType::i64, ""}, {PinType::f64, ""}) && !logic::fits(mode, {PinType::i64, ""}) && !logic::fits({PinType::text, ""}, mode));
+  CHECK(!logic::fits({PinType::i64, ""}, {PinType::f64, ""}) && !logic::fits(mode, {PinType::i64, ""}) && !logic::fits({PinType::text, ""}, mode));
 
   // A Blueprint with an enum: a variable and a list of its type, Switch on Enum (a case that is
   // not wired goes nowhere), to and from a place and a name, a function that takes and gives them.
@@ -3393,7 +3399,7 @@ struct Door : kern::Blueprint {
   TypeRef t;
   CHECK(logic::type_from_text("Mode", g, t) && t == mode && logic::type_text(t) == "Mode" && logic::type_label(t) == "Mode");
   CHECK(logic::type_from_text("Mode_list", g, t) && t == modes && logic::type_text(t) == "Mode_list" && logic::type_label(t) == "Mode List");
-  CHECK(logic::type_from_text("float_list", g, t) && t.type == PinType::f64_list && t.of.empty() && !logic::type_from_text("Light", g, t) && !logic::type_from_text("enum", g, t) && !logic::type_from_text("exec", g, t));
+  CHECK(logic::type_from_text("f64_list", g, t) && t.type == PinType::f64_list && t.of.empty() && !logic::type_from_text("Light", g, t) && !logic::type_from_text("enum", g, t) && !logic::type_from_text("exec", g, t));
   for (bool jit : {false, true}) {
     FakeLogicHost host;
     logic::Runtime rt(host);
@@ -3536,7 +3542,7 @@ TEST(logic_random_nodes_have_their_own_sequences) {
     logic::Runtime rt(host);
     const std::string graph = std::string(R"({"variables":[{"name":"X","type":"f64","value":0},{"name":"Y","type":"f64","value":0},{"name":"Z","type":"f64","value":0}],
       "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"X"}},{"id":3,"type":"var.set","params":{"variable":"Y"}},
-        {"id":4,"type":"math.random"},{"id":5,"type":"math.random"},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
+        {"id":4,"type":"math.random"},{"id":5,"type":"math.random"},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select","params":{"type":"f64"}},
         {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":0}}],
       "links":[[4,"result",2,"value"],[5,"result",3,"value"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"],)") + links + "]}";
     logic::Instance* inst = rt.add(logic_graph(graph.c_str()), 0, "R");
@@ -3559,7 +3565,7 @@ TEST(logic_random_nodes_have_their_own_sequences) {
     FakeLogicHost host;
     logic::Runtime rt(host);
     logic::Instance* inst = rt.add(logic_graph(R"({"variables":[{"name":"Z","type":"f64","value":0}],
-      "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
+      "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select","params":{"type":"f64"}},
         {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":0}}],
       "links":[[1,"then",6,"exec"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"]]})"), 0, "S");
     rt.begin();
@@ -3645,8 +3651,8 @@ TEST(game_logic_graphs_drive_the_world) {
   door.mesh->size = {0.3f, 3, 3};
   door.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.custom","params":{"name":"OpenDoor"}},
       {"id":2,"type":"flow.tween","params":{"ease":"linear"},"values":{"duration":1}},
-      {"id":3,"type":"actor.set_location"},{"id":4,"type":"vector.lerp","values":{"a":[10,0,1.5],"b":[10,0,4.5]}}],
-    "links":[[1,"then",2,"play"],[2,"update",3,"exec"],[2,"alpha",4,"alpha"],[4,"result",3,"location"]]})");
+      {"id":3,"type":"actor.set_location"},{"id":4,"type":"vector.lerp","values":{"a":[10,0,1.5],"b":[10,0,4.5]}},{"id":5,"type":"num.cast","params":{"to":"f32","from":"f64"}}],
+    "links":[[1,"then",2,"play"],[2,"update",3,"exec"],[2,"alpha",5,"a"],[5,"result",4,"alpha"],[4,"result",3,"location"]]})");
   const game::ActorId door_id = l.add(door).id;
   // The level graph: Interact spawns a copy of the Cube in front of the player; Begin Play greets.
   l.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message","values":{"text":"Welcome"}},
@@ -4153,12 +4159,15 @@ TEST(logic_tier_cases_interpreter) {
     if (std::string(c.name) == "recursion_endless")
       CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
-      const i64 top = std::numeric_limits<i64>::max();
-      CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
-      CHECK(inst->get("Edge").as_int() == 9007199254740992);                                              // 2^53 + 1 is 2^53, as a number adds
-      CHECK(inst->get("Top").as_int() == top && inst->get("TopAsFloat").as_number() == 9223372036854775808.0);
-      CHECK(inst->get("Low").as_int() == -top && inst->get("Least").as_int() == -top);  // Int's lower end: the same distance from 0
-      CHECK(inst->get("FromFloor").as_number() == 0 && inst->get("FromRound").as_number() == 0);          // endless and no number: 0
+      // i64 as C++ has it (numbers.h): doubled 70 times it goes round to 0, 2^53 + 3 is exact, the f64 1e300 cast to an i64 is
+      // its end (as wasm's trunc_sat) and + 5 goes round from there; i64's smallest - 1 goes round to its largest
+      const i64 top = std::numeric_limits<i64>::max(), least = std::numeric_limits<i64>::min();
+      CHECK(inst->get("Big").as<i64>() == 0 && inst->get("Shown").as_text() == "0");
+      CHECK(inst->get("Edge").as<i64>() == 9007199254740995);
+      CHECK(inst->get("Top").as<i64>() == least + 4 && inst->get("TopAsFloat").as<f64>() == -9223372036854775808.0);
+      CHECK(inst->get("Low").as<i64>() == top && inst->get("Least").as<i64>() == least);
+      // floor(inf) is inf, round(inf - inf) NaN: IEEE as C++ (no number is made a 0)
+      CHECK(std::isinf(inst->get("FromFloor").as<f64>()) && std::isnan(inst->get("FromRound").as<f64>()));
     }
     if (std::string(c.name) == "infinite_loop") CHECK(inst->disabled());
     if (std::string(c.name) == "reroutes") {
@@ -4229,7 +4238,7 @@ TEST(logic_structs) {
   PinType named = PinType::exec;
   CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
   CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
-  CHECK(logic::kValueTypes == 10 && logic::list_of(PinType::object) == PinType::object_list && logic::element_of(PinType::object_list) == PinType::object && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
+  CHECK(logic::kValueTypes == 17 && logic::list_of(PinType::object) == PinType::object_list && logic::element_of(PinType::object_list) == PinType::object && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
   // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
   for (PinType other : {PinType::boolean, PinType::i64, PinType::f64, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::f64_list, PinType::enumeration_list}) {
     CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
@@ -4406,7 +4415,7 @@ struct Arena : kern::Blueprint {
   problem(with_types(R"("nodes":[{"id":1,"type":"enum.name","params":{"enum":"S"}}],"links":[])"), "\"S\" is no enum of this Blueprint");
   problem(with_types(R"("nodes":[{"id":1,"type":"logic.select","params":{"type":"U"}}],"links":[])"), "\"U\" is no type it can have (Type: float, int, bool, vector, text, actor, an enum or a struct of this Blueprint, or a list of one");
   problem(with_types(R"("variables":[{"name":"V","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"N"}}],"links":[[1,"then",2,"exec"]])"),
-          "V is float: it has no fields");
+          "V is f64: it has no fields");
   problem(with_types(R"("variables":[{"name":"V","type":"struct","of":"S","value":{}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"Gone"}}],"links":[[1,"then",2,"exec"]])"),
           "S has no field \"Gone\" (K, N)");
   problem(with_types(R"("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"Gone","field":"N"}}],"links":[[1,"then",2,"exec"]])"), "no variable \"Gone\"");
@@ -4496,18 +4505,22 @@ static logic::Graph every_node_graph(bool wired) {
                       {"LF", PinType::f64_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
                       {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::u64, ""},        {"LX", PinType::u64_list, ""},
-                      // (a map and a set as the nodes of maps and sets are typed by default: i64 keys, f64 values)
-                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
+                      // (a map and a set as the nodes of maps and sets are typed by default: i64 keys, f32 values)
+                      {"VM", PinType::map, "i64>f32"},  {"VQ", PinType::set, "i64"},   {"VSB", PinType::structure, "SB"},
                       // (bytes - Bytes of Text, Bytes of S: a List<u8>)
-                      {"L8", PinType::i64_list, "u8"},
+                      {"L8", PinType::u8_list, ""},
                       // (an object of the engine: what Engine Object of Blueprint gives, as its Interface says by default)
-                      {"VO", PinType::object, "App"}};
+                      {"VO", PinType::object, "App"},
+                      // (a variable of each other number type and a list of it: what a node of that type gives is read into it)
+                      {"Wf32", PinType::f32, ""}, {"Wi32", PinType::i32, ""}, {"Wu32", PinType::u32, ""}, {"Wi8", PinType::i8, ""}, {"Wu8", PinType::u8, ""},
+                      {"Wi16", PinType::i16, ""}, {"Wu16", PinType::u16, ""}, {"Lf32", PinType::f32_list, ""}, {"Li32", PinType::i32_list, ""},
+                      {"Lu32", PinType::u32_list, ""}, {"Li8", PinType::i8_list, ""}, {"Li16", PinType::i16_list, ""}, {"Lu16", PinType::u16_list, ""}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::i64, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
   g.structs.push_back({"SM", {}, "A struct that holds one.\n\nIts second paragraph."});
   // (a struct of numbers: what the bytes of a value are of - in the layout the nodes say by default, "4: i32@0")
-  g.structs.push_back({"SB", {{"Bits", {PinType::i64, ""}, json::Value(7)}}, "A struct of one number."});
+  g.structs.push_back({"SB", {{"Bits", {PinType::i32, ""}, json::Value(7)}}, "A struct of one number."});
   {
     json::Value in = json::Value::object(), numbers = json::Value::array(), places = json::Value::array(), at = json::Value::array();
     in.set("N", 5);
@@ -4531,7 +4544,7 @@ static logic::Graph every_node_graph(bool wired) {
     const logic::Value inner = logic::Value::structure({logic::Value::integer(-7), logic::Value::text("x \"y\"\n")});
     if (logic::element_of(t) == PinType::structure) {
       const logic::Value one = of == "SI" ? inner
-                               : of == "SB" ? logic::Value::structure({logic::Value::integer(-123456)})
+                               : of == "SB" ? logic::Value::structure({logic::Value::of_number<i32>(-123456)})
                                           : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
                                                                      logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
                                                                      logic::Value::vector({1, -2, 3.5f}), logic::Value::actor({}), logic::Value::enumerations({2, 0})});
@@ -4554,15 +4567,20 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
       case PinType::actor: return logic::Value::actor({});   // (an actor written down is none: one comes from its world)
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
-      case PinType::i64_list:  // (of a width: numbers it holds - a List<u8> holds no -7)
-        return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
+      case PinType::i64_list: return logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993});
+      case PinType::u8_list: return logic::Value::of(std::vector<u8>{7, 0, 255});
       case PinType::f64_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
       case PinType::enumeration: return logic::Value::enumeration(2);
       case PinType::enumeration_list: return logic::Value::enumerations({2, 0, 1});
-      default: return logic::Value::of(std::vector<logic::ActorHandle>{{}, {}});
+      default: break;
     }
+    // (the other number types: a value of each that is none of its defaults - the largest's neighbour, a fraction)
+    if (logic::is_number(t)) return logic::with_number(t, [](auto tag) { using T = typename decltype(tag)::type; return logic::Value::of_number(static_cast<T>(std::is_floating_point_v<T> ? T(2.625) : T(std::numeric_limits<T>::max() - 2))); });
+    if (logic::is_list(t) && logic::is_number(logic::element_of(t)))
+      return logic::with_number(logic::element_of(t), [](auto tag) { using T = typename decltype(tag)::type; return logic::Value::of(std::vector<T>{T(1), std::numeric_limits<T>::lowest(), std::numeric_limits<T>::max()}); });
+    return logic::Value::of(std::vector<logic::ActorHandle>{{}, {}});
   };
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
@@ -4625,7 +4643,7 @@ static logic::Graph every_node_graph(bool wired) {
   };
   // the functions' bodies
   {
-    const u32 e = add("func.entry", {{"function", "Fn"}}), mul = add("math.mul"), r = add("func.return", {{"function", "Fn"}});
+    const u32 e = add("func.entry", {{"function", "Fn"}}), mul = add("math.mul", {{"type", "f64"}}), r = add("func.return", {{"function", "Fn"}});
     wire(e, "then", r, "exec");
     wire(e, "x", mul, "a");
     wire(mul, "result", r, "y");
@@ -4647,7 +4665,7 @@ static logic::Graph every_node_graph(bool wired) {
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
       // (Copy Bytes on a list of whole numbers: its default numbers are bytes, u8; Insert Text Bytes takes only such a list)
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type == "text.set_code" ? "VT" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "L8" : type == "text.set_code" ? "VT" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
@@ -4760,7 +4778,7 @@ TEST(logic_notation_every_node_type) {
     for (std::size_t k = 0; k < out_a.size() && k < out_b.size(); ++k) CHECK(out_a[k].id == out_b[k].id && out_a[k].type == out_b[k].type);
   }
   for (const char* ok : {"Heat", "max_stars", "a1", "Go", "n", "on", "it", "x_y"}) CHECK(logic::cpp_name_ok(ok));
-  for (const char* no : {"", "1a", "my var", "class", "float", "Float", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
+  for (const char* no : {"", "1a", "my var", "class", "float", "f32", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
     CHECK(!logic::cpp_name_ok(no));
 }
 
@@ -5344,6 +5362,7 @@ TEST(game_blueprints_as_classes) {
   }
   // the door went up, the crates were hit, the scenario is the same when it is played again
   const std::size_t end = played.text.find("-- the end\n");
+  if (played.text.find("Door: alive at (10, 0, 4.5)") == std::string::npos || played.text.find("Hits=0 Moved=0 Sum=0") == std::string::npos) std::printf("played:\n%s\n", played.text.c_str());
   CHECK(played.text.find("Door: alive at (10, 0, 4.5)") != std::string::npos && played.text.find("Hits=0 Moved=0 Sum=0") != std::string::npos && end != std::string::npos &&
         played.text.find(" Hits=0 ", end) == std::string::npos && played.text.find(" Bumps=0 ", end) == std::string::npos);
   CHECK(game_cases::play(stored, cases[0].scenario, false).text == played.text);
@@ -5450,9 +5469,9 @@ TEST(logic_fixed_lists) {
   }
   CHECK(says("  List<f64> Two = Fixed<f64, 2>{1.0, 2.0};\n", "this is Fixed<f64, 2>, but List<f64> is needed"));
   CHECK(says(in_event("    Any = Fixed<f64, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
-  CHECK(says("  void Fill(List<f64>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));
-  CHECK(says("  void Fill(Fixed<f64, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list[4], but Axis is float_list[3]"));
-  CHECK(says("  void Fill(Fixed<f64, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is float_list[3], but Any is float_list"));
+  CHECK(says("  void Fill(List<f64>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is f64_list, but Axis is f64_list[3] - a reference is the place itself, nothing converts"));
+  CHECK(says("  void Fill(Fixed<f64, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is f64_list[4], but Axis is f64_list[3]"));
+  CHECK(says("  void Fill(Fixed<f64, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is f64_list[3], but Any is f64_list"));
   {
     // ... and a graph that says it wrong
     logic::Graph g;
@@ -5464,7 +5483,7 @@ TEST(logic_fixed_lists) {
     g.variables.push_back({"Big", logic::PinType::f64_list, json::Value::array(), {}, {}, logic::kLongestFixed + 1});
     std::string all;
     for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
-    CHECK(all.find("variable \"N\" has a fixed length (3), but is float: a length is a list's") != std::string::npos);
+    CHECK(all.find("variable \"N\" has a fixed length (3), but is f64: a length is a list's") != std::string::npos);
     CHECK(all.find("variable \"L\"") == std::string::npos);  // (a default says no more than the list has: what it does not say is zero)
     CHECK(all.find("variable \"Big\" is a list of " + std::to_string(logic::kLongestFixed + 1) + " entries") != std::string::npos);
     json::Value four = two;
@@ -5707,14 +5726,14 @@ TEST(logic_maps_and_sets) {
   };
   {
     // the types and what TypeRef::of says of them
-    const logic::TypeRef cells{logic::PinType::map, "text>struct:Cell"}, seen{logic::PinType::set, "int64"};
+    const logic::TypeRef cells{logic::PinType::map, "text>struct:Cell"}, seen{logic::PinType::set, "u64"};
     CHECK(logic::key_type(cells).type == logic::PinType::text && logic::value_type(cells).type == logic::PinType::structure && logic::value_type(cells).of == "Cell");
     CHECK(logic::key_type(seen).type == logic::PinType::u64 && logic::value_type(seen).type == logic::PinType::exec);
     const logic::TypeRef kind{logic::PinType::enumeration, "Kind"}, floats{logic::PinType::f64_list, {}};
-    CHECK(logic::keyed_of(kind, &floats) == "enum:Kind>float_list" && logic::keyed_of(kind, nullptr) == "enum:Kind");
-    CHECK(logic::type_text(cells) == "map<text>struct:Cell>" && logic::type_label(cells) == "Map of Text to Cell" && logic::type_label(seen) == "Set of Int64");
+    CHECK(logic::keyed_of(kind, &floats) == "enum:Kind>f64_list" && logic::keyed_of(kind, nullptr) == "enum:Kind");
+    CHECK(logic::type_text(cells) == "map<text>struct:Cell>" && logic::type_label(cells) == "Map of Text to Cell" && logic::type_label(seen) == "Set of u64");
     CHECK(logic::key_type_ok(logic::PinType::u64) && !logic::key_type_ok(logic::PinType::f64) && !logic::key_type_ok(logic::PinType::vector) && !logic::key_type_ok(logic::PinType::map));
-    CHECK(logic::fits(cells, cells) && !logic::fits(cells, {logic::PinType::map, "text>struct:Other"}) && !logic::fits(seen, {logic::PinType::set, "int"}));
+    CHECK(logic::fits(cells, cells) && !logic::fits(cells, {logic::PinType::map, "text>struct:Other"}) && !logic::fits(seen, {logic::PinType::set, "i64"}));
   }
   {
     // the text and the graph: every node, a value of a map as a place, literals of each kind of key
@@ -5729,12 +5748,12 @@ TEST(logic_maps_and_sets) {
       if (i.error) std::printf("%s\n", i.text.c_str());
       CHECK(!i.error);
     }
-    CHECK(g.variable("Scores") && g.variable("Scores")->type == logic::PinType::map && g.variable("Scores")->of == "int>float" && json::stringify(g.variable("Scores")->value) == "[[3,1.5],[1,2]]");
-    CHECK(g.variable("Seen") && g.variable("Seen")->type == logic::PinType::set && g.variable("Seen")->of == "int64" && json::stringify(g.variable("Seen")->value) == "[\"5\"]");
-    CHECK(g.variable("Big") && json::stringify(g.variable("Big")->value) == "[[\"18446744073709551615\",\"max\"]]" && g.variable("Lists")->of == "enum:Kind>float_list");
+    CHECK(g.variable("Scores") && g.variable("Scores")->type == logic::PinType::map && g.variable("Scores")->of == "i64>f64" && json::stringify(g.variable("Scores")->value) == "[[3,1.5],[1,2]]");
+    CHECK(g.variable("Seen") && g.variable("Seen")->type == logic::PinType::set && g.variable("Seen")->of == "u64" && json::stringify(g.variable("Seen")->value) == "[5]");
+    CHECK(g.variable("Big") && json::stringify(g.variable("Big")->value) == "[[\"18446744073709551615\",\"max\"]]" && g.variable("Lists")->of == "enum:Kind>f64_list");
     CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
-    CHECK(text.find("  Map<i64, f64> Scores = Map<i64, f64>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<u64> Seen = Set<u64>{0x5u};\n") != std::string::npos);
-    CHECK(text.find("  Map<Kind, List<f64>> Lists = Map<Kind, List<f64>>{};\n") != std::string::npos && text.find("0xffffffffffffffffu") != std::string::npos);
+    CHECK(text.find("  Map<i64, f64> Scores = Map<i64, f64>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<u64> Seen = Set<u64>{5};\n") != std::string::npos);
+    CHECK(text.find("  Map<Kind, List<f64>> Lists = Map<Kind, List<f64>>{};\n") != std::string::npos && text.find("18446744073709551615u") != std::string::npos);
     CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
     CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
     // every tier the same: the order the keys came, an entry taken out of the middle
@@ -5769,8 +5788,8 @@ TEST(logic_maps_and_sets) {
     CHECK(inst->get("Cells").size() == 1 && inst->get("N").as_int() == 0 && host.errors.empty());
   }
   // what the notation and the check refuse - with the reason
-  CHECK(says("  Map<f64, i64> Wrong = Map<f64, i64>{};\n", "the keys of a map or a set are bool, i64, u64, Text or an enum"));
-  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are bool, i64, u64, Text or an enum"));
+  CHECK(says("  Map<f64, i64> Wrong = Map<f64, i64>{};\n", "the keys of a map or a set are bool, a whole number (i8 ... u64), Text or an enum"));
+  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are bool, a whole number (i8 ... u64), Text or an enum"));
   CHECK(says("  Map<i64, Map<i64, f64>> Wrong = Map<i64, Map<i64, f64>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
   CHECK(says("  Map<i64, Fixed<f64, 3>> Wrong = Map<i64, Fixed<f64, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
   CHECK(says("  Map<i64, f64> Twice = Map<i64, f64>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
@@ -5785,25 +5804,25 @@ TEST(logic_maps_and_sets) {
       return all;
     };
     logic::Graph g;
-    g.variables.push_back({"M", logic::PinType::map, json::Value::array(), {}, "float>int"});
-    CHECK(issues(g).find("variable \"M\" is map<float>int>, which this Blueprint cannot have") != std::string::npos);
-    g.variables[0].of = "int>map:int>float";
+    g.variables.push_back({"M", logic::PinType::map, json::Value::array(), {}, "f64>i64"});
+    CHECK(issues(g).find("variable \"M\" is map<f64>i64>, which this Blueprint cannot have") != std::string::npos);
+    g.variables[0].of = "i64>map:i64>f64";
     CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
-    g.variables[0].of = "int>float";
+    g.variables[0].of = "i64>f64";
     g.variables[0].count = 3;
-    CHECK(issues(g).find("variable \"M\" has a fixed length (3), but is map<int>float>: a length is a list's") != std::string::npos);
+    CHECK(issues(g).find("variable \"M\" has a fixed length (3), but is map<i64>f64>: a length is a list's") != std::string::npos);
     g.variables[0].count = 0;
-    g.variables[0].of = "enum:Nope>int";
+    g.variables[0].of = "enum:Nope>i64";
     CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
     // (in a file: a type it cannot have is no graph)
     logic::Graph none;
     json::Value j;
-    CHECK(json::parse(R"({"variables":[{"name":"M","type":"map","of":"float>int","value":[]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+    CHECK(json::parse(R"({"variables":[{"name":"M","type":"map","of":"f64>i64","value":[]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
   }
   {
     // JSON: [[key, value], ...] in the order of the entries; a key said again: the first
     logic::Graph g;
-    const logic::TypeRef scores{logic::PinType::map, "int>float"}, words{logic::PinType::set, "text"};
+    const logic::TypeRef scores{logic::PinType::map, "i64>f64"}, words{logic::PinType::set, "text"};
     json::Value j;
     CHECK(json::parse("[[2, 1.5], [1, 3], [2, 9], 7]", j));
     const logic::Value m = logic::Value::from_json(j, scores, g);
@@ -5874,7 +5893,7 @@ TEST(logic_notation_hands_over) {
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    list_add(Kept, num_cast<f64, i64>(list_length<f64>(n5.list)));\n"), "list_length<f64>(n5.list)"));  // (a value reads it: whenever it is read)
   // a value that is needed again is copied
   CHECK(has(written("Made, text_append(name, \"!\", \"\")", plain), "    return {std::move(Made), text_append(name, \"!\", \"\")};\n"));  // (name inside a value: the value reads it)
-  CHECK(has(written("Made, text_append(kern::to<Text>(Made), name, \"\")", plain), "    return {Made, text_append(kern::to<Text>(Made), name, \"\")};\n"));
+  CHECK(has(written("Made, text_append(list_text<f64>(Made), name, \"\")", plain), "    return {Made, text_append(list_text<f64>(Made), name, \"\")};\n"));
   CHECK(has(written("given, name", plain), "    Made = given;\n    return {std::move(given), std::move(name)};\n"));  // (the Set is not the last to read it, the Return is)
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = n5.list;\n    Log = n5.list;\n"), "    Kept = n5.list;\n    Log = n5.list;\n"));
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Count += 1;\n    Kept = n5.list;\n"), "    Count += 1;\n    Kept = n5.list;\n"));  // (not the step right before)
@@ -5898,7 +5917,7 @@ TEST(logic_notation_hands_over) {
     if (!right) std::printf("expected the std::move at %s to be refused, got: %s\n", where, read ? "(it was read)" : error.c_str());
     CHECK(right);
   };
-  refused("std::move(Made), text_append(kern::to<Text>(Made), name, \"\")", plain, "line 10, column 13:");
+  refused("std::move(Made), text_append(list_text<f64>(Made), name, \"\")", plain, "line 10, column 13:");
   refused("std::move(Log), name", plain, "line 10, column 13:");
   refused("Made, text_append(std::move(name), \"!\", \"\")", plain, "line 10, column 31:");
   refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(n5.list);\n    Log = n5.list;\n", "line 15, column 12:");
@@ -5923,10 +5942,10 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   };
   auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n" + lines + "\n  }"; };
   refused(in_event("    Heat = nope;"), "\"nope\" is not known here", "line 7, column 12:");
-  refused(in_event("    Count = 1.5;"), "is i64, this is Float", "line 7, column 13:");
-  refused(in_event("    Count = Heat;"), "write num_cast<i64, f64>(...)");
-  refused(in_event("    Heat = num_cast<f64, i64>(Heat);"), "no kern::to");
-  refused(in_event("    Name = num_cast<f64, i64>(Count);"), "this input is Text");
+  refused(in_event("    Count = 1.5;"), "1.5 is no i64", "line 7, column 13:");
+  refused(in_event("    Count = Heat;"), "no wire converts a number - the conversion is a node, num_cast<i64, f64>(...)");
+  refused(in_event("    Heat = num_cast<f64, i64>(Heat);"), "this is f64, the input is i64");
+  refused(in_event("    Name = num_cast<f64, i64>(Count);"), "this is f64, the input is Text: the two do not convert");
   refused(in_event("    Heat = math_add<f64>(1.0);"), "math_add takes 2 value(s): a, b");
   refused(in_event("    Heat = math_add<f64>(1.0, 2.0, 3.0);"), "\")\" expected");
   refused(in_event("    Heat = math_nope(1.0);"), "\"math_nope\" is not known here");
@@ -5958,10 +5977,10 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> f64 { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an i64 only where");
   refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return a < 3.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
   refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
-  refused(in_event("    Heat = kern::formula([](i64 a) -> i64 { return a + 1.0; }, Count);"), "this formula gives an i64 by +, - or *, and this reads it as Float");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a, f64 b) -> i64 { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a f64 input gives a Float: -> Float");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
-  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, num_cast<f64, i64>(Count)));"), "an i64 as it is: no kern::to");
+  refused(in_event("    Heat = kern::formula([](i64 a) -> i64 { return a + 1.0; }, Count);"), "this formula gives an i64 by +, - or *, and this reads it as f64");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a, f64 b) -> i64 { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a f64 input gives a f64: -> f64");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an i64");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, num_cast<f64, i64>(Count)));"), "this is f64, the input of the formula is an i64");
   refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
   // (a list of a fixed length written out on an input says the input's length: Fixed<f64, 3> for a field of three)
   for (const char* wrong : {"Fixed<f64, 4>{1.5}", "Fixed<f64, 2>{1.5}"})
@@ -5977,14 +5996,14 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<f64> Other = List<i64>{1};", "this is List<i64>, but List<f64> is needed (like List<f64>{})");
   refused("  List<f64> Other = List<f64>{1.0, \"a\"};", "a list's item: this is Text, but f64 is needed");
   refused("  List<f64> Other = 1.0;", "this is f64, but List<f64> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<bool>, List<i64>, List<u8> ... List<i32>, List<f64>, List<Vector>, List<Text>, List<Actor>, List<u64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<bool>, List<i8> ... List<u64>, List<f32>, List<f64>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
   refused("  List<List<f64>> Other;", "\"List\" is no type a list holds");
   refused("  List<f64> Other = List<f64>;", "a list written out is List<f64>{...}");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add<\"float\">(Items, 1.0);"), "list_add has no settings (no <...>)");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add(Items, \"a\");"), "is f64, this is Text");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = Items;"), "the two do not convert");
-  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = num_cast<f64, i64>(Items);"), "cannot become a Float");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = num_cast<f64, i64>(Items);"), "this is List<f64>, the input is i64: the two do not convert");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = list_length<i64>(Items);"), "do not convert");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_length<f64>(Items);"), "list_length is a value: alone on a line it does nothing");
   refused("  List<f64> Items = List<f64>{};\n" + in_event("    flow_for_each<f64>(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
@@ -5997,15 +6016,15 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  KERN_ENUM(Mode, A);\n  KERN_ENUM(Mode, B);", "the name Mode is declared twice");
   refused("  KERN_ENUM(Mode, A, 2);", "a value's name expected");
   refused("  KERN_ENUM(Items_list, A);", "a name that ends in _list reads as a list");
-  refused("  KERN_ENUM(Mode, A, f64);", "the value \"Float\" of Mode is no name C++ can write");
-  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them", "line 5, column 3:");
+  refused("  KERN_ENUM(Mode, A, f64);", "the value \"f64\" of Mode is no name C++ can write");
+  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is a number (bool, i8 ... u64, f32, f64), Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them", "line 5, column 3:");
   refused(mode + "  Mode Other = Mode::Ajar;", "Mode has no value \"Ajar\" (Closed, Open)", "line 7, column 22:");
   refused(mode + "  Mode Other = 1;", "this is i64, but Mode is needed (like Mode::Closed)");
   refused(mode + "  KERN_ENUM(Light, Red);\n  Mode Other = Light::Red;", "this is Light, but Mode is needed");
   refused(mode + "  List<Mode> Other = List<Mode>{Mode::Open, 1};", "a list's item: this is i64, but Mode is needed");
-  refused(mode + in_event("    State = 1;"), "is Mode, this is Int");
+  refused(mode + in_event("    State = 1;"), "is Mode, this is i64");
   refused(mode + in_event("    Count = State;"), "the two do not convert");
-  refused(mode + in_event("    Count = num_cast<i64, f64>(State);"), "cannot become a Int");
+  refused(mode + in_event("    Count = num_cast<i64, f64>(State);"), "this is Mode, the input is f64: the two do not convert");
   refused(mode + in_event("    Name = State;"), "the two do not convert");
   refused(mode + "  KERN_ENUM(Light, Red);\n  Light Lamp = Light::Red;\n" + in_event("    State = Lamp;"), "this is Light, the input is Mode: the two do not convert");
   refused(mode + in_event("    Name = enum_name(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
@@ -6020,23 +6039,23 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   const std::string weapon = "  KERN_ENUM(Kind, Melee, Ranged);\n  KERN_STRUCT(Weapon) {\n    Text Label = \"\";\n    Kind Type = Kind::Melee;\n    f64 Damage = 10.0;\n  };\n"
                              "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0};\n";
   const std::string solo = "  KERN_STRUCT(Solo) {\n    f64 A = 0.0;\n  };\n  Solo One = Solo{1.0};\n";
-  refused("  KERN_STRUCT(Weapon) {\n  };", "a struct has fields: KERN_STRUCT(Weapon) { f64 Field = 0.0; };", "line 6, column 3:");
+  refused("  KERN_STRUCT(Weapon) {\n  };", "a struct has fields: KERN_STRUCT(Weapon) { f32 Field = 0.0f; };", "line 6, column 3:");
   refused("  KERN_STRUCT(Heat) {\n    f64 A = 0.0;\n  };", "the name Heat is declared twice");
   refused("  KERN_ENUM(Weapon, A);\n  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n  };", "the name Weapon is declared twice");
   refused(solo + "  KERN_ENUM(Solo, A);", "the name Solo is declared twice");
   refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n    i64 A = 1;\n  };", "Weapon has the field A twice", "line 7, column 9:");
-  refused("  KERN_STRUCT(Weapon) {\n    Double A = 0.0;\n  };", "the struct Weapon: \"Double\" is no type here: a field is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
+  refused("  KERN_STRUCT(Weapon) {\n    Double A = 0.0;\n  };", "the struct Weapon: \"Double\" is no type here: a field is a number (bool, i8 ... u64, f32, f64), Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
   refused("  KERN_STRUCT(Weapon) {\n    f64 A = \"a\";\n  };", "Weapon.A: this is Text, but f64 is needed (like 0.0)");
   refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0\n  };", "\";\" expected");
   refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n  }", "\";\" expected");
   refused("  KERN_STRUCT(Items_list) {\n    f64 A = 0.0;\n  };", "a name that ends in _list reads as a list");
-  refused("  KERN_STRUCT(Weapon) {\n    f64 f64 = 0.0;\n  };", "the field \"Float\" of Weapon is no name C++ can write");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 f64 = 0.0;\n  };", "the field \"f64\" of Weapon is no name C++ can write");
   refused("  KERN_ENUM(Kind, A);\n  KERN_STRUCT(Weapon) {\n    Kind Kind = Kind::A;\n  };", "the field \"Kind\" of Weapon has the name of a type of this Blueprint");
   // a struct does not contain itself, and holds only what is declared above it
   refused("  KERN_STRUCT(Chain) {\n    f64 A = 0.0;\n    Chain Next = Chain{0.0};\n  };", "the struct Chain cannot contain itself: a field is of a type declared above the struct", "line 7, column 5:");
   refused("  KERN_STRUCT(Chain) {\n    List<Chain> More = List<Chain>{};\n  };", "the struct Chain cannot contain itself", "line 6, column 5:");
   refused("  KERN_STRUCT(Outer) {\n    Inner In = Inner{0.0};\n  };\n  KERN_STRUCT(Inner) {\n    f64 A = 0.0;\n  };", "the struct Outer: \"Inner\" is no type here: a field is", "line 6, column 5:");
-  refused("  Solo One = Solo{1.0};\n  KERN_STRUCT(Solo) {\n    f64 A = 0.0;\n  };", "\"Solo\" is no type here: a variable is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them",
+  refused("  Solo One = Solo{1.0};\n  KERN_STRUCT(Solo) {\n    f64 A = 0.0;\n  };", "\"Solo\" is no type here: a variable is a number (bool, i8 ... u64, f32, f64), Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them",
           "line 5, column 3:");
   // a struct written out gives a value for every field, in their order, each of its type
   refused(weapon + "  Weapon Other = Weapon{\"a\", Kind::Melee};", "Weapon has 3 field(s) (Label, Type, Damage): Weapon{...} gives a value for each, in that order", "line 12, column 41:");
@@ -6052,14 +6071,14 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(weapon + in_event("    Held.Range = 1.0;"), "Weapon has no field \"Range\" (Label, Type, Damage)", "line 14, column 10:");
   refused(weapon + in_event("    Held.Damage = \"a\";"), "is f64, this is Text");
   refused(weapon + in_event("    Held.Type = Count;"), "this is i64, the input is Kind: the two do not convert");
-  refused(in_event("    Heat.X = 1.0;"), "Heat is Float: only a struct has fields to set (Variable.Field = value;)");
+  refused(in_event("    Heat.X = 1.0;"), "Heat is f64: only a struct has fields to set (Variable.Field = value;)");
   refused(weapon + in_event("    n9.value = (Held.Range = 1.0);"), "Weapon has no field \"Range\"");
   refused(weapon + in_event("    n9.total = (Held.Damage = 1.0);"), "a Set gives \"value\"");
   refused(weapon + in_event("    struct_set_field<\"Damage\">(Held, 1.0);"), "a struct's field is set by its name: Variable.Field = value;");
   refused(weapon + in_event("    Held.Label[0] = \"a\";"), "Held.Label is Text: it has no entries");
-  refused(weapon + in_event("    Heat = Held.Damage[0];"), "Held.Damage is Float: it has no entries");
+  refused(weapon + in_event("    Heat = Held.Damage[0];"), "Held.Damage is f64: it has no entries");
   refused(weapon + in_event("    list_set(Held, 0, 1.0);"), "an entry of a list is set at its place: List[index] = value;");
-  refused(in_event("    Heat = Count.Damage;"), "Count is Int: it has no fields");
+  refused(in_event("    Heat = Count.Damage;"), "Count is i64: it has no fields");
 
   // ---- reference inputs: the call names a place, the function works on it where it stands ----
   {
@@ -6110,7 +6129,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     // what is no place, what is only read, what does not fit
     CHECK(says(bump + in_event("    Bump(1.0, 2.0);"), "its input x is a reference - a place stands there"));
     CHECK(says(bump + in_event("    Bump(Count, 2.0);"), "a reference is the place itself, nothing converts"));
-    CHECK(says(bump + in_event("    Bump(Mine.Marks[0].Speed, 2.0);"), "Mine.Marks[] is Float: only a struct has fields"));
+    CHECK(says(bump + in_event("    Bump(Mine.Marks[0].Speed, 2.0);"), "Mine.Marks[] is f64: only a struct has fields"));
     CHECK(says("  void Set(Car car = Car{1.0, List<f64>{}}) {\n    car.Speed = 2.0;\n  }", "car is an input by value: it is read, not changed"));
     CHECK(says("  void Set(const Car& car) {\n    car.Speed = 2.0;\n  }", "car is a const reference: it is read, not changed"));
     CHECK(says(bump + "  void Set(const Car& car) {\n    Bump(car.Speed, 1.0);\n  }", "car is a const reference: it is read, not changed"));
@@ -6169,26 +6188,26 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(weapon + in_event("    Heat = struct_break<Weapon>(Held);"), "struct_break gives several values: say which one (.Label, Type, Damage)");
   refused(solo + in_event("    Heat = struct_break<Solo>(One);"), "which field: struct_break<Solo>(...).A");
   refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Range;"), "struct_break has no output \"Range\" (Label, Type, Damage)");
-  refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Label;"), "this is Text, the input is Float: the two do not convert");
+  refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Label;"), "this is Text, the input is f64: the two do not convert");
   refused(weapon + solo + in_event("    Heat = struct_break<Solo>(Held).A;"), "this is Weapon, the input is Solo: the two do not convert");
   refused(weapon + in_event("    Held = struct_make(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
   refused(weapon + in_event("    Held = struct_make<Kind>(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
   refused(weapon + in_event("    Held = struct_make<\"Weapon\">(\"a\", Kind::Melee, 1.0);"), "struct_make has 1 setting(s): struct_make<AStruct>");
   refused(weapon + in_event("    Held = struct_make<Weapon>(\"a\", Kind::Melee);"), "struct_make takes 3 value(s): Label, Type, Damage");
-  refused(weapon + in_event("    Held = struct_make<Weapon>(\"a\", 1, 1.0);"), "\"Type\" of struct_make is Kind, this is Int");
+  refused(weapon + in_event("    Held = struct_make<Weapon>(\"a\", 1, 1.0);"), "\"Type\" of struct_make is Kind, this is i64");
   refused(weapon + in_event("    struct_make<Weapon>(\"a\", Kind::Melee, 1.0);"), "struct_make is a value: alone on a line it does nothing");
   // a struct is no number and no text, and no other struct
   refused(weapon + in_event("    Name = Held;"), "this is Weapon, the input is Text: the two do not convert");
-  refused(weapon + in_event("    Name = kern::to<Text>(Held);"), "a Weapon cannot become a Text");
-  refused(weapon + in_event("    Held = 1.0;"), "is Weapon, this is Float");
+  refused(weapon + in_event("    Name = kern::to<Text>(Held);"), "no wire converts: a conversion is a node");
+  refused(weapon + in_event("    Held = 1.0;"), "is Weapon, this is f64");
   refused(weapon + solo + in_event("    Held = One;"), "this is Solo, the input is Weapon: the two do not convert");
-  refused(weapon + in_event("    Held = logic_select<Weapon>(true, Held, 1.0);"), "\"b\" of logic_select is Weapon, this is Float");
+  refused(weapon + in_event("    Held = logic_select<Weapon>(true, Held, 1.0);"), "\"b\" of logic_select is Weapon, this is f64");
   refused(weapon + in_event("    Count = list_length<Weapon>(Held);"), "this is Weapon, the input is List<Weapon>: the two do not convert");
   // the setting "Type" of a generic node is the type itself
-  refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f64>");
+  refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f32>");
   refused(in_event("    Heat = logic_select<Double>(true, 1.0, 2.0);"), "a setting is a text (\"...\") or a type");
-  refused(in_event("    Heat = logic_select(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f64>");
-  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = list_get<List<f64>>(Items, 0);"), "list_get has 1 setting(s): list_get<f64>");
+  refused(in_event("    Heat = logic_select(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f32>");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = list_get<List<f64>>(Items, 0);"), "list_get has 1 setting(s): list_get<f32>");
   refused(in_event("    Heat = num_cast<f64, i64>(list_length<f64>(list_make<f64, 2>(1.0, 2.0)));"), "a setting (a text in quotes) expected, not \"2\"");
   refused(in_event("    flow_tween<smooth>(n9, \"play\", 1.0, [this] {\n    });"), "a setting is a text (\"...\") or a type");
   refused("  void Fn() {\n  }\n  void Fn() {\n  }", "the function Fn is declared twice");
@@ -6250,7 +6269,7 @@ TEST(logic_callbacks) {
   const std::string g1 = read("Ground", ground), g2 = read("Site", site);
   CHECK(g1.empty() && g2.empty());
   if (!g1.empty() || !g2.empty()) std::printf("%s%s", g1.c_str(), g2.c_str());
-  const logic::TypeRef type{logic::PinType::callback, "float(float,float)"};
+  const logic::TypeRef type{logic::PinType::callback, "f64(f64,f64)"};
   // the text, the graph and the document: one thing
   for (const char* name : {"Ground", "Site"}) {
     std::string text, error;
@@ -6261,7 +6280,7 @@ TEST(logic_callbacks) {
     CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name]);
     CHECK(logic::cpp_problem(project[name]).empty());
   }
-  CHECK(logic::type_label(type) == "Callback of f64(f64, f64)" && logic::type_text(type) == "callback<float(float,float)>");
+  CHECK(logic::type_label(type) == "Callback of f64(f64, f64)" && logic::type_text(type) == "callback<f64(f64,f64)>");
   for (bool jit : {false, true}) {
     FakeLogicHost host;
     logic::Runtime rt(host);
@@ -6600,7 +6619,7 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
     CHECK(!logic::to_cpp(g, "G", text, &error) && !error.empty());
   };
   problem(R"({"variables":[{"name":"my var","type":"f64","value":0}],"nodes":[],"links":[]})", "\"my var\" is no name C++ can write");
-  problem(R"({"variables":[{"name":"Float","type":"f64","value":0}],"nodes":[],"links":[]})", "\"Float\" is no name C++ can write");
+  problem(R"({"variables":[{"name":"f32","type":"f64","value":0}],"nodes":[],"links":[]})", "\"f32\" is no name C++ can write");
   problem(R"({"variables":[{"name":"math_add","type":"f64","value":0}],"nodes":[],"links":[]})", "is the name of a node");
   problem(R"({"variables":[{"name":"value","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}}],"links":[]})", "\"value\" is an output of", 1);
   problem(R"({"variables":[{"name":"A","type":"f64","value":0}],"functions":[{"name":"F","inputs":[{"name":"A","type":"f64","value":0}],"outputs":[]}],
@@ -6664,8 +6683,8 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
             "functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"f64","value":0}]},{"name":"Count","inputs":[],"outputs":[]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.call","params":{"function":"Count"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"Count"}},{"id":5,"type":"flow.do_once"},{"id":6,"type":"event.begin"},{"id":7,"type":"debug.print"},{"id":8,"type":"func.pure","params":{"function":"F"}},
-              {"id":9,"type":"text.append"}],
-            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[8,"r",9,"a"],[9,"result",7,"text"]]})",
+              {"id":9,"type":"text.append"},{"id":10,"type":"num.text","params":{"type":"f64"}}],
+            "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[8,"r",10,"a"],[10,"result",9,"a"],[9,"result",7,"text"]]})",
           "function \"Count\" runs inside \"F\", which is read as a value, so it only computes: Do Once (node 5) changes something", 5);
   problem(R"({"functions":[{"name":"F","pure":true,"inputs":[],"outputs":[]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})",
@@ -6673,8 +6692,8 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   // (branches, loops and other values are computing)
   fine(R"({"functions":[{"name":"Sum","pure":true,"inputs":[{"name":"to","type":"i64","value":3}],"outputs":[{"name":"r","type":"f64","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"Sum"}},{"id":2,"type":"flow.for"},{"id":3,"type":"flow.branch"},{"id":4,"type":"func.return","params":{"function":"Sum"}},
-              {"id":5,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":1}},{"id":6,"type":"func.return","params":{"function":"Sum"},"values":{"r":-1}}],
-            "links":[[1,"then",2,"exec"],[1,"to",2,"last"],[2,"body",3,"exec"],[2,"index",5,"a"],[5,"result",3,"condition"],[3,"true",4,"exec"],[2,"index",4,"r"],[2,"completed",6,"exec"]]})");
+              {"id":5,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":1}},{"id":6,"type":"func.return","params":{"function":"Sum"},"values":{"r":-1}},{"id":7,"type":"num.cast","params":{"to":"f64","from":"i64"}},{"id":8,"type":"num.cast","params":{"to":"f64","from":"i64"}}],
+            "links":[[1,"then",2,"exec"],[1,"to",2,"last"],[2,"body",3,"exec"],[2,"index",7,"a"],[7,"result",5,"a"],[5,"result",3,"condition"],[3,"true",4,"exec"],[2,"index",8,"a"],[8,"result",4,"r"],[2,"completed",6,"exec"]]})");
   // no path leads back into itself without a wait: a loop node repeats steps
   problem(R"({"variables":[{"name":"A","type":"f64","value":0}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.branch"},{"id":4,"type":"math.compare","params":{"type":"f64","op":"<"},"values":{"b":5}},
@@ -6700,11 +6719,11 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   // Add to Variable counts: numbers only
   problem(R"({"variables":[{"name":"Name","type":"text","value":""}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Name"}}],"links":[[1,"then",2,"exec"]]})",
-          "needs a number variable (Integer or f64): \"Name\" is", 2);
+          "needs a number variable: \"Name\" is", 2);
   // an enum is a type of the Blueprint's C++: its name and its values' names are names there
   problem(R"({"enums":[{"name":"my enum","values":["A"]}],"nodes":[],"links":[]})", "the enum \"my enum\" is no name C++ can write");
   problem(R"({"enums":[{"name":"E","values":["A","b c"]}],"nodes":[],"links":[]})", "the value \"b c\" of E is no name C++ can write");
-  problem(R"({"enums":[{"name":"E","values":["A","Float"]}],"nodes":[],"links":[]})", "the value \"Float\" of E is no name C++ can write");
+  problem(R"({"enums":[{"name":"E","values":["A","u8"]}],"nodes":[],"links":[]})", "the value \"u8\" of E is no name C++ can write");
   problem(R"({"enums":[{"name":"Items_list","values":["A"]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
   problem(R"({"enums":[{"name":"E","values":["A"]}],"variables":[{"name":"E","type":"f64","value":0}],"nodes":[],"links":[]})", "the name \"E\" is used twice");
   problem(R"({"enums":[{"name":"E","values":["A"]}],"functions":[{"name":"E","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"E"}}],"links":[]})",
@@ -6899,7 +6918,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
   }
   // A change in the text: what is still there keeps its id and place, what is new gets new ones.
   const char* before_text = "struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n"
-                            "    Heat = math_add<f64>(Heat, value);\n    if (math_compare<\">\", f64>(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
+                            "    Heat = math_add<f64>(Heat, value);\n    if (math_compare<\">\", f64>(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(num_text<i64>(Count), false);\n  }\n};\n";
   logic::Graph g0, g1, g2, g3;
   std::string error;
   CHECK(logic::from_cpp(before_text, g0, nullptr, &error));
@@ -6923,21 +6942,21 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
   // one more line in the middle
   CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += num_cast<i64, f64>(math_mul<f64>(value, 2.0));\n    if (math_compare"), g0, g1, &error));
   kept(g1, 0);
-  CHECK(g1.nodes.size() == g0.nodes.size() + 2 && g1.next_id == g0.next_id + 2);
+  CHECK(g1.nodes.size() == g0.nodes.size() + 3 && g1.next_id == g0.next_id + 3);  // (Add, Cast, Multiply)
   int fresh = 0;
   for (const logic::Node& n : g1.nodes)
     if (!g0.find(n.id)) {
       ++fresh;
-      CHECK(n.id >= g0.next_id && (n.type == "var.add" || n.type == "math.mul") && n.comment.empty() && n.x > 1000);
+      CHECK(n.id >= g0.next_id && (n.type == "var.add" || n.type == "num.cast" || n.type == "math.mul") && n.comment.empty() && n.x > 1000);
     }
-  CHECK(fresh == 2);
+  CHECK(fresh == 3);
   // a value changed, a line gone
   CHECK(logic::apply_cpp(changed("10.0", "12.5"), g0, g2, &error));
   kept(g2, 0);
   CHECK(g2.nodes.size() == g0.nodes.size() && g2.next_id == g0.next_id && !(g2 == g0));
-  CHECK(logic::apply_cpp(changed("    debug_print(kern::to<Text>(Count), false);\n", ""), g0, g3, &error));
-  kept(g3, 2);  // the Print and the Get it read
-  CHECK(g3.nodes.size() == g0.nodes.size() - 2);
+  CHECK(logic::apply_cpp(changed("    debug_print(num_text<i64>(Count), false);\n", ""), g0, g3, &error));
+  kept(g3, 3);  // the Print, its To Text and the Get it read
+  CHECK(g3.nodes.size() == g0.nodes.size() - 3);
   // what cannot be read changes nothing and says where
   logic::Graph untouched = g0;
   CHECK(!logic::apply_cpp(changed("Heat = math_add<f64>(Heat, value);", "Heat = Heat + value;"), g0, untouched, &error) && error.rfind("line 7, column 17:", 0) == 0 && untouched == g0);
@@ -7296,7 +7315,7 @@ TEST(engine_objects_are_never_ints) {
   logic::EngineObjects o;
   o.on_missing(logic::engine_make_default);
   std::vector<logic::Value> out{logic::Value::zero(logic::PinType::i64)};
-  CHECK(!logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(1)}, out) && o.error == "the input mixer is no Object of the engine (it is int)" && o.size() == 0);
+  CHECK(!logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(1)}, out) && o.error == "the input mixer is no Object of the engine (it is i64)" && o.size() == 0);
   // (... and one of another world names nothing here, not the object of the same handle)
   logic::EngineObjects there;
   there.on_missing(logic::engine_make_default);
@@ -7377,27 +7396,27 @@ struct Probe : kern::Blueprint {
   KERN_ENUM(audio_Rolloff, inverse, linear, exponential);
   KERN_ENUM(game_Shape, box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh);
   KERN_ENUM(physics_Surface, none, cloth, tpu, floor_);
-  KERN_STRUCT(Quat) { f64 x = 0.0; f64 y = 0.0; f64 z = 0.0; f64 w = 1.0; };
-  KERN_STRUCT(Mat4) { Fixed<f64, 16> m = Fixed<f64, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
-  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; f64 radius = -1.0; };
-  KERN_STRUCT(MeshData) { List<f64> positions = List<f64>{}; List<f64> normals = List<f64>{}; List<f64> colors = List<f64>{}; List<f64> uvs = List<f64>{}; List<f64> extra = List<f64>{}; i64 extra_size = 0; List<i64> indices = List<i64>{}; };
-  KERN_STRUCT(audio_PlayParams) { f64 volume = 1.0; f64 pitch = 1.0; f64 pan = 0.0; bool the_loop = false; audio_Bus bus = audio_Bus::sfx; f64 fade_in = 0.0; f64 start = 0.0; i64 priority = 0; bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; f64 min_distance = 1.0; f64 max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; f64 spread = 0.0; f64 doppler = 1.0; };
+  KERN_STRUCT(Quat) { f32 x = 0.0f; f32 y = 0.0f; f32 z = 0.0f; f32 w = 1.0f; };
+  KERN_STRUCT(Mat4) { Fixed<f32, 16> m = Fixed<f32, 16>{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f}; };
+  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; f32 radius = -1.0f; };
+  KERN_STRUCT(MeshData) { List<f32> positions = List<f32>{}; List<f32> normals = List<f32>{}; List<f32> colors = List<f32>{}; List<f32> uvs = List<f32>{}; List<f32> extra = List<f32>{}; u32 extra_size = 0; List<u32> indices = List<u32>{}; };
+  KERN_STRUCT(audio_PlayParams) { f32 volume = 1.0f; f32 pitch = 1.0f; f32 pan = 0.0f; bool the_loop = false; audio_Bus bus = audio_Bus::sfx; f32 fade_in = 0.0f; f32 start = 0.0f; i32 priority = 0; bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; f32 min_distance = 1.0f; f32 max_distance = 50.0f; audio_Rolloff rolloff = audio_Rolloff::inverse; f32 spread = 0.0f; f32 doppler = 1.0f; };
   KERN_STRUCT(game_Transform) { Vector position = Vector{0.0, 0.0, 0.0}; Vector rotation = Vector{0.0, 0.0, 0.0}; Vector scale = Vector{1.0, 1.0, 1.0}; };
   KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0, 0.0, 0.0, 1.0}; };
 
   // what the calls are given
-  List<f64> Samples = List<f64>{};
+  List<f32> Samples = List<f32>{};
   audio_PlayParams Params = audio_PlayParams{};
   game_Transform Placed = game_Transform{Vector{1.0, 2.0, 3.0}, Vector{10.0, 20.0, 30.0}, Vector{1.0, 1.5, 2.0}};
   // what they gave
   Object<kern::audio::Mixer> Mixer = Object<kern::audio::Mixer>{};
   bool Ready = false;
-  i64 Clip = 0;
-  u64 Voice = 0x0u;
-  List<f64> Sound = List<f64>{};
-  i64 Rate = 0;
-  i64 Clips = 0;
-  List<f64> Gone = List<f64>{1.0};
+  u32 Clip = 0;
+  u64 Voice = 0;
+  List<f32> Sound = List<f32>{};
+  u32 Rate = 0;
+  u32 Clips = 0;
+  List<f32> Gone = List<f32>{1.0f};
   Quat Turned = Quat{};
   Vector Angles = Vector{0.0, 0.0, 0.0};
   Mat4 Matrix = Mat4{};
@@ -7409,7 +7428,7 @@ struct Probe : kern::Blueprint {
   Text Name = "";
   MeshData Box = MeshData{};
   Sphere Ball = Sphere{};
-  f64 Friction = 0.0;
+  f32 Friction = 0.0f;
   physics_Pose Frame = physics_Pose{};
   Text Hex = "";
   bool HexOk = false;
@@ -7418,9 +7437,9 @@ struct Probe : kern::Blueprint {
 
   struct { Object<kern::audio::Mixer> result = Object<kern::audio::Mixer>{}; } n1;
   struct { bool result = false; } n2;
-  struct { i64 result = 0; } n3;
-  struct { u64 result = 0x0u; } n4;
-  struct { List<f64> out = List<f64>{}; } n5;
+  struct { u32 result = 0; } n3;
+  struct { u64 result = 0; } n4;
+  struct { List<f32> out = List<f32>{}; } n5;
   struct { bool result = false; game_Shape out = game_Shape::box; } n7;
   struct { bool result = false; Vector out = Vector{0.0, 0.0, 0.0}; } n8;
 
@@ -7479,28 +7498,28 @@ namespace engine_place_probe {
 struct EnginePlaces : kern::Blueprint {
   // ---- types ----
   KERN_STRUCT(MeshData) {
-    List<f64> positions = List<f64>{};
-    List<f64> normals = List<f64>{};
-    List<f64> colors = List<f64>{};
-    List<f64> uvs = List<f64>{};
-    List<f64> extra = List<f64>{};
-    i64 extra_size = 0;
-    List<i64> indices = List<i64>{};
+    List<f32> positions = List<f32>{};
+    List<f32> normals = List<f32>{};
+    List<f32> colors = List<f32>{};
+    List<f32> uvs = List<f32>{};
+    List<f32> extra = List<f32>{};
+    u32 extra_size = 0;
+    List<u32> indices = List<u32>{};
   };
   KERN_STRUCT(GeoChunk) {
-    i64 x = 0;
-    i64 y = 0;
-    i64 items = 0;
-    i64 triangles = 0;
-    i64 hash = 0;
+    i32 x = 0;
+    i32 y = 0;
+    u32 items = 0;
+    u32 triangles = 0;
+    u32 hash = 0;
     bool welded = false;
-    MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
+    MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
   };
   KERN_STRUCT(WeldStats) {
     u32 source_vertices = 0;
     u32 unique_vertices = 0;
-    i64 bytes_before = 0;
-    i64 bytes_after = 0;
+    u64 bytes_before = 0;
+    u64 bytes_after = 0;
     bool indexed = false;
   };
 
@@ -7508,24 +7527,24 @@ struct EnginePlaces : kern::Blueprint {
   Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
   i64 Length = 0;
   i64 At = 0;
-  i64 X = 0;
-  i64 Items = 0;
-  f64 P0 = 0.0;
-  i64 Beside = 0;
-  i64 Set = 0;
+  i32 X = 0;
+  u32 Items = 0;
+  f32 P0 = 0.0f;
+  i32 Beside = 0;
+  i32 Set = 0;
   List<GeoChunk> Chunks = List<GeoChunk>{};
   i64 LengthAfter = 0;
   bool Removed = false;
-  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}};
-  i64 Before = 0;
-  i64 Gone = 0;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}};
+  i32 Before = 0;
+  i32 Gone = 0;
   i64 GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
   i64 AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
-  MeshData Soup = MeshData{List<f64>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<f64>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<f64>{}, 0, List<i64>{}};
+  MeshData Soup = MeshData{List<f32>{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, List<f32>{1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f, 1.0f, 0.5f, 0.25f}, List<f32>{0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, List<f32>{}, 0, List<u32>{}};
   WeldStats Stats = WeldStats{0, 0, 0, 0, false};
-  MeshData Welded = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
+  MeshData Welded = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}};
 
   // ---- functions ----
   void Bind() {
@@ -7537,20 +7556,20 @@ struct EnginePlaces : kern::Blueprint {
 
   void Change() {
     engine_building_builder_chunks(n7, Builder);
-    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f64>{0.1, 2.5}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 2, List<i64>{1, 2}}});
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f32>{0.1f, 2.5f}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 2, List<u32>{1, 2}}});
     At = n3.index;
-    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     n7.result[0].items = 7;
     n5.value = (n7.result[0].x += 3);
     X = n5.value;
-    n7.result[1].mesh.positions = List<f64>{0.3333333333333333, 4.0};
+    n7.result[1].mesh.positions = List<f32>{0.33333334f, 4.0f};
     P0 = n7.result[1].mesh.positions[0];
-    n7.result[1].mesh.positions[1] = 0.1;
+    n7.result[1].mesh.positions[1] = 0.1f;
     Items = n7.result[0].items;
     Removed = list_contains<GeoChunk>(n7.result, First);
     First = list_get<GeoChunk>(n7.result, 1);
-    P0 = math_mul<f64>(n7.result[1].mesh.positions[0], 2.0);
-    LengthAfter = list_length<f64>(n7.result[1].mesh.positions);
+    P0 = math_mul<f32>(n7.result[1].mesh.positions[0], 2.0f);
+    LengthAfter = list_length<f32>(n7.result[1].mesh.positions);
     Beside = n7.result[5].x;
     n6.value = (n7.result[5].x = 9);
     Set = n6.value;
@@ -7587,7 +7606,7 @@ struct EnginePlaces : kern::Blueprint {
     engine_building_builder_release(Builder);
     Gone = n8.result[0].x;
     n8.result[0].x = 4;
-    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}});
     GoneLength = list_length<GeoChunk>(n8.result);
     GoneChunks = n8.result;
   }
@@ -7604,15 +7623,15 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
   struct { i64 index = 0; } n3;
   struct { bool removed = false; } n4;
-  struct { i64 value = 0; } n5;
-  struct { i64 value = 0; } n6;
+  struct { i32 value = 0; } n5;
+  struct { i32 value = 0; } n6;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
-  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}; } n13;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, List<f32>{}, 0, List<u32>{}}; } n13;
 };
 
 }  // namespace engine_place_probe
@@ -7678,7 +7697,7 @@ inline void Probe::Numbers() {
   Kept = n7.out;
   Name = engine_game_shape_name(game_Shape::torus);
   Box = engine_primitives_box(Vector{1.0, 2.0, 3.0}, Vector{0.5, 0.25, 1.0});
-  Ball = engine_bounding_sphere(Box.positions, i64(static_cast<i64>(Box.positions.size() / 3)));
+  Ball = engine_bounding_sphere(Box.positions, u32(static_cast<u32>(Box.positions.size() / 3)));
   Friction = engine_physics_surface_friction(physics_Surface::cloth, physics_Surface::tpu);
   Frame = engine_physics_frame_from_axis(Vector{1.0, 2.0, 3.0}, Vector{0.0, 0.0, 1.0}, true);
   Hex = engine_game_hex_color(Vector{1.0, 0.5, 0.0});
@@ -7816,19 +7835,19 @@ TEST(engine_calls_class_calls_the_engine_itself) {
   std::vector<f32> wrote(600);
   m.render(wrote.data(), 300);
   bool same = a.Sound.size() == wrote.size(), sounds = false;
-  for (std::size_t k = 0; same && k < wrote.size(); ++k) same = std::bit_cast<u64>(a.Sound[k]) == std::bit_cast<u64>(static_cast<f64>(wrote[k]));
+  for (std::size_t k = 0; same && k < wrote.size(); ++k) same = std::bit_cast<u32>(f32(a.Sound[k])) == std::bit_cast<u32>(wrote[k]);
   for (f32 x : wrote) sounds |= x != 0;
   CHECK(same && sounds);
   const Quat q = game::euler_to_quat(Vec3(10, 20, 30));
-  CHECK(std::bit_cast<u64>(a.Turned.x) == std::bit_cast<u64>(static_cast<f64>(q.x)) && std::bit_cast<u64>(a.Turned.w) == std::bit_cast<u64>(static_cast<f64>(q.w)));
+  CHECK(std::bit_cast<u32>(a.Turned.x) == std::bit_cast<u32>(q.x) && std::bit_cast<u32>(a.Turned.w) == std::bit_cast<u32>(q.w));
   const Mat4 placed = game::transform_matrix(game::Transform{Vec3(1, 2, 3), Vec3(10, 20, 30), Vec3(1, 1.5f, 2)});
   bool matrix = true;
-  for (std::size_t k = 0; k < 16; ++k) matrix = matrix && std::bit_cast<u64>(a.Matrix.m[k]) == std::bit_cast<u64>(static_cast<f64>(placed.m[k]));
+  for (std::size_t k = 0; k < 16; ++k) matrix = matrix && std::bit_cast<u32>(f32(a.Matrix.m[k])) == std::bit_cast<u32>(placed.m[k]);
   CHECK(matrix);
   CHECK(a.Parsed && a.Shape == engine_probe::Probe::game_Shape::cone && !a.Unparsed && a.Name == logic::Text("torus"));
   const MeshData box = primitives::box(Vec3(1, 2, 3), Vec3(0.5f, 0.25f, 1));
   CHECK(a.Box.positions.size() == box.positions.size() && a.Box.indices.size() == box.indices.size() && !box.positions.empty());
-  CHECK(std::bit_cast<u64>(a.Friction) == std::bit_cast<u64>(static_cast<f64>(physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu))));
+  CHECK(std::bit_cast<u32>(a.Friction) == std::bit_cast<u32>(physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu)));
 }
 
 // What a call the class makes itself costs: where the function of the engine asks for no memory, the call
@@ -8066,8 +8085,8 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
     f64 time = 0.0;
-    f64 dt = 0.0;
-    u64 index = 0x0u;
+    f32 dt = 0.0f;
+    u64 index = 0;
   };
 
   // ---- variables ----
@@ -8083,7 +8102,7 @@ struct Running : kern::Blueprint, kern::Implements<kern::App> {
     return {true};
   }
 
-  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {
     Updates += 1;
     Last = frame.time;
   }
@@ -8098,31 +8117,31 @@ namespace implements_probe {
 struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
-    u64 id = 0x0u;
+    u64 id = 0;
   };
 
   // ---- variables ----
-  net_Address Last = net_Address{0x0u};
-  i64 Bytes = 0;
+  net_Address Last = net_Address{0};
+  u32 Bytes = 0;
   i64 Sent = 0;
 
   // ---- functions ----
-  struct addressResult { net_Address result = net_Address{0x0u}; };
+  struct addressResult { net_Address result = net_Address{0}; };
   KERN_OVERRIDE KERN_PURE addressResult address() {
-    return {net_Address{0x7u}};
+    return {net_Address{7}};
   }
 
   struct sendResult { bool result = false; };
-  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0x0u}, List<u8> data = List<u8>{}, i64 bytes = 0) {
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0}, List<u8> data = List<u8>{}, u32 bytes = 0) {
     Last = to;
     Bytes = bytes;
     Sent = list_length<u8>(data);
     return {true};
   }
 
-  struct receiveResult { i64 result = 0; net_Address from = net_Address{0x0u}; List<i64> data = List<i64>{}; };
-  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0x0u}, i64 max_bytes = 0) {
-    return {Bytes, Last, List<i64>{1, 2, 3}};
+  struct receiveResult { i32 result = 0; net_Address from = net_Address{0}; List<u8> data = List<u8>{}; };
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0}, u32 max_bytes = 0) {
+    return {num_cast<i32, u32>(Bytes), Last, List<u8>{1, 2, 3}};
   }
 };
 }  // namespace implements_probe
@@ -8292,7 +8311,7 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(f64 program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
   const std::vector<logic::Issue> issues = logic::check(wrong);
   const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
-  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is object<Program>, not float"));
+  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is object<Program>, not f64"));
   wrong.implements = "Nothing";
   CHECK(!no_errors(logic::check(wrong)));
   // the Blueprint ends: the engine's object stays, and gets nothing from it - the zero of what it asks for
@@ -8335,6 +8354,7 @@ TEST(engine_interface_overrides_are_said) {
   std::string text;
   CHECK(logic::from_cpp(said, g, nullptr, &error) && g.functions.size() == 3 && g.functions[2].name == "stop" && g.functions[2].overrides &&
         logic::to_cpp(g, "Running", text, &error, logic::library(), false) && text.ends_with(said));   // (written as it was: after the text's head)
+  if (!text.ends_with(said)) std::printf("written as:\n%s\n", text.c_str());
   // (without a pure one: the error says which)
   const auto bare = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void stop(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n  }\n};\n", &error);
   CHECK(error.empty() && has(bare, true, "it implements App: it has no function start (the interface's has no body - engine.app.start)"));
@@ -8749,8 +8769,8 @@ TEST(program_from_the_project) {
                      "  // ---- types ----\n"
                      "  KERN_STRUCT(Frame) {\n"
                      "    f64 time = 0.0;\n"
-                     "    f64 dt = 0.0;\n"
-                     "    u64 index = 0x0u;\n"
+                     "    f32 dt = 0.0f;\n"
+                     "    u64 index = 0;\n"
                      "  };\n"
                      "\n"
                      "  // ---- functions ----\n"
@@ -8760,7 +8780,7 @@ TEST(program_from_the_project) {
                      "    return {true};\n"
                      "  }\n"
                      "\n"
-                     "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                     "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                      "    debug_print(\"update\", false);\n"
                      "  }\n"
                      "\n"
@@ -9094,11 +9114,11 @@ TEST(program_world_has_the_project) {
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
                         "    f64 time = 0.0;\n"
-                        "    f64 dt = 0.0;\n"
-                        "    u64 index = 0x0u;\n"
+                        "    f32 dt = 0.0f;\n"
+                        "    u64 index = 0;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   game::Project pr;
@@ -9227,11 +9247,11 @@ TEST(program_beside_an_app_of_cpp) {
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
                         "    f64 time = 0.0;\n"
-                        "    f64 dt = 0.0;\n"
-                        "    u64 index = 0x0u;\n"
+                        "    f32 dt = 0.0f;\n"
+                        "    u64 index = 0;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(error.empty());
@@ -9261,15 +9281,15 @@ TEST(program_binds_the_exports) {
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
                         "    f64 time = 0.0;\n"
-                        "    f64 dt = 0.0;\n"
-                        "    u64 index = 0x0u;\n"
+                        "    f32 dt = 0.0f;\n"
+                        "    u64 index = 0;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
-                        "  struct game_shownResult { i64 Result = 0; };\n"
+                        "  struct game_shownResult { i32 Result = 0; };\n"
                         "  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n"
                         "    return {7};\n"
                         "  }\n"
@@ -9325,11 +9345,11 @@ TEST(run_the_program_of_a_project) {
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
                         "    f64 time = 0.0;\n"
-                        "    f64 dt = 0.0;\n"
-                        "    u64 index = 0x0u;\n"
+                        "    f32 dt = 0.0f;\n"
+                        "    u64 index = 0;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   CHECK(error.empty() && main.implements == "App");
@@ -13849,7 +13869,7 @@ TEST(studio_blueprint_sheets) {
     const u32 base = 1000 + k * 100;
     node(base, "func.entry", "function", name);
     for (u32 i = 1; i <= 40; ++i) {
-      node(base + i, "math.mul");
+      node(base + i, "math.mul", "type", "f64");
       link(base + i - 1, i == 1 ? "x" : "result", base + i, "a");
     }
     node(base + 41, "func.return", "function", name);
@@ -14151,7 +14171,7 @@ TEST(studio_logic_functions) {
   CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"Twice","to":"math_add"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Speed","type":"f64"})")["name"].as_string() == "Speed");
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Top Speed"})")["ok"].as_bool());
-  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Float"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"f32"})")["ok"].as_bool());
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Twice"})")["ok"].as_bool());  // (a function has that name)
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"my var","type":"f64"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"TopSpeed"})")["ok"].as_bool());
@@ -14272,18 +14292,20 @@ TEST(studio_logic_local_variables) {
     return f.s->command(c);
   };
   CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  f64 Sum = 0.0;\n\n  struct AddResult { f64 out = 0.0; };\n  AddResult Add(f64 x = 1.0) {\n    return {x};\n  }\n};\n"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Add"}, {"side", "local"}})["pin"].as_string() == "local");
+  const json::Value made = cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Add"}, {"side", "local"}});
+  if (made["pin"].as_string() != "local") std::printf("pinAdd local: %s\n", json::stringify(made).c_str());
+  CHECK(made["pin"].as_string() == "local");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "local"}, {"to", "Acc"}})["ok"].as_bool());
   // it hides nothing: not a variable, not a pin of its function - and no pin or variable takes its name
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "Sum"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "x"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "in"}, {"pin", "x"}, {"to", "Acc"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicVariable"}, {"op", "rename"}, {"name", "Sum"}, {"to", "Acc"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"type", "i64"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"value", 4}})["ok"].as_bool());
   json::Value st = f.s->state();
   CHECK(st["logic"]["functions"][0]["locals"].size() == 1 && st["logic"]["functions"][0]["locals"][0]["name"].as_string() == "Acc" &&
-        st["logic"]["functions"][0]["locals"][0]["type"].as_string() == "int" && st["logic"]["functions"][0]["locals"][0]["value"].as_number() == 4);
+        st["logic"]["functions"][0]["locals"][0]["type"].as_string() == "i64" && st["logic"]["functions"][0]["locals"][0]["value"].as_number() == 4);
   // the action menu offers its nodes, under the function's name
   const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "acc"}});
   bool get = false, add = false;
@@ -14363,7 +14385,7 @@ TEST(studio_logic_reference_inputs) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinMove"}, {"name", "Bump"}, {"side", "in"}, {"pin", "by"}, {"by", -1}})["ok"].as_bool());
   CHECK(inputs() == "x:ref by scale ");
   // an output is no reference
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"type", "f64"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"ref", "ref"}})["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
 }
@@ -14407,7 +14429,7 @@ TEST(studio_logic_implements) {
   std::string text = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
   const std::size_t end = text.rfind("};");
   CHECK(end != std::string::npos);
-  text.insert(end, "\n  struct game_shownResult { i64 Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
+  text.insert(end, "\n  struct game_shownResult { i32 Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
   json::Value apply = json::Value::object();
   apply.set("cmd", "logicCppApply");
   apply.set("text", text);
@@ -14437,8 +14459,8 @@ TEST(studio_play_project) {
                         "  // ---- types ----\n"
                         "  KERN_STRUCT(Frame) {\n"
                         "    f64 time = 0.0;\n"
-                        "    f64 dt = 0.0;\n"
-                        "    u64 index = 0x0u;\n"
+                        "    f32 dt = 0.0f;\n"
+                        "    u64 index = 0;\n"
                         "  };\n"
                         "\n"
                         "  // ---- variables ----\n"
@@ -14461,7 +14483,7 @@ TEST(studio_play_project) {
                         "    return {n2.result};\n"
                         "  }\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {\n"
                         "    Punkte += 1;\n"
                         "    engine_engine_ui_text(engine, \"punkte\", \"Punkte\", 0.1, 0.1);\n"
                         "    engine_engine_ui_button(n6, engine, \"ende\", \"Ende\", 0.9, 0.1);\n"
@@ -14483,7 +14505,7 @@ TEST(studio_play_project) {
                         "  struct { bool result = false; } n2;\n"
                         "  struct { Object<kern::audio::Mixer> result = Object<kern::audio::Mixer>{}; } n3;\n"
                         "  struct { i64 result = 0; } n4;\n"
-                        "  struct { u64 result = 0x0u; } n5;\n"
+                        "  struct { u64 result = 0; } n5;\n"
                         "  struct { bool result = false; } n6;\n"
                         "  struct { bool result = false; } n7;\n"
                         "};\n", spiel, nullptr, &error));
@@ -14596,7 +14618,7 @@ TEST(studio_project) {
   st = f.s->state();
   CHECK(st["logic"]["program"].as_bool() && st["logic"]["ownerName"].as_string() == "Spiel" && st["project"]["blueprints"][0]["open"].as_bool());
   CHECK(st["logic"]["owners"].size() == 2);  // the program's Blueprints, no level graph
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Score"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Score"}, {"type", "i64"}})["ok"].as_bool());
   CHECK(f.s->project().blueprints[0].logic.variables.size() == 1 && f.s->level().logic.variables.empty());
   CHECK(st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
@@ -14609,7 +14631,7 @@ TEST(studio_project) {
   const game::ActorId cube = f.s->level().actors.back().id;
   CHECK(cmd({{"cmd", "rename"}, {"id", static_cast<f64>(cube)}, {"name", "Kiste"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(cube)}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Hits"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Hits"}, {"type", "i64"}})["ok"].as_bool());
   st = f.s->state();
   CHECK(!st["logic"]["program"].as_bool() && st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
   CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Mathe"}})["ok"].as_bool());
@@ -14708,7 +14730,7 @@ TEST(studio_logic_libraries) {
   json::Value st = f.s->state();
   CHECK(st["logic"]["library"].as_bool() && st["logic"]["uses"].size() == 0);
   // a library keeps nothing: a variable is refused when it compiles
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Kept"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Kept"}, {"type", "f64"}})["ok"].as_bool());
   bool kept = false;
   const json::Value with_variable = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : with_variable["issues"].items()) kept = kept || i["text"].as_string().find("a library keeps nothing: it has no variables") != std::string::npos;
@@ -14731,7 +14753,7 @@ TEST(studio_logic_libraries) {
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   // the Blueprint that uses it: the editor offers the library, then its functions; a call brings what the function looks like
   CHECK(open(user));
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Bumps"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Bumps"}, {"type", "i64"}})["ok"].as_bool());
   st = f.s->state();
   CHECK(!st["logic"]["library"].as_bool() && st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Tally");
   CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Tally"}})["ok"].as_bool());
@@ -14804,7 +14826,7 @@ TEST(studio_logic_call_on_actor) {
   const game::ActorId other = f.s->level().actors.front().id;
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(other)}})["ok"].as_bool());
   // the editor offers the Level's function; declared here it is a function of another Blueprint
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Got"}, {"type", "float"}})["ok"].as_bool());  // (the actor has a Blueprint now)
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Got"}, {"type", "f64"}})["ok"].as_bool());  // (the actor has a Blueprint now)
   json::Value st = f.s->state();
   CHECK(st["logic"]["otherFunctions"].size() == 1 && st["logic"]["otherFunctions"][0]["name"].as_string() == "Twice" && st["logic"]["otherFunctions"][0]["ownerName"].as_string() == "Level");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "Twice"}, {"from", 0}})["ok"].as_bool());
@@ -14830,7 +14852,7 @@ TEST(studio_logic_call_on_actor) {
   for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
   // a declaration nobody has as it stands gets a hint (no error: the call gives the defaults)
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Twice"}, {"side", "in"}, {"pin", "more"}, {"type", "i64"}})["ok"].as_bool());
   bool hint = false;
   st = f.s->state();
   for (const json::Value& i : st["logic"]["issues"].items()) hint = hint || (!i["error"].as_bool() && i["text"].as_string().find("with these inputs and outputs") != std::string::npos);
@@ -14891,7 +14913,7 @@ TEST(studio_logic_project_types) {
   CHECK(!type("enums", "Mode")["project"].as_bool() && !type("structs", "Door")["project"].as_bool());
   // the actor's Blueprint is offered the Level's types
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "f64"}})["ok"].as_bool());
   json::Value st = f.s->state();
   CHECK(st["logic"]["otherTypes"].size() == 2 && st["logic"]["otherTypes"][0]["name"].as_string() == "Mode" && st["logic"]["otherTypes"][1]["kind"].as_string() == "struct" &&
         st["logic"]["otherTypes"][0]["ownerName"].as_string() == "Level");
@@ -14903,7 +14925,7 @@ TEST(studio_logic_project_types) {
   CHECK(type("structs", "Door")["project"].as_bool() && type("enums", "Mode")["project"].as_bool());  // (in the Level too)
   // one edit changes both: a value more, a field more, a new name
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "addValue"}, {"name", "Mode"}, {"value", "Opening"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "addField"}, {"name", "Door"}, {"field", "Height"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "addField"}, {"name", "Door"}, {"field", "Height"}, {"type", "f64"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "Mode"}, {"to", "DoorMode"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
   CHECK(type("enums", "DoorMode")["values"].size() == 3 && type("structs", "Door")["fields"].size() == 3 && type("structs", "Door")["fields"][0]["of"].as_string() == "DoorMode");
@@ -14918,7 +14940,7 @@ TEST(studio_logic_project_types) {
   CHECK(type("enums", "Mode")["values"].size() == 3 && type("enums", "DoorMode").is_null());
   // an edit one of them cannot follow is refused as a whole: the actor has a variable called Gate
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Gate"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Gate"}, {"type", "f64"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicOpen"}, {"owner", 0}})["ok"].as_bool());
   const json::Value refused = cmd({{"cmd", "logicStruct"}, {"op", "rename"}, {"name", "Door"}, {"to", "Gate"}});
   CHECK(!refused["ok"].as_bool() && refused["error"].as_string().find("the Blueprint of ") == 0);
@@ -15237,7 +15259,7 @@ TEST(studio_logic_lists) {
     return json::Value();
   };
   CHECK(variable("Names")["type"].as_string() == "text_list" && variable("Names")["value"].size() == 2 && variable("Names")["value"][1].as_string() == "b");
-  CHECK(variable("Nums")["type"].as_string() == "float_list" && variable("Nums")["value"].is_array() && variable("Nums")["value"].size() == 0);
+  CHECK(variable("Nums")["type"].as_string() == "f64_list" && variable("Nums")["value"].is_array() && variable("Nums")["value"].size() == 0);
   // The steps that change a list are offered per list variable, by its name - never bare.
   json::Value pal = f.cmd(R"({"cmd":"logicPalette","query":"names"})");
   bool add_to = false, bare = false;
@@ -15306,10 +15328,10 @@ TEST(studio_logic_lists) {
     each |= it["type"].as_string() == "flow.for_each" && it["params"]["type"].as_string() == "text";
     length |= it["type"].as_string() == "list.length" && it["params"]["type"].as_string() == "text";
     plus |= it["type"].as_string() == "math.add";
-    print |= it["type"].as_string() == "debug.print";  // (a list prints: it goes into Text)
+    print |= it["type"].as_string() == "list.text" && it["params"]["type"].as_string() == "text";  // (a list prints through List to Text: no wire makes it a Text)
   }
   CHECK(each && length && !plus && print);
-  // A new Length is of a f64 List; its list pin says what it could be, and the first wire decides.
+  // A new Length is of a List of f32 (the Float of the editor); its list pin says what it could be, and the first wire decides.
   const u32 len = added("list.length");
   auto pin = [&](u32 node, const char* id, bool output) {
     const json::Value st = f.s->state();
@@ -15318,7 +15340,7 @@ TEST(studio_logic_lists) {
         for (const json::Value& p : n[output ? "outputs" : "inputs"].items()) if (p["id"].as_string() == id) return p;
     return json::Value();
   };
-  CHECK(pin(len, "list", false)["type"].as_string() == "float_list" && pin(len, "list", false)["generic"].as_string().find("text_list") != std::string::npos);
+  CHECK(pin(len, "list", false)["type"].as_string() == "f32_list" && pin(len, "list", false)["generic"].as_string().find("text_list") != std::string::npos);
   CHECK(!pin(len, "length", true)["generic"].is_string());  // (Length is an Integer whatever the list)
   auto wire = [&](u32 from, const char* out, u32 to, const char* in) {
     json::Value c = json::Value::object();
@@ -15333,13 +15355,13 @@ TEST(studio_logic_lists) {
   CHECK(pin(len, "list", false)["type"].as_string() == "text_list" && pin(len, "list", false)["linked"].as_bool());
   // Another list into the same pin replaces the wire, and the node follows ...
   const u32 nums = added("var.get", R"({"variable":"Nums"})"), sum = added("math.add");
-  CHECK(pin(len, "list", false)["generic"].is_string() && wire(nums, "value", len, "list")["ok"].as_bool() && pin(len, "list", false)["type"].as_string() == "float_list");
+  CHECK(pin(len, "list", false)["generic"].is_string() && wire(nums, "value", len, "list")["ok"].as_bool() && pin(len, "list", false)["type"].as_string() == "f64_list");
   // ... but not a node whose other pins are wired in its type: Get Item of Names, read as a Text.
   const u32 item = added("list.get", R"({"type":"text"})"), names = added("list.contains", R"({"type":"text"})");
   CHECK(wire(get, "value", item, "list")["ok"].as_bool() && wire(item, "item", names, "item")["ok"].as_bool() && wire(get, "value", names, "list")["ok"].as_bool());
   CHECK(!pin(item, "list", false)["generic"].is_string() && !pin(item, "item", true)["generic"].is_string());
   json::Value r = wire(nums, "value", item, "list");
-  CHECK(!r["ok"].as_bool() && r["error"].as_string().find("float_list") != std::string::npos && pin(item, "list", false)["type"].as_string() == "text_list");
+  CHECK(!r["ok"].as_bool() && r["error"].as_string().find("f64_list") != std::string::npos && pin(item, "list", false)["type"].as_string() == "text_list");
   // A list never goes into a number.
   CHECK(!wire(get, "value", sum, "a")["ok"].as_bool());
   // Two new generic nodes: the one the wire goes into takes the type of the one it comes from ...
@@ -15359,7 +15381,7 @@ TEST(studio_logic_lists) {
   val.set("value", items);
   CHECK(f.s->command(val)["ok"].as_bool());
   const json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
-  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<f64>(List<f64>{1.5, -2.0}, 0.0)") != std::string::npos);
+  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<f32>(List<f32>{1.5f, -2.0f}, 0.0f)") != std::string::npos);
   CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
 }
 
@@ -15386,7 +15408,7 @@ TEST(studio_logic_enums) {
   const json::Value made = cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Mode"}});
   CHECK(made["ok"].as_bool() && made["name"].as_string() == "Mode" && values("Mode") == "First,Second");
   // its name is a type's name in C++: not a word of the notation, not a list's name, not taken twice
-  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Float"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Items_list"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "f32"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Items_list"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Mode"}})["ok"].as_bool() && cmd({{"cmd", "logicEnum"}, {"op", "add"}})["name"].as_string() == "NewEnum");
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "NewEnum"}, {"to", "Light"}})["ok"].as_bool() && values("Light") == "First,Second");
   CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "Light"}, {"to", "Mode"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Mode"}})["ok"].as_bool());
@@ -15409,7 +15431,7 @@ TEST(studio_logic_enums) {
   // A variable of the enum's type, a list of them, and a function's pins.
   CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "State"}, {"type", "Mode"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicVariable"}, {"op", "value"}, {"name", "State"}, {"value", 2}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "float"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Seen"}, {"type", "Mode_list"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "f64"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Seen"}, {"type", "Mode_list"}})["ok"].as_bool());
   json::Value places = json::Value::array();
   places.push(2);
   places.push(1);
@@ -15529,7 +15551,7 @@ TEST(studio_logic_enums) {
   const u32 entry = added("func.entry");
   const std::string fn = f.s->level().logic.find(entry)->param("function");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "in"}, {"pin", "to"}, {"type", "Door"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "f64"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "Door_list"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", fn}, {"side", "in"}, {"pin", "to"}, {"value", 2}})["ok"].as_bool());
   CHECK(pin(entry, "to", true)["type"].as_string() == "enum" && pin(entry, "to", true)["of"].as_string() == "Door");
@@ -15628,7 +15650,7 @@ TEST(studio_logic_structs) {
     for (const json::Value& s : st["logic"]["structs"].items()) if (s["name"].as_string() == name) return s;
     return json::Value();
   };
-  /// The fields of a struct as text: "Name:text,Damage:float".
+  /// The fields of a struct as text: "Name:text,Damage:f64".
   auto fields = [&](const char* name) {
     std::string all;
     const json::Value declared = structure(name);
@@ -15651,9 +15673,9 @@ TEST(studio_logic_structs) {
     return f.s->command(c);
   };
   const json::Value made = cmd({{"cmd", "logicStruct"}, {"op", "add"}, {"name", "Weapon"}});
-  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Weapon" && fields("Weapon") == "Field:float" && structure("Weapon")["fields"][0]["value"].as_number() == 0);
+  CHECK(made["ok"].as_bool() && made["name"].as_string() == "Weapon" && fields("Weapon") == "Field:f64" && structure("Weapon")["fields"][0]["value"].as_number() == 0);
   // its name is a type's name in C++: not a word of the notation, not a list's name, not taken twice
-  CHECK(!edit("add", "Float")["ok"].as_bool() && !edit("add", "Items_list")["ok"].as_bool() && !edit("add", "Weapon")["ok"].as_bool() && !edit("add", "math_add")["ok"].as_bool());
+  CHECK(!edit("add", "f32")["ok"].as_bool() && !edit("add", "Items_list")["ok"].as_bool() && !edit("add", "Weapon")["ok"].as_bool() && !edit("add", "math_add")["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicStruct"}, {"op", "add"}})["name"].as_string() == "NewStruct" && order() == "Weapon,NewStruct");
   CHECK(edit("rename", "NewStruct", {{"to", "Aim"}})["ok"].as_bool() && !edit("rename", "Aim", {{"to", "Weapon"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Aim"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Kind"}})["ok"].as_bool() && !cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Weapon"}})["ok"].as_bool() && !edit("add", "Kind")["ok"].as_bool());
@@ -15661,8 +15683,8 @@ TEST(studio_logic_structs) {
   // the fields: renamed, added (of a value type, an enum's, another struct's, a list), given a default
   CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Damage"}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Damage"}, {"value", 10}})["ok"].as_bool());
   CHECK(edit("addField", "Weapon", {{"field", "Label"}, {"type", "text"}})["ok"].as_bool() && edit("addField", "Weapon", {{"field", "Type"}, {"type", "Kind"}})["ok"].as_bool());
-  CHECK(edit("addField", "Weapon", {{"type", "float_list"}})["field"].as_string() == "Field" && edit("addField", "Weapon")["field"].as_string() == "Field2");
-  CHECK(fields("Weapon") == "Damage:float,Label:text,Type:Kind,Field:float_list,Field2:float" && structure("Weapon")["fields"][0]["value"].as_number() == 10);
+  CHECK(edit("addField", "Weapon", {{"type", "f64_list"}})["field"].as_string() == "Field" && edit("addField", "Weapon")["field"].as_string() == "Field2");
+  CHECK(fields("Weapon") == "Damage:f64,Label:text,Type:Kind,Field:f64_list,Field2:f32" && structure("Weapon")["fields"][0]["value"].as_number() == 10);
   json::Value r = edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "Label"}});
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon has a field Label already");
   CHECK(!edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "my field"}})["ok"].as_bool() && !edit("renameField", "Weapon", {{"field", "Field2"}, {"to", "class"}})["ok"].as_bool());
@@ -15674,25 +15696,25 @@ TEST(studio_logic_structs) {
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "\"Label\" is a field of the struct Weapon" && !edit("rename", "Aim", {{"to", "Damage"}})["ok"].as_bool());
   CHECK(edit("renameField", "Weapon", {{"field", "Field"}, {"to", "Falloff"}})["ok"].as_bool() && edit("removeField", "Weapon", {{"field", "Field2"}})["ok"].as_bool());
   CHECK(edit("fieldValue", "Weapon", {{"field", "Type"}, {"value", 1}})["ok"].as_bool() && edit("fieldValue", "Weapon", {{"field", "Falloff"}, {"value", parsed("[1, 0.5]")}})["ok"].as_bool());
-  CHECK(edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}})["ok"].as_bool() && fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list");
+  CHECK(edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}})["ok"].as_bool() && fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list");
   // (the first one does not move up, the last one not down)
   edit("moveField", "Weapon", {{"field", "Label"}, {"by", -1}});
   edit("moveField", "Weapon", {{"field", "Falloff"}, {"by", 1}});
-  CHECK(fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list" && edit("help", "Weapon", {{"text", "What a weapon does."}})["ok"].as_bool());
+  CHECK(fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list" && edit("help", "Weapon", {{"text", "What a weapon does."}})["ok"].as_bool());
   // A field of another struct: the struct it is of stands above (Aim moves up) - and no struct
   // holds itself, directly or through another one.
-  CHECK(edit("renameField", "Aim", {{"field", "Field"}, {"to", "Tries"}})["ok"].as_bool() && edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(edit("renameField", "Aim", {{"field", "Field"}, {"to", "Tries"}})["ok"].as_bool() && edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "i64"}})["ok"].as_bool());
   CHECK(edit("fieldValue", "Aim", {{"field", "Tries"}, {"value", 3}})["ok"].as_bool() && order() == "Weapon,Aim");
-  CHECK(edit("addField", "Weapon", {{"field", "Sight"}, {"type", "Aim"}})["ok"].as_bool() && order() == "Aim,Weapon" && fields("Weapon") == "Label:text,Damage:float,Type:Kind,Falloff:float_list,Sight:Aim");
+  CHECK(edit("addField", "Weapon", {{"field", "Sight"}, {"type", "Aim"}})["ok"].as_bool() && order() == "Aim,Weapon" && fields("Weapon") == "Label:text,Damage:f64,Type:Kind,Falloff:f64_list,Sight:Aim");
   CHECK(structure("Weapon")["fields"][4]["value"]["Tries"].as_number() == 3 && edit("addField", "Weapon", {{"field", "Marks"}, {"type", "Aim_list"}})["ok"].as_bool() && fields("Weapon").find("Marks:Aim[]") != std::string::npos);
   r = edit("addField", "Aim", {{"field", "Of"}, {"type", "Weapon"}});
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Weapon holds Aim: a struct cannot contain itself" && !edit("addField", "Aim", {{"field", "Me"}, {"type", "Aim_list"}})["ok"].as_bool());
   r = edit("fieldType", "Aim", {{"field", "Tries"}, {"type", "Aim"}});
-  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "a struct cannot contain itself" && fields("Aim") == "Tries:int" && no_errors(logic::check(f.s->level().logic)));
+  CHECK(!r["ok"].as_bool() && r["error"].as_string() == "a struct cannot contain itself" && fields("Aim") == "Tries:i64" && no_errors(logic::check(f.s->level().logic)));
 
   // A variable of the struct's type, a list of them, and their defaults - by the fields' names.
   CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Held"}, {"type", "Weapon"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Rack"}, {"type", "float"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Rack"}, {"type", "Weapon_list"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Rack"}, {"type", "f64"}})["ok"].as_bool() && cmd({{"cmd", "logicVariable"}, {"op", "type"}, {"name", "Rack"}, {"type", "Weapon_list"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Other"}, {"type", "Nope"}})["ok"].as_bool() && !cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Weapon"}})["ok"].as_bool());
   auto variable = [&](const char* name) {
     const json::Value st = f.s->state();
@@ -15776,12 +15798,12 @@ TEST(studio_logic_structs) {
   // Make has an input for each field - of the field's type, with its default -, Break an output; Set Field names a variable and a field.
   const u32 begin = added("event.begin"), make = added("struct.make", R"({"struct":"Weapon"})"), brk = added("struct.break", R"({"struct":"Weapon"})"), set = added("var.set", R"({"variable":"Held"})");
   const u32 tune = added("var.set", R"({"variable":"Held","path":".Damage"})"), number = added("math.add"), text = added("text.append"), print = added("debug.print");
-  CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "float");
+  CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "f64");
   CHECK(pin(make, "Damage", false)["value"].as_number() == 10 && pin(make, "Type", false)["type"].as_string() == "enum" && pin(make, "Type", false)["of"].as_string() == "Kind" && pin(make, "Type", false)["value"].as_number() == 1);
   CHECK(pin(make, "Sight", false)["type"].as_string() == "struct" && pin(make, "Sight", false)["of"].as_string() == "Aim" && pin(make, "Sight", false)["value"]["Tries"].as_number() == 3);
   CHECK(pin(make, "Marks", false)["type"].as_string() == "struct_list" && pin(make, "value", true)["type"].as_string() == "struct" && pin(make, "value", true)["of"].as_string() == "Weapon");
   CHECK(node(brk)["title"].as_string() == "Break Weapon" && node(brk)["outputs"].size() == 6 && pin(brk, "Label", true)["type"].as_string() == "text" && pin(brk, "value", false)["value"]["Damage"].as_number() == 10);
-  CHECK(node(tune)["title"].as_string() == "Set Held.Damage" && pin(tune, "value", false)["type"].as_string() == "float" && pin(tune, "value", false)["value"].as_number() == 10);
+  CHECK(node(tune)["title"].as_string() == "Set Held.Damage" && pin(tune, "value", false)["type"].as_string() == "f64" && pin(tune, "value", false)["value"].as_number() == 10);
   // (its settings: the variable, and the path from it to the place - a text on the node)
   std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
@@ -15796,10 +15818,10 @@ TEST(studio_logic_structs) {
   const u32 loose = added("var.set", R"({"variable":"Held","path":".Label"})");
   CHECK(node(loose)["title"].as_string() == "Set Held.Label" && pin(loose, "value", false)["type"].as_string() == "text");
   CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Last"}})["ok"].as_bool() && f.s->level().logic.find(loose)->param("path").empty() && node(loose)["title"].as_string() == "Set Last");
-  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "path"}, {"value", ".Tries"}})["ok"].as_bool() && node(loose)["title"].as_string() == "Set Last.Tries" && pin(loose, "value", false)["type"].as_string() == "int");
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "path"}, {"value", ".Tries"}})["ok"].as_bool() && node(loose)["title"].as_string() == "Set Last.Tries" && pin(loose, "value", false)["type"].as_string() == "i64");
   // (a list's entry: the path's [] is an index pin of the node)
   CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Held"}})["ok"].as_bool() && cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "path"}, {"value", ".Marks[].Tries"}})["ok"].as_bool());
-  CHECK(node(loose)["title"].as_string() == "Set Held.Marks[].Tries" && pin(loose, "path0", false)["type"].as_string() == "int" && pin(loose, "value", false)["type"].as_string() == "int");
+  CHECK(node(loose)["title"].as_string() == "Set Held.Marks[].Tries" && pin(loose, "path0", false)["type"].as_string() == "i64" && pin(loose, "value", false)["type"].as_string() == "i64");
   json::Value gone = json::Value::array();
   gone.push(loose);
   CHECK(cmd({{"cmd", "logicDelete"}, {"ids", gone}})["ok"].as_bool());
@@ -15819,7 +15841,7 @@ TEST(studio_logic_structs) {
   CHECK(f.s->level().logic.find(length)->param("type") == "Weapon" && pin(length, "list", false)["type"].as_string() == "struct_list" && no_errors(logic::check(f.s->level().logic)));
 
   // A field's new name: its values and its wires stay with it - on Make, on Break, in every path that leads through it, in every default.
-  CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:float") != std::string::npos);
+  CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:f64") != std::string::npos);
   CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && !wired(number, "result", make, "Damage") && node(tune)["title"].as_string() == "Set Held.Power");
   CHECK(variable("Held")["value"]["Power"].as_number() == 25 && !variable("Held")["value"].has("Damage") && variable("Rack")["value"][1]["Power"].as_number() == 10 && no_errors(logic::check(f.s->level().logic)));
   CHECK(cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Label"}, {"value", "typed"}})["ok"].as_bool() && edit("renameField", "Weapon", {{"field", "Label"}, {"to", "Title"}})["ok"].as_bool());
@@ -15829,7 +15851,7 @@ TEST(studio_logic_structs) {
   CHECK(edit("renameField", "Aim", {{"field", "Tries"}, {"to", "Shots"}})["ok"].as_bool() && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7 && pin(make, "Sight", false)["value"]["Shots"].as_number() == 9);
   CHECK(structure("Weapon")["fields"][4]["value"]["Shots"].as_number() == 3 && variable("Last")["value"]["Shots"].as_number() == 3 && no_errors(logic::check(f.s->level().logic)));
   // A field moves: nothing but its place changes.
-  CHECK(edit("moveField", "Weapon", {{"field", "Power"}, {"by", 1}})["ok"].as_bool() && fields("Weapon") == "Title:text,Type:Kind,Power:float,Falloff:float_list,Sight:Aim,Marks:Aim[]");
+  CHECK(edit("moveField", "Weapon", {{"field", "Power"}, {"by", 1}})["ok"].as_bool() && fields("Weapon") == "Title:text,Type:Kind,Power:f64,Falloff:f64_list,Sight:Aim,Marks:Aim[]");
   CHECK(variable("Held")["value"]["Power"].as_number() == 25 && variable("Held")["value"]["Type"].as_number() == 1 && wired(number, "result", make, "Power") && node(make)["inputs"][2]["id"].as_string() == "Power");
   // An enum's values move: what a struct holds of them follows.
   CHECK(cmd({{"cmd", "logicEnum"}, {"op", "moveValue"}, {"name", "Kind"}, {"index", 1}, {"by", -1}})["ok"].as_bool() && variable("Held")["value"]["Type"].as_number() == 0 && structure("Weapon")["fields"][1]["value"].as_number() == 0);
@@ -15837,13 +15859,13 @@ TEST(studio_logic_structs) {
   r = cmd({{"cmd", "logicEnum"}, {"op", "remove"}, {"name", "Kind"}});
   CHECK(!r["ok"].as_bool() && r["error"].as_string() == "Kind is in use: the field Type of the struct Weapon");
   // A field's new type: what it holds is kept where the types convert; wires that no longer fit go.
-  CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "int"}})["ok"].as_bool() && fields("Weapon").find("Power:int") != std::string::npos && variable("Held")["value"]["Power"].as_number() == 25);
-  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && pin(tune, "value", false)["type"].as_string() == "int" && no_errors(logic::check(f.s->level().logic)));
+  CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "i64"}})["ok"].as_bool() && fields("Weapon").find("Power:i64") != std::string::npos && variable("Held")["value"]["Power"].as_number() == 25);
+  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && pin(tune, "value", false)["type"].as_string() == "i64" && no_errors(logic::check(f.s->level().logic)));
   CHECK(edit("fieldType", "Weapon", {{"field", "Power"}, {"type", "Kind"}})["ok"].as_bool() && variable("Held")["value"]["Power"].as_number() == 0 && !wired(number, "result", make, "Power"));
   CHECK(wired(brk, "Power", tune, "value") && pin(tune, "value", false)["of"].as_string() == "Kind" && no_errors(logic::check(f.s->level().logic)));
-  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && fields("Weapon").find("Power:int") != std::string::npos && wired(number, "result", make, "Power") && variable("Held")["value"]["Power"].as_number() == 25);
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && fields("Weapon").find("Power:i64") != std::string::npos && wired(number, "result", make, "Power") && variable("Held")["value"]["Power"].as_number() == 25);
   // A field goes: its values and its wires go with it.
-  CHECK(edit("removeField", "Weapon", {{"field", "Title"}})["ok"].as_bool() && fields("Weapon") == "Type:Kind,Power:int,Falloff:float_list,Sight:Aim,Marks:Aim[]");
+  CHECK(edit("removeField", "Weapon", {{"field", "Title"}})["ok"].as_bool() && fields("Weapon") == "Type:Kind,Power:i64,Falloff:f64_list,Sight:Aim,Marks:Aim[]");
   CHECK(!variable("Held")["value"].has("Title") && !variable("Rack")["value"][0].has("Title") && !f.s->level().logic.find(make)->value("Title") && node(make)["inputs"].size() == 5 && node(brk)["outputs"].size() == 5);
   bool hangs = false;
   for (const logic::Link& l : f.s->level().logic.links) hangs |= l.in == "Title" || l.out == "Title";
@@ -15860,7 +15882,7 @@ TEST(studio_logic_structs) {
   const u32 entry = added("func.entry");
   const std::string fn = f.s->level().logic.find(entry)->param("function");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "in"}, {"pin", "gun"}, {"type", "Gun"}})["ok"].as_bool());
-  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "f64"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinType"}, {"name", fn}, {"side", "out"}, {"pin", "all"}, {"type", "Scope_list"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", fn}, {"side", "in"}, {"pin", "gun"}, {"value", parsed(R"({"Power":7})")}})["ok"].as_bool());
   CHECK(pin(entry, "gun", true)["type"].as_string() == "struct" && pin(entry, "gun", true)["of"].as_string() == "Gun");
@@ -15906,7 +15928,7 @@ TEST(studio_logic_structs) {
   apply.set("text", changed);
   r = f.s->command(apply);
   if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
-  CHECK(r["ok"].as_bool() && fields("Scope") == "Zoom:float,Shots:int" && variable("Held")["value"]["Sight"]["Zoom"].as_number() == 2.5 && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7);
+  CHECK(r["ok"].as_bool() && fields("Scope") == "Zoom:f64,Shots:i64" && variable("Held")["value"]["Sight"]["Zoom"].as_number() == 2.5 && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7);
   CHECK(no_errors(logic::check(f.s->level().logic)));
   // (a struct written out with a field missing is refused, with its place)
   apply.set("text", code.substr(0, at) + "    f64 Zoom = 2.5;\n" + code.substr(at));
@@ -15928,7 +15950,7 @@ TEST(studio_logic_structs) {
     CHECK(pasted["ok"].as_bool() && here() && here()->structs.size() == 2 && here()->structs[0].name == "Scope" && here()->structs[1].name == "Gun" && here()->enums.size() == 1);
     CHECK(here() && here()->links.size() == 1 && here()->links[0].in == "Power" && no_errors(logic::check(*here())) && fields("Gun").find("Sight:Scope") != std::string::npos);
     // (here the struct loses the field the pasted wire goes into, and gets another one)
-    CHECK(edit("removeField", "Gun", {{"field", "Power"}})["ok"].as_bool() && edit("addField", "Gun", {{"field", "Weight"}, {"type", "float"}})["ok"].as_bool() && here()->links.empty());
+    CHECK(edit("removeField", "Gun", {{"field", "Power"}})["ok"].as_bool() && edit("addField", "Gun", {{"field", "Weight"}, {"type", "f64"}})["ok"].as_bool() && here()->links.empty());
     pasted = cmd({{"cmd", "logicPaste"}, {"text", copied["text"]}, {"x", 0}, {"y", 400}});
     CHECK(pasted["ok"].as_bool() && here() && here()->structs.size() == 2 && here()->links.empty() && no_errors(logic::check(*here())));
     u32 pasted_make = 0;
@@ -15936,7 +15958,7 @@ TEST(studio_logic_structs) {
       if (const logic::Node* n = here()->find(static_cast<u32>(id.as_number())); n && n->type == "struct.make") pasted_make = n->id;
     // (what was typed into Sight is held by the field's name: it is there; Weight is at its default)
     CHECK(pasted_make && pin(pasted_make, "Sight", false)["value"]["Shots"].as_number() == 9 && pin(pasted_make, "Weight", false)["value"].as_number() == 0 && node(pasted_make)["inputs"].size() == 5);
-    CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool() && fields("Gun").find("Power:int") != std::string::npos);
+    CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool() && fields("Gun").find("Power:i64") != std::string::npos);
   }
 
   // A struct in use stays; one nothing is of goes.
@@ -16091,7 +16113,7 @@ TEST(studio_blueprint_comments_reroutes_promote) {
   from.set("pin", "result");
   from.set("output", true);
   const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "reroute"}, {"from", from}});
-  CHECK(pal["items"].size() >= 1 && pal["items"][0]["type"].as_string() == "value.reroute" && pal["items"][0]["params"]["type"].as_string() == "float");
+  CHECK(pal["items"].size() >= 1 && pal["items"][0]["type"].as_string() == "value.reroute" && pal["items"][0]["params"]["type"].as_string() == "f32");
 }
 
 TEST(studio_multiplayer_play) {

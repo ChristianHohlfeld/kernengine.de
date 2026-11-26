@@ -1065,7 +1065,7 @@ struct Shape {
     for (const auto& d : lib.all()) node_names.insert(node_name(d->type));
     auto name_ok = [&](const std::string& name, const std::string& what) {
       if (!cpp_name_ok(name))
-        return fail(what + " \"" + name + "\" is no name C++ can write: letters, digits and _, not a word of C++ or of the notation (Float, loop, n1 ...)");
+        return fail(what + " \"" + name + "\" is no name C++ can write: letters, digits and _, not a word of C++ or of the notation (f32, loop, n1 ...)");
       if (node_names.count(name)) return fail(what + " \"" + name + "\" is the name of a node");
       return true;
     };
@@ -1328,8 +1328,9 @@ struct Writer {
     } else {
       e = "n" + id(from) + "." + pin.id;
     }
-    const PinType want = at(x).in[static_cast<std::size_t>(k)].type;
-    return pin.type == want || !convert ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+    // (no wire converts: a wire joins pins of one type - or a list of whole numbers an input of any of them takes, kAnyWidth)
+    (void)convert;
+    return e;
   }
   /// The types of the formula `x` in a Blueprint's C++ (docs/blueprint_cpp.md, "Formeln"): input i is an
   /// Int where Formula::int_input(i) holds and its wire comes from an Int, else a Float; the result is an
@@ -2186,8 +2187,8 @@ std::string interface_names() {
   for (const EngineInterface& i : engine_interfaces()) r += (r.empty() ? "" : ", ") + std::string(i.cpp);
   return r.empty() ? "this build has none" : "it has " + r;
 }
-const char* const kTypes = "a type (Bool, Int, U8 ... I32, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
+const char* const kTypes = "a type (bool, i8 ... u64, f32, f64, Vector, Text, Actor, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
+const char* const kListTypes = "List<bool>, List<i8> ... List<u64>, List<f32>, List<f64>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -2692,19 +2693,9 @@ struct Reader {
   /// f32 where the f32 is that same number (f32 x = 0.5;) - nothing is rounded that the text does not round itself:
   /// 0.1 is no f32 (0.1f is), 300 no u8, 2.5 no whole number. (Lists: each entry so.)
   bool literal_for(PinType want, Value& v, std::size_t at, const std::string& what) {
-    if (is_list(want) && is_list(v.type) && is_number(element_of(want)) && is_number(element_of(v.type)) && want != v.type) {
-      const PinType e = element_of(want);
-      std::vector<Value> items;
-      for (std::size_t k = 0; k < v.size(); ++k) {
-        Value x = v.item(k);
-        if (!literal_for(e, x, at, what)) return false;
-        items.push_back(std::move(x));
-      }
-      Value r = Value::zero(want);
-      with_number(e, [&](auto t) { using T = typename decltype(t)::type; auto& to = r.edit<T>(); for (const Value& x : items) to.push_back(x.as<T>()); });
-      v = std::move(r);
-      return true;
-    }
+    // (a list written out names its type - List<i64>{1}: one of another type is no value of this one, as in C++)
+    if (is_list(want) && is_list(v.type) && want != v.type)
+      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, {}}) + ", but " + cpp_type(TypeRef{want, {}}) + " is needed (like " + cpp_type(TypeRef{want, {}}) + "{})");
     if (!is_number(want) || !is_number(v.type) || v.type == want || v.type == PinType::boolean || want == PinType::boolean) return true;
     const Value r = v.converted(want);
     const bool exact = r.converted(v.type).bits() == v.bits() && !(is_floating(v.type) && !is_floating(want)) && (!is_floating(v.type) || v.as<f64>() == v.as<f64>());
@@ -2776,7 +2767,7 @@ struct Reader {
       const std::size_t at = p;
       p += 2;
       TypeRef r{PinType::exec, {}};
-      if (!accept("void") && (!type_here(r) || !callback_type_ok(r.type) || r.count)) return fail(at + 2, "a Callback gives a Bool, an Int, a Float, a Vector, an Int64 or nothing: Callback<Float(Float, Float)>, Callback<void(Int)>");
+      if (!accept("void") && (!type_here(r) || !callback_type_ok(r.type) || r.count)) return fail(at + 2, "a Callback gives a number (bool, i8 ... u64, f32, f64), a Vector or nothing: Callback<f32(f32, f32)>, Callback<void(Int)>");
       if (!expect("(")) return false;
       std::vector<TypeRef> in;
       while (!is(")")) {
@@ -2816,7 +2807,7 @@ struct Reader {
         if (!expect(",")) return false;
         const Tok length = peek();
         const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
-        if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<Float, 16>");
+        if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<f32, 16>");
         ++p;
         t.count = static_cast<u32>(entries);
       }
@@ -2836,7 +2827,7 @@ struct Reader {
       if (!fixed) return true;
       const Tok length = peek();
       const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
-      if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<Float, 16>");
+      if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<f32, 16>");
       ++p;
       t.count = static_cast<u32>(entries);
       return expect(">");
@@ -3070,7 +3061,7 @@ struct Reader {
           const Tok named = (is("List") || is("Fixed")) && is("<", 1) ? peek(2) : peek();
           if (named.kind == Tok::id && named.s == s.name) return fail(p, "the struct " + s.name + " cannot contain itself: a field is of a type declared above the struct");
           if (!type_here(f.type))
-            return fail(p, "the struct " + s.name + ": " + shown(peek()) + " is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
+            return fail(p, "the struct " + s.name + ": " + shown(peek()) + " is no type here: a field is a number (bool, i8 ... u64, f32, f64), Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
           const std::size_t where = p;
           if (!word(f.name, "the field's name")) return false;
           if (s.field(f.name) >= 0) return fail(where, s.name + " has the field " + f.name + " twice");
@@ -3080,7 +3071,7 @@ struct Reader {
           f.value = init.to_json(g, f.type);
           s.fields.push_back(std::move(f));
         }
-        if (s.fields.empty()) return fail(p, "a struct has fields: KERN_STRUCT(" + s.name + ") { Float Field = 0.0; };");
+        if (s.fields.empty()) return fail(p, "a struct has fields: KERN_STRUCT(" + s.name + ") { f32 Field = 0.0f; };");
         if (s.fields.size() > StructType::kMaxFields) return fail(at + 2, s.name + " has " + std::to_string(s.fields.size()) + " fields: a struct has " + std::to_string(StructType::kMaxFields) + " at most");
         if (!expect("}") || !expect(";")) return false;
         s.help = take_docs();
@@ -3090,7 +3081,7 @@ struct Reader {
       // KERN_CONST Float Gravity = 9.81;   a constant: read like a variable, never changed
       const bool constant = accept("KERN_CONST");
       TypeRef type;
-      if (constant && !type_here(type)) return fail(p, "KERN_CONST stands in front of a constant: KERN_CONST Float Name = 1.0;");
+      if (constant && !type_here(type)) return fail(p, "KERN_CONST stands in front of a constant: KERN_CONST f32 Name = 1.0f;");
       if (constant || type_here(type)) {
         // a variable
         Variable v;
@@ -3217,7 +3208,7 @@ struct Reader {
         continue;
       }
       if (ret != "void" && (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result"))
-        return fail(at, "\"" + ret + "\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them; a function gives void or <Function>Result");
+        return fail(at, "\"" + ret + "\" is no type here: a variable is a number (bool, i8 ... u64, f32, f64), Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them; a function gives void or <Function>Result");
       if (!expect("(")) return false;
       Item it;
       if (ret == "void" && numbered(fn, "on")) {
@@ -3797,6 +3788,9 @@ struct Reader {
         if (!expect("<")) return s;
         if (!type_here(to)) { fail(p, "kern::to<Type>: a type expected, not " + shown(peek())); return s; }
         if (is_number(to.type)) { fail(p - 1, "no wire converts a number: a conversion is a node - num_cast<To, From>(x)"); return s; }
+        // (no wire converts any value: a text of a number is num_text<T>(x), of a list list_text<T>(l))
+        fail(p - 1, "no wire converts: a conversion is a node - num_text<T>(x), list_text<T>(list), num_cast<To, From>(x)");
+        return s;
         if (!expect(">") || !expect("(")) return s;
         Src inner = value();
         if (failed() || !expect(")")) return s;
@@ -3930,7 +3924,7 @@ struct Reader {
       if (fn->second->kind != NodeKind::pure) { fail(s.tok, t.s + " is a step, not a value: it stands on a line of its own"); return s; }
       if (fn->second->type == "var.get") { fail(s.tok, "a variable is read by its name"); return s; }
       if (fn->second->type == "func.pure") { fail(s.tok, "a function's value is Function(values).result"); return s; }
-      if (fn->second->type == "math.formula") { fail(s.tok, "a formula is kern::formula([](Float a) -> Float { return ...; }, value)"); return s; }
+      if (fn->second->type == "math.formula") { fail(s.tok, "a formula is kern::formula([](f64 a) -> f64 { return ...; }, value)"); return s; }
       s = pure_call(fn->second, s.tok);
       if (failed()) return s;
       if (accept(".")) {
@@ -3990,15 +3984,15 @@ struct Reader {
     }
     for (std::size_t i = 0; i < ints.size(); ++i)
       if (ints[i] && !f.int_input(i)) {
-        fail(body_tok, "the input " + names[i] + " is an Int only where the formula reads it as a whole number: as an argument of band, bor, bxor, shl, shr, wrap32, wrap32s "
+        fail(body_tok, "the input " + names[i] + " is an i64 only where the formula reads it as a whole number: as an argument of band, bor, bxor, shl, shr, wrap32, wrap32s "
                        "or mul32, as a side of a comparison whose other side is an input, a number or one of those, or through +, - and * between them - "
-                       "here it is read otherwise (by /, %, ^, a function, ! or ?:): Float " + names[i]);
+                       "here it is read otherwise (by /, %, ^, a function, ! or ?:): f64 " + names[i]);
         return s;
       }
-    if (whole && std::find(ints.begin(), ints.end(), 0) != ints.end()) { fail(tok, "a formula with a Float input gives a Float: -> Float"); return s; }
+    if (whole && std::find(ints.begin(), ints.end(), 0) != ints.end()) { fail(tok, "a formula with a f64 input gives a f64: -> f64"); return s; }
     if (whole && !f.whole_result()) {
-      fail(body_tok, "-> Int is a formula whose value is a whole number: band, bor, bxor, shl, shr, wrap32, wrap32s or mul32, or +, - and * of inputs, numbers and those - "
-                     "this one gives a Float: -> Float");
+      fail(body_tok, "-> i64 is a formula whose value is a whole number: band, bor, bxor, shl, shr, wrap32, wrap32s or mul32, or +, - and * of inputs, numbers and those - "
+                     "this one gives a f64: -> f64");
       return s;
     }
     const int node = make("math.formula", tok, {{"formula", f.text()}});
@@ -4014,7 +4008,7 @@ struct Reader {
       if (!ints[i]) continue;
       bool wired = false;
       for (std::size_t w = wires_before; w < data_wires.size(); ++w) wired = wired || (data_wires[w].to == node && data_wires[w].in == names[i]);
-      if (!wired) { fail(tok, "an Int input of a formula is an Int that is read (no number written out): Float " + names[i]); return s; }
+      if (!wired) { fail(tok, "an i64 input of a formula is an i64 that is read (no number written out): f64 " + names[i]); return s; }
       int_inputs.insert({node, names[i]});
     }
     if (whole && f.result_sum()) int_sums.push_back(node);
@@ -5038,10 +5032,10 @@ struct Reader {
       const bool same = from_type == to_type || (to_type.of == kAnyWidth && fits(from_type, to_type)) ||
                         (element_of(to_type.type) == PinType::object && from_type.type == to_type.type && fits(from_type, to_type));   // (an object where one of a class it derives from goes, as in C++)
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::i64)
-        return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
+        return fail(w.from.tok, "this formula gives an i64 by +, - or *, and this reads it as " + need + " (past i64's ends the two differ): the formula is -> f64");
       if (int_inputs.count({w.to, w.in})) {
         // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
-        if (w.from.cast) return fail(w.from.tok, "an Int input of a formula is an Int as it is: no kern::to");
+        if (w.from.cast) return fail(w.from.tok, "an i64 input of a formula is an i64 as it is: no num_cast");
         if (from_type.type != PinType::i64) return fail(w.from.tok, "this is " + have + ", the input of the formula is an i64");
         g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
         continue;

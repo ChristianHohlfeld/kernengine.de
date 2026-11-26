@@ -185,6 +185,18 @@ template <> struct Direct<Text> {
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
+/// A number of the type T of the signature: the class holds T itself (no number is converted at the door).
+template <class T> struct Direct<Num<T>> {
+  template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) {
+    static_assert(std::is_same_v<B, T>, "a pin of a number type the class holds as another type");
+    Conv<Num<T>>::from(o, Value::of_number<T>(b), c);
+  }
+  template <class B, class C> static B make(EngineObjects& o, const C& c) {
+    static_assert(std::is_same_v<B, T>, "a pin of a number type the class holds as another type");
+    return Conv<Num<T>>::to(o, c).template as<T>();
+  }
+  template <class C> static void pass(EngineObjects&, const C&) {}
+};
 template <> struct Direct<Int64> {
   template <class C> static void from(EngineObjects&, u64 b, C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");

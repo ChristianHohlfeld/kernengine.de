@@ -25,24 +25,24 @@ struct S_net_EndpointStats { [[maybe_unused]] static Value to(EngineObjects& o, 
 struct S_net_Message { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Message& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Message& x); };
 struct S_net_SimulatorSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::SimulatorSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::SimulatorSettings& x); };
 struct S_net_Simulator_Packet { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Simulator::Packet& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x); };
-Value S_net_Address::to(EngineObjects& o, const kern::net::Address& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.id)}); }
-void S_net_Address::from(EngineObjects& o, const Value& v, kern::net::Address& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.id); }
-Value S_net_ChannelConfig::to(EngineObjects& o, const kern::net::ChannelConfig& x) { return Value::structure({ev::Conv<ev::Enum<E_net_ChannelType>>::to(o, x.type), ev::Conv<ev::Int>::to(o, x.send_queue_size), ev::Conv<ev::Int>::to(o, x.receive_queue_size), ev::Conv<ev::Int>::to(o, x.max_messages_per_packet), ev::Conv<ev::Int>::to(o, x.packet_budget), ev::Conv<ev::Int>::to(o, x.max_message_size), ev::Conv<ev::Int>::to(o, x.block_threshold), ev::Conv<ev::Int>::to(o, x.block_fragment_size), ev::Conv<ev::Float>::to(o, x.resend_time)}); }
-void S_net_ChannelConfig::from(EngineObjects& o, const Value& v, kern::net::ChannelConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_net_ChannelType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.send_queue_size); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.receive_queue_size); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.max_messages_per_packet); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.packet_budget); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.max_message_size); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.block_threshold); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.block_fragment_size); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.resend_time); }
-Value S_net_ClientServerConfig::to(EngineObjects& o, const kern::net::ClientServerConfig& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.protocol_id), ev::Conv<ev::Int>::to(o, x.max_clients), ev::Conv<ev::Float>::to(o, x.timeout), ev::Conv<ev::Float>::to(o, x.request_interval), ev::Conv<ev::Float>::to(o, x.connect_timeout), ev::Conv<ev::Float>::to(o, x.keepalive_interval), ev::Conv<ev::Struct<S_net_ConnectionConfig>>::to(o, x.connection)}); }
-void S_net_ClientServerConfig::from(EngineObjects& o, const Value& v, kern::net::ClientServerConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.protocol_id); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.max_clients); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.timeout); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.request_interval); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.connect_timeout); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.keepalive_interval); if (const Value* f = v.field(6)) ev::Conv<ev::Struct<S_net_ConnectionConfig>>::from(o, *f, x.connection); }
-Value S_net_ConnectionConfig::to(EngineObjects& o, const kern::net::ConnectionConfig& x) { return Value::structure({ev::Conv<ev::List<ev::Struct<S_net_ChannelConfig>>>::to(o, x.channels), ev::Conv<ev::Int>::to(o, x.max_packet_size), ev::Conv<ev::Int>::to(o, x.max_message_types), ev::Conv<ev::Struct<S_net_EndpointConfig>>::to(o, x.endpoint)}); }
-void S_net_ConnectionConfig::from(EngineObjects& o, const Value& v, kern::net::ConnectionConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Struct<S_net_ChannelConfig>>>::from(o, *f, x.channels); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.max_packet_size); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.max_message_types); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_net_EndpointConfig>>::from(o, *f, x.endpoint); }
-Value S_net_EndpointConfig::to(EngineObjects& o, const kern::net::EndpointConfig& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.max_packet_size), ev::Conv<ev::Int>::to(o, x.fragment_above), ev::Conv<ev::Int>::to(o, x.fragment_size), ev::Conv<ev::Int>::to(o, x.max_fragments), ev::Conv<ev::Int>::to(o, x.ack_buffer_size), ev::Conv<ev::Int>::to(o, x.sent_packets_buffer_size), ev::Conv<ev::Int>::to(o, x.received_packets_buffer_size), ev::Conv<ev::Int>::to(o, x.fragment_reassembly_buffer_size), ev::Conv<ev::Float>::to(o, x.rtt_smoothing), ev::Conv<ev::Float>::to(o, x.packet_loss_smoothing), ev::Conv<ev::Float>::to(o, x.bandwidth_smoothing), ev::Conv<ev::Int>::to(o, x.packet_header_size)}); }
-void S_net_EndpointConfig::from(EngineObjects& o, const Value& v, kern::net::EndpointConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.max_packet_size); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.fragment_above); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.fragment_size); if (const Value* f = v.field(3)) ev::Conv<ev::Int>::from(o, *f, x.max_fragments); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.ack_buffer_size); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.sent_packets_buffer_size); if (const Value* f = v.field(6)) ev::Conv<ev::Int>::from(o, *f, x.received_packets_buffer_size); if (const Value* f = v.field(7)) ev::Conv<ev::Int>::from(o, *f, x.fragment_reassembly_buffer_size); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.rtt_smoothing); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.packet_loss_smoothing); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.bandwidth_smoothing); if (const Value* f = v.field(11)) ev::Conv<ev::Int>::from(o, *f, x.packet_header_size); }
-Value S_net_EndpointStats::to(EngineObjects& o, const kern::net::EndpointStats& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.rtt_ms), ev::Conv<ev::Float>::to(o, x.packet_loss), ev::Conv<ev::Float>::to(o, x.sent_kbps), ev::Conv<ev::Float>::to(o, x.received_kbps), ev::Conv<ev::Float>::to(o, x.acked_kbps), ev::Conv<ev::Int64>::to(o, x.packets_sent), ev::Conv<ev::Int64>::to(o, x.packets_received), ev::Conv<ev::Int64>::to(o, x.packets_acked), ev::Conv<ev::Int64>::to(o, x.packets_stale), ev::Conv<ev::Int64>::to(o, x.packets_invalid), ev::Conv<ev::Int64>::to(o, x.packets_too_large_to_send), ev::Conv<ev::Int64>::to(o, x.packets_too_large_to_receive), ev::Conv<ev::Int64>::to(o, x.fragments_sent), ev::Conv<ev::Int64>::to(o, x.fragments_received), ev::Conv<ev::Int64>::to(o, x.fragments_invalid)}); }
-void S_net_EndpointStats::from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.rtt_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.packet_loss); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.sent_kbps); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.received_kbps); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.acked_kbps); if (const Value* f = v.field(5)) ev::Conv<ev::Int64>::from(o, *f, x.packets_sent); if (const Value* f = v.field(6)) ev::Conv<ev::Int64>::from(o, *f, x.packets_received); if (const Value* f = v.field(7)) ev::Conv<ev::Int64>::from(o, *f, x.packets_acked); if (const Value* f = v.field(8)) ev::Conv<ev::Int64>::from(o, *f, x.packets_stale); if (const Value* f = v.field(9)) ev::Conv<ev::Int64>::from(o, *f, x.packets_invalid); if (const Value* f = v.field(10)) ev::Conv<ev::Int64>::from(o, *f, x.packets_too_large_to_send); if (const Value* f = v.field(11)) ev::Conv<ev::Int64>::from(o, *f, x.packets_too_large_to_receive); if (const Value* f = v.field(12)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_sent); if (const Value* f = v.field(13)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_received); if (const Value* f = v.field(14)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_invalid); }
-Value S_net_Message::to(EngineObjects& o, const kern::net::Message& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.id), ev::Conv<ev::Int>::to(o, x.type), ev::Conv<ev::List<ev::Int>>::to(o, x.data)}); }
-void S_net_Message::from(EngineObjects& o, const Value& v, kern::net::Message& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.type); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.data); }
-Value S_net_SimulatorSettings::to(EngineObjects& o, const kern::net::SimulatorSettings& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.latency_ms), ev::Conv<ev::Float>::to(o, x.jitter_ms), ev::Conv<ev::Float>::to(o, x.loss_percent), ev::Conv<ev::Float>::to(o, x.duplicate_percent)}); }
-void S_net_SimulatorSettings::from(EngineObjects& o, const Value& v, kern::net::SimulatorSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.latency_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.jitter_ms); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.loss_percent); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.duplicate_percent); }
-Value S_net_Simulator_Packet::to(EngineObjects& o, const kern::net::Simulator::Packet& x) { return Value::structure({ev::Conv<ev::Struct<S_net_Address>>::to(o, x.from), ev::Conv<ev::Struct<S_net_Address>>::to(o, x.to), ev::Conv<ev::Float>::to(o, x.deliver), ev::Conv<ev::List<ev::Int>>::to(o, x.data)}); }
-void S_net_Simulator_Packet::from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.from); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.to); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.deliver); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.data); }
+Value S_net_Address::to(EngineObjects& o, const kern::net::Address& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.id)}); }
+void S_net_Address::from(EngineObjects& o, const Value& v, kern::net::Address& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.id); }
+Value S_net_ChannelConfig::to(EngineObjects& o, const kern::net::ChannelConfig& x) { return Value::structure({ev::Conv<ev::Enum<E_net_ChannelType>>::to(o, x.type), ev::Conv<ev::Num<i32>>::to(o, x.send_queue_size), ev::Conv<ev::Num<i32>>::to(o, x.receive_queue_size), ev::Conv<ev::Num<i32>>::to(o, x.max_messages_per_packet), ev::Conv<ev::Num<i32>>::to(o, x.packet_budget), ev::Conv<ev::Num<i32>>::to(o, x.max_message_size), ev::Conv<ev::Num<i32>>::to(o, x.block_threshold), ev::Conv<ev::Num<i32>>::to(o, x.block_fragment_size), ev::Conv<ev::Num<f32>>::to(o, x.resend_time)}); }
+void S_net_ChannelConfig::from(EngineObjects& o, const Value& v, kern::net::ChannelConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_net_ChannelType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.send_queue_size); if (const Value* f = v.field(2)) ev::Conv<ev::Num<i32>>::from(o, *f, x.receive_queue_size); if (const Value* f = v.field(3)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_messages_per_packet); if (const Value* f = v.field(4)) ev::Conv<ev::Num<i32>>::from(o, *f, x.packet_budget); if (const Value* f = v.field(5)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_message_size); if (const Value* f = v.field(6)) ev::Conv<ev::Num<i32>>::from(o, *f, x.block_threshold); if (const Value* f = v.field(7)) ev::Conv<ev::Num<i32>>::from(o, *f, x.block_fragment_size); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.resend_time); }
+Value S_net_ClientServerConfig::to(EngineObjects& o, const kern::net::ClientServerConfig& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.protocol_id), ev::Conv<ev::Num<i32>>::to(o, x.max_clients), ev::Conv<ev::Num<f64>>::to(o, x.timeout), ev::Conv<ev::Num<f64>>::to(o, x.request_interval), ev::Conv<ev::Num<f64>>::to(o, x.connect_timeout), ev::Conv<ev::Num<f64>>::to(o, x.keepalive_interval), ev::Conv<ev::Struct<S_net_ConnectionConfig>>::to(o, x.connection)}); }
+void S_net_ClientServerConfig::from(EngineObjects& o, const Value& v, kern::net::ClientServerConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.protocol_id); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_clients); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f64>>::from(o, *f, x.timeout); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f64>>::from(o, *f, x.request_interval); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f64>>::from(o, *f, x.connect_timeout); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f64>>::from(o, *f, x.keepalive_interval); if (const Value* f = v.field(6)) ev::Conv<ev::Struct<S_net_ConnectionConfig>>::from(o, *f, x.connection); }
+Value S_net_ConnectionConfig::to(EngineObjects& o, const kern::net::ConnectionConfig& x) { return Value::structure({ev::Conv<ev::List<ev::Struct<S_net_ChannelConfig>>>::to(o, x.channels), ev::Conv<ev::Num<i32>>::to(o, x.max_packet_size), ev::Conv<ev::Num<i32>>::to(o, x.max_message_types), ev::Conv<ev::Struct<S_net_EndpointConfig>>::to(o, x.endpoint)}); }
+void S_net_ConnectionConfig::from(EngineObjects& o, const Value& v, kern::net::ConnectionConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Struct<S_net_ChannelConfig>>>::from(o, *f, x.channels); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_packet_size); if (const Value* f = v.field(2)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_message_types); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_net_EndpointConfig>>::from(o, *f, x.endpoint); }
+Value S_net_EndpointConfig::to(EngineObjects& o, const kern::net::EndpointConfig& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.max_packet_size), ev::Conv<ev::Num<i32>>::to(o, x.fragment_above), ev::Conv<ev::Num<i32>>::to(o, x.fragment_size), ev::Conv<ev::Num<i32>>::to(o, x.max_fragments), ev::Conv<ev::Num<i32>>::to(o, x.ack_buffer_size), ev::Conv<ev::Num<i32>>::to(o, x.sent_packets_buffer_size), ev::Conv<ev::Num<i32>>::to(o, x.received_packets_buffer_size), ev::Conv<ev::Num<i32>>::to(o, x.fragment_reassembly_buffer_size), ev::Conv<ev::Num<f32>>::to(o, x.rtt_smoothing), ev::Conv<ev::Num<f32>>::to(o, x.packet_loss_smoothing), ev::Conv<ev::Num<f32>>::to(o, x.bandwidth_smoothing), ev::Conv<ev::Num<i32>>::to(o, x.packet_header_size)}); }
+void S_net_EndpointConfig::from(EngineObjects& o, const Value& v, kern::net::EndpointConfig& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_packet_size); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.fragment_above); if (const Value* f = v.field(2)) ev::Conv<ev::Num<i32>>::from(o, *f, x.fragment_size); if (const Value* f = v.field(3)) ev::Conv<ev::Num<i32>>::from(o, *f, x.max_fragments); if (const Value* f = v.field(4)) ev::Conv<ev::Num<i32>>::from(o, *f, x.ack_buffer_size); if (const Value* f = v.field(5)) ev::Conv<ev::Num<i32>>::from(o, *f, x.sent_packets_buffer_size); if (const Value* f = v.field(6)) ev::Conv<ev::Num<i32>>::from(o, *f, x.received_packets_buffer_size); if (const Value* f = v.field(7)) ev::Conv<ev::Num<i32>>::from(o, *f, x.fragment_reassembly_buffer_size); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rtt_smoothing); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f32>>::from(o, *f, x.packet_loss_smoothing); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.bandwidth_smoothing); if (const Value* f = v.field(11)) ev::Conv<ev::Num<i32>>::from(o, *f, x.packet_header_size); }
+Value S_net_EndpointStats::to(EngineObjects& o, const kern::net::EndpointStats& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.rtt_ms), ev::Conv<ev::Num<f32>>::to(o, x.packet_loss), ev::Conv<ev::Num<f32>>::to(o, x.sent_kbps), ev::Conv<ev::Num<f32>>::to(o, x.received_kbps), ev::Conv<ev::Num<f32>>::to(o, x.acked_kbps), ev::Conv<ev::Num<u64>>::to(o, x.packets_sent), ev::Conv<ev::Num<u64>>::to(o, x.packets_received), ev::Conv<ev::Num<u64>>::to(o, x.packets_acked), ev::Conv<ev::Num<u64>>::to(o, x.packets_stale), ev::Conv<ev::Num<u64>>::to(o, x.packets_invalid), ev::Conv<ev::Num<u64>>::to(o, x.packets_too_large_to_send), ev::Conv<ev::Num<u64>>::to(o, x.packets_too_large_to_receive), ev::Conv<ev::Num<u64>>::to(o, x.fragments_sent), ev::Conv<ev::Num<u64>>::to(o, x.fragments_received), ev::Conv<ev::Num<u64>>::to(o, x.fragments_invalid)}); }
+void S_net_EndpointStats::from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rtt_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.packet_loss); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.sent_kbps); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.received_kbps); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.acked_kbps); if (const Value* f = v.field(5)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_sent); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_received); if (const Value* f = v.field(7)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_acked); if (const Value* f = v.field(8)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_stale); if (const Value* f = v.field(9)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_invalid); if (const Value* f = v.field(10)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_too_large_to_send); if (const Value* f = v.field(11)) ev::Conv<ev::Num<u64>>::from(o, *f, x.packets_too_large_to_receive); if (const Value* f = v.field(12)) ev::Conv<ev::Num<u64>>::from(o, *f, x.fragments_sent); if (const Value* f = v.field(13)) ev::Conv<ev::Num<u64>>::from(o, *f, x.fragments_received); if (const Value* f = v.field(14)) ev::Conv<ev::Num<u64>>::from(o, *f, x.fragments_invalid); }
+Value S_net_Message::to(EngineObjects& o, const kern::net::Message& x) { return Value::structure({ev::Conv<ev::Num<u16>>::to(o, x.id), ev::Conv<ev::Num<u16>>::to(o, x.type), ev::Conv<ev::List<ev::Num<u8>>>::to(o, x.data)}); }
+void S_net_Message::from(EngineObjects& o, const Value& v, kern::net::Message& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u16>>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u16>>::from(o, *f, x.type); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Num<u8>>>::from(o, *f, x.data); }
+Value S_net_SimulatorSettings::to(EngineObjects& o, const kern::net::SimulatorSettings& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.latency_ms), ev::Conv<ev::Num<f32>>::to(o, x.jitter_ms), ev::Conv<ev::Num<f32>>::to(o, x.loss_percent), ev::Conv<ev::Num<f32>>::to(o, x.duplicate_percent)}); }
+void S_net_SimulatorSettings::from(EngineObjects& o, const Value& v, kern::net::SimulatorSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.latency_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.jitter_ms); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.loss_percent); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.duplicate_percent); }
+Value S_net_Simulator_Packet::to(EngineObjects& o, const kern::net::Simulator::Packet& x) { return Value::structure({ev::Conv<ev::Struct<S_net_Address>>::to(o, x.from), ev::Conv<ev::Struct<S_net_Address>>::to(o, x.to), ev::Conv<ev::Num<f64>>::to(o, x.deliver), ev::Conv<ev::List<ev::Num<u8>>>::to(o, x.data)}); }
+void S_net_Simulator_Packet::from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.from); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.to); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f64>>::from(o, *f, x.deliver); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Num<u8>>>::from(o, *f, x.data); }
 
 // engine.net.client_state_name: kern::net::client_state_name
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
@@ -60,7 +60,7 @@ bool c1(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 2, a1);
+  ev::take<ev::Num<f64>>(o, in, 2, a1);
   self->connect(std::move(a0), std::move(a1));
   return true;
 }
@@ -96,7 +96,7 @@ bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   decltype(auto) r = self->client_index();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -105,7 +105,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   decltype(auto) r = self->max_clients();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -122,7 +122,7 @@ bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -140,11 +140,11 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned short>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u16>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-  ev::take<ev::List<ev::Int>>(o, in, 3, a2);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 3, a2);
   decltype(auto) r = self->send(std::move(a0), std::move(a1), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -155,7 +155,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Client>(o, in, 0, "client");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->receive(std::move(a0));
   ev::give<ev::List<ev::Struct<S_net_Message>>>(o, out, 0, r);
   return true;
@@ -193,7 +193,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   self->start(std::move(a0));
   return true;
 }
@@ -220,7 +220,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   decltype(auto) r = self->max_clients();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -229,7 +229,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->client_connected(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -240,7 +240,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   decltype(auto) r = self->connected_clients();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -249,7 +249,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->client_address(std::move(a0));
   ev::give<ev::Struct<S_net_Address>>(o, out, 0, r);
   return true;
@@ -260,7 +260,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   self->disconnect_client(std::move(a0));
   return true;
 }
@@ -278,7 +278,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -296,13 +296,13 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned short>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u16>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-  ev::take<ev::List<ev::Int>>(o, in, 4, a3);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 4, a3);
   decltype(auto) r = self->send(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -313,9 +313,9 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   decltype(auto) r = self->receive(std::move(a0), std::move(a1));
   ev::give<ev::List<ev::Struct<S_net_Message>>>(o, out, 0, r);
   return true;
@@ -326,7 +326,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->connection(std::move(a0));
   out[0] = Value::object(o.ref(ev::handle_of<kern::net::Connection>(o, std::forward<decltype(r)>(r))));
   return true;
@@ -337,7 +337,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Server>(o, in, 0, "server");
   if (!self) return false;
   decltype(auto) r = self->take_events();
-  ev::give<ev::List<ev::Pair<ev::Int, ev::Bool>>>(o, out, 0, r);
+  ev::give<ev::List<ev::Pair<ev::Num<i32>, ev::Bool>>>(o, out, 0, r);
   return true;
 }
 
@@ -363,7 +363,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->can_send(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -374,11 +374,11 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned short>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u16>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-  ev::take<ev::List<ev::Int>>(o, in, 3, a2);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 3, a2);
   decltype(auto) r = self->send(std::move(a0), std::move(a1), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -389,7 +389,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->receive(std::move(a0));
   ev::give<ev::List<ev::Struct<S_net_Message>>>(o, out, 0, r);
   return true;
@@ -408,9 +408,9 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->receive_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
@@ -421,7 +421,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -458,7 +458,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   decltype(auto) r = self->channel_count();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -467,9 +467,9 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Connection>(o, in, 0, "connection");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->pending(std::move(a0));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -486,7 +486,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   decltype(auto) r = self->next_sequence();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u16>>(o, out, 0, r);
   return true;
 }
 
@@ -495,12 +495,12 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list payload has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u16>>(o, out, 0, r);
   return true;
 }
 
@@ -509,9 +509,9 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list packet has fewer entries than bytes says"; return false; }
   self->receive_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
@@ -522,7 +522,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   decltype(auto) r = self->acks();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<u16>>>(o, out, 0, r);
   return true;
 }
 
@@ -539,7 +539,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->update(std::move(a0));
   return true;
 }
@@ -549,7 +549,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::Endpoint>(o, in, 0, "endpoint");
   if (!self) return false;
   decltype(auto) r = self->time();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f64>>(o, out, 0, r);
   return true;
 }
 
@@ -576,9 +576,9 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   self->write_bits(std::move(a0), std::move(a1));
   return true;
 }
@@ -596,9 +596,9 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->write_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
@@ -617,7 +617,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -626,7 +626,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bits_written();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -635,7 +635,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bits_available();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -644,7 +644,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitWriter>(o, in, 0, "bit_writer");
   if (!self) return false;
   decltype(auto) r = self->bytes_written();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -662,7 +662,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->would_overflow(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -673,9 +673,9 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   decltype(auto) r = self->read_bits(std::move(a0));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -693,11 +693,11 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 1, a1);
+  ev::take<ev::Num<u32>>(o, in, 1, a1);
   ev::Written<unsigned char> a0(ev::room(a1) * 1);
   self->read_bytes(a0.data(), std::move(a1));
   if (!a0.kept(o, "data")) return false;
-  ev::give<ev::List<ev::Int>>(o, out, 0, a0.room);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 0, a0.room);
   return true;
 }
 
@@ -706,7 +706,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -715,7 +715,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bits_read();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -724,7 +724,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bits_remaining();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -733,7 +733,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
   decltype(auto) r = self->bytes_read();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -742,11 +742,11 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<i32>>(o, in, 3, a2);
   decltype(auto) r = self->serialize_integer(std::move(a0), std::move(a1), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -757,9 +757,9 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   decltype(auto) r = self->serialize_bits(std::move(a0), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -770,9 +770,9 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->serialize_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -793,7 +793,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->serialize_check(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -812,7 +812,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -821,7 +821,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -830,7 +830,7 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::WriteStream>(o, in, 0, "write_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -848,14 +848,14 @@ bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int&>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<i32>>(o, in, 3, a2);
   decltype(auto) r = self->serialize_integer(a0, std::move(a1), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Int>(o, out, 1, a0);
+  ev::give<ev::Num<i32>>(o, out, 1, a0);
   return true;
 }
 
@@ -864,12 +864,12 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int&>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   decltype(auto) r = self->serialize_bits(a0, std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::Int>(o, out, 1, a0);
+  ev::give<ev::Num<u32>>(o, out, 1, a0);
   return true;
 }
 
@@ -878,12 +878,12 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 1, a1);
+  ev::take<ev::Num<u32>>(o, in, 1, a1);
   ev::Written<unsigned char> a0(ev::room(a1) * 1);
   decltype(auto) r = self->serialize_bytes(a0.data(), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   if (!a0.kept(o, "data")) return false;
-  ev::give<ev::List<ev::Int>>(o, out, 1, a0.room);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 1, a0.room);
   return true;
 }
 
@@ -901,7 +901,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->serialize_check(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -912,7 +912,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -921,7 +921,7 @@ bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -930,7 +930,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_remaining();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -939,7 +939,7 @@ bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -948,11 +948,11 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<i32>>(o, in, 3, a2);
   decltype(auto) r = self->serialize_integer(std::move(a0), std::move(a1), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -963,9 +963,9 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<i32>>(o, in, 2, a1);
   decltype(auto) r = self->serialize_bits(std::move(a0), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -976,9 +976,9 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   std::vector<unsigned char> a0;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a0);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a1);
+  ev::take<ev::Num<u32>>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list value1 has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->serialize_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -999,7 +999,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Num<u32>>(o, in, 1, a0);
   decltype(auto) r = self->serialize_check(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1010,7 +1010,7 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->bits_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -1019,7 +1019,7 @@ bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->bytes_processed();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -1028,7 +1028,7 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::net::MeasureStream>(o, in, 0, "measure_stream");
   if (!self) return false;
   decltype(auto) r = self->align_bits();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   return true;
 }
 
@@ -1048,9 +1048,9 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -1064,13 +1064,13 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a2);
+  ev::take<ev::Num<u32>>(o, in, 2, a2);
   ev::Written<unsigned char> a1(ev::room(a2) * 1);
   decltype(auto) r = self->receive(a0, a1.data(), std::move(a2));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   ev::give<ev::Struct<S_net_Address>>(o, out, 1, a0);
   if (!a1.kept(o, "data")) return false;
-  ev::give<ev::List<ev::Int>>(o, out, 2, a1.room);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 2, a1.room);
   return true;
 }
 
@@ -1079,7 +1079,7 @@ bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::Transport>(o, in, 0, "transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -1093,11 +1093,11 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 2, a1);
   std::vector<unsigned char> a2;
-  ev::take<ev::List<ev::Int>>(o, in, 3, a2);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 4, a3);
+  ev::take<ev::Num<u32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 5, a4);
+  ev::take<ev::Num<f64>>(o, in, 5, a4);
   if (ev::numbers(a3) > a2.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->send(std::move(a0), std::move(a1), a2.empty() ? nullptr : a2.data(), std::move(a3), std::move(a4));
   return true;
@@ -1108,7 +1108,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<kern::net::Simulator::Packet, std::allocator<kern::net::Simulator::Packet> >&>>();
   ev::take<ev::List<ev::Struct<S_net_Simulator_Packet>>>(o, in, 2, a1);
   self->take_due(std::move(a0), a1);
@@ -1129,7 +1129,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->in_flight();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u64>>(o, out, 0, r);
   return true;
 }
 
@@ -1138,7 +1138,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->dropped();
-  ev::give<ev::Int64>(o, out, 0, r);
+  ev::give<ev::Num<u64>>(o, out, 0, r);
   return true;
 }
 
@@ -1147,7 +1147,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
   if (!self) return false;
   decltype(auto) r = self->duplicated();
-  ev::give<ev::Int64>(o, out, 0, r);
+  ev::give<ev::Num<u64>>(o, out, 0, r);
   return true;
 }
 
@@ -1174,7 +1174,7 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -1184,7 +1184,7 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->time();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f64>>(o, out, 0, r);
   return true;
 }
 
@@ -1193,7 +1193,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::LoopbackNetwork>(o, in, 0, "loopback_network");
   if (!self) return false;
   decltype(auto) r = self->delivered();
-  ev::give<ev::Int64>(o, out, 0, r);
+  ev::give<ev::Num<u64>>(o, out, 0, r);
   return true;
 }
 
@@ -1223,9 +1223,9 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -1239,13 +1239,13 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 2, a2);
+  ev::take<ev::Num<u32>>(o, in, 2, a2);
   ev::Written<unsigned char> a1(ev::room(a2) * 1);
   decltype(auto) r = self->receive(a0, a1.data(), std::move(a2));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<i32>>(o, out, 0, r);
   ev::give<ev::Struct<S_net_Address>>(o, out, 1, a0);
   if (!a1.kept(o, "data")) return false;
-  ev::give<ev::List<ev::Int>>(o, out, 2, a1.room);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 2, a1.room);
   return true;
 }
 
@@ -1254,7 +1254,7 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto* self = ev::object<kern::net::HostTransport>(o, in, 0, "host_transport");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a0);
+  ev::take<ev::Num<f64>>(o, in, 1, a0);
   self->advance_time(std::move(a0));
   return true;
 }
@@ -1266,9 +1266,9 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
-  ev::take<ev::Int>(o, in, 3, a2);
+  ev::take<ev::Num<u32>>(o, in, 3, a2);
   if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->push_incoming(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   return true;
@@ -1281,11 +1281,11 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a1);
   decltype(auto) r = self->take_outgoing(a0, a1);
   ev::give<ev::Bool>(o, out, 0, r);
   ev::give<ev::Struct<S_net_Address>>(o, out, 1, a0);
-  ev::give<ev::List<ev::Int>>(o, out, 2, a1);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 2, a1);
   return true;
 }
 
@@ -1305,7 +1305,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int64>(o, in, 2, a2);
+  ev::take<ev::Num<u64>>(o, in, 2, a2);
   out[0] = Value::object(o.ref(o.own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*a0, a1, std::move(a2))))));
   return true;
 }
@@ -1322,7 +1322,7 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::ConnectionConfig const&>>();
   ev::take<ev::Struct<S_net_ConnectionConfig>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 1, a1);
+  ev::take<ev::Num<f64>>(o, in, 1, a1);
   out[0] = Value::object(o.ref(o.own<kern::net::Connection>(std::unique_ptr<kern::net::Connection>(new kern::net::Connection(a0, std::move(a1))))));
   return true;
 }
@@ -1352,7 +1352,7 @@ bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 // engine.loopback_network.make: kern::net::LoopbackNetwork::LoopbackNetwork
 bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   out[0] = Value::object(o.ref(o.own<kern::net::LoopbackNetwork>(std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork(std::move(a0))))));
   return true;
 }
@@ -1384,7 +1384,7 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int64>(o, in, 2, a2);
+  ev::take<ev::Num<u64>>(o, in, 2, a2);
   out[0] = Value::object(o.ref(o.own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*a0, a1, std::move(a2))))));
   return true;
 }
@@ -1399,7 +1399,7 @@ bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 // engine.simulator.make: kern::net::Simulator::Simulator
 bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   out[0] = Value::object(o.ref(o.own<kern::net::Simulator>(std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator(std::move(a0))))));
   return true;
 }
@@ -1440,7 +1440,7 @@ class Implements_net_Transport final : public kern::net::Transport {
     return kern_r;
   }
   decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) send(kern::net::Address kern_p0, unsigned char const* kern_p1, kern::Count<1u> kern_p2) override {
-    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::List<ev::Int>>::to(o_, kern::Span<const unsigned char>(kern_p1, static_cast<std::size_t>(ev::numbers(kern_p2)))), ev::Conv<ev::Int>::to(o_, kern_p2)};
+    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::List<ev::Num<u8>>>::to(o_, kern::Span<const unsigned char>(kern_p1, static_cast<std::size_t>(ev::numbers(kern_p2)))), ev::Conv<ev::Num<u32>>::to(o_, kern_p2)};
     std::vector<Value> kern_out;
     const bool kern_given = by_->call("send", kern_in, kern_out) && !kern_out.empty();
     decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) kern_r = ev::blank<decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>()))>();
@@ -1448,22 +1448,22 @@ class Implements_net_Transport final : public kern::net::Transport {
     return kern_r;
   }
   decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) receive(kern::net::Address& kern_p0, unsigned char* kern_p1, kern::Count<1u> kern_p2) override {
-    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::Int>::to(o_, kern_p2)};
+    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::Num<u32>>::to(o_, kern_p2)};
     std::vector<Value> kern_out;
     const bool kern_given = by_->call("receive", kern_in, kern_out) && !kern_out.empty();
     if (kern_given && kern_out.size() > 1) ev::Conv<ev::Struct<S_net_Address>>::from(o_, kern_out[1], kern_p0);
     if (kern_given && kern_out.size() > 2) {
       std::vector<std::remove_pointer_t<decltype(kern_p1)>> kern_w;
-      ev::Conv<ev::List<ev::Int>>::from(o_, kern_out[2], kern_w);
+      ev::Conv<ev::List<ev::Num<u8>>>::from(o_, kern_out[2], kern_w);
       std::copy_n(kern_w.begin(), std::min(kern_w.size(), static_cast<std::size_t>(ev::numbers(kern_p2))), kern_p1);
     }
     decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) kern_r = ev::blank<decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>()))>();
-    if (kern_given) ev::Conv<ev::Int>::from(o_, kern_out[0], kern_r);
+    if (kern_given) ev::Conv<ev::Num<i32>>::from(o_, kern_out[0], kern_r);
     return kern_r;
   }
   decltype(std::declval<kern::net::Transport&>().advance_time(std::declval<double>())) advance_time(double kern_p0) override {
     if (!by_->has("advance_time")) return kern::net::Transport::advance_time(kern_p0);
-    const std::vector<Value> kern_in{ev::Conv<ev::Float>::to(o_, kern_p0)};
+    const std::vector<Value> kern_in{ev::Conv<ev::Num<f64>>::to(o_, kern_p0)};
     std::vector<Value> kern_out;
     by_->call("advance_time", kern_in, kern_out);
   }

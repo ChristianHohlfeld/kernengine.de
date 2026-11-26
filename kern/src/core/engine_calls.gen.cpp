@@ -47,44 +47,44 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 // engine.now_ms: kern::now_ms
 bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::now_ms();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f64>>(o, out, 0, r);
   return true;
 }
 
 // engine.wall_ms: kern::wall_ms
 bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::wall_ms();
-  ev::give<ev::Float>(o, out, 0, r);
+  ev::give<ev::Num<f64>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.submit: kern::jobs::submit
 bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-  ev::take<ev::List<ev::Int>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
   decltype(auto) r = kern::jobs::submit(std::move(a0), std::move(a1));
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.take: kern::jobs::take
 bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
   decltype(auto) r = kern::jobs::take(std::move(a0), a1);
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::List<ev::Int>>(o, out, 1, a1);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 1, a1);
   return true;
 }
 
 // engine.jobs.cancel: kern::jobs::cancel
 bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   kern::jobs::cancel(std::move(a0));
   return true;
 }
@@ -92,7 +92,7 @@ bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 // engine.jobs.pump: kern::jobs::pump
 bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Float>(o, in, 0, a0);
+  ev::take<ev::Num<f64>>(o, in, 0, a0);
   kern::jobs::pump(std::move(a0));
   return true;
 }
@@ -100,7 +100,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 // engine.jobs.pending: kern::jobs::pending
 bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::pending();
-  ev::give<ev::Int>(o, out, 0, r);
+  ev::give<ev::Num<u32>>(o, out, 0, r);
   return true;
 }
 
@@ -143,29 +143,29 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.jobs.take_queued: kern::jobs::take_queued
 bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::take_queued();
-  ev::give<ev::List<ev::Int>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.run: kern::jobs::run
 bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-  ev::take<ev::List<ev::Int>>(o, in, 2, a2);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a2);
   kern::jobs::run(std::move(a0), kern::Span<unsigned char const>(a1.data(), a1.size()), a2);
-  ev::give<ev::List<ev::Int>>(o, out, 0, a2);
+  ev::give<ev::List<ev::Num<u8>>>(o, out, 0, a2);
   return true;
 }
 
 // engine.jobs.done: kern::jobs::done
 bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Int>(o, in, 0, a0);
+  ev::take<ev::Num<u32>>(o, in, 0, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Int>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
   kern::jobs::done(std::move(a0), kern::Span<unsigned char const>(a1.data(), a1.size()));
   return true;
 }
