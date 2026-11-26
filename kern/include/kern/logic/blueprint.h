@@ -517,8 +517,7 @@ struct BlueprintCore : logic::PureNodes {
   /// Bytes (each the number of the second setting) from its entry `from` on into the entries of the place
   /// (each the number of the first) from `at` on: what std::memcpy between lists of numbers does
   /// (logic::bytes::copy, nodes.h - the interpreter's function). On a list or a list of a fixed length.
-  template <logic::bytes::Code C> using BytesNumber = std::conditional_t<logic::bytes::whole(C), Int, std::conditional_t<logic::bytes::wide(C), Int64, f64>>;
-  // (Items: a list of Ints of any width, Int or U8 ... I32 - its numbers as they are; of Int64s, of Floats)
+  // (Items: a list of numbers of the second setting's type, as they are)
   template <Setting Into, Setting Of, class T, class L>
   static void list_copy_bytes(List<T>& list, Int at, const L& items, Int from, Int count) {
     copy_bytes<Into, Of, T>(list.data(), list.size(), at, logic::items_of(items), from, count);
@@ -536,8 +535,8 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Code kInto = logic::bytes::code_of(Into.view()), kOf = logic::bytes::code_of(Of.view());
     static_assert(kInto != logic::bytes::Code::none && kInto != logic::bytes::Code::boolean && kOf != logic::bytes::Code::none && kOf != logic::bytes::Code::boolean,
                   "Copy Bytes: a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64");
-    static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
-    static_assert(logic::bytes::suits_list(kOf, logic::pin_type_of<S>()), "Copy Bytes: the numbers of Items are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
+    static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are of the first setting's type");
+    static_assert(logic::bytes::suits_list(kOf, logic::pin_type_of<S>()), "Copy Bytes: the numbers of Items are of the second setting's type");
     logic::bytes::copy(to, size, kInto, at, items.first, items.count, kOf, from, count);
   }
 
@@ -572,8 +571,8 @@ struct BlueprintCore : logic::PureNodes {
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
-  /// (Text to Int64: of the text where it stands)
-  static Int64 int64_of_text(const Text& a) { return logic::PureNodes::int64_parse(a.view()); }
+  /// (Text to u64: of the text where it stands)
+  static u64 num_text_to_u64(const Text& a) { return logic::PureNodes::int64_parse(a.view()); }
   static Int text_code_at(const Text& a, Int index) {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
@@ -616,8 +615,8 @@ struct BlueprintCore : logic::PureNodes {
   template <class L> static Text text_of_bytes(const L& bytes, Int at, Int count) { return logic::texts::of_bytes(logic::items_of(read_of(bytes)), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Bytes of Text: its bytes, a List<U8> (one request for memory, as std::vector<u8> of the text's range makes it).
-  static List<logic::Sized<u8>> text_bytes(const Text& a) {
-    List<logic::Sized<u8>> r;
+  static List<u8> text_bytes(const Text& a) {
+    List<u8> r;
     logic::texts::insert_bytes(r, 0, a.view());
     return r;
   }
@@ -637,25 +636,33 @@ struct BlueprintCore : logic::PureNodes {
     f64 value = 0.0;
     Int end = 0;
   };
+  struct ParsedFloat32 {
+    f32 value = 0.0f;
+    Int end = 0;
+  };
   struct ParsedWhole {
-    Int64 value{};
+    i64 value = 0;
+    Int end = 0;
+  };
+  struct ParsedUnsigned {
+    u64 value = 0;
     Int end = 0;
   };
   static ParsedFloat text_parse_float(const Text& a, Int at) {
     const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), false);
     return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
-  static ParsedFloat text_parse_float32(const Text& a, Int at) {
+  static ParsedFloat32 text_parse_float32(const Text& a, Int at) {
     const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), true);
-    return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {static_cast<f32>(r.value), static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
   static ParsedWhole text_parse_int(const Text& a, Int at, Int base) {
     const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), true);
-    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {static_cast<i64>(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
-  static ParsedWhole text_parse_uint(const Text& a, Int at, Int base) {
+  static ParsedUnsigned text_parse_uint(const Text& a, Int at, Int base) {
     const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), false);
-    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+    return {r.bits, static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
   /// Scan Text: text_scan<"%f %f">(n, text, at, x, y) - what sscanf reads (logic::scan), a step: n.count, and
   /// n.v0, n.v1 ... a value for each conversion, of the type the format says (`before`: what stays where the
@@ -670,13 +677,13 @@ struct BlueprintCore : logic::PureNodes {
   template <logic::scan::Kind K, class V> static void scan_before(logic::scan::Slot& s, const V& v) {
     s.kind = K;
     if constexpr (K == logic::scan::Kind::whole) s.whole = static_cast<i64>(Int(v));
-    else if constexpr (K == logic::scan::Kind::whole64) s.bits = Int64(v).bits;
-    else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(Float(v));
+    else if constexpr (K == logic::scan::Kind::whole64) s.bits = static_cast<u64>(v);
+    else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(v);
   }
   template <logic::scan::Kind K, class F, class V> static void scan_after(F& field, logic::scan::Slot& s, const V& before) {
     if constexpr (K == logic::scan::Kind::whole) field = Int(s.whole);
-    else if constexpr (K == logic::scan::Kind::whole64) field = Int64(s.bits);
-    else if constexpr (K == logic::scan::Kind::number) field = Float(s.number);
+    else if constexpr (K == logic::scan::Kind::whole64) field = s.bits;
+    else if constexpr (K == logic::scan::Kind::number) field = s.number;
     else if (s.written) field = Text(std::move(s.text));
     else field = Text(before);
   }
@@ -722,9 +729,11 @@ struct BlueprintCore : logic::PureNodes {
     const logic::format::Arg args[] = {format_arg(values)..., logic::format::Arg{}};
     return logic::format::text_of(Format.view(), args, sizeof...(V), most);
   }
-  static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
-  template <class T> static logic::format::Arg format_arg(logic::Sized<T> v) { return logic::format::arg(static_cast<i64>(v)); }  // (an Int of a fixed width: its Int)
-  static logic::format::Arg format_arg(f64 v) { return logic::format::arg(v); }
+  template <class T>
+    requires(logic::num::Number<T> && !std::is_same_v<T, bool>)
+  static logic::format::Arg format_arg(T v) {
+    return logic::format::arg(v);   // (a whole number: its bits, as C's varargs; an f32 promoted to a double)
+  }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
   /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
   /// lives until text_format ends; made into a Text first, the view would be of a Text that is gone)
@@ -803,7 +812,7 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Bytes of Struct cannot be read");
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
-    Fixed<logic::Sized<u8>, kLayout.size> out;   // (the bytes: std::array<u8, N>)
+    Fixed<u8, kLayout.size> out;   // (the bytes: std::array<u8, N>)
     std::size_t k = 0;
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;

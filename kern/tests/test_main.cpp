@@ -2133,7 +2133,7 @@ TEST(logic_flow_variables_and_latent_nodes) {
   FakeLogicHost host;
   logic::Runtime rt(host);
   // Begin Play -> For 1..5 { Add to Sum (Index) } -> Print "Sum " + Sum -> Delay 1 -> Print "later"
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Sum","type":"float","value":0}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Sum","type":"f64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},
       {"id":2,"type":"flow.for","values":{"first":1,"last":5}},
       {"id":3,"type":"var.add","params":{"variable":"Sum"}},
@@ -2171,7 +2171,7 @@ TEST(logic_sequence_gates_switch_and_events) {
       {"id":7,"type":"var.set","params":{"variable":"Log"}},{"id":8,"type":"text.append","values":{"b":"once,"}},{"id":9,"type":"var.get","params":{"variable":"Log"}},
       {"id":10,"type":"flow.switch_text","params":{"cases":"x, y"}},
       {"id":11,"type":"var.set","params":{"variable":"Log"}},{"id":12,"type":"text.append","values":{"b":"Y"}},{"id":13,"type":"var.get","params":{"variable":"Log"}},
-      {"id":14,"type":"flow.branch"},{"id":15,"type":"math.compare","params":{"op":">"},"values":{"b":2}},
+      {"id":14,"type":"flow.branch"},{"id":15,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":2}},
       {"id":16,"type":"debug.print","values":{"text":"big"}}],
     "links":[[1,"then",2,"exec"],[2,"then0",3,"exec"],[5,"value",4,"a"],[1,"text",4,"b"],[4,"result",3,"value"],
       [2,"then1",6,"exec"],[6,"completed",7,"exec"],[9,"value",8,"a"],[8,"result",7,"value"],
@@ -2192,7 +2192,7 @@ TEST(logic_sequence_gates_switch_and_events) {
 TEST(logic_state_machine_timers_events_conditions) {
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Armed","type":"bool","value":false},{"name":"Entered","type":"float","value":0}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Armed","type":"bool","value":false},{"name":"Entered","type":"f64","value":0}],
     "machines":[{"id":20,"name":"Door","states":[{"id":21,"name":"Closed","initial":true},{"id":22,"name":"Opening"},{"id":23,"name":"Open"},{"id":24,"name":"Locked"}],
       "transitions":[{"id":30,"from":21,"to":22,"trigger":"event","event":"Use"},{"id":31,"from":22,"to":23,"trigger":"timer","seconds":0.5},
                      {"id":32,"from":23,"to":21,"trigger":"timer","seconds":2},{"id":33,"from":0,"to":24,"trigger":"condition","variable":"Armed"}]}],
@@ -2299,7 +2299,7 @@ TEST(logic_formulas) {
   // the node: its pins are the formula's names; a formula that cannot be read is an error of the graph
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Out","type":"float","value":0}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Out","type":"f64","value":0}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Out"}},
       {"id":3,"type":"math.formula","params":{"formula":"max(9000, 16000 - level * 1300) + bonus"},"values":{"bonus":0.5}}],
     "links":[[1,"then",2,"exec"],[1,"value",3,"level"],[3,"result",2,"value"]]})");
@@ -2328,9 +2328,9 @@ TEST(logic_bytes_of_struct) {
   // a frame of a wire protocol (NAV1): its bytes as C++ lays them out, and back
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":513},
-      {"name":"Vx","type":"int","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0.1},{"name":"Key","type":"int64","value":"18364758544493064720"}]}],
-    "variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"i64","value":1447121230},{"name":"Seq","type":"i64","value":513},
+      {"name":"Vx","type":"i64","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"f64","value":0.1},{"name":"Key","type":"u64","value":"18364758544493064720"}]}],
+    "variables":[{"name":"B","type":"i64_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
       {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
       {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},
@@ -2346,7 +2346,7 @@ TEST(logic_bytes_of_struct) {
   CHECK(back.field(0) && back.field(0)->as_int() == 1447121230 && back.field(1)->as_int() == 513 && back.field(2)->as_int() == -3 && back.field(3)->as_bool());
   CHECK(back.field(4) && back.field(4)->as_number() == static_cast<f64>(0.1f) && static_cast<u64>(back.field(5)->i) == 0xfedcba9876543210ull);
   // what does not suit the struct is an error of the graph
-  const logic::Graph wrong = logic_graph(R"({"structs":[{"name":"P","fields":[{"name":"A","type":"float","value":0}]}],
+  const logic::Graph wrong = logic_graph(R"({"structs":[{"name":"P","fields":[{"name":"A","type":"f64","value":0}]}],
     "nodes":[{"id":1,"type":"struct.bytes","params":{"struct":"P","layout":"4: i32@0"}}]})");
   bool said = false;
   for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("does not suit") != std::string::npos;
@@ -2356,7 +2356,7 @@ TEST(logic_bytes_of_struct) {
 TEST(logic_copy_bytes) {
   // Copy Bytes is std::memcpy between lists of numbers: what it makes of them is what memcpy makes
   // of the same numbers in C++ - floats into bytes, bytes into floats and whole numbers (the last
-  // written in part), an Int64 into bytes beyond their end, a list into itself (as memmove).
+  // written in part), an u64 into bytes beyond their end, a list into itself (as memmove).
   using logic::bytes::Code;
   const f32 floats[3] = {0.1f, -2.5f, 1e30f};
   u8 raw[12] = {7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
@@ -2377,10 +2377,10 @@ TEST(logic_copy_bytes) {
   std::vector<i64> whole = {1, 2, 3};
   logic::bytes::copy(whole.data(), whole.size(), Code::i16, 0, bytes.data(), bytes.size(), Code::u8, 1, 5);
   for (int k = 0; k < 3; ++k) CHECK(whole[static_cast<std::size_t>(k)] == shorts[k]);
-  // an Int64 into bytes: what is beyond the list is not written, what is before it is not either
+  // an u64 into bytes: what is beyond the list is not written, what is before it is not either
   const u64 big = 0xfedcba9876543210ull;
   std::vector<i64> short_bytes(5, 0);
-  const std::vector<logic::Int64> wide = {logic::Int64(big)};
+  const std::vector<u64> wide = {big};
   logic::bytes::copy(short_bytes.data(), short_bytes.size(), Code::u8, -2, wide.data(), wide.size(), Code::u64, 0, 8);
   for (int k = 0; k < 5; ++k) CHECK(static_cast<u64>(short_bytes[static_cast<std::size_t>(k)]) == ((big >> (8 * (k + 2))) & 0xffu));
   // no bytes: nothing; a list into itself, up and down (as memmove)
@@ -2398,7 +2398,7 @@ TEST(logic_copy_bytes) {
   logic::bytes::copy(back_down.data(), back_down.size(), Code::u32, 0, back_down.data(), back_down.size(), Code::u32, 1, 12);
   for (int k = 0; k < 4; ++k) CHECK(back_down[static_cast<std::size_t>(k)] == moved_back[k]);
   // the node on a graph: the list's numbers suit its setting, or the check says so
-  const logic::Graph wrong = logic_graph(R"({"variables":[{"name":"G","type":"float_list","value":[]}],
+  const logic::Graph wrong = logic_graph(R"({"variables":[{"name":"G","type":"f64_list","value":[]}],
     "nodes":[{"id":1,"type":"list.copy_bytes","params":{"variable":"G","code":"i32","from_code":"u8"}}]})");
   bool said = false;
   for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("are not i32") != std::string::npos;
@@ -2413,7 +2413,7 @@ TEST(logic_place_of_the_engine_text_round) {
       "struct Mix : kern::Blueprint {\n"
       "  // ---- types ----\n"
       "  KERN_ENUM(audio_Bus, master, music, sfx, ambience, ui, voice, count);\n"
-      "  KERN_STRUCT(audio_BusSettings) { Float volume = 1.0; Bool muted = false; Float lowpass_hz = 0.0; Float reverb_send = 0.0; };\n"
+      "  KERN_STRUCT(audio_BusSettings) { f64 volume = 1.0; bool muted = false; f64 lowpass_hz = 0.0; f64 reverb_send = 0.0; };\n"
       "\n"
       "  // ---- variables ----\n"
       "  Object<kern::audio::Mixer> Mixer = Object<kern::audio::Mixer>{};\n"
@@ -2459,13 +2459,13 @@ TEST(logic_local_variables) {
   if (!error.empty()) std::printf("%s\n", error.c_str());
   CHECK(no_errors(logic::check(g)));
   CHECK(g.function("SumTo") && g.function("SumTo")->locals.size() == 2 && g.function("Join")->locals.size() == 3);
-  CHECK(g.function("SumTo")->local("Total")->type == logic::PinType::number && g.function("Join")->local("Total")->type == logic::PinType::text);
+  CHECK(g.function("SumTo")->local("Total")->type == logic::PinType::f64 && g.function("Join")->local("Total")->type == logic::PinType::text);
   // the graph as JSON and as its C++ and back: the same Blueprint
   logic::Graph back;
   CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
   std::string text;
   CHECK(logic::to_cpp(g, "Locals", text, &error));
-  CHECK(text.find("  SumToResult SumTo(Int n = 3) {\n    Float Total = 0.5;\n    Int Steps = 0;\n") != std::string::npos);
+  CHECK(text.find("  SumToResult SumTo(i64 n = 3) {\n    f64 Total = 0.5;\n    i64 Steps = 0;\n") != std::string::npos);
   CHECK(text.find("    Hit Last = Hit{\"none\", 3.0};\n") != std::string::npos && text.find("scope") == std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(text, read, nullptr, &error) && read == g);
@@ -2529,9 +2529,9 @@ TEST(logic_local_variables) {
   }
   // In the text: a local variable is not known after a wait or in another body.
   logic::Graph none;
-  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  void F() {\n    Float L = 1.0;\n    L += 1.0;\n  }\n  void G() {\n    L += 1.0;\n  }\n};\n", none, nullptr, &error));
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  void F() {\n    f64 L = 1.0;\n    L += 1.0;\n  }\n  void G() {\n    L += 1.0;\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("line 7") != std::string::npos);
-  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  Float L = 0.0;\n  void F() {\n    Float L = 1.0;\n  }\n};\n", none, nullptr, &error));
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  f64 L = 0.0;\n  void F() {\n    f64 L = 1.0;\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
@@ -2540,8 +2540,8 @@ TEST(logic_end_play) {
   // every stage the same; as C++ notation: KERN_EVENT(onN, event_end).
   const char* text = R"kn(
 struct Ends : kern::Blueprint {
-  Int Began = 0;
-  Int Ended = 0;
+  i64 Began = 0;
+  i64 Ended = 0;
 
   KERN_EVENT(on1, event_begin)
   void on1() {
@@ -2550,7 +2550,7 @@ struct Ends : kern::Blueprint {
 
   KERN_EVENT(on2, event_end)
   void on2() {
-    Ended = kern::to<Int>(math_add(kern::to<Float>(Began), 10.0));
+    Ended = num_cast<i64, f64>(math_add<f64>(num_cast<f64, i64>(Began), 10.0));
   }
 };
 )kn";
@@ -2591,19 +2591,19 @@ TEST(logic_function_export) {
   const char* text = R"kn(
 struct Host : kern::Blueprint {
   struct game_hudResult { Text Result = ""; };
-  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0, Float scale = 0.0) {
+  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", i64 ask_length = 0, List<i64> data = List<i64>{}, i64 data_length = 0, i64 view = 0, f64 scale = 0.0) {
     return {ask};
   }
-  KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
+  KERN_EXPORT_AS("game_tick", "f64") void game_tick(f64 dt = 0.0) {
   }
-  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
+  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<i64>& data, i64 data_at = 0, i64 length = 0) {
   }
-  struct game_takeResult { List<Int> Result = List<Int>{}; };
+  struct game_takeResult { List<i64> Result = List<i64>{}; };
   KERN_EXPORT_AS("game_take", "-> bytes") game_takeResult game_take() {
-    return {List<Int>{}};
+    return {List<i64>{}};
   }
-  struct game_audioResult { List<Float> Result = List<Float>{}; };
-  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<Float>& samples, Int samples_at = 0, Int count = 0, Int rate = 0) {
+  struct game_audioResult { List<f64> Result = List<f64>{}; };
+  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<f64>& samples, i64 samples_at = 0, i64 count = 0, i64 rate = 0) {
     return {samples};
   }
 };
@@ -2628,7 +2628,7 @@ struct Host : kern::Blueprint {
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
         glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
-  // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
+  // floats: a pointer to f32 (in: a List of f64, its at and len; out: the entries as f32, kept until the next - none
   // when the list is empty); bytes go out the same way, as u8
   CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
         glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3, kern::u32* out_len) {") != std::string::npos &&
@@ -2647,11 +2647,11 @@ struct Host : kern::Blueprint {
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes i32 i32 f32 -> text";   // (bytes without their len)
   CHECK(!logic::export_ok(f));
-  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
+  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an i64 is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of Int, not of a Text)
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of i64, not of a Text)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of Float, not of Int)
+  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of f64, not of i64)
   CHECK(!logic::export_ok(f));
   f.wire = "text len floats i32 i32 f32 -> text";   // (floats without their len)
   CHECK(!logic::export_ok(f));
@@ -2672,27 +2672,27 @@ TEST(logic_call_on_actor_by_its_name) {
   // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
   const char* level_text = R"kn(
 struct Level : kern::Blueprint {
-  struct StarsResult { Int stars = -1; };
-  StarsResult Stars(Int base = 1) {
-    return {kern::to<Int>(math_add(kern::to<Float>(base), 10.0))};
+  struct StarsResult { i64 stars = -1; };
+  StarsResult Stars(i64 base = 1) {
+    return {num_cast<i64, f64>(math_add<f64>(num_cast<f64, i64>(base), 10.0))};
   }
 };
 )kn";
   const char* caller_text = R"kn(
 struct Caller : kern::Blueprint {
-  Int Got = 0;
+  i64 Got = 0;
 
-  struct Level_StarsResult { Int stars = 3; };
+  struct Level_StarsResult { i64 stars = 3; };
   /// (of the Level, called on it)
-  KERN_EXTERN_AS("Stars") Level_StarsResult Level_Stars(Int base = 1);
+  KERN_EXTERN_AS("Stars") Level_StarsResult Level_Stars(i64 base = 1);
 
   KERN_EVENT(on1, event_custom<"Ask">)
-  void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Level_Stars">(Actor{}, kern::out(n2.stars), kern::to<Int>(value));
+  void on1(Actor actor, f64 value, Text text) {
+    func_call_on<"Level_Stars">(Actor{}, kern::out(n2.stars), num_cast<i64, f64>(value));
     Got = n2.stars;
   }
 
-  struct { Int stars = 0; } n2;
+  struct { i64 stars = 0; } n2;
 };
 )kn";
   logic::Graph level, caller;
@@ -2704,7 +2704,7 @@ struct Caller : kern::Blueprint {
   logic::Graph back;
   CHECK(logic::graph_from_json(logic::graph_to_json(caller), back) && back == caller);
   std::string text;
-  CHECK(logic::to_cpp(caller, "Caller", text, &error) && text.find("  KERN_EXTERN_AS(\"Stars\") Level_StarsResult Level_Stars(Int base = 1);\n") != std::string::npos);
+  CHECK(logic::to_cpp(caller, "Caller", text, &error) && text.find("  KERN_EXTERN_AS(\"Stars\") Level_StarsResult Level_Stars(i64 base = 1);\n") != std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller);
   for (bool jit : {false, true}) {
@@ -2732,38 +2732,38 @@ TEST(logic_actor_find_by_the_host) {
   CHECK(game::logic_nodes_registered());
   const char* guard_text = R"kn(
 struct Guard : kern::Blueprint {
-  Float Speed = 1.0;
+  f64 Speed = 1.0;
 
-  struct TwiceResult { Float out = 0.0; };
-  TwiceResult Twice(Float x = 0.0) {
-    return {math_add(math_mul(x, 2.0), Speed)};
+  struct TwiceResult { f64 out = 0.0; };
+  TwiceResult Twice(f64 x = 0.0) {
+    return {math_add<f64>(math_mul<f64>(x, 2.0), Speed)};
   }
 };
 )kn";
   const char* asker_text = R"kn(
 struct Asker : kern::Blueprint {
-  Float GotA = 0.0;
-  Float GotB = 0.0;
-  Float SpeedA = 0.0;
-  Float SpeedB = 0.0;
-  Float Nobody = 0.0;
+  f64 GotA = 0.0;
+  f64 GotB = 0.0;
+  f64 SpeedA = 0.0;
+  f64 SpeedB = 0.0;
+  f64 Nobody = 0.0;
 
-  struct TwiceResult { Float out = -1.0; };
-  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+  struct TwiceResult { f64 out = -1.0; };
+  KERN_EXTERN TwiceResult Twice(f64 x = 0.0);
 
   KERN_EVENT(on1, event_custom<"Ask">)
-  void on1(Actor actor, Float value, Text text) {
+  void on1(Actor actor, f64 value, Text text) {
     func_call_on<"Twice">(actor_find("A"), kern::out(n2.out), 10.0);
     GotA = n2.out;
     func_call_on<"Twice">(actor_find("B"), kern::out(n4.out), 10.0);
     GotB = n4.out;
-    SpeedA = func_get_on<"Speed", Float>(actor_find("A"));
-    SpeedB = func_get_on<"Speed", Float>(actor_find("B"));
-    Nobody = func_get_on<"Speed", Float>(actor_find("C"));
+    SpeedA = func_get_on<"Speed", f64>(actor_find("A"));
+    SpeedB = func_get_on<"Speed", f64>(actor_find("B"));
+    Nobody = func_get_on<"Speed", f64>(actor_find("C"));
   }
 
-  struct { Float out = 0.0; } n2;
-  struct { Float out = 0.0; } n4;
+  struct { f64 out = 0.0; } n2;
+  struct { f64 out = 0.0; } n4;
 };
 )kn";
   struct NamingHost : FakeLogicHost {
@@ -2816,10 +2816,10 @@ TEST(logic_call_on_actor) {
   // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).
   const char* level_text = R"kn(
 struct Level : kern::Blueprint {
-  Int Asked = 0;
+  i64 Asked = 0;
 
-  struct StarsResult { Int stars = -1; Text who = "none"; };
-  StarsResult Stars(Int base = 1, Text name = "x") {
+  struct StarsResult { i64 stars = -1; Text who = "none"; };
+  StarsResult Stars(i64 base = 1, Text name = "x") {
     Asked += base;
     return {Asked, text_append(name, "!", "")};
   }
@@ -2827,25 +2827,25 @@ struct Level : kern::Blueprint {
 )kn";
   const char* cop_text = R"kn(
 struct Cop : kern::Blueprint {
-  Int Got = 0;
+  i64 Got = 0;
   Text Heard = "";
-  Float Miss = 0.0;
-  Int Deep = 0;
+  f64 Miss = 0.0;
+  i64 Deep = 0;
 
-  struct StarsResult { Int stars = 5; Text who = "nobody"; };
+  struct StarsResult { i64 stars = 5; Text who = "nobody"; };
   /// How wanted somebody is (the Level knows).
-  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = "x");
-  struct MissingResult { Float value = 2.5; };
+  KERN_EXTERN StarsResult Stars(i64 base = 1, Text name = "x");
+  struct MissingResult { f64 value = 2.5; };
   KERN_EXTERN MissingResult Missing();
 
-  struct DownResult { Float sum = 0.0; };
-  DownResult Down(Int n = 0, Actor me = Actor{}) {
-    Int Mine = 0;
+  struct DownResult { f64 sum = 0.0; };
+  DownResult Down(i64 n = 0, Actor me = Actor{}) {
+    i64 Mine = 0;
     Mine = n;
-    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
-      func_call_on<"Down">(me, kern::out(n20.sum), kern::to<Int>(math_sub(kern::to<Float>(n), 1.0)), me);
+    if (math_compare<">">(num_cast<f64, i64>(n), 0.0)) {
+      func_call_on<"Down">(me, kern::out(n20.sum), num_cast<i64, f64>(math_sub<f64>(num_cast<f64, i64>(n), 1.0)), me);
     }
-    return {math_add(kern::to<Float>(Mine), n20.sum)};
+    return {math_add<f64>(num_cast<f64, i64>(Mine), n20.sum)};
   }
 
   void Forever(Actor me = Actor{}) {
@@ -2854,8 +2854,8 @@ struct Cop : kern::Blueprint {
   }
 
   KERN_EVENT(on1, event_custom<"Ask">)
-  void on1(Actor actor, Float value, Text text) {
-    func_call_on<"Stars">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);
+  void on1(Actor actor, f64 value, Text text) {
+    func_call_on<"Stars">(Actor{}, kern::out(n2.stars, n2.who), num_cast<i64, f64>(value), text);
     Got = n2.stars;
     Heard = n2.who;
     func_call_on<"Missing">(actor, kern::out(n5.value));
@@ -2864,10 +2864,10 @@ struct Cop : kern::Blueprint {
     Heard = text_append(Heard, n7.who, "");
   }
 
-  struct { Int stars = 0; Text who = ""; } n2;
-  struct { Float value = 0.0; } n5;
-  struct { Int stars = 0; Text who = ""; } n7;
-  struct { Float sum = 0.0; } n20;
+  struct { i64 stars = 0; Text who = ""; } n2;
+  struct { f64 value = 0.0; } n5;
+  struct { i64 stars = 0; Text who = ""; } n7;
+  struct { f64 sum = 0.0; } n20;
 };
 )kn";
   logic::Graph level, cop;
@@ -2882,8 +2882,8 @@ struct Cop : kern::Blueprint {
   CHECK(logic::graph_from_json(logic::graph_to_json(cop), back) && back == cop);
   std::string text;
   CHECK(logic::to_cpp(cop, "Cop", text, &error));
-  CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(Int base = 1, Text name = \"x\");\n") != std::string::npos);
-  CHECK(text.find("    func_call_on<\"Stars\">(Actor{}, kern::out(n2.stars, n2.who), kern::to<Int>(value), text);\n") != std::string::npos);
+  CHECK(text.find("  /// How wanted somebody is (the Level knows).\n  KERN_EXTERN StarsResult Stars(i64 base = 1, Text name = \"x\");\n") != std::string::npos);
+  CHECK(text.find("    func_call_on<\"Stars\">(Actor{}, kern::out(n2.stars, n2.who), num_cast<i64, f64>(value), text);\n") != std::string::npos);
   CHECK(text.find("    func_call_on<\"Forever\">(me, kern::out(), me);\n") != std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(text, read, nullptr, &error) && read == cop);
@@ -2939,8 +2939,8 @@ struct Cop : kern::Blueprint {
   CHECK(error.find("no body here") != std::string::npos);
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Nope\">(Actor{}, kern::out());\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("KERN_EXTERN") != std::string::npos);
-  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
-                         "    func_call_on<\"F\">(Actor{}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
+  CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { f64 a = 0.0; f64 b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
+                         "    func_call_on<\"F\">(Actor{}, kern::out(n2.b, n2.a));\n  }\n  struct { f64 a = 0.0; f64 b = 0.0; } n2;\n};\n", none, nullptr, &error));
   CHECK(error.find("in their order") != std::string::npos);
 }
 
@@ -2952,30 +2952,30 @@ TEST(logic_actor_blueprint_from_cpp) {
   CHECK(game::logic_nodes_registered());
   const char* rules_text = R"kn(
 struct Rules : kern::Blueprint {
-  Float Speed = 2.5;
-  Int Laps = 3;
+  f64 Speed = 2.5;
+  i64 Laps = 3;
   Text Name = "fast";
-  Int Depth = 0;
+  i64 Depth = 0;
 
-  struct TwiceResult { Float out = 0.0; Int laps = 0; };
-  TwiceResult Twice(Float x = 0.0) {
+  struct TwiceResult { f64 out = 0.0; i64 laps = 0; };
+  TwiceResult Twice(f64 x = 0.0) {
     Laps += 1;
-    return {math_add(math_mul(x, 2.0), Speed), Laps};
+    return {math_add<f64>(math_mul<f64>(x, 2.0), Speed), Laps};
   }
 
-  struct KeepResult { Int kept = 0; };
-  KeepResult Keep(Int n = 0) {
-    Int Mine = 0;
+  struct KeepResult { i64 kept = 0; };
+  KeepResult Keep(i64 n = 0) {
+    i64 Mine = 0;
     Mine = n;
     debug_print("keep", false);
     return {Mine};
   }
 
-  struct KeepOnResult { Int kept = 0; };
-  KeepOnResult KeepOn(Int n = 0) {
-    Int Mine = 0;
+  struct KeepOnResult { i64 kept = 0; };
+  KeepOnResult KeepOn(i64 n = 0) {
+    i64 Mine = 0;
     Mine = n;
-    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
+    if (math_compare<">">(num_cast<f64, i64>(n), 0.0)) {
       func_call_on<"KeepOn">(actor_find("Rules"), kern::out(n30.kept), 0);
     }
     return {Mine};
@@ -2990,51 +2990,51 @@ struct Rules : kern::Blueprint {
     func_call_on<"Deeper">(actor_find("Rules"), kern::out());
   }
 
-  struct { Int kept = 0; } n30;
+  struct { i64 kept = 0; } n30;
 };
 )kn";
   const char* level_text = R"kn(
 struct Level : kern::Blueprint {
-  struct TwiceResult { Float out = 0.0; Int laps = 0; };
-  TwiceResult Twice(Float x = 0.0) {
-    return {math_mul(x, 3.0), 0};
+  struct TwiceResult { f64 out = 0.0; i64 laps = 0; };
+  TwiceResult Twice(f64 x = 0.0) {
+    return {math_mul<f64>(x, 3.0), 0};
   }
 };
 )kn";
   const char* caller_text = R"kn(
 struct Caller : kern::Blueprint {
-  Float Got = 0.0;
-  Int GotLaps = 0;
-  Float AtLevel = 0.0;
-  Float Speed = 0.0;
-  Float LapsRead = 0.0;
-  Float Nobody = 0.0;
-  Float Wrong = 0.0;
+  f64 Got = 0.0;
+  i64 GotLaps = 0;
+  f64 AtLevel = 0.0;
+  f64 Speed = 0.0;
+  f64 LapsRead = 0.0;
+  f64 Nobody = 0.0;
+  f64 Wrong = 0.0;
   Text Name = "";
-  Bool Has = false;
-  Bool HasLost = false;
+  bool Has = false;
+  bool HasLost = false;
 
-  struct TwiceResult { Float out = 0.0; Int laps = 0; };
-  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+  struct TwiceResult { f64 out = 0.0; i64 laps = 0; };
+  KERN_EXTERN TwiceResult Twice(f64 x = 0.0);
 
   KERN_EVENT(on1, event_custom<"Ask">)
-  void on1(Actor actor, Float value, Text text) {
+  void on1(Actor actor, f64 value, Text text) {
     func_call_on<"Twice">(actor_find("Rules"), kern::out(n2.out, n2.laps), value);
     Got = n2.out;
     GotLaps = n2.laps;
     func_call_on<"Twice">(actor_find("Lost"), kern::out(n3.out, n3.laps), value);
     AtLevel = n3.out;
-    Speed = func_get_on<"Speed", Float>(actor_find("Rules"));
-    LapsRead = func_get_on<"Laps", Float>(actor_find("Rules"));
-    Nobody = func_get_on<"Missing", Float>(actor_find("Rules"));
-    Wrong = func_get_on<"Name", Float>(actor_find("Rules"));
+    Speed = func_get_on<"Speed", f64>(actor_find("Rules"));
+    LapsRead = func_get_on<"Laps", f64>(actor_find("Rules"));
+    Nobody = func_get_on<"Missing", f64>(actor_find("Rules"));
+    Wrong = func_get_on<"Name", f64>(actor_find("Rules"));
     Name = func_get_on<"Name", Text>(actor_find("Rules"));
     Has = func_has_blueprint(actor_find("Rules"));
     HasLost = func_has_blueprint(actor_find("Lost"));
   }
 
-  struct { Float out = 0.0; Int laps = 0; } n2;
-  struct { Float out = 0.0; Int laps = 0; } n3;
+  struct { f64 out = 0.0; i64 laps = 0; } n2;
+  struct { f64 out = 0.0; i64 laps = 0; } n3;
 };
 )kn";
   struct CallingHost : FakeLogicHost {
@@ -3058,7 +3058,7 @@ struct Caller : kern::Blueprint {
       }
     }
   };
-  logic::Graph rules_g, level_g, caller_g, broken = logic_graph(R"({"variables":[{"name":"Speed","type":"float","value":7}],"nodes":[{"id":1,"type":"no.such.node"}],"links":[]})");
+  logic::Graph rules_g, level_g, caller_g, broken = logic_graph(R"({"variables":[{"name":"Speed","type":"f64","value":7}],"nodes":[{"id":1,"type":"no.such.node"}],"links":[]})");
   std::string error;
   CHECK(logic::from_cpp(rules_text, rules_g, nullptr, &error));
   CHECK(logic::from_cpp(level_text, level_g, nullptr, &error));
@@ -3150,15 +3150,15 @@ TEST(logic_functions) {
   FakeLogicHost host;
   logic::Runtime rt(host);
   // Double(x) -> result (pure); Clamp01(v) -> out, low: returns early below zero.
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Calls","type":"int","value":0}],
-    "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
-      {"name":"Clamp01","inputs":[{"name":"v","type":"float","value":0.5}],"outputs":[{"name":"out","type":"float","value":-1},{"name":"low","type":"bool","value":false}]},
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Calls","type":"i64","value":0}],
+    "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"f64","value":0}],"outputs":[{"name":"result","type":"f64","value":0}]},
+      {"name":"Clamp01","inputs":[{"name":"v","type":"f64","value":0.5}],"outputs":[{"name":"out","type":"f64","value":-1},{"name":"low","type":"bool","value":false}]},
       {"name":"Label","inputs":[{"name":"who","type":"text","value":"nobody"}],"outputs":[{"name":"text","type":"text","value":""}]}],
-    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
+    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Double"}},{"id":2,"type":"math.mul","params":{"type":"f64"},"values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Double"}},
       {"id":10,"type":"func.entry","params":{"function":"Clamp01"}},{"id":11,"type":"var.add","params":{"variable":"Calls"}},{"id":12,"type":"flow.sequence","params":{"count":"2"}},
-      {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"op":"<"},"values":{"b":0}},
+      {"id":13,"type":"flow.branch"},{"id":14,"type":"math.compare","params":{"type":"f64","op":"<"},"values":{"b":0}},
       {"id":15,"type":"func.return","params":{"function":"Clamp01"},"values":{"out":0,"low":true}},
-      {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","values":{"b":1}},
+      {"id":16,"type":"func.return","params":{"function":"Clamp01"}},{"id":17,"type":"math.min","params":{"type":"f64"},"values":{"b":1}},
       {"id":30,"type":"func.entry","params":{"function":"Label"}},{"id":31,"type":"text.append","values":{"a":"hello "}},{"id":32,"type":"func.return","params":{"function":"Label"}}],
     "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"result"],
       [10,"then",11,"exec"],[11,"then",12,"exec"],[12,"then0",13,"exec"],[10,"v",14,"a"],[14,"result",13,"condition"],[13,"true",15,"exec"],
@@ -3221,10 +3221,10 @@ TEST(logic_lists) {
   CHECK(a == b && a.size() == 2 && a.as_text() == "[1, 2.5]");
   b.edit<f64>().push_back(4);
   CHECK(a.size() == 2 && b.size() == 3 && !(a == b) && b.as_text() == "[1, 2.5, 4]");
-  CHECK(Value::zero(PinType::number_list) == Value::of(std::vector<f64>{}) && Value::zero(PinType::number_list).size() == 0);
+  CHECK(Value::zero(PinType::f64_list) == Value::of(std::vector<f64>{}) && Value::zero(PinType::f64_list).size() == 0);
   CHECK(!(Value::of(std::vector<f64>{}) == Value::of(std::vector<i64>{})));  // (lists of different types)
   CHECK(a.item(1) == Value::number(2.5) && a.item(7) == Value::number(0) && Value::of(std::vector<std::string>{"x"}).item(3) == Value::text(""));
-  // (whole numbers in a list are held as every Int is)
+  // (whole numbers in a list are held as every i64 is)
   CHECK(Value::of(std::vector<i64>{std::numeric_limits<i64>::min()}).item(0).i == -std::numeric_limits<i64>::max());
   const Value every[] = {Value::of(std::vector<bool>{true, false}),      Value::of(std::vector<i64>{-3, 9007199254740992}),   Value::of(std::vector<f64>{0.1, -1e300}),
                          Value::of(std::vector<Vec3>{{1, 2, 3.5f}}),     Value::of(std::vector<std::string>{"a \"b\"", ""}),  Value::of(std::vector<logic::ActorHandle>{{}, {}})};
@@ -3237,7 +3237,7 @@ TEST(logic_lists) {
     CHECK(v.type == PinType::text_list || !logic::convertible(v.type, logic::element_of(v.type)));
     CHECK(v.converted(PinType::text).s == v.as_text() && v.converted(v.type) == v);
   }
-  CHECK(!logic::convertible(PinType::integer_list, PinType::number_list) && a.converted(PinType::integer_list).size() == 0);
+  CHECK(!logic::convertible(PinType::i64_list, PinType::f64_list) && a.converted(PinType::i64_list).size() == 0);
   CHECK(every[3].as_text() == "[(1, 2, 3.5)]" && every[5].as_text() == "[none, none]" && every[0].as_text() == "[true, false]");
 
   // The nodes. The steps change a list variable; For Each goes through the list as it was when
@@ -3246,11 +3246,11 @@ TEST(logic_lists) {
   std::string error;
   CHECK(logic::from_cpp(R"kn(
 struct L : kern::Blueprint {
-  List<Float> Items = List<Float>{3.0, 1.0};
+  List<f64> Items = List<f64>{3.0, 1.0};
   List<Text> Names = List<Text>{};
-  Float Sum = 0.0;
-  Int Length = 0;
-  Int At = 0;
+  f64 Sum = 0.0;
+  i64 Length = 0;
+  i64 At = 0;
   KERN_EVENT(on1, event_begin)
   void on1() {
     list_add(Items, 2.0);
@@ -3258,17 +3258,17 @@ struct L : kern::Blueprint {
     Items[1] = 7.0;
     list_remove_at(Items, 5);
     list_remove(Items, 1.0);
-    for (auto it7 = flow_for_each<Float>(n7, Items); it7.next();) {
+    for (auto it7 = flow_for_each<f64>(n7, Items); it7.next();) {
       Sum += n7.item;
       list_clear(Items);
       list_add(n9, Names, kern::to<Text>(n7.index));
     }
-    Length = list_length<Float>(Items);
+    Length = list_length<f64>(Items);
     At = n9.index;
     debug_print(kern::to<Text>(list_make<Text, "2">("a", list_get<Text>(Names, 2))), false);
   }
-  struct : kern::Node<7> { Float item = 0.0; Int index = 0; } n7;
-  struct { Int index = 0; } n9;
+  struct : kern::Node<7> { f64 item = 0.0; i64 index = 0; } n7;
+  struct { i64 index = 0; } n9;
 };
 )kn", g, nullptr, &error));
   if (!error.empty()) std::printf("lists: %s\n", error.c_str());
@@ -3286,7 +3286,7 @@ struct L : kern::Blueprint {
     CHECK(host.printed.size() == 1 && host.printed[0] == "[a, 2]" && host.errors.empty());
     // from outside: a list is set as a list; what is no list of that type is the empty list
     CHECK(inst->set("Items", Value::of(std::vector<f64>{5, 6})) && inst->get("Items").as_text() == "[5, 6]");
-    CHECK(inst->set("Items", Value::number(4)) && inst->get("Items").size() == 0 && inst->get("Items").type == PinType::number_list);
+    CHECK(inst->set("Items", Value::number(4)) && inst->get("Items").size() == 0 && inst->get("Items").type == PinType::f64_list);
   }
   // JSON round trip of a graph with list variables.
   logic::Graph back;
@@ -3301,19 +3301,19 @@ struct L : kern::Blueprint {
       for (const logic::Issue& i : logic::check(bad)) std::printf("lists: expected \"%s\", got: %s\n", why, i.text.c_str());
     CHECK(said);
   };
-  problem(R"({"variables":[{"name":"Sum","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.add","params":{"variable":"Sum"}}],
+  problem(R"({"variables":[{"name":"Sum","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.add","params":{"variable":"Sum"}}],
             "links":[[1,"then",2,"exec"]]})",
           "needs a list variable: \"Sum\" is float");
-  problem(R"({"variables":[{"name":"L","type":"float_list","value":[1]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"L"}}],
+  problem(R"({"variables":[{"name":"L","type":"f64_list","value":[1]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"L"}}],
             "links":[[1,"then",2,"exec"]]})",
           "needs a number variable");
   problem(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.clear","params":{"variable":"Gone"}}],"links":[[1,"then",2,"exec"]]})", "no variable \"Gone\"");
   // a list goes into a list input of its own type only (and into Text)
-  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"float_list","value":[]},{"name":"X","type":"float","value":0}],
+  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"f64_list","value":[]},{"name":"X","type":"f64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"var.set","params":{"variable":"X"}}],
     "links":[[1,"then",3,"exec"],[2,"value",3,"value"]]})"))));
-  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"float_list","value":[]}],
-    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"list.length","params":{"type":"int"}},{"id":4,"type":"debug.print"}],
+  CHECK(!no_errors(logic::check(logic_graph(R"({"variables":[{"name":"L","type":"f64_list","value":[]}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"L"}},{"id":3,"type":"list.length","params":{"type":"i64"}},{"id":4,"type":"debug.print"}],
     "links":[[1,"then",4,"exec"],[2,"value",3,"list"],[3,"length",4,"text"]]})"))));
 }
 
@@ -3334,7 +3334,7 @@ TEST(logic_enums) {
   CHECK(logic::is_list(PinType::enumeration_list) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::enumeration) == PinType::enumeration_list);
   // It is no number and no text: it becomes nothing but itself and nothing becomes it (the nodes
   // Enum to Text, Enum to Index and their ways back say what is meant) ...
-  for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::integer_list, PinType::text_list}) {
+  for (PinType other : {PinType::boolean, PinType::i64, PinType::f64, PinType::vector, PinType::text, PinType::actor, PinType::i64_list, PinType::text_list}) {
     CHECK(!logic::convertible(PinType::enumeration, other) && !logic::convertible(other, PinType::enumeration));
     CHECK(!logic::convertible(PinType::enumeration_list, other) && !logic::convertible(other, PinType::enumeration_list));
   }
@@ -3343,7 +3343,7 @@ TEST(logic_enums) {
   // ... and a value of one enum is none of another.
   const TypeRef mode{PinType::enumeration, "Mode"}, light{PinType::enumeration, "Light"}, modes{PinType::enumeration_list, "Mode"}, lights{PinType::enumeration_list, "Light"};
   CHECK(logic::fits(mode, mode) && !logic::fits(mode, light) && logic::fits(modes, modes) && !logic::fits(modes, lights) && !logic::fits(mode, modes));
-  CHECK(logic::fits({PinType::integer, ""}, {PinType::number, ""}) && !logic::fits(mode, {PinType::integer, ""}) && !logic::fits({PinType::text, ""}, mode));
+  CHECK(logic::fits({PinType::i64, ""}, {PinType::f64, ""}) && !logic::fits(mode, {PinType::i64, ""}) && !logic::fits({PinType::text, ""}, mode));
 
   // A Blueprint with an enum: a variable and a list of its type, Switch on Enum (a case that is
   // not wired goes nowhere), to and from a place and a name, a function that takes and gives them.
@@ -3356,12 +3356,12 @@ struct Door : kern::Blueprint {
   Mode State = Mode::Opening;
   List<Mode> Seen = List<Mode>{Mode::Open};
   Text Log = "";
-  Int Place = 0;
-  Bool Ok = false;
+  i64 Place = 0;
+  bool Ok = false;
   KERN_EVENT(on1, event_custom<"Go">)
-  void on1(Actor actor, Float value, Text text) {
-    Ok = enum_from_index<Mode>(kern::to<Int>(value)).valid;
-    State = enum_from_index<Mode>(kern::to<Int>(value)).value;
+  void on1(Actor actor, f64 value, Text text) {
+    Ok = enum_from_index<Mode>(num_cast<i64, f64>(value)).valid;
+    State = enum_from_index<Mode>(num_cast<i64, f64>(value)).value;
     list_add(Seen, State);
     switch (flow_switch_enum<Mode>(State)) {
       case Mode::Closed: {
@@ -3373,7 +3373,7 @@ struct Door : kern::Blueprint {
     }
     Place = enum_index<Mode>(enum_from_name<Mode>(text).value);
   }
-  struct TakeResult { Mode now = Mode::Closed; Int count = 0; };
+  struct TakeResult { Mode now = Mode::Closed; i64 count = 0; };
   TakeResult Take(Mode to = Mode::Open, List<Mode> more = List<Mode>{}) {
     State = to;
     Seen = more;
@@ -3389,7 +3389,7 @@ struct Door : kern::Blueprint {
   TypeRef t;
   CHECK(logic::type_from_text("Mode", g, t) && t == mode && logic::type_text(t) == "Mode" && logic::type_label(t) == "Mode");
   CHECK(logic::type_from_text("Mode_list", g, t) && t == modes && logic::type_text(t) == "Mode_list" && logic::type_label(t) == "Mode List");
-  CHECK(logic::type_from_text("float_list", g, t) && t.type == PinType::number_list && t.of.empty() && !logic::type_from_text("Light", g, t) && !logic::type_from_text("enum", g, t) && !logic::type_from_text("exec", g, t));
+  CHECK(logic::type_from_text("float_list", g, t) && t.type == PinType::f64_list && t.of.empty() && !logic::type_from_text("Light", g, t) && !logic::type_from_text("enum", g, t) && !logic::type_from_text("exec", g, t));
   for (bool jit : {false, true}) {
     FakeLogicHost host;
     logic::Runtime rt(host);
@@ -3452,7 +3452,7 @@ struct Door : kern::Blueprint {
           "\"value\" is value 3 of E, which has 2");
   // a value of one enum does not go into another's, into a number or into a text
   const char* two = R"({"enums":[{"name":"E","values":["A","B"]},{"name":"F","values":["A","B"]}],
-    "variables":[{"name":"A","type":"enum","of":"E","value":0},{"name":"B","type":"enum","of":"F","value":0},{"name":"N","type":"int","value":0},{"name":"C","type":"enum","of":"E","value":1}],
+    "variables":[{"name":"A","type":"enum","of":"E","value":0},{"name":"B","type":"enum","of":"F","value":0},{"name":"N","type":"i64","value":0},{"name":"C","type":"enum","of":"E","value":1}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"%s"}},{"id":4,"type":"debug.print"}],
     "links":[[1,"then",3,"exec"],[2,"value",%s]]})";
   auto wired = [&](const char* into, const char* link) {
@@ -3488,7 +3488,7 @@ TEST(logic_checks_and_infinite_loops) {
   // Blueprint is stopped. (That is what a compiled class can do too, without an exception.)
   logic::Runtime rt(host);
   rt.budget = 5000;
-  const logic::Graph loop = logic_graph(R"({"variables":[{"name":"N","type":"float","value":0},{"name":"After","type":"float","value":0},{"name":"More","type":"float","value":0}],
+  const logic::Graph loop = logic_graph(R"({"variables":[{"name":"N","type":"f64","value":0},{"name":"After","type":"f64","value":0},{"name":"More","type":"f64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.while","values":{"condition":true}},{"id":3,"type":"var.add","params":{"variable":"N"}},
       {"id":4,"type":"var.add","params":{"variable":"After"}},{"id":5,"type":"flow.for","values":{"first":1,"last":10}},{"id":6,"type":"var.add","params":{"variable":"More"}},
       {"id":7,"type":"var.add","params":{"variable":"After"}},{"id":8,"type":"event.tick"},{"id":9,"type":"var.add","params":{"variable":"After"},"values":{"amount":100}}],
@@ -3506,14 +3506,14 @@ TEST(logic_checks_and_infinite_loops) {
   // Loops that end stay under the guard however many chains run in a step, and a new step counts anew.
   logic::Runtime calm(host);
   calm.budget = 50;
-  logic::Instance* fine = calm.add(logic_graph(R"({"variables":[{"name":"N","type":"float","value":0}],"nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"flow.for","values":{"first":1,"last":40}},
+  logic::Instance* fine = calm.add(logic_graph(R"({"variables":[{"name":"N","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"flow.for","values":{"first":1,"last":40}},
     {"id":3,"type":"var.add","params":{"variable":"N"}}],"links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})"), 0, "Fine");
   calm.begin();
   for (int i = 0; i < 5; ++i) calm.tick(1.0f / 60);
   CHECK(!fine->disabled() && fine->get("N").as_number() == 200 && host.errors.size() == 1);
   // The limit is the budget as it is now - also for an event raised between two steps.
   logic::Runtime wide(host);
-  logic::Instance* big = wide.add(logic_graph(R"({"variables":[{"name":"N","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+  logic::Instance* big = wide.add(logic_graph(R"({"variables":[{"name":"N","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
     {"id":2,"type":"flow.for","values":{"first":1,"last":300000}},{"id":3,"type":"var.add","params":{"variable":"N"}}],"links":[[1,"then",2,"exec"],[2,"body",3,"exec"]]})"), 0, "Big");
   wide.begin();
   wide.budget = 1000000;
@@ -3530,10 +3530,10 @@ TEST(logic_random_nodes_have_their_own_sequences) {
   auto run = [](const char* links, int rounds) {
     FakeLogicHost host;
     logic::Runtime rt(host);
-    const std::string graph = std::string(R"({"variables":[{"name":"X","type":"float","value":0},{"name":"Y","type":"float","value":0},{"name":"Z","type":"float","value":0}],
+    const std::string graph = std::string(R"({"variables":[{"name":"X","type":"f64","value":0},{"name":"Y","type":"f64","value":0},{"name":"Z","type":"f64","value":0}],
       "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"X"}},{"id":3,"type":"var.set","params":{"variable":"Y"}},
         {"id":4,"type":"math.random"},{"id":5,"type":"math.random"},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
-        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"op":">"},"values":{"b":0}}],
+        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":0}}],
       "links":[[4,"result",2,"value"],[5,"result",3,"value"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"],)") + links + "]}";
     logic::Instance* inst = rt.add(logic_graph(graph.c_str()), 0, "R");
     rt.begin();
@@ -3554,9 +3554,9 @@ TEST(logic_random_nodes_have_their_own_sequences) {
   {
     FakeLogicHost host;
     logic::Runtime rt(host);
-    logic::Instance* inst = rt.add(logic_graph(R"({"variables":[{"name":"Z","type":"float","value":0}],
+    logic::Instance* inst = rt.add(logic_graph(R"({"variables":[{"name":"Z","type":"f64","value":0}],
       "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":6,"type":"var.set","params":{"variable":"Z"}},{"id":7,"type":"logic.select"},
-        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"op":">"},"values":{"b":0}}],
+        {"id":8,"type":"math.random"},{"id":9,"type":"math.random"},{"id":10,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":0}}],
       "links":[[1,"then",6,"exec"],[8,"result",7,"a"],[9,"result",7,"b"],[7,"result",6,"value"],[1,"value",10,"a"],[10,"result",7,"pick"]]})"), 0, "S");
     rt.begin();
     rt.call("Go", 0, {{"value", logic::Value::number(0)}});
@@ -3571,7 +3571,7 @@ TEST(logic_random_nodes_have_their_own_sequences) {
   // another Blueprint (another seed from the world): other numbers
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph one = logic_graph(R"({"variables":[{"name":"X","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"X"}},
+  const logic::Graph one = logic_graph(R"({"variables":[{"name":"X","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"X"}},
     {"id":4,"type":"math.random"}],"links":[[1,"then",2,"exec"],[4,"result",2,"value"]]})");
   logic::Instance* first = rt.add(one, 1, "One");
   logic::Instance* second = rt.add(one, 2, "Two");
@@ -3582,7 +3582,7 @@ TEST(logic_random_nodes_have_their_own_sequences) {
 TEST(logic_tween_and_every) {
   FakeLogicHost host;
   logic::Runtime rt(host);
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"A","type":"float","value":0},{"name":"Ticks","type":"float","value":0},{"name":"Done","type":"bool","value":false}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"A","type":"f64","value":0},{"name":"Ticks","type":"f64","value":0},{"name":"Done","type":"bool","value":false}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.tween","params":{"ease":"linear"},"values":{"duration":1}},
       {"id":3,"type":"var.set","params":{"variable":"A"}},{"id":4,"type":"var.set","params":{"variable":"Done"},"values":{"value":true}},
       {"id":5,"type":"event.every","params":{"seconds":"0.25"}},{"id":6,"type":"var.add","params":{"variable":"Ticks"}}],
@@ -3601,7 +3601,7 @@ TEST(logic_tween_and_every) {
   // does not run away).
   FakeLogicHost host0;
   logic::Runtime rt0(host0);
-  const logic::Graph zero = logic_graph(R"({"variables":[{"name":"A","type":"float","value":0},{"name":"Updates","type":"int","value":0},{"name":"Done","type":"int","value":0}],
+  const logic::Graph zero = logic_graph(R"({"variables":[{"name":"A","type":"f64","value":0},{"name":"Updates","type":"i64","value":0},{"name":"Done","type":"i64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.tween","values":{"duration":0}},{"id":3,"type":"var.set","params":{"variable":"A"}},
       {"id":4,"type":"var.add","params":{"variable":"Done"}},{"id":5,"type":"var.add","params":{"variable":"Updates"}}],
     "links":[[1,"then",2,"play"],[2,"update",3,"exec"],[2,"alpha",3,"value"],[3,"then",5,"exec"],[2,"finished",4,"exec"],[4,"then",2,"play"]]})");
@@ -3629,7 +3629,7 @@ TEST(game_logic_graphs_drive_the_world) {
   s.center = {0, 0, 1};
   s.sensor = true;
   zone.colliders.push_back(s);
-  zone.logic = logic_graph(R"({"variables":[{"name":"Visits","type":"int","value":0}],
+  zone.logic = logic_graph(R"({"variables":[{"name":"Visits","type":"i64","value":0}],
     "nodes":[{"id":1,"type":"game.overlap_begin"},{"id":2,"type":"var.add","params":{"variable":"Visits"}},
       {"id":3,"type":"game.add_score","values":{"points":5}},{"id":4,"type":"flow.call","params":{"name":"OpenDoor"}}],
     "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})");
@@ -3700,7 +3700,7 @@ game::Level template_level() {
   box.shape = game::ColliderShape::box;
   box.size = {1, 1, 1};
   crate.colliders.push_back(box);
-  crate.logic = logic_graph(R"({"variables":[{"name":"Began","type":"int","value":0}],
+  crate.logic = logic_graph(R"({"variables":[{"name":"Began","type":"i64","value":0}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Began"}}],"links":[[1,"then",2,"exec"]]})");
   const game::ActorId crate_id = l.add(crate).id;
   game::Actor lid;
@@ -3936,7 +3936,7 @@ TEST(sound_bank_request_world) {
   CHECK(bank.ready("builtin:goal"));   // (collect all)
 }
 
-// Parse Float / Parse Int / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
+// Parse f64 / Parse i64 / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
 // the machine the tests run on - glibc - on texts made of the pieces numbers are made of. (%b, C23's
 // binary, is read the same way; the sanitizer's interceptor of sscanf does not know it, so it is not here.)
 TEST(logic_scan_like_c) {
@@ -4209,7 +4209,7 @@ TEST(logic_structs) {
   // A value of a struct holds a value for each of its fields, in the order its declaration has
   // them; which struct it is of is the pin's or the variable's to say.
   const Value knife = Value::structure({Value::text("Knife"), Value::number(25)});
-  CHECK(knife.type == PinType::structure && knife.fields() == 2 && knife.field(0)->s == "Knife" && knife.field(1)->n == 25 && !knife.field(2));
+  CHECK(knife.type == PinType::structure && knife.fields() == 2 && knife.field(0)->s == "Knife" && knife.field(1)->as<f64>() == 25 && !knife.field(2));
   CHECK(Value::zero(PinType::structure).fields() == 0 && !Value::zero(PinType::structure).field(0) && Value::number(1).fields() == 0);
   // two of them are equal when all their fields are - and a struct is equal to a struct only
   CHECK(knife == Value::structure({Value::text("Knife"), Value::number(25)}) && !(knife == Value::structure({Value::text("Knife"), Value::number(26)})));
@@ -4221,13 +4221,13 @@ TEST(logic_structs) {
   Value changed = rack;
   changed.edit<Value>()[0] = rack.item(1);
   logic::structs::set_field(changed.edit<Value>()[1], 1, Value::number(13));
-  CHECK(rack.item(0) == knife && rack.item(1).field(1)->n == 12 && changed.item(0) == rack.item(1) && changed.item(1).field(1)->n == 13 && !(changed == rack));
+  CHECK(rack.item(0) == knife && rack.item(1).field(1)->as<f64>() == 12 && changed.item(0) == rack.item(1) && changed.item(1).field(1)->as<f64>() == 13 && !(changed == rack));
   PinType named = PinType::exec;
   CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
   CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
   CHECK(logic::kValueTypes == 10 && logic::list_of(PinType::object) == PinType::object_list && logic::element_of(PinType::object_list) == PinType::object && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
   // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
-  for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::number_list, PinType::enumeration_list}) {
+  for (PinType other : {PinType::boolean, PinType::i64, PinType::f64, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::f64_list, PinType::enumeration_list}) {
     CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
     CHECK(!logic::convertible(PinType::structure_list, other) && !logic::convertible(other, PinType::structure_list));
   }
@@ -4235,7 +4235,7 @@ TEST(logic_structs) {
   // ... and a value of one struct is none of another.
   const TypeRef weapon{PinType::structure, "Weapon"}, slot{PinType::structure, "Slot"}, weapons{PinType::structure_list, "Weapon"}, slots{PinType::structure_list, "Slot"};
   CHECK(logic::fits(weapon, weapon) && !logic::fits(weapon, slot) && logic::fits(weapons, weapons) && !logic::fits(weapons, slots) && !logic::fits(weapon, weapons));
-  CHECK(!logic::fits(weapon, {PinType::text, ""}) && !logic::fits({PinType::number, ""}, weapon) && !logic::fits({PinType::enumeration, "Weapon"}, weapon));
+  CHECK(!logic::fits(weapon, {PinType::text, ""}) && !logic::fits({PinType::f64, ""}, weapon) && !logic::fits({PinType::enumeration, "Weapon"}, weapon));
 
   // A Blueprint with structs: a variable and a list of a struct's type, a struct inside a
   // struct, an enum's value and a list as fields; Make, Break, Set Field; a function that takes
@@ -4249,33 +4249,33 @@ struct Arena : kern::Blueprint {
   KERN_STRUCT(Weapon) {
     Text Name = "";
     Kind Type = Kind::Melee;
-    Float Damage = 10.0;
-    List<Float> Falloff = List<Float>{};
+    f64 Damage = 10.0;
+    List<f64> Falloff = List<f64>{};
   };
   KERN_STRUCT(Slot) {
-    Weapon In = Weapon{"Fist", Kind::Melee, 1.0, List<Float>{}};
-    Int Count = 1;
+    Weapon In = Weapon{"Fist", Kind::Melee, 1.0, List<f64>{}};
+    i64 Count = 1;
   };
-  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}};
+  Weapon Held = Weapon{"Knife", Kind::Melee, 25.0, List<f64>{}};
   List<Weapon> Rack = List<Weapon>{};
-  Slot Belt = Slot{Weapon{"Fist", Kind::Melee, 1.0, List<Float>{}}, 1};
-  Float Seen = 0.0;
-  Bool Has = false;
+  Slot Belt = Slot{Weapon{"Fist", Kind::Melee, 1.0, List<f64>{}}, 1};
+  f64 Seen = 0.0;
+  bool Has = false;
   KERN_EVENT(on1, event_begin)
   void on1() {
-    Held.Damage = math_mul(struct_break<Weapon>(Held).Damage, 2.0);
-    list_add(Rack, struct_make<Weapon>("Bow", Kind::Ranged, 12.0, List<Float>{1.0, 0.5}));
+    Held.Damage = math_mul<f64>(struct_break<Weapon>(Held).Damage, 2.0);
+    list_add(Rack, struct_make<Weapon>("Bow", Kind::Ranged, 12.0, List<f64>{1.0, 0.5}));
   }
   KERN_EVENT(on5, event_custom<"Go">)
-  void on5(Actor actor, Float value, Text text) {
+  void on5(Actor actor, f64 value, Text text) {
     Held.Name = text;
     Belt.In = Held;
     Belt.Count = list_length<Weapon>(Rack);
-    Seen = struct_break<Weapon>(list_get<Weapon>(Rack, kern::to<Int>(value))).Damage;
+    Seen = struct_break<Weapon>(list_get<Weapon>(Rack, num_cast<i64, f64>(value))).Damage;
     Has = list_contains<Weapon>(Rack, Held);
   }
-  struct SwapResult { Weapon was = Weapon{"", Kind::Melee, 10.0, List<Float>{}}; Int count = 0; };
-  SwapResult Swap(Weapon to = Weapon{"Club", Kind::Ranged, 7.0, List<Float>{2.0}}, List<Weapon> more = List<Weapon>{}) {
+  struct SwapResult { Weapon was = Weapon{"", Kind::Melee, 10.0, List<f64>{}}; i64 count = 0; };
+  SwapResult Swap(Weapon to = Weapon{"Club", Kind::Ranged, 7.0, List<f64>{2.0}}, List<Weapon> more = List<Weapon>{}) {
     Rack = more;
     list_add(Rack, Held);
     Held = to;
@@ -4303,7 +4303,7 @@ struct Arena : kern::Blueprint {
   const Value plain = logic::default_of(declared, g);
   const Value fist = Value::structure({Value::text("Fist"), Value::enumeration(0), Value::number(1), Value::of(std::vector<f64>{})});
   CHECK(plain == Value::structure({Value::text(""), Value::enumeration(0), Value::number(10), Value::of(std::vector<f64>{})}) && logic::zero_of(weapon, g) == plain);
-  CHECK(logic::zero_of(slot, g) == Value::structure({fist, Value::integer(1)}) && logic::zero_of(weapons, g).size() == 0 && logic::zero_of({PinType::number, ""}, g) == Value::number(0));
+  CHECK(logic::zero_of(slot, g) == Value::structure({fist, Value::integer(1)}) && logic::zero_of(weapons, g).size() == 0 && logic::zero_of({PinType::f64, ""}, g) == Value::number(0));
   CHECK(logic::field_of(Value::zero(PinType::structure), declared, 2, g) == Value::number(10) && logic::field_of(fist, declared, 2, g) == Value::number(1) && logic::field_of(fist, declared, 0, g).s == "Fist");
   json::Value partly;
   CHECK(json::parse(R"({"Damage":3,"Falloff":[0.5],"Other":true})", partly));
@@ -4376,10 +4376,10 @@ struct Arena : kern::Blueprint {
   notation_round_trip(g, "Arena");
   std::string text;
   CHECK(logic::to_cpp(g, "Arena", text, &error, logic::library(), false));
-  CHECK(text.find("  // ---- types ----\n  KERN_ENUM(Kind, Melee, Ranged);\n  /// What a weapon does.\n  KERN_STRUCT(Weapon) {\n    Text Name = \"\";\n    Kind Type = Kind::Melee;\n    Float Damage = 10.0;\n"
-                  "    List<Float> Falloff = List<Float>{};\n  };\n  KERN_STRUCT(Slot) {\n    Weapon In = Weapon{\"Fist\", Kind::Melee, 1.0, List<Float>{}};\n    Int Count = 1;\n  };\n\n  // ---- variables ----\n"
-                  "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0, List<Float>{}};\n  List<Weapon> Rack = List<Weapon>{};\n") != std::string::npos);
-  CHECK(text.find("    Held.Damage = math_mul(struct_break<Weapon>(Held).Damage, 2.0);\n    list_add(Rack, struct_make<Weapon>(\"Bow\", Kind::Ranged, 12.0, List<Float>{1.0, 0.5}));\n") != std::string::npos);
+  CHECK(text.find("  // ---- types ----\n  KERN_ENUM(Kind, Melee, Ranged);\n  /// What a weapon does.\n  KERN_STRUCT(Weapon) {\n    Text Name = \"\";\n    Kind Type = Kind::Melee;\n    f64 Damage = 10.0;\n"
+                  "    List<f64> Falloff = List<f64>{};\n  };\n  KERN_STRUCT(Slot) {\n    Weapon In = Weapon{\"Fist\", Kind::Melee, 1.0, List<f64>{}};\n    i64 Count = 1;\n  };\n\n  // ---- variables ----\n"
+                  "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0, List<f64>{}};\n  List<Weapon> Rack = List<Weapon>{};\n") != std::string::npos);
+  CHECK(text.find("    Held.Damage = math_mul<f64>(struct_break<Weapon>(Held).Damage, 2.0);\n    list_add(Rack, struct_make<Weapon>(\"Bow\", Kind::Ranged, 12.0, List<f64>{1.0, 0.5}));\n") != std::string::npos);
   // (the glue of its class: a struct is held field by field)
   std::string glue;
   CHECK(logic::native_glue(g, "Arena", glue, &error) && glue.find("template <> struct Held<::Arena::Weapon> {") != std::string::npos && glue.find("template <> struct Held<::Arena::Slot> {") != std::string::npos);
@@ -4394,14 +4394,14 @@ struct Arena : kern::Blueprint {
       for (const logic::Issue& i : logic::check(bad)) std::printf("structs: expected \"%s\", got: %s\n", why, i.text.c_str());
     CHECK(said);
   };
-  const char* types = R"("enums":[{"name":"E","values":["A","B"]}],"structs":[{"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":1},{"name":"N","type":"float","value":2}]},
+  const char* types = R"("enums":[{"name":"E","values":["A","B"]}],"structs":[{"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":1},{"name":"N","type":"f64","value":2}]},
                                                                             {"name":"T","fields":[{"name":"In","type":"struct","of":"S","value":{}}]}],)";
   auto with_types = [&](const std::string& rest) { return logic_graph(("{" + std::string(types) + rest + "}").c_str()); };
   problem(with_types(R"("nodes":[{"id":1,"type":"struct.make","params":{"struct":"Nope"}}],"links":[])"), "\"Nope\" is no struct of this Blueprint");
   problem(with_types(R"("nodes":[{"id":1,"type":"struct.break","params":{"struct":"E"}}],"links":[])"), "\"E\" is no struct of this Blueprint");
   problem(with_types(R"("nodes":[{"id":1,"type":"enum.name","params":{"enum":"S"}}],"links":[])"), "\"S\" is no enum of this Blueprint");
   problem(with_types(R"("nodes":[{"id":1,"type":"logic.select","params":{"type":"U"}}],"links":[])"), "\"U\" is no type it can have (Type: float, int, bool, vector, text, actor, an enum or a struct of this Blueprint, or a list of one");
-  problem(with_types(R"("variables":[{"name":"V","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"N"}}],"links":[[1,"then",2,"exec"]])"),
+  problem(with_types(R"("variables":[{"name":"V","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"N"}}],"links":[[1,"then",2,"exec"]])"),
           "V is float: it has no fields");
   problem(with_types(R"("variables":[{"name":"V","type":"struct","of":"S","value":{}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"Gone"}}],"links":[[1,"then",2,"exec"]])"),
           "S has no field \"Gone\" (K, N)");
@@ -4413,7 +4413,7 @@ struct Arena : kern::Blueprint {
           "struct \"S\": the field \"K\": 4 is no value of E (it has 1)");
   problem(logic_graph(R"({"structs":[{"name":"S","fields":[]}],"nodes":[],"links":[]})"), "struct \"S\" has no fields");
   // a struct does not go into another's pin, into a number or into a text - and it comes out of Break field by field
-  const char* two = R"("variables":[{"name":"A","type":"struct","of":"S","value":{}},{"name":"B","type":"struct","of":"T","value":{}},{"name":"N","type":"float","value":0},{"name":"C","type":"struct","of":"S","value":{}},
+  const char* two = R"("variables":[{"name":"A","type":"struct","of":"S","value":{}},{"name":"B","type":"struct","of":"T","value":{}},{"name":"N","type":"f64","value":0},{"name":"C","type":"struct","of":"S","value":{}},
     {"name":"L","type":"struct_list","of":"S","value":[]}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"%s"}},{"id":4,"type":"debug.print"},
              {"id":5,"type":"struct.break","params":{"struct":"S"}},{"id":6,"type":"struct.break","params":{"struct":"T"}}],
@@ -4430,13 +4430,13 @@ struct Arena : kern::Blueprint {
   json::Value j;
   logic::Graph none;
   CHECK(json::parse(R"({"variables":[{"name":"V","type":"struct","of":"Gone","value":{}}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
-  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]},{"name":"S","fields":[{"name":"B","type":"float","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
-  CHECK(json::parse(R"({"enums":[{"name":"S","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"B","type":"float","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
-  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0},{"name":"A","type":"int","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none, &error) &&
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"f64","value":0}]},{"name":"S","fields":[{"name":"B","type":"f64","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"enums":[{"name":"S","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"B","type":"f64","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"f64","value":0},{"name":"A","type":"i64","value":0}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none, &error) &&
         error.find("the field \"A\" exists twice") != std::string::npos);
   CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"Me","type":"struct","of":"S","value":{}}]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none, &error) &&
         error.find("a struct holds structs declared above it") != std::string::npos);
-  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"In","type":"struct_list","of":"T","value":[]}]},{"name":"T","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", j) &&
+  CHECK(json::parse(R"({"structs":[{"name":"S","fields":[{"name":"In","type":"struct_list","of":"T","value":[]}]},{"name":"T","fields":[{"name":"A","type":"f64","value":0}]}],"nodes":[],"links":[]})", j) &&
         !logic::graph_from_json(j, none));
   // (a graph an editor's mistake built wrong: the check says what is wrong with it, and nothing reads without end)
   logic::Graph wrong = g;
@@ -4454,10 +4454,10 @@ struct Arena : kern::Blueprint {
   wrong.structs[1].fields.push_back(wrong.structs[1].fields[1]);
   problem(wrong, "struct \"Slot\" has two fields called \"Count\"");
   wrong = g;
-  for (std::size_t k = wrong.structs[1].fields.size(); k < logic::StructType::kMaxFields; ++k) wrong.structs[1].fields.push_back({"F" + std::to_string(k), {PinType::number, ""}, json::Value(0.0)});
+  for (std::size_t k = wrong.structs[1].fields.size(); k < logic::StructType::kMaxFields; ++k) wrong.structs[1].fields.push_back({"F" + std::to_string(k), {PinType::f64, ""}, json::Value(0.0)});
   CHECK(no_errors(logic::check(wrong)) && wrong.structs[1].fields.size() == logic::StructType::kMaxFields);
   notation_round_trip(wrong, "Arena");
-  wrong.structs[1].fields.push_back({"OneMore", {PinType::number, ""}, json::Value(0.0)});
+  wrong.structs[1].fields.push_back({"OneMore", {PinType::f64, ""}, json::Value(0.0)});
   problem(wrong, "struct \"Slot\" has 97 fields (a struct has 96 at most)");
   wrong = g;
   wrong.structs.clear();
@@ -4487,23 +4487,23 @@ static logic::Graph every_node_graph(bool wired) {
   logic::Graph g;
   u32 next = 1;
   struct Var { const char* name; PinType type; const char* of; };
-  const Var vars[] = {{"VB", PinType::boolean, ""},        {"VI", PinType::integer, ""},          {"VF", PinType::number, ""},         {"VV", PinType::vector, ""},
-                      {"VT", PinType::text, ""},           {"VA", PinType::actor, ""},            {"LB", PinType::boolean_list, ""},   {"LI", PinType::integer_list, ""},
-                      {"LF", PinType::number_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
+  const Var vars[] = {{"VB", PinType::boolean, ""},        {"VI", PinType::i64, ""},          {"VF", PinType::f64, ""},         {"VV", PinType::vector, ""},
+                      {"VT", PinType::text, ""},           {"VA", PinType::actor, ""},            {"LB", PinType::boolean_list, ""},   {"LI", PinType::i64_list, ""},
+                      {"LF", PinType::f64_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
-                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
-                      // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
+                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::u64, ""},        {"LX", PinType::u64_list, ""},
+                      // (a map and a set as the nodes of maps and sets are typed by default: i64 keys, f64 values)
                       {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
-                      // (bytes - Bytes of Text, Bytes of S: a List<U8>)
-                      {"L8", PinType::integer_list, "u8"},
+                      // (bytes - Bytes of Text, Bytes of S: a List<u8>)
+                      {"L8", PinType::i64_list, "u8"},
                       // (an object of the engine: what Engine Object of Blueprint gives, as its Interface says by default)
                       {"VO", PinType::object, "App"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
-  g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
+  g.structs.push_back({"SI", {{"N", {PinType::i64, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
   g.structs.push_back({"SM", {}, "A struct that holds one.\n\nIts second paragraph."});
   // (a struct of numbers: what the bytes of a value are of - in the layout the nodes say by default, "4: i32@0")
-  g.structs.push_back({"SB", {{"Bits", {PinType::integer, ""}, json::Value(7)}}, "A struct of one number."});
+  g.structs.push_back({"SB", {{"Bits", {PinType::i64, ""}, json::Value(7)}}, "A struct of one number."});
   {
     json::Value in = json::Value::object(), numbers = json::Value::array(), places = json::Value::array(), at = json::Value::array();
     in.set("N", 5);
@@ -4512,8 +4512,8 @@ static logic::Graph every_node_graph(bool wired) {
     numbers.push(-2.0);
     places.push(1);
     for (f64 x : {0.0, 0.5, -1.0}) at.push(x);
-    g.structs[1].fields = {{"F", {PinType::number, ""}, json::Value(1.5)},   {"E", {PinType::enumeration, "EM"}, json::Value(1)}, {"In", {PinType::structure, "SI"}, in},
-                           {"L", {PinType::number_list, ""}, numbers},      {"Ins", {PinType::structure_list, "SI"}, json::Value::array()},
+    g.structs[1].fields = {{"F", {PinType::f64, ""}, json::Value(1.5)},   {"E", {PinType::enumeration, "EM"}, json::Value(1)}, {"In", {PinType::structure, "SI"}, in},
+                           {"L", {PinType::f64_list, ""}, numbers},      {"Ins", {PinType::structure_list, "SI"}, json::Value::array()},
                            {"B", {PinType::boolean, ""}, json::Value(true)}, {"V", {PinType::vector, ""}, at},                    {"A", {PinType::actor, ""}, json::Value(0)},
                            {"Es", {PinType::enumeration_list, "EM"}, places}};
   }
@@ -4542,17 +4542,17 @@ static logic::Graph every_node_graph(bool wired) {
     }
     switch (t) {
       case PinType::boolean: return logic::Value::boolean(true);
-      case PinType::int64: return logic::Value::int64(0xfffffffffffffff9ull);
-      case PinType::int64_list: return logic::Value::of(std::vector<logic::Int64>{logic::Int64{0x8000000000000001ull}, logic::Int64{0}, logic::Int64{9007199254740993ull}});
-      case PinType::integer: return logic::Value::integer(-7);
-      case PinType::number: return logic::Value::number(2.625);
+      case PinType::u64: return logic::Value::of_number<u64>(0xfffffffffffffff9ull);
+      case PinType::u64_list: return logic::Value::of(std::vector<u64>{0x8000000000000001ull, 0, 9007199254740993ull});
+      case PinType::i64: return logic::Value::integer(-7);
+      case PinType::f64: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
       case PinType::actor: return logic::Value::actor({});   // (an actor written down is none: one comes from its world)
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
-      case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
+      case PinType::i64_list:  // (of a width: numbers it holds - a List<u8> holds no -7)
         return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
-      case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
+      case PinType::f64_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
       case PinType::enumeration: return logic::Value::enumeration(2);
@@ -4562,23 +4562,23 @@ static logic::Graph every_node_graph(bool wired) {
   };
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
-    if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration ||
-        logic::element_of(v.type) == PinType::structure || v.type == PinType::int64_list || logic::is_keyed(v.type))
+    if (v.type == PinType::i64_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration ||
+        logic::element_of(v.type) == PinType::structure || v.type == PinType::u64_list || logic::is_keyed(v.type))
       v.value = other_than_default(v.type, v.of).to_json(g, v.of);
   logic::Function fn;
   fn.name = "Fn";
   fn.help = "Twice x.";
-  fn.inputs = {{"x", PinType::number, json::Value(1.5)}};
-  fn.outputs = {{"y", PinType::number, json::Value(0.25)}, {"ok", PinType::boolean, json::Value(true)}};
+  fn.inputs = {{"x", PinType::f64, json::Value(1.5)}};
+  fn.outputs = {{"y", PinType::f64, json::Value(0.25)}, {"ok", PinType::boolean, json::Value(true)}};
   logic::Function proc;
   proc.name = "Proc";
   logic::Function calc;
   calc.name = "Calc";
   calc.pure = true;
-  calc.inputs = {{"a", PinType::integer, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list, "").to_json()},
+  calc.inputs = {{"a", PinType::i64, json::Value(2)}, {"b", PinType::text, json::Value("t")}, {"l", PinType::text_list, other_than_default(PinType::text_list, "").to_json()},
                  {"none", PinType::actor_list, json::Value::array()}, {"e", PinType::enumeration, json::Value(1), "EM"},
                  {"s", PinType::structure, other_than_default(PinType::structure, "SM").to_json(g, "SM"), "SM"}};
-  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::integer_list, other_than_default(PinType::integer_list, "").to_json()},
+  calc.outputs = {{"r", PinType::vector, logic::Value::vector({1, 2, 3}).to_json()}, {"numbers", PinType::i64_list, other_than_default(PinType::i64_list, "").to_json()},
                   {"all", PinType::enumeration_list, other_than_default(PinType::enumeration_list, "").to_json(), "EM"},
                   {"structs", PinType::structure_list, other_than_default(PinType::structure_list, "SI").to_json(g, "SI"), "SI"}};
   g.functions = {fn, proc, calc};
@@ -4768,24 +4768,24 @@ TEST(logic_notation_values_of_a_call) {
   const std::string text =
       "struct Calls : kern::Blueprint {\n"
       "  // ---- variables ----\n"
-      "  Float Total = 0.0;\n"
-      "  Float Last = 0.0;\n"
+      "  f64 Total = 0.0;\n"
+      "  f64 Last = 0.0;\n"
       "\n"
       "  // ---- functions ----\n"
-      "  struct HalfResult { Float h = 0.0; };\n"
-      "  HalfResult Half(Float x = 0.0) {\n"
-      "    return {math_div(x, 2.0)};\n"
+      "  struct HalfResult { f64 h = 0.0; };\n"
+      "  HalfResult Half(f64 x = 0.0) {\n"
+      "    return {math_div<f64>(x, 2.0)};\n"
       "  }\n"
       "\n"
-      "  struct SumResult { Float s = 0.0; };\n"
-      "  SumResult Sum(Int n = 0) {\n"
-      "    Float Acc = 0.0;\n"
-      "    struct : kern::Node<11> { Int index = 0; } n11;\n"
+      "  struct SumResult { f64 s = 0.0; };\n"
+      "  SumResult Sum(i64 n = 0) {\n"
+      "    f64 Acc = 0.0;\n"
+      "    struct : kern::Node<11> { i64 index = 0; } n11;\n"
       "    HalfResult n12;\n"
       "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
       "      Last = n13.h;\n"
-      "      n12 = Half(kern::to<Float>(n11.index));\n"
-      "      Acc = math_add(Acc, n12.h);\n"
+      "      n12 = Half(num_cast<f64, i64>(n11.index));\n"
+      "      Acc = math_add<f64>(Acc, n12.h);\n"
       "      n13 = Half(Acc);\n"
       "    }\n"
       "    return {Acc};\n"
@@ -4793,8 +4793,8 @@ TEST(logic_notation_values_of_a_call) {
       "\n"
       "  // ---- events ----\n"
       "  KERN_EVENT(on1, event_custom<\"Go\">)\n"
-      "  void on1(Actor actor, Float value, Text text) {\n"
-      "    n2 = Sum(kern::to<Int>(value));\n"
+      "  void on1(Actor actor, f64 value, Text text) {\n"
+      "    n2 = Sum(num_cast<i64, f64>(value));\n"
       "    Total = n2.s;\n"
       "  }\n"
       "\n"
@@ -4817,8 +4817,8 @@ TEST(logic_notation_values_of_a_call) {
   std::string before = text;
   auto cut = [&](const std::string& what) { const std::size_t at = before.find(what); CHECK(at != std::string::npos); if (at != std::string::npos) before.erase(at, what.size()); };
   cut("    HalfResult n12;\n");
-  cut("    struct : kern::Node<11> { Int index = 0; } n11;\n");
-  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { Int index = 0; } n11;\n");
+  cut("    struct : kern::Node<11> { i64 index = 0; } n11;\n");
+  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { i64 index = 0; } n11;\n");
   logic::Graph old;
   CHECK(logic::from_cpp(before, old, &name, &error) && logic::same_blueprint(old, g));
   // a value an earlier pass of the loop reads (n13), or one an event reads (n2), is no local of Sum
@@ -4842,17 +4842,17 @@ TEST(logic_recursion_rules) {
     if (read || error.find(why) == std::string::npos) std::printf("%s\n", error.c_str());
     return !read && error.find(why) != std::string::npos;
   };
-  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  KERN_PURE HalfResult Half(Float x = 0.0) {\n"
-                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { f64 h = 0.0; };\n  KERN_PURE HalfResult Half(f64 x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div<f64>(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
                 "calls itself and is read as a value"));
-  CHECK(refused("struct Q : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n"
-                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+  CHECK(refused("struct Q : kern::Blueprint {\n  f64 Seen = 0.0;\n\n  struct HalfResult { f64 h = 0.0; };\n  HalfResult Half(f64 x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
                 "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
                 "calls itself, so every call has its own values"));
   logic::Graph ok;
   std::string error;
-  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n    HalfResult n5;\n"
-                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { f64 h = 0.0; };\n  HalfResult Half(f64 x = 0.0) {\n    HalfResult n5;\n"
+                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div<f64>(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
                         ok, nullptr, &error));
   if (!error.empty()) std::printf("%s\n", error.c_str());
 }
@@ -4865,24 +4865,24 @@ TEST(logic_notation_reads_what_a_person_writes) {
 struct Demo : kern::Blueprint {
   /// How hot it is.
   /// Second line.
-  Float Heat = 1;
-  Int Count = 0;
-  Bool Open = false;
+  f64 Heat = 1;
+  i64 Count = 0;
+  bool Open = false;
 
-  struct LevelResult { Float Result = 0.0; Bool Hot = false; };
+  struct LevelResult { f64 Result = 0.0; bool Hot = false; };
   /// The level for a heat.
-  KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
+  KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
     if (math_compare<">">(heat, 10.0)) {
-      return {kern::formula([](Float h, Float s) -> Float { return h*s; }, heat, scale), true};
+      return {kern::formula([](f64 h, f64 s) -> f64 { return h*s; }, heat, scale), true};
     } else {
       return {0.0, false};
     }
   }
 
-  void Cool(Float by = 1.0) {
-    if (math_compare<"<=">(Heat, 0.0)) { return; }
+  void Cool(f64 by = 1.0) {
+    if (math_compare<"<=", f64>(Heat, 0.0)) { return; }
     else {
-      Heat = math_sub(Heat, by);
+      Heat = math_sub<f64>(Heat, by);
       if (Open) { Count += 1; }
       else { if (math_compare<">">(Heat, 5.0)) { Count += 2; } }
       debug_print(kern::to<Text>(Count), false);
@@ -4890,12 +4890,12 @@ struct Demo : kern::Blueprint {
   }
 
   KERN_EVENT(on1, event_tick)
-  void on1(Float delta) {
+  void on1(f64 delta) {
     n1 = {delta};
     Cool(delta);
     flow_delay(n9, 0.5, [this] { Heat += n1.delta; });
   }
-  struct { Float delta = 0.0; } n1;
+  struct { f64 delta = 0.0; } n1;
   kern::Node<9> n9;
 };
 )kn";
@@ -4903,25 +4903,25 @@ struct Demo : kern::Blueprint {
   // ---- variables ----
   /// How hot it is.
   /// Second line.
-  Float Heat = 1.0;
-  Int Count = 0;
-  Bool Open = false;
+  f64 Heat = 1.0;
+  i64 Count = 0;
+  bool Open = false;
 
   // ---- functions ----
-  struct LevelResult { Float Result = 0.0; Bool Hot = false; };
+  struct LevelResult { f64 Result = 0.0; bool Hot = false; };
   /// The level for a heat.
-  KERN_PURE LevelResult Level(Float heat = 0.0, Float scale = 2.0) {
+  KERN_PURE LevelResult Level(f64 heat = 0.0, f64 scale = 2.0) {
     if (math_compare<">">(heat, 10.0)) {
-      return {kern::formula([](Float h, Float s) -> Float { return h * s; }, heat, scale), true};
+      return {kern::formula([](f64 h, f64 s) -> f64 { return h * s; }, heat, scale), true};
     }
     return {0.0, false};
   }
 
-  void Cool(Float by = 1.0) {
-    if (math_compare<"<=">(Heat, 0.0)) {
+  void Cool(f64 by = 1.0) {
+    if (math_compare<"<=", f64>(Heat, 0.0)) {
       return;
     }
-    Heat = math_sub(Heat, by);
+    Heat = math_sub<f64>(Heat, by);
     if (Open) {
       Count += 1;
     } else if (math_compare<">">(Heat, 5.0)) {
@@ -4932,7 +4932,7 @@ struct Demo : kern::Blueprint {
 
   // ---- events ----
   KERN_EVENT(on1, event_tick)
-  void on1(Float delta) {
+  void on1(f64 delta) {
     n1 = {delta};
     Cool(delta);
     flow_delay(n9, 0.5, [this] {
@@ -4941,7 +4941,7 @@ struct Demo : kern::Blueprint {
   }
 
   // ---- what nodes give and keep ----
-  struct { Float delta = 0.0; } n1;
+  struct { f64 delta = 0.0; } n1;
   kern::Node<9> n9;
 };
 )kn";
@@ -4979,8 +4979,8 @@ struct Demo : kern::Blueprint {
   // values nothing reads.
   const char* door = R"kn(
 struct Door : kern::Blueprint {
-  Float Angle = 0.0;
-  Int Hits = 0;
+  f64 Angle = 0.0;
+  i64 Hits = 0;
   Text Note = "a \"door\"\n\ttab \\ end \101";
   Vector Home = Vector{1.0, -2.5, 3.0};
   Actor Other = Actor{};
@@ -4993,18 +4993,18 @@ struct Door : kern::Blueprint {
       .when(8, 0, 4, "Angle")
       .automatic(9, 5, 5);
 
-  auto n20() { return math_mul(Angle, 2.0); }
+  auto n20() { return math_mul<f64>(Angle, 2.0); }
 
   KERN_EVENT(on1, event_custom<"Open">)
-  void on1(Actor actor, Float value, Text text) {
+  void on1(Actor actor, f64 value, Text text) {
     go30("open");
   }
 
   KERN_EVENT(on2, event_custom<"Push">)
-  void on2(Actor actor, Float value, Text text) {
+  void on2(Actor actor, f64 value, Text text) {
     n2 = {actor, value, text};
-    const auto n21 = [&] { return math_add(value, n20()); };
-    switch (flow_switch_int<"2">(kern::to<Int>(n21()))) {
+    const auto n21 = [&] { return math_add<f64>(value, n20()); };
+    switch (flow_switch_int<"2">(num_cast<i64, f64>(n21()))) {
       case 0: { Hits += 1; } break;
       case 1: { Hits += 2; } break;
     }
@@ -5019,21 +5019,21 @@ struct Door : kern::Blueprint {
         for (auto it42 = flow_for(n42, 0, 3); it42.next();) {
           Hits += n42.index;
         }
-        Angle = kern::to<Float>(n42.index);
+        Angle = num_cast<f64, i64>(n42.index);
       }
     }
     {
       flow_tween<"smooth">(n43, "play", 1.5, {
         {"update", [this] {
-          const auto n44 = [&] { return math_mul(n43.alpha, 90.0); };
-          Angle = math_add(n44(), n44());
+          const auto n44 = [&] { return math_mul<f64>(n43.alpha, 90.0); };
+          Angle = math_add<f64>(n44(), n44());
         }},
         {"finished", [this] {
           flow_call<"Open">(Actor{}, Other, n20(), Note);
         }},
       });
     }
-    while (loop(math_compare<"<">(Angle, 10.0))) {
+    while (loop(math_compare<"<", f64>(Angle, 10.0))) {
       Angle += 1;
     }
     Hits = 0;
@@ -5065,11 +5065,11 @@ struct Door : kern::Blueprint {
     (void)Home;
   }
 
-  struct { Actor actor = Actor{}; Float value = 0.0; Text text = ""; } n2;
+  struct { Actor actor = Actor{}; f64 value = 0.0; Text text = ""; } n2;
   kern::Node<30> n30;
   kern::Node<41> n41;
-  struct : kern::Node<42> { Int index = 0; } n42;
-  struct : kern::Node<43> { Float alpha = 0.0; } n43;
+  struct : kern::Node<42> { i64 index = 0; } n42;
+  struct : kern::Node<43> { f64 alpha = 0.0; } n43;
   kern::Node<51> n51;
   kern::Node<70> n70;
 };
@@ -5127,7 +5127,7 @@ TEST(logic_native_blueprints) {
   }
   for (const auto& d : logic::library().all()) {
     // the node next to a variable and a function it can name
-    logic::Graph g = logic_graph(R"({"variables":[{"name":"V","type":"float","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
+    logic::Graph g = logic_graph(R"({"variables":[{"name":"V","type":"f64","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
       "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})");
     logic::Node n;
     n.id = 2;
@@ -5155,7 +5155,7 @@ TEST(logic_native_blueprints) {
   CHECK(logic::native_ready(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"game.message"}],"links":[[1,"then",2,"exec"]]})")));
   CHECK(logic::native_ready(logic_graph(R"({"nodes":[{"id":4,"type":"actor.self"},{"id":5,"type":"walker.quack"}],"links":[[4,"actor",5,"target"]]})")));
   CHECK(logic::native_ready(logic_graph(R"({"machines":[{"id":40,"name":"Door","states":[{"id":41,"name":"A","initial":true}],"transitions":[]}],"nodes":[],"links":[]})")));
-  not_yet(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
+  not_yet(R"({"variables":[{"name":"my var","type":"f64","value":0}],"nodes":[],"links":[]})", "is no name C++ can write");
 
   // A graph whose class the binary has runs as that class: the instance reaches it by name
   // (logic::NativeBlueprint - written for a Blueprint by logic::native_glue; here one by hand,
@@ -5182,9 +5182,9 @@ TEST(logic_native_blueprints) {
     }
     void* object(const void* type) override { return type == &logic::class_key<Fake> ? this : nullptr; }
   };
-  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"float","value":5}],
-    "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"r","type":"float","value":0}]}],
-    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Twice"}},{"id":2,"type":"math.mul","values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Twice"}}],
+  const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"f64","value":5}],
+    "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"f64","value":0}],"outputs":[{"name":"r","type":"f64","value":0}]}],
+    "nodes":[{"id":1,"type":"func.entry","params":{"function":"Twice"}},{"id":2,"type":"math.mul","params":{"type":"f64"},"values":{"b":2}},{"id":3,"type":"func.return","params":{"function":"Twice"}}],
     "links":[[1,"then",3,"exec"],[1,"x",2,"a"],[2,"result",3,"r"]]})");
   logic::register_native_blueprint(logic::graph_hash(g), [] { return std::unique_ptr<logic::NativeBlueprint>(new Fake()); });
   FakeLogicHost host;
@@ -5268,7 +5268,7 @@ TEST(logic_native_blueprints) {
   CHECK(logic::native_glue(logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.tween","params":{"ease":"out"}}],"links":[[1,"then",4,"play"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.flow_tween_resume<\"out\">(self.n4); break;  // Tween") != std::string::npos);
   // an event's handler is reached through the glue: the node's place in the graph, its values from its outputs
-  CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"float","value":0}],
+  CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"f64","value":0}],
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
                   "native_out<kern::logic::Text>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
@@ -5352,128 +5352,14 @@ TEST(game_blueprints_as_classes) {
   }
 }
 
-TEST(logic_fixed_widths) {
-  // An Int place of a fixed width (U8 ... I32): what flows is an Int, the place holds its low
-  // bits as C++ stores them - in every tier, at every place (a variable, a field, an input, an
-  // output, a local variable), by Set, Add to Variable, a call and from outside.
-  const std::string text =
-      "struct B : kern::Blueprint {\n"
-      "  KERN_STRUCT(P) {\n    U16 a = 65535;\n  };\n"
-      "  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n  I32 Big = 0;\n  Int Plain = 0;\n  P Pt = P{65535};\n"
-      "  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x) {\n    I16 Here = 0;\n    Here = x;\n    return {Here};\n  }\n"
-      "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
-      "    Small = 300;\n    Signed = kern::to<Int>(value);\n    Big = Hash;\n    Pt.a = kern::to<Int>(value);\n    Small += 220;\n    Hash += -4000000001;\n  }\n};\n";
-  logic::Graph g, back;
-  std::string error, written, twice;
-  CHECK(logic::from_cpp(text, g, nullptr, &error));
-  if (!error.empty()) std::printf("%s\n", error.c_str());
-  CHECK(g.variable("Small") && g.variable("Small")->type == logic::PinType::integer && g.variable("Small")->of == "u8" && g.structure("P") && g.structure("P")->fields[0].type.of == "u16");
-  for (const logic::Issue& i : logic::check(g))
-    if (i.error) { std::printf("check: %s\n", i.text.c_str()); CHECK(false); }
-  CHECK(logic::to_cpp(g, "B", written, &error, logic::library(), false));
-  CHECK(written.find("  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n") != std::string::npos && written.find("  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x = 0) {\n    I16 Here = 0;\n") != std::string::npos);
-  CHECK(logic::from_cpp(written, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == written);
-  if (twice != written) std::printf("%s\n---\n%s\n", written.c_str(), twice.c_str());
-  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
-  CHECK(logic::type_label({logic::PinType::integer, "u32"}) == "U32" && logic::type_text({logic::PinType::integer, "i16"}) == "i16");
-  logic::TypeRef named;
-  CHECK(logic::type_from_text("u8", g, named) && named.type == logic::PinType::integer && named.of == "u8" && !logic::type_from_text("map<u8>float", g, named));
-  // the ends of every width, and Ints beyond them: static_cast<u32>(x), two's complement for a signed width
-  CHECK(logic::wrapped(256, "u8") == 0 && logic::wrapped(-1, "u8") == 255 && logic::wrapped(128, "i8") == -128 && logic::wrapped(-129, "i8") == 127);
-  CHECK(logic::wrapped(65536 + 7, "u16") == 7 && logic::wrapped(32768, "i16") == -32768 && logic::wrapped(i64{1} << 32, "u32") == 0 && logic::wrapped(-1, "u32") == 4294967295);
-  CHECK(logic::wrapped(i64{2147483648}, "i32") == -2147483648LL && logic::wrapped(9223372036854775807LL, "u32") == 4294967295 && logic::wrapped(-9223372036854775807LL, "i32") == 1);
-  CHECK(logic::wrapped((i64{1} << 53) + 2, "u32") == 2 && logic::wrapped(-(i64{1} << 53), "i16") == 0 && logic::wrapped(5, "") == 5);
-  for (bool jit : {false, true}) {
-    FakeLogicHost host;
-    logic::Runtime rt(host);
-    rt.jit = jit;
-    rt.native = false;
-    logic::Instance* inst = rt.add(g, 0, "Level");
-    rt.begin();
-    rt.call("Go", 0, {{"value", logic::Value::number(200.7)}});
-    CHECK(host.errors.empty());
-    CHECK(inst->get("Small").i == 8 && inst->get("Signed").i == -56 && inst->get("Big").i == -294967296 && inst->get("Pt").field(0)->i == 200);  // (300 -> 44, + 220 -> 8)
-    CHECK(inst->get("Hash").i == 4294967295);  // (4000000000 - 4000000001)
-    CHECK(inst->set("Small", logic::Value::integer(-1)) && inst->get("Small").i == 255 && inst->set("Signed", logic::Value::number(1e30)) && inst->get("Signed").i == -1);
-    std::vector<logic::Value> results;
-    CHECK(inst->call("Twice", {logic::Value::integer(65537 + 255)}, results) && results.size() == 1 && results[0].i == 0);  // (65792 as I16 is 256, as U8 0)
-    CHECK(inst->call("Twice", {logic::Value::integer(40000)}, results) && results.size() == 1 && results[0].i == 64);  // (40000 as I16 is -25536, as U8 64)
-  }
-  auto says = [&](const std::string& body, const char* why) {
-    logic::Graph h;
-    std::string e;
-    const bool is_read = logic::from_cpp("struct B : kern::Blueprint {\n" + body + "};\n", h, nullptr, &e);
-    for (const logic::Issue& i : is_read ? logic::check(h) : std::vector<logic::Issue>())
-      if (i.error) e += " | " + i.text;
-    const bool right = e.find(why) != std::string::npos;
-    if (!right) std::printf("expected \"%s\", got: %s\n", why, e.empty() ? "(nothing is wrong with it)" : e.c_str());
-    return right;
-  };
-  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = kern::to<I8>(value);\n  }\n", "kern::to<Int>, not kern::to<I8>"));
-  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = value;\n  }\n", "this is Float, the input is Int: write kern::to<Int>(...)"));
-  CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
-  CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
-  CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
-  // (a map's values may be of a width - the map is the place -, its defaults hold values of it; a list of a fixed length is no value of a map)
-  {
-    logic::Graph h;
-    std::string e;
-    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Map<Int, U32> Good = Map<Int, U32>{{1, 4294967295}};\n  Map<Int, List<U8>> Bytes = Map<Int, List<U8>>{{2, List<U8>{0, 255}}};\n};\n", h, nullptr, &e));
-    for (const logic::Issue& i : logic::check(h)) CHECK(!i.error);
-    // (a map from outside: its values as the map holds them - 2^32 + 7 as a U32 is 7, 256 in a List<U8> is 0)
-    const logic::TypeRef good = logic::declared(h.variables[0]), bytes = logic::declared(h.variables[1]);
-    logic::Value a = logic::Value::zero(logic::PinType::map), b = logic::Value::zero(logic::PinType::map);
-    a.own_entries().try_emplace(logic::key_of(logic::Value::integer(1)), logic::Value::integer(4294967303));
-    b.own_entries().try_emplace(logic::key_of(logic::Value::integer(2)), logic::Value::from_json([] { json::Value l = json::Value::array(); l.push(json::Value(256.0)); l.push(json::Value(1.0)); return l; }(), logic::PinType::integer_list));
-    const logic::Value a2 = logic::from_outside(a, good, h), b2 = logic::from_outside(b, bytes, h);
-    CHECK(a2.keyed().value_at(0).i == 7 && b2.keyed().value_at(0).item(0).i == 0 && b2.keyed().value_at(0).item(1).i == 1);
-    CHECK(a.keyed().value_at(0).i == 4294967303);  // (the map given stays as it was)
-  }
-  CHECK(says("  Map<Int, U8> Bad = Map<Int, U8>{{1, 256}};\n", "a value: 256 is no U8"));
-  CHECK(says("  Map<Int, List<I8>> Bad = Map<Int, List<I8>>{{1, List<I8>{128}}};\n", "a list's item: 128 is no I8"));
-  CHECK(says("  Map<Int, Fixed<Int, 2>> Bad = Map<Int, Fixed<Int, 2>>{};\n", "no map, set or list of a fixed length"));
-  // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
-  // writes numbers of its width into it; a field of a width has its own width in a layout
-  CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
-  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_append(W, B);\n  }\n",
-             "this is List<U8>, the input is List<Int>: the two do not convert"));
-  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_copy_bytes<\"u32\", \"u8\">(B, 0, W, 0, 4);\n  }\n",
-             "its numbers are u8, not u32"));
-  CHECK(says("  KERN_STRUCT(H) {\n    U8 a = 0;\n  };\n  List<U16> B = List<U16>{};\n  H Hh = H{0};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Hh = struct_of_bytes<H, \"2: u16@0\">(B, 0);\n  }\n",
-             "its own width"));
-  {
-    // ... and a graph that says it wrong
-    logic::Graph h;
-    h.variables.push_back({"W", logic::PinType::integer, json::Value(70000.0), {}, "u16"});
-    h.variables.push_back({"X", logic::PinType::integer, json::Value(-1.0), {}, "u32"});
-    std::string all;
-    for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
-    CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
-  }
-  {
-    // Lists of a width hold and give what std::vector<u8>, <int8_t>, <uint32_t> hold and give - the same steps in C++ give these numbers
-    // (and the case fixed_width_lists runs as a class and in the JIT against this interpreter)
-    for (const logic_cases::Case& c : logic_cases::cases()) {
-      if (std::string(c.name) != "fixed_width_lists") continue;
-      logic_cases::Host lh;
-      logic::Runtime lr(lh);
-      lr.native = false;
-      logic::Instance* li = lr.add(logic_cases::parse(c), 0, "l");
-      lr.begin();
-      CHECK(li->get("W").as_text() ==
-            "[3, 0, -1, 6, 7, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, "
-            "-1, 0, -1, 127, -128, 0, -1, -128, 127, -1, 1, 0, 127, 20]");
-    }
-  }
-}
-
+// (logic_fixed_widths: the widths of a place and Int64 went into the number types - numbers_against_cpp, numbers_nodes_interpreter, number_cases.h)
 TEST(logic_fixed_lists) {
-  // A place can be declared as a list of a fixed length - Fixed<Float, 3>, std::array in a
+  // A place can be declared as a list of a fixed length - Fixed<f64, 3>, std::array in a
   // Blueprint's C++: a variable, a field, an input, an output, a local variable. What flows
   // through a pin stays a list; the place keeps its length.
-  const std::string head = "struct B : kern::Blueprint {\n  KERN_STRUCT(Mat) {\n    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n  };\n"
-                           "  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n  List<Float> Any = List<Float>{};\n  Mat Now = Mat{Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0}};\n";
-  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_STRUCT(Mat) {\n    Fixed<f64, 4> m = Fixed<f64, 4>{1.0, 0.0, 0.0, 1.0};\n  };\n"
+                           "  Fixed<f64, 3> Axis = Fixed<f64, 3>{1.0, 2.0, 3.0};\n  List<f64> Any = List<f64>{};\n  Mat Now = Mat{Fixed<f64, 4>{1.0, 0.0, 0.0, 1.0}};\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n" + lines + "\n  }\n"; };
   auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
   auto says = [&](const std::string& body, const char* why) {
     logic::Graph g;
@@ -5491,11 +5377,11 @@ TEST(logic_fixed_lists) {
     // that is not zero - in the text and in JSON (a buffer of 24000 zeros says nothing)
     logic::Graph g, back;
     std::string error, text, twice;
-    CHECK(read("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n"
-               "    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];\n    Echo[23999] = value;"),
+    CHECK(read("  Fixed<f64, 24000> Echo = Fixed<f64, 24000>{};\n  struct GiveResult { Fixed<f64, 3> v = Fixed<f64, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<f64, 3>& seen, Fixed<f64, 3>& into, Fixed<f64, 3> v = Fixed<f64, 3>{1.0}) {\n"
+               "    Fixed<f64, 2> Pair = Fixed<f64, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];\n    Echo[23999] = value;"),
                g, error));
     if (!error.empty()) std::printf("%s\n", error.c_str());
-    CHECK(g.variable("Axis") && g.variable("Axis")->count == 3 && g.variable("Axis")->type == logic::PinType::number_list && g.variable("Any")->count == 0);
+    CHECK(g.variable("Axis") && g.variable("Axis")->count == 3 && g.variable("Axis")->type == logic::PinType::f64_list && g.variable("Any")->count == 0);
     CHECK(g.structure("Mat") && g.structure("Mat")->fields[0].type.count == 4);
     const logic::Function* give = g.function("Give");
     CHECK(give && give->input("v")->count == 3 && give->input("seen")->count == 3 && give->input("into")->ref && give->outputs[0].count == 3 && give->locals[0].count == 2);
@@ -5503,9 +5389,9 @@ TEST(logic_fixed_lists) {
     CHECK(g.variable("Echo") && g.variable("Echo")->count == 24000 && json::stringify(g.variable("Echo")->value) == "[]" && json::stringify(g.structure("Mat")->fields[0].value) == "[1,0,0,1]");
     {
       // (said: up to the last entry that is not exactly zero - -0.0 is said, a struct at its defaults is not)
-      const logic::TypeRef three{logic::PinType::number_list, {}, 3};
+      const logic::TypeRef three{logic::PinType::f64_list, {}, 3};
       CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), three, g) == 2 && logic::said(logic::Value::of(std::vector<f64>{0, 0, -0.0}), three, g) == 3);
-      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), {logic::PinType::number_list, {}, 0}, g) == 3 && logic::said(logic::Value::of(std::vector<f64>{}), three, g) == 0);
+      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), {logic::PinType::f64_list, {}, 0}, g) == 3 && logic::said(logic::Value::of(std::vector<f64>{}), three, g) == 0);
       const logic::TypeRef mats{logic::PinType::structure_list, "Mat", 2};
       const logic::Value plain = logic::zero_of({logic::PinType::structure, "Mat"}, g);
       CHECK(logic::said(logic::fitted(logic::Value::structures({}), mats, g), mats, g) == 0 && logic::said(logic::Value::structures({plain, plain}), mats, g) == 0);
@@ -5513,9 +5399,9 @@ TEST(logic_fixed_lists) {
     }
     CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
     // (the text says an entry up to the last that is not zero - what it does not say is zero, as in C++)
-    CHECK(text.find("  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n") != std::string::npos);
-    CHECK(text.find("  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n") != std::string::npos && text.find("    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n") != std::string::npos);
-    CHECK(text.find("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n") != std::string::npos && text.find("  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{}; };\n") != std::string::npos);
+    CHECK(text.find("  GiveResult Give(const Fixed<f64, 3>& seen, Fixed<f64, 3>& into, Fixed<f64, 3> v = Fixed<f64, 3>{1.0}) {\n    Fixed<f64, 2> Pair = Fixed<f64, 2>{};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<f64, 3> Axis = Fixed<f64, 3>{1.0, 2.0, 3.0};\n") != std::string::npos && text.find("    Fixed<f64, 4> m = Fixed<f64, 4>{1.0, 0.0, 0.0, 1.0};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<f64, 24000> Echo = Fixed<f64, 24000>{};\n") != std::string::npos && text.find("  struct GiveResult { Fixed<f64, 3> v = Fixed<f64, 3>{}; };\n") != std::string::npos);
     CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
     CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
     std::string difference;
@@ -5545,30 +5431,30 @@ TEST(logic_fixed_lists) {
   CHECK(says(in_event("    list_add(Axis, 1.0);"), "\"Axis\" is a list of a fixed length (3)"));
   CHECK(says(in_event("    list_clear(Now.m);"), "is a list of a fixed length (4)"));
   CHECK(says(in_event("    list_resize(Axis, 5, 0.0);"), "is a list of a fixed length (3)"));
-  CHECK(says("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
-  CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 65536 entries"));
-  CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
+  CHECK(says("  Fixed<f64, 2> Two = Fixed<f64, 2>{1.0, 2.0, 3.0};\n", "Fixed<f64, 2> has 2 entries: this says 3"));
+  CHECK(says("  Fixed<f64, 0> None = Fixed<f64, 0>{};\n", "a list of a fixed length has 1 to 65536 entries"));
+  CHECK(says("  Fixed<f64, 2> Two = List<f64>{1.0, 2.0, 3.0};\n", "Fixed<f64, 2> has 2 entries: this says 3"));
   {
     // (a list written out for a place of a fixed length is that place's entries - as C++ takes it; the text of the graph says Fixed)
     logic::Graph g;
     std::string error, text;
-    CHECK(read("  Fixed<Float, 2> Two = List<Float>{1.5};\n  Mat Other = Mat{List<Float>{2.0, 3.0}};\n", g, error) && logic::to_cpp(g, "B", text, &error, logic::library(), false));
-    CHECK(text.find("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.5};\n  Mat Other = Mat{Fixed<Float, 4>{2.0, 3.0}};\n") != std::string::npos);
+    CHECK(read("  Fixed<f64, 2> Two = List<f64>{1.5};\n  Mat Other = Mat{List<f64>{2.0, 3.0}};\n", g, error) && logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  Fixed<f64, 2> Two = Fixed<f64, 2>{1.5};\n  Mat Other = Mat{Fixed<f64, 4>{2.0, 3.0}};\n") != std::string::npos);
   }
-  CHECK(says("  List<Float> Two = Fixed<Float, 2>{1.0, 2.0};\n", "this is Fixed<Float, 2>, but List<Float> is needed"));
-  CHECK(says(in_event("    Any = Fixed<Float, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
-  CHECK(says("  void Fill(List<Float>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));
-  CHECK(says("  void Fill(Fixed<Float, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list[4], but Axis is float_list[3]"));
-  CHECK(says("  void Fill(Fixed<Float, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is float_list[3], but Any is float_list"));
+  CHECK(says("  List<f64> Two = Fixed<f64, 2>{1.0, 2.0};\n", "this is Fixed<f64, 2>, but List<f64> is needed"));
+  CHECK(says(in_event("    Any = Fixed<f64, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
+  CHECK(says("  void Fill(List<f64>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));
+  CHECK(says("  void Fill(Fixed<f64, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list[4], but Axis is float_list[3]"));
+  CHECK(says("  void Fill(Fixed<f64, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is float_list[3], but Any is float_list"));
   {
     // ... and a graph that says it wrong
     logic::Graph g;
-    g.variables.push_back({"N", logic::PinType::number, json::Value(0.0), {}, {}, 3});
+    g.variables.push_back({"N", logic::PinType::f64, json::Value(0.0), {}, {}, 3});
     json::Value two = json::Value::array();
     two.push(1.0);
     two.push(2.0);
-    g.variables.push_back({"L", logic::PinType::number_list, two, {}, {}, 3});
-    g.variables.push_back({"Big", logic::PinType::number_list, json::Value::array(), {}, {}, logic::kLongestFixed + 1});
+    g.variables.push_back({"L", logic::PinType::f64_list, two, {}, {}, 3});
+    g.variables.push_back({"Big", logic::PinType::f64_list, json::Value::array(), {}, {}, logic::kLongestFixed + 1});
     std::string all;
     for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
     CHECK(all.find("variable \"N\" has a fixed length (3), but is float: a length is a list's") != std::string::npos);
@@ -5590,9 +5476,9 @@ inline constexpr char kTitle[] = "the title of this Blueprint, longer than a sma
 inline constexpr char kName[] = "a name that is longer than fifteen characters";
 struct B : kern::Blueprint {
   KERN_ENUM(Mode, Closed, Open);
-  KERN_STRUCT(Spec) { Text Name = kName; Float Mass = 1.0; };
-  KERN_STRUCT(Part) { Vector At = Vector{0.0, 0.0, 0.0}; List<Float> Loads = List<Float>{}; };
-  KERN_STRUCT(Rig) { Text Name = ""; Part Core = Part{Vector{0.0, 0.0, 0.0}, List<Float>{}}; List<Part> Parts = List<Part>{}; };
+  KERN_STRUCT(Spec) { Text Name = kName; f64 Mass = 1.0; };
+  KERN_STRUCT(Part) { Vector At = Vector{0.0, 0.0, 0.0}; List<f64> Loads = List<f64>{}; };
+  KERN_STRUCT(Rig) { Text Name = ""; Part Core = Part{Vector{0.0, 0.0, 0.0}, List<f64>{}}; List<Part> Parts = List<Part>{}; };
   Text Title = kTitle;
   Spec Car = Spec{kName, 2.0};
   struct NameResult { Text out = ""; };
@@ -5676,7 +5562,8 @@ TEST(logic_text_of_the_program) {
   CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
   const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);
   CHECK(back.size() == 3 && back[1] == names[1] && logic::to_value(b.Title).as_text() == kTitle && logic::from_value<Text>(logic::Value::text("t")) == "t");
-  CHECK(kern::to<Text>(1.5) == "1.5" && kern::to<Text>(true) == "true" && kern::to<Text>(Text("t")) == "t");
+  // (no wire converts: a number becomes a text by To Text - num_text, the shortest decimal that gives it again)
+  CHECK(logic::PureNodes::num_text<f64>(1.5) == "1.5" && logic::PureNodes::num_text<f32>(0.1f) == "0.1" && logic::PureNodes::num_text<u8>(255) == "255" && kern::to<Text>(Text("t")) == "t");
   const kern::Fixed<Text, 2> pair{"only one"};
   CHECK(pair[0] == "only one" && pair[1] == "" && pair[5] == "");
   Text set;
@@ -5791,76 +5678,14 @@ TEST(kern_map_keeps_the_order_its_keys_came) {
   CHECK((kern::Map<int, int>{{1, 2}} == kern::Map<int, int>{{1, 2}}) && !(kern::Map<int, int>{{1, 2}, {3, 4}} == kern::Map<int, int>{{3, 4}, {1, 2}}));
 }
 
-TEST(logic_int64_is_u64_and_i64) {
-  // Every Int64 node against what u64 and i64 of C++ do - with random bits (and the edges: 0, 1,
-  // -1, the smallest and the largest i64); where C++ leaves it open, the node's own answer.
-  using P = logic::PureNodes;
-  using I = logic::Int64;
-  u64 state = 0x2545f4914f6cdd1dull;
-  auto next = [&] {
-    state ^= state << 13, state ^= state >> 7, state ^= state << 17;
-    return state;
-  };
-  const u64 edges[] = {0, 1, ~u64{0}, u64{1} << 63, (u64{1} << 63) - 1, 2, 63, 64, 0xffffffffull, 0x100000000ull};
-  auto draw = [&] { return next() % 4 == 0 ? edges[next() % (sizeof edges / sizeof edges[0])] : next() >> (next() % 64); };
-  bool same = true;
-  for (int k = 0; k < 20000 && same; ++k) {
-    const u64 a = draw(), b = draw();
-    const i64 sa = static_cast<i64>(a), sb = static_cast<i64>(b);
-    const i64 by = static_cast<i64>(next() % 200) - 50;
-    const unsigned sh = static_cast<unsigned>(static_cast<u64>(by) & 63);
-    same = same && P::int64_add(I(a), I(b)).bits == a + b && P::int64_sub(I(a), I(b)).bits == a - b && P::int64_mul(I(a), I(b)).bits == a * b;
-    same = same && P::int64_div_unsigned(I(a), I(b)).bits == (b ? a / b : 0) && P::int64_rem_unsigned(I(a), I(b)).bits == (b ? a % b : 0);
-    if (sb != 0 && !(sb == -1 && sa == std::numeric_limits<i64>::min()))
-      same = same && P::int64_div(I(a), I(b)).bits == static_cast<u64>(sa / sb) && P::int64_rem(I(a), I(b)).bits == static_cast<u64>(sa % sb);
-    same = same && P::int64_and(I(a), I(b)).bits == (a & b) && P::int64_or(I(a), I(b)).bits == (a | b) && P::int64_xor(I(a), I(b)).bits == (a ^ b) && P::int64_not(I(a)).bits == ~a;
-    same = same && P::int64_shift_left(I(a), by).bits == (a << sh) && P::int64_shift_right_unsigned(I(a), by).bits == (a >> sh) && P::int64_shift_right(I(a), by).bits == static_cast<u64>(sa >> sh);
-    same = same && P::int64_rotate_left(I(a), by).bits == std::rotl(a, static_cast<int>(sh)) && P::int64_rotate_right(I(a), by).bits == std::rotr(a, static_cast<int>(sh));
-    same = same && P::int64_equal(I(a), I(b)) == (a == b) && P::int64_less(I(a), I(b)) == (sa < sb) && P::int64_less_unsigned(I(a), I(b)) == (a < b);
-    same = same && P::int64_high(I(a)) == static_cast<i64>(a >> 32) && P::int64_low(I(a)) == static_cast<i64>(a & 0xffffffffull) && P::int64_of_halves(P::int64_high(I(a)), P::int64_low(I(a))).bits == a;
-    same = same && P::int64_count_ones(I(a)) == std::popcount(a) && P::int64_leading_zeros(I(a)) == std::countl_zero(a) && P::int64_trailing_zeros(I(a)) == std::countr_zero(a);
-    same = same && P::int64_bits_of_float(P::int64_float_of_bits(I(a))).bits == a;  // (a no-number's bits too)
-    // 32 bits: std::bit_cast of a float, both ways - of every pattern, also the no-numbers (their sign and payload) and the subnormals
-    const u32 w = static_cast<u32>(a);
-    const bool no_number = (w & 0x7f800000u) == 0x7f800000u && (w & 0x007fffffu) != 0;
-    // (a no-number a Float holds is quiet - as a float that becomes a double is: its 32 bits again with the quiet bit)
-    same = same && P::math_bits_of_float32(P::math_float32_of_bits(static_cast<i64>(w))) == static_cast<i64>(no_number ? w | 0x00400000u : w);
-    same = same && P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(a))).bits == P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(w))).bits;  // (the last 32 bits)
-    if (!no_number)
-      same = same && P::math_float32_of_bits(static_cast<i64>(w)) == static_cast<f64>(std::bit_cast<f32>(w)) && P::math_bits_of_float32(static_cast<f64>(std::bit_cast<f32>(w))) == static_cast<i64>(w);
-    same = same && P::int64_of_text(P::int64_text(I(a))).bits == a && P::int64_of_text(P::int64_text_signed(I(a))).bits == a && P::int64_of_text("0x" + P::int64_text_hex(I(a))).bits == a;
-    same = same && P::int64_text(I(a)) == std::to_string(a) && P::int64_text_signed(I(a)) == std::to_string(sa);
-    same = same && P::int64_to_float(I(a)) == static_cast<f64>(sa) && P::int64_to_float_unsigned(I(a)) == static_cast<f64>(a) && P::int64_to_int(I(a)) == logic::normal(sa);
-    const f64 x = static_cast<f64>(sa) * 0.75;
-    same = same && P::int64_of_float(x).bits == static_cast<u64>(static_cast<i64>(x));
-    if (!same) std::printf("Int64: %llx %llx by %lld\n", static_cast<unsigned long long>(a), static_cast<unsigned long long>(b), static_cast<long long>(by));
-  }
-  CHECK(same);
-  // what C++ leaves open, defined: by 0, the smallest i64 by -1, Floats beyond the ends and no number, texts that are none
-  const u64 min = u64{1} << 63;
-  CHECK(P::int64_div(I(5), I(0)).bits == 0 && P::int64_rem(I(5), I(0)).bits == 0 && P::int64_div_unsigned(I(5), I(0)).bits == 0 && P::int64_rem_unsigned(I(5), I(0)).bits == 0);
-  CHECK(P::int64_div(I(min), I(~u64{0})).bits == min && P::int64_rem(I(min), I(~u64{0})).bits == 0);
-  CHECK(P::int64_of_float(1e30).bits == static_cast<u64>(std::numeric_limits<i64>::max()) && P::int64_of_float(-1e30).bits == min && P::int64_of_float(std::nan("")).bits == 0);
-  CHECK(P::int64_of_float(-9223372036854775808.0).bits == min && P::int64_of_float(9223372036854775808.0).bits == static_cast<u64>(std::numeric_limits<i64>::max()));
-  CHECK(P::int64_of_float_unsigned(-1).bits == 0 && P::int64_of_float_unsigned(1e30).bits == ~u64{0} && P::int64_of_float_unsigned(3.75).bits == 3 && P::int64_of_float_unsigned(std::nan("")).bits == 0);
-  CHECK(P::int64_of_text("").bits == 0 && P::int64_of_text("zz").bits == 0 && P::int64_of_text("18446744073709551616").bits == 0 && P::int64_of_text("-5").bits == ~u64{0} - 4);
-  CHECK(P::int64_of_text("0x1F").bits == 31 && P::int64_text_hex(I(255)) == "ff" && P::int64_of_int(-1).bits == ~u64{0} && P::int64_to_int_unsigned(I(7)) == 7);
-  // the value of the language: its bits, as JSON a text of their u64, as a literal Int64{0x...}
-  const logic::Value v = logic::Value::int64(~u64{0});
-  CHECK(json::stringify(v.to_json()) == "\"18446744073709551615\"" && logic::Value::from_json(v.to_json(), logic::PinType::int64).i == v.i && v.as_text() == "18446744073709551615");
-  CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::int64).i == 5 && logic::Value::from_json(json::Value("0x10"), logic::PinType::int64).i == 16);
-  CHECK(!logic::convertible(logic::PinType::int64, logic::PinType::number) && !logic::convertible(logic::PinType::integer, logic::PinType::int64) && !logic::convertible(logic::PinType::int64, logic::PinType::text));
-  CHECK(logic::list_of(logic::PinType::int64) == logic::PinType::int64_list && logic::element_of(logic::PinType::int64_list) == logic::PinType::int64 && logic::is_list(logic::PinType::int64_list));
-  CHECK(!logic::is_list(logic::PinType::map) && !logic::is_list(logic::PinType::set) && logic::is_keyed(logic::PinType::map) && std::string(logic::pin_type_name(logic::PinType::int64_list)) == "int64_list");
-}
-
+// (logic_int64_is_u64_and_i64: the widths of a place and Int64 went into the number types - numbers_against_cpp, numbers_nodes_interpreter, number_cases.h)
 TEST(logic_maps_and_sets) {
   // Maps and sets of a Blueprint: types, values, JSON, the text, the check - and that a call that
   // holds an entry of a map keeps it where it is.
-  const std::string head = "struct B : kern::Blueprint {\n  KERN_ENUM(Kind, A, B, C);\n  KERN_STRUCT(Cell) {\n    Int Count = 0;\n    List<Text> Tags = List<Text>{};\n  };\n"
-                           "  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n  Map<Text, Cell> Cells = Map<Text, Cell>{};\n  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n"
-                           "  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n  Map<Int64, Text> Big = Map<Int64, Text>{{Int64{0xffffffffffffffff}, \"max\"}};\n  Float Got = 0.0;\n  Int N = 0;\n";
-  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_ENUM(Kind, A, B, C);\n  KERN_STRUCT(Cell) {\n    i64 Count = 0;\n    List<Text> Tags = List<Text>{};\n  };\n"
+                           "  Map<i64, f64> Scores = Map<i64, f64>{{3, 1.5}, {1, 2.0}};\n  Map<Text, Cell> Cells = Map<Text, Cell>{};\n  Map<Kind, List<f64>> Lists = Map<Kind, List<f64>>{};\n"
+                           "  Set<u64> Seen = Set<u64>{0x5u};\n  Map<u64, Text> Big = Map<u64, Text>{{0xffffffffffffffffu, \"max\"}};\n  f64 Got = 0.0;\n  i64 N = 0;\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n" + lines + "\n  }\n"; };
   auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
   auto says = [&](const std::string& body, const char* why) {
     logic::Graph g;
@@ -5877,11 +5702,11 @@ TEST(logic_maps_and_sets) {
     // the types and what TypeRef::of says of them
     const logic::TypeRef cells{logic::PinType::map, "text>struct:Cell"}, seen{logic::PinType::set, "int64"};
     CHECK(logic::key_type(cells).type == logic::PinType::text && logic::value_type(cells).type == logic::PinType::structure && logic::value_type(cells).of == "Cell");
-    CHECK(logic::key_type(seen).type == logic::PinType::int64 && logic::value_type(seen).type == logic::PinType::exec);
-    const logic::TypeRef kind{logic::PinType::enumeration, "Kind"}, floats{logic::PinType::number_list, {}};
+    CHECK(logic::key_type(seen).type == logic::PinType::u64 && logic::value_type(seen).type == logic::PinType::exec);
+    const logic::TypeRef kind{logic::PinType::enumeration, "Kind"}, floats{logic::PinType::f64_list, {}};
     CHECK(logic::keyed_of(kind, &floats) == "enum:Kind>float_list" && logic::keyed_of(kind, nullptr) == "enum:Kind");
     CHECK(logic::type_text(cells) == "map<text>struct:Cell>" && logic::type_label(cells) == "Map of Text to Cell" && logic::type_label(seen) == "Set of Int64");
-    CHECK(logic::key_type_ok(logic::PinType::int64) && !logic::key_type_ok(logic::PinType::number) && !logic::key_type_ok(logic::PinType::vector) && !logic::key_type_ok(logic::PinType::map));
+    CHECK(logic::key_type_ok(logic::PinType::u64) && !logic::key_type_ok(logic::PinType::f64) && !logic::key_type_ok(logic::PinType::vector) && !logic::key_type_ok(logic::PinType::map));
     CHECK(logic::fits(cells, cells) && !logic::fits(cells, {logic::PinType::map, "text>struct:Other"}) && !logic::fits(seen, {logic::PinType::set, "int"}));
   }
   {
@@ -5889,8 +5714,8 @@ TEST(logic_maps_and_sets) {
     logic::Graph g, back;
     std::string error, text, twice;
     CHECK(read(in_event("    map_set(Scores, 7, value);\n    map_add(Cells, \"a\");\n    Cells[0].Count += 1;\n    list_add(Cells[0].Tags, text);\n"
-                        "    map_set(Lists, Kind::B, list_make<Float, \"2\">(value, 2.5));\n    set_add(Seen, Int64{0x10000000000000});\n    map_set(Big, Int64{0x20000000000001}, \"far\");\n"
-                        "    Got = map_find<Int, Float>(Scores, 7).value;\n    N = map_length<Int, Float>(Scores);\n    map_remove(Scores, 3);\n    set_remove_at(Seen, 0);"),
+                        "    map_set(Lists, Kind::B, list_make<f64, \"2\">(value, 2.5));\n    set_add(Seen, 0x10000000000000u);\n    map_set(Big, 0x20000000000001u, \"far\");\n"
+                        "    Got = map_find<i64, f64>(Scores, 7).value;\n    N = map_length<i64, f64>(Scores);\n    map_remove(Scores, 3);\n    set_remove_at(Seen, 0);"),
                g, error));
     if (!error.empty()) std::printf("%s\n", error.c_str());
     for (const logic::Issue& i : logic::check(g)) {
@@ -5901,8 +5726,8 @@ TEST(logic_maps_and_sets) {
     CHECK(g.variable("Seen") && g.variable("Seen")->type == logic::PinType::set && g.variable("Seen")->of == "int64" && json::stringify(g.variable("Seen")->value) == "[\"5\"]");
     CHECK(g.variable("Big") && json::stringify(g.variable("Big")->value) == "[[\"18446744073709551615\",\"max\"]]" && g.variable("Lists")->of == "enum:Kind>float_list");
     CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
-    CHECK(text.find("  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n") != std::string::npos);
-    CHECK(text.find("  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n") != std::string::npos && text.find("Int64{0xffffffffffffffff}") != std::string::npos);
+    CHECK(text.find("  Map<i64, f64> Scores = Map<i64, f64>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<u64> Seen = Set<u64>{0x5u};\n") != std::string::npos);
+    CHECK(text.find("  Map<Kind, List<f64>> Lists = Map<Kind, List<f64>>{};\n") != std::string::npos && text.find("0xffffffffffffffffu") != std::string::npos);
     CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
     CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
     // every tier the same: the order the keys came, an entry taken out of the middle
@@ -5937,16 +5762,16 @@ TEST(logic_maps_and_sets) {
     CHECK(inst->get("Cells").size() == 1 && inst->get("N").as_int() == 0 && host.errors.empty());
   }
   // what the notation and the check refuse - with the reason
-  CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
-  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
-  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
-  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
-  CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
+  CHECK(says("  Map<f64, i64> Wrong = Map<f64, i64>{};\n", "the keys of a map or a set are bool, i64, u64, Text or an enum"));
+  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are bool, i64, u64, Text or an enum"));
+  CHECK(says("  Map<i64, Map<i64, f64>> Wrong = Map<i64, Map<i64, f64>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<i64, Fixed<f64, 3>> Wrong = Map<i64, Fixed<f64, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<i64, f64> Twice = Map<i64, f64>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
   CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
   CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));
   CHECK(says("  void Touch(Cell& c) {\n    map_remove(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    Touch(Cells[0]);"), "an entry that is held stays where it is"));
   {
-    // ... and a graph that says it wrong: a key of a Float, a map in a map, a map with a fixed length
+    // ... and a graph that says it wrong: a key of a f64, a map in a map, a map with a fixed length
     auto issues = [](logic::Graph g) {
       std::string all;
       for (const logic::Issue& i : logic::check(g)) all += i.error ? i.text + " | " : "";
@@ -5990,24 +5815,24 @@ TEST(logic_notation_hands_over) {
   // the step right before gave when this input alone reads it. The text of a graph has it there;
   // a text is read with it there, without it there (the graph is the same), and with it nowhere
   // else.
-  const std::string head = "struct B : kern::Blueprint {\n  List<Float> Log = List<Float>{};\n  List<Float> Kept = List<Float>{};\n  Text Name = \"\";\n  Int Count = 0;\n";
-  const std::string make = "  struct MakeResult { List<Float> list = List<Float>{}; Text name = \"\"; };\n"
-                           "  MakeResult Make(List<Float> given = List<Float>{}, Text name = \"\") {\n"
-                           "    List<Float> Made = List<Float>{};\n"
+  const std::string head = "struct B : kern::Blueprint {\n  List<f64> Log = List<f64>{};\n  List<f64> Kept = List<f64>{};\n  Text Name = \"\";\n  i64 Count = 0;\n";
+  const std::string make = "  struct MakeResult { List<f64> list = List<f64>{}; Text name = \"\"; };\n"
+                           "  MakeResult Make(List<f64> given = List<f64>{}, Text name = \"\") {\n"
+                           "    List<f64> Made = List<f64>{};\n"
                            "    Made = given;\n";
   auto text_of = [&](const std::string& returned, const std::string& event, const std::string& round = {}) {
     // (the members of the steps the text names: n5, n7 and n23 are calls of Make, n9 is a Take, n20 a For Loop)
     const auto names = [&](const char* member) { return event.find(member) != std::string::npos || round.find(member) != std::string::npos; };
     const std::string grow = round.empty() ? std::string()
-                                           : "  struct GrowResult { List<Float> list = List<Float>{}; };\n"
-                                             "  GrowResult Grow(List<Float> from = List<Float>{}, Int n = 2) {\n"
-                                             "    List<Float> Item = List<Float>{};\n"
-                                             "    List<Float> All = List<Float>{};\n"
+                                           : "  struct GrowResult { List<f64> list = List<f64>{}; };\n"
+                                             "  GrowResult Grow(List<f64> from = List<f64>{}, i64 n = 2) {\n"
+                                             "    List<f64> Item = List<f64>{};\n"
+                                             "    List<f64> All = List<f64>{};\n"
                                              "    for (auto it20 = flow_for(n20, 1, n); it20.next();) {\n" +
                                                  round + "    }\n    return {All};\n  }\n";
-    return head + make + "    return {" + returned + "};\n  }\n" + grow + "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + event + "  }\n" +
-           (names("n5") ? "  MakeResult n5;\n" : "") + (names("n7") ? "  MakeResult n7;\n" : "") + (names("n9") ? "  struct { List<Float> value = List<Float>{}; } n9;\n" : "") +
-           (round.empty() ? "" : "  struct : kern::Node<20> { Int index = 0; } n20;\n") + (names("n23") ? "  MakeResult n23;\n" : "") + "};\n";
+    return head + make + "    return {" + returned + "};\n  }\n" + grow + "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n" + event + "  }\n" +
+           (names("n5") ? "  MakeResult n5;\n" : "") + (names("n7") ? "  MakeResult n7;\n" : "") + (names("n9") ? "  struct { List<f64> value = List<f64>{}; } n9;\n" : "") +
+           (round.empty() ? "" : "  struct : kern::Node<20> { i64 index = 0; } n20;\n") + (names("n23") ? "  MakeResult n23;\n" : "") + "};\n";
   };
   auto written = [&](const std::string& returned, const std::string& event, const std::string& round = {}) {
     logic::Graph g;
@@ -6039,7 +5864,7 @@ TEST(logic_notation_hands_over) {
   // what a call is given: the step right before - a call, a Take
   CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    n7 = Make(n5.list, n5.name);\n    Kept = n7.list;\n"), "    n7 = Make(std::move(n5.list), std::move(n5.name));\n    Kept = std::move(n7.list);\n"));
   CHECK(has(written("Made, name", "    var_take(n9, Log);\n    Kept = n9.value;\n"), "    var_take(n9, Log);\n    Kept = std::move(n9.value);\n"));
-  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    list_add(Kept, kern::to<Float>(list_length<Float>(n5.list)));\n"), "list_length<Float>(n5.list)"));  // (a value reads it: whenever it is read)
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    list_add(Kept, num_cast<f64, i64>(list_length<f64>(n5.list)));\n"), "list_length<f64>(n5.list)"));  // (a value reads it: whenever it is read)
   // a value that is needed again is copied
   CHECK(has(written("Made, text_append(name, \"!\", \"\")", plain), "    return {std::move(Made), text_append(name, \"!\", \"\")};\n"));  // (name inside a value: the value reads it)
   CHECK(has(written("Made, text_append(kern::to<Text>(Made), name, \"\")", plain), "    return {Made, text_append(kern::to<Text>(Made), name, \"\")};\n"));
@@ -6055,7 +5880,7 @@ TEST(logic_notation_hands_over) {
   CHECK(has(written("Made, name", plain, "      list_add(Item, 1.0);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      All = std::move(n23.list);\n"));
   CHECK(has(written("Made, name", plain, "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n      Item = from;\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n"));
   CHECK(has(written("Made, name", plain, "      n23 = Make(All, \"x\");\n      All = n23.list;\n"), "      n23 = Make(std::move(All), \"x\");\n      All = std::move(n23.list);\n"));  // (All = Make(All): nothing is copied)
-  CHECK(has(written("Made, name", plain, "      if (math_compare<\">\">(kern::to<Float>(n20.index), 1.0)) {\n        Item = from;\n      }\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
+  CHECK(has(written("Made, name", plain, "      if (math_compare<\">\">(num_cast<f64, i64>(n20.index), 1.0)) {\n        Item = from;\n      }\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
             "      n23 = Make(Item, \"x\");\n"));  // (a round that does not set it reads what the round before left)
   // and where C++ would leave a place empty that the Blueprint still reads, the text is refused
   auto refused = [&](const std::string& returned, const std::string& event, const char* where, const std::string& round = {}) {
@@ -6072,7 +5897,7 @@ TEST(logic_notation_hands_over) {
   refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(n5.list);\n    Log = n5.list;\n", "line 15, column 12:");
   refused("Made, name", "    n5 = Make(std::move(Log), \"a\");\n    Kept = n5.list;\n", "line 14, column 15:");
   refused("Made, name", "    n5 = Make(Log, \"a\");\n    Count += 1;\n    Kept = std::move(n5.list);\n", "line 16, column 12:");
-  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(list_make<Float, \"1\">(1.0));\n", "line 15, column 12:");
+  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(list_make<f64, \"1\">(1.0));\n", "line 15, column 12:");
   refused("Made, name", "    n5 = Make(Log, \"a\");\n    Count = std::move(Count);\n", "line 15, column 13:");
   refused("Made, name", plain, "line 18, column 18:", "      list_add(Item, 1.0);\n      n23 = Make(std::move(Item), \"x\");\n      All = n23.list;\n");  // (the next round reads it)
   refused("Made, name", plain, "line 17, column 14:", "      Item = std::move(from);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n");                      // (every round reads it)
@@ -6081,7 +5906,7 @@ TEST(logic_notation_hands_over) {
 TEST(logic_notation_refuses_with_place_and_reason) {
   // What is not in the subset is refused: where, and why.
   auto refused = [](const std::string& body, const char* why, const char* where = nullptr) {
-    const std::string text = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n  Text Name = \"\";\n" + body + "\n};\n";
+    const std::string text = "struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n  Text Name = \"\";\n" + body + "\n};\n";
     logic::Graph g;
     std::string error;
     const bool read = logic::from_cpp(text, g, nullptr, &error);
@@ -6089,22 +5914,22 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     if (!right) std::printf("expected \"%s\"%s%s, got: %s\n", why, where ? " at " : "", where ? where : "", read ? "(it was read)" : error.c_str());
     CHECK(right);
   };
-  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }"; };
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n" + lines + "\n  }"; };
   refused(in_event("    Heat = nope;"), "\"nope\" is not known here", "line 7, column 12:");
-  refused(in_event("    Count = 1.5;"), "is Int, this is Float", "line 7, column 13:");
-  refused(in_event("    Count = Heat;"), "write kern::to<Int>(...)");
-  refused(in_event("    Heat = kern::to<Float>(Heat);"), "no kern::to");
-  refused(in_event("    Name = kern::to<Float>(Count);"), "this input is Text");
-  refused(in_event("    Heat = math_add(1.0);"), "math_add takes 2 value(s): a, b");
-  refused(in_event("    Heat = math_add(1.0, 2.0, 3.0);"), "\")\" expected");
+  refused(in_event("    Count = 1.5;"), "is i64, this is Float", "line 7, column 13:");
+  refused(in_event("    Count = Heat;"), "write num_cast<i64, f64>(...)");
+  refused(in_event("    Heat = num_cast<f64, i64>(Heat);"), "no kern::to");
+  refused(in_event("    Name = num_cast<f64, i64>(Count);"), "this input is Text");
+  refused(in_event("    Heat = math_add<f64>(1.0);"), "math_add takes 2 value(s): a, b");
+  refused(in_event("    Heat = math_add<f64>(1.0, 2.0, 3.0);"), "\")\" expected");
   refused(in_event("    Heat = math_nope(1.0);"), "\"math_nope\" is not known here");
-  refused(in_event("    Heat = math_add(1.0, 2.0).result;"), "gives one value: no .result");
+  refused(in_event("    Heat = math_add<f64>(1.0, 2.0).result;"), "gives one value: no .result");
   refused(in_event("    Heat = 1.0 + 2.0;"), "\";\" expected");
   refused(in_event("    int x = 3;"), "\"int\" starts no statement");
   refused(in_event("    break;"), "\"break\" is not part of the notation");
   refused(in_event("    return 3;"), "only a function's own body returns values");
   refused(in_event("    return;\n    Heat = 1.0;"), "nothing leads here", "line 8, column 5:");
-  refused(in_event("    if (math_compare<\"<\">(Heat, 1.0)) {\n      flow_delay(n2, 1.0, [this] {\n      });\n    }\n    Heat = 1.0;\n  }\n  kern::Node<2> n2;\n  void Unused() {"),
+  refused(in_event("    if (math_compare<\"<\", f64>(Heat, 1.0)) {\n      flow_delay(n2, 1.0, [this] {\n      });\n    }\n    Heat = 1.0;\n  }\n  kern::Node<2> n2;\n  void Unused() {"),
           "C++ would go on with this line", "line 11, column 5:");
   refused(in_event("    flow_delay(n2, 1.0, [this] {\n      Heat = value;\n    });\n  }\n  kern::Node<2> n2;\n  void Unused() {"), "after a wait", "line 8, column 14:");
   refused(in_event("    flow_delay(1.0, [this] {\n    });"), "is not declared: kern::Node<");  // (the Delay keeps its wait)
@@ -6112,50 +5937,50 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    flow_tween(n2, \"play\", 1.0, {});"), "flow_tween has 1 setting(s): flow_tween<\"smooth\">");
   refused(in_event("    flow_do_once(n2, \"exec\", false);"), "decides whether the path goes on: if (flow_do_once(...)) { }");
   refused(in_event("    flow_flip_flop(n2);"), "switch (flow_flip_flop(...)) { case 0: { } break; }");
-  refused(in_event("    math_add(1.0, 2.0);"), "math_add is a value");
+  refused(in_event("    math_add<f64>(1.0, 2.0);"), "math_add is a value");
   refused(in_event("    Heat = n9.value;"), "n9 names no node");
   refused(in_event("    go9();"), "go9 names no step");
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
-  refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
-  refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
-  // (Int inputs only where Formula::int_input holds, an Int result only where Formula::whole_result holds and - by +, - or * -
-  // everything that reads it is an Int; every Int input a wire from an Int as it is)
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::div(a, 2.0); }, Count));"), "the input a is an Int only where");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an Int only where");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an Int only where");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an Int only where");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a < 3.0; }, Count));"), "-> Int is a formula whose value is a whole number");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> Int is a formula whose value is a whole number");
-  refused(in_event("    Heat = kern::formula([](Int a) -> Int { return a + 1.0; }, Count);"), "this formula gives an Int by +, - or *, and this reads it as Float");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a Float input gives a Float: -> Float");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
-  // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
-  for (const char* wrong : {"Fixed<Float, 4>{1.5}", "Fixed<Float, 2>{1.5}"})
-    refused("  KERN_STRUCT(Trio) { Fixed<Float, 3> m = Fixed<Float, 3>{}; Int k = 0; };\n  Trio P = Trio{Fixed<Float, 3>{}, 0};\n" +
+  refused(in_event("    Heat = kern::formula([](f64 a) -> f64 { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
+  refused(in_event("    Heat = kern::formula([](f64 a) -> f64 { return a +; }, 1.0);"), "the formula:");
+  // (i64 inputs only where Formula::int_input holds, an i64 result only where Formula::whole_result holds and - by +, - or * -
+  // everything that reads it is an Int; every i64 input a wire from an i64 as it is)
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> f64 { return kern::math::div(a, 2.0); }, Count));"), "the input a is an i64 only where");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an i64 only where");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an i64 only where");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> f64 { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an i64 only where");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return a < 3.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> i64 is a formula whose value is a whole number");
+  refused(in_event("    Heat = kern::formula([](i64 a) -> i64 { return a + 1.0; }, Count);"), "this formula gives an i64 by +, - or *, and this reads it as Float");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a, f64 b) -> i64 { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a f64 input gives a Float: -> Float");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, num_cast<f64, i64>(Count)));"), "an i64 as it is: no kern::to");
+  refused(in_event("    Count = num_cast<i64, f64>(kern::formula([](i64 a) -> i64 { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  // (a list of a fixed length written out on an input says the input's length: Fixed<f64, 3> for a field of three)
+  for (const char* wrong : {"Fixed<f64, 4>{1.5}", "Fixed<f64, 2>{1.5}"})
+    refused("  KERN_STRUCT(Trio) { Fixed<f64, 3> m = Fixed<f64, 3>{}; i64 k = 0; };\n  Trio P = Trio{Fixed<f64, 3>{}, 0};\n" +
                 in_event(std::string("    P = struct_make<Trio>(") + wrong + ", 7);"),
-            "\"m\" of struct_make is Fixed<Float, 3>, this is Fixed<Float, ");
-  refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
-  refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
-  refused("  Float Heat = 1.0;", "the variable Heat is declared twice");
+            "\"m\" of struct_make is Fixed<f64, 3>, this is Fixed<f64, ");
+  refused(in_event("    Heat = value;\n  }\n  struct { f64 value = 1.0; } n1;\n  void Unused() {"), "starts empty");
+  refused(in_event("    Heat = value;\n  }\n  struct { f64 value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
+  refused("  f64 Heat = 1.0;", "the variable Heat is declared twice");
   refused("  double Heat2 = 1.0;", "\"double\" is no type here");
-  refused("  Float Other = \"text\";", "this is Text, but Float is needed");
+  refused("  f64 Other = \"text\";", "this is Text, but f64 is needed");
   // lists
-  refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
-  refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
-  refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
-  refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
-  refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add<\"float\">(Items, 1.0);"), "list_add has no settings (no <...>)");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(Items, \"a\");"), "is Float, this is Text");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = Items;"), "the two do not convert");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = kern::to<Float>(Items);"), "cannot become a Float");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_length<Int>(Items);"), "do not convert");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_length<Float>(Items);"), "list_length is a value: alone on a line it does nothing");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    flow_for_each<Float>(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
+  refused("  List<f64> Other = List<i64>{1};", "this is List<i64>, but List<f64> is needed (like List<f64>{})");
+  refused("  List<f64> Other = List<f64>{1.0, \"a\"};", "a list's item: this is Text, but f64 is needed");
+  refused("  List<f64> Other = 1.0;", "this is f64, but List<f64> is needed");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<bool>, List<i64>, List<u8> ... List<i32>, List<f64>, List<Vector>, List<Text>, List<Actor>, List<u64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
+  refused("  List<List<f64>> Other;", "\"List\" is no type a list holds");
+  refused("  List<f64> Other = List<f64>;", "a list written out is List<f64>{...}");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add<\"float\">(Items, 1.0);"), "list_add has no settings (no <...>)");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_add(Items, \"a\");"), "is f64, this is Text");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = Items;"), "the two do not convert");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = num_cast<f64, i64>(Items);"), "cannot become a Float");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = list_length<i64>(Items);"), "do not convert");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    list_length<f64>(Items);"), "list_length is a value: alone on a line it does nothing");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    flow_for_each<f64>(Items);"), "flow_for_each is a loop: for (auto it<id> = flow_for_each(...); it<id>.next();) { }");
   refused("  void List() {\n  }", "no name C++ can write");
   // enums
   const std::string mode = "  KERN_ENUM(Mode, Closed, Open);\n  Mode State = Mode::Closed;\n";
@@ -6165,19 +5990,19 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  KERN_ENUM(Mode, A);\n  KERN_ENUM(Mode, B);", "the name Mode is declared twice");
   refused("  KERN_ENUM(Mode, A, 2);", "a value's name expected");
   refused("  KERN_ENUM(Items_list, A);", "a name that ends in _list reads as a list");
-  refused("  KERN_ENUM(Mode, A, Float);", "the value \"Float\" of Mode is no name C++ can write");
-  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them", "line 5, column 3:");
+  refused("  KERN_ENUM(Mode, A, f64);", "the value \"Float\" of Mode is no name C++ can write");
+  refused("  Mode State = Mode::Closed;\n  KERN_ENUM(Mode, Closed, Open);", "\"Mode\" is no type here: a variable is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them", "line 5, column 3:");
   refused(mode + "  Mode Other = Mode::Ajar;", "Mode has no value \"Ajar\" (Closed, Open)", "line 7, column 22:");
-  refused(mode + "  Mode Other = 1;", "this is Int, but Mode is needed (like Mode::Closed)");
+  refused(mode + "  Mode Other = 1;", "this is i64, but Mode is needed (like Mode::Closed)");
   refused(mode + "  KERN_ENUM(Light, Red);\n  Mode Other = Light::Red;", "this is Light, but Mode is needed");
-  refused(mode + "  List<Mode> Other = List<Mode>{Mode::Open, 1};", "a list's item: this is Int, but Mode is needed");
+  refused(mode + "  List<Mode> Other = List<Mode>{Mode::Open, 1};", "a list's item: this is i64, but Mode is needed");
   refused(mode + in_event("    State = 1;"), "is Mode, this is Int");
   refused(mode + in_event("    Count = State;"), "the two do not convert");
-  refused(mode + in_event("    Count = kern::to<Int>(State);"), "cannot become a Int");
+  refused(mode + in_event("    Count = num_cast<i64, f64>(State);"), "cannot become a Int");
   refused(mode + in_event("    Name = State;"), "the two do not convert");
   refused(mode + "  KERN_ENUM(Light, Red);\n  Light Lamp = Light::Red;\n" + in_event("    State = Lamp;"), "this is Light, the input is Mode: the two do not convert");
   refused(mode + in_event("    Name = enum_name(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
-  refused(mode + in_event("    Name = enum_name<Float>(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
+  refused(mode + in_event("    Name = enum_name<f64>(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
   refused(mode + in_event("    Name = enum_name<\"Mode\">(State);"), "enum_name has 1 setting(s): enum_name<AnEnum>");
   refused(mode + in_event("    flow_switch_enum<Mode>(State);"), "flow_switch_enum goes on at the enum's value: switch (flow_switch_enum<AnEnum>(...)) { case AnEnum::Value: { } break; }");
   refused(mode + in_event("    if (flow_switch_enum<Mode>(State)) {\n    }"), "flow_switch_enum goes on at the enum's value");
@@ -6185,41 +6010,41 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Ajar: {\n      } break;\n    }"), "Mode has no value \"Ajar\"");
   refused(mode + in_event("    switch (flow_switch_enum<Mode>(State)) {\n      case Mode::Open: {\n      } break;\n      case Mode::Open: {\n      } break;\n    }"), "case Mode::Open is there twice");
   // structs
-  const std::string weapon = "  KERN_ENUM(Kind, Melee, Ranged);\n  KERN_STRUCT(Weapon) {\n    Text Label = \"\";\n    Kind Type = Kind::Melee;\n    Float Damage = 10.0;\n  };\n"
+  const std::string weapon = "  KERN_ENUM(Kind, Melee, Ranged);\n  KERN_STRUCT(Weapon) {\n    Text Label = \"\";\n    Kind Type = Kind::Melee;\n    f64 Damage = 10.0;\n  };\n"
                              "  Weapon Held = Weapon{\"Knife\", Kind::Melee, 25.0};\n";
-  const std::string solo = "  KERN_STRUCT(Solo) {\n    Float A = 0.0;\n  };\n  Solo One = Solo{1.0};\n";
-  refused("  KERN_STRUCT(Weapon) {\n  };", "a struct has fields: KERN_STRUCT(Weapon) { Float Field = 0.0; };", "line 6, column 3:");
-  refused("  KERN_STRUCT(Heat) {\n    Float A = 0.0;\n  };", "the name Heat is declared twice");
-  refused("  KERN_ENUM(Weapon, A);\n  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n  };", "the name Weapon is declared twice");
+  const std::string solo = "  KERN_STRUCT(Solo) {\n    f64 A = 0.0;\n  };\n  Solo One = Solo{1.0};\n";
+  refused("  KERN_STRUCT(Weapon) {\n  };", "a struct has fields: KERN_STRUCT(Weapon) { f64 Field = 0.0; };", "line 6, column 3:");
+  refused("  KERN_STRUCT(Heat) {\n    f64 A = 0.0;\n  };", "the name Heat is declared twice");
+  refused("  KERN_ENUM(Weapon, A);\n  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n  };", "the name Weapon is declared twice");
   refused(solo + "  KERN_ENUM(Solo, A);", "the name Solo is declared twice");
-  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n    Int A = 1;\n  };", "Weapon has the field A twice", "line 7, column 9:");
-  refused("  KERN_STRUCT(Weapon) {\n    Double A = 0.0;\n  };", "the struct Weapon: \"Double\" is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
-  refused("  KERN_STRUCT(Weapon) {\n    Float A = \"a\";\n  };", "Weapon.A: this is Text, but Float is needed (like 0.0)");
-  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0\n  };", "\";\" expected");
-  refused("  KERN_STRUCT(Weapon) {\n    Float A = 0.0;\n  }", "\";\" expected");
-  refused("  KERN_STRUCT(Items_list) {\n    Float A = 0.0;\n  };", "a name that ends in _list reads as a list");
-  refused("  KERN_STRUCT(Weapon) {\n    Float Float = 0.0;\n  };", "the field \"Float\" of Weapon is no name C++ can write");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n    i64 A = 1;\n  };", "Weapon has the field A twice", "line 7, column 9:");
+  refused("  KERN_STRUCT(Weapon) {\n    Double A = 0.0;\n  };", "the struct Weapon: \"Double\" is no type here: a field is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 A = \"a\";\n  };", "Weapon.A: this is Text, but f64 is needed (like 0.0)");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0\n  };", "\";\" expected");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 A = 0.0;\n  }", "\";\" expected");
+  refused("  KERN_STRUCT(Items_list) {\n    f64 A = 0.0;\n  };", "a name that ends in _list reads as a list");
+  refused("  KERN_STRUCT(Weapon) {\n    f64 f64 = 0.0;\n  };", "the field \"Float\" of Weapon is no name C++ can write");
   refused("  KERN_ENUM(Kind, A);\n  KERN_STRUCT(Weapon) {\n    Kind Kind = Kind::A;\n  };", "the field \"Kind\" of Weapon has the name of a type of this Blueprint");
   // a struct does not contain itself, and holds only what is declared above it
-  refused("  KERN_STRUCT(Chain) {\n    Float A = 0.0;\n    Chain Next = Chain{0.0};\n  };", "the struct Chain cannot contain itself: a field is of a type declared above the struct", "line 7, column 5:");
+  refused("  KERN_STRUCT(Chain) {\n    f64 A = 0.0;\n    Chain Next = Chain{0.0};\n  };", "the struct Chain cannot contain itself: a field is of a type declared above the struct", "line 7, column 5:");
   refused("  KERN_STRUCT(Chain) {\n    List<Chain> More = List<Chain>{};\n  };", "the struct Chain cannot contain itself", "line 6, column 5:");
-  refused("  KERN_STRUCT(Outer) {\n    Inner In = Inner{0.0};\n  };\n  KERN_STRUCT(Inner) {\n    Float A = 0.0;\n  };", "the struct Outer: \"Inner\" is no type here: a field is", "line 6, column 5:");
-  refused("  Solo One = Solo{1.0};\n  KERN_STRUCT(Solo) {\n    Float A = 0.0;\n  };", "\"Solo\" is no type here: a variable is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them",
+  refused("  KERN_STRUCT(Outer) {\n    Inner In = Inner{0.0};\n  };\n  KERN_STRUCT(Inner) {\n    f64 A = 0.0;\n  };", "the struct Outer: \"Inner\" is no type here: a field is", "line 6, column 5:");
+  refused("  Solo One = Solo{1.0};\n  KERN_STRUCT(Solo) {\n    f64 A = 0.0;\n  };", "\"Solo\" is no type here: a variable is bool, i64, f64, Vector, Text, Actor, an enum or a struct declared above it, or a List of one of them",
           "line 5, column 3:");
   // a struct written out gives a value for every field, in their order, each of its type
   refused(weapon + "  Weapon Other = Weapon{\"a\", Kind::Melee};", "Weapon has 3 field(s) (Label, Type, Damage): Weapon{...} gives a value for each, in that order", "line 12, column 41:");
   refused(weapon + "  Weapon Other = Weapon{\"a\", Kind::Melee, 1.0, 2.0};", "Weapon has 3 field(s) (Label, Type, Damage)", "line 12, column 46:");
   refused(weapon + "  Weapon Other = Weapon{};", "Weapon has 3 field(s) (Label, Type, Damage)");
-  refused(weapon + "  Weapon Other = Weapon{\"a\", 1, 2.0};", "Weapon.Type: this is Int, but Kind is needed (like Kind::Melee)", "line 12, column 30:");
-  refused(weapon + "  Weapon Other = Weapon{1.5, Kind::Melee, 2.0};", "Weapon.Label: this is Float, but Text is needed");
-  refused(weapon + "  Weapon Other = 1.0;", "this is Float, but Weapon is needed (like Weapon{\"\", Kind::Melee, 10.0})");
+  refused(weapon + "  Weapon Other = Weapon{\"a\", 1, 2.0};", "Weapon.Type: this is i64, but Kind is needed (like Kind::Melee)", "line 12, column 30:");
+  refused(weapon + "  Weapon Other = Weapon{1.5, Kind::Melee, 2.0};", "Weapon.Label: this is f64, but Text is needed");
+  refused(weapon + "  Weapon Other = 1.0;", "this is f64, but Weapon is needed (like Weapon{\"\", Kind::Melee, 10.0})");
   refused(weapon + solo + "  Weapon Other = Solo{1.0};", "this is Solo, but Weapon is needed");
-  refused(weapon + "  List<Weapon> Rack = List<Weapon>{Weapon{\"a\", Kind::Melee, 1.0}, 2.0};", "a list's item: this is Float, but Weapon is needed");
+  refused(weapon + "  List<Weapon> Rack = List<Weapon>{Weapon{\"a\", Kind::Melee, 1.0}, 2.0};", "a list's item: this is f64, but Weapon is needed");
   refused(weapon + "  List<Weapon> Rack = List<Kind>{};", "this is List<Kind>, but List<Weapon> is needed (like List<Weapon>{})");
   // a field is set and read at its place: by its name
   refused(weapon + in_event("    Held.Range = 1.0;"), "Weapon has no field \"Range\" (Label, Type, Damage)", "line 14, column 10:");
-  refused(weapon + in_event("    Held.Damage = \"a\";"), "is Float, this is Text");
-  refused(weapon + in_event("    Held.Type = Count;"), "this is Int, the input is Kind: the two do not convert");
+  refused(weapon + in_event("    Held.Damage = \"a\";"), "is f64, this is Text");
+  refused(weapon + in_event("    Held.Type = Count;"), "this is i64, the input is Kind: the two do not convert");
   refused(in_event("    Heat.X = 1.0;"), "Heat is Float: only a struct has fields to set (Variable.Field = value;)");
   refused(weapon + in_event("    n9.value = (Held.Range = 1.0);"), "Weapon has no field \"Range\"");
   refused(weapon + in_event("    n9.total = (Held.Damage = 1.0);"), "a Set gives \"value\"");
@@ -6231,12 +6056,12 @@ TEST(logic_notation_refuses_with_place_and_reason) {
 
   // ---- reference inputs: the call names a place, the function works on it where it stands ----
   {
-    const std::string car = "  KERN_STRUCT(Car) {\n    Float Speed = 0.0;\n    List<Float> Marks = List<Float>{};\n  };\n  List<Car> Cars = List<Car>{};\n  Car Mine = Car{1.0, List<Float>{}};\n";
+    const std::string car = "  KERN_STRUCT(Car) {\n    f64 Speed = 0.0;\n    List<f64> Marks = List<f64>{};\n  };\n  List<Car> Cars = List<Car>{};\n  Car Mine = Car{1.0, List<f64>{}};\n";
     // what is wrong with a text: what the reader says, or the check of the Blueprint it read
     auto wrong = [&](const std::string& body) {
       logic::Graph g;
       std::string error;
-      if (!logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return error;
+      if (!logic::from_cpp("struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return error;
       for (const logic::Issue& i : logic::check(g)) error += i.text + "\n";
       return error + logic::cpp_problem(g);
     };
@@ -6245,16 +6070,16 @@ TEST(logic_notation_refuses_with_place_and_reason) {
       if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
       return got.find(why) != std::string::npos;
     };
-    const std::string bump = "  void Bump(Float& x, Float by = 1.0) {\n    x += by;\n  }\n";
-    const std::string drive = "  void Drive(Car& car, Float by = 1.0) {\n    car.Speed += by;\n    list_add(car.Marks, car.Speed);\n    Bump(car.Speed, by);\n  }\n";
-    const std::string read = "  struct ReadResult { Float speed = 0.0; Int marks = 0; };\n  KERN_PURE ReadResult Read(const Car& car) {\n    return {car.Speed, list_length<Float>(car.Marks)};\n  }\n";
+    const std::string bump = "  void Bump(f64& x, f64 by = 1.0) {\n    x += by;\n  }\n";
+    const std::string drive = "  void Drive(Car& car, f64 by = 1.0) {\n    car.Speed += by;\n    list_add(car.Marks, car.Speed);\n    Bump(car.Speed, by);\n  }\n";
+    const std::string read = "  struct ReadResult { f64 speed = 0.0; i64 marks = 0; };\n  KERN_PURE ReadResult Read(const Car& car) {\n    return {car.Speed, list_length<f64>(car.Marks)};\n  }\n";
     const std::string go = "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_add(Cars, Mine);\n    Drive(Cars[0], 2.0);\n    Drive(Mine, 0.5);\n    Bump(Heat, Read(Cars[0]).speed);\n    Count = Read(Mine).marks;\n  }\n";
     CHECK(wrong(bump + drive + read + go).empty());
     // the same Blueprint: its one text, its file, and what it does - in the interpreter and with the JIT's nodes
     logic::Graph g, back, again;
     std::string error, text, twice;
-    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + bump + drive + read + go + "};\n", g, nullptr, &error) && no_errors(logic::check(g)));
-    CHECK(logic::to_cpp(g, "B", text) && text.find("void Bump(Float& x, Float by = 1.0) {") != std::string::npos && text.find("KERN_PURE ReadResult Read(const Car& car) {") != std::string::npos);
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n" + car + bump + drive + read + go + "};\n", g, nullptr, &error) && no_errors(logic::check(g)));
+    CHECK(logic::to_cpp(g, "B", text) && text.find("void Bump(f64& x, f64 by = 1.0) {") != std::string::npos && text.find("KERN_PURE ReadResult Read(const Car& car) {") != std::string::npos);
     CHECK(text.find("    Drive(Cars[0], 2.0);") != std::string::npos && text.find("    Bump(car.Speed, by);") != std::string::npos && text.find("Read(Cars[0]).speed") != std::string::npos);
     CHECK(logic::from_cpp(text, again, nullptr, &error) && logic::to_cpp(again, "B", twice) && twice == text);
     CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g && back.function("Bump")->inputs[0].ref && !back.function("Bump")->inputs[0].constant && back.function("Read")->inputs[0].constant);
@@ -6279,15 +6104,15 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     CHECK(says(bump + in_event("    Bump(1.0, 2.0);"), "its input x is a reference - a place stands there"));
     CHECK(says(bump + in_event("    Bump(Count, 2.0);"), "a reference is the place itself, nothing converts"));
     CHECK(says(bump + in_event("    Bump(Mine.Marks[0].Speed, 2.0);"), "Mine.Marks[] is Float: only a struct has fields"));
-    CHECK(says("  void Set(Car car = Car{1.0, List<Float>{}}) {\n    car.Speed = 2.0;\n  }", "car is an input by value: it is read, not changed"));
+    CHECK(says("  void Set(Car car = Car{1.0, List<f64>{}}) {\n    car.Speed = 2.0;\n  }", "car is an input by value: it is read, not changed"));
     CHECK(says("  void Set(const Car& car) {\n    car.Speed = 2.0;\n  }", "car is a const reference: it is read, not changed"));
     CHECK(says(bump + "  void Set(const Car& car) {\n    Bump(car.Speed, 1.0);\n  }", "car is a const reference: it is read, not changed"));
     CHECK(says("  void Set(const Car car) {\n  }", "a const input is a reference: const Car& name"));
-    CHECK(says("  void Set(Car& car = Car{1.0, List<Float>{}}) {\n  }", "car is a reference: the call names its place, it has no default"));
-    CHECK(says("  struct GetResult { Float speed = 0.0; };\n  KERN_PURE GetResult Get(Car& car) {\n    return {car.Speed};\n  }", "a function that is read as a value changes nothing"));
+    CHECK(says("  void Set(Car& car = Car{1.0, List<f64>{}}) {\n  }", "car is a reference: the call names its place, it has no default"));
+    CHECK(says("  struct GetResult { f64 speed = 0.0; };\n  KERN_PURE GetResult Get(Car& car) {\n    return {car.Speed};\n  }", "a function that is read as a value changes nothing"));
     // the inputs by reference come first: a value has a default, and in C++ every input after one with a default has one
-    CHECK(says("  void Late(Float by = 1.0, Car& car) {\n    car.Speed += by;\n  }", "the input \"by\" is a value with a default and stands before a reference - the inputs by reference come first"));
-    CHECK(wrong("  void Early(Car& car, const Car& other, Float by = 1.0) {\n    car.Speed += by;\n  }").empty());
+    CHECK(says("  void Late(f64 by = 1.0, Car& car) {\n    car.Speed += by;\n  }", "the input \"by\" is a value with a default and stands before a reference - the inputs by reference come first"));
+    CHECK(wrong("  void Early(Car& car, const Car& other, f64 by = 1.0) {\n    car.Speed += by;\n  }").empty());
     // an entry of a list that is held stays where it is
     CHECK(says("  void Grow(Car& car) {\n    list_add(Cars, car);\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
     CHECK(says("  void Swap(Car& car) {\n    Cars = List<Car>{};\n    car.Speed = 1.0;\n  }\n" + in_event("    Swap(Cars[0]);"), "while Swap holds it, what stands at Cars is changed"));
@@ -6295,7 +6120,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     for (const char* step : {"list_resize(Cars, 9, car)", "list_append(Cars, Cars)", "list_insert_list(Cars, 0, Cars)", "list_reserve(Cars, 99)"})
       CHECK(says("  void Grow(Car& car) {\n    " + std::string(step) + ";\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
     CHECK(says("  void Take(Car& car) {\n    var_take(Cars);\n    car.Speed = 1.0;\n  }\n" + in_event("    Take(Cars[0]);"), "while Take holds it, what stands at Cars is changed"));
-    CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(Float& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
+    CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(f64& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
                    in_event("    Mark(Mine.Marks[0], Mine);"),
                "while Mark holds it, the length of Mine.Marks is changed"));
     // an entry of a list of any length given to a function that may run handlers: the call is checked - logic::Held
@@ -6304,7 +6129,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     auto held_text = [&](const std::string& body) {
       logic::Graph g, again;
       std::string error, text, difference;
-      if (!logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return "not read: " + error;
+      if (!logic::from_cpp("struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return "not read: " + error;
       if (!logic::check(g).empty() || !logic::cpp_problem(g).empty()) return "not checked: " + logic::cpp_problem(g);
       if (!logic::to_cpp(g, "B", text, &error)) return "not written: " + error;
       if (!logic::from_cpp(text, again, nullptr, &error)) return "not read again: " + error;
@@ -6323,14 +6148,14 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
     // that list is - but an entry of a list of any length inside it can go)
     const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{}, Actor{}, car.Speed, \"\");\n  }\n"
-                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{}, Actor{}, mark, \"\");\n  }\n";
+                              "  void Hum(f64& mark) {\n    flow_call<\"Go\">(Actor{}, Actor{}, mark, \"\");\n  }\n";
     CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
     CHECK(wrong(shout + in_event("    Hum(Two[1].Marks[0]);")).empty());
     CHECK(held_text(shout + in_event("    Hum(Two[1].Marks[0]);")).find("(Two[1].Marks);") != std::string::npos);
     // (a function read as a value cannot be checked around: it may not hold such an entry while it runs handlers - there is none
     // that runs them, a pure function only computes)
     // ... and what is fine: the list itself, another list, a field of the entry, a variable that is no entry
-    CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<Float>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
+    CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<f64>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
                 in_event("    Grow(Cars, Mine);\n    More(Cars[0].Marks);\n    More(Mine.Marks);"))
               .empty());
   }
@@ -6353,24 +6178,24 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(weapon + in_event("    Held = logic_select<Weapon>(true, Held, 1.0);"), "\"b\" of logic_select is Weapon, this is Float");
   refused(weapon + in_event("    Count = list_length<Weapon>(Held);"), "this is Weapon, the input is List<Weapon>: the two do not convert");
   // the setting "Type" of a generic node is the type itself
-  refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
+  refused(in_event("    Heat = logic_select<\"float\">(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f64>");
   refused(in_event("    Heat = logic_select<Double>(true, 1.0, 2.0);"), "a setting is a text (\"...\") or a type");
-  refused(in_event("    Heat = logic_select(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<Float>");
-  refused("  List<Float> Items = List<Float>{};\n" + in_event("    Heat = list_get<List<Float>>(Items, 0);"), "list_get has 1 setting(s): list_get<Float>");
-  refused(in_event("    Heat = kern::to<Float>(list_length<Float>(list_make<Float, 2>(1.0, 2.0)));"), "a setting (a text in quotes) expected, not \"2\"");
+  refused(in_event("    Heat = logic_select(true, 1.0, 2.0);"), "logic_select has 1 setting(s): logic_select<f64>");
+  refused("  List<f64> Items = List<f64>{};\n" + in_event("    Heat = list_get<List<f64>>(Items, 0);"), "list_get has 1 setting(s): list_get<f64>");
+  refused(in_event("    Heat = num_cast<f64, i64>(list_length<f64>(list_make<f64, 2>(1.0, 2.0)));"), "a setting (a text in quotes) expected, not \"2\"");
   refused(in_event("    flow_tween<smooth>(n9, \"play\", 1.0, [this] {\n    });"), "a setting is a text (\"...\") or a type");
   refused("  void Fn() {\n  }\n  void Fn() {\n  }", "the function Fn is declared twice");
   refused("  FnResult Fn() {\n  }", "struct FnResult { ... }; must be declared above");
   refused("  void on3() {\n  }", "on3 needs its KERN_EVENT");
   refused("  KERN_EVENT(on3, event_nope)\n  void on3() {\n  }", "\"event_nope\" is no event");
-  refused("  KERN_EVENT(on3, event_tick)\n  void on3() {\n  }", "the method of event_tick is void on3(Float delta)");
+  refused("  KERN_EVENT(on3, event_tick)\n  void on3() {\n  }", "the method of event_tick is void on3(f64 delta)");
   refused("  void Text() {\n  }", "the function \"Text\" is no name C++ can write");
   refused("  void loop() {\n  }", "no name C++ can write");
-  refused("  Float my_value = 0.0;\n  Float value = 0.0;\n" + in_event("    Heat = 1.0;"), "\"value\" is an output of");
+  refused("  f64 my_value = 0.0;\n  f64 value = 0.0;\n" + in_event("    Heat = 1.0;"), "\"value\" is an output of");
   // the layout: one line per node, in the text's order
   logic::Graph g;
   std::string error;
-  const std::string one = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n" + in_event("    Heat = 1.0;") + "\n};\nKERN_LAYOUT(B) {\n";
+  const std::string one = "struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n" + in_event("    Heat = 1.0;") + "\n};\nKERN_LAYOUT(B) {\n";
   CHECK(logic::from_cpp(one + "  node(1, 8, 16.5, \"start\");\n  node(2, 300, 16);\n  box(3, 0, 0, 400, 200, \"all of it\", 0x102030);\n  next_id(9);\n}\n", g, nullptr, &error));
   CHECK(g.nodes.size() == 2 && g.nodes[0].id == 1 && g.nodes[0].y == 16.5f && g.nodes[0].comment == "start" && g.nodes[1].x == 300 && g.next_id == 9);
   CHECK(g.comments.size() == 1 && g.comments[0].color == 0x102030 && g.comments[0].w == 400);
@@ -6381,7 +6206,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   CHECK(!logic::from_cpp(one + "  node(1, 0, 0);\n  node(2, 0, 0);\n  knot(3);\n}\n", g, nullptr, &error) && error.find("a layout has node(id, x, y)") != std::string::npos);
   // not a Blueprint at all
   CHECK(!logic::from_cpp("int main() { return 0; }", g, nullptr, &error) && error.find("line 1, column 1: \"struct\" expected") == 0);
-  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  Float x = 0.0;\n", g, nullptr, &error) && error.find("\"};\" is missing") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  f64 x = 0.0;\n", g, nullptr, &error) && error.find("\"};\" is missing") != std::string::npos);
   CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n};\nint more;", g, nullptr, &error) && error.find("is too much") != std::string::npos);
   CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
 }
@@ -6390,16 +6215,16 @@ TEST(logic_callbacks) {
   // A Callback: a function of a library as a value only the engine calls (Make Callback) - its first input bound to a
   // place, read where it stands when the engine calls; unbound once the Blueprint that made it has ended.
   const char* ground =
-      "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    Float Base = 1.0;\n    Float Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
-      "  struct heightResult { Float h = 0.0; };\n"
-      "  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {\n    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
-      "  struct loudResult { Float h = 0.0; };\n"
-      "  loudResult loud(const Field& f, Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
+      "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    f64 Base = 1.0;\n    f64 Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
+      "  struct heightResult { f64 h = 0.0; };\n"
+      "  KERN_PURE heightResult height(const Field& f, f64 x = 0.0, f64 y = 0.0) {\n    return {kern::formula([](f64 b, f64 s, f64 x, f64 y) -> f64 { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
+      "  struct loudResult { f64 h = 0.0; };\n"
+      "  loudResult loud(const Field& f, f64 x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
   const char* site =
       "struct Site : virtual kern::Blueprint, virtual Ground {\n  // ---- variables ----\n"
-      "  Field Here = Field{2.0, 0.5};\n  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};\n\n  // ---- functions ----\n"
+      "  Field Here = Field{2.0, 0.5};\n  Callback<f64(f64, f64)> Kept = Callback<f64(f64, f64)>{};\n\n  // ---- functions ----\n"
       "  void Make() {\n    Kept = callback<&Ground::height>(Here);\n  }\n\n"
-      "  struct MadeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; };\n"
+      "  struct MadeResult { Callback<f64(f64, f64)> c = Callback<f64(f64, f64)>{}; };\n"
       "  KERN_PURE MadeResult Made() {\n    return {callback<&Ground::height>(Here)};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
@@ -6429,7 +6254,7 @@ TEST(logic_callbacks) {
     CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name]);
     CHECK(logic::cpp_problem(project[name]).empty());
   }
-  CHECK(logic::type_label(type) == "Callback of Float(Float, Float)" && logic::type_text(type) == "callback<float(float,float)>");
+  CHECK(logic::type_label(type) == "Callback of f64(f64, f64)" && logic::type_text(type) == "callback<float(float,float)>");
   for (bool jit : {false, true}) {
     FakeLogicHost host;
     logic::Runtime rt(host);
@@ -6440,17 +6265,17 @@ TEST(logic_callbacks) {
     rt.begin();
     std::vector<logic::Value> out;
     logic::Value r;
-    CHECK(!logic::call_back(inst->get("Kept"), type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.type == logic::PinType::number && r.n == 0);
+    CHECK(!logic::call_back(inst->get("Kept"), type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.type == logic::PinType::f64 && r.as<f64>() == 0);
     CHECK(inst->call("Make", {}, out) && host.errors.empty());
     const logic::Value kept = inst->get("Kept");
     // 2 + 0.5 * 1 + 3: the place as it is when the engine calls
-    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 5.5);
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.as<f64>() == 5.5);
     CHECK(inst->set("Here", logic::Value::structure({logic::Value::number(10), logic::Value::number(2)})));
-    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 15);
-    CHECK(inst->call("Made", {}, out) && out.size() == 1 && out[0].type == logic::PinType::callback && logic::call_back(out[0], type, std::vector<logic::Value>{logic::Value::number(0), logic::Value::number(0)}, r) && r.n == 10);
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.as<f64>() == 15);
+    CHECK(inst->call("Made", {}, out) && out.size() == 1 && out[0].type == logic::PinType::callback && logic::call_back(out[0], type, std::vector<logic::Value>{logic::Value::number(0), logic::Value::number(0)}, r) && r.as<f64>() == 10);
     rt.remove(0);
     rt.clear();
-    CHECK(!logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 0);  // (its Blueprint has ended: unbound)
+    CHECK(!logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.as<f64>() == 0);  // (its Blueprint has ended: unbound)
   }
   // what is no Callback
   auto says = [&](const std::string& got, const char* why) {
@@ -6459,38 +6284,38 @@ TEST(logic_callbacks) {
   };
   // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
   {
-    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { Float h = 0.0; };\n  stepsResult steps(Float x = 0.0) {\n"
-                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(kern::to<Float>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
-                                            "    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n"
-                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { Int index = 0; } n1;\n};\n");
+    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { f64 h = 0.0; };\n  stepsResult steps(f64 x = 0.0) {\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(num_cast<f64, i64>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    return {x};\n  }\n\n  struct mResult { Callback<f64(f64)> c = Callback<f64(f64)>{}; };\n  KERN_PURE mResult m() {\n"
+                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { i64 index = 0; } n1;\n};\n");
     CHECK(loops.empty());
     if (!loops.empty()) std::printf("Loops: %s", loops.c_str());
   }
-  CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
-  CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
-  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
-  CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct fResult { Float r = 0.0; };\n  KERN_PURE fResult f(Float x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
+  CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<f64(f64)> K = Callback<f64(f64)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
+  CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { f64 h = 0.0; };\n  loudResult loud(f64 x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<f64(f64)> c = Callback<f64(f64)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
+  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<f64(f64, f64)> K = Callback<f64(f64, f64)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
+  CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  f64 Seen = 0.0;\n\n  struct fResult { f64 r = 0.0; };\n  KERN_PURE fResult f(f64 x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<f64(f64)> c = Callback<f64(f64)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
 }
 
 TEST(logic_libraries) {
   // A library is a Blueprint that keeps nothing: types and functions. A Blueprint that uses it
   // has its types and calls its functions directly - Wheels::skid(Spare[at], by); -, also with
   // references. Each function is there once.
-  const char* types = "struct Types : virtual kern::Library {\n  // ---- types ----\n  KERN_ENUM(Side, Front, Rear);\n  KERN_STRUCT(Wheel) {\n    Float Slip = 0.5;\n    Side At = Side::Front;\n    List<Float> Marks = List<Float>{};\n  };\n};\n";
+  const char* types = "struct Types : virtual kern::Library {\n  // ---- types ----\n  KERN_ENUM(Side, Front, Rear);\n  KERN_STRUCT(Wheel) {\n    f64 Slip = 0.5;\n    Side At = Side::Front;\n    List<f64> Marks = List<f64>{};\n  };\n};\n";
   const char* wheels =
       "struct Wheels : virtual kern::Library, virtual Types {\n  // ---- functions ----\n"
       "  /// Changes the wheel the call names.\n"
-      "  void skid(Wheel& wheel, Float by = 0.5) {\n    wheel.Slip += by;\n    list_add(wheel.Marks, wheel.Slip);\n  }\n\n"
-      "  struct wearResult { Float slip = 0.0; Int marks = 0; };\n"
-      "  KERN_PURE wearResult wear(const Wheel& wheel) {\n    return {wheel.Slip, list_length<Float>(wheel.Marks)};\n  }\n\n"
-      "  struct twiceResult { Float slip = 0.0; };\n"
+      "  void skid(Wheel& wheel, f64 by = 0.5) {\n    wheel.Slip += by;\n    list_add(wheel.Marks, wheel.Slip);\n  }\n\n"
+      "  struct wearResult { f64 slip = 0.0; i64 marks = 0; };\n"
+      "  KERN_PURE wearResult wear(const Wheel& wheel) {\n    return {wheel.Slip, list_length<f64>(wheel.Marks)};\n  }\n\n"
+      "  struct twiceResult { f64 slip = 0.0; };\n"
       "  twiceResult twice(Wheel& wheel) {\n    skid(wheel, 0.25);\n    skid(wheel, 0.25);\n    wheel.At = Side::Rear;\n    return {wear(wheel).slip};\n  }\n\n"
       "  void unused(Wheel& wheel) {\n    wheel.Slip = 9.0;\n  }\n};\n";
   const char* garage =
       "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
-      "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
-      "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
-      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<f64>{}}};\n  f64 Seen = 0.0;\n\n  // ---- functions ----\n"
+      "  struct RunResult { f64 slip = 0.0; i64 marks = 0; Side at = Side::Front; };\n"
+      "  RunResult Run(i64 at = 0, f64 by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
       "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
@@ -6582,10 +6407,10 @@ TEST(logic_libraries) {
     CHECK(!host.errors.empty() && host.errors[0].find("the library \"Wheels\" is not there") != std::string::npos && !inst->call("Run", {}, out));
   }
   // what a library is not, and what cannot be used
-  CHECK(says(read("Kept", "struct Kept : virtual kern::Library {\n  Float Sum = 0.0;\n};\n"), "a library keeps nothing: it has no variables"));
+  CHECK(says(read("Kept", "struct Kept : virtual kern::Library {\n  f64 Sum = 0.0;\n};\n"), "a library keeps nothing: it has no variables"));
   CHECK(says(read("Waits", "struct Waits : virtual kern::Library {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n  }\n};\n"), "a library keeps nothing and waits for nothing: it has no events"));
-  CHECK(says(read("Flips", "struct Flips : virtual kern::Library {\n  void f(Float& x) {\n    switch (flow_flip_flop(n2)) {\n      case 0: { x = 1.0; } break;\n      case 1: { x = 2.0; } break;\n    }\n  }\n\n"
-                           "  struct : kern::Node<2> { Bool is_a = false; } n2;\n};\n"),
+  CHECK(says(read("Flips", "struct Flips : virtual kern::Library {\n  void f(f64& x) {\n    switch (flow_flip_flop(n2)) {\n      case 0: { x = 1.0; } break;\n      case 1: { x = 2.0; } break;\n    }\n  }\n\n"
+                           "  struct : kern::Node<2> { bool is_a = false; } n2;\n};\n"),
              "keeps something between two calls"));
   CHECK(says(read("A", "struct A : kern::Library {\n};\n"), "a library is `struct A : virtual kern::Library`"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint {\n};\n"), "`virtual` is for a library"));
@@ -6594,10 +6419,10 @@ TEST(logic_libraries) {
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Garage {\n};\n"), "\"Garage\" is no library"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels, virtual Wheels {\n};\n"), "the library Wheels is used twice"));
   // a library's name is a name of C++ like any other: a variable or an input may have it - a type of the Blueprint may not
-  CHECK(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  Float Wheels = 0.0;\n\n  void f(Wheel& Types) {\n    Wheels::skid(Types, Wheels);\n  }\n};\n").empty());
+  CHECK(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  f64 Wheels = 0.0;\n\n  void f(Wheel& Types) {\n    Wheels::skid(Types, Wheels);\n  }\n};\n").empty());
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_ENUM(Wheels, One, Two);\n};\n"), "the library \"Wheels\" has the name of a type the Blueprint has"));
-  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_STRUCT(Wheel) {\n    Float Slip = 0.0;\n  };\n};\n"), "the name Wheel is declared twice"));
-  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Types {\n  Wheel Mine = Wheel{0.5, Side::Front, List<Float>{}};\n\n  void f() {\n    Wheels::skid(Mine, 1.0);\n  }\n};\n"), "starts no statement"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_STRUCT(Wheel) {\n    f64 Slip = 0.0;\n  };\n};\n"), "the name Wheel is declared twice"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Types {\n  Wheel Mine = Wheel{0.5, Side::Front, List<f64>{}};\n\n  void f() {\n    Wheels::skid(Mine, 1.0);\n  }\n};\n"), "starts no statement"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  void f() {\n    Wheels::nothing();\n  }\n};\n"), "starts no statement"));
   {
     std::string text;
@@ -6625,7 +6450,7 @@ TEST(logic_libraries) {
   // Of its libraries a Blueprint holds what it uses - of their types those it names (and those
   // the fields of these are of). What it does not use it does not hold: a library that gets
   // another type leaves it as it is.
-  CHECK(read("Idle", "struct Idle : virtual kern::Blueprint, virtual Wheels {\n  Float X = 0.0;\n};\n").empty() && project["Idle"].structs.empty() && project["Idle"].enums.empty() &&
+  CHECK(read("Idle", "struct Idle : virtual kern::Blueprint, virtual Wheels {\n  f64 X = 0.0;\n};\n").empty() && project["Idle"].structs.empty() && project["Idle"].enums.empty() &&
         project["Idle"].functions.empty());
   CHECK(read("Sided", "struct Sided : virtual kern::Blueprint, virtual Types {\n  Side At = Side::Rear;\n};\n").empty() && project["Sided"].enumeration("Side") && project["Sided"].structs.empty());
   CHECK(g.structs.size() == 1 && g.enums.size() == 1);  // (Wheel, and Side: a field of Wheel is of it)
@@ -6635,20 +6460,20 @@ TEST(logic_libraries) {
       auto it = later.find(std::string(name));
       return it == later.end() ? nullptr : &it->second;
     };
-    later["Types"].structs.push_back({"Axle", {{"Load", {logic::PinType::number, {}}, json::Value(0.0)}}, {}});
+    later["Types"].structs.push_back({"Axle", {{"Load", {logic::PinType::f64, {}}, json::Value(0.0)}}, {}});
     logic::Graph fresh = g, with, before;
     CHECK(logic::take_libraries(fresh, now, &error) && fresh == g);
     CHECK(logic::link(g, all, before, &error) && logic::link(g, now, with, &error) && logic::graph_hash(with) == logic::graph_hash(before) && !with.structure("Axle"));
     // a type two libraries declare is two types: none of them is what a Blueprint means by the name
-    CHECK(read("More", "struct More : virtual kern::Library {\n  KERN_STRUCT(Wheel) {\n    Int Spokes = 0;\n  };\n};\n").empty());
+    CHECK(read("More", "struct More : virtual kern::Library {\n  KERN_STRUCT(Wheel) {\n    i64 Spokes = 0;\n  };\n};\n").empty());
     CHECK(read("Both", "struct Both : virtual kern::Blueprint, virtual Types, virtual More {\n  Side At = Side::Front;\n};\n").empty() && project["Both"].structs.empty());
     CHECK(says(read("Both2", "struct Both2 : virtual kern::Blueprint, virtual Types, virtual More {\n  List<Wheel> All = List<Wheel>{};\n};\n"), "the libraries Types and More both declare a type \"Wheel\""));
   }
   // what a library's function names in its body comes along where the Blueprint runs: the one
   // graph has the types the bodies need - the Blueprint itself holds none of them
-  CHECK(read("Deep", "struct Deep : virtual kern::Library, virtual Types {\n  struct slipResult { Float slip = 0.0; };\n  slipResult slip(Float by = 0.0) {\n    Wheel w = Wheel{0.5, Side::Front, List<Float>{}};\n"
+  CHECK(read("Deep", "struct Deep : virtual kern::Library, virtual Types {\n  struct slipResult { f64 slip = 0.0; };\n  slipResult slip(f64 by = 0.0) {\n    Wheel w = Wheel{0.5, Side::Front, List<f64>{}};\n"
                      "    w.Slip += by;\n    return {w.Slip};\n  }\n};\n").empty());
-  CHECK(read("Far", "struct Far : virtual kern::Blueprint, virtual Deep {\n  Float Got = 0.0;\n\n  void Run() {\n    n3 = Deep::slip(1.0);\n    Got = n3.slip;\n  }\n\n"
+  CHECK(read("Far", "struct Far : virtual kern::Blueprint, virtual Deep {\n  f64 Got = 0.0;\n\n  void Run() {\n    n3 = Deep::slip(1.0);\n    Got = n3.slip;\n  }\n\n"
                     "  // ---- what nodes give and keep ----\n  Deep::slipResult n3;\n};\n").empty());
   {
     const logic::Graph& far = project["Far"];
@@ -6678,14 +6503,14 @@ TEST(logic_constants) {
   auto says = [&](const std::string& body, const char* why) {
     logic::Graph g;
     std::string error;
-    if (logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST Float Gravity = 9.81;\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Float Speed = 0.0;\n" + body + "};\n", g, nullptr, &error))
+    if (logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST f64 Gravity = 9.81;\n  KERN_CONST List<f64> Table = List<f64>{1.0, 2.0};\n  f64 Speed = 0.0;\n" + body + "};\n", g, nullptr, &error))
       for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
     if (error.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing wrong)" : error.c_str());
     return error.find(why) != std::string::npos;
   };
-  const char* text = "struct B : kern::Blueprint {\n  // ---- variables ----\n  /// How fast things fall.\n  KERN_CONST Float Gravity = 9.81;\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Float Speed = 0.0;\n\n"
-                     "  // ---- functions ----\n  struct fallResult { Float speed = 0.0; };\n  fallResult fall(Float time = 1.0, Int at = 0) {\n    Speed += math_mul(Gravity, time);\n"
-                     "    return {math_add(Speed, Table[at])};\n  }\n};\n";
+  const char* text = "struct B : kern::Blueprint {\n  // ---- variables ----\n  /// How fast things fall.\n  KERN_CONST f64 Gravity = 9.81;\n  KERN_CONST List<f64> Table = List<f64>{1.0, 2.0};\n  f64 Speed = 0.0;\n\n"
+                     "  // ---- functions ----\n  struct fallResult { f64 speed = 0.0; };\n  fallResult fall(f64 time = 1.0, i64 at = 0) {\n    Speed += math_mul<f64>(Gravity, time);\n"
+                     "    return {math_add<f64>(Speed, Table[at])};\n  }\n};\n";
   logic::Graph g, back;
   std::string error, written;
   CHECK(logic::from_cpp(text, g, nullptr, &error) && no_errors(logic::check(g)) && g.variable("Gravity")->constant && g.variable("Table")->constant && !g.variable("Speed")->constant);
@@ -6708,13 +6533,13 @@ TEST(logic_constants) {
   CHECK(says("  void f() {\n    Gravity += 1.0;\n  }\n", "Gravity is a constant: it is read, not changed"));
   CHECK(says("  void f() {\n    Table[0] = 1.0;\n  }\n", "Table is a constant: it is read, not changed"));
   CHECK(says("  void f() {\n    list_add(Table, 1.0);\n  }\n", "Table is a constant"));
-  CHECK(says("  void bump(Float& x) {\n    x += 1.0;\n  }\n  void f() {\n    bump(Gravity);\n  }\n", "Gravity is a constant"));
+  CHECK(says("  void bump(f64& x) {\n    x += 1.0;\n  }\n  void f() {\n    bump(Gravity);\n  }\n", "Gravity is a constant"));
   CHECK(says("  KERN_CONST void f() {\n  }\n", "KERN_CONST stands in front of a constant"));
   {
     // by a const reference it is read where it stands
     logic::Graph r;
-    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Int Seen = 0;\n\n  struct sizeResult { Int n = 0; };\n"
-                          "  KERN_PURE sizeResult size(const List<Float>& list) {\n    return {list_length<Float>(list)};\n  }\n  void f() {\n    Seen = size(Table).n;\n  }\n};\n", r, nullptr, &error) && no_errors(logic::check(r)));
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST List<f64> Table = List<f64>{1.0, 2.0};\n  i64 Seen = 0;\n\n  struct sizeResult { i64 n = 0; };\n"
+                          "  KERN_PURE sizeResult size(const List<f64>& list) {\n    return {list_length<f64>(list)};\n  }\n  void f() {\n    Seen = size(Table).n;\n  }\n};\n", r, nullptr, &error) && no_errors(logic::check(r)));
   }
   // a library's constant and a constant of the Blueprint that uses it, with one name: each its own
   std::map<std::string, logic::Graph> project;
@@ -6722,9 +6547,9 @@ TEST(logic_constants) {
     auto it = project.find(std::string(name));
     return it == project.end() ? nullptr : &it->second;
   };
-  CHECK(logic::from_cpp("struct Steps : virtual kern::Library {\n  KERN_CONST Float Step = 0.25;\n\n  struct nextResult { Float value = 0.0; };\n  KERN_PURE nextResult next(Float from = 0.0) {\n    return {math_add(from, Step)};\n  }\n};\n",
+  CHECK(logic::from_cpp("struct Steps : virtual kern::Library {\n  KERN_CONST f64 Step = 0.25;\n\n  struct nextResult { f64 value = 0.0; };\n  KERN_PURE nextResult next(f64 from = 0.0) {\n    return {math_add<f64>(from, Step)};\n  }\n};\n",
                         project["Steps"], nullptr, &error, logic::library(), all) && no_errors(logic::check(project["Steps"])) && project["Steps"].library);
-  CHECK(logic::from_cpp("struct Walk : virtual kern::Blueprint, virtual Steps {\n  KERN_CONST Float Step = 10.0;\n  Float At = 0.0;\n\n  void go() {\n    At = math_add(Steps::next(At).value, Step);\n  }\n};\n",
+  CHECK(logic::from_cpp("struct Walk : virtual kern::Blueprint, virtual Steps {\n  KERN_CONST f64 Step = 10.0;\n  f64 At = 0.0;\n\n  void go() {\n    At = math_add<f64>(Steps::next(At).value, Step);\n  }\n};\n",
                         project["Walk"], nullptr, &error, logic::library(), all) && no_errors(logic::check(project["Walk"])));
   logic::Graph linked;
   CHECK(logic::link(project["Walk"], all, linked, &error) && linked.variable("Step") && linked.variable("Step")->from.empty() && linked.variable("Steps::Step") && linked.variable("Steps::Step")->from == "Steps" &&
@@ -6744,7 +6569,7 @@ TEST(logic_constants) {
   // a library keeps nothing: a variable that is no constant is none of its
   project.erase("Walk");
   logic::Graph kept;
-  CHECK(logic::from_cpp("struct Kept : virtual kern::Library {\n  KERN_CONST Float Fine = 1.0;\n  Float Sum = 0.0;\n};\n", kept, nullptr, &error));
+  CHECK(logic::from_cpp("struct Kept : virtual kern::Library {\n  KERN_CONST f64 Fine = 1.0;\n  f64 Sum = 0.0;\n};\n", kept, nullptr, &error));
   bool refused = false;
   for (const logic::Issue& i : logic::check(kept)) refused = refused || i.text.find("a library keeps nothing: it has no variables (\"Sum\") but constants") != std::string::npos;
   CHECK(refused);
@@ -6767,23 +6592,23 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
     std::string text, error;
     CHECK(!logic::to_cpp(g, "G", text, &error) && !error.empty());
   };
-  problem(R"({"variables":[{"name":"my var","type":"float","value":0}],"nodes":[],"links":[]})", "\"my var\" is no name C++ can write");
-  problem(R"({"variables":[{"name":"Float","type":"float","value":0}],"nodes":[],"links":[]})", "\"Float\" is no name C++ can write");
-  problem(R"({"variables":[{"name":"math_add","type":"float","value":0}],"nodes":[],"links":[]})", "is the name of a node");
-  problem(R"({"variables":[{"name":"value","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}}],"links":[]})", "\"value\" is an output of", 1);
-  problem(R"({"variables":[{"name":"A","type":"float","value":0}],"functions":[{"name":"F","inputs":[{"name":"A","type":"float","value":0}],"outputs":[]}],
+  problem(R"({"variables":[{"name":"my var","type":"f64","value":0}],"nodes":[],"links":[]})", "\"my var\" is no name C++ can write");
+  problem(R"({"variables":[{"name":"Float","type":"f64","value":0}],"nodes":[],"links":[]})", "\"Float\" is no name C++ can write");
+  problem(R"({"variables":[{"name":"math_add","type":"f64","value":0}],"nodes":[],"links":[]})", "is the name of a node");
+  problem(R"({"variables":[{"name":"value","type":"f64","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}}],"links":[]})", "\"value\" is an output of", 1);
+  problem(R"({"variables":[{"name":"A","type":"f64","value":0}],"functions":[{"name":"F","inputs":[{"name":"A","type":"f64","value":0}],"outputs":[]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})",
           "the input \"A\" of F has the name of a variable");
-  problem(R"({"variables":[{"name":"FResult","type":"float","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
+  problem(R"({"variables":[{"name":"FResult","type":"f64","value":0}],"functions":[{"name":"F","inputs":[],"outputs":[]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}}],"links":[]})",
           "\"FResult\" is taken by the function F");
   // a random number read by two inputs: each read would be another one
-  problem(R"({"variables":[{"name":"A","type":"float","value":0},{"name":"B","type":"float","value":0}],
+  problem(R"({"variables":[{"name":"A","type":"f64","value":0},{"name":"B","type":"f64","value":0}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"A"}},{"id":3,"type":"var.set","params":{"variable":"B"}},{"id":4,"type":"math.random"}],
             "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[4,"result",2,"value"],[4,"result",3,"value"]]})",
           "is new on every read, and 2 inputs read it", 4);
-  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
-            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"A"}},{"id":4,"type":"math.random"},{"id":5,"type":"math.negate"},{"id":6,"type":"math.add"}],
+  problem(R"({"variables":[{"name":"A","type":"f64","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"A"}},{"id":4,"type":"math.random"},{"id":5,"type":"math.negate","params":{"type":"f64"}},{"id":6,"type":"math.add","params":{"type":"f64"}}],
             "links":[[1,"then",2,"exec"],[4,"result",5,"a"],[5,"result",6,"a"],[5,"result",6,"b"],[6,"result",2,"value"]]})",
           "passes on a value that is new on every read", 5);
   // a Return off its function's path
@@ -6796,7 +6621,7 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
             "links":[[2,"then",3,"exec"]]})",
           "is not on a path of its own function", 3);
   // one exec output, two wires
-  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
+  problem(R"({"variables":[{"name":"A","type":"f64","value":0}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"var.add","params":{"variable":"A"}}],
             "links":[[1,"then",2,"exec"],[1,"then",3,"exec"]]})",
           "has more than one wire", 1);
@@ -6811,10 +6636,10 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   };
   // a function calls itself as a step - its own values in every call (that this one never ends is
   // the scenario's, not the graph's: logic_cases recursion_endless) - but not as a value
-  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"i64","value":1}],"outputs":[{"name":"r","type":"f64","value":7}]}],
             "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
             "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})");
-  problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
+  problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"f64","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"f64","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],
             "links":[[1,"then",3,"exec"],[2,"r",3,"r"],[4,"then",5,"exec"],[5,"then",6,"exec"],[5,"r",6,"r"]]})",
@@ -6824,12 +6649,12 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"Again"}},{"id":2,"type":"flow.delay"},{"id":3,"type":"func.call","params":{"function":"Again"}}],
             "links":[[1,"then",2,"exec"],[2,"completed",3,"exec"]]})");
   // a function read as a value only computes - and so does what it calls
-  problem(R"({"variables":[{"name":"Calls","type":"int","value":0}],"functions":[{"name":"F","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
+  problem(R"({"variables":[{"name":"Calls","type":"i64","value":0}],"functions":[{"name":"F","pure":true,"inputs":[],"outputs":[{"name":"r","type":"f64","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"var.add","params":{"variable":"Calls"}},{"id":3,"type":"func.return","params":{"function":"F"}}],
             "links":[[1,"then",2,"exec"],[2,"then",3,"exec"]]})",
           "function \"F\" is read as a value, so it only computes: Add to Calls (node 2) changes something", 2);
-  problem(R"({"variables":[{"name":"Calls","type":"int","value":0}],
-            "functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"Count","inputs":[],"outputs":[]}],
+  problem(R"({"variables":[{"name":"Calls","type":"i64","value":0}],
+            "functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"f64","value":0}]},{"name":"Count","inputs":[],"outputs":[]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.call","params":{"function":"Count"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"Count"}},{"id":5,"type":"flow.do_once"},{"id":6,"type":"event.begin"},{"id":7,"type":"debug.print"},{"id":8,"type":"func.pure","params":{"function":"F"}},
               {"id":9,"type":"text.append"}],
@@ -6839,21 +6664,21 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.delay"}],"links":[[1,"then",2,"exec"]]})",
           "Delay (node 2) waits", 2);
   // (branches, loops and other values are computing)
-  fine(R"({"functions":[{"name":"Sum","pure":true,"inputs":[{"name":"to","type":"int","value":3}],"outputs":[{"name":"r","type":"float","value":0}]}],
+  fine(R"({"functions":[{"name":"Sum","pure":true,"inputs":[{"name":"to","type":"i64","value":3}],"outputs":[{"name":"r","type":"f64","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"Sum"}},{"id":2,"type":"flow.for"},{"id":3,"type":"flow.branch"},{"id":4,"type":"func.return","params":{"function":"Sum"}},
-              {"id":5,"type":"math.compare","params":{"op":">"},"values":{"b":1}},{"id":6,"type":"func.return","params":{"function":"Sum"},"values":{"r":-1}}],
+              {"id":5,"type":"math.compare","params":{"type":"f64","op":">"},"values":{"b":1}},{"id":6,"type":"func.return","params":{"function":"Sum"},"values":{"r":-1}}],
             "links":[[1,"then",2,"exec"],[1,"to",2,"last"],[2,"body",3,"exec"],[2,"index",5,"a"],[5,"result",3,"condition"],[3,"true",4,"exec"],[2,"index",4,"r"],[2,"completed",6,"exec"]]})");
   // no path leads back into itself without a wait: a loop node repeats steps
-  problem(R"({"variables":[{"name":"A","type":"float","value":0}],
-            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.branch"},{"id":4,"type":"math.compare","params":{"op":"<"},"values":{"b":5}},
+  problem(R"({"variables":[{"name":"A","type":"f64","value":0}],
+            "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.branch"},{"id":4,"type":"math.compare","params":{"type":"f64","op":"<"},"values":{"b":5}},
               {"id":5,"type":"var.get","params":{"variable":"A"}}],
             "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[5,"value",4,"a"],[4,"result",3,"condition"],[3,"true",2,"exec"]]})",
           "leads back to Add to A (node 2) without a wait", 3);
-  fine(R"({"variables":[{"name":"A","type":"float","value":0}],
+  fine(R"({"variables":[{"name":"A","type":"f64","value":0}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"A"}},{"id":3,"type":"flow.delay"}],
             "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"completed",2,"exec"]]})");
   // (a Gate that closes itself, a Do Once that resets itself: the path ends in that input)
-  fine(R"({"variables":[{"name":"A","type":"float","value":0}],
+  fine(R"({"variables":[{"name":"A","type":"f64","value":0}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.gate"},{"id":3,"type":"var.add","params":{"variable":"A"}},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
             "links":[[1,"then",2,"enter"],[2,"exit",3,"exec"],[3,"then",4,"exec"],[4,"completed",5,"exec"],[5,"exit",2,"close"]]})");
   fine(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":4,"type":"flow.do_once"},{"id":5,"type":"flow.do_n"}],
@@ -6868,13 +6693,13 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   // Add to Variable counts: numbers only
   problem(R"({"variables":[{"name":"Name","type":"text","value":""}],
             "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Name"}}],"links":[[1,"then",2,"exec"]]})",
-          "needs a number variable (Integer or Float): \"Name\" is", 2);
+          "needs a number variable (Integer or f64): \"Name\" is", 2);
   // an enum is a type of the Blueprint's C++: its name and its values' names are names there
   problem(R"({"enums":[{"name":"my enum","values":["A"]}],"nodes":[],"links":[]})", "the enum \"my enum\" is no name C++ can write");
   problem(R"({"enums":[{"name":"E","values":["A","b c"]}],"nodes":[],"links":[]})", "the value \"b c\" of E is no name C++ can write");
   problem(R"({"enums":[{"name":"E","values":["A","Float"]}],"nodes":[],"links":[]})", "the value \"Float\" of E is no name C++ can write");
   problem(R"({"enums":[{"name":"Items_list","values":["A"]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
-  problem(R"({"enums":[{"name":"E","values":["A"]}],"variables":[{"name":"E","type":"float","value":0}],"nodes":[],"links":[]})", "the name \"E\" is used twice");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"variables":[{"name":"E","type":"f64","value":0}],"nodes":[],"links":[]})", "the name \"E\" is used twice");
   problem(R"({"enums":[{"name":"E","values":["A"]}],"functions":[{"name":"E","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"E"}}],"links":[]})",
           "the name \"E\" is used twice");
   problem(R"({"enums":[{"name":"math_add","values":["A"]}],"nodes":[],"links":[]})", "is the name of a node");
@@ -6885,20 +6710,20 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
                    {"id":4,"type":"enum.values","params":{"enum":"E"}}],
           "links":[[1,"then",2,"exec"],[1,"e",2,"value"],[2,"case1",3,"exec"],[4,"values",3,"all"]]})");
   // a struct is a type of the Blueprint's C++ too: its name and its fields' names are names there
-  problem(R"({"structs":[{"name":"my struct","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "the struct \"my struct\" is no name C++ can write");
-  problem(R"({"structs":[{"name":"S","fields":[{"name":"b c","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"b c\" of S is no name C++ can write");
-  problem(R"({"structs":[{"name":"S","fields":[{"name":"Text","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"Text\" of S is no name C++ can write");
-  problem(R"({"structs":[{"name":"Items_list","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
-  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]}],"variables":[{"name":"S","type":"float","value":0}],"nodes":[],"links":[]})", "the name \"S\" is used twice");
-  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"float","value":0}]}],"functions":[{"name":"S","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"S"}}],"links":[]})",
+  problem(R"({"structs":[{"name":"my struct","fields":[{"name":"A","type":"f64","value":0}]}],"nodes":[],"links":[]})", "the struct \"my struct\" is no name C++ can write");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"b c","type":"f64","value":0}]}],"nodes":[],"links":[]})", "the field \"b c\" of S is no name C++ can write");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"Text","type":"f64","value":0}]}],"nodes":[],"links":[]})", "the field \"Text\" of S is no name C++ can write");
+  problem(R"({"structs":[{"name":"Items_list","fields":[{"name":"A","type":"f64","value":0}]}],"nodes":[],"links":[]})", "a name that ends in _list reads as a list");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"f64","value":0}]}],"variables":[{"name":"S","type":"f64","value":0}],"nodes":[],"links":[]})", "the name \"S\" is used twice");
+  problem(R"({"structs":[{"name":"S","fields":[{"name":"A","type":"f64","value":0}]}],"functions":[{"name":"S","inputs":[],"outputs":[]}],"nodes":[{"id":1,"type":"func.entry","params":{"function":"S"}}],"links":[]})",
           "the name \"S\" is used twice");
-  problem(R"({"structs":[{"name":"math_add","fields":[{"name":"A","type":"float","value":0}]}],"nodes":[],"links":[]})", "is the name of a node");
-  problem(R"({"enums":[{"name":"E","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"E","type":"float","value":0}]}],"nodes":[],"links":[]})", "the field \"E\" of S has the name of a type of this Blueprint");
+  problem(R"({"structs":[{"name":"math_add","fields":[{"name":"A","type":"f64","value":0}]}],"nodes":[],"links":[]})", "is the name of a node");
+  problem(R"({"enums":[{"name":"E","values":["A"]}],"structs":[{"name":"S","fields":[{"name":"E","type":"f64","value":0}]}],"nodes":[],"links":[]})", "the field \"E\" of S has the name of a type of this Blueprint");
   fine(R"({"enums":[{"name":"E","values":["A","B"]}],
-          "structs":[{"name":"In","fields":[{"name":"A","type":"float","value":1}]},
+          "structs":[{"name":"In","fields":[{"name":"A","type":"f64","value":1}]},
                      {"name":"S","fields":[{"name":"K","type":"enum","of":"E","value":1},{"name":"I","type":"struct","of":"In","value":{"A":2}},{"name":"L","type":"struct_list","of":"In","value":[{}]},
-                                           {"name":"value","type":"float","value":0}]}],
-          "variables":[{"name":"V","type":"struct","of":"S","value":{"K":1}},{"name":"L","type":"struct_list","of":"S","value":[{"K":0},{}]},{"name":"A","type":"float","value":0}],
+                                           {"name":"value","type":"f64","value":0}]}],
+          "variables":[{"name":"V","type":"struct","of":"S","value":{"K":1}},{"name":"L","type":"struct_list","of":"S","value":[{"K":0},{}]},{"name":"A","type":"f64","value":0}],
           "functions":[{"name":"F","inputs":[{"name":"s","type":"struct","of":"S","value":{}}],"outputs":[{"name":"all","type":"struct_list","of":"In","value":[]},{"name":"one","type":"struct","of":"In","value":{}}]}],
           "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"I"}},{"id":3,"type":"func.return","params":{"function":"F"}},
                    {"id":4,"type":"struct.break","params":{"struct":"S"}},{"id":5,"type":"struct.make","params":{"struct":"In"},"values":{"A":3}},
@@ -6910,9 +6735,9 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   {
     json::Value held;
     logic::Graph g;
-    CHECK(json::parse(R"({"uses":["lib"],"variables":[{"name":"pad","type":"float","value":0}],
-            "functions":[{"name":"lib::hit","from":"lib","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]},
-              {"name":"own","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]}],
+    CHECK(json::parse(R"({"uses":["lib"],"variables":[{"name":"pad","type":"f64","value":0}],
+            "functions":[{"name":"lib::hit","from":"lib","inputs":[{"name":"pad","type":"f64","value":0}],"outputs":[{"name":"Result","type":"f64","value":0}]},
+              {"name":"own","inputs":[{"name":"pad","type":"f64","value":0}],"outputs":[{"name":"Result","type":"f64","value":0}]}],
             "nodes":[],"links":[]})", held) &&
           logic::graph_from_json(held, g));
     const auto renamed = logic::cpp_names(g);
@@ -6924,9 +6749,9 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   {
     json::Value old;
     logic::Graph g;
-    CHECK(json::parse(R"({"variables":[{"name":"Ball Seen","type":"bool","value":false},{"name":"Text","type":"text","value":""},{"name":"value","type":"float","value":0},
-              {"name":"2nd","type":"float","value":0},{"name":"BallSeen","type":"float","value":0}],
-            "functions":[{"name":"my fn","inputs":[{"name":"in put","type":"float","value":0},{"name":"value","type":"float","value":0}],"outputs":[{"name":"class","type":"float","value":0}]}],
+    CHECK(json::parse(R"({"variables":[{"name":"Ball Seen","type":"bool","value":false},{"name":"Text","type":"text","value":""},{"name":"value","type":"f64","value":0},
+              {"name":"2nd","type":"f64","value":0},{"name":"BallSeen","type":"f64","value":0}],
+            "functions":[{"name":"my fn","inputs":[{"name":"in put","type":"f64","value":0},{"name":"value","type":"f64","value":0}],"outputs":[{"name":"class","type":"f64","value":0}]}],
             "machines":[{"id":40,"name":"M","states":[{"id":41,"name":"A","initial":true},{"id":42,"name":"B"}],"transitions":[{"id":43,"from":41,"to":42,"trigger":"condition","variable":"Ball Seen"}]}],
             "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Ball Seen"},"values":{"value":true}},
               {"id":3,"type":"var.set","params":{"variable":"value"}},{"id":4,"type":"func.pure","params":{"function":"my fn"},"values":{"in put":3}},
@@ -6962,7 +6787,7 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
   // (paths that meet before a Return are fine when they come from one Branch)
   json::Value j;
   logic::Graph ok;
-  CHECK(json::parse(R"({"variables":[{"name":"A","type":"float","value":0}],"functions":[{"name":"F","inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"y","type":"float","value":0}]}],
+  CHECK(json::parse(R"({"variables":[{"name":"A","type":"f64","value":0}],"functions":[{"name":"F","inputs":[{"name":"x","type":"f64","value":0}],"outputs":[{"name":"y","type":"f64","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"flow.branch"},{"id":3,"type":"var.add","params":{"variable":"A"}},
                      {"id":4,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"func.return","params":{"function":"F"}}],
             "links":[[1,"then",2,"exec"],[2,"true",3,"exec"],[2,"false",4,"exec"],[3,"then",5,"exec"],[4,"then",5,"exec"],[1,"x",5,"y"]]})", j) && logic::graph_from_json(j, ok));
@@ -7066,8 +6891,8 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
     if (!difference.empty()) std::printf("%s: %s\n", name.c_str(), difference.c_str());
   }
   // A change in the text: what is still there keeps its id and place, what is new gets new ones.
-  const char* before_text = "struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
-                            "    Heat = math_add(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
+  const char* before_text = "struct B : kern::Blueprint {\n  f64 Heat = 0.0;\n  i64 Count = 0;\n\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, f64 value, Text text) {\n"
+                            "    Heat = math_add<f64>(Heat, value);\n    if (math_compare<\">\">(Heat, 10.0)) {\n      Count += 1;\n    }\n    debug_print(kern::to<Text>(Count), false);\n  }\n};\n";
   logic::Graph g0, g1, g2, g3;
   std::string error;
   CHECK(logic::from_cpp(before_text, g0, nullptr, &error));
@@ -7089,7 +6914,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
     CHECK(missing == gone);
   };
   // one more line in the middle
-  CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += kern::to<Int>(math_mul(value, 2.0));\n    if (math_compare"), g0, g1, &error));
+  CHECK(logic::apply_cpp(changed("    if (math_compare", "    Count += num_cast<i64, f64>(math_mul<f64>(value, 2.0));\n    if (math_compare"), g0, g1, &error));
   kept(g1, 0);
   CHECK(g1.nodes.size() == g0.nodes.size() + 2 && g1.next_id == g0.next_id + 2);
   int fresh = 0;
@@ -7108,7 +6933,7 @@ TEST(logic_notation_apply_keeps_ids_and_places) {
   CHECK(g3.nodes.size() == g0.nodes.size() - 2);
   // what cannot be read changes nothing and says where
   logic::Graph untouched = g0;
-  CHECK(!logic::apply_cpp(changed("Heat = math_add(Heat, value);", "Heat = Heat + value;"), g0, untouched, &error) && error.rfind("line 7, column 17:", 0) == 0 && untouched == g0);
+  CHECK(!logic::apply_cpp(changed("Heat = math_add<f64>(Heat, value);", "Heat = Heat + value;"), g0, untouched, &error) && error.rfind("line 7, column 17:", 0) == 0 && untouched == g0);
 }
 
 TEST(game_character_mover) {
@@ -7377,19 +7202,19 @@ TEST(engine_calls_mixer_is_the_mixer) {
   CHECK(render && render->outputs.size() == 1 && std::string(render->outputs[0].count) == "frames" && render->outputs[0].per == 2);
   // the same steps through the nodes and on a mixer of C++: the same numbers, bit for bit
   logic::EngineObjects objects;
-  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  std::vector<Value> out{Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
   const Value mixer = out[0];
   out = {Value::zero(logic::PinType::boolean)};
   CHECK(logic::call_engine(objects, "engine.mixer.init", {mixer, Value::integer(48000), Value::integer(16)}, out) && out[0].b);
   const std::vector<f32> tone = sine(48000, 0.25f, 440);
   std::vector<f64> samples(tone.begin(), tone.end());
-  out = {Value::zero(logic::PinType::integer)};
+  out = {Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(objects, "engine.mixer.adopt_clip", {mixer, Value::of(samples), Value::integer(1), Value::text("tone"), Value::boolean(false)}, out));
   const Value clip = out[0];
-  out = {Value::zero(logic::PinType::int64)};
+  out = {Value::zero(logic::PinType::u64)};
   CHECK(logic::call_engine(objects, "engine.mixer.play", {mixer, clip, Value::zero(logic::PinType::structure)}, out));
-  out = {Value::zero(logic::PinType::number_list)};
+  out = {Value::zero(logic::PinType::f64_list)};
   CHECK(logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(300)}, out));
   const std::vector<f64>& got = out[0].items<f64>();
   CHECK(got.size() == 600);
@@ -7410,7 +7235,7 @@ TEST(engine_calls_mixer_is_the_mixer) {
   std::vector<Value> none;
   CHECK(logic::call_engine(objects, "engine.mixer.release", {mixer}, none));
   // a handle of no mixer: the call fails and says so
-  out = {Value::zero(logic::PinType::number_list)};
+  out = {Value::zero(logic::PinType::f64_list)};
   CHECK(!logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(4)}, out));
   CHECK(objects.error.find("mixer") != std::string::npos);
   // the room behind what the engine writes: writing past the count is caught
@@ -7426,9 +7251,9 @@ TEST(engine_calls_mixer_is_the_mixer) {
 // compares (engine_make_default: as C++ makes it without arguments, at that handle).
 // An object of the engine is an Object<I> of its class at every node of the engine - never a number (kern/docs/
 // engine_object.md): every pin of the form of an object (o, h - or a list of them) is an object pin, every object pin names
-// a class of the engine and no Int pin does; what makes an object gives one of its class, what ends one takes one. (The
+// a class of the engine and no i64 pin does; what makes an object gives one of its class, what ends one takes one. (The
 // generator stops on a pin of an object that is no Object - tools/engine_api.py, table_text.) Handle of Object is the one
-// way to an Int; no Int becomes an Object.
+// way to an Int; no i64 becomes an Object.
 TEST(engine_objects_are_never_ints) {
   const auto item = [](std::string_view shape) {   // (the form of an entry: [3o], [?h], [o] -> o)
     while (!shape.empty() && (shape[0] == '[' || shape[0] == '?' || (shape[0] >= '0' && shape[0] <= '9'))) shape.remove_prefix(1);
@@ -7441,7 +7266,7 @@ TEST(engine_objects_are_never_ints) {
         const bool object = p.type == logic::PinType::object || p.type == logic::PinType::object_list;
         const char c = item(p.shape);
         const bool shaped = (c == 'o' || c == 'h') && (p.shape[0] == '[') == (p.type == logic::PinType::object_list);
-        const bool integer = p.type == logic::PinType::integer || p.type == logic::PinType::integer_list;
+        const bool integer = p.type == logic::PinType::i64 || p.type == logic::PinType::i64_list;
         const bool ok = object ? shaped && logic::engine_class(p.of) != nullptr : !(c == 'o' || c == 'h') && !(integer && logic::engine_class(p.of));
         if (!ok) {
           std::printf("%s: the pin %s (%s, of %s, form %s) - an object of the engine is an Object of its class\n", f.type, p.id, logic::pin_type_name(p.type), p.of, p.shape);
@@ -7458,12 +7283,12 @@ TEST(engine_objects_are_never_ints) {
       CHECK(f.outputs.size() == 1 && f.outputs[0].type == logic::PinType::object && std::string(f.outputs[0].shape) == "h");
   }
   CHECK(wrong == 0 && objects > 300);
-  // (the one way to an Int: Handle of Object; an Int at an object's input of the engine is no handle - the call fails, saying so)
+  // (the one way to an Int: Handle of Object; an i64 at an object's input of the engine is no handle - the call fails, saying so)
   const logic::NodeDef* handle = logic::library().find("object.handle");
-  CHECK(handle && handle->outputs.size() == 1 && handle->outputs[0].type == logic::PinType::integer && handle->inputs[0].type == logic::PinType::object);
+  CHECK(handle && handle->outputs.size() == 1 && handle->outputs[0].type == logic::PinType::i64 && handle->inputs[0].type == logic::PinType::object);
   logic::EngineObjects o;
   o.on_missing(logic::engine_make_default);
-  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::integer)};
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::i64)};
   CHECK(!logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(1)}, out) && o.error == "the input mixer is no Object of the engine (it is int)" && o.size() == 0);
   // (... and one of another world names nothing here, not the object of the same handle)
   logic::EngineObjects there;
@@ -7480,7 +7305,7 @@ TEST(engine_calls_default_objects) {
   for (logic::EngineObjects* o : {&a, &b}) {
     std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
     CHECK(logic::call_engine(*o, "engine.mixer.init", {logic::Value::object(o->ref(5)), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
-    out = {logic::Value::zero(logic::PinType::integer)};
+    out = {logic::Value::zero(logic::PinType::i64)};
     CHECK(logic::call_engine(*o, "engine.mixer.sample_rate", {logic::Value::object(o->ref(5))}, out));
     CHECK(out[0].i == 44100);
   }
@@ -7519,11 +7344,11 @@ TEST(engine_calls_default_objects_by_class) {
   out = {logic::Value::zero(logic::PinType::boolean)};
   CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::object(o.ref(3))}, out) && !out[0].b);
   CHECK(o.size() == 2);
-  out = {logic::Value::zero(logic::PinType::integer)};
+  out = {logic::Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::object(o.ref(3))}, out) && out[0].i == 44100);
   out.clear();
   CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::object(o.ref(3))}, out) && o.size() == 1);
-  out = {logic::Value::zero(logic::PinType::integer)};
+  out = {logic::Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::object(o.ref(3))}, out) && out[0].i == 44100);
   CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::object(o.ref(3))}, out = {logic::Value::zero(logic::PinType::boolean)}));
   CHECK(o.size() == 2);
@@ -7545,52 +7370,52 @@ struct Probe : kern::Blueprint {
   KERN_ENUM(audio_Rolloff, inverse, linear, exponential);
   KERN_ENUM(game_Shape, box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh);
   KERN_ENUM(physics_Surface, none, cloth, tpu, floor_);
-  KERN_STRUCT(Quat) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 1.0; };
-  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
-  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; Float radius = -1.0; };
-  KERN_STRUCT(MeshData) { List<Float> positions = List<Float>{}; List<Float> normals = List<Float>{}; List<Float> colors = List<Float>{}; List<Float> uvs = List<Float>{}; List<Float> extra = List<Float>{}; Int extra_size = 0; List<Int> indices = List<Int>{}; };
-  KERN_STRUCT(audio_PlayParams) { Float volume = 1.0; Float pitch = 1.0; Float pan = 0.0; Bool the_loop = false; audio_Bus bus = audio_Bus::sfx; Float fade_in = 0.0; Float start = 0.0; Int priority = 0; Bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; Float min_distance = 1.0; Float max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; Float spread = 0.0; Float doppler = 1.0; };
+  KERN_STRUCT(Quat) { f64 x = 0.0; f64 y = 0.0; f64 z = 0.0; f64 w = 1.0; };
+  KERN_STRUCT(Mat4) { Fixed<f64, 16> m = Fixed<f64, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; f64 radius = -1.0; };
+  KERN_STRUCT(MeshData) { List<f64> positions = List<f64>{}; List<f64> normals = List<f64>{}; List<f64> colors = List<f64>{}; List<f64> uvs = List<f64>{}; List<f64> extra = List<f64>{}; i64 extra_size = 0; List<i64> indices = List<i64>{}; };
+  KERN_STRUCT(audio_PlayParams) { f64 volume = 1.0; f64 pitch = 1.0; f64 pan = 0.0; bool the_loop = false; audio_Bus bus = audio_Bus::sfx; f64 fade_in = 0.0; f64 start = 0.0; i64 priority = 0; bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; f64 min_distance = 1.0; f64 max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; f64 spread = 0.0; f64 doppler = 1.0; };
   KERN_STRUCT(game_Transform) { Vector position = Vector{0.0, 0.0, 0.0}; Vector rotation = Vector{0.0, 0.0, 0.0}; Vector scale = Vector{1.0, 1.0, 1.0}; };
   KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0, 0.0, 0.0, 1.0}; };
 
   // what the calls are given
-  List<Float> Samples = List<Float>{};
+  List<f64> Samples = List<f64>{};
   audio_PlayParams Params = audio_PlayParams{};
   game_Transform Placed = game_Transform{Vector{1.0, 2.0, 3.0}, Vector{10.0, 20.0, 30.0}, Vector{1.0, 1.5, 2.0}};
   // what they gave
   Object<kern::audio::Mixer> Mixer = Object<kern::audio::Mixer>{};
-  Bool Ready = false;
-  Int Clip = 0;
-  Int64 Voice = Int64{0x0};
-  List<Float> Sound = List<Float>{};
-  Int Rate = 0;
-  Int Clips = 0;
-  List<Float> Gone = List<Float>{1.0};
+  bool Ready = false;
+  i64 Clip = 0;
+  u64 Voice = 0x0u;
+  List<f64> Sound = List<f64>{};
+  i64 Rate = 0;
+  i64 Clips = 0;
+  List<f64> Gone = List<f64>{1.0};
   Quat Turned = Quat{};
   Vector Angles = Vector{0.0, 0.0, 0.0};
   Mat4 Matrix = Mat4{};
   game_Transform Back = game_Transform{};
-  Bool Parsed = false;
+  bool Parsed = false;
   game_Shape Shape = game_Shape::box;
-  Bool Unparsed = true;
+  bool Unparsed = true;
   game_Shape Kept = game_Shape::box;
   Text Name = "";
   MeshData Box = MeshData{};
   Sphere Ball = Sphere{};
-  Float Friction = 0.0;
+  f64 Friction = 0.0;
   physics_Pose Frame = physics_Pose{};
   Text Hex = "";
-  Bool HexOk = false;
+  bool HexOk = false;
   Vector Color = Vector{0.0, 0.0, 0.0};
-  Bool Known = false;
+  bool Known = false;
 
   struct { Object<kern::audio::Mixer> result = Object<kern::audio::Mixer>{}; } n1;
-  struct { Bool result = false; } n2;
-  struct { Int result = 0; } n3;
-  struct { Int64 result = Int64{0x0}; } n4;
-  struct { List<Float> out = List<Float>{}; } n5;
-  struct { Bool result = false; game_Shape out = game_Shape::box; } n7;
-  struct { Bool result = false; Vector out = Vector{0.0, 0.0, 0.0}; } n8;
+  struct { bool result = false; } n2;
+  struct { i64 result = 0; } n3;
+  struct { u64 result = 0x0u; } n4;
+  struct { List<f64> out = List<f64>{}; } n5;
+  struct { bool result = false; game_Shape out = game_Shape::box; } n7;
+  struct { bool result = false; Vector out = Vector{0.0, 0.0, 0.0}; } n8;
 
   void Sounds();
   void Numbers();
@@ -7647,53 +7472,53 @@ namespace engine_place_probe {
 struct EnginePlaces : kern::Blueprint {
   // ---- types ----
   KERN_STRUCT(MeshData) {
-    List<Float> positions = List<Float>{};
-    List<Float> normals = List<Float>{};
-    List<Float> colors = List<Float>{};
-    List<Float> uvs = List<Float>{};
-    List<Float> extra = List<Float>{};
-    Int extra_size = 0;
-    List<Int> indices = List<Int>{};
+    List<f64> positions = List<f64>{};
+    List<f64> normals = List<f64>{};
+    List<f64> colors = List<f64>{};
+    List<f64> uvs = List<f64>{};
+    List<f64> extra = List<f64>{};
+    i64 extra_size = 0;
+    List<i64> indices = List<i64>{};
   };
   KERN_STRUCT(GeoChunk) {
-    Int x = 0;
-    Int y = 0;
-    Int items = 0;
-    Int triangles = 0;
-    Int hash = 0;
-    Bool welded = false;
-    MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+    i64 x = 0;
+    i64 y = 0;
+    i64 items = 0;
+    i64 triangles = 0;
+    i64 hash = 0;
+    bool welded = false;
+    MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
   };
   KERN_STRUCT(WeldStats) {
-    U32 source_vertices = 0;
-    U32 unique_vertices = 0;
-    Int bytes_before = 0;
-    Int bytes_after = 0;
-    Bool indexed = false;
+    u32 source_vertices = 0;
+    u32 unique_vertices = 0;
+    i64 bytes_before = 0;
+    i64 bytes_after = 0;
+    bool indexed = false;
   };
 
   // ---- variables ----
   Object<kern::BuildingBuilder> Builder = Object<kern::BuildingBuilder>{};
-  Int Length = 0;
-  Int At = 0;
-  Int X = 0;
-  Int Items = 0;
-  Float P0 = 0.0;
-  Int Beside = 0;
-  Int Set = 0;
+  i64 Length = 0;
+  i64 At = 0;
+  i64 X = 0;
+  i64 Items = 0;
+  f64 P0 = 0.0;
+  i64 Beside = 0;
+  i64 Set = 0;
   List<GeoChunk> Chunks = List<GeoChunk>{};
-  Int LengthAfter = 0;
-  Bool Removed = false;
-  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}};
-  Int Before = 0;
-  Int Gone = 0;
-  Int GoneLength = 0;
+  i64 LengthAfter = 0;
+  bool Removed = false;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}};
+  i64 Before = 0;
+  i64 Gone = 0;
+  i64 GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
-  Int AppendedLength = 0;
+  i64 AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
-  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  MeshData Soup = MeshData{List<f64>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<f64>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<f64>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<f64>{}, 0, List<i64>{}};
   WeldStats Stats = WeldStats{0, 0, 0, 0, false};
-  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+  MeshData Welded = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}};
 
   // ---- functions ----
   void Bind() {
@@ -7705,20 +7530,20 @@ struct EnginePlaces : kern::Blueprint {
 
   void Change() {
     engine_building_builder_chunks(n7, Builder);
-    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<Float>{0.1, 2.5}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 2, List<Int>{1, 2}}});
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<f64>{0.1, 2.5}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 2, List<i64>{1, 2}}});
     At = n3.index;
-    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
     n7.result[0].items = 7;
     n5.value = (n7.result[0].x += 3);
     X = n5.value;
-    n7.result[1].mesh.positions = List<Float>{0.3333333333333333, 4.0};
+    n7.result[1].mesh.positions = List<f64>{0.3333333333333333, 4.0};
     P0 = n7.result[1].mesh.positions[0];
     n7.result[1].mesh.positions[1] = 0.1;
     Items = n7.result[0].items;
     Removed = list_contains<GeoChunk>(n7.result, First);
     First = list_get<GeoChunk>(n7.result, 1);
-    P0 = math_mul(n7.result[1].mesh.positions[0], 2.0);
-    LengthAfter = list_length<Float>(n7.result[1].mesh.positions);
+    P0 = math_mul<f64>(n7.result[1].mesh.positions[0], 2.0);
+    LengthAfter = list_length<f64>(n7.result[1].mesh.positions);
     Beside = n7.result[5].x;
     n6.value = (n7.result[5].x = 9);
     Set = n6.value;
@@ -7755,7 +7580,7 @@ struct EnginePlaces : kern::Blueprint {
     engine_building_builder_release(Builder);
     Gone = n8.result[0].x;
     n8.result[0].x = 4;
-    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}});
     GoneLength = list_length<GeoChunk>(n8.result);
     GoneChunks = n8.result;
   }
@@ -7770,17 +7595,17 @@ struct EnginePlaces : kern::Blueprint {
   // ---- what nodes give and keep ----
   struct { Object<kern::BuildingBuilder> result = Object<kern::BuildingBuilder>{}; } n1;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
-  struct { Int index = 0; } n3;
-  struct { Bool removed = false; } n4;
-  struct { Int value = 0; } n5;
-  struct { Int value = 0; } n6;
+  struct { i64 index = 0; } n3;
+  struct { bool removed = false; } n4;
+  struct { i64 value = 0; } n5;
+  struct { i64 value = 0; } n6;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
-  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, List<f64>{}, 0, List<i64>{}}; } n13;
 };
 
 }  // namespace engine_place_probe
@@ -7846,7 +7671,7 @@ inline void Probe::Numbers() {
   Kept = n7.out;
   Name = engine_game_shape_name(game_Shape::torus);
   Box = engine_primitives_box(Vector{1.0, 2.0, 3.0}, Vector{0.5, 0.25, 1.0});
-  Ball = engine_bounding_sphere(Box.positions, Int(static_cast<i64>(Box.positions.size() / 3)));
+  Ball = engine_bounding_sphere(Box.positions, i64(static_cast<i64>(Box.positions.size() / 3)));
   Friction = engine_physics_surface_friction(physics_Surface::cloth, physics_Surface::tpu);
   Frame = engine_physics_frame_from_axis(Vector{1.0, 2.0, 3.0}, Vector{0.0, 0.0, 1.0}, true);
   Hex = engine_game_hex_color(Vector{1.0, 0.5, 0.0});
@@ -7922,8 +7747,8 @@ TEST(logic_export_gives_its_own_piece) {
   std::vector<f32> samples(2048, 0.25f);
   logic::List<f64> wide;
   for (std::size_t i = 0; i < 2048; ++i) wide.push_back(0.5);
-  logic::List<logic::Whole> bytes;
-  for (int i = 0; i < 64; ++i) bytes.push_back(logic::Whole(static_cast<i64>(i)));
+  logic::List<u8> bytes;
+  for (int i = 0; i < 64; ++i) bytes.push_back(static_cast<u8>(i));
   const f32* audio = logic::export_floats<&export_keys::audio>(samples, &len_audio);
   const u8* datagram = logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
   // (by turns: each still holds what it gave)
@@ -7980,7 +7805,7 @@ TEST(engine_calls_class_calls_the_engine_itself) {
   CHECK(m.init(48000, 16));
   const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
   CHECK(static_cast<i64>(c) == static_cast<i64>(a.Clip));
-  CHECK(static_cast<u64>(m.play(c, audio::PlayParams{})) == a.Voice.bits);
+  CHECK(static_cast<u64>(m.play(c, audio::PlayParams{})) == a.Voice);
   std::vector<f32> wrote(600);
   m.render(wrote.data(), 300);
   bool same = a.Sound.size() == wrote.size(), sounds = false;
@@ -8104,7 +7929,7 @@ TEST(engine_places_class_names_the_engines_list) {
   CHECK(a.X == 6 && a.Items == 7 && a.Set == 9 && a.Beside == 0 && a.LengthAfter == 2 && a.Removed);
   CHECK(std::bit_cast<u64>(static_cast<f64>(a.P0)) == std::bit_cast<u64>(2.0 * static_cast<f64>(static_cast<f32>(0.3333333333333333))));
   // what naming the place costs: a field read, a field set, the length - no memory asked for (C++: none either)
-  logic::Whole x = 0, length = 0;
+  i64 x = 0, length = 0;
   const long asked = memory_asked_by([&] {
     a.engine_building_builder_chunks(a.n7, a.Builder);
     x = a.n7.result[0].x;
@@ -8161,7 +7986,7 @@ TEST(engine_reports_through_an_optional_pointer) {
     }
   };
   logic::EngineObjects objects;
-  std::vector<Value> out{Value::zero(PinType::boolean), Value::zero(PinType::structure), Value::zero(PinType::number), Value::zero(PinType::number)};
+  std::vector<Value> out{Value::zero(PinType::boolean), Value::zero(PinType::structure), Value::zero(PinType::f64), Value::zero(PinType::f64)};
   CHECK(logic::call_engine(objects, "engine.build_terrain_tile",
                            {Value::number(0), Value::number(0), Value::number(1), Value::integer(2), Value::zero(PinType::structure),
                             Value::callback(std::make_shared<Slope>()), Value::zero(PinType::structure)},
@@ -8182,14 +8007,14 @@ TEST(engine_reports_through_an_optional_pointer) {
 TEST(engine_footprint_stream_values) {
   using logic::Value;
   logic::EngineObjects objects;
-  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  std::vector<Value> out{Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(objects, "engine.footprint_stream.make", {}, out));
   const Value fs = out[0];
   std::vector<Value> none;
   CHECK(logic::call_engine(objects, "engine.footprint_stream.begin", {fs, Value::integer(7), Value::number(1.5), Value::number(9.25)}, none));
   CHECK(logic::call_engine(objects, "engine.footprint_stream.ring", {fs, Value::of(std::vector<Vec3>{{0, 0, 0}, {4, 0, 0}, {4, 3, 0}}), Value::integer(3)}, none));
   const FootprintStream* const held = logic::engine_values::object_of<FootprintStream>(objects, fs.as_object(), "footprint_stream");
-  out = {Value::zero(logic::PinType::number_list)};
+  out = {Value::zero(logic::PinType::f64_list)};
   CHECK(held && logic::call_engine(objects, "engine.footprint_stream.values", {fs}, out) && out[0].size() == held->size());
   bool same = held != nullptr;
   for (std::size_t k = 0; same && k < out[0].size(); ++k) same = std::bit_cast<u64>(out[0].item(k).as_number()) == std::bit_cast<u64>(held->data()[k]);
@@ -8205,10 +8030,10 @@ TEST(engine_footprint_stream_values) {
 namespace implements_probe {
 struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
-  Float Time = 0.25;
+  f64 Time = 0.25;
   Object<kern::Program> Program = Object<kern::Program>{};
   Object<kern::UniformCache> Cache = Object<kern::UniformCache>{};
-  Int Frames = 0;
+  i64 Frames = 0;
 
   // ---- functions ----
   struct nameResult { Text result = ""; };
@@ -8218,7 +8043,7 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 
   struct vertexResult { Text result = ""; };
   KERN_OVERRIDE KERN_PURE vertexResult vertex() {
-    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+    return {text_append("vWater = aWater * ", num_text<f64>(Time), ";")};
   }
 
   KERN_OVERRIDE void bind(Object<kern::Program> program = Object<kern::Program>{}) {
@@ -8233,25 +8058,25 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
 struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
-    Float time = 0.0;
-    Float dt = 0.0;
-    Int64 index = Int64{0x0};
+    f64 time = 0.0;
+    f64 dt = 0.0;
+    u64 index = 0x0u;
   };
 
   // ---- variables ----
   Object<kern::Engine> Engine = Object<kern::Engine>{};
-  Int Updates = 0;
-  Float Last = 0.0;
-  Bool Stopped = false;
+  i64 Updates = 0;
+  f64 Last = 0.0;
+  bool Stopped = false;
 
   // ---- functions ----
-  struct startResult { Bool result = false; };
+  struct startResult { bool result = false; };
   KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     Engine = engine;
     return {true};
   }
 
-  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {
     Updates += 1;
     Last = frame.time;
   }
@@ -8266,31 +8091,31 @@ namespace implements_probe {
 struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
-    Int64 id = Int64{0x0};
+    u64 id = 0x0u;
   };
 
   // ---- variables ----
-  net_Address Last = net_Address{Int64{0x0}};
-  Int Bytes = 0;
-  Int Sent = 0;
+  net_Address Last = net_Address{0x0u};
+  i64 Bytes = 0;
+  i64 Sent = 0;
 
   // ---- functions ----
-  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  struct addressResult { net_Address result = net_Address{0x0u}; };
   KERN_OVERRIDE KERN_PURE addressResult address() {
-    return {net_Address{Int64{0x7}}};
+    return {net_Address{0x7u}};
   }
 
-  struct sendResult { Bool result = false; };
-  KERN_OVERRIDE sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+  struct sendResult { bool result = false; };
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{0x0u}, List<u8> data = List<u8>{}, i64 bytes = 0) {
     Last = to;
     Bytes = bytes;
-    Sent = list_length<U8>(data);
+    Sent = list_length<u8>(data);
     return {true};
   }
 
-  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
-  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
-    return {Bytes, Last, List<Int>{1, 2, 3}};
+  struct receiveResult { i64 result = 0; net_Address from = net_Address{0x0u}; List<i64> data = List<i64>{}; };
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{0x0u}, i64 max_bytes = 0) {
+    return {Bytes, Last, List<i64>{1, 2, 3}};
   }
 };
 }  // namespace implements_probe
@@ -8445,7 +8270,7 @@ TEST(engine_interface_a_blueprint_implements) {
   app->update(engine, f);
   f.time = 2.0;
   app->update(engine, f);
-  CHECK(a->get("Updates").i == 2 && a->get("Last").n == 2.0 && !a->get("Stopped").b);
+  CHECK(a->get("Updates").i == 2 && a->get("Last").as<f64>() == 2.0 && !a->get("Stopped").b);
   app->resized(engine);
   CHECK(app->extensions().empty());  // (App's own)
   app->stop(engine);
@@ -8457,7 +8282,7 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
-  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
+  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(f64 program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
   const std::vector<logic::Issue> issues = logic::check(wrong);
   const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
   CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is object<Program>, not float"));
@@ -8513,7 +8338,7 @@ TEST(engine_interface_overrides_are_said) {
         error.find("the interface of the engine by its C++ type expected (kern::Implements<kern::App>)") != std::string::npos);
   CHECK(!logic::from_cpp("struct A : kern::Blueprint, kern::Implements<kern::Appp> {\n};\n", g, nullptr, &error) &&
         error.find("kern::Implements<kern::Appp>: the engine has no interface Appp") != std::string::npos);
-  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  // ---- variables ----\n  KERN_OVERRIDE Int X = 0;\n};\n", g, nullptr, &error));
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  // ---- variables ----\n  KERN_OVERRIDE i64 X = 0;\n};\n", g, nullptr, &error));
 }
 
 // Engine Object of Blueprint (func.engine_object, Runtime::engine_object): the object of the engine another Blueprint is -
@@ -8550,7 +8375,7 @@ TEST(engine_object_of_a_blueprint) {
       "    return {func_engine_object<kern::App>(actor_find(\"Asks\"))};\n"
       "  }\n"
       "\n"
-      "  struct nobodyResult { Bool result = false; };\n"
+      "  struct nobodyResult { bool result = false; };\n"
       "  nobodyResult nobody() {\n"
       "    return {object_valid<kern::App>(func_engine_object<kern::App>(actor_find(\"Nobody\")))};\n"
       "  }\n"
@@ -8560,7 +8385,7 @@ TEST(engine_object_of_a_blueprint) {
       "    return {list_make<Object<kern::ShaderExtension>, \"2\">(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")), func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
       "  }\n"
       "\n"
-      "  struct handleResult { Int result = 0; };\n"
+      "  struct handleResult { i64 result = 0; };\n"
       "  handleResult handle() {\n"
       "    return {object_handle<kern::ShaderExtension>(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
       "  }\n"
@@ -8585,7 +8410,7 @@ TEST(engine_object_of_a_blueprint) {
   CHECK(host.errors.empty());
   std::string why;
   CHECK(rt.engine_object(11, "ShaderExtension", why) == h && rt.engine_object(11, "ShaderExtension", why) == h);   // (made once)
-  CHECK(a->call("handle", {}, got) && got.size() == 1 && got[0].as_int() == h.handle);   // (Handle of Object: the one way to an Int)
+  CHECK(a->call("handle", {}, got) && got.size() == 1 && got[0].as_int() == h.handle);   // (Handle of Object: the one way to an i64)
   // (a list of them: List<Object<kern::ShaderExtension>> - what an App gives the engine as its extensions)
   CHECK(a->call("both", {}, got) && got.size() == 1 && got[0].type == logic::PinType::object_list && got[0].size() == 2 && got[0].item(1).as_object() == h);
   // (each reason in its own words, at the caller - and no object)
@@ -8601,7 +8426,7 @@ TEST(engine_object_of_a_blueprint) {
   CHECK(!other.engine_object(11, "ShaderExtension", why).valid() && why == "this host has no objects of the engine - the Blueprint Water cannot be one");
   // (a setting that names no interface of the engine is refused where it is read, and checked)
   logic::Graph wrong;
-  CHECK(!logic::from_cpp("struct Wrong : kern::Blueprint {\n  // ---- functions ----\n  struct fResult { Int result = 0; };\n  fResult f() {\n    return {object_handle<kern::App>(func_engine_object<kern::Nothing>(actor_find(\"Water\")))};\n  }\n};\n", wrong, nullptr, &error) &&
+  CHECK(!logic::from_cpp("struct Wrong : kern::Blueprint {\n  // ---- functions ----\n  struct fResult { i64 result = 0; };\n  fResult f() {\n    return {object_handle<kern::App>(func_engine_object<kern::Nothing>(actor_find(\"Water\")))};\n  }\n};\n", wrong, nullptr, &error) &&
         error.find("the engine has no interface kern::Nothing") != std::string::npos);
   host.objects.clear();
 }
@@ -8620,10 +8445,10 @@ TEST(actors_know_their_world) {
   poker.logic = logic::Graph{};
   std::string error;
   CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
-                        "  Int Hits = 0;\n"
+                        "  i64 Hits = 0;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct HitResult { Int hits = 0; };\n"
+                        "  struct HitResult { i64 hits = 0; };\n"
                         "  HitResult Hit() {\n"
                         "    Hits += 1;\n"
                         "    return {Hits};\n"
@@ -8632,22 +8457,22 @@ TEST(actors_know_their_world) {
   if (!error.empty()) std::printf("  actors_know_their_world (Door): %s\n", error.c_str());
   error.clear();
   CHECK(logic::from_cpp("struct Poker : kern::Blueprint {\n"
-                        "  Int Got = -1;\n"
-                        "  Bool Same = false;\n"
-                        "  Int Id = 0;\n"
+                        "  i64 Got = -1;\n"
+                        "  bool Same = false;\n"
+                        "  i64 Id = 0;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct HitResult { Int hits = 0; };\n"
+                        "  struct HitResult { i64 hits = 0; };\n"
                         "  KERN_EXTERN HitResult Hit();\n"
                         "\n"
                         "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
-                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "  void on1(Actor actor, f64 value, Text text) {\n"
                         "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
                         "    Got = n2.hits;\n"
                         "    Same = actor_equal(actor, actor_find(\"Door\"));\n"
                         "    Id = actor_id(actor);\n"
                         "  }\n"
-                        "  struct { Int hits = 0; } n2;\n"
+                        "  struct { i64 hits = 0; } n2;\n"
                         "};\n", *poker.logic, nullptr, &error));
   if (!error.empty()) std::printf("  actors_know_their_world (Poker): %s\n", error.c_str());
   const game::ActorId door_id = l.add(door).id;
@@ -8683,7 +8508,7 @@ TEST(actors_know_their_world) {
   CHECK(hits(a, door_id) == 1 && hits(b, door_id) == 0 && poker_now("Got").as_int() == 1 && poker_now("Same").as_bool());
   // a Blueprint's class asks the same way (BlueprintCore::kern_actor_here - Runtime::actor_here)
   struct Reach : kern::Blueprint {
-    Bool Has = false;
+    bool Has = false;
     void run(Actor x) { Has = func_has_blueprint(x); }
   } reach;
   reach.kern_world.host = &a->host();
@@ -8696,7 +8521,7 @@ TEST(actors_know_their_world) {
   fa.world->stop();
   fb.world->stop();
   // no number becomes an actor: not on a wire, not converted, not written down
-  CHECK(!logic::convertible(logic::PinType::integer, logic::PinType::actor) && !logic::convertible(logic::PinType::number, logic::PinType::actor));
+  CHECK(!logic::convertible(logic::PinType::i64, logic::PinType::actor) && !logic::convertible(logic::PinType::f64, logic::PinType::actor));
   CHECK(logic::Value::integer(5).converted(logic::PinType::actor).as_actor() == logic::ActorHandle{});
   CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::actor).as_actor() == logic::ActorHandle{});
   logic::Graph g;
@@ -8720,10 +8545,10 @@ TEST(object_refs_know_their_world) {
   CHECK(logic::fits(TypeRef{PinType::object, "net_HostTransport"}, TypeRef{PinType::object, "net_Transport"}) &&
         !logic::fits(TypeRef{PinType::object, "net_Transport"}, TypeRef{PinType::object, "net_HostTransport"}));
   CHECK(logic::engine_class("physics_World") && std::string(logic::engine_class("physics_World")->cpp) == "kern::physics::World" && !logic::engine_class("Nothing"));
-  CHECK(!logic::fits(TypeRef{PinType::integer, ""}, TypeRef{PinType::object, "App"}));
-  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::integer, ""}));
+  CHECK(!logic::fits(TypeRef{PinType::i64, ""}, TypeRef{PinType::object, "App"}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::i64, ""}));
   CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::text, ""}));
-  CHECK(!logic::convertible(PinType::integer, PinType::object) && !logic::convertible(PinType::object, PinType::boolean));
+  CHECK(!logic::convertible(PinType::i64, PinType::object) && !logic::convertible(PinType::object, PinType::boolean));
   CHECK(!logic::Value::integer(7).converted(PinType::object).as_object().valid());
   CHECK(logic::engine_class_name("kern::physics::World") == "physics_World" && logic::engine_class_cpp("physics_World") == "kern::physics::World");
   CHECK(logic::engine_class_name(logic::cpp_name_of<kern::App>()) == "App");
@@ -8756,7 +8581,7 @@ TEST(object_refs_know_their_world) {
         g.variables.size() == 1 && g.variables[0].type == PinType::object_list && g.variables[0].of == "ShaderExtension" && no_errors(logic::check(g)));
   std::string listed;
   CHECK(logic::to_cpp(g, "Holds", listed, &error, logic::library(), false) && listed.find("  List<Object<kern::ShaderExtension>> All = List<Object<kern::ShaderExtension>>{};\n") != std::string::npos);
-  CHECK(!logic::fits(TypeRef{PinType::integer_list, ""}, TypeRef{PinType::object_list, "App"}) && !logic::fits(TypeRef{PinType::object_list, "App"}, TypeRef{PinType::object_list, "ShaderExtension"}) &&
+  CHECK(!logic::fits(TypeRef{PinType::i64_list, ""}, TypeRef{PinType::object_list, "App"}) && !logic::fits(TypeRef{PinType::object_list, "App"}, TypeRef{PinType::object_list, "ShaderExtension"}) &&
         logic::fits(TypeRef{PinType::object_list, "App"}, TypeRef{PinType::object_list, "App"}));
   CHECK(logic::type_text(TypeRef{PinType::object_list, "App"}) == "object<App>_list");
   logic::TypeRef back;
@@ -8779,10 +8604,10 @@ TEST(game_world_fixed_step) {
   counter.logic = logic::Graph{};
   std::string error;
   CHECK(logic::from_cpp("struct Counter : kern::Blueprint {\n"
-                        "  Int Ticks = 0;\n"
+                        "  i64 Ticks = 0;\n"
                         "\n"
                         "  KERN_EVENT(on1, event_tick)\n"
-                        "  void on1(Float delta) {\n"
+                        "  void on1(f64 delta) {\n"
                         "    Ticks += 1;\n"
                         "  }\n"
                         "};\n", *counter.logic, nullptr, &error));
@@ -8823,7 +8648,7 @@ TEST(game_world_fixed_step) {
   error.clear();
   CHECK(logic::from_cpp("struct Stepper : kern::Blueprint, kern::Implements<kern::game::FixedStep> {\n"
                         "  // ---- functions ----\n"
-                        "  KERN_OVERRIDE void fixed_step(Float dt) {\n"
+                        "  KERN_OVERRIDE void fixed_step(f64 dt) {\n"
                         "    debug_print(\"step\", false);\n"
                         "  }\n"
                         "};\n", stepper, nullptr, &error));
@@ -8903,7 +8728,7 @@ TEST(program_from_the_project) {
                   "  }\n"
                   "\n"
                   "  KERN_EVENT(on2, event_tick)\n"
-                  "  void on2(Float delta) {\n"
+                  "  void on2(f64 delta) {\n"
                   "    debug_print(\"tick " + name + "\", false);\n"
                   "  }\n"
                   "};\n").c_str());
@@ -8916,19 +8741,19 @@ TEST(program_from_the_project) {
   main.logic = graph("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                      "  // ---- types ----\n"
                      "  KERN_STRUCT(Frame) {\n"
-                     "    Float time = 0.0;\n"
-                     "    Float dt = 0.0;\n"
-                     "    Int64 index = Int64{0x0};\n"
+                     "    f64 time = 0.0;\n"
+                     "    f64 dt = 0.0;\n"
+                     "    u64 index = 0x0u;\n"
                      "  };\n"
                      "\n"
                      "  // ---- functions ----\n"
-                     "  struct startResult { Bool result = false; };\n"
+                     "  struct startResult { bool result = false; };\n"
                      "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                      "    debug_print(\"start\", false);\n"
                      "    return {true};\n"
                      "  }\n"
                      "\n"
-                     "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                      "    debug_print(\"update\", false);\n"
                      "  }\n"
                      "\n"
@@ -9067,48 +8892,48 @@ TEST(program_reaches_actors_of_its_worlds) {
   door.logic = logic::Graph{};
   std::string error;
   CHECK(logic::from_cpp("struct Door : kern::Blueprint {\n"
-                        "  Int Hits = 0;\n"
-                        "  Int Bumps = 0;\n"
+                        "  i64 Hits = 0;\n"
+                        "  i64 Bumps = 0;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct HitResult { Int hits = 0; };\n"
+                        "  struct HitResult { i64 hits = 0; };\n"
                         "  HitResult Hit() {\n"
                         "    Hits += 1;\n"
                         "    return {Hits};\n"
                         "  }\n"
                         "\n"
                         "  KERN_EVENT(on1, event_custom<\"Bump\">)\n"
-                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "  void on1(Actor actor, f64 value, Text text) {\n"
                         "    Bumps += 1;\n"
                         "  }\n"
                         "  KERN_EVENT(on2, event_custom<\"Back\">)\n"
-                        "  void on2(Actor actor, Float value, Text text) {\n"
+                        "  void on2(Actor actor, f64 value, Text text) {\n"
                         "    func_call_on<\"Hit\">(actor, kern::out(n3.hits));\n"
                         "  }\n"
-                        "  struct { Int hits = 0; } n3;\n"
+                        "  struct { i64 hits = 0; } n3;\n"
                         "};\n", *door.logic, nullptr, &error));
   if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Door): %s\n", error.c_str());
   const game::ActorId door_id = l.add(door).id;
   logic::Graph main;
   error.clear();
   CHECK(logic::from_cpp("struct Main : kern::Blueprint {\n"
-                        "  Int Got = -1;\n"
-                        "  Int Seen = -1;\n"
-                        "  Bool Has = false;\n"
+                        "  i64 Got = -1;\n"
+                        "  i64 Seen = -1;\n"
+                        "  bool Has = false;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct HitResult { Int hits = 0; };\n"
+                        "  struct HitResult { i64 hits = 0; };\n"
                         "  KERN_EXTERN HitResult Hit();\n"
                         "\n"
                         "  KERN_EVENT(on1, event_custom<\"Poke\">)\n"
-                        "  void on1(Actor actor, Float value, Text text) {\n"
+                        "  void on1(Actor actor, f64 value, Text text) {\n"
                         "    func_call_on<\"Hit\">(actor, kern::out(n2.hits));\n"
                         "    Got = n2.hits;\n"
                         "    flow_call<\"Bump\">(actor, Actor{}, 0.0, \"\");\n"
-                        "    Seen = func_get_on<\"Bumps\", Int>(actor);\n"
+                        "    Seen = func_get_on<\"Bumps\", i64>(actor);\n"
                         "    Has = func_has_blueprint(actor);\n"
                         "  }\n"
-                        "  struct { Int hits = 0; } n2;\n"
+                        "  struct { i64 hits = 0; } n2;\n"
                         "};\n", main, nullptr, &error));
   if (!error.empty()) std::printf("  program_reaches_actors_of_its_worlds (Main): %s\n", error.c_str());
   game::Project pr;
@@ -9158,11 +8983,11 @@ TEST(program_reaches_actors_of_its_worlds) {
   CHECK(program.said().empty());
   // a program Blueprint's class reaches them the same way (BlueprintCore::kern_runtime_of - Runtime::runtime_of)
   struct Reach : kern::Blueprint {
-    Bool Has = false;
-    Int Hits = -1;
+    bool Has = false;
+    i64 Hits = -1;
     void run(Actor x) {
       Has = func_has_blueprint(x);
-      Hits = func_get_on<"Hits", Int>(x);
+      Hits = func_get_on<"Hits", i64>(x);
     }
   } reach;
   reach.kern_world.host = &rt->host();
@@ -9255,18 +9080,18 @@ TEST(program_world_has_the_project) {
   logic::Graph main;
   std::string error;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
-                        "  struct startResult { Bool result = false; };\n"
+                        "  struct startResult { bool result = false; };\n"
                         "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
-                        "    Float time = 0.0;\n"
-                        "    Float dt = 0.0;\n"
-                        "    Int64 index = Int64{0x0};\n"
+                        "    f64 time = 0.0;\n"
+                        "    f64 dt = 0.0;\n"
+                        "    u64 index = 0x0u;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   game::Project pr;
@@ -9364,8 +9189,8 @@ TEST(program_beside_an_app_of_cpp) {
   std::string error;
   logic::Graph lib, app;
   CHECK(logic::from_cpp("struct Codes : virtual kern::Library {\n"
-                        "  struct sameResult { Int Result = 0; };\n"
-                        "  KERN_PURE sameResult same(Int x = 0) {\n"
+                        "  struct sameResult { i64 Result = 0; };\n"
+                        "  KERN_PURE sameResult same(i64 x = 0) {\n"
                         "    return {x};\n"
                         "  }\n"
                         "};\n", lib, nullptr, &error));
@@ -9388,18 +9213,18 @@ TEST(program_beside_an_app_of_cpp) {
   program.end();
   // one App: a Blueprint of the project that implements App too - refused, named
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
-                        "  struct startResult { Bool result = false; };\n"
+                        "  struct startResult { bool result = false; };\n"
                         "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
-                        "    Float time = 0.0;\n"
-                        "    Float dt = 0.0;\n"
-                        "    Int64 index = Int64{0x0};\n"
+                        "    f64 time = 0.0;\n"
+                        "    f64 dt = 0.0;\n"
+                        "    u64 index = 0x0u;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(error.empty());
@@ -9422,22 +9247,22 @@ TEST(program_binds_the_exports) {
   std::string error;
   logic::Graph app, hud;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
-                        "  struct startResult { Bool result = false; };\n"
+                        "  struct startResult { bool result = false; };\n"
                         "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
-                        "    Float time = 0.0;\n"
-                        "    Float dt = 0.0;\n"
-                        "    Int64 index = Int64{0x0};\n"
+                        "    f64 time = 0.0;\n"
+                        "    f64 dt = 0.0;\n"
+                        "    u64 index = 0x0u;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                         "  }\n"
                         "};\n", app, nullptr, &error));
   CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
-                        "  struct game_shownResult { Int Result = 0; };\n"
+                        "  struct game_shownResult { i64 Result = 0; };\n"
                         "  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n"
                         "    return {7};\n"
                         "  }\n"
@@ -9486,18 +9311,18 @@ TEST(run_the_program_of_a_project) {
   logic::Graph main;
   std::string error;
   CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
-                        "  struct startResult { Bool result = false; };\n"
+                        "  struct startResult { bool result = false; };\n"
                         "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    return {true};\n"
                         "  }\n"
                         "\n"
                         "  KERN_STRUCT(Frame) {\n"
-                        "    Float time = 0.0;\n"
-                        "    Float dt = 0.0;\n"
-                        "    Int64 index = Int64{0x0};\n"
+                        "    f64 time = 0.0;\n"
+                        "    f64 dt = 0.0;\n"
+                        "    u64 index = 0x0u;\n"
                         "  };\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                         "  }\n"
                         "};\n", main, nullptr, &error));
   CHECK(error.empty() && main.implements == "App");
@@ -9817,7 +9642,7 @@ TEST(engine_place_at_an_entry_of_an_array) {
   const logic::EngineFunction* bus = logic::engine_function("engine.mixer.bus");
   CHECK(bus && bus->place && bus->inputs.size() == 2);
   logic::EngineObjects objects;
-  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  std::vector<Value> out{Value::zero(logic::PinType::i64)};
   CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
   const Value mixer = out[0];
   const Value sfx = Value::enumeration(static_cast<i64>(audio::Bus::sfx));
@@ -9830,7 +9655,7 @@ TEST(engine_place_at_an_entry_of_an_array) {
         m->bus(audio::Bus::sfx).reverb_send == 0.5f && m->bus(audio::Bus::master).volume == 1 && !m->bus(audio::Bus::master).muted);
   // read at the place: what C++ reads there
   out = {Value::zero(logic::PinType::structure)};
-  CHECK(logic::call_engine(objects, "engine.mixer.bus@get", {mixer, sfx}, out) && out[0].field(1) && out[0].field(1)->b && out[0].field(0)->n == 0.25);
+  CHECK(logic::call_engine(objects, "engine.mixer.bus@get", {mixer, sfx}, out) && out[0].field(1) && out[0].field(1)->b && out[0].field(0)->as<f64>() == 0.25);
   // outside the array: refused, said, nothing set
   const Value outside = Value::enumeration(static_cast<i64>(audio::Bus::count));
   objects.error.clear();
@@ -13943,7 +13768,7 @@ TEST(micro_duck_blueprint_nodes_drive_and_sense) {
   game::Level l = game::basic_level();
   for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {6, 0, 0.5f};
   const game::ActorId duck = add_duck(l, {0, 0, 0}, true);
-  l.logic = logic_graph(R"({"variables":[{"name":"Sees","type":"bool","value":false},{"name":"Dist","type":"float","value":-1}],
+  l.logic = logic_graph(R"({"variables":[{"name":"Sees","type":"bool","value":false},{"name":"Dist","type":"f64","value":-1}],
     "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"walker.autonomous","values":{"enable":false}},{"id":3,"type":"walker.move","values":{"forward":0.3}},
       {"id":4,"type":"event.tick"},{"id":5,"type":"var.set","params":{"variable":"Sees"}},{"id":6,"type":"walker.sees"},
       {"id":7,"type":"var.set","params":{"variable":"Dist"}},{"id":8,"type":"walker.tof"},{"id":9,"type":"actor.find","values":{"name":"Cube"}}],
@@ -14010,8 +13835,8 @@ TEST(studio_blueprint_sheets) {
     const std::string name = "F" + std::to_string(k);
     json::Value fn, in, out;
     json::parse(R"({"pure":true})", fn);
-    json::parse(R"([{"name":"x","type":"float","value":0}])", in);
-    json::parse(R"([{"name":"result","type":"float","value":0}])", out);
+    json::parse(R"([{"name":"x","type":"f64","value":0}])", in);
+    json::parse(R"([{"name":"result","type":"f64","value":0}])", out);
     fn.set("name", name); fn.set("inputs", std::move(in)); fn.set("outputs", std::move(out));
     fns.push(std::move(fn));
     const u32 base = 1000 + k * 100;
@@ -14310,22 +14135,22 @@ TEST(studio_logic_functions) {
   for (const json::Value& n : st["logic"]["nodes"].items()) if (n["type"].as_string() == "func.return") ret = static_cast<u32>(n["id"].as_number());
   CHECK(ret != 0);
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"NewFunction","to":"Twice"})")["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"float"})")["pin"].as_string() == "x");
-  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"out","pin":"result","type":"float"})")["pin"].as_string() == "result");
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"f64"})")["pin"].as_string() == "x");
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"out","pin":"result","type":"f64"})")["pin"].as_string() == "result");
   CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"exec"})")["ok"].as_bool());  // a reserved name
   // names are names of the Blueprint's C++ too: no spaces, no words of the language
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinRename","name":"Twice","side":"in","pin":"x","to":"my value"})")["error"].as_string().find("cannot be a name") != std::string::npos);
   CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"Twice","to":"class"})")["ok"].as_bool());
   CHECK(!f.cmd(R"({"cmd":"logicFunction","op":"rename","name":"Twice","to":"math_add"})")["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Speed","type":"float"})")["name"].as_string() == "Speed");
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Speed","type":"f64"})")["name"].as_string() == "Speed");
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Top Speed"})")["ok"].as_bool());
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Float"})")["ok"].as_bool());
   CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"Twice"})")["ok"].as_bool());  // (a function has that name)
-  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"my var","type":"float"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"my var","type":"f64"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"rename","name":"Speed","to":"TopSpeed"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"TopSpeed"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"help","name":"Twice","text":"Two times x"})")["ok"].as_bool());
-  const u32 mul = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.mul","x":160,"y":80})")["id"].as_number());
+  const u32 mul = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.mul","params":{"type":"f64"},"x":160,"y":80})")["id"].as_number());
   auto connect = [&](u32 from, const char* out, u32 to, const char* in) {
     json::Value c = json::Value::object();
     c.set("cmd", "logicConnect");
@@ -14386,7 +14211,7 @@ TEST(studio_logic_functions) {
   CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinRemove","name":"Twice","side":"in","pin":"value"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["links"].size() == 2);
   // the level with its function survives saving and loading, and the function runs when playing
-  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"float"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicFunction","op":"pinAdd","name":"Twice","side":"in","pin":"x","type":"f64"})")["ok"].as_bool());
   CHECK(connect(entry, "x", mul, "a"));
   CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
   logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(0) : nullptr;
@@ -14414,7 +14239,7 @@ TEST(studio_logic_places_of_the_engine) {
     for (const auto& [k, v] : fields) c.set(k, v);
     return f.s->command(c);
   };
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Object<kern::game::GameWorld> World = Object<kern::game::GameWorld>{};\n  Int Count = 0;\n\n"
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Object<kern::game::GameWorld> World = Object<kern::game::GameWorld>{};\n  i64 Count = 0;\n\n"
                                                 "  void Note() {\n    engine_game_world_events(n2, World);\n    list_add(n2.result, \"x\");\n"
                                                 "    Count = list_length<Text>(n2.result);\n  }\n\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;\n};\n"}})["ok"].as_bool());
   const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "n2"}});
@@ -14439,7 +14264,7 @@ TEST(studio_logic_local_variables) {
     for (const auto& [k, v] : fields) c.set(k, v);
     return f.s->command(c);
   };
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  struct AddResult { Float out = 0.0; };\n  AddResult Add(Float x = 1.0) {\n    return {x};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  f64 Sum = 0.0;\n\n  struct AddResult { f64 out = 0.0; };\n  AddResult Add(f64 x = 1.0) {\n    return {x};\n  }\n};\n"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Add"}, {"side", "local"}})["pin"].as_string() == "local");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "local"}, {"to", "Acc"}})["ok"].as_bool());
   // it hides nothing: not a variable, not a pin of its function - and no pin or variable takes its name
@@ -14462,8 +14287,8 @@ TEST(studio_logic_local_variables) {
   }
   CHECK(get && add);
   // as C++ it is a local of the function's body; the text sets it and the Blueprint runs
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  struct AddResult { Float out = 0.0; };\n  AddResult Add(Float x = 1.0) {\n    Int Acc = 4;\n    "
-                                                "Acc += 2;\n    return {math_add(x, kern::to<Float>(Acc))};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  f64 Sum = 0.0;\n\n  struct AddResult { f64 out = 0.0; };\n  AddResult Add(f64 x = 1.0) {\n    i64 Acc = 4;\n    "
+                                                "Acc += 2;\n    return {math_add<f64>(x, num_cast<f64, i64>(Acc))};\n  }\n};\n"}})["ok"].as_bool());
   st = f.s->state();
   u32 node = 0;
   for (const json::Value& n : st["logic"]["nodes"].items())
@@ -14478,7 +14303,7 @@ TEST(studio_logic_local_variables) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRename"}, {"name", "Add"}, {"side", "local"}, {"pin", "Acc"}, {"to", "Count"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "rename"}, {"name", "Add"}, {"to", "Plus"}})["ok"].as_bool());
   const std::string text = cmd({{"cmd", "logicCpp"}})["text"].as_string();
-  CHECK(text.find("  PlusResult Plus(Float x = 1.0) {\n    Int Count = 4;\n    Count += 2;\n") != std::string::npos);
+  CHECK(text.find("  PlusResult Plus(f64 x = 1.0) {\n    i64 Count = 4;\n    Count += 2;\n") != std::string::npos);
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
   logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(0) : nullptr;
@@ -14512,14 +14337,14 @@ TEST(studio_logic_reference_inputs) {
     for (const json::Value& in : st["logic"]["functions"][0]["inputs"].items()) names += in["name"].as_string() + (in["ref"].as_string() == "const" ? ":const " : in["ref"].as_bool() ? ":ref " : " ");
     return names;
   };
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  void Bump(Float by = 1.0, Float scale = 2.0, Float x = 0.0) {\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  f64 Sum = 0.0;\n\n  void Bump(f64 by = 1.0, f64 scale = 2.0, f64 x = 0.0) {\n  }\n};\n"}})["ok"].as_bool());
   CHECK(inputs() == "by scale x ");
   // a reference goes before the values, behind the references that are there
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "in"}, {"pin", "x"}, {"ref", "ref"}})["ok"].as_bool());
   CHECK(inputs() == "x:ref by scale ");
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "in"}, {"pin", "scale"}, {"ref", "const"}})["ok"].as_bool());
   CHECK(inputs() == "x:ref scale:const by ");
-  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  void Bump(Float& x, const Float& scale, Float by = 1.0) {\n") != std::string::npos);
+  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  void Bump(f64& x, const f64& scale, f64 by = 1.0) {\n") != std::string::npos);
   // moving keeps that order: among the references and among the values
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinMove"}, {"name", "Bump"}, {"side", "in"}, {"pin", "by"}, {"by", -1}})["error"].as_string().find("the inputs by reference come first") != std::string::npos);
   CHECK(inputs() == "x:ref scale:const by ");
@@ -14546,7 +14371,7 @@ TEST(studio_logic_implements) {
   if (f.s->level().actors.empty()) return;
   const game::ActorId id = f.s->level().actors.back().id;
   CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"float"})")["ok"].as_bool());   // (the actor has a Blueprint now)
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"f64"})")["ok"].as_bool());   // (the actor has a Blueprint now)
   json::Value st = f.s->state();
   bool offered = false, transport = false;
   for (const json::Value& i : st["logic"]["interfaces"].items()) {
@@ -14575,7 +14400,7 @@ TEST(studio_logic_implements) {
   std::string text = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
   const std::size_t end = text.rfind("};");
   CHECK(end != std::string::npos);
-  text.insert(end, "\n  struct game_shownResult { Int Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
+  text.insert(end, "\n  struct game_shownResult { i64 Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
   json::Value apply = json::Value::object();
   apply.set("cmd", "logicCppApply");
   apply.set("text", text);
@@ -14604,32 +14429,32 @@ TEST(studio_play_project) {
   CHECK(logic::from_cpp("struct Spiel : virtual kern::Blueprint, virtual engine_game_runtime, virtual engine_audio_audio, kern::Implements<kern::App> {\n"
                         "  // ---- types ----\n"
                         "  KERN_STRUCT(Frame) {\n"
-                        "    Float time = 0.0;\n"
-                        "    Float dt = 0.0;\n"
-                        "    Int64 index = Int64{0x0};\n"
+                        "    f64 time = 0.0;\n"
+                        "    f64 dt = 0.0;\n"
+                        "    u64 index = 0x0u;\n"
                         "  };\n"
                         "\n"
                         "  // ---- variables ----\n"
                         "  Object<kern::game::GameWorld> Welt = Object<kern::game::GameWorld>{};\n"
-                        "  Int Punkte = 0;\n"
-                        "  Int Level = 0;\n"
-                        "  Bool Ende = false;\n"
-                        "  Bool Gestoppt = false;\n"
+                        "  i64 Punkte = 0;\n"
+                        "  i64 Level = 0;\n"
+                        "  bool Ende = false;\n"
+                        "  bool Gestoppt = false;\n"
                         "\n"
                         "  // ---- functions ----\n"
-                        "  struct startResult { Bool result = false; };\n"
+                        "  struct startResult { bool result = false; };\n"
                         "  KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {\n"
                         "    engine_game_world_make_2(n1, engine);\n"
                         "    Welt = n1.result;\n"
                         "    engine_game_world_start_level(n2, Welt, \"a.klevel\", game_SimMode::play);\n"
                         "    Level = 1;\n"
                         "    engine_engine_mixer(n3, engine);\n"
-                        "    engine_mixer_create_clip(n4, n3.result, List<Float>{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 256, 1, 48000, \"ton\");\n"
+                        "    engine_mixer_create_clip(n4, n3.result, List<f64>{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 256, 1, 48000, \"ton\");\n"
                         "    engine_mixer_play(n5, n3.result, n4.result, audio_PlayParams{1.0, 1.0, 0.0, false, audio_Bus::sfx, 0.0, 0.0, 0, false, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, 1.0, 50.0, audio_Rolloff::inverse, 0.0, 1.0});\n"
                         "    return {n2.result};\n"
                         "  }\n"
                         "\n"
-                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, 0x0u}) {\n"
                         "    Punkte += 1;\n"
                         "    engine_engine_ui_text(engine, \"punkte\", \"Punkte\", 0.1, 0.1);\n"
                         "    engine_engine_ui_button(n6, engine, \"ende\", \"Ende\", 0.9, 0.1);\n"
@@ -14648,12 +14473,12 @@ TEST(studio_play_project) {
                         "  }\n"
                         "\n"
                         "  struct { Object<kern::game::GameWorld> result = Object<kern::game::GameWorld>{}; } n1;\n"
-                        "  struct { Bool result = false; } n2;\n"
+                        "  struct { bool result = false; } n2;\n"
                         "  struct { Object<kern::audio::Mixer> result = Object<kern::audio::Mixer>{}; } n3;\n"
-                        "  struct { Int result = 0; } n4;\n"
-                        "  struct { Int64 result = Int64{0x0}; } n5;\n"
-                        "  struct { Bool result = false; } n6;\n"
-                        "  struct { Bool result = false; } n7;\n"
+                        "  struct { i64 result = 0; } n4;\n"
+                        "  struct { u64 result = 0x0u; } n5;\n"
+                        "  struct { bool result = false; } n6;\n"
+                        "  struct { bool result = false; } n7;\n"
                         "};\n", spiel, nullptr, &error));
   if (!error.empty()) std::printf("  studio_play_project (Spiel): %s\n", error.c_str());
   game::Project pr;
@@ -14755,8 +14580,8 @@ TEST(studio_project) {
   // a program Blueprint in the logic editor: its edits change the project, not the level, and are undone like any
   CHECK(!cmd({{"cmd", "logicOpen"}, {"program", "Nope"}})["ok"].as_bool());
   CHECK(cmd({{"cmd", "logicOpen"}, {"program", "Mathe"}})["ok"].as_bool());
-  const json::Value applied = cmd({{"cmd", "logicCppApply"}, {"text", "struct Mathe : virtual kern::Library {\n  struct clampedResult { Float value = 0.0; };\n"
-                                                                    "  KERN_PURE clampedResult clamped(Float value = 0.0) {\n    return {math_max(value, 0.0)};\n  }\n};\n"}});
+  const json::Value applied = cmd({{"cmd", "logicCppApply"}, {"text", "struct Mathe : virtual kern::Library {\n  struct clampedResult { f64 value = 0.0; };\n"
+                                                                    "  KERN_PURE clampedResult clamped(f64 value = 0.0) {\n    return {math_max<f64>(value, 0.0)};\n  }\n};\n"}});
   CHECK(applied["ok"].as_bool());
   if (!applied["ok"].as_bool()) std::printf("    %s\n", applied["error"].as_string().c_str());
   CHECK(f.s->project().blueprints[1].logic.functions.size() == 1 && f.s->project().blueprints[1].logic.library);
@@ -14870,9 +14695,9 @@ TEST(studio_logic_libraries) {
   CHECK(cmd({{"cmd", "rename"}, {"id", static_cast<f64>(lib)}, {"name", "Tally"}})["ok"].as_bool() && cmd({{"cmd", "rename"}, {"id", static_cast<f64>(user)}, {"name", "Crate"}})["ok"].as_bool());
   // the library: its text says what it is
   CHECK(open(lib));
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Tally : virtual kern::Library {\n  KERN_STRUCT(Hits) {\n    Int Count = 0;\n    Float Hardest = 0.0;\n  };\n\n  /// Counts a hit.\n"
-                                                "  void hit(Hits& hits, Float speed = 0.0) {\n    hits.Count += 1;\n    hits.Hardest = math_max(hits.Hardest, speed);\n  }\n\n"
-                                                "  struct worstResult { Float speed = 0.0; };\n  KERN_PURE worstResult worst(const Hits& hits) {\n    return {hits.Hardest};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Tally : virtual kern::Library {\n  KERN_STRUCT(Hits) {\n    i64 Count = 0;\n    f64 Hardest = 0.0;\n  };\n\n  /// Counts a hit.\n"
+                                                "  void hit(Hits& hits, f64 speed = 0.0) {\n    hits.Count += 1;\n    hits.Hardest = math_max<f64>(hits.Hardest, speed);\n  }\n\n"
+                                                "  struct worstResult { f64 speed = 0.0; };\n  KERN_PURE worstResult worst(const Hits& hits) {\n    return {hits.Hardest};\n  }\n};\n"}})["ok"].as_bool());
   json::Value st = f.s->state();
   CHECK(st["logic"]["library"].as_bool() && st["logic"]["uses"].size() == 0);
   // a library keeps nothing: a variable is refused when it compiles
@@ -14894,7 +14719,7 @@ TEST(studio_logic_libraries) {
     set = set || e["label"].as_string() == "Set Kept";
   }
   CHECK(get && !set);
-  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  KERN_CONST Float Kept = 0.0;\n") != std::string::npos);
+  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  KERN_CONST f64 Kept = 0.0;\n") != std::string::npos);
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   // the Blueprint that uses it: the editor offers the library, then its functions; a call brings what the function looks like
@@ -14931,7 +14756,7 @@ TEST(studio_logic_libraries) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Tally::hit"}, {"side", "in"}})["error"].as_string().find("is a function of the library Tally: it is changed there") != std::string::npos);
   CHECK(cmd({{"cmd", "logicStruct"}, {"op", "fieldAdd"}, {"name", "Hits"}})["error"].as_string().find("is a type of the library Tally: it is changed there") != std::string::npos);
   // its one text, and back
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Crate : virtual kern::Blueprint, virtual Tally {\n  Int Bumps = 0;\n  Hits Taken = Hits{0, 0.0};\n  Float Worst = 0.0;\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Crate : virtual kern::Blueprint, virtual Tally {\n  i64 Bumps = 0;\n  Hits Taken = Hits{0, 0.0};\n  f64 Worst = 0.0;\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
                                                 "    Bumps += 1;\n    Tally::hit(Taken, 2.5);\n    Tally::hit(Taken, 1.5);\n    Worst = Tally::worst(Taken).speed;\n  }\n};\n"}})["ok"].as_bool());
   const std::string text = cmd({{"cmd", "logicCpp"}})["text"].as_string();
   CHECK(text.find("struct Crate : virtual kern::Blueprint, virtual Tally {") != std::string::npos && text.find("    Tally::hit(Taken, 2.5);\n") != std::string::npos && text.find("KERN_STRUCT(Hits)") == std::string::npos);
@@ -14965,8 +14790,8 @@ TEST(studio_logic_call_on_actor) {
     for (const auto& [k, v] : fields) c.set(k, v);
     return f.s->command(c);
   };
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Asked = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  /// Two times x.\n  TwiceResult Twice(Float x = 1.0) {\n"
-                                                "    Asked += x;\n    return {math_mul(x, 2.0)};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  f64 Asked = 0.0;\n\n  struct TwiceResult { f64 out = 0.0; };\n  /// Two times x.\n  TwiceResult Twice(f64 x = 1.0) {\n"
+                                                "    Asked += x;\n    return {math_mul<f64>(x, 2.0)};\n  }\n};\n"}})["ok"].as_bool());
   CHECK(!f.s->level().actors.empty());
   if (f.s->level().actors.empty()) return;
   const game::ActorId other = f.s->level().actors.front().id;
@@ -14991,9 +14816,9 @@ TEST(studio_logic_call_on_actor) {
   }
   CHECK(on_actor && !plain);
   // the actor's Blueprint asks the Level on Begin Play
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  Float Got = 0.0;\n\n  struct TwiceResult { Float out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(Float x = 1.0);\n\n"
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Actor1 : kern::Blueprint {\n  f64 Got = 0.0;\n\n  struct TwiceResult { f64 out = 0.0; };\n  KERN_EXTERN TwiceResult Twice(f64 x = 1.0);\n\n"
                                                 "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    func_call_on<\"Twice\">(Actor{}, kern::out(n2.out), 21.0);\n    Got = n2.out;\n  }\n\n"
-                                                "  struct { Float out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
+                                                "  struct { f64 out = 0.0; } n2;\n};\n"}})["ok"].as_bool());
   st = f.s->state();
   for (const json::Value& i : st["logic"]["issues"].items()) CHECK(i["text"].as_string().find("no other Blueprint") == std::string::npos);
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
@@ -15044,8 +14869,8 @@ TEST(studio_logic_project_types) {
     return f.s->command(c);
   };
   // the Level declares Mode, the struct Door (a Mode in it) and a function that takes a Door
-  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  KERN_ENUM(Mode, Closed, Open);\n  KERN_STRUCT(Door) {\n    Mode State = Mode::Closed;\n    Float Width = 1.0;\n  };\n\n"
-                                                "  struct IsOpenResult { Bool open = false; };\n  KERN_PURE IsOpenResult IsOpen(Door door = Door{Mode::Closed, 1.0}) {\n"
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  KERN_ENUM(Mode, Closed, Open);\n  KERN_STRUCT(Door) {\n    Mode State = Mode::Closed;\n    f64 Width = 1.0;\n  };\n\n"
+                                                "  struct IsOpenResult { bool open = false; };\n  KERN_PURE IsOpenResult IsOpen(Door door = Door{Mode::Closed, 1.0}) {\n"
                                                 "    return {enum_equal<Mode>(struct_break<Door>(door).State, Mode::Open)};\n  }\n};\n"}})["ok"].as_bool());
   CHECK(!f.s->level().actors.empty());
   if (f.s->level().actors.empty()) return;
@@ -15131,8 +14956,8 @@ TEST(studio_logic_cpp_view) {
     c.set("text", text);
     return f.s->command(c);
   };
-  const std::string typed = "struct Level : kern::Blueprint {\n  Float Score = 0.0;\n\n  struct TwiceResult { Float result = 0.0; };\n  KERN_PURE TwiceResult Twice(Float x = 0.0) {\n"
-                            "    return {math_mul(x, 2.0)};\n  }\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Score = Twice(21.0).result;\n  }\n};\n";
+  const std::string typed = "struct Level : kern::Blueprint {\n  f64 Score = 0.0;\n\n  struct TwiceResult { f64 result = 0.0; };\n  KERN_PURE TwiceResult Twice(f64 x = 0.0) {\n"
+                            "    return {math_mul<f64>(x, 2.0)};\n  }\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Score = Twice(21.0).result;\n  }\n};\n";
   json::Value r = apply(typed);
   if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
   CHECK(r["ok"].as_bool());
@@ -15149,12 +14974,12 @@ TEST(studio_logic_cpp_view) {
   CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
   // the view shows the text the one canonical way; a change in it changes the graph and keeps ids and places
   std::string shown = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
-  CHECK(shown.find("    return {math_mul(x, 2.0)};\n") != std::string::npos && shown.find("  // ---- functions ----\n") != std::string::npos);
+  CHECK(shown.find("    return {math_mul<f64>(x, 2.0)};\n") != std::string::npos && shown.find("  // ---- functions ----\n") != std::string::npos);
   std::map<u32, std::pair<f64, f64>> places;
   for (const json::Value& n : st["logic"]["nodes"].items()) places[static_cast<u32>(n["id"].as_number())] = {n["x"].as_number(), n["y"].as_number()};
-  const std::size_t at = shown.find("math_mul(x, 2.0)");
+  const std::size_t at = shown.find("math_mul<f64>(x, 2.0)");
   CHECK(at != std::string::npos);
-  if (at != std::string::npos) shown.replace(at, 16, "math_mul(x, 3.0)");
+  if (at != std::string::npos) shown.replace(at, 16, "math_mul<f64>(x, 3.0)");
   CHECK(apply(shown)["ok"].as_bool());
   st = f.s->state();
   CHECK(st["logic"]["nodes"].size() == 6);
@@ -15169,7 +14994,7 @@ TEST(studio_logic_cpp_view) {
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string() == shown);
   // one undo step
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul(x, 2.0)") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul<f64>(x, 2.0)") != std::string::npos);
   // The view says whether a compiler runs the text as it stands; Download gives what a game build
   // compiles: for a Blueprint of functions its own class (the text and the glue), named as C++.
   {
@@ -15214,8 +15039,8 @@ TEST(studio_logic_cpp_view) {
     CHECK(own.s->command(open)["ok"].as_bool());
     json::Value text = json::Value::object();
     text.set("cmd", "logicCppApply");
-    text.set("text", "struct Anything : kern::Blueprint {\n  Float Score = 0.0;\n\n  struct ScoreBoard2Result { Float result = 0.0; };\n"
-                     "  KERN_PURE ScoreBoard2Result ScoreBoard2(Float x = 0.0) {\n    return {math_mul(x, 2.0)};\n  }\n};\n");
+    text.set("text", "struct Anything : kern::Blueprint {\n  f64 Score = 0.0;\n\n  struct ScoreBoard2Result { f64 result = 0.0; };\n"
+                     "  KERN_PURE ScoreBoard2Result ScoreBoard2(f64 x = 0.0) {\n    return {math_mul<f64>(x, 2.0)};\n  }\n};\n");
     json::Value applied = own.s->command(text);
     if (!applied["ok"].as_bool()) std::printf("%s\n", applied["error"].as_string().c_str());
     CHECK(applied["ok"].as_bool());
@@ -15260,7 +15085,7 @@ TEST(studio_logic_cpp_view) {
   broken.replace(broken.find("Twice(21.0).result"), 18, "Twice(21.0)");
   r = apply(broken);
   CHECK(!r["ok"].as_bool() && r["error"].as_string().rfind("line ", 0) == 0 && r["error"].as_string().find("which result: Twice(...).result") != std::string::npos);
-  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul(x, 2.0)") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find("math_mul<f64>(x, 2.0)") != std::string::npos);
 }
 
 TEST(studio_logic_editor_commands) {
@@ -15310,7 +15135,7 @@ TEST(studio_logic_editor_commands) {
   val.set("pin", "text");
   val.set("value", "Hello from Logic");
   CHECK(f.s->command(val)["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Lives","type":"int"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Lives","type":"i64"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Lives","value":3})")["ok"].as_bool());
   pal = f.cmd(R"({"cmd":"logicPalette","query":"lives"})");
   CHECK(pal["items"].size() >= 2);
@@ -15397,8 +15222,8 @@ TEST(studio_logic_lists) {
   CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Names","type":"text_list"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Names","value":["a","b"]})")["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Nums","type":"float"})")["ok"].as_bool());
-  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Nums","type":"float_list"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Nums","type":"f64"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Nums","type":"f64_list"})")["ok"].as_bool());
   auto variable = [&](const char* name) {
     const json::Value st = f.s->state();
     for (const json::Value& v : st["logic"]["variables"].items()) if (v["name"].as_string() == name) return v;
@@ -15424,11 +15249,11 @@ TEST(studio_logic_lists) {
     // A list of a fixed length: the command says its length ("count"); its default has that many entries,
     // the palette offers its Get and the Set of an entry - no step that would change its length (Copy Bytes
     // writes its numbers where they stand).
-    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Axis","type":"float_list","count":3})")["ok"].as_bool());
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Axis","type":"f64_list","count":3})")["ok"].as_bool());
     CHECK(variable("Axis")["count"].as_number() == 3 && variable("Axis")["value"].size() == 3);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Axis","value":[1,2,3,4,5]})")["ok"].as_bool() && variable("Axis")["value"].size() == 3 && variable("Axis")["value"][2].as_number() == 3);
-    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float","count":3})")["ok"].as_bool());
-    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":70000})")["ok"].as_bool());
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"f64","count":3})")["ok"].as_bool());
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"f64_list","count":70000})")["ok"].as_bool());
     pal = f.cmd(R"({"cmd":"logicPalette","query":"axis"})");
     bool get = false, set_entry = false, step = false, copy = false;
     for (const json::Value& it : pal["items"].items()) {
@@ -15440,13 +15265,13 @@ TEST(studio_logic_lists) {
     }
     CHECK(get && set_entry && !step && copy);
     // (another length keeps what fits; the same type without a length is a list of any length again)
-    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
-    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"f64_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"f64_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Axis"})")["ok"].as_bool());
     // (a default says its entries up to the last that is not zero; the place has them all - also as a list of any length, or of numbers of another kind)
-    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Pad","type":"float_list","count":3})")["ok"].as_bool() && f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Pad","value":[4]})")["ok"].as_bool());
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Pad","type":"f64_list","count":3})")["ok"].as_bool() && f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Pad","value":[4]})")["ok"].as_bool());
     CHECK(variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4 && json::stringify(f.s->level().logic.variable("Pad")->value) == "[4]");
-    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Pad","type":"int_list"})")["ok"].as_bool() && variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Pad","type":"i64_list"})")["ok"].as_bool() && variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Pad"})")["ok"].as_bool());
   }
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
@@ -15477,7 +15302,7 @@ TEST(studio_logic_lists) {
     print |= it["type"].as_string() == "debug.print";  // (a list prints: it goes into Text)
   }
   CHECK(each && length && !plus && print);
-  // A new Length is of a Float List; its list pin says what it could be, and the first wire decides.
+  // A new Length is of a f64 List; its list pin says what it could be, and the first wire decides.
   const u32 len = added("list.length");
   auto pin = [&](u32 node, const char* id, bool output) {
     const json::Value st = f.s->state();
@@ -15527,7 +15352,7 @@ TEST(studio_logic_lists) {
   val.set("value", items);
   CHECK(f.s->command(val)["ok"].as_bool());
   const json::Value cpp = f.cmd(R"({"cmd":"logicCpp"})");
-  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<Float>(List<Float>{1.5, -2.0}, 0.0)") != std::string::npos);
+  CHECK(cpp["ok"].as_bool() && cpp["text"].as_string().find("list_find<f64>(List<f64>{1.5, -2.0}, 0.0)") != std::string::npos);
   CHECK(cpp["text"].as_string().find("List<Text> Names = List<Text>{\"a\", \"b\"};") != std::string::npos);
 }
 
@@ -16057,17 +15882,17 @@ TEST(studio_logic_structs) {
   const std::string code = cpp["text"].as_string();
   if (!cpp["ok"].as_bool()) std::printf("%s\n", cpp["error"].as_string().c_str());
   CHECK(cpp["ok"].as_bool() && cpp["native"].as_bool());
-  CHECK(code.find("  KERN_ENUM(Kind, Ranged, Melee);\n  KERN_STRUCT(Scope) {\n    Int Shots = 3;\n  };\n  /// What a weapon does.\n  KERN_STRUCT(Gun) {\n    Kind Type = Kind::Ranged;\n    Int Power = 10;\n"
-                  "    List<Float> Falloff = List<Float>{1.0, 0.5};\n    Scope Sight = Scope{3};\n    List<Scope> Marks = List<Scope>{};\n  };\n") != std::string::npos);
-  CHECK(code.find("  Gun Held = Gun{Kind::Ranged, 25, List<Float>{1.0, 0.5}, Scope{7}, List<Scope>{}};\n  List<Gun> Rack = List<Gun>{Gun{Kind::Ranged, 10, List<Float>{1.0, 0.5}, Scope{3}, List<Scope>{}}, "
-                  "Gun{Kind::Ranged, 10, List<Float>{1.0, 0.5}, Scope{3}, List<Scope>{}}};\n  Scope Last = Scope{3};\n") != std::string::npos);
-  CHECK(code.find("Held.Power = struct_break<Gun>(n") != std::string::npos && code.find("struct_make<Gun>(Kind::Melee, kern::to<Int>(") != std::string::npos);
+  CHECK(code.find("  KERN_ENUM(Kind, Ranged, Melee);\n  KERN_STRUCT(Scope) {\n    i64 Shots = 3;\n  };\n  /// What a weapon does.\n  KERN_STRUCT(Gun) {\n    Kind Type = Kind::Ranged;\n    i64 Power = 10;\n"
+                  "    List<f64> Falloff = List<f64>{1.0, 0.5};\n    Scope Sight = Scope{3};\n    List<Scope> Marks = List<Scope>{};\n  };\n") != std::string::npos);
+  CHECK(code.find("  Gun Held = Gun{Kind::Ranged, 25, List<f64>{1.0, 0.5}, Scope{7}, List<Scope>{}};\n  List<Gun> Rack = List<Gun>{Gun{Kind::Ranged, 10, List<f64>{1.0, 0.5}, Scope{3}, List<Scope>{}}, "
+                  "Gun{Kind::Ranged, 10, List<f64>{1.0, 0.5}, Scope{3}, List<Scope>{}}};\n  Scope Last = Scope{3};\n") != std::string::npos);
+  CHECK(code.find("Held.Power = struct_break<Gun>(n") != std::string::npos && code.find("struct_make<Gun>(Kind::Melee, num_cast<i64, f64>(") != std::string::npos);
   json::Value apply = json::Value::object();
   apply.set("cmd", "logicCppApply");
   std::string changed = code;
-  const std::size_t at = changed.find("    Int Shots = 3;\n");
+  const std::size_t at = changed.find("    i64 Shots = 3;\n");
   CHECK(at != std::string::npos);
-  if (at != std::string::npos) changed.replace(at, 19, "    Float Zoom = 2.5;\n    Int Shots = 3;\n");
+  if (at != std::string::npos) changed.replace(at, 19, "    f64 Zoom = 2.5;\n    i64 Shots = 3;\n");
   // (the text names every field of a struct that is written out: the new field too)
   for (const char* scope : {"Scope{3}", "Scope{7}", "Scope{9}"})
     for (std::size_t k = changed.find(scope); k != std::string::npos; k = changed.find(scope, k + 1)) changed.insert(k + 6, "2.5, ");
@@ -16077,7 +15902,7 @@ TEST(studio_logic_structs) {
   CHECK(r["ok"].as_bool() && fields("Scope") == "Zoom:float,Shots:int" && variable("Held")["value"]["Sight"]["Zoom"].as_number() == 2.5 && variable("Held")["value"]["Sight"]["Shots"].as_number() == 7);
   CHECK(no_errors(logic::check(f.s->level().logic)));
   // (a struct written out with a field missing is refused, with its place)
-  apply.set("text", code.substr(0, at) + "    Float Zoom = 2.5;\n" + code.substr(at));
+  apply.set("text", code.substr(0, at) + "    f64 Zoom = 2.5;\n" + code.substr(at));
   r = f.s->command(apply);
   CHECK(!r["ok"].as_bool() && r["error"].as_string().find("Scope has 2 field(s) (Zoom, Shots): Scope{...} gives a value for each, in that order") != std::string::npos && r["error"].as_string().rfind("line ", 0) == 0);
 
@@ -16125,9 +15950,9 @@ TEST(studio_logic_structs) {
     CHECK(t.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool() && t.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
     json::Value apply = json::Value::object();
     apply.set("cmd", "logicCppApply");
-    apply.set("text", "struct Level : kern::Blueprint {\n  KERN_STRUCT(Item) {\n    Text Key = \"\";\n    Float Price = 1.0;\n  };\n"
-                      "  List<Item> Shop = List<Item>{Item{\"apple\", 2.5}, Item{\"pear\", 4.0}};\n  Float Cost = 0.0;\n  Bool Has = true;\n\n"
-                      "  KERN_EVENT(on1, event_custom<\"Buy\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+    apply.set("text", "struct Level : kern::Blueprint {\n  KERN_STRUCT(Item) {\n    Text Key = \"\";\n    f64 Price = 1.0;\n  };\n"
+                      "  List<Item> Shop = List<Item>{Item{\"apple\", 2.5}, Item{\"pear\", 4.0}};\n  f64 Cost = 0.0;\n  bool Has = true;\n\n"
+                      "  KERN_EVENT(on1, event_custom<\"Buy\">)\n  void on1(Actor actor, f64 value, Text text) {\n"
                       "    Cost = struct_break<Item>(list_find_row<&Item::Key>(Shop, text).row).Price;\n    Has = list_find_row<&Item::Key>(Shop, text).found;\n  }\n};\n");
     json::Value r = t.s->command(apply);
     if (!r["ok"].as_bool()) std::printf("%s\n", r["error"].as_string().c_str());
@@ -16197,7 +16022,7 @@ TEST(studio_blueprint_comments_reroutes_promote) {
   CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
   const u32 begin = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"event.begin","x":0,"y":0})")["id"].as_number());
   const u32 msg = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"game.message","x":400,"y":0})")["id"].as_number());
-  const u32 add = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.add","x":0,"y":200})")["id"].as_number());
+  const u32 add = static_cast<u32>(f.cmd(R"({"cmd":"logicAdd","type":"math.add","params":{"type":"f64"},"x":0,"y":200})")["id"].as_number());
   auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> kv) {
     json::Value c = json::Value::object();
     for (const auto& [k, v] : kv) c.set(k, v);

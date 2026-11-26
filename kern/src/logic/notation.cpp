@@ -128,7 +128,6 @@ template <class T> std::string floating_literal(T v) {
   if (t.find_first_of(".en") == std::string::npos) t += ".0";
   return std::is_same_v<T, f32> ? t + "f" : t;
 }
-std::string float_text(f64 v) { return floating_literal(v); }
 /// A number as C++ writes it, of its type: true, 7, -3, 18446744073709551615u (a u64 beyond what a long long holds
 /// has its u), -9223372036854775807 - 1 (i64's smallest: no literal in C++), 0.5f, 0.5.
 std::string number_literal(const Value& v) {

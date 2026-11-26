@@ -103,8 +103,7 @@ struct ActorBlueprint {
     if constexpr (is_list<T>) return list_of(pin_of<typename T::value_type>());
     else if constexpr (std::is_same_v<T, bool>) return PinType::boolean;
     else if constexpr (std::is_enum_v<T>) return PinType::enumeration;
-    else if constexpr (std::is_integral_v<T>) return PinType::integer;
-    else if constexpr (std::is_floating_point_v<T>) return PinType::number;
+    else if constexpr (logic::num::Number<T>) return number_type<T>();   // (a number: its own type)
     else if constexpr (is_vector<T>) return PinType::vector;
     else if constexpr (std::is_same_v<T, std::string>) return PinType::text;
     else {

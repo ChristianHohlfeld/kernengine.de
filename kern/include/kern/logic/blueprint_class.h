@@ -78,35 +78,23 @@ template <class T> T& blueprint() { return *blueprint_object<T>; }
 
 // ---- exports: a function of a Blueprint the program gives its host under a fixed C name ----
 // (Function::exported, KERN_EXPORT_AS; the glue of the class writes the export - logic::native_glue)
-/// A number as the export takes it in (i32, u32, f32, f64) - into the language's Int, Float or Bool as C++
-/// converts it.
-template <class In, class C> In export_in(C x) { return In(x); }
-template <> inline bool export_in<bool, i32>(i32 x) { return x != 0; }
-template <> inline bool export_in<bool, u32>(u32 x) { return x != 0; }
-template <> inline bool export_in<bool, f32>(f32 x) { return x != 0; }
-template <> inline bool export_in<bool, f64>(f64 x) { return x != 0; }
+/// A number as the export takes it in (i32, u32, f32, f64): the input is of that type itself (Function::wire).
+template <class In, class C> In export_in(C x) {
+  static_assert(std::is_same_v<In, C>, "an export's number is of its C type (i32, u32, f32, f64)");
+  return x;
+}
 /// A text that comes in: its characters, copied (the host's memory is the host's).
 inline Text export_text_in(const char* text, u32 length) { return Text(std::string_view(text ? text : "", text ? length : 0)); }
 /// A text that comes in without its length: up to its 0.
 inline Text export_text_in(const char* text) { return Text(std::string_view(text ? text : "")); }
-/// Bytes that come in: a List of Int, one entry each.
-inline List<Whole> export_bytes_in(const u8* bytes, u32 length) {
-  List<Whole> out;
-  out.reserve(length);
-  for (u32 i = 0; i < length; ++i) out.push_back(Whole(static_cast<i64>(bytes[i])));
-  return out;
-}
-/// Floats that come in (f32, as the host gives them): a List of Float, one entry each, as C++ converts an f32.
-inline List<f64> export_floats_in(const f32* floats, u32 length) {
-  List<f64> out;
-  out.reserve(length);
-  for (u32 i = 0; i < length; ++i) out.push_back(static_cast<f64>(floats[i]));
-  return out;
-}
-/// A number as the export gives it (i32, u32, f32, f64): as C++ converts it.
+/// Bytes that come in: a List<u8>, one entry each.
+inline List<u8> export_bytes_in(const u8* bytes, u32 length) { return List<u8>(typename List<u8>::Items(bytes, bytes + length)); }
+/// Floats that come in (f32, as the host gives them): a List<f32>, one entry each.
+inline List<f32> export_floats_in(const f32* floats, u32 length) { return List<f32>(typename List<f32>::Items(floats, floats + length)); }
+/// A number as the export gives it (i32, u32, f32, f64): the output is of that type itself.
 template <class C, class Out> C export_out(const Out& x) {
-  if constexpr (std::is_same_v<Out, Whole>) return static_cast<C>(x.v);
-  else return static_cast<C>(x);
+  static_assert(std::is_same_v<C, Out>, "an export's number is of its C type (i32, u32, f32, f64)");
+  return x;
 }
 
 // What an export gives its host by a pointer - a text, bytes, floats - is a piece {pointer, length}: the export
@@ -145,14 +133,14 @@ template <auto Export> const char* export_text_out(const Text& text, u32* out_le
 template <auto Export, class L> const u8* export_bytes_out(const L& bytes, u32* out_len) {
   static std::vector<u8> held;
   held.resize(bytes.size());
-  for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<u8>(Whole(bytes[i]).v);
+  for (std::size_t i = 0; i < held.size(); ++i) held[i] = bytes[i];   // (a List<u8>)
   if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }
 template <auto Export, class L> const f32* export_floats_out(const L& floats, u32* out_len) {
   static std::vector<f32> held;
   held.resize(floats.size());
-  for (std::size_t i = 0; i < held.size(); ++i) held[i] = static_cast<f32>(static_cast<f64>(floats[i]));
+  for (std::size_t i = 0; i < held.size(); ++i) held[i] = floats[i];   // (a List<f32>)
   if (out_len) *out_len = static_cast<u32>(held.size());
   return held.empty() ? nullptr : held.data();
 }

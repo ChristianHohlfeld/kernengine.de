@@ -9,7 +9,10 @@
 #include <limits>
 #include <vector>
 
+#include "kern/core/json.h"
+#include "kern/logic/logic.h"
 #include "kern/logic/numbers.h"
+#include "logic_cases.h"
 
 namespace number_cases {
 using namespace kern;
@@ -142,6 +145,200 @@ template <class To, class From> void conversion() {
 template <class From, class... To> void conversions_from() { (conversion<To, From>(), ...); }
 template <class... T> void every_conversion() { (conversions_from<T, bool, i8, i16, i32, i64, u8, u16, u32, u64, f32, f64>(), ...); }
 
+
+// ---------------------------------------------------------------------------
+// The nodes of the numbers, in every tier: a Blueprint of one pure function per operation and type (add_f32,
+// shl_u8, cast_f32_i64 ...), each the one node of that operation. The interpreter's answers are checked against
+// numbers.h here (numbers.h against C++ above); the Blueprint's class gives the interpreter's answers, call for
+// call (blueprint_native.h: the case "numbers").
+
+/// An operation of the nodes: its function's name, the node, its family, how many inputs.
+struct NodeOp {
+  const char* name;
+  const char* node;
+  int family;   // 0 arithmetic, 1 whole, 2 floating, 3 compare (param op)
+  int inputs;
+  const char* op = nullptr;  // (math.compare: the operator)
+};
+inline const std::vector<NodeOp>& node_ops() {
+  static const std::vector<NodeOp> ops = {
+      {"add", "math.add", 0, 2}, {"sub", "math.sub", 0, 2}, {"mul", "math.mul", 0, 2}, {"div", "math.div", 0, 2}, {"rem", "math.rem", 0, 2},
+      {"min", "math.min", 0, 2}, {"max", "math.max", 0, 2}, {"neg", "math.negate", 0, 1}, {"abs", "math.abs", 0, 1},
+      {"eq", "math.compare", 3, 2, "=="}, {"ne", "math.compare", 3, 2, "!="}, {"lt", "math.compare", 3, 2, "<"}, {"le", "math.compare", 3, 2, "<="},
+      {"gt", "math.compare", 3, 2, ">"}, {"ge", "math.compare", 3, 2, ">="},
+      {"and", "math.and", 1, 2}, {"or", "math.or", 1, 2}, {"xor", "math.xor", 1, 2}, {"not", "math.not", 1, 1}, {"shl", "math.shift_left", 1, 2}, {"shr", "math.shift_right", 1, 2},
+      {"sqrt", "math.sqrt", 2, 1}, {"floor", "math.floor", 2, 1}, {"ceil", "math.ceil", 2, 1}, {"trunc", "math.trunc", 2, 1}, {"round", "math.round", 2, 1},
+      {"sin", "math.sin", 2, 1}, {"cos", "math.cos", 2, 1}, {"tan", "math.tan", 2, 1}, {"atan", "math.atan", 2, 1}, {"exp", "math.exp", 2, 1}, {"log", "math.log", 2, 1},
+      {"pow", "math.pow", 2, 2}, {"atan2", "math.atan2", 2, 2}, {"hypot", "math.hypot", 2, 2}, {"copysign", "math.copysign", 2, 2}, {"fmin", "math.fmin", 2, 2}};
+  return ops;
+}
+inline const char* const kNumberTypes[] = {"i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"};
+inline bool op_takes(const NodeOp& op, const std::string& t) {
+  const bool fl = t[0] == 'f';
+  return op.family == 0 || op.family == 3 || (op.family == 1 && !fl) || (op.family == 2 && fl);
+}
+/// The input pins of a node of the operation (a, b; the shifts: a, by; atan2: y, x; copysign: a, b).
+inline std::pair<const char*, const char*> op_pins(const NodeOp& op) {
+  if (std::string(op.name) == "shl" || std::string(op.name) == "shr") return {"a", "by"};
+  if (std::string(op.name) == "atan2") return {"y", "x"};
+  return {"a", "b"};
+}
+/// The Blueprint: one pure function per operation and type, and per conversion (cast_<to>_<from>).
+inline std::string numbers_graph_json() {
+  std::string fns, nodes, links;
+  u32 id = 1;
+  auto function = [&](const std::string& name, const std::vector<std::pair<std::string, std::string>>& in, const std::string& out_type, const std::string& node, const std::string& params,
+                      const std::vector<std::pair<std::string, std::string>>& wires) {
+    fns += std::string(fns.empty() ? "" : ",") + "{\"name\":\"" + name + "\",\"pure\":true,\"inputs\":[";
+    for (std::size_t k = 0; k < in.size(); ++k) fns += std::string(k ? "," : "") + "{\"name\":\"" + in[k].first + "\",\"type\":\"" + in[k].second + "\",\"value\":0}";
+    fns += "],\"outputs\":[{\"name\":\"r\",\"type\":\"" + out_type + "\",\"value\":" + (out_type == "bool" ? "false" : "0") + "}]}";
+    const u32 e = id++, n = id++, r = id++;
+    nodes += std::string(nodes.empty() ? "" : ",") + "{\"id\":" + std::to_string(e) + ",\"type\":\"func.entry\",\"params\":{\"function\":\"" + name + "\"}}";
+    nodes += ",{\"id\":" + std::to_string(n) + ",\"type\":\"" + node + "\",\"params\":{" + params + "}}";
+    nodes += ",{\"id\":" + std::to_string(r) + ",\"type\":\"func.return\",\"params\":{\"function\":\"" + name + "\"}}";
+    links += std::string(links.empty() ? "" : ",") + "[" + std::to_string(e) + ",\"then\"," + std::to_string(r) + ",\"exec\"]";
+    for (const auto& [from, to] : wires) links += ",[" + std::to_string(e) + ",\"" + from + "\"," + std::to_string(n) + ",\"" + to + "\"]";
+    links += ",[" + std::to_string(n) + ",\"result\"," + std::to_string(r) + ",\"r\"]";
+  };
+  for (const NodeOp& op : node_ops())
+    for (const char* t : kNumberTypes) {
+      if (!op_takes(op, t)) continue;
+      const auto [pa, pb] = op_pins(op);
+      const std::string by = std::string(pb) == "by" ? "i64" : t;
+      std::vector<std::pair<std::string, std::string>> in{{"a", t}}, wires{{"a", pa}};
+      if (op.inputs == 2) in.push_back({"b", by}), wires.push_back({"b", pb});
+      const std::string params = std::string(op.op ? "\"op\":\"" + std::string(op.op) + "\"," : "") + "\"type\":\"" + t + "\"";
+      function(std::string(op.name) + "_" + t, in, op.family == 3 ? "bool" : t, op.node, params, wires);
+    }
+  for (const char* to : kNumberTypes)
+    for (const char* from : kNumberTypes) function(std::string("cast_") + to + "_" + from, {{"a", from}}, to, "num.cast", "\"to\":\"" + std::string(to) + "\",\"from\":\"" + from + "\"", {{"a", "a"}});
+  for (const char* t : {"bool"})
+    for (const char* to : kNumberTypes) {
+      function(std::string("cast_") + to + "_" + t, {{"a", t}}, to, "num.cast", "\"to\":\"" + std::string(to) + "\",\"from\":\"bool\"", {{"a", "a"}});
+      function(std::string("cast_bool_") + to, {{"a", to}}, "bool", "num.cast", "\"to\":\"bool\",\"from\":\"" + std::string(to) + "\"", {{"a", "a"}});
+    }
+  return "{\"functions\":[" + fns + "],\"nodes\":[" + nodes + "],\"links\":[" + links + "]}";
+}
+/// The edge values of a type as values (a few, so that every pair is a call): see edges<T>, float_edges<T>.
+inline std::vector<logic::Value> node_edges(const std::string& t) {
+  std::vector<logic::Value> r;
+  logic::PinType pt{};
+  logic::pin_type_from_name(t, pt);
+  logic::with_number(pt, [&](auto tag) {
+    using T = typename decltype(tag)::type;
+    if constexpr (std::is_same_v<T, bool>) {
+      r = {logic::Value::boolean(false), logic::Value::boolean(true)};
+    } else if constexpr (std::is_floating_point_v<T>) {
+      for (T x : {T(0), -T(0), T(1), T(-1.5), T(0.1), T(1) / T(3), std::numeric_limits<T>::max(), std::numeric_limits<T>::denorm_min(), std::numeric_limits<T>::infinity(),
+                  -std::numeric_limits<T>::infinity(), std::numeric_limits<T>::quiet_NaN(), T(1e10), T(-3e9), T(255.9)})
+        r.push_back(logic::Value::of_number(x));
+    } else {
+      using L = std::numeric_limits<T>;
+      std::vector<T> v = {T(0), T(1), T(2), T(7), L::max(), L::min(), T(L::max() / 2 + 1), static_cast<T>(0xa5a5a5a5a5a5a5a5ull)};
+      if constexpr (std::is_signed_v<T>) v.insert(v.end(), {T(-1), T(-7), T(L::min() + 1)});
+      if constexpr (sizeof(T) == 8) v.push_back(static_cast<T>((u64{1} << 53) + 1));
+      for (T x : v) r.push_back(logic::Value::of_number(x));
+    }
+  });
+  return r;
+}
+/// numbers.h's answer for a function of the Blueprint (what the node must give).
+inline logic::Value node_reference(const std::string& fn, const std::vector<logic::Value>& args) {
+  using logic::Value;
+  const std::size_t u = fn.find('_');
+  const std::string op = fn.substr(0, u), rest = fn.substr(u + 1);
+  if (op == "cast") {
+    const std::size_t v = rest.find('_');
+    logic::PinType to{};
+    logic::pin_type_from_name(rest.substr(0, v), to);
+    return logic::with_number(to, [&](auto t) { return Value::of_number(args[0].as<typename decltype(t)::type>()); });
+  }
+  logic::PinType pt{};
+  logic::pin_type_from_name(rest, pt);
+  return logic::with_number(pt, [&](auto tag) -> Value {
+    using T = typename decltype(tag)::type;
+    if constexpr (std::is_same_v<T, bool>) return Value();
+    else {
+      const T a = args[0].as<T>();
+      const T b = args.size() > 1 ? args[1].as<T>() : T(0);
+      const i64 by = args.size() > 1 ? args[1].as<i64>() : 0;
+      if (op == "add") return Value::of_number(num::add(a, b));
+      if (op == "sub") return Value::of_number(num::sub(a, b));
+      if (op == "mul") return Value::of_number(num::mul(a, b));
+      if (op == "div") return Value::of_number(num::div(a, b));
+      if (op == "rem") return Value::of_number(num::rem(a, b));
+      if (op == "min") return Value::of_number(num::min(a, b));
+      if (op == "max") return Value::of_number(num::max(a, b));
+      if (op == "neg") return Value::of_number(num::neg(a));
+      if (op == "abs") return Value::of_number(num::abs(a));
+      if (op == "eq") return Value::boolean(num::eq(a, b));
+      if (op == "ne") return Value::boolean(num::ne(a, b));
+      if (op == "lt") return Value::boolean(num::lt(a, b));
+      if (op == "le") return Value::boolean(num::le(a, b));
+      if (op == "gt") return Value::boolean(num::gt(a, b));
+      if (op == "ge") return Value::boolean(num::ge(a, b));
+      if constexpr (num::Integer<T>) {
+        if (op == "and") return Value::of_number(num::bit_and(a, b));
+        if (op == "or") return Value::of_number(num::bit_or(a, b));
+        if (op == "xor") return Value::of_number(num::bit_xor(a, b));
+        if (op == "not") return Value::of_number(num::bit_not(a));
+        if (op == "shl") return Value::of_number(num::shl(a, by));
+        if (op == "shr") return Value::of_number(num::shr(a, by));
+      } else {
+        if (op == "sqrt") return Value::of_number(num::sqrt(a));
+        if (op == "floor") return Value::of_number(num::floor(a));
+        if (op == "ceil") return Value::of_number(num::ceil(a));
+        if (op == "trunc") return Value::of_number(num::trunc(a));
+        if (op == "round") return Value::of_number(num::round(a));
+        if (op == "sin") return Value::of_number(num::sin(a));
+        if (op == "cos") return Value::of_number(num::cos(a));
+        if (op == "tan") return Value::of_number(num::tan(a));
+        if (op == "atan") return Value::of_number(num::atan(a));
+        if (op == "exp") return Value::of_number(num::exp(a));
+        if (op == "log") return Value::of_number(num::log(a));
+        if (op == "pow") return Value::of_number(num::pow(a, b));
+        if (op == "atan2") return Value::of_number(num::atan2(a, b));
+        if (op == "hypot") return Value::of_number(num::hypot(a, b));
+        if (op == "copysign") return Value::of_number(num::copysign(a, b));
+        if (op == "fmin") return Value::of_number(num::fmin(a, b));
+      }
+      return Value();
+    }
+  });
+}
+/// Every call of the Blueprint: each function with every pair of edge values of its inputs' types (a shift's
+/// amount: 0, 1, 7, the width, beyond it, -1).
+inline std::vector<std::pair<std::string, std::vector<logic::Value>>> numbers_calls(const logic::Graph& g) {
+  std::vector<std::pair<std::string, std::vector<logic::Value>>> r;
+  for (const logic::Function& f : g.functions) {
+    std::vector<std::vector<logic::Value>> each;
+    for (const logic::FunctionPin& p : f.inputs) {
+      if (p.name == "b" && (f.name.rfind("shl_", 0) == 0 || f.name.rfind("shr_", 0) == 0)) {
+        std::vector<logic::Value> by;
+        for (i64 n : {0, 1, 7, 8, 31, 32, 63, 64, 65, -1}) by.push_back(logic::Value::integer(n));
+        each.push_back(by);
+      } else {
+        each.push_back(node_edges(logic::pin_type_name(p.type)));
+      }
+    }
+    if (each.size() == 1)
+      for (const logic::Value& a : each[0]) r.push_back({f.name, {a}});
+    else
+      for (const logic::Value& a : each[0])
+        for (const logic::Value& b : each[1]) r.push_back({f.name, {a, b}});
+  }
+  return r;
+}
+/// The same value: of the same type and with the same bits (two NaNs: both NaN - numbers.h).
+inline bool same_value(const logic::Value& a, const logic::Value& b) {
+  if (a.type != b.type) return false;
+  if (logic::is_floating(a.type)) {
+    const f64 x = a.as<f64>(), y = b.as<f64>();
+    if (std::isnan(x) || std::isnan(y)) return std::isnan(x) && std::isnan(y);
+  }
+  return a.bits() == b.bits();
+}
+
 }  // namespace number_cases
 
 TEST(numbers_against_cpp) {
@@ -192,4 +389,49 @@ TEST(numbers_against_cpp) {
   num::Kind k{};
   CHECK(num::kind_from_name("u32", k) && k == num::Kind::u32 && num::kind_name(num::Kind::f32) == "f32" && !num::kind_from_name("float", k) && !num::kind_from_name("int", k));
   CHECK(num::cast_kind(num::Kind::f32, num::Kind::f64) == num::Cast::floating && num::cast_name(num::cast_kind(num::Kind::i32, num::Kind::f32)) == "IntegralToFloating" && num::is_promotion(num::Kind::u8, num::Kind::i32));
+}
+
+TEST(numbers_nodes_interpreter) {
+  // Each node of the numbers in the interpreter gives what numbers.h gives (and numbers.h what C++ gives: above) -
+  // every operation of every type, with the edge values; and a wire of one number type into an input of another
+  // is an error of the graph (no wire converts).
+  using namespace number_cases;
+  logic::Graph g;
+  std::string error;
+  json::Value j;
+  CHECK(json::parse(numbers_graph_json(), j, &error) && logic::graph_from_json(j, g, &error));
+  if (!error.empty()) std::printf("  numbers graph: %s\n", error.c_str());
+  for (const logic::Issue& i : logic::check(g))
+    if (i.error) {
+      std::printf("  numbers graph: %s\n", i.text.c_str());
+      CHECK(!i.error);
+      break;
+    }
+  logic_cases::Host host;
+  logic::Runtime rt(host);
+  logic::Instance* inst = rt.add(g, 0, "numbers");
+  CHECK(inst != nullptr);
+  int wrong = 0, calls = 0;
+  for (const auto& [fn, args] : numbers_calls(g)) {
+    std::vector<logic::Value> got;
+    ++calls;
+    const bool ok = inst->call(fn, args, got) && got.size() == 1 && same_value(got[0], node_reference(fn, args));
+    if (!ok && ++wrong <= 10)
+      std::printf("  numbers: %s(%s%s%s) gives %s, numbers.h %s\n", fn.c_str(), args[0].as_text().c_str(), args.size() > 1 ? ", " : "", args.size() > 1 ? args[1].as_text().c_str() : "",
+                  got.empty() ? "nothing" : got[0].as_text().c_str(), node_reference(fn, args).as_text().c_str());
+  }
+  CHECK(wrong == 0);
+  CHECK(calls > 20000);
+  // (no wire converts: an f32 into an f64 input, an i32 into an i64 one is an error of the graph)
+  const char* mixed = R"({"variables":[{"name":"X","type":"f32","value":0.5},{"name":"Y","type":"f64","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"Y"}},{"id":3,"type":"var.get","params":{"variable":"X"}}],
+    "links":[[1,"then",2,"exec"],[3,"value",2,"value"]]})";
+  logic::Graph m;
+  CHECK(json::parse(mixed, j, &error) && logic::graph_from_json(j, m, &error));
+  bool refused = false;
+  for (const logic::Issue& i : logic::check(m)) refused = refused || i.error;
+  CHECK(refused);
+  // (a text of the time before the number types is refused with the place and the reason)
+  logic::Graph old;
+  CHECK(json::parse(R"({"variables":[{"name":"X","type":"float","value":0}]})", j, &error) && !logic::graph_from_json(j, old, &error) && error.find("before the number types") != std::string::npos);
 }

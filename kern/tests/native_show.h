@@ -25,10 +25,13 @@ inline std::string native_show(const kern::logic::Value& v) {
     std::snprintf(b, sizeof b, "%.*g", digits, x);
     return b;
   };
+  // (a number: its type and its value, exactly - a NaN whatever its bits)
+  if (kern::logic::is_number(v.type) && v.type != PinType::boolean) {
+    if (kern::logic::is_floating(v.type) && std::isnan(v.as<double>())) return std::string("nan ") + kern::logic::pin_type_name(v.type);
+    return kern::logic::number_as_text(v) + " " + kern::logic::pin_type_name(v.type);
+  }
   switch (v.type) {
     case PinType::boolean: return v.b ? "true" : "false";
-    case PinType::integer: std::snprintf(b, sizeof b, "%lld", static_cast<long long>(v.i)); return b;
-    case PinType::number: return number(v.n, 17);
     case PinType::vector: return "(" + number(v.v.x, 9) + ", " + number(v.v.y, 9) + ", " + number(v.v.z, 9) + ")";
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "#%llu", static_cast<unsigned long long>(v.a)); return b;
