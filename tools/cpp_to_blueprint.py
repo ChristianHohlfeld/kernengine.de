@@ -15012,6 +15012,9 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
+                if (scope or "").startswith(ENGINE + "::") and scope in self.tree.records:
+                    continue   # (a name a class of the engine gives inside itself - `using Object = kern::net::Simulator;` of a node's
+                               # description - is that class's: the test reaches the engine as the engine, never through a copy of it)
                 if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
                     continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather - but for what a value of it the test holds names: logic_value)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
