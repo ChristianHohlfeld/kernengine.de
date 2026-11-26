@@ -7145,7 +7145,9 @@ TEST(engine_objects_are_never_ints) {
     const std::string type = f.type;
     if (type.ends_with(".release"))
       CHECK(f.inputs.size() == 1 && f.inputs[0].type == logic::PinType::object && std::string(f.cpp).starts_with(logic::engine_class_cpp(f.inputs[0].of) + "::~"));
-    if (type.ends_with(".make") || type.find(".make_") != std::string::npos)
+    const std::size_t made = type.rfind(".make");   // (a maker: <class>.make, <class>.make_2 ... - not make_mesh)
+    if (made != std::string::npos && made + 5 <= type.size() &&
+        (made + 5 == type.size() || (type[made + 5] == '_' && type.find_first_not_of("0123456789", made + 6) == std::string::npos && made + 6 < type.size())))
       CHECK(f.outputs.size() == 1 && f.outputs[0].type == logic::PinType::object && std::string(f.outputs[0].shape) == "h");
   }
   CHECK(wrong == 0 && objects > 300);
