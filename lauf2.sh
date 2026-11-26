@@ -140,6 +140,11 @@ run_job() {  # name
   echo "werkzeuge: clang=${CLANGXX:-FEHLT} ($("${CLANGXX:-false}" --version 2>/dev/null | head -1)) c++=$(command -v c++ || echo FEHLT) ($(c++ --version 2>/dev/null | head -1)) python=$(python3 --version 2>&1) PATH=$PATH" >> mag-log/when
   git checkout -q -B "mag/ergebnis-$name"; git add -f mag-log; $G commit -q -m "mag: $name gestartet ($kind auf $SHA)"; git push -q origin "mag/ergebnis-$name" 2>/dev/null
   local conv="python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract -I../../include -I../../third_party/box3d/include -Isrc"
+  # (ab dem Projekt über den Levels, 26.11.: der Konverter schreibt Programm-Blueprints ins Projekt und hat keine Vorgaben eines Spiels mehr)
+  local proj=""
+  if [ -f kern/games/spawncity/level/spawncity.kproject ]; then
+    conv="$conv --project level/spawncity.kproject --folder Source --classes level_blueprints.h --whole-program"; proj="kern/games/spawncity/level/spawncity.kproject"
+  fi
   case "$kind" in
     voll)
       # (die Engine-Suite hängt nicht an der Konvertierung: sie rechnet von Anfang an daneben, mit einem Drittel der Kerne, in ihrem eigenen Ordner $TMPDIR/kern-tests)
@@ -150,7 +155,7 @@ run_job() {  # name
           $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
       # (Level und Tests sofort, mit dem Protokoll der Konvertierung in mag-zwischen/ - nicht in mag-log/: ein Auftrag gilt als fertig, sobald mag-log zweimal geschrieben ist)
-      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
+      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted $proj
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true
       mkdir -p mag-zwischen && cp mag-log/when mag-zwischen/when && tail -80 mag-log/convert.log > mag-zwischen/convert.tail.txt && xz -9 -T0 -c mag-log/convert.log > mag-zwischen/convert.log.xz
       git add -f mag-zwischen && $G commit -q -m "mag: $name auf $SHA – Zwischenstand nach der Konvertierung (die Suiten rechnen noch)" && git push -q origin "mag/ergebnis-$name" 2>/dev/null
@@ -161,7 +166,7 @@ run_job() {  # name
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
           $(ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
-      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
+      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted $proj
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints ($KERN_JOBS Kerne)" || true ;;
     probe)
       mkdir -p "$W/pt/converted" && cp kern/games/spawncity/tests/*.h "$W/pt/"   # (der Test-Schreiber sucht <test>/../converted.h)
