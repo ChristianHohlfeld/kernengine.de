@@ -21,6 +21,15 @@ STAMP = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z ")
 FUNCTION = re.compile(r"^    (\S.*?) \((\d+)\): (.*)$")
 WRITTEN = re.compile(r"^(\d+) of (\d+) functions of the program are written")
 COMPARED = re.compile(r"^(\d+) functions? of the Blueprints (?:is|are) compared")
+# (a name for a place - a function that gives a reference to a place of its own, `T& at(i)` - is written where it is called:
+# the converter counts it as written, and so does this)
+PLACE = "a name for a place - written where it is called"
+
+
+def is_written(why):
+    return why.startswith("written") or why == PLACE
+
+
 CALLS = re.compile(r"^it calls (.+?)\(\), which waits")
 TEST = re.compile(r"its test cannot compare it yet \((.*)\)")
 CLANG = re.compile(r"^--- (\S+?): (?:clang: )?\S*?:\d+:\d+: error: (.*)$")
@@ -79,8 +88,8 @@ def summary(name, n, top=25):
     lines = [f"== {name}"]
     lines.append("stops the run: " + ("nothing" if not n["fatal"] else f"{len(n['fatal'])} lines"))
     lines += ["  " + x for x in n["fatal"][:20]]
-    written = sum(1 for why in n["functions"].values() if why.startswith("written"))
-    waiting = {k: why for k, why in n["functions"].items() if not why.startswith("written")}
+    written = sum(1 for why in n["functions"].values() if is_written(why))
+    waiting = {k: why for k, why in n["functions"].items() if not is_written(why)}
     total = n["written"] or (written, len(n["functions"]))
     lines.append(f"written: {total[0]} of {total[1]} functions" + ("" if n["written"] else " (counted from the lines of the functions: the converter's total is missing)"))
     lines.append(f"compared: {n['compared'] if n['compared'] is not None else '-'}")
@@ -111,8 +120,8 @@ def main(argv):
         print()
     if len(logs) == 2:
         (pa, a), (pb, b) = logs
-        wa = {k for k, why in a["functions"].items() if why.startswith("written")}
-        wb = {k for k, why in b["functions"].items() if why.startswith("written")}
+        wa = {k for k, why in a["functions"].items() if is_written(why)}
+        wb = {k for k, why in b["functions"].items() if is_written(why)}
         print(f"== written in {pb}, not in {pa}: {len(wb - wa)}")
         for k in sorted(wb - wa)[:60]:
             print(f"  {k[0]}: {k[1]}  (before: {a['functions'].get(k, 'not named')[:120]})")
