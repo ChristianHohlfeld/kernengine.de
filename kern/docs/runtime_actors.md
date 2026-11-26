@@ -24,7 +24,8 @@ Geschosse, Gegner), entstehen aus **Vorlagen** des Levels.
 ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
 ```
 
-- Eine Kopie der Vorlage mit ihren Kindern, Komponenten und ihrem Blueprint (Begin Play läuft). Die Wurzel bekommt
+- Eine Kopie der Vorlage mit ihren Kindern, Komponenten und ihrem Blueprint. Begin Play der Kopie läuft sofort, auch
+  wenn ein Graph spawnt – im Budget des laufenden Schritts (`logic::Runtime::begin_added`). Die Wurzel bekommt
   `at` als ihre Transformation in der Welt (auch die Skalierung), die Kinder behalten ihre relative.
 - **Ids:** die nächsten freien in der Reihenfolge Wurzel, Kinder (wie im Level) – deterministisch: dieselben Aufrufe
   geben dieselben Ids. `id` setzt die Id der Wurzel (ein Replikat spiegelt, was sein Server gesetzt hat); sonst 0.
@@ -38,8 +39,9 @@ ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, Ac
 
 **Knoten:** „Spawn Actor“ (`actor.spawn`) mit der Einstellung *Template* (der Name der Vorlage, am Knoten zu sehen) und
 den Eingängen Location, Rotation, Scale; Ausgang *Spawned* (der Akteur). C++-Text:
-`actor_spawn<"Coin">(n3, Vector{0.0, 3.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0})`. Unbekannte Vorlage: Fehler
-an den Host mit derselben Meldung. Dazu der Knoten der Engine `GameWorld spawn` (aus dem Header).
+`actor_spawn<"Coin">(n3, Vector{0.0, 3.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0})`. Unbekannte oder leere
+Vorlage: Fehler an den Host beim Lauf, mit derselben Meldung (welche Vorlagen ein Level hat, weiß erst die laufende Welt; zur
+Bearbeitungszeit ist jeder Knoten mit seinen Vorgaben gültig). Dazu der Knoten der Engine `GameWorld spawn` (aus dem Header).
 
 **Rückgabe – die eine Stelle für den Akteur-Verweis:** heute `ActorId` (C++) bzw. der Pin-Typ `actor` (Knoten). Wenn der
 typisierte Verweis `{WorldId, ActorRef}` kommt (project.md 7., engine_object.md), ändert sich nur der Rückgabetyp von
@@ -66,7 +68,8 @@ wird, keine laufende Welt).
 ## Stand
 
 - Gebaut: siehe Tests `world_templates_spawn`, `world_spawn_errors`, `world_set_property_says_why`, `sound_bank_request_world`
-  (kern/tests/test_main.cpp); Murmel setzt seine Münzen aus der Vorlage „Muenze“ (Level-Graph, Begin Play).
+  (kern/tests/test_main.cpp); Murmel setzt seine Münzen aus der Vorlage „Muenze“ (Level-Graph, Begin Play); SpawnCity
+  setzt seine Fahrzeuge (Vorlagen Drone, Jet, Car, Bus, Parachute) in `Game::start`.
 - Offen: der typisierte Akteur-Verweis (Zweig work-projekt); Komponenten zur Laufzeit hinzufügen/entfernen (nicht
   nötig, solange Vorlagen sie tragen); `add_pawn` (Mitspieler) kopiert weiterhin den Spieler-Akteur der Welt – eine
   Vorlage „Spieler“ wäre der gleiche Weg, ist aber eine eigene Entscheidung (Besitz beim Start).
