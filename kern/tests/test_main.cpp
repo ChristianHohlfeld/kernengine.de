@@ -78,6 +78,9 @@ struct Register {
   Register register_##name(#name, test_##name); \
   void test_##name()
 
+}  // namespace
+#include "number_cases.h"
+namespace {
 
 bool mat_near(const Mat4& a, const Mat4& b, f32 eps = 1e-5f) {
   for (int i = 0; i < 16; ++i)
