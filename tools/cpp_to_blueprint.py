@@ -10277,6 +10277,11 @@ class Emit:
                         raise Wait(f"the value {ref.get('name')} of the enum {e} of a Blueprint's class, which the level does not have")
                     return f"{e}::{ref['name']}", e
                 if q is None:
+                    # (the value's own declaration not among the trees' - the dump of another namespace named it by
+                    # another address: its type is its enum)
+                    t = re.sub(r"^const\s+", "", self.ctype(b) or "").strip()
+                    q = t if t in self.tree.enums else None
+                if q is None:
                     raise Wait("an enum value of an enum without a name")
                 e = u.enum(q)
                 return f"{e}::{enum_value(u, e, ref['name'])}", e

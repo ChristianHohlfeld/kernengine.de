@@ -1,4 +1,4 @@
-#include "synth.h"
+#include "patch.h"
 namespace cases {
 using kern::audio::SynthPatch;
 using kern::audio::Wave;
