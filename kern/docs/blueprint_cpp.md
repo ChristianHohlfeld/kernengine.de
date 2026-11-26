@@ -1909,6 +1909,19 @@ immer ein Member. Der Leser nimmt einen solchen Wert auch als Member an (die For
 Blueprint); geschrieben wird er lokal. Eine Deklaration im Rumpf einer Funktion für einen Knoten, der nicht so
 dieser Funktion gehört, weist er ab.
 
+### Konverter: woher die Identität einer Deklaration kommt
+
+Der Konverter (`tools/cpp_to_blueprint.py`) liest jede Quelldatei mit **einem** Lauf des Compilers – ein Baum
+(`unit_dump`: `clang -ast-dump=json` ohne Filter), darin die Deklarationen jedes Namensraums: der des Programms,
+seine weiteren (`--program`), der der Engine, der eigene unbenannte der Datei, was außerhalb jedes Namensraums steht
+(Exporte, `kern_main`). Was in einem Kopf des Systems steht (Standardbibliothek, C-Bibliothek: außerhalb der Ordner
+des Programms und der Engine), wird überlesen, ohne als JSON gelesen zu werden. clang nennt einen Knoten bei seiner
+Adresse; so ein Name ist eine Identität **nur innerhalb dieses einen Baums** (ein Verweis `referencedDecl` und die
+Deklaration, auf die er zeigt, stehen im selben Lauf). Zwei Läufe werden nie über Adressen verbunden – sie träfen
+sich oder nicht nach Zufall (die Länge eines Pfads verschob sie). Darum ist die Ausgabe dieselbe, wo immer die
+Quellen liegen: `tools/converter_cases/run.sh` wandelt einen Fall aus zwei verschieden langen Ordnern und vergleicht
+Texte und Level Byte für Byte.
+
 ## Regeln: was kein Blueprint sein darf
 
 Damit jeder Blueprint genau ein C++ hat, gelten für Blueprints diese Regeln. `check()` meldet

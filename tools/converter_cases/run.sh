@@ -44,6 +44,7 @@
 #   meshextra.cpp the engine's MeshData::push_extra(const f32* values) handed only arrays of a fixed length (`const f32
 #             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
 #             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
+#   objects.cpp once more, from a folder of another length: the same texts and the same level, byte for byte.
 #   patch.cpp a struct and an enum of the engine (kern::audio::SynthPatch, Wave) the file names with `using kern::audio::Wave;`:
 #             in its test the enum stands before every `using` of it (before: `using audio::Wave;` in front of the enum
 #             itself - the test went without it, its function was not compared).
@@ -59,7 +60,7 @@ top="$(mktemp -d)"
 [ -n "${KEEP:-}" ] && echo "($top)" >&2 || trap 'rm -rf "$top"' EXIT
 fail=0
 convert() {   # convert <case> [<file> ...]: the case's program (its files), converted with its test, into a project and a level of their own
-  out="$top/$1"
+  out="$top/${INTO:-}$1"
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
   local f files=()
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
@@ -177,6 +178,13 @@ logged views "all eight are written and compared" '^8 functions of the Blueprint
 convert patch
 logged patch "bright is written" '^ +bright \([0-9]+\): written$'
 logged patch "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+
+# (the same case from a folder of another length: the same Blueprints, byte for byte - a declaration's identity is its own
+# in the one tree of the compiler, never an address: kern/docs/blueprint_cpp.md)
+INTO=a_folder_whose_name_is_much_longer_than_the_other_ones/ convert objects
+if diff -r -q "$top/objects/texts" "$top/a_folder_whose_name_is_much_longer_than_the_other_ones/objects/texts" > /dev/null &&
+   cmp -s "$top/objects/cases.klevel" "$top/a_folder_whose_name_is_much_longer_than_the_other_ones/objects/cases.klevel"
+then echo "ok   objects: the same from a folder of another length, byte for byte"; else echo "FAIL objects: the same from a folder of another length, byte for byte"; fail=1; fi
 
 convert program door
 logged program "the log says the App stands in the project, and why" '^  CasesApp: the project - it implements App - the program.s App'
