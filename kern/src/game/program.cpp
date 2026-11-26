@@ -68,7 +68,8 @@ App* program_app(logic::Runtime& rt) {
     }
   logic::EngineObjects* objects = rt.host().engine_objects();
   if (!one || !objects) return nullptr;
-  return objects->get<App>(rt.engine_object(one->self()));
+  std::string why;
+  return objects->get<App>(rt.engine_object(one->self(), "App", why));
 }
 
 Program::Program() = default;
