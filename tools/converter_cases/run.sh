@@ -88,6 +88,12 @@
 #   logicarg.cpp + logicarg_b.cpp  a function that takes the logic the Blueprints run in (kern::logic::Runtime&: no input, the
 #             Blueprint's own) called from another file: what it takes is told the same there and here - written (before: the
 #             converter stopped, "takes and gives ['I32', 'Bool'] there and ['Object<kern::logic::Runtime>', 'I32', 'Bool'] here").
+#   placelib.cpp + placelib_b.cpp  a place of the engine (`auto& ev = w->events(); ev.clear();` - GameWorld::events is
+#             KERN_PLACE: one node binds it, the nodes that read and clear it name that node, "bound") in a function of a
+#             library, called from another file: linked into its caller (logic::link), the library's nodes have ids of the
+#             caller's, and so has the node "bound" names - read, compared, its classes compile (before: "\"bound\" names no
+#             node that binds a place of the engine (10)", the Blueprints not read - as a game's library with
+#             RoadBuilder::chunks()).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
@@ -264,6 +270,12 @@ convert logicarg logicarg_b
 logged logicarg "both_ready (hands the logic on to a function of another file) is written" '^ +both_ready \([0-9]+\): written'
 logged logicarg "both are compared" '^2 functions of the Blueprints are compared'
 
+convert placelib placelib_b
+logged placelib "take_events (names a place of the engine) is written" '^ +take_events \([0-9]+\): written'
+logged placelib "events_twice (calls it from another file) is written" '^ +events_twice \([0-9]+\): written'
+logged placelib "both are compared" '^2 functions of the Blueprints are compared'
+classes placelib "the classes compile: the library's place, linked into its caller"
+
 convert running
 logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
 logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
@@ -378,6 +390,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg running pieces blasts far worldrules look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far worldrules look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
