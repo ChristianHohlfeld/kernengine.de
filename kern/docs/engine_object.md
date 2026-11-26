@@ -67,4 +67,10 @@ project.md 7. „Vom Programm aus“); ein Objekt der Engine nennt nur in seiner
   haben eine Welt (`EngineObjects(world)`: `kNativeTestWorld`, `kTestWorld` der Vergleichstests).
 - Der Konverter schreibt einen Zeiger, eine Referenz, ein `std::unique_ptr` der Engine als `Object<…>`: Nullzeiger
   `Object<…>{}`, `if (p)`/`p != nullptr` Is Valid Object, `a == b` Same Object, Container von Zeigern `List<Object<…>>`,
-  `unique_ptr<…>::get()` das Objekt; ein Objekt wird nie eine Zahl (Fall tools/converter_cases/objects).
+  `unique_ptr<…>::get()` das Objekt; ein Objekt wird nie eine Zahl (Fall tools/converter_cases/objects). Ein lokales Objekt
+  (`kern::Earcut ec;`) ist das `Object<…>`, das `<klasse>.make` gibt, freigegeben am Ende seines Blocks; ein gebundener Platz
+  eines Objekts (`auto& r = obj->feld()`) nimmt das Objekt als `Object<…>` (Fall localobj; vorher wartete beides:
+  „Object<kern::Earcut> where Int is wanted“).
+- In der Klasse (`tools/blueprint_cpp`) hält ein Struct des Programms ein Objekt-Feld als dasselbe `Object<…>`, mit dem
+  es deklariert ist – auch in seiner Hülle als Wert (`Held<Struct>`, `native_glue`: ein Typ je Feld, eine Regel für alle
+  Feld-Typen). Früher wurde es dort still ein `ActorHandle`, und die Klasse kompilierte nicht (Fall objects: „the classes compile“).

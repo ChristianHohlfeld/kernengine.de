@@ -162,6 +162,84 @@ NODE_SHAPE = re.compile(r"^(n|go|on|it|machine)\d+$")
 ENGINE_RUN = [False]
 ENGINE_HEADERS = set()
 ENGINE_HEADERS_DIR = os.path.join(ROOT, "kern", "include", "kern")   # (the engine's headers: their types are Blueprints' only where marked)
+# A header of the engine that marks a type for Blueprints (KERN_BLUEPRINT_TYPE) is one library of the engine, named by its
+# path (kern/input/actions.h: engine_input_actions) - tools/engine_api.py --libraries writes them all into
+# kern/src/logic/engine_libraries.gen.cpp. What a Blueprint names of them is checked where it is written (engine_names_missing).
+MARKED = re.compile(r"\b(?:struct|class|union|enum(?:\s+class|\s+struct)?)\s+KERN_BLUEPRINT_TYPE\b")
+ENGINE_LIBRARIES_GEN = os.path.join(ROOT, "kern", "src", "logic", "engine_libraries.gen.cpp")
+
+
+def strings_of(x):
+    """Every text in a value of lists, tuples and dicts (what a conversion gives: the pieces of a Blueprint's text)."""
+    if isinstance(x, str):
+        return [x]
+    if isinstance(x, dict):
+        return [t for v in x.values() for t in strings_of(v)]
+    if isinstance(x, (list, tuple, set)):
+        return [t for v in x for t in strings_of(v)]
+    return []
+
+
+def marked_headers():
+    """The engine's headers (kern/include/kern, without the generated ones and the test's) that mark a type for
+    Blueprints: each one library of the engine (relative paths, sorted)."""
+    out = []
+    for d, _, names in os.walk(ENGINE_HEADERS_DIR):
+        for n in names:
+            rel = os.path.relpath(os.path.join(d, n), ENGINE_HEADERS_DIR).replace(os.sep, "/")
+            if n.endswith(".h") and not n.endswith(".gen.h") and not rel.startswith("test/") and MARKED.search(open(os.path.join(d, n), encoding="utf-8").read()):
+                out.append(rel)
+    return sorted(out)
+
+
+def library_of_header(rel):
+    """The name of the library of the engine's header `rel` (input/actions.h: engine_input_actions)."""
+    return "engine_" + re.sub(r"\W", "_", rel[:-2] if rel.endswith(".h") else rel)
+
+
+_BUILT = []
+
+
+def built_engine_libraries():
+    """The engine's libraries as the build has them (engine_libraries.gen.cpp): name -> {"types", "functions"} (their own)."""
+    if not _BUILT:
+        text = open(ENGINE_LIBRARIES_GEN, encoding="utf-8").read() if os.path.exists(ENGINE_LIBRARIES_GEN) else ""
+        have = {}
+        for m in re.finditer(r'\{"(engine_\w+)", "\w*", R"kl\((.*?)\)kl"\}', text, re.S):
+            g = json.loads(m.group(2))
+            have[m.group(1)] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
+                                "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
+        _BUILT.append(have)
+    return _BUILT[0]
+
+
+def engine_libraries_missing():
+    """The headers of the engine that mark types and have no library in the build: ["kern/<h>: ..."] (empty: all there)."""
+    have = built_engine_libraries()
+    return [f"kern/{h} marks types for Blueprints, but the engine has no library {library_of_header(h)} "
+            f"(tools/engine_api.py --libraries writes it into {os.path.relpath(ENGINE_LIBRARIES_GEN, ROOT)})"
+            for h in marked_headers() if library_of_header(h) not in have]
+
+
+def engine_names_missing(texts):
+    """What Blueprint texts ({who: text}) name of the engine's libraries that the build does not have - a library, or a
+    type or function of one: [(who, line, what is missing)] (empty: all there). The one check of it: the converter runs it
+    on every text it writes, tools/engine_api.py --check on a folder of texts."""
+    have = built_engine_libraries()
+    out = []
+    for who, text in sorted(texts.items()):
+        for at, line in enumerate(text.split("\n"), 1):
+            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", line):
+                if lib not in have:
+                    out.append((who, at, f"{lib}: no library of the engine"))
+                elif fn not in have[lib]["types"] and fn not in have[lib]["functions"] and not fn.endswith("Result"):
+                    out.append((who, at, f"{lib}: the type or function {fn} - the engine does not write it"))
+            for lib in re.findall(r"virtual (engine_\w+)\b", line):
+                if lib not in have:
+                    out.append((who, at, f"{lib}: no library of the engine"))
+    return out
+
+
 
 
 def engine_only(field):
@@ -5761,7 +5839,7 @@ class Emit:
                     continue
                 name = self.local(v, self.whole64() if wide_init else kept)
                 if made is not None:
-                    out += self.take_pre() + [f"{name} = {self.ex(init, 'Int')};"]
+                    out += self.take_pre() + [f"{name} = {self.ex(init, object_type(made))};"]   # (the Object <class>.make gives)
                     self.scopes[-1].append((name, made))
                     continue
                 made_here = self.made_default(init, self.types[v["id"]]) if init is not None else None
@@ -9649,7 +9727,7 @@ class Emit:
         if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
             return cached[2]
         u, bt = self.u, f["outs"][0][1]
-        handle = self.ex(kids(b)[0], "Int")   # (the object: its handle - also where C++ points at it)
+        handle = self.ex(kids(b)[0], object_type(q))   # (the object: an Object of its class - also where C++ points at it)
         u.engine_calls[fd["id"]] = f
         self.f.asks_engine = True
         self.f.effect(f"it binds a place of the engine ({f['type']})")
@@ -16684,6 +16762,14 @@ def blueprints_of(level, project=None):
 APP_INTERFACE = "App"
 
 
+def engine_library(name):
+    """A Blueprint of the engine's own headers (engine_<header>: the libraries of the engine, kern/logic/engine_libraries.h).
+    The engine has them, built from its headers (tools/engine_api.py --libraries): a run over a program's sources writes
+    their texts and their tests, never into its level or its project - one way, whatever source includes the header.
+    (A run over the engine itself, --engine, writes them.)"""
+    return not ENGINE_RUN[0] and name.startswith("engine_")
+
+
 def place_blueprints(written, uses, implements, texts, known, in_project=()):
     """Where each Blueprint of a run stands (kern/docs/project.md 1., 4., 5.): {name: ("project" | "level", why)}. The
     program's - in the project - are its App (a state that implements the engine's App: kern::run starts the program
@@ -16695,7 +16781,10 @@ def place_blueprints(written, uses, implements, texts, known, in_project=()):
     `in_project`: the Blueprints that stand in the project and that this run does not write - the program's already
     (what the program's C++ calls as their classes): what they use is the program's too."""
     why = {}
+    engine = {u for u in written if engine_library(u)}
     for u in sorted(written):
+        if u in engine:
+            continue
         if implements.get(u) == APP_INTERFACE:
             why[u] = f"it implements {APP_INTERFACE} - the program's App (kern::run starts the program with its object)"
         else:
@@ -16706,10 +16795,12 @@ def place_blueprints(written, uses, implements, texts, known, in_project=()):
     while todo:   # (what a Blueprint of the program uses, and what that uses: the program's too)
         u = todo.pop(0)
         for x in sorted(uses.get(u, ()) if u in uses else known.get(u, ())):
-            if x not in why and (x in uses or x in known):
+            if x not in why and x not in engine and (x in uses or x in known):
                 why[x] = f"the program's {u} uses it - a Blueprint of the program finds its libraries only in the project"
                 todo.append(x)
     out = {u: ("project", why[u]) for u in why}
+    for u in sorted(engine):
+        out[u] = ("engine", "a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one")
     for u in sorted(written):
         out.setdefault(u, ("level", "a world's - it is not the App, has no export, and no Blueprint of the program uses it"))
     return out
@@ -16725,10 +16816,10 @@ def apply_to_level(level, folder, blueprints, prune=False, project=None, placed=
     Blueprint of another folder - a source of its own - is never moved: one the program uses that stands in the level
     stops the run (its place is the project; the files stay as they are). All of them, or nothing: the files are
     written when every Blueprint was read."""
-    if not ENGINE_RUN[0]:
-        # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
-        # engine has, written by tools/engine_api.py --libraries; neither a level nor a project holds one)
-        blueprints = [(name, text) for name, text in blueprints if not name.startswith("engine_")]
+    # (a library of the engine is the engine's - kern/logic/engine_libraries.h: what the program calls of it the
+    # engine has, written by tools/engine_api.py --libraries; neither a level nor a project holds one)
+    blueprints = [(name, text) for name, text in blueprints if not engine_library(name)]
+    placed = {name: why for name, why in (placed or {}).items() if not engine_library(name)} or None
     placed = placed or {name: ("level", "") for name, _ in blueprints}
     program = {name for name, (where, _) in placed.items() if where == "project"}
     if program and not project:
@@ -16974,6 +17065,12 @@ def main(argv):
         raise SystemExit("--folder <name>: the folder (in the level and the project) of the Blueprints this run writes - it knows its own by it")
     if whole and not level:
         raise SystemExit("--whole-program: a run over the whole program drops, of its folder, what it does not write any more - give the level (--level)")
+    # (the engine's libraries this run's Blueprints may name - one for each header that marks types: all of them there before
+    # anything is converted, or the run stops now, not when the level reads the texts at the end)
+    if not ENGINE_RUN[0]:
+        lacking = engine_libraries_missing()
+        if lacking:
+            raise SystemExit("the engine's libraries are not whole - nothing is converted:\n  " + "\n  ".join(lacking))
     CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
     RUN_FOLDER[0] = folder
     if classes[0] is not None and not project:
@@ -17424,6 +17521,16 @@ def main(argv):
         for u in now:
             took[u], got[u] = futures[u].result()
         for u in now:
+            # (what a text names of the engine's libraries is there - the check tools/engine_api.py --check makes of the texts:
+            # here as each is written, so that a run stops at once, with the Blueprint, the line and what is missing)
+            if not ENGINE_RUN[0]:
+                written = "\n".join(strings_of(got[u]["parts"]) + strings_of(got[u]["types"]))
+                lacking = engine_names_missing({u: written})
+                if lacking:
+                    lines_ = written.split("\n")
+                    raise SystemExit(f"{u} names what the engine's libraries do not have (tools/engine_api.py --libraries):\n  "
+                                     + "\n  ".join(f"{what} - in `{lines_[line - 1].strip()[:160]}`" for _, line, what in lacking[:12]))
+        for u in now:
             r = got[u]
             # (what is given only grows - more of the others written - and with it what is written: a function
             # that was written and waits now goes against that; it is said, a finding of what the converter writes)
@@ -17563,8 +17670,7 @@ def main(argv):
             users = sorted(u for u in blue if name in blue[u]["types"])
             if users:
                 return min(users, key=lambda h: (depth_of(h), h))
-        if not ENGINE_RUN[0]:   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
-            below = {h for h in below if not h.startswith("engine_")}
+        below = {h for h in below if not engine_library(h)}   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
         return max(below, key=lambda h: (depth_of(h), h)) if below else SHAPES
     homes = collections.defaultdict(list)
     for name in declared:
@@ -17668,7 +17774,7 @@ def main(argv):
         placed = place_blueprints(set(order), {u: uses[u] for u in order}, {u: (blueprint_implements[u] or [None])[0] for u in order}, blueprints, known, in_project)
         print("\nwhere the Blueprints stand (kern/docs/project.md):")
         for u in order:
-            print(f"  {u}: {'the project' if placed[u][0] == 'project' else 'the level'} - {placed[u][1]}")
+            print(f"  {u}: the {placed[u][0]} - {placed[u][1]}")
         apply_to_level(level, folder, [(u, blueprints[u]) for u in order], prune=whole, project=project, placed=placed)
     for f in nowhere:   # (a header's function that needs a source file which is not among those converted)
         if world.program(f["file"]):
