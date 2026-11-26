@@ -618,16 +618,16 @@ const vpCenter = async (page, i = 0) => {
     const app = await cmd(page, {cmd: "logicCppApply", text: `struct Spiel : virtual kern::Blueprint, virtual engine_game_runtime, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
-    Float time = 0.0;
-    Float dt = 0.0;
-    Int64 index = Int64{0x0};
+    f64 time = 0.0;
+    f32 dt = 0.0f;
+    u64 index = 0;
   };
 
   // ---- variables ----
   Object<kern::game::GameWorld> Welt = Object<kern::game::GameWorld>{};
 
   // ---- functions ----
-  struct startResult { Bool result = false; };
+  struct startResult { bool result = false; };
   KERN_OVERRIDE startResult start(Object<kern::Engine> engine = Object<kern::Engine>{}) {
     engine_game_world_make_2(n1, engine);
     Welt = n1.result;
@@ -635,12 +635,12 @@ const vpCenter = async (page, i = 0) => {
     return {n2.result};
   }
 
-  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
-    engine_engine_ui_text(engine, "punkte", "Punkte", 0.1, 0.1);
+  KERN_OVERRIDE void update(Object<kern::Engine> engine = Object<kern::Engine>{}, Frame frame = Frame{0.0, 0.0f, 0}) {
+    engine_engine_ui_text(engine, "punkte", "Punkte", 0.1f, 0.1f);
   }
 
   struct { Object<kern::game::GameWorld> result = Object<kern::game::GameWorld>{}; } n1;
-  struct { Bool result = false; } n2;
+  struct { bool result = false; } n2;
 };
 `});
     check(app.ok, "play project: the App is written as C++" + (app.ok ? "" : ": " + app.error));

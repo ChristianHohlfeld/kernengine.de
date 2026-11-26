@@ -10,6 +10,8 @@
 //     in the list's type from its pin, For Each over it - as C++, changed there, and played;
 //     then an enum and a struct, each made in My Blueprint and edited in Details, a variable of
 //     its type, its nodes from the action menu - as C++, changed there, and played;
+//     then the number types: an f32 and an i64 made in Details (values read exactly in their type, a bad one
+//     refused at the field), an Add wired by hand - its Cast appears on the wire, one undo step -, compiled, played;
 //  2. (with a game's level file named) it opens as a level: its actors are there, their
 //     Blueprints compile without errors with the editor's own node library, and Play runs them
 //     as machine code. (The game's project file must stay a file the editor reads.)
@@ -95,38 +97,40 @@ check(!!call && call.inputs.some(p => p.id === "x") && call.outputs.some(p => p.
 const msg = (await cmd({cmd: "logicAdd", type: "game.message", x: call.x + 320, y: call.y})).id;
 await cmd({cmd: "logicConnect", from: begin, out: "then", to: call.id, in: "exec"});
 await cmd({cmd: "logicConnect", from: call.id, out: "then", to: msg, in: "exec"});
-await cmd({cmd: "logicConnect", from: call.id, out: "result", to: msg, in: "text"});
+// (the function gives an f32, Show Message takes a Text: the wire gets its To Text, in the open - no wire converts)
+const toText = await cmd({cmd: "logicConnect", from: call.id, out: "result", to: msg, in: "text"});
+check(toText.ok && toText.title === "To Text" && (await logic()).nodes.find(n => n.id === toText.inserted)?.type === "num.text", "a number into a Text pin gets its To Text on the wire");
 await cmd({cmd: "logicValue", node: call.id, pin: "x", value: 20});
 check(errorsOf(await logic()).length === 0, "the graph compiles");
 
 // ---- 1b. the same Blueprint as C++: read it, change it, apply it ----------------------------------
 await page.click(".lg-cpp");
 const cppText = page.locator(".lg-cpptext");
-check(await until(async () => (await cppText.inputValue()).includes("TwiceResult Twice(Float x = 0.0) {")), "the C++ button shows the Blueprint as C++");
+check(await until(async () => (await cppText.inputValue()).includes("TwiceResult Twice(f32 x = 0.0f) {")), "the C++ button shows the Blueprint as C++");
 let code = await cppText.inputValue();
-check(code.includes("return {kern::formula([](Float x, Float bonus) -> Float { return x * 2.0 + bonus; }, x, 0.5)};"), "the Formula node is the expression itself");
-check(/n\d+ = Twice\(20\.0\);/.test(code) && code.includes("KERN_EVENT(on") && !code.includes("KERN_LAYOUT") && !/call_node|read_pin/.test(code), "the call is a call, the event a method; no layout, no callbacks");
+check(code.includes("return {kern::formula<f32, f32>([](auto x, auto bonus) { return x * 2.0f + bonus; }, x, 0.5f)};"), "the Formula node is the expression itself");
+check(/n\d+ = Twice\(20\.0f\);/.test(code) && code.includes("game_message(num_text<f32>(n") && code.includes("KERN_EVENT(on") && !code.includes("KERN_LAYOUT") && !/call_node|read_pin/.test(code), "the call is a call, the event a method; no layout, no callbacks");
 // (an event, a call, Show Message - a gameplay node: a compiler runs this text as it stands, and the view says so)
 const nativeNote = page.locator(".lg-cppnative");
 check((await nativeNote.textContent()) === "runs as compiled C++" && /every node is a function/.test(await nativeNote.getAttribute("title")), "the view says that a compiler runs the text as it stands");
 // a change typed into the text becomes the graph (Ctrl+Enter), and the nodes stay where they are
 const places = async () => JSON.stringify((await logic()).nodes.map(n => [n.id, n.x, n.y]).sort((a, b) => a[0] - b[0]));
 const placesBefore = await places();
-await cppText.fill(code.replace("x, 0.5)};", "x, 1.5)};"));
+await cppText.fill(code.replace("x, 0.5f)};", "x, 1.5f)};"));
 check(await page.locator(".lg-cppstate.dirty").count() === 1, "a changed text says so");
 await cppText.press("Control+Enter");
 check(await until(async () => (await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 1.5), "Apply changes the Blueprint: the Formula's bonus is 1.5");
 check(await places() === placesBefore, "every node kept its id and its place");
-check(await page.locator(".lg-cppstate.dirty").count() === 0 && (await cppText.inputValue()).includes("x, 1.5)};"), "the view shows the Blueprint as it now is");
+check(await page.locator(".lg-cppstate.dirty").count() === 0 && (await cppText.inputValue()).includes("x, 1.5f)};"), "the view shows the Blueprint as it now is");
 // what is not a Blueprint is refused with its line, and nothing changes
-await cppText.fill((await cppText.inputValue()).replace("Twice(20.0);", "Twice(20.0, 1.0);"));
+await cppText.fill((await cppText.inputValue()).replace("Twice(20.0f);", "Twice(20.0f, 1.0f);"));
 await cppText.press("Control+Enter");
 check(await until(async () => /^line \d+, column \d+: /.test(await page.locator(".lg-cpperr").innerText().catch(() => ""))), `a text that is no Blueprint is refused with line and reason (${await page.locator(".lg-cpperr").innerText().catch(() => "")})`);
 check((await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 1.5, "and the Blueprint is untouched");
 await page.click(".lg-cppreset");
-check(await page.locator(".lg-cpperr").isHidden() && (await cppText.inputValue()).includes("Twice(20.0);"), "Reset shows the Blueprint's text again");
+check(await page.locator(".lg-cpperr").isHidden() && (await cppText.inputValue()).includes("Twice(20.0f);"), "Reset shows the Blueprint's text again");
 // back to 0.5 through the text, then back to the graph
-await cppText.fill((await cppText.inputValue()).replace("x, 1.5)};", "x, 0.5)};"));
+await cppText.fill((await cppText.inputValue()).replace("x, 1.5f)};", "x, 0.5f)};"));
 await page.click(".lg-cppapply");
 check(await until(async () => (await logic()).nodes.find(n => n.id === formula)?.inputs.find(p => p.id === "bonus")?.value === 0.5), "the Apply button does the same");
 await page.click(".lg-cppclose");
@@ -141,12 +145,15 @@ await cmd({cmd: "stop"});
 await cmd({cmd: "new", template: "basic"});
 await cmd({cmd: "logicOpen", owner: 0});
 await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
-await cmd({cmd: "logicVariable", op: "add", name: "Scores", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "Scores", type: "f32"});
 await page.click('.lg-var[data-var="Scores"]');
 const typeSelect = page.locator('.lg-dbody [data-vk="type"]');
-check(await until(async () => await typeSelect.count() === 1) && (await typeSelect.locator("option").count()) === 28 && (await typeSelect.locator('option[value="u32"]').textContent()) === "U32", "Details offers the seven value types, their lists, the six fixed widths (U8 ... I32), a map and a set");
-await typeSelect.selectOption("float_list");
-check(await until(async () => (await logic()).variables.find(v => v.name === "Scores")?.type === "float_list"), "a variable becomes a Float List");
+check(await until(async () => await typeSelect.count() === 1) && (await typeSelect.locator("option").count()) === 30 && (await typeSelect.locator('option[value="u32"]').textContent()) === "u32",
+      "Details offers the ten number types, bool, Vector, Text, Actor, a list of each, a map and a set");
+check((await typeSelect.locator("option").allTextContents()).slice(0, 3).join("|") === "Float (f32)|Int (i64)|f64" && (await typeSelect.locator("option:checked").textContent()) === "Float (f32)",
+      "first the defaults Float (f32) and Int (i64), the other widths below them");
+await typeSelect.selectOption("f32_list");
+check(await until(async () => (await logic()).variables.find(v => v.name === "Scores")?.type === "f32_list"), "a variable becomes a Float List (f32)");
 const scores = async () => JSON.stringify((await logic()).variables.find(v => v.name === "Scores")?.value);
 check(await until(async () => await page.locator(".lg-dbody .lg-list [data-ladd]").count() === 1) && await scores() === "[]", "its default is the empty list, with + Item below");
 // (the rows are drawn from the Blueprint: each click waits for its row)
@@ -168,15 +175,15 @@ check(await rows(2) && await scores() === "[1.5,40]", "x takes an item out");
 // Get Scores; from its pin the menu's nodes come in the list's type; a new Length takes the wire's type
 const getScores = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 320, params: {variable: "Scores"}})).id;
 const offered = (await cmd({cmd: "logicPalette", query: "", from: {node: getScores, pin: "value", output: true}})).items;
-check(offered.some(e => e.type === "flow.for_each" && e.params?.type === "float") && offered.some(e => e.type === "list.get" && e.params?.type === "float") && !offered.some(e => e.type === "math.add"),
-      "from a Float List pin the menu offers For Each and Get Item of Floats, and nothing a list does not go into");
+check(offered.some(e => e.type === "flow.for_each" && e.params?.type === "f32") && offered.some(e => e.type === "list.get" && e.params?.type === "f32") && !offered.some(e => e.type === "math.add"),
+      "from an f32 List pin the menu offers For Each and Get Item of f32, and nothing a list does not go into");
 const lengthNode = (await cmd({cmd: "logicAdd", type: "list.length", x: 320, y: 420, params: {type: "text"}})).id;
 await cmd({cmd: "logicConnect", from: getScores, out: "value", to: lengthNode, in: "list"});
 l = await logic();
-check(l.nodes.find(n => n.id === lengthNode).inputs[0].type === "float_list" && l.links.some(k => k[0] === getScores && k[2] === lengthNode), "a Length of Texts with nothing wired to it becomes a Length of Floats with the wire");
+check(l.nodes.find(n => n.id === lengthNode).inputs[0].type === "f32_list" && l.links.some(k => k[0] === getScores && k[2] === lengthNode), "a Length of Texts with nothing wired to it becomes a Length of f32 with the wire");
 check(await until(async () => await page.locator(`.lg-node[data-id="${getScores}"] .lg-pin.list`).count() === 1), "a list pin is drawn as a list");
 // Begin Play: Add 0.5 to Scores, then for each item add it to Sum; then show Sum and the list
-await cmd({cmd: "logicVariable", op: "add", name: "Sum", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "Sum", type: "f32"});
 const lb = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 0})).id;
 const addStep = (await cmd({cmd: "logicAdd", type: "list.add", x: 280, y: 0, params: {variable: "Scores"}})).id;
 const each = (await cmd({cmd: "logicAdd", type: "flow.for_each", x: 560, y: 0, from: {node: getScores, pin: "value", output: true}})).id;
@@ -185,23 +192,27 @@ const getSum = (await cmd({cmd: "logicAdd", type: "var.get", x: 840, y: 240, par
 const text3 = (await cmd({cmd: "logicAdd", type: "text.append", x: 1000, y: 240})).id;
 const show = (await cmd({cmd: "logicAdd", type: "game.message", x: 1200, y: 120})).id;
 l = await logic();
-check(l.nodes.find(n => n.id === addStep).title === "Add to Scores" && l.nodes.find(n => n.id === addStep).inputs.find(p => p.id === "item").type === "float", "Add to Scores takes an item of the list's type");
-check(l.nodes.find(n => n.id === each).outputs.find(p => p.id === "item").type === "float" && l.links.some(k => k[0] === getScores && k[2] === each), "For Each dropped from the list's pin is wired and gives Floats");
+check(l.nodes.find(n => n.id === addStep).title === "Add to Scores" && l.nodes.find(n => n.id === addStep).inputs.find(p => p.id === "item").type === "f32", "Add to Scores takes an item of the list's type");
+check(l.nodes.find(n => n.id === each).outputs.find(p => p.id === "item").type === "f32" && l.links.some(k => k[0] === getScores && k[2] === each), "For Each dropped from the list's pin is wired and gives f32");
 await cmd({cmd: "logicValue", node: addStep, pin: "item", value: 0.5});
 for (const [from, out, to, input] of [[lb, "then", addStep, "exec"], [addStep, "then", each, "exec"], [each, "body", addSum, "exec"], [each, "item", addSum, "amount"], [each, "completed", show, "exec"],
-                                      [getSum, "value", text3, "a"], [getScores, "value", text3, "c"], [text3, "result", show, "text"]])
-  await cmd({cmd: "logicConnect", from, out, to, in: input});
+                                      [getSum, "value", text3, "a"], [getScores, "value", text3, "c"], [text3, "result", show, "text"]]) {
+  const r = await cmd({cmd: "logicConnect", from, out, to, in: input});
+  // (a number and a list into Append's Text pins: To Text and List to Text on the wires)
+  if (input === "a") check(r.title === "To Text", "an f32 into a Text pin: To Text on the wire");
+  if (input === "c") check(r.title === "List to Text", "a list into a Text pin: List to Text on the wire");
+}
 await cmd({cmd: "logicValue", node: text3, pin: "b", value: " of "});
 check(errorsOf(await logic()).length === 0, "the list graph compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
 await page.click(".lg-cpp");
-check(await until(async () => (await cppText.inputValue()).includes("List<Float> Scores = List<Float>{1.5, 40.0};")), "the C++ view has the list variable with its items");
+check(await until(async () => (await cppText.inputValue()).includes("List<f32> Scores = List<f32>{1.5f, 40.0f};")), "the C++ view has the list variable with its items");
 code = await cppText.inputValue();
 // (Get Scores is read by inputs of several bodies - the loop, the message, the Length nothing reads: a value with a name, n<id>())
-check(code.includes("list_add(Scores, 0.5);") && /for \(auto it\d+ = flow_for_each<Float>\(n\d+, n\d+\(\)\); it\d+\.next\(\);\) \{/.test(code) && /kern::to<Text>\(n\d+\(\)\)/.test(code) &&
-      /auto n\d+\(\) \{ return Scores; \}/.test(code), "Add to List names its variable, For Each is a for loop, a list becomes Text");
+check(code.includes("list_add(Scores, 0.5f);") && /for \(auto it\d+ = flow_for_each<f32>\(n\d+, n\d+\(\)\); it\d+\.next\(\);\) \{/.test(code) && /list_text<f32>\(n\d+\(\)\)/.test(code) && code.includes("num_text<f32>(Sum)") &&
+      /auto n\d+\(\) \{ return Scores; \}/.test(code), "Add to List names its variable, For Each is a for loop, a list and a number become Text by their nodes");
 check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
 // an item added in the text is an item in Details
-await cppText.fill(code.replace("List<Float>{1.5, 40.0};", "List<Float>{1.5, 40.0, 0.25};"));
+await cppText.fill(code.replace("List<f32>{1.5f, 40.0f};", "List<f32>{1.5f, 40.0f, 0.25f};"));
 await cppText.press("Control+Enter");
 check(await until(async () => await scores() === "[1.5,40,0.25]"), "a list changed in the text is the Blueprint's list");
 await page.click(".lg-cppclose");
@@ -236,10 +247,10 @@ await valueField(2).fill("Open");
 await valueField(2).press("Enter");
 check(await until(async () => await valueField(2).inputValue() === "Opening") && await enumValues() === "Closed,Open,Opening", "a name another value has is refused");
 // a variable of the enum, set to Open; then Opening moves up: the variable is still Open
-await cmd({cmd: "logicVariable", op: "add", name: "State", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "State", type: "f32"});
 await page.click('.lg-var[data-var="State"]');
 const enumType = page.locator('.lg-dbody [data-vk="type"]');
-check(await until(async () => await enumType.count() === 1) && (await enumType.locator("option").count()) === 30 && (await enumType.locator('option[value="Mode_list"]').textContent()) === "Mode List",
+check(await until(async () => await enumType.count() === 1) && (await enumType.locator("option").count()) === 32 && (await enumType.locator('option[value="Mode_list"]').textContent()) === "Mode List",
       "a variable's Type offers the enum and a list of it");
 await enumType.selectOption("Mode");
 const stateVar = async () => (await logic()).variables.find(v => v.name === "State");
@@ -307,7 +318,7 @@ await settle(async () => await page.locator("#logicEditor:not([hidden]) .lg-canv
 const structs = async () => (await logic()).structs;
 const fieldsOf = async name => (((await structs()).find(s => s.name === name))?.fields || []).map(f => f.name + ":" + (f.of ? f.of + (f.type.endsWith("_list") ? "[]" : "") : f.type)).join(",");
 await page.click('.lg-sec[data-sec="structs"] [data-add]');
-check(await settle(async () => (await structs()).length === 1 && await page.locator('.lg-dbody [data-stk="name"]').count() === 1) && await fieldsOf("NewStruct") === "Field:float",
+check(await settle(async () => (await structs()).length === 1 && await page.locator('.lg-dbody [data-stk="name"]').count() === 1) && await fieldsOf("NewStruct") === "Field:f32",
       "+ in My Blueprint adds a struct with one field, shown in Details");
 await page.locator('.lg-dbody [data-stk="name"]').fill("Weapon");
 await page.locator('.lg-dbody [data-stk="name"]').press("Enter");
@@ -315,7 +326,7 @@ check(await settle(async () => (await structs())[0]?.name === "Weapon" && await 
 const fieldRow = name => page.locator(`.lg-dbody .lg-srow[data-field="${name}"]`);
 const renameField = async (from, to) => { await fieldRow(from).locator('[data-sf="name"]').fill(to); await fieldRow(from).locator('[data-sf="name"]').press("Enter"); };
 await renameField("Field", "Damage");
-check(await settle(async () => await fieldsOf("Weapon") === "Damage:float"), "a field is renamed in place");
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:f32"), "a field is renamed in place");
 await fieldRow("Damage").locator('[data-sf="value"]').fill("10");
 await fieldRow("Damage").locator('[data-sf="value"]').press("Enter");
 check(await settle(async () => (await structs())[0].fields[0].value === 10), "and given its default");
@@ -324,42 +335,42 @@ await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 2)
 await renameField("Field", "Label");
 await settle(async () => await fieldRow("Label").count() === 1);
 await fieldRow("Label").locator('[data-sf="type"]').selectOption("text");
-await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text");
+await settle(async () => await fieldsOf("Weapon") === "Damage:f32,Label:text");
 await fieldRow("Label").locator('[data-sf="value"]').fill("Fist");
 await fieldRow("Label").locator('[data-sf="value"]').press("Enter");
-check(await settle(async () => (await structs())[0].fields[1]?.value === "Fist") && await fieldsOf("Weapon") === "Damage:float,Label:text", `+ Field adds a field; its name, type and default are set in its row (${await fieldsOf("Weapon")})`);
+check(await settle(async () => (await structs())[0].fields[1]?.value === "Fist") && await fieldsOf("Weapon") === "Damage:f32,Label:text", `+ Field adds a field; its name, type and default are set in its row (${await fieldsOf("Weapon")})`);
 await renameField("Label", "Damage");
-check(await settle(async () => await fieldRow("Label").locator('[data-sf="name"]').inputValue() === "Label") && await fieldsOf("Weapon") === "Damage:float,Label:text", "a name another field has is refused");
+check(await settle(async () => await fieldRow("Label").locator('[data-sf="name"]').inputValue() === "Label") && await fieldsOf("Weapon") === "Damage:f32,Label:text", "a name another field has is refused");
 // a field of an enum and one of another struct: the types a field can have, a struct inside a struct
 await cmd({cmd: "logicEnum", op: "add", name: "Kind"});
 await cmd({cmd: "logicStruct", op: "add", name: "Aim"});
 await cmd({cmd: "logicStruct", op: "renameField", name: "Aim", field: "Field", to: "Tries"});
-await cmd({cmd: "logicStruct", op: "fieldType", name: "Aim", field: "Tries", type: "int"});
+await cmd({cmd: "logicStruct", op: "fieldType", name: "Aim", field: "Tries", type: "i64"});
 await cmd({cmd: "logicStruct", op: "fieldValue", name: "Aim", field: "Tries", value: 3});
 await page.click('.lg-dbody [data-act="struct-field"]');
 await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 3);
 await renameField("Field", "Type");
 await settle(async () => await fieldRow("Type").count() === 1);
 const fieldType = fieldRow("Type").locator('[data-sf="type"]');
-check((await fieldType.locator("option").count()) === 32 && (await fieldType.locator('option[value="Aim_list"]').textContent()) === "Aim List" && (await fieldType.locator('option[value="Weapon"]').count()) === 0,
+check((await fieldType.locator("option").count()) === 34 && (await fieldType.locator('option[value="Aim_list"]').textContent()) === "Aim List" && (await fieldType.locator('option[value="Weapon"]').count()) === 0,
       "a field's Type offers the value types, the enums, the other structs and lists of them - not the struct itself");
 await fieldType.selectOption("Kind");
-check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Type:Kind" && await fieldRow("Type").locator('select[data-sf="value"] option').count() === 2), "a field of an enum: its default is one of the values");
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:f32,Label:text,Type:Kind" && await fieldRow("Type").locator('select[data-sf="value"] option').count() === 2), "a field of an enum: its default is one of the values");
 await page.click('.lg-dbody [data-act="struct-field"]');
 await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 4);
 await renameField("Field", "Sight");
 await settle(async () => await fieldRow("Sight").count() === 1);
 await fieldRow("Sight").locator('[data-sf="type"]').selectOption("Aim");
 const sightDefault = page.locator(`.lg-dbody .lg-vsub[data-sfield="Sight"] [data-vp='["Tries"]']`);
-check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Type:Kind,Sight:Aim" && await sightDefault.count() === 1) && (await sightDefault.inputValue()) === "3" &&
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:f32,Label:text,Type:Kind,Sight:Aim" && await sightDefault.count() === 1) && (await sightDefault.inputValue()) === "3" &&
       (await structs()).map(s => s.name).join(",") === "Aim,Weapon", "a field of another struct: its default is edited field by field, and that struct stands above");
 await fieldRow("Sight").locator('[data-sf="up"]').click();
-check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Sight:Aim,Type:Kind"), "a field moves up");
+check(await settle(async () => await fieldsOf("Weapon") === "Damage:f32,Label:text,Sight:Aim,Type:Kind"), "a field moves up");
 // a variable of the struct: its default field by field
-await cmd({cmd: "logicVariable", op: "add", name: "Held", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "Held", type: "f32"});
 await page.click('.lg-var[data-var="Held"]');
 const heldType = page.locator('.lg-dbody [data-vk="type"]');
-check(await settle(async () => await heldType.count() === 1) && (await heldType.locator("option").count()) === 34 && (await heldType.locator('option[value="Weapon_list"]').textContent()) === "Weapon List",
+check(await settle(async () => await heldType.count() === 1) && (await heldType.locator("option").count()) === 36 && (await heldType.locator('option[value="Weapon_list"]').textContent()) === "Weapon List",
       "a variable's Type offers the structs and lists of them");
 await heldType.selectOption("Weapon");
 const held = async () => (await logic()).variables.find(v => v.name === "Held");
@@ -379,7 +390,7 @@ check(await settle(async () => (await held()).value.Type === 1) && (await held()
 await page.click('.lg-st[data-struct="Weapon"]');
 await settle(async () => await fieldRow("Damage").count() === 1);
 await renameField("Damage", "Power");
-check(await settle(async () => await fieldsOf("Weapon") === "Power:float,Label:text,Sight:Aim,Type:Kind") && (await held()).value.Power === 25 && !("Damage" in (await held()).value), "a renamed field keeps its values");
+check(await settle(async () => await fieldsOf("Weapon") === "Power:f32,Label:text,Sight:Aim,Type:Kind") && (await held()).value.Power === 25 && !("Damage" in (await held()).value), "a renamed field keeps its values");
 // Begin Play: Set Held.Power (typed on the node); the message says Break's Label and Power
 await page.hover('.lg-st[data-struct="Weapon"]');  // (a row's buttons show under the cursor)
 await page.click('.lg-st[data-struct="Weapon"] [data-make]');
@@ -403,7 +414,7 @@ const joined = (await cmd({cmd: "logicAdd", type: "text.append", x: 760, y: 520}
 const says = (await cmd({cmd: "logicAdd", type: "game.message", x: 1000, y: 300})).id;
 l = await logic();
 const tuneNode = l.nodes.find(n => n.id === tune);
-check(tuneNode.title === "Set Held.Power" && tuneNode.params.find(q => q.key === "path").value === ".Power" && tuneNode.params.find(q => q.key === "path").kind === "path" && tuneNode.inputs.find(q => q.id === "value").type === "float",
+check(tuneNode.title === "Set Held.Power" && tuneNode.params.find(q => q.key === "path").value === ".Power" && tuneNode.params.find(q => q.key === "path").kind === "path" && tuneNode.inputs.find(q => q.id === "value").type === "f32",
       "a Set names a variable and the path to the place in it - one of its fields; its value is of the field's type");
 const fromHeld = (await cmd({cmd: "logicPalette", query: "", from: {node: getHeld, pin: "value", output: true}})).items;
 check(fromHeld.some(e => e.type === "struct.break" && e.params?.struct === "Weapon") && fromHeld.some(e => e.type === "logic.select" && e.params?.type === "Weapon") && !fromHeld.some(e => e.type === "debug.print" || e.type === "math.add" || e.params?.struct === "Aim"),
@@ -421,15 +432,15 @@ check(errorsOf(await logic()).length === 0, "the struct graph compiles" + (error
 await page.click(".lg-cpp");
 check(await settle(async () => (await cppText.inputValue()).includes("KERN_STRUCT(Weapon) {")), "the C++ view declares the struct");
 code = await cppText.inputValue();
-check(code.includes("  KERN_STRUCT(Aim) {\n    Int Tries = 3;\n  };\n  KERN_STRUCT(Weapon) {\n    Float Power = 10.0;\n    Text Label = \"Fist\";\n    Aim Sight = Aim{3};\n    Kind Type = Kind::First;\n  };\n") &&
-      code.includes("Weapon Held = Weapon{25.0, \"Fist\", Aim{7}, Kind::Second};") && code.includes("Held.Power = 12.5;") && /struct_break<Weapon>\(Held\)/.test(code) && /n\d+\(\)\.Label/.test(code) &&
-      code.includes("struct_make<Weapon>(10.0, \"Fist\", Aim{9}, Kind::First)"),
+check(code.includes("  KERN_STRUCT(Aim) {\n    i64 Tries = 3;\n  };\n  KERN_STRUCT(Weapon) {\n    f32 Power = 10.0f;\n    Text Label = \"Fist\";\n    Aim Sight = Aim{3};\n    Kind Type = Kind::First;\n  };\n") &&
+      code.includes("Weapon Held = Weapon{25.0f, \"Fist\", Aim{7}, Kind::Second};") && code.includes("Held.Power = 12.5f;") && /struct_break<Weapon>\(Held\)/.test(code) && /n\d+\(\)\.Label/.test(code) &&
+      /num_text<f32>\(n\d+\(\)\.Power\)/.test(code) && code.includes("struct_make<Weapon>(10.0f, \"Fist\", Aim{9}, Kind::First)"),
       "the structs with their fields, a variable written out with every field, the Set of a field as an assignment, Break read by the field's name");
 check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
 // a field renamed in the text is renamed in the Blueprint
 await cppText.fill(code.replaceAll("Label", "Title"));
 await cppText.press("Control+Enter");
-check(await settle(async () => await fieldsOf("Weapon") === "Power:float,Title:text,Sight:Aim,Type:Kind"), "a struct changed in the text is the Blueprint's struct");
+check(await settle(async () => await fieldsOf("Weapon") === "Power:f32,Title:text,Sight:Aim,Type:Kind"), "a struct changed in the text is the Blueprint's struct");
 await page.click(".lg-cppclose");
 check(await settle(async () => (await logic()).nodes.some(n => n.type === "struct.break" && n.outputs[1].id === "Title")), "Break shows the new name");
 await cmd({cmd: "logicClose"});
@@ -444,14 +455,14 @@ await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canva
 check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
   KERN_STRUCT(Item) {
     Text Key = "";
-    Float Price = 1.0;
-    Bool Fresh = true;
+    f32 Price = 1.0f;
+    bool Fresh = true;
   };
-  List<Item> Shop = List<Item>{Item{"apple", 2.5, true}, Item{"pear", 4.0, false}};
+  List<Item> Shop = List<Item>{Item{"apple", 2.5f, true}, Item{"pear", 4.0f, false}};
 
   KERN_EVENT(on1, event_begin)
   void on1() {
-    game_message(text_append("pear costs ", kern::to<Text>(struct_break<Item>(list_find_row<&Item::Key>(Shop, "pear").row).Price), ""));
+    game_message(text_append("pear costs ", num_text<f32>(struct_break<Item>(list_find_row<&Item::Key>(Shop, "pear").row).Price), ""));
   }
 };
 `})).ok, "a table and a lookup written as C++ are a Blueprint");
@@ -478,11 +489,11 @@ await cmd({cmd: "new", template: "basic"});
 await cmd({cmd: "logicOpen", owner: 0});
 await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
 check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
-  struct SumToResult { Float sum = 0.0; };
-  SumToResult SumTo(Int n = 3) {
-    Float Total = 0.5;
+  struct SumToResult { f32 sum = 0.0f; };
+  SumToResult SumTo(i64 n = 3) {
+    f32 Total = 0.5f;
     for (auto it10 = flow_for(n10, 1, n); it10.next();) {
-      Total += kern::to<Float>(n10.index);
+      Total += num_cast<f32, i64>(n10.index);
     }
     return {Total};
   }
@@ -491,10 +502,10 @@ check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
   void on1() {
     n2 = SumTo(3);
     n3 = SumTo(2);
-    game_message(text_append(kern::to<Text>(n2.sum), "/", kern::to<Text>(n3.sum)));
+    game_message(text_append(num_text<f32>(n2.sum), "/", num_text<f32>(n3.sum)));
   }
 
-  struct : kern::Node<10> { Int index = 0; } n10;
+  struct : kern::Node<10> { i64 index = 0; } n10;
   SumToResult n2;
   SumToResult n3;
 };
@@ -510,8 +521,8 @@ const renamed = page.locator('.lg-dbody .lg-frow[data-side="local"][data-pin="lo
 await renamed.fill("Count");
 await renamed.press("Enter");
 check(await until(async () => (await sumTo())?.locals?.[1]?.name === "Count"), "it takes a name");
-await page.selectOption('.lg-dbody .lg-frow[data-side="local"][data-pin="Count"] [data-pf="type"]', "int");
-check(await until(async () => (await sumTo())?.locals?.[1]?.type === "int"), "and a type");
+await page.selectOption('.lg-dbody .lg-frow[data-side="local"][data-pin="Count"] [data-pf="type"]', "i64");
+check(await until(async () => (await sumTo())?.locals?.[1]?.type === "i64"), "and a type");
 const scoped = async () => (await logic()).nodes.filter(n => (n.params || []).some(p => p.key === "scope" && p.value === "SumTo"));
 const scopedBefore = (await scoped()).length;
 await page.click('.lg-dbody .lg-frow[data-side="local"][data-pin="Count"] [data-pf="set"]');
@@ -522,7 +533,7 @@ const loose = (await scoped()).find(n => n.type === "var.set" && n.params.some(p
 await cmd({cmd: "logicDelete", ids: [loose.id]});
 await cmd({cmd: "logicFunction", name: "SumTo", op: "pinRemove", side: "local", pin: "Count"});
 check(await until(async () => (await sumTo())?.locals?.length === 1) && errorsOf(await logic()).length === 0, "a local variable can be removed again");
-check((await cmd({cmd: "logicCpp"})).text.includes("  SumToResult SumTo(Int n = 3) {\n    Float Total = 0.5;\n"), "as C++ it is a local of the function's body");
+check((await cmd({cmd: "logicCpp"})).text.includes("  SumToResult SumTo(i64 n = 3) {\n    f32 Total = 0.5f;\n"), "as C++ it is a local of the function's body");
 await cmd({cmd: "logicClose"});
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "6.5/3.5", 60000), `every call starts with the local variable's default (${(await status()).hud?.message})`);
@@ -533,16 +544,16 @@ await cmd({cmd: "new", template: "basic"});
 await cmd({cmd: "logicOpen", owner: 0});
 await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
 check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
-  struct TwiceResult { Float out = 0.0; };
+  struct TwiceResult { f32 out = 0.0f; };
   /// Two times x.
-  TwiceResult Twice(Float x = 1.0) {
-    return {math_mul(x, 2.0)};
+  TwiceResult Twice(f32 x = 1.0f) {
+    return {math_mul<f32>(x, 2.0f)};
   }
 };
 `})).ok, "the Level's Blueprint has a function");
 const asker = (await state()).actors?.[0]?.[0];
 await cmd({cmd: "logicOpen", owner: asker});
-await cmd({cmd: "logicVariable", op: "add", name: "Got", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "Got", type: "f32"});
 check(await until(async () => await page.locator('.lg-declare [data-declare] option[value="0:Twice"]').count() === 1), "an actor's Blueprint is offered the functions of the level's other Blueprints");
 await page.selectOption(".lg-declare [data-declare]", "0:Twice");
 const twice = async () => (await logic()).functions.find(f => f.name === "Twice");
@@ -553,19 +564,19 @@ await page.click('.lg-dbody [data-act="fn-call-on"]');
 check(await until(async () => (await logic()).nodes.some(n => n.type === "func.call_on")) && (await logic()).nodes.find(n => n.type === "func.call_on").inputs.some(p => p.id === "this" && p.label === "Target"),
       "Call on Actor puts its call into the graph, with a Target");
 check((await cmd({cmd: "logicCppApply", text: `struct Asker : kern::Blueprint {
-  Float Got = 0.0;
+  f32 Got = 0.0f;
 
-  struct TwiceResult { Float out = 0.0; };
+  struct TwiceResult { f32 out = 0.0f; };
   /// Two times x.
-  KERN_EXTERN TwiceResult Twice(Float x = 1.0);
+  KERN_EXTERN TwiceResult Twice(f32 x = 1.0f);
 
   KERN_EVENT(on1, event_begin)
   void on1() {
-    func_call_on<"Twice">(Actor{}, kern::out(n2.out), 21.0);
-    game_message(kern::to<Text>(n2.out));
+    func_call_on<"Twice">(Actor{}, kern::out(n2.out), 21.0f);
+    game_message(num_text<f32>(n2.out));
   }
 
-  struct { Float out = 0.0; } n2;
+  struct { f32 out = 0.0f; } n2;
 };
 `})).ok, "the call written as C++ is the same Blueprint");
 check(errorsOf(await logic()).length === 0 && !(await logic()).issues.some(i => i.text.includes("no other Blueprint")), "it compiles, and the level has that function" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
@@ -585,7 +596,7 @@ check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
 `})).ok, "the Level's Blueprint has an enum");
 const taker = (await state()).actors?.[0]?.[0];
 await cmd({cmd: "logicOpen", owner: taker});
-await cmd({cmd: "logicVariable", op: "add", name: "Seen", type: "float"});
+await cmd({cmd: "logicVariable", op: "add", name: "Seen", type: "f32"});
 check(await until(async () => await page.locator('.lg-declare [data-adopt="enum"] option[value="0:Mode"]').count() === 1), "an actor's Blueprint is offered the enums of the level's other Blueprints");
 await page.selectOption('.lg-declare [data-adopt="enum"]', "0:Mode");
 const modeOf = async () => (await logic()).enums.find(e => e.name === "Mode");
@@ -602,6 +613,116 @@ check(await until(async () => (await page.locator(".lg-cpptext").inputValue()).i
 await page.click(".lg-cppclose");
 check(errorsOf(await logic()).length === 0, "both compile" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
 await cmd({cmd: "logicClose"});
+
+// ---- 1j. number types: f32 and i64 in one Blueprint - built in the page, wired by hand, its Cast in the open, played ----
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+const vars = async () => (await logic()).variables;
+await page.click('.lg-sec[data-sec="vars"] [data-add]');
+check(await until(async () => (await vars())?.length === 1 && (await vars())[0].type === "f32"), "+ in Variables adds a Float: an f32");
+const varName = page.locator('.lg-dbody [data-vk="name"]');
+await until(async () => await varName.count() === 1);
+await varName.fill("Pace");
+await varName.press("Enter");
+check(await until(async () => (await vars())[0].name === "Pace" && await page.locator('.lg-dbody [data-vk="type"] option:checked').count() === 1) &&
+      (await page.locator('.lg-dbody [data-vk="type"] option:checked').textContent()) === "Float (f32)", "Details says its type: Float (f32)");
+const paceValue = page.locator('.lg-dbody [data-vk="value"]');
+await paceValue.fill("0.1");
+await paceValue.press("Enter");
+check(await until(async () => (await vars())[0].value === Math.fround(0.1)), "0.1 typed in is the f32 nearest to it (0.1f in C++), not the double");
+check(await until(async () => await page.locator('.lg-dbody [data-vk="value"]').inputValue() === "0.1"), "and is shown in the shortest form that gives that f32");
+await paceValue.fill("abc");
+await paceValue.press("Enter");
+check(await until(async () => await page.locator('.lg-dbody [data-vk="value"].lg-bad').count() === 1) && /is no f32/.test(await paceValue.getAttribute("title")) && (await vars())[0].value === Math.fround(0.1),
+      "a text that is no f32 is refused at the field, with the reason - the value stays");
+await paceValue.fill("2.5");
+await paceValue.press("Enter");
+check(await until(async () => (await vars())[0].value === 2.5), "2.5 is taken");
+await cmd({cmd: "logicVariable", op: "add", name: "Hits", type: "i64"});
+await page.click('.lg-var[data-var="Hits"]');
+const hitsValue = page.locator('.lg-dbody [data-vk="value"]');
+await until(async () => await page.locator('.lg-dbody [data-vk="name"]').inputValue() === "Hits");
+await hitsValue.fill("9007199254740993");
+await hitsValue.press("Enter");
+check(await until(async () => (await vars()).find(v => v.name === "Hits")?.value === "9007199254740993"), "an i64 beyond 2^53 is taken digit for digit (never by way of a JavaScript number)");
+await hitsValue.fill("3");
+await hitsValue.press("Enter");
+await until(async () => (await vars()).find(v => v.name === "Hits")?.value === 3);
+check(await page.locator('.lg-var[data-var="Hits"] .lg-pt').textContent() === "i64" && await page.locator('.lg-var[data-var="Pace"] .lg-pt').textContent() === "f32", "My Blueprint says each variable's type");
+// Begin Play: Hits = Hits + Pace (an Add of i64), shown
+const nb = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 0})).id;
+const getHits = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 160, params: {variable: "Hits"}})).id;
+const getPace = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 260, params: {variable: "Pace"}})).id;
+const plus = (await cmd({cmd: "logicAdd", type: "math.add", x: 400, y: 200})).id;
+const setHits = (await cmd({cmd: "logicAdd", type: "var.set", x: 640, y: 0, params: {variable: "Hits"}})).id;
+const shown = (await cmd({cmd: "logicAdd", type: "game.message", x: 960, y: 0})).id;
+check((await logic()).nodes.find(n => n.id === plus).numberType === "f32", "a new Add is an Add of f32 (the Float)");
+await cmd({cmd: "logicConnect", from: getHits, out: "value", to: plus, in: "a"});
+check(await until(async () => (await logic()).nodes.find(n => n.id === plus).numberType === "i64"), "the first wire, an i64, makes it an Add of i64");
+await page.click(".lg-fit");
+check(await until(async () => await page.locator(`.lg-node[data-id="${plus}"] .lg-symt`).count() === 1) && (await page.locator(`.lg-node[data-id="${plus}"] .lg-symt`).textContent()) === "i64" &&
+      (await page.locator(`.lg-node[data-id="${getPace}"] .lg-pt`).textContent()) === "f32", "the node says its type under its symbol, a pin its type beside it");
+// the f32 into the Add of i64, with the mouse: the pin lights as a conversion, and the Cast stands on the wire
+const from = await page.locator(`.lg-node[data-id="${getPace}"] .lg-row.out[data-pin="value"] .lg-pin`).boundingBox();
+const into = await page.locator(`.lg-node[data-id="${plus}"] .lg-row.in[data-pin="b"] .lg-pin`).boundingBox();
+const nodesBefore = (await logic()).nodes.length;
+await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+await page.mouse.down();
+await page.mouse.move(into.x + into.width / 2, into.y + into.height / 2, {steps: 8});
+check(await page.locator(`.lg-node[data-id="${plus}"] .lg-row.in[data-pin="b"].conv`).count() === 1, "while dragging, the pin of another type lights as one a conversion reaches");
+await page.mouse.up();
+l = await until(async () => { const x = await logic(); return x.nodes.length === nodesBefore + 1 && x; });
+const castNode = l && l.nodes.find(n => n.type === "num.cast");
+check(!!castNode && castNode.title === "f32 → i64 (FloatingToIntegral)" && l.links.some(k => k[0] === getPace && k[2] === castNode.id) && l.links.some(k => k[0] === castNode.id && k[2] === plus && k[3] === "b"),
+      `the wire got its Cast, in the open: f32 → i64 (${castNode?.title})`);
+check(await until(async () => await page.locator(`.lg-node[data-id="${castNode?.id}"] .lg-loss`).count() === 1) && /toward zero/.test(await page.locator(`.lg-node[data-id="${castNode?.id}"] .lg-loss`).getAttribute("title")),
+      "the Cast says that it can change a value, and how");
+check(await until(async () => /On the wire: f32 → i64/.test(await page.locator("#toast").textContent())), "and the editor says what it put there");
+await cmd({cmd: "undo"});
+check(await until(async () => (await logic()).nodes.length === nodesBefore && !(await logic()).links.some(k => k[2] === plus && k[3] === "b")), "one Undo takes the Cast and its wires away");
+await cmd({cmd: "redo"});
+check(await until(async () => (await logic()).nodes.some(n => n.type === "num.cast")), "Redo brings them back");
+// a node's Type does not change silently under wires of another type
+await page.click(`.lg-node[data-id="${plus}"] .lg-sym`);
+const plusType = page.locator('.lg-dbody select.lg-par[data-param="type"]');
+check(await until(async () => await plusType.count() === 1) && (await plusType.locator("option").allTextContents()).slice(0, 2).join("|") === "Float (f32)|Int (i64)" &&
+      !(await plusType.locator("option").allTextContents()).some(t => /Vector|Text/.test(t)) && (await plusType.locator("option").count()) === 10, "the Type of an Add offers the ten numbers, the defaults first");
+await plusType.selectOption("f32");
+check(await until(async () => /brings an i64/.test(await page.locator("#toast").textContent())) && (await logic()).nodes.find(n => n.id === plus).numberType === "i64" && await plusType.inputValue() === "i64",
+      "another Type while an i64 is wired in is refused, and the wire named");
+// a value its type does not hold, typed on a node
+const small = (await cmd({cmd: "logicAdd", type: "math.add", x: 400, y: 420, params: {type: "u8"}})).id;
+await page.click(".lg-fit");
+const smallA = page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit`);
+check(await until(async () => await smallA.count() === 1), "an Add of u8 has its fields");
+await smallA.fill("300");
+await smallA.press("Enter");
+check(await until(async () => await page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit.lg-bad`).count() === 1) &&
+      /0 to 255/.test(await page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit`).getAttribute("title")) &&
+      (await page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit`).inputValue()) === "300", "300 typed into a u8 is refused at the field, with the reason");
+await page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit`).fill("255");
+await page.locator(`.lg-node[data-id="${small}"] .lg-row.in[data-pin="a"] input.lg-lit`).press("Enter");
+check(await until(async () => (await logic()).nodes.find(n => n.id === small).inputs.find(p => p.id === "a").value === 255), "255 is taken");
+await cmd({cmd: "logicDelete", ids: [small]});
+// no node turns a Vector into a number: refused, with the reason
+await cmd({cmd: "logicVariable", op: "add", name: "Where", type: "vector"});
+const getWhere = (await cmd({cmd: "logicAdd", type: "var.get", x: 0, y: 420, params: {variable: "Where"}})).id;
+const refused = await cmd({cmd: "logicConnect", from: getWhere, out: "value", to: plus, in: "a"});
+check(!refused.ok && /Break Vector/.test(refused.error), `a Vector into an i64 is refused with the reason (${refused.error})`);
+await cmd({cmd: "logicDelete", ids: [getWhere]});
+await cmd({cmd: "logicVariable", op: "remove", name: "Where"});
+for (const [a, out, b, input] of [[plus, "result", setHits, "value"], [nb, "then", setHits, "exec"], [setHits, "then", shown, "exec"], [setHits, "value", shown, "text"]])
+  await cmd({cmd: "logicConnect", from: a, out, to: b, in: input});
+check(errorsOf(await logic()).length === 0, "the Blueprint of f32 and i64 compiles" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+const numbersCode = (await cmd({cmd: "logicCpp"})).text;
+check(numbersCode.includes("f32 Pace = 2.5f;") && numbersCode.includes("i64 Hits = 3;") && numbersCode.includes("math_add<i64>(Hits, num_cast<i64, f32>(Pace))") && numbersCode.includes("game_message(num_text<i64>("),
+      "as C++: the types themselves, the Cast a num_cast, the To Text a num_text");
+await cmd({cmd: "logicClose"});
+await cmd({cmd: "play"});
+check(await until(async () => (await status()).hud?.message === "5", 60000), `Play: 3 + (i64) 2.5 = 5 (${(await status()).hud?.message})`);
+check(await until(async () => (await status()).logic?.compiled >= 1, 30000), "as machine code (JIT)");
+await cmd({cmd: "stop"});
 
 if (gameLevel) {
   // ---- 2. a game's level file (only when one is named: the engine's cases above need no game) ------------
