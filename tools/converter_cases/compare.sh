@@ -8,7 +8,7 @@
 # teacher), kern/tools/test_main.cpp, and the program's own <source>s (what the tests' sources call of other files). INCLUDES:
 # more -I switches (the program's folders). Each test and each source is compiled on its own: one that does not compile is
 # said and left out (a source whose functions are then missing: linked without them, said). What the tests print goes to
-# <out folder>/compare.log; the status is the build's - the tests' own verdict is read from the log (tools/source_numbers.py).
+# <out folder>/compare.log (the program: tests.bin - no name of a header, the folder is on the include path); the status is the build's - the tests' own verdict is read from the log (tools/source_numbers.py).
 # The engine's objects are kept in $CASES_OBJ (default $TMPDIR/kern-cases-obj), keyed by their source, the switches and every
 # header of the engine.
 set -euo pipefail
@@ -54,8 +54,8 @@ printf '%s\n' "${own[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   "$cxx" "$@" -c "$s" -o "$x" 2> "$x.log" || { rm -f "$x"; echo "does not compile: $s: $(grep -m1 "error:" "$x.log" | cut -c1-300)"; }' _ {} "${flags[@]}" -I"$o" "${more[@]}"
 built=()
 for s in "${own[@]}"; do x="$o/obj/$(basename "$s" .cpp).o"; [ -f "$x" ] && built+=("$x"); done
-if ! "$cxx" "${built[@]}" "${objects[@]}" -lm -o "$o/compare" 2> "$o/link.log"; then
+if ! "$cxx" "${built[@]}" "${objects[@]}" -lm -o "$o/tests.bin" 2> "$o/link.log"; then
   echo "linked without what is missing ($(grep -c 'undefined reference' "$o/link.log") references - $o/link.log): a test that calls it ends there"
-  "$cxx" "${built[@]}" "${objects[@]}" -lm -Wl,--unresolved-symbols=ignore-all -o "$o/compare"
+  "$cxx" "${built[@]}" "${objects[@]}" -lm -Wl,--unresolved-symbols=ignore-all -o "$o/tests.bin"
 fi
-"$o/compare" > "$o/compare.log" 2>&1 || true
+"$o/tests.bin" > "$o/compare.log" 2>&1 || true
