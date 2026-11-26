@@ -482,10 +482,11 @@ Besucher).
 `actor.all_with_tag` All Actors with Tag (eine Actor-Liste) ·
 `actor.random_tag` · `actor.has_tag` · `actor.name` · `actor.valid` · `actor.location` ·
 `actor.rotation` · `actor.forward` · `actor.velocity` · `actor.distance` · `actor.set_location` ·
-`actor.set_rotation` (Grad) · `actor.move_by` · `actor.spawn` Spawn Actor (Kopie einer Vorlage mit
-Kindern und Logik, an alle Spieler repliziert) · `actor.destroy` · `actor.enable` Set Enabled ·
+`actor.set_rotation` (Grad) · `actor.move_by` · `actor.spawn` Spawn Actor (Kopie einer Vorlage des Levels – ein Akteur
+mit „Template“ – mit Kindern, Komponenten und Logik, an alle Spieler repliziert; [runtime_actors.md](../runtime_actors.md)) · `actor.destroy` · `actor.enable` Set Enabled ·
 `actor.set_property` Set Property (jeder Komponentenwert über seinen Pfad wie in der Leveldatei,
-z. B. `components.mesh.material.color` – repliziert)
+z. B. `components.light.intensity` – repliziert; ein Pfad, den der Akteur nicht hat, oder ein Wert anderer Art ist ein Fehler mit Grund) ·
+`actor.set_color` Set Color (die Farbe des Meshs, `GameWorld::set_material_color`)
 
 ### Physik
 
@@ -546,7 +547,7 @@ Hat ein Level Logik, schaltet die GameWorld **Sensor-Events an allen beweglichen
 allen dynamischen Formen** ein – sonst gäbe es keine Überlappungen und Treffer für die Graphen.
 
 **Replikation.** Was Logik an der Welt ändert, wird mitgeschrieben: `set_property` (Pfad und Wert),
-`spawn_copy` (Vorlage, ID, Pose) und das Versetzen statischer Körper (`teleport` schreibt
+`spawn` (Name der Vorlage, ID, Transformation) und das Versetzen statischer Körper (`teleport` schreibt
 `transform.position`/`rotation`). Der Server schickt diese Änderungen an alle Clients, auch an
 Spieler, die später dazukommen ([Kapitel 10](10-netzwerk.md)).
 
@@ -785,7 +786,7 @@ Ein Exec-Ausgang hat genau einen Draht.
 ### Spawner (Vorlage `spawner`)
 
 Every 3 s → Branch (Spawned < 10) → Spawn Actor (Vorlage „Physics Cube“ bei (0, 0, 6)) → Add to
-Spawned. Gespawnte Kopien werden an alle Spieler repliziert.
+Spawned. „Physics Cube“ muss in seinen Details als „Template“ markiert sein (dann steht er selbst nicht in der Welt). Gespawnte Kopien werden an alle Spieler repliziert.
 
 ### Ampel (Vorlage `traffic_light`)
 

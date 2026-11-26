@@ -13430,6 +13430,8 @@ class TestWriter:
             return f"converted::draw_maybe<{self.spell(raw)}>(draw, {one})"
         q = self.record_named(c)
         if q in self.tree.enums:
+            if q not in self.u.enums:   # (an enum the Blueprint has not: its values are not known here)
+                raise Wait(f"the test has no values of {c}: the enum {q} is none of this Blueprint's")
             return f"converted::enum_value<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
         if q in self.tree.records:
             return f"{self.helpers(q)}(draw)"

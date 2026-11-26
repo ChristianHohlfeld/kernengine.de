@@ -266,7 +266,7 @@ two.
 
 The **actions** are sorted into families. One example each:
 
-- **Things:** **Spawn Actor** creates a copy of a thing – along with its children and game rules.
+- **Things:** **Spawn Actor** creates a copy of a template – a thing marked "Template" – along with its children and game rules.
   That's how you get a spawner that spits out a crate every few seconds.
 - **Physics:** **Launch** gives a thing a strong boost, for example upward like a trampoline. Other
   nodes nudge, brake or switch joint motors – for doors, elevators and winches.

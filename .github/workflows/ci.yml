@@ -70,7 +70,10 @@ jobs:
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 TEST_KEEP="$W/keep" python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract --folder Source --classes level_blueprints.h \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --project "$W/pt/l.kproject" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
-          rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"; exit $rc   # (the whole log: a session without access to the artifacts reads it here)
+          rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"
+          # (what the texts name of the engine's libraries that they do not have: tools/engine_api.py --check - its status itself, no pipe)
+          python3 ../../../tools/engine_api.py --check "$W/texts"; echo "engine_api --check rc=$?"
+          exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
         if: always()
         with:

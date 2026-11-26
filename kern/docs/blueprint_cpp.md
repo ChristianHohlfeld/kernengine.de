@@ -2047,7 +2047,7 @@ void on1(Actor actor, Actor other) {
   Visits += 1;
   game_add_score(5.0);
   if (actor_has_tag(other, "player")) {
-    actor_spawn<"Crate">(n7, Actor{}, actor_location(other), Vector{0.0, 0.0, 0.0});
+    actor_spawn<"Crate">(n7, actor_location(other), Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0});
     actor_impulse(n7.spawned, Vector{0.0, 0.0, 300.0});
   }
 }

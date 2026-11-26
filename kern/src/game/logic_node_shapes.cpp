@@ -221,20 +221,23 @@ void add_actor_nodes(logic::Library& lib) {
                {}, "Box3D radial impulse with flash, sound and damage falling off with distance.", "blast bomb radial"));
   {
     NodeDef d = step("actor.spawn", "Spawn Actor", "Actors",
-                     {data("template", "Template", PinType::actor, 0), data("location", "Location", PinType::vector, vec3(0, 0, 1)), data("rotation", "Rotation", PinType::vector, zero3)},
-                     {data("spawned", "Spawned", PinType::actor)}, "A copy of a template actor (with its children and logic) - replicated to every player.", "create instantiate clone copy");
+                     {data("location", "Location", PinType::vector, vec3(0, 0, 1)), data("rotation", "Rotation", PinType::vector, zero3), data("scale", "Scale", PinType::vector, vec3(1, 1, 1))},
+                     {data("spawned", "Spawned", PinType::actor)},
+                     "A copy of a template of the level (an actor marked Template, with its children, components and Blueprint) - replicated to every player.",
+                     "create instantiate clone copy template");
     d.params = {param("template", "Template name", ParamDef::Kind::text, "")};
+    // (which templates a level has is known when it runs: an unknown or empty name is an error then, naming them)
     lib.add(std::move(d));
   }
   lib.add(step("actor.destroy", "Destroy Actor", "Actors", {actor_in}, {}, "Removes the actor for the rest of the game.", "delete remove kill"));
   lib.add(step("actor.enable", "Set Enabled", "Actors", {actor_in, data("enabled", "Enabled", PinType::boolean, false)}, {}, "Hides and disables (or brings back) the actor and its body.",
                "visible hide show active"));
   lib.add(step("actor.set_property", "Set Property", "Actors", {actor_in, data("path", "Property", PinType::text, "components.light.intensity"), data("value", "Value", PinType::text, "20")}, {},
-               "Changes any component value (the path as in the level file, e.g. components.mesh.material.color) - replicated.", "component field details"));
+               "Changes any component value by its path in the level file (e.g. components.light.intensity) - replicated. A path the actor does not have or a value of another kind is an error with the reason.", "component field details"));
   lib.add(step("actor.set_light", "Set Light", "Effects",
                {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.9f, 0.7f)), data("intensity", "Intensity", PinType::number, 10.0), data("range", "Range", PinType::number, 10.0)}, {},
                "Colour (0..1 each), brightness and reach of the actor's point light.", "lamp brightness"));
-  lib.add(step("actor.set_color", "Set Color", "Effects", {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.2f, 0.2f))}, {}, "Mesh colour (0..1 each).", "material paint tint"));
+  lib.add(step("actor.set_color", "Set Color", "Effects", {actor_in, data("color", "Color", PinType::vector, vec3(1, 0.2f, 0.2f))}, {}, "The colour of the actor's mesh material (0..1 each) - GameWorld::set_material_color.", "material paint tint"));
 }
 
 /// Robots (walkers, the Micro Duck): drive them, look, read their ToF and camera. Commands are in

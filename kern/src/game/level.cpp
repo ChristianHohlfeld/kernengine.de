@@ -407,6 +407,7 @@ json::Value actor_to_json(const Actor& a) {
   if (!a.folder.empty()) o.set("folder", a.folder);
   if (a.hidden) o.set("hidden", true);
   if (a.locked) o.set("locked", true);
+  if (a.is_template) o.set("template", true);
   o.set("transform", transform_json(a.transform));
   if (!a.tags.empty()) {
     json::Value t = json::Value::array();
@@ -676,6 +677,7 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
   r.string("folder", a.folder);
   r.boolean("hidden", a.hidden);
   r.boolean("locked", a.locked);
+  r.boolean("template", a.is_template);
   if (const json::Value* t = v.find("transform")) {
     Reader tr{*t, error, "transform"};
     tr.vector("position", a.transform.position);
@@ -1138,9 +1140,19 @@ json::Value to_json(const Level& level) {
 }
 
 u32 default_player(const Level& level) {
-  if (const Actor* a = level.find(level.world.player); a && a->controller) return a->id;
+  if (const Actor* a = level.find(level.world.player); a && a->controller && !template_of(level, a->id)) return a->id;
   for (const Actor& a : level.actors)
-    if (a.controller) return a.id;
+    if (a.controller && !template_of(level, a.id)) return a.id;
+  return 0;
+}
+
+u32 template_of(const Level& level, u32 actor) {
+  const Actor* a = level.find(actor);
+  for (u32 hops = 0; a && hops < 4096; ++hops) {   // (a cycle of parents is no template: validate names it)
+    if (a->is_template) return a->id;
+    if (!a->parent) return 0;
+    a = level.find(a->parent);
+  }
   return 0;
 }
 
@@ -1346,10 +1358,17 @@ std::vector<Issue> validate(const Level& level) {
       sound(a.audio->sound, "audio source sound");
       if (a.audio->sound.empty() || a.audio->sound == "none" || a.audio->sound == "auto") warn("the audio source has no sound");
     }
-    if (a.controller) ++players;
+    if (a.controller && !template_of(level, a.id)) ++players;   // (a template's is no player of the world)
     if (a.controller && !a.body) error("a controller needs a body on the same actor");
     if (a.controller && a.body && a.body->motion != Motion::dynamic) warn("a controller only drives dynamic bodies");
     if (a.city && a.parent) error("a city must be a top-level actor");
+    if (a.is_template && a.parent) error("a template must be a top-level actor (it has a parent)");
+    if (a.is_template)
+      for (const Actor& b : level.actors)
+        if (b.is_template && b.id != a.id && b.name == a.name) { error("two templates are called so (GameWorld::spawn finds a template by its name)"); break; }
+    for (const JointComponent& j : a.joints)
+      if (j.target && level.find(j.target) && template_of(level, a.id) != template_of(level, j.target))
+        error("a joint connects a template's actor with one outside of it (a template is copied whole)");
     if ((a.pickup || a.trigger) && !a.colliders.empty()) {
       bool sensor = false;
       for (const ColliderComponent& c : a.colliders) sensor |= c.sensor;
@@ -1359,6 +1378,8 @@ std::vector<Issue> validate(const Level& level) {
   for (const char* ref : {level.world.music.c_str(), level.world.ambience.c_str()})
     if (!sound_reference_ok(level, ref)) out.push_back({false, 0, std::string("world sound \"") + ref + "\" does not exist (it is silent)"});
   if (players > 1) out.push_back({false, 0, "more than one actor has a player controller; the first one is possessed"});
+  if (level.world.player && template_of(level, level.world.player))
+    out.push_back({true, level.world.player, "world.player is a template or a part of one (a template is not in the world)"});
   if (level.world.goal == GameGoal::reach_goal) {
     bool goal = false;
     for (const Actor& a : level.actors) goal |= a.trigger && a.trigger->action == TriggerAction::goal;

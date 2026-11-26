@@ -1206,7 +1206,7 @@ class StudioPage {
       const cls = ["row", r.selected && "sel", r.primary && "primary", r.hidden && "hidden-actor"].filter(Boolean).join(" ");
       return `<div class="${cls}" data-id="${r.id}" data-key="a:${r.id}" draggable="true">` +
         `<button class="eye" tabindex="-1" title="Show / hide (H)">${icon(r.hidden ? "eyeOff" : "eye")}</button>` +
-        `<span class="name" style="padding-left:${pad}px">${tw}<span class="ico">${icon(r.icon)}</span><span class="label">${esc(r.name)}</span>${r.player ? `<span class="badge player" title="Play controls this actor">Player</span>` : ""}${r.locked ? `<span class="lock" title="Locked">${icon("lock")}</span>` : ""}</span>` +
+        `<span class="name" style="padding-left:${pad}px">${tw}<span class="ico">${icon(r.icon)}</span><span class="label">${esc(r.name)}</span>${r.player ? `<span class="badge player" title="Play controls this actor">Player</span>` : ""}${r.template ? `<span class="badge template" title="Not in the world when it starts: Spawn Actor makes copies of it">Template</span>` : ""}${r.locked ? `<span class="lock" title="Locked">${icon("lock")}</span>` : ""}</span>` +
         `<span class="type">${esc(r.type)}</span></div>`;
     }).join("");
     host.innerHTML = html || `<div class="empty dim" style="padding:16px">${o.filter ? "No actor matches" : "The level is empty - add actors from the toolbar or the content drawer"}</div>`;

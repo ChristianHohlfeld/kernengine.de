@@ -56,8 +56,13 @@ Editor-Test der CI laufen durch.
 - [x] **Blueprint-Funktionen:** Funktionen mit typisierten Eingängen und Rückgabewerten
   (Function Entry, Return, Call, pure Aufrufe), in allen drei Ausführungsarten, im Editor
   anlegbar; aus C++ aufrufbar (`logic::Instance::call`).
-- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `build_level()` beginnt
-  mit dieser Datei (Welt-Einstellungen, Regel-Actors) und ergänzt, was noch im Code gebaut wird.
+- [x] **Das Level als Datei:** `level/spawncity.klevel` ist das Projekt. `build_level()` liest
+  diese Datei (Welt-Einstellungen, Regel-Actors, der Spieler mit Kopf, die Fahrzeuge als Vorlagen) und setzt
+  nur, was das Gerät entscheidet (Schrittrate, Unterschritte, Schattenweite). Die Fahrzeuge (Drone, Jet, Car, Bus,
+  Parachute) sind Vorlagen (`kern/docs/runtime_actors.md`); `Game::start` setzt sie mit `GameWorld::spawn`
+  (42 Autos und 8 Busse, am Telefon 28 und 5, 3 Polizeiwagen aus „Car“). Geschrieben hat sie
+  `tools/level_templates.sh` aus den Starrkörpern der Fahrzeuge (`rigid_spec`); der Test
+  `entry_vehicle_templates_are_the_rigid_specs` hält beide gleich.
   Die Datei öffnet sich im Editor; die CI prüft das (`kern/tests/e2e/blueprint_e2e.mjs`).
 - [x] **Erstes Regelwerk als Blueprint:** die Fahndung (`wanted`) – Actor „Wanted“ im Level mit
   19 Funktionen und den Variablen Heat / HiddenMs. Die Formeln sind aus dem C++ gelöscht;

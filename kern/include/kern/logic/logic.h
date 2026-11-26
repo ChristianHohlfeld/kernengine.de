@@ -1659,8 +1659,11 @@ class Runtime {
   /// Takes the actor's Blueprint out - after its End Play.
   void remove(ActorRef self);
   void clear();
-  /// Begin Play for instances that have not begun.
+  /// Begin Play for instances that have not begun - a step of its own (its loop budget starts anew).
   void begin();
+  /// Begin Play for the instances added since (an actor spawned now), within the step that runs: a graph that spawns in a
+  /// loop does not get a fresh budget with every copy.
+  void begin_added();
   /// End Play for every instance that has begun and not ended (play stops), in the order they were added.
   void end();
   /// One fixed step: latent actions, timers, state machine timers, Tick events.

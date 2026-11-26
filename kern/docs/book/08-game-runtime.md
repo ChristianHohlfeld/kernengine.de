@@ -942,7 +942,7 @@ and the soldier's aim rates (`web/studio/game.mjs`, `GamepadInput`). Tests:
 Every actor and the level can carry a logic graph. The GameWorld starts them on the authority
 (standalone or server) in Play and Simulate, delivers events to them (overlap, hit, pickup, trigger,
 damage, death, respawn, interact, input, key, game over, new player) and offers operations to their
-nodes (`set_property`, `spawn_copy`, `teleport`, `push_actor`, `set_joint_motor`, `line_trace`,
+nodes (`set_property`, `spawn`, `teleport`, `push_actor`, `set_joint_motor`, `line_trace`,
 `add_score`, `end_game` …). Whatever logic changes is recorded for the network. Everything else is
 in [Chapter 9](09-logic.md).
 
@@ -977,7 +977,7 @@ Tests: `game_world_orb_run_play`, `game_world_physics_lab`, `game_shooting_range
 | Messages | `events()` (pickups, broken joints, skipped colliders, logic output), `sound_cues()`, `shots()` |
 | Combat | `damage`, `health_of`, `set_health`, `heal`, `give_ammo`, `soldier_state`, `apply_soldier_state`, `set_view` |
 | Network | `add_pawn`, `remove_pawn`, `set_pawn_input`, `set_local_pawn`, `pawns`, `take_alive_changes`, `dead_actors`, `set_alive`, `networked_actors`, `start_replica`, `set_replica_pose`, `step_replica`, `take_replicated_changes`, `replicated_state` |
-| Logic | `logic_runtime`, `key_event`, `set_property`, `spawn_copy`, `teleport`, `actor_velocity`, `set_actor_velocity`, `push_actor`, `set_simulate_physics`, `set_joint_motor`, `find_actor`, `actors_with_tag`, `has_tag`, `line_trace`, `add_score`, `end_game`, `show_message`, `play_sound`, `particle_burst`, `shake_camera`, `destroy_actor`, `call_logic_event` |
+| Logic | `logic_runtime`, `key_event`, `set_property`, `spawn`, `teleport`, `actor_velocity`, `set_actor_velocity`, `push_actor`, `set_simulate_physics`, `set_joint_motor`, `find_actor`, `actors_with_tag`, `has_tag`, `line_trace`, `add_score`, `end_game`, `show_message`, `play_sound`, `particle_burst`, `shake_camera`, `destroy_actor`, `call_logic_event` |
 | Grab | `begin_grab`, `move_grab`, `end_grab`, `grabbing` |
 
 ---

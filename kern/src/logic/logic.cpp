@@ -4069,6 +4069,10 @@ void Runtime::chain_ends(Instance& inst) {
 
 void Runtime::begin() {
   step_starts();
+  begin_added();
+}
+
+void Runtime::begin_added() {
   for (std::size_t k = 0; k < instances_.size(); ++k) {
     Instance& inst = *instances_[k];
     if (inst.begun_ || inst.disabled_) continue;

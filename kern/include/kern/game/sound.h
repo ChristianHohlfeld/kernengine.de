@@ -43,7 +43,10 @@ class SoundBank {
   audio::ClipId clip(std::string_view ref);
   /// Queues a reference for preparation (built-ins render, imports wait for PCM).
   void request(std::string_view ref);
-  /// Requests every sound a level uses (so Play starts with everything in place).
+  /// Requests every sound a world needs: its actors' and its templates' (what GameWorld::spawn makes sounds at once) -
+  /// how a game has its sounds ready without holding a level (kern/docs/runtime_actors.md).
+  void request_world(const GameWorld& world);
+  /// Requests every sound a level uses: a level being edited (the editor), not a running world - that is request_world.
   void request_level(const Level& level);
   /// Tracks the level's imported assets: clips of removed or replaced assets are dropped.
   void sync_assets(const Level& level);
@@ -74,6 +77,7 @@ class SoundBank {
   };
   Entry* entry(std::string_view ref);
   const Entry* entry(std::string_view ref) const;
+  void request_of(const Level& level, const Level* templates);
 
   audio::Mixer& mixer_;
   std::unordered_map<std::string, Entry> entries_;

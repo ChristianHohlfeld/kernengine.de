@@ -31,51 +31,12 @@ namespace {
 constexpr f32 kStepHz = 240;                 // fixed physics rate: the firmware runs 4 ticks per step (~1 kHz)
 constexpr f32 kEnterCar = 5.2f, kEnterJet = 9;  // player_car_mode.mjs ENTER_RADIUS_M, jet_mode.mjs ENTER_M
 constexpr f32 kDroneAhead = 2.9f;            // player_vehicle_runtime_v2.mjs: the drone starts 2.9 m ahead
-constexpr f32 kPlayerHealth = 100 * 1.18f;   // player_vitals_runtime.mjs: +18 % tougher
 constexpr f32 kChuteOpen = 1.1f, kChuteSink = 6.5f, kChuteSteer = 4, kEjectUp = 28;  // jet_mode.mjs
 
 Vec3 car_color(u32 i) {
   static const Vec3 c[] = {{0.62f, 0.05f, 0.04f}, {0.08f, 0.16f, 0.42f}, {0.85f, 0.85f, 0.86f}, {0.06f, 0.06f, 0.07f}, {0.45f, 0.47f, 0.5f},
                            {0.12f, 0.32f, 0.18f}, {0.9f, 0.62f, 0.08f}, {0.3f, 0.5f, 0.75f}, {0.55f, 0.36f, 0.22f}, {0.7f, 0.7f, 0.66f}};
   return c[i % (sizeof c / sizeof c[0])];
-}
-
-kern::game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 pos, f32 yaw_deg) {
-  using namespace kern::game;
-  Actor a;
-  a.name = name;
-  a.transform.position = pos;
-  a.transform.rotation = {0, 0, yaw_deg};
-  BodyComponent b;
-  b.motion = Motion::dynamic;
-  b.mass = spec.mass.mass;
-  b.center_of_mass = spec.mass.center;
-  for (int i = 0; i < 6; ++i) b.inertia[i] = spec.mass.inertia[i];
-  b.linear_damping = spec.linear_damping;
-  b.angular_damping = spec.angular_damping;
-  b.bullet = spec.bullet;
-  b.allow_sleep = false;
-  a.body = b;
-  for (const ColliderSpec& c : spec.colliders) {
-    ColliderComponent cc;
-    switch (c.kind) {
-      case kern::physics::ShapeKind::box: cc.shape = ColliderShape::box; break;
-      case kern::physics::ShapeKind::sphere: cc.shape = ColliderShape::sphere; break;
-      case kern::physics::ShapeKind::capsule: cc.shape = ColliderShape::capsule; break;
-      default: cc.shape = ColliderShape::hull; break;
-    }
-    cc.center = c.center;
-    cc.rotation = quat_to_euler(c.rotation);
-    cc.size = c.size;
-    cc.radius = c.radius;
-    cc.length = c.length;
-    cc.points = c.points;
-    cc.friction = c.friction;
-    cc.restitution = c.restitution;
-    cc.density = 100;
-    a.colliders.push_back(cc);
-  }
-  return a;
 }
 
 }  // namespace
@@ -142,8 +103,9 @@ kern::game::Level Game::build_level() const {
   // The level file is the project (level/spawncity.klevel, rules.h): the world's settings - the
   // 480 s day, the fog of stylized_world_style.mjs, no ground plane (the terrain's tiles are the
   // ground), a kill plane far below (real terrain lies under the origin in places), the city's
-  // ambience - and the actors that carry the rules as Blueprints. What follows adds what the
-  // device decides and what is still built in code.
+  // ambience -, the actors that carry the rules as Blueprints, the player (with its head: where it
+  // starts) and the vehicles as templates (Game::start spawns them - kern/docs/runtime_actors.md;
+  // tools/level_templates.cpp wrote them). What follows is what the device decides.
   Level l;
   {
     std::string error;
@@ -156,78 +118,6 @@ kern::game::Level Game::build_level() const {
   l.world.substeps = substeps_;
   l.world.shadow_distance = mobile_ ? 70 : 110;
   l.world.ground_color = {0.36f, 0.40f, 0.31f};
-
-  // The player: Kern's soldier with SpawnCity's on-foot values (walk 5.5, sprint 8.1, jump 3.6 m/s,
-  // eye 1.68 m, 90 degrees horizontal field of view), starting with the pistol.
-  Actor s;
-  s.name = "Player";
-  s.transform.position = {0, 0, 0.725f};
-  MeshComponent m;
-  m.shape = Shape::capsule;
-  m.radius = 0.35f;
-  m.height = 1.45f;
-  m.material.color = {0.32f, 0.42f, 0.3f};
-  s.mesh = m;
-  BodyComponent b;
-  b.motion = Motion::dynamic;
-  b.mass = 80;
-  b.allow_sleep = false;
-  b.lock_angular[0] = b.lock_angular[1] = true;  // stands upright while not possessed (flying the drone)
-  s.body = b;
-  ControllerComponent c = soldier_controller_;
-  s.controller = c;
-  s.weapon = weapon_preset(WeaponKind::pistol);
-  s.weapon->spread = s.weapon->aim_spread = s.weapon->recoil = 0;  // the original's rounds: no cone (select_foot_weapon)
-  HealthComponent h;
-  h.max_health = kPlayerHealth;
-  h.regen_delay = 0;  // player_vitals_runtime.mjs: no regeneration (only a RESET or a respawn heals)
-  h.respawn = true;
-  s.health = h;
-  const ActorId sid = l.add(s).id;
-  Actor head;
-  head.name = "Head";
-  head.parent = sid;
-  head.transform.position = {0, 0, 0.83f};
-  MeshComponent hm;
-  hm.shape = Shape::sphere;
-  hm.radius = 0.17f;
-  head.mesh = hm;
-  head.tags.push_back("head");
-  l.add(head);
-
-  // Vehicles: bodies only (the game draws them).
-  l.add(vehicle_actor("Drone", Drone::rigid_spec(), {0, 0, -200}, 0));
-  l.add(vehicle_actor("Jet", Jet::rigid_spec(), {0, 0, -300}, 0));
-  // world_procedural_population.mjs CAR_COUNT 42 (phone 28), BUS_COUNT 8 (phone 5)
-  const u32 n = mobile_ ? 28 : 42, nb = mobile_ ? 5 : 8;
-  for (u32 i = 0; i < n + nb; ++i) {
-    char name[32];
-    if (i < n) std::snprintf(name, sizeof name, "Car %u", i + 1);
-    else std::snprintf(name, sizeof name, "Bus %u", i - n + 1);
-    const CarSpec spec = i >= n ? CarSpec::bus() : CarSpec::car();
-    l.add(vehicle_actor(name, Car::rigid_spec(spec), {static_cast<f32>(i % 20) * 10, static_cast<f32>(i / 20) * 12 - 40, -400}, 0));
-  }
-  // Police cruisers (police_ground_units.mjs: at most three units).
-  for (u32 i = 0; i < 3; ++i) {
-    char name[32];
-    std::snprintf(name, sizeof name, "Police %u", i + 1);
-    l.add(vehicle_actor(name, Car::rigid_spec(CarSpec::car()), {static_cast<f32>(i) * 10, 20, -400}, 0));
-  }
-  // Parachute (pilot + canopy): an upright capsule body carried by the canopy's drag.
-  {
-    RigidSpec rs;
-    ColliderSpec cap;
-    cap.kind = kern::physics::ShapeKind::capsule;
-    cap.radius = 0.3f;
-    cap.length = 1.1f;
-    rs.colliders.push_back(cap);
-    rs.mass.mass = 90;
-    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass);
-    Actor a = vehicle_actor("Parachute", rs, {0, 0, -500}, 0);
-    a.body->lock_angular[0] = a.body->lock_angular[1] = a.body->lock_angular[2] = true;
-    l.add(a);
-  }
-
   return l;
 }
 
@@ -248,14 +138,6 @@ bool Game::start(kern::Engine& e) {
   if (e.has_arg("start")) start_mode_ = e.arg("start", "");
 
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
-  soldier_controller_ = kern::game::ControllerComponent{};
-  soldier_controller_.mode = kern::game::ControlMode::soldier;
-  soldier_controller_.camera = kern::game::CameraMode::first_person;
-  soldier_controller_.max_speed = 5.5f;
-  soldier_controller_.boost_speed = 8.1f;
-  soldier_controller_.jump_speed = 3.6f;
-  soldier_controller_.eye_height = 1.68f;
-  soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (facades().set_night)
@@ -292,33 +174,39 @@ bool Game::start(kern::Engine& e) {
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");
-  drone_actor_ = world_->find_actor("Drone");
-  jet_actor_ = world_->find_actor("Jet");
-  chute_actor_ = world_->find_actor("Parachute");
-  const u32 n = mobile_ ? 28 : 42, nb = mobile_ ? 5 : 8;  // CAR_COUNT / BUS_COUNT (world_procedural_population.mjs)
+  // The vehicles: copies of the level's templates (GameWorld::spawn), parked far below the world - in the order they
+  // always had (their ids follow it): the drone, the jet, the cars and buses, the police cruisers, the parachute.
+  std::string missing;   // (why a vehicle is not there: GameWorld::spawn says it)
+  auto spawn = [&](const char* name, Vec3 at) {
+    const ActorId id = world_->spawn(name, kern::game::Transform{at, {0, 0, 0}, {1, 1, 1}});
+    if (!id && missing.empty()) missing = kern::last_error();
+    return id;
+  };
+  drone_actor_ = spawn("Drone", {0, 0, -200});
+  jet_actor_ = spawn("Jet", {0, 0, -300});
+  const u32 n = mobile_ ? 28 : 42, nb = mobile_ ? 5 : 8;  // CAR_COUNT / BUS_COUNT (world_procedural_population.mjs; phone 28, 5)
   for (u32 i = 0; i < n + nb; ++i) {
-    char name[32];
-    if (i < n) std::snprintf(name, sizeof name, "Car %u", i + 1);
-    else std::snprintf(name, sizeof name, "Bus %u", i - n + 1);
     const bool bus = i >= n;
     TrafficCar c;
-    c.actor = world_->find_actor(name);
+    c.actor = spawn(bus ? "Bus" : "Car", {static_cast<f32>(i % 20) * 10, static_cast<f32>(i / 20) * 12 - 40, -400});
     c.car = std::make_unique<Car>(bus ? CarSpec::bus() : CarSpec::car());
     c.color = bus ? Vec3{0.92f, 0.78f, 0.1f} : car_color(i);
     c.target_speed = bus ? 8 : 9 + static_cast<f32>(i % 4);
     cars_.push_back(std::move(c));
   }
+  // Police cruisers (police_ground_units.mjs: at most three units).
   for (u32 i = 0; i < 3; ++i) {
-    char name[32];
-    std::snprintf(name, sizeof name, "Police %u", i + 1);
     TrafficCar c;
-    c.actor = world_->find_actor(name);
+    c.actor = spawn("Car", {static_cast<f32>(i) * 10, 20, -400});
     c.car = std::make_unique<Car>(CarSpec::car());
     c.color = {0.067f, 0.078f, 0.098f};  // buildCruiser: the black body 0x111419, white doors (people_art light_bar)
     c.police = true;
     c.driver = false;
     cars_.push_back(std::move(c));
   }
+  chute_actor_ = spawn("Parachute", {0, 0, -500});
+  if (!soldier_) return kern::fail("SpawnCity: the level has no actor \"Player\" (tools/level_templates.sh puts it in)");
+  if (!missing.empty()) return kern::fail("SpawnCity: a vehicle of the level's templates: %s (tools/level_templates.sh puts them in)", missing.c_str());
   for (ActorId a : {drone_actor_, jet_actor_, chute_actor_}) world_->set_alive(a, false);
   for (TrafficCar& c : cars_) world_->set_alive(c.actor, false);
   world_->set_paused(true);  // until the ground under the player is built
@@ -1265,7 +1153,7 @@ bool Game::audio_init(u32 rate) {
   if (!mixer_.init(rate, 64)) return false;
   bank_ = std::make_unique<kern::game::SoundBank>(mixer_);
   game_audio_ = std::make_unique<kern::game::GameAudio>(mixer_, *bank_);
-  if (world_) bank_->request_level(world_->level());
+  if (world_) bank_->request_world(*world_);   // (the sounds of its actors and its templates - kern/docs/runtime_actors.md)
   fx_.init(mixer_);
   ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
   combat_audio_init();  // combat_audio_bank.mjs sounds (game_details.cpp)

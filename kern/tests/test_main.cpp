@@ -3563,7 +3563,7 @@ TEST(logic_tween_and_every) {
 TEST(game_logic_graphs_drive_the_world) {
   GameFixture f;
   game::Level l = game::basic_level();
-  for (game::Actor& a : l.actors) if (a.name == "Cube") a.transform.position = {40, 40, 0.5f};
+  for (game::Actor& a : l.actors) if (a.name == "Cube") a.is_template = true;   // (Spawn Actor copies it: kern/docs/runtime_actors.md)
   const game::ActorId me = add_soldier(l, {0, 0, 0.8f});
   // A sensor volume with its own graph: entering it scores and opens the "Door" (moves it up over 1 s).
   game::Actor zone;
@@ -3627,6 +3627,233 @@ TEST(game_logic_graphs_drive_the_world) {
   for (const std::string& e : f.world->events()) printed |= e == "Logic: Cube";
   CHECK(printed);
   CHECK(!props.empty());  // the door's moves (a body-less actor) replicate as transform changes
+}
+
+// Templates (kern/docs/runtime_actors.md): a level's actor with "template": true is not in the world; spawn makes copies
+// of it with its children, body, colliders and Blueprint, at the next free ids (the same calls, the same ids).
+namespace {
+game::Level template_level() {
+  game::Level l = game::basic_level();
+  game::Actor crate;
+  crate.name = "Crate";
+  crate.is_template = true;
+  crate.transform.position = {50, 50, 50};   // (where it stands in the level does not matter: spawn says where)
+  crate.mesh = game::MeshComponent{};
+  crate.body = game::BodyComponent{};
+  crate.body->motion = game::Motion::dynamic;
+  crate.body->mass = 7;
+  game::ColliderComponent box;
+  box.shape = game::ColliderShape::box;
+  box.size = {1, 1, 1};
+  crate.colliders.push_back(box);
+  crate.logic = logic_graph(R"({"variables":[{"name":"Began","type":"int","value":0}],
+    "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.add","params":{"variable":"Began"}}],"links":[[1,"then",2,"exec"]]})");
+  const game::ActorId crate_id = l.add(crate).id;
+  game::Actor lid;
+  lid.name = "Lid";
+  lid.parent = crate_id;
+  lid.transform.position = {0, 0, 0.6f};
+  lid.mesh = game::MeshComponent{};
+  l.add(lid);
+  game::Actor coin;
+  coin.name = "Coin";
+  coin.is_template = true;
+  coin.mesh = game::MeshComponent{};
+  coin.pickup = game::PickupComponent{};
+  coin.pickup->sound = "builtin:laser";
+  l.add(coin);
+  l.world.goal = game::GameGoal::collect_all;
+  return l;
+}
+}  // namespace
+
+TEST(world_templates_spawn) {
+  GameFixture f;
+  const game::Level l = template_level();
+  CHECK(no_errors(game::validate(l)));
+  game::ActorId tpl = 0, lid_tpl = 0, last = 0;
+  for (const game::Actor& a : l.actors) {
+    if (a.name == "Crate") tpl = a.id;
+    if (a.name == "Lid") lid_tpl = a.id;
+    last = std::max(last, a.id);
+  }
+  CHECK(game::template_of(l, lid_tpl) == tpl && game::template_of(l, tpl) == tpl && game::template_of(l, 1) == 0);
+  // A template round-trips through the level file.
+  game::Level read;
+  std::string error;
+  CHECK(game::from_text(game::to_text(l), read, &error) && read.find(tpl) && read.find(tpl)->is_template && !read.find(lid_tpl)->is_template);
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  // The template is not in the world: no actor, no body, no Blueprint; the world keeps it apart.
+  CHECK(!f.world->level().find(tpl) && !f.world->level().find(lid_tpl) && f.world->find_actor("Crate") == 0 && f.world->find_actor("Lid") == 0);
+  CHECK(f.world->templates().find(tpl) && f.world->templates().find(lid_tpl));
+  CHECK(!f.world->actor_body(tpl).valid());
+  CHECK(f.world->hud().pickups_total == 0);
+  // spawn: the copy with its child, its body and collider, its Blueprint (Begin Play ran).
+  const game::Transform at{{3, 4, 5}, {0, 0, 90}, {1, 1, 1}};
+  const game::ActorId a = f.world->spawn("Crate", at);
+  CHECK(a == last + 1);   // (past every actor of the level and every template)
+  const game::Actor* copy = f.world->level().find(a);
+  CHECK(copy && copy->name == "Crate" && !copy->is_template && copy->parent == 0 && copy->transform.position == at.position && copy->transform.rotation == at.rotation);
+  const game::Actor* lid = f.world->level().find(a + 1);
+  CHECK(lid && lid->name == "Lid" && lid->parent == a);
+  CHECK(copy && copy->body && copy->body->mass == 7 && copy->colliders.size() == 1);
+  CHECK(f.world->actor_body(a).valid());
+  CHECK(f.world->actor_alive(a) && f.world->actor_alive(a + 1));
+  logic::Instance* inst = f.world->logic_runtime() ? f.world->logic_runtime()->find(a) : nullptr;
+  CHECK(inst && inst->get("Began").as_int() == 1);
+  // A second copy: the next ids; the template itself is unchanged.
+  const game::ActorId b = f.world->spawn("Crate", game::Transform{{-3, 4, 5}, {}, {2, 2, 2}});
+  CHECK(b == a + 2 && f.world->level().find(b)->transform.scale == Vec3(2, 2, 2));
+  CHECK(f.world->templates().find(tpl)->transform.position == Vec3(50, 50, 50));
+  // Its body falls (a dynamic body of the template).
+  Mat4 m0, m1;
+  CHECK(f.world->actor_matrix(a, m0));
+  f.run(0.5f);
+  CHECK(f.world->actor_matrix(a, m1) && m1.translation().z < m0.translation().z - 0.5f);
+  // A pickup of a template counts once it is spawned (collect all).
+  const game::ActorId c = f.world->spawn("Coin", game::Transform{{0, 8, 0.5f}, {}, {1, 1, 1}});
+  CHECK(c == b + 2 && f.world->hud().pickups_total == 1);
+  // Replicated: the template's name, the id and the transform.
+  std::vector<game::GameWorld::PropertyChange> props;
+  std::vector<game::GameWorld::SpawnChange> spawns;
+  f.world->take_replicated_changes(props, spawns);
+  CHECK(spawns.size() == 3 && spawns[0].template_name == "Crate" && spawns[0].id == a && spawns[0].at.position == at.position && spawns[2].template_name == "Coin");
+  // despawn: destroy_actor - out of the world, its Blueprint ends.
+  f.world->destroy_actor(a);
+  CHECK(!f.world->actor_alive(a) && !f.world->logic_runtime()->find(a));
+  // Deterministic: the same level and the same calls give the same ids in another world.
+  GameFixture g;
+  CHECK(g.world->start(l, game::SimMode::simulate));
+  CHECK(g.world->spawn("Crate", at) == a && g.world->spawn("Crate", at) == b && g.world->spawn("Coin", at) == c);
+  // A replica's spawn takes the server's id.
+  CHECK(g.world->spawn("Coin", at, 500) == 500 && g.world->level().find(500));
+  // After the run, the level is the level again (the editor sees the template).
+  f.world->stop();
+  CHECK(f.world->level().find(tpl) && f.world->level().find(tpl)->is_template && !f.world->level().find(a));
+}
+
+TEST(world_spawn_errors) {
+  GameFixture f;
+  const game::Level l = template_level();
+  // The world does not run.
+  CHECK(f.world->spawn("Crate", {}) == 0 && std::string(last_error()) == "spawn \"Crate\": the world does not run");
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  // No template of that name: the level's templates are named.
+  CHECK(f.world->spawn("Barrel", {}) == 0);
+  CHECK(std::string(last_error()) == "no template \"Barrel\" - the level's templates: Crate, Coin");
+  // An empty name too (the node's setting is checked when it runs: each node of the library is valid with its defaults).
+  CHECK(f.world->spawn("", {}) == 0 && std::string(last_error()) == "no template \"\" - the level's templates: Crate, Coin");
+  // An actor of the world is no template.
+  CHECK(f.world->spawn("Cube", {}) == 0 && std::string(last_error()).find("no template \"Cube\"") == 0);
+  // A transform that is no place.
+  CHECK(f.world->spawn("Crate", game::Transform{{0, 0, 0}, {}, {0, 1, 1}}) == 0 && std::string(last_error()) == "spawn \"Crate\": the scale must not be zero");
+  // An id that is taken (a replica told a wrong one).
+  CHECK(f.world->spawn("Crate", {}, 1) == 0 && std::string(last_error()).find("are taken") != std::string::npos);
+  f.world->stop();
+  // A level without templates says so.
+  CHECK(f.world->start(game::basic_level(), game::SimMode::simulate));
+  CHECK(f.world->spawn("Crate", {}) == 0 && std::string(last_error()) == "no template \"Crate\" - the level has no templates (an actor with \"template\": true)");
+  f.world->stop();
+  // What a level must not do with templates (validate: errors with the actor and the reason, start refuses).
+  auto first_error = [](const game::Level& x) {
+    for (const game::Issue& i : game::validate(x)) if (i.error) return i.text;
+    return std::string();
+  };
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors) if (a.name == "Lid") a.is_template = true;
+    CHECK(first_error(x) == "\"Lid\": a template must be a top-level actor (it has a parent)");
+    CHECK(!f.world->start(x, game::SimMode::simulate));
+  }
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors) if (a.name == "Coin") a.name = "Crate";
+    CHECK(first_error(x).find("two templates are called so") != std::string::npos);
+  }
+  {
+    game::Level x = template_level();
+    game::JointComponent j;
+    j.kind = game::JointKind::hinge;
+    for (game::Actor& a : x.actors) if (a.name == "Cube") j.target = a.id;
+    for (game::Actor& a : x.actors) if (a.name == "Crate") a.joints.push_back(j);
+    CHECK(first_error(x) == "\"Crate\": a joint connects a template's actor with one outside of it (a template is copied whole)");
+  }
+  {
+    game::Level x = template_level();
+    for (game::Actor& a : x.actors)
+      if (a.name == "Crate") { a.controller = game::ControllerComponent{}; x.world.player = a.id; }
+    CHECK(game::default_player(x) == 0);   // (a template's controller is no player of the world)
+    CHECK(first_error(x) == "world.player is a template or a part of one (a template is not in the world)");
+  }
+  {
+    // "template" in the file must be true or false.
+    game::Level x;
+    std::string error;
+    CHECK(!game::from_text(R"({"format":"kern-level","version":1,"actors":[{"id":1,"name":"A","template":"yes"}]})", x, &error));
+    CHECK(error.find("template must be true or false") != std::string::npos);
+  }
+}
+
+// Setting a property says why it does not (kern/docs/runtime_actors.md): no silent nothing; the material colour is a
+// typed function (Set Color).
+TEST(world_set_property_says_why) {
+  GameFixture f;
+  game::Level l = game::basic_level();
+  game::Actor lamp;
+  lamp.name = "Lamp";
+  lamp.light = game::LightComponent{};
+  const game::ActorId lamp_id = l.add(lamp).id;
+  game::ActorId cube = 0;
+  for (const game::Actor& a : l.actors) if (a.name == "Cube") cube = a.id;
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  auto why = [] { return std::string(last_error()); };
+  CHECK(!f.world->set_property(999, "components.light.intensity", json::Value(3.0)) && why() == "set property \"components.light.intensity\": no actor 999 in the world");
+  CHECK(!f.world->set_property(lamp_id, "", json::Value(3.0)) && why().find("the path is empty") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "parent", json::Value(1.0)) && why().find("cannot be set while the world runs") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.lamp.intensity", json::Value(3.0)));
+  CHECK(why() == "set property \"components.lamp.intensity\" of actor \"Lamp\": \"components\" has no \"lamp\" - it has light");
+  CHECK(!f.world->set_property(lamp_id, "components.light.brightness", json::Value(3.0)) && why().find("\"components.light\" has no \"brightness\" - it has ") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "transform.position.x", json::Value(3.0)) && why().find("\"transform.position\" is a list of 3: \"x\" is no index of it (0..2)") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.light.intensity", json::Value("bright")) && why().find("it is a number, the value is a text") != std::string::npos);
+  CHECK(!f.world->set_property(cube, "components.mesh.collision", json::Value(1.0)) && why().find("it is true or false, the value is a number") != std::string::npos);
+  CHECK(!f.world->set_property(lamp_id, "components.light.color", json::Value("red")) && why().find("#rrggbb") != std::string::npos);
+  // What is right is set: a number, a text that is all a number, a number for all three of a vector, a colour.
+  CHECK(f.world->set_property(lamp_id, "components.light.intensity", json::Value(3.0)) && f.world->level().find(lamp_id)->light->intensity == 3.0f);
+  CHECK(f.world->set_property(lamp_id, "components.light.intensity", json::Value("4.5")) && f.world->level().find(lamp_id)->light->intensity == 4.5f);
+  CHECK(f.world->set_property(lamp_id, "transform.scale", json::Value(2.0)) && f.world->level().find(lamp_id)->transform.scale == Vec3(2, 2, 2));
+  CHECK(f.world->set_property(lamp_id, "components.light.color", json::Value("#ff0000")) && f.world->level().find(lamp_id)->light->color.y < 0.01f);
+  // The material colour, typed.
+  CHECK(!f.world->set_material_color(lamp_id, {1, 0, 0}) && why() == "set material color of actor \"Lamp\": it has no mesh");
+  CHECK(!f.world->set_material_color(999, {1, 0, 0}) && why() == "set material color: no actor 999 in the world");
+  CHECK(f.world->set_material_color(cube, {0, 1, 0}));
+  const Vec3 c = f.world->level().find(cube)->mesh->material.color;
+  CHECK(c.x < 0.01f && c.y > 0.99f && c.z < 0.01f);
+  // The nodes: Set Color and Set Light do it (Set Light gave its colour as a list, which the light's #rrggbb field never
+  // took - silently), an error goes to the host.
+  f.world->stop();
+  game::Level n = l;
+  n.logic = logic_graph(R"({"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"actor.find","values":{"name":"Lamp"}},
+      {"id":3,"type":"actor.set_light","values":{"color":[0,0,1],"intensity":7,"range":3}},{"id":4,"type":"actor.set_color","values":{"color":[1,0,0]}}],
+    "links":[[1,"then",3,"exec"],[2,"actor",3,"target"],[3,"then",4,"exec"],[2,"actor",4,"target"]]})");
+  CHECK(f.world->start(n, game::SimMode::simulate));
+  const game::Actor* lit = f.world->level().find(lamp_id);
+  CHECK(lit && lit->light->intensity == 7.0f && lit->light->range == 3.0f && lit->light->color.z > 0.99f && lit->light->color.x < 0.01f);
+  bool said = false;
+  for (const std::string& e : f.world->events()) said |= e.find("Set Color: set material color of actor \"Lamp\": it has no mesh") != std::string::npos;
+  CHECK(said);
+}
+
+// The sounds of a world: its actors' and its templates' (what spawn makes sounds at once) - without a level as a value.
+TEST(sound_bank_request_world) {
+  GameFixture f;
+  audio::Mixer mixer;
+  CHECK(mixer.init(48000));
+  game::SoundBank bank(mixer);
+  CHECK(f.world->start(template_level(), game::SimMode::simulate));
+  bank.request_world(*f.world);
+  while (!bank.prepare(5)) {}
+  CHECK(bank.ready("builtin:laser"));   // (only the template Coin has it)
+  CHECK(bank.ready("builtin:goal"));   // (collect all)
 }
 
 // Parse Float / Parse Int / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
@@ -5024,7 +5251,7 @@ TEST(game_blueprints_as_classes) {
   for (const char* happened :
        {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
         "interact:Dummy", "joined:Soldier", "death:Soldier", "respawn:Soldier", "over:Done\"", "blueprint Zone #5: Visits=1", "Opener=\"Zone\"", "Deaths=1", "Players=2",
-        "event: Logic error: Spawn Actor: no template \"Nothing\"", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
+        "event: Logic error: Spawn Actor: no template \"Nothing\" - the level's templates: Template", "event: Game won: Done", "hud: status 2 score 15 pickups 1 message \"Done\""}) {
     if (played.text.find(happened) == std::string::npos) std::printf("the scenario did not give: %s\n", happened);
     CHECK(played.text.find(happened) != std::string::npos);
   }
@@ -9982,6 +10209,7 @@ TEST(net_game_replicates_logic_changes) {
   crate.transform.position = {30, 30, 0.5f};
   crate.mesh = game::MeshComponent{};
   crate.body = game::BodyComponent{};
+  crate.is_template = true;   // (the copies are in the world, the template is not: kern/docs/runtime_actors.md)
   l.add(crate);
   l.logic = logic_graph(R"({"nodes":[{"id":1,"type":"game.input","params":{"action":"interact"}},
       {"id":2,"type":"actor.find","values":{"name":"Door"}},{"id":3,"type":"actor.set_location","values":{"location":[10,0,4.5]}},
@@ -10018,7 +10246,7 @@ TEST(net_game_replicates_logic_changes) {
   CHECK(cw.level().find(door_id)->mesh->material.color.y < 0.05f);
   int crates = 0;
   for (const game::Actor& a : cw.level().actors) crates += a.name == "Crate" ? 1 : 0;
-  CHECK(crates == 2);
+  CHECK(crates == 1);   // (the copy the server spawned; the template is in no world)
   // A player joining later sees the same world.
   auto t2 = hub.create();
   game::GameWorld lw(renderer, &windows);
@@ -10036,7 +10264,7 @@ TEST(net_game_replicates_logic_changes) {
   CHECK(lw.actor_matrix(door_id, m) && std::fabs(m.translation().z - 4.5f) < 0.01f);
   crates = 0;
   for (const game::Actor& a : lw.level().actors) crates += a.name == "Crate" ? 1 : 0;
-  CHECK(crates == 2);
+  CHECK(crates == 1);
   late.stop();
   server.stop();
   client.stop();

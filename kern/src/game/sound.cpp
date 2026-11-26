@@ -70,13 +70,22 @@ audio::ClipId SoundBank::clip(std::string_view ref) {
   return 0;
 }
 
-void SoundBank::request_level(const Level& level) {
+void SoundBank::request_level(const Level& level) { request_of(level, nullptr); }
+
+void SoundBank::request_world(const GameWorld& world) { request_of(world.level(), world.running() ? &world.templates() : nullptr); }
+
+void SoundBank::request_of(const Level& level, const Level* templates) {
   sync_assets(level);
   const WorldSettings& w = level.world;
   request(w.music);
   request(w.ambience);
   bool goal = false, lose = w.time_limit > 0 || w.kill_z > -1e8f;
-  for (const Actor& a : level.actors) {
+  std::vector<const Actor*> actors;
+  for (const Actor& a : level.actors) actors.push_back(&a);
+  if (templates)
+    for (const Actor& a : templates->actors) actors.push_back(&a);   // (what spawn makes sounds at once)
+  for (const Actor* actor : actors) {
+    const Actor& a = *actor;
     if (a.body) {
       request(a.body->impact_sound);
       if (a.body->impact_sound == "builtin:impact") request("builtin:impact_light");
@@ -273,7 +282,7 @@ void GameAudio::begin(const GameWorld& world) {
   session_ = world.session();
   paused_ = false;
   const Level& level = world.level();
-  bank_.request_level(level);
+  bank_.request_world(world);
   apply_settings(level.world);
   music_ref_ = level.world.music;
   ambience_ref_ = level.world.ambience;

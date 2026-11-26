@@ -2,7 +2,7 @@
 //
 // level/spawncity.klevel is the game's project file - a Kern level as the editor reads and writes
 // it: world settings, actors, and on the actors the Blueprints that hold the game's rules. The
-// game starts from it (Game::build_level) and adds what is still built in code; BLUEPRINTS.md
+// game starts from it (Game::build_level; the vehicles are its templates, Game::start spawns them); BLUEPRINTS.md
 // says what moves there next. Its project, level/spawncity.kproject, holds the settings the engine applies at start.
 // The build embeds both (kern/tools/embed_project.py -> level_data.cpp, kern/game/embedded.h).
 #pragma once

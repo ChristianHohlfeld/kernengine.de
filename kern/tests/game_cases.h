@@ -129,10 +129,10 @@ struct Level : kern::Blueprint {
 
   KERN_EVENT(on9, event_custom<"Spawn">)
   void on9(Actor actor, Float value, Text text) {
-    actor_spawn<"Template">(n50, Actor{}, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0});
+    actor_spawn<"Template">(n50, vector_make(value, 5.0, 0.5), Vector{0.0, 0.0, 45.0}, Vector{1.0, 1.0, 1.0});
     Made = n50.spawned;
     Log = text_append(Log, actor_name(n50.spawned), ";");
-    actor_spawn<"Nothing">(actor, Vector{0.0, 9.0, 0.5}, Vector{0.0, 0.0, 0.0});
+    actor_spawn<"Nothing">(Vector{0.0, 9.0, 0.5}, Vector{0.0, 0.0, 0.0}, Vector{1.0, 1.0, 1.0});
   }
 
   KERN_EVENT(on10, event_custom<"Remove">)
@@ -553,6 +553,7 @@ inline game::Level arena(std::string* error = nullptr) {
     Actor tpl = actor("Template", {30, 30, 0.5f});
     tpl.mesh = box({0.4f, 0.4f, 0.4f});
     tpl.tags.push_back("made");
+    tpl.is_template = true;   // (not in the world: Spawn Actor copies it - kern/docs/runtime_actors.md)
     l.add(tpl);
   }
   l.logic = blueprint(kLevel, &why);
