@@ -16151,7 +16151,7 @@ class TestWriter:
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
         # (the switches of the suite itself - run_tests.sh: -Wall -Wextra, no -Werror: what only warns there does not
         # make a function wait here; its warnings are said in the log - see below)
-        r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
+        r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fwrapv", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
                             # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
                             # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
                             "-Wno-missing-field-initializers",

@@ -4,7 +4,7 @@
 # Then e.g.: kern/build/kern_lehrer --task jump --iterations 600 --out jump.onnx
 #
 # Bit-identical with the browser and the Studio (docs/lehrer.md, determinism): Box3D's scalar path,
-# no FMA contraction anywhere (-ffp-contract=off), the deterministic libm (third_party/musl_math).
+# no FMA contraction anywhere (-ffp-contract=off -fwrapv), the deterministic libm (third_party/musl_math).
 # The CPU-specific flags (KERN_NATIVE=1, the default) only let the compiler pick instructions; they
 # never change a result.
 set -euo pipefail
@@ -14,7 +14,7 @@ out="${1:-$root/build}"
 mkdir -p "$out/obj/box3d" "$out/obj/musl_math" "$out/obj/cpp"
 cc="${CC:-cc}" cxx="${CXX:-c++}"
 jobs="${KERN_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
-opt=(-O3 -DNDEBUG -ffp-contract=off)
+opt=(-O3 -DNDEBUG -ffp-contract=off -fwrapv)
 if [ "${KERN_NATIVE:-1}" = 1 ]; then
   for f in -march=native -mcpu=native; do
     if echo 'int main(){return 0;}' | "$cxx" -x c++ "$f" -o /dev/null - 2>/dev/null; then opt+=("$f"); break; fi

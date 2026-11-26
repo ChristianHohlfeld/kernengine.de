@@ -8,13 +8,13 @@ mkdir -p "$out/box3d" "$out/musl" "$out/obj" "$out/gen"
 jobs=()
 for c in "$kern"/third_party/box3d/src/*.c; do
   o="$out/box3d/$(basename "$c" .c).o"
-  [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
+  [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -fwrapv -w -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
 done
 for c in "$kern"/third_party/musl_math/src/*.c; do
   o="$out/musl/$(basename "$c" .c).o"
-  [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $o")
+  [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fwrapv -fno-math-errno -w -c $c -o $o")
 done
-flags=(-std=c++20 -O1 -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include")
+flags=(-std=c++20 -O1 -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -w -I"$kern/include" -I"$kern/third_party/box3d/include")
 # (ein Objekt je Quelle, unter dem Hash von Quelle, Flags und allen Headern der Engine: ein geänderter Header baut neu)
 headers="$(find "$kern/include" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-12)"
 engine=()

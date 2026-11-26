@@ -506,6 +506,11 @@ Quelle als Fehler:
 - ein Shift geht um die Weite modulo der Breite (wie x86 und WebAssembly); `>>` einer signed-Zahl bringt das Vorzeichen;
 - Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly);
 - `fmin`/`fmax` von 0 und −0: −0 bzw. 0;
+- **gebaut mit `-fwrapv`** (wie `-ffp-contract=off`: kern/build.sh, kern/tools/build_native.sh, kern/tests/run.sh und jedes
+  Skript, das Klassen oder Quellen übersetzt): wo eine Klasse den eingebauten Operator auf einer signed-Zahl nimmt
+  (`Count += n` ist Add to Variable eines `i64`), bricht er um wie numbers.h – sonst wäre der Überlauf in C++ UB und die
+  Klasse ≠ Interpreter (UBSan meldete es in CI 45835265511: `3 + 9223372036854775807`). Eine Quelle des Teilsatzes, die
+  so überläuft, bleibt ein Fehler des Konverters;
 - **das eine NaN**: welches NaN eine Rechnung gibt (Vorzeichen, Nutzlast), legen IEEE 754 und C++ nicht fest – x86 gibt
   für `0 * inf` ein negatives, und ein Compiler darf die Operanden von `a + b` tauschen, dann kommt das NaN des anderen
   durch (GCC mit -O1 tut es). Die Sprache legt es fest: solange gerechnet wird, ist ein NaN „ein NaN“ (kein Schritt zahlt

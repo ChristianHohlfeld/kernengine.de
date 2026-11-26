@@ -16,7 +16,7 @@ for c in "$root"/third_party/box3d/src/*.c; do
   o="$out/box3d/$(basename "$c" .c).o"
   objects+=("$o")
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ -n "$(find "$root/third_party/box3d" -name '*.h' -newer "$o" -o -name '*.inl' -newer "$o" | head -1)" ]; then
-    "$cc" -std=c17 -O2 -g -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$root/third_party/box3d/include" -I"$root/third_party/box3d/src" -c "$c" -o "$o" &
+    "$cc" -std=c17 -O2 -g -DBOX3D_DISABLE_SIMD -ffp-contract=off -fwrapv -w -I"$root/third_party/box3d/include" -I"$root/third_party/box3d/src" -c "$c" -o "$o" &
     pids+=($!)
   fi
 done
@@ -27,7 +27,7 @@ for c in "$root"/third_party/musl_math/src/*.c; do
   o="$out/musl_math/$(basename "$c" .c).o"
   objects+=("$o")
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ] || [ -n "$(find "$root/third_party/musl_math" -name '*.h' -newer "$o" | head -1)" ]; then
-    "$cc" -std=c17 -O2 -g -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o"
+    "$cc" -std=c17 -O2 -g -ffp-contract=off -fwrapv -fno-math-errno -w -c "$c" -o "$o"
   fi
 done
 sources=()
@@ -35,7 +35,7 @@ while IFS= read -r f; do sources+=("$f"); done < <(find "$root/src" -name '*.cpp
 sources+=("$here/gl_stub.cpp" "$here/test_main.cpp")
 # One object per source, compiled in parallel (all cores).
 cxx="${CXX:-c++}"
-flags=(-std=c++20 -O1 -g -ffp-contract=off -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
+flags=(-std=c++20 -O1 -g -ffp-contract=off -fwrapv -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
        -Wall -Wextra -Wno-unused-parameter -Werror -I"$root/include" -I"$root/third_party/box3d/include" -I"$here")
 mkdir -p "$out/obj"
 export cxx
