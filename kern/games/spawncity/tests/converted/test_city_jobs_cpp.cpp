@@ -9,15 +9,22 @@
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <bit>
+#include <array>
+#include <string_view>
 #include "../../src/city_jobs.h"
 #include "kern/core/jobs.h"
 #include "kern/geo/mesh_data.h"
 #include "../../src/mvt.h"
 #include "../../src/wire.h"
+#include "kern/core/base.h"
+#include "../../src/tiles.h"
+#include "kern/core/map.h"
 #include "kern/test/converted.h"
 
 namespace converted_city_jobs_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -94,7 +101,7 @@ bool fail(const char* text, ...) __attribute__((format(printf, 1, 2)));
 double now_ms();
 template <class T>
 constexpr T max_of(T a, T b) { return a < b ? b : a; }
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -105,7 +112,7 @@ struct Vec4 {
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct MeshData {
+struct KERN_BLUEPRINT_TYPE MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
   u32 extra_size = 0;
@@ -129,11 +136,30 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
-struct Rgb {
+struct KERN_BLUEPRINT_TYPE WeldStats {
+  u32 source_vertices = 0, unique_vertices = 0;
+  std::size_t bytes_before = 0, bytes_after = 0;
+  bool indexed = false;
+};
+WeldStats weld(MeshData& mesh, const unsigned long& min_saving = 0);
+struct KERN_BLUEPRINT_TYPE Rgb {
   f64 r = 1, g = 1, b = 1;
   
 };
-struct GeoChunk {
+struct KERN_BLUEPRINT_TYPE BuildingStyle {
+  std::vector<Rgb> walls{{0.75, 0.73, 0.70}};
+  std::vector<Rgb> roofs{{0.30, 0.30, 0.32}};
+  Rgb trim{0.957, 0.937, 0.894};
+  f64 trim_mix = 0.45;  // cornice colour = mix(wall, trim, trim_mix)
+};
+struct KERN_BLUEPRINT_TYPE BuildingOptions {
+  f64 chunk_size = 320;
+  u32 max_buildings = 2600;
+  bool cornice = true;
+  bool wall_records = true;
+  BuildingStyle style;
+};
+struct KERN_BLUEPRINT_TYPE GeoChunk {
   i32 x = 0, y = 0;  // chunk grid coordinates
   u32 items = 0;     // buildings / roads in the chunk
   u32 triangles = 0;
@@ -143,8 +169,10 @@ struct GeoChunk {
 };
 struct BuildingBuilder : converted::EngineObject {
   BuildingBuilder();
+  bool begin(const double* stream, const u32& length, const BuildingOptions& options) const;
   ~BuildingBuilder();
   bool step(const double& budget_ms) const;
+  std::vector<GeoChunk>& chunks();
   BuildingBuilder(const BuildingBuilder&) = default;
   BuildingBuilder(BuildingBuilder&&) = default;
   BuildingBuilder& operator=(const BuildingBuilder&) = default;
@@ -152,9 +180,11 @@ struct BuildingBuilder : converted::EngineObject {
 };
 struct FootprintStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  std::vector<double> values() const;
 };
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -171,7 +201,7 @@ struct RoadBuilder : converted::EngineObject {
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -278,6 +308,7 @@ void furnish(MapFeatures& out, const Vec4& square, const std::vector<std::vector
 void extract(const mvt::Tile& tile, const TileKey& key, const GeoProjector& proj, MapFeatures& out);
 namespace cityjobs { std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, Span<const u8> mvt); }
 namespace cityjobs { bool read_features(const std::vector<u8>& output, MapFeatures& out); }
+namespace cityjobs { std::vector<u8> buildings_input(const FootprintStream& footprints, const BuildingOptions& options); }
 namespace cityjobs { bool read_chunks(const std::vector<u8>& output, std::vector<GeoChunk>& out); }
 namespace cityjobs { u32 chunk_count(const std::vector<u8>& output); }
 namespace cityjobs { bool read_chunk(const std::vector<u8>& output, std::size_t& at, GeoChunk& out); }
@@ -465,7 +496,7 @@ namespace mvt { namespace mvt_cpp_local { bool read_feature(Span<const u8> bytes
 } } }
 namespace mvt { bool Decoder::step(Span<const u8> bytes, f64 budget_ms) { using mvt::mvt_cpp_local::Reader;
   if (done_) return true;
-  const f64 start = now_ms();
+  const f64 start = ::converted_city_jobs_cpp::now_ms();
   u32 work = 0;
   while (layer_ < layers_.size()) {
     if (!layer_open_) {
@@ -485,7 +516,7 @@ namespace mvt { bool Decoder::step(Span<const u8> bytes, f64 budget_ms) { using 
       if (!mvt::mvt_cpp_local::read_feature(bytes, Reader{converted::at(features_, feature_).at, converted::at(features_, feature_).end}, f)) { failed_ = done_ = true; return true; }
       layer.features.push_back(std::move(f));
       converted::pre_inc(feature_);
-      if ((++work & 63) == 0 && budget_ms > 0 && now_ms() - start > budget_ms) return false;
+      if ((++work & 63) == 0 && budget_ms > 0 && ::converted_city_jobs_cpp::now_ms() - start > budget_ms) return false;
     }
     layer_open_ = false;
     converted::pre_inc(layer_);
@@ -991,6 +1022,35 @@ namespace cityjobs { void run_tile(Span<const u8> in, std::vector<u8>& out) {
   put_spots(out, f.trees);
   put_spots(out, f.lamps);
 } }
+namespace cityjobs { void run_buildings(Span<const u8> in, std::vector<u8>& out) {
+  Reader r;
+  BuildingOptions o;
+  o.chunk_size = r.get_f64(in);
+  o.max_buildings = r.get_u32(in);
+  o.cornice = r.get_u8(in) != 0;
+  o.wall_records = r.get_u8(in) != 0;
+  auto rgb = [&] { Rgb c; c.r = r.get_f64(in); c.g = r.get_f64(in); c.b = r.get_f64(in); return c; };
+  o.style.walls.resize(converted::count(r.get_u32(in)));
+  for (auto& c : o.style.walls) c = rgb();
+  o.style.roofs.resize(converted::count(r.get_u32(in)));
+  for (auto& c : o.style.roofs) c = rgb();
+  o.style.trim = rgb();
+  o.style.trim_mix = r.get_f64(in);
+  std::vector<f64> stream;
+  r.array_f64(in, stream);
+  if (!r.ok || o.style.walls.empty() || o.style.roofs.empty()) return;
+  BuildingBuilder b;
+  if (!b.begin(stream.data(), stream.size(), o)) return;
+  while (!b.step(1e9)) {}
+  auto& chunks = b.chunks();
+  wire::put_u32(out, static_cast<u32>(chunks.size()));
+  for (auto& c : chunks) {
+    ::converted_city_jobs_cpp::weld(c.mesh);
+    put_i32(out, c.x); put_i32(out, c.y); wire::put_u32(out, c.items); wire::put_u32(out, c.triangles);
+    wire::put_u32(out, c.mesh.extra_size);
+    put_array_f32(out, c.mesh.positions); put_array_f32(out, c.mesh.normals); put_array_f32(out, c.mesh.colors); put_array_f32(out, c.mesh.uvs); put_array_f32(out, c.mesh.extra); put_array_u32(out, c.mesh.indices);
+  }
+} }
 namespace cityjobs { std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, Span<const u8> mvt) {
   std::vector<u8> b;
   b.reserve(converted::count(converted::plus(mvt.size, 28)));
@@ -1022,6 +1082,20 @@ namespace cityjobs { bool read_features(const std::vector<u8>& output, MapFeatur
   }
   if (!r.spots(in, f.trees) || !r.spots(in, f.lamps)) return false;
   return r.ok;
+} }
+namespace cityjobs { std::vector<u8> buildings_input(const FootprintStream& footprints, const BuildingOptions& o) {
+  std::vector<u8> b;
+  wire::put_f64(b, o.chunk_size); wire::put_u32(b, o.max_buildings); wire::put_u8(b, o.cornice ? 1 : 0); wire::put_u8(b, o.wall_records ? 1 : 0);
+  auto rgb = [&](const Rgb& c) { wire::put_f64(b, c.r); wire::put_f64(b, c.g); wire::put_f64(b, c.b); };
+  wire::put_u32(b, static_cast<u32>(o.style.walls.size()));
+  for (const auto& c : o.style.walls) rgb(c);
+  wire::put_u32(b, static_cast<u32>(o.style.roofs.size()));
+  for (const auto& c : o.style.roofs) rgb(c);
+  rgb(o.style.trim);
+  wire::put_f64(b, o.style.trim_mix);
+  std::vector<f64> stream(footprints.values());
+  put_array_f64(b, stream);
+  return b;
 } }
 namespace cityjobs { bool read_chunks(const std::vector<u8>& output, std::vector<GeoChunk>& out) {
   const Span<const u8> in(output);
@@ -1172,10 +1246,67 @@ namespace cityjobs { using converted::arg; using converted::same; using converte
 [[maybe_unused]] static bool defined(const MapFeatures& s) { return defined(s.buildings) && defined(s.roads) && defined(s.areas) && defined(s.trees) && defined(s.lamps) && defined(s.procedural); }
 [[maybe_unused]] static std::string text(const MapFeatures& s) { return std::string("{") + text(s.buildings) + ", " + text(s.roads) + ", " + text(s.areas) + ", " + text(s.trees) + ", " + text(s.lamps) + ", " + text(s.procedural) + "}"; }
 [[maybe_unused]] static void take(MapFeatures& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<MapFeatures::Building>>(s.buildings, (*v.rows)[0]); converted::take_as<std::vector<MapFeatures::Road>>(s.roads, (*v.rows)[1]); converted::take_as<std::vector<MapFeatures::Area>>(s.areas, (*v.rows)[2]); converted::take_as<std::vector<MapFeatures::Spot>>(s.trees, (*v.rows)[3]); converted::take_as<std::vector<MapFeatures::Spot>>(s.lamps, (*v.rows)[4]); converted::take_as<bool>(s.procedural, (*v.rows)[5]); }
+[[maybe_unused]] static Rgb draw_kern__Rgb(converted::Draw& draw) {
+  Rgb s{};
+  s.r = draw.number();
+  s.g = draw.number();
+  s.b = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rgb& s) { return converted::Value::structure({arg(s.r), arg(s.g), arg(s.b)}); }
+[[maybe_unused]] static bool same(const Rgb& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.r, (*got.rows)[0]), ".r") && converted::at_place(same(want.g, (*got.rows)[1]), ".g") && converted::at_place(same(want.b, (*got.rows)[2]), ".b"); }
+[[maybe_unused]] static bool defined(const Rgb& s) { return defined(s.r) && defined(s.g) && defined(s.b); }
+[[maybe_unused]] static std::string text(const Rgb& s) { return std::string("{") + text(s.r) + ", " + text(s.g) + ", " + text(s.b) + "}"; }
+[[maybe_unused]] static void take(Rgb& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.r, (*v.rows)[0]); converted::take_as<double>(s.g, (*v.rows)[1]); converted::take_as<double>(s.b, (*v.rows)[2]); }
+[[maybe_unused]] static BuildingStyle draw_kern__BuildingStyle(converted::Draw& draw) {
+  BuildingStyle s{};
+  s.walls = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
+  s.roofs = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
+  s.trim = draw_kern__Rgb(draw);
+  s.trim_mix = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const BuildingStyle& s) { return converted::Value::structure({arg(s.walls), arg(s.roofs), arg(s.trim), arg(s.trim_mix)}); }
+[[maybe_unused]] static bool same(const BuildingStyle& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.walls, (*got.rows)[0]), ".walls") && converted::at_place(same(want.roofs, (*got.rows)[1]), ".roofs") && converted::at_place(same(want.trim, (*got.rows)[2]), ".trim") && converted::at_place(same(want.trim_mix, (*got.rows)[3]), ".trim_mix"); }
+[[maybe_unused]] static bool defined(const BuildingStyle& s) { return defined(s.walls) && defined(s.roofs) && defined(s.trim) && defined(s.trim_mix); }
+[[maybe_unused]] static std::string text(const BuildingStyle& s) { return std::string("{") + text(s.walls) + ", " + text(s.roofs) + ", " + text(s.trim) + ", " + text(s.trim_mix) + "}"; }
+[[maybe_unused]] static void take(BuildingStyle& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Rgb>>(s.walls, (*v.rows)[0]); converted::take_as<std::vector<Rgb>>(s.roofs, (*v.rows)[1]); converted::take_as<Rgb>(s.trim, (*v.rows)[2]); converted::take_as<double>(s.trim_mix, (*v.rows)[3]); }
+[[maybe_unused]] static BuildingOptions draw_kern__BuildingOptions(converted::Draw& draw) {
+  BuildingOptions s{};
+  s.chunk_size = draw.number();
+  s.max_buildings = static_cast<unsigned int>(draw.below(40));
+  s.cornice = draw.flag();
+  s.wall_records = draw.flag();
+  s.style = draw_kern__BuildingStyle(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const BuildingOptions& s) { return converted::Value::structure({arg(s.chunk_size), arg(s.max_buildings), arg(s.cornice), arg(s.wall_records), arg(s.style)}); }
+[[maybe_unused]] static bool same(const BuildingOptions& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.chunk_size, (*got.rows)[0]), ".chunk_size") && converted::at_place(same(want.max_buildings, (*got.rows)[1]), ".max_buildings") && converted::at_place(same(want.cornice, (*got.rows)[2]), ".cornice") && converted::at_place(same(want.wall_records, (*got.rows)[3]), ".wall_records") && converted::at_place(same(want.style, (*got.rows)[4]), ".style"); }
+[[maybe_unused]] static bool defined(const BuildingOptions& s) { return defined(s.chunk_size) && defined(s.max_buildings) && defined(s.cornice) && defined(s.wall_records) && defined(s.style); }
+[[maybe_unused]] static std::string text(const BuildingOptions& s) { return std::string("{") + text(s.chunk_size) + ", " + text(s.max_buildings) + ", " + text(s.cornice) + ", " + text(s.wall_records) + ", " + text(s.style) + "}"; }
+[[maybe_unused]] static void take(BuildingOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.chunk_size, (*v.rows)[0]); converted::take_as<unsigned int>(s.max_buildings, (*v.rows)[1]); converted::take_as<bool>(s.cornice, (*v.rows)[2]); converted::take_as<bool>(s.wall_records, (*v.rows)[3]); converted::take_as<BuildingStyle>(s.style, (*v.rows)[4]); }
+[[maybe_unused]] static WeldStats draw_kern__WeldStats(converted::Draw& draw) {
+  WeldStats s{};
+  s.source_vertices = static_cast<unsigned int>(draw.below(40));
+  s.unique_vertices = static_cast<unsigned int>(draw.below(40));
+  s.bytes_before = static_cast<unsigned long>(draw.below(40));
+  s.bytes_after = static_cast<unsigned long>(draw.below(40));
+  s.indexed = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const WeldStats& s) { return converted::Value::structure({arg(s.source_vertices), arg(s.unique_vertices), arg(s.bytes_before), arg(s.bytes_after), arg(s.indexed)}); }
+[[maybe_unused]] static bool same(const WeldStats& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.source_vertices, (*got.rows)[0]), ".source_vertices") && converted::at_place(same(want.unique_vertices, (*got.rows)[1]), ".unique_vertices") && converted::at_place(same(want.bytes_before, (*got.rows)[2]), ".bytes_before") && converted::at_place(same(want.bytes_after, (*got.rows)[3]), ".bytes_after") && converted::at_place(same(want.indexed, (*got.rows)[4]), ".indexed"); }
+[[maybe_unused]] static bool defined(const WeldStats& s) { return defined(s.source_vertices) && defined(s.unique_vertices) && defined(s.bytes_before) && defined(s.bytes_after) && defined(s.indexed); }
+[[maybe_unused]] static std::string text(const WeldStats& s) { return std::string("{") + text(s.source_vertices) + ", " + text(s.unique_vertices) + ", " + text(s.bytes_before) + ", " + text(s.bytes_after) + ", " + text(s.indexed) + "}"; }
+[[maybe_unused]] static void take(WeldStats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned int>(s.source_vertices, (*v.rows)[0]); converted::take_as<unsigned int>(s.unique_vertices, (*v.rows)[1]); converted::take_as<unsigned long>(s.bytes_before, (*v.rows)[2]); converted::take_as<unsigned long>(s.bytes_after, (*v.rows)[3]); converted::take_as<bool>(s.indexed, (*v.rows)[4]); }
 inline BuildingBuilder::BuildingBuilder() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.building_builder.make", {}); converted::take_made(*this, kern_out[0]); }
+inline bool BuildingBuilder::begin(const double* stream, const u32& length, const BuildingOptions& options) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.building_builder.begin", {converted::value_of(*this), converted::value_of(std::vector<double>(stream, stream + converted::room(stream, 1 * static_cast<std::size_t>(length)))), converted::value_of(length), converted::value_of(options)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline BuildingBuilder::~BuildingBuilder() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.building_builder.release", {converted::value_of(*this)}); }
 inline bool BuildingBuilder::step(const double& budget_ms) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.building_builder.step", {converted::value_of(*this), converted::value_of(budget_ms)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline std::vector<GeoChunk>& BuildingBuilder::chunks() { return converted::engine_place<std::vector<GeoChunk>, std::vector<GeoChunk>>("engine.building_builder.chunks", {converted::value_of(*this)}); }
 inline BuildingBuilder& BuildingBuilder::operator=(BuildingBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.building_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline std::vector<double> FootprintStream::values() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.values", {converted::value_of(*this)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; }
+inline WeldStats weld(MeshData& mesh, const unsigned long& min_saving) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.weld", {converted::value_of(mesh), converted::value_of(min_saving)}); WeldStats kern_result = converted::quiet<WeldStats>(); converted::take_as<WeldStats>(kern_result, kern_out[0]); converted::take_as<MeshData>(mesh, kern_out[1]); return kern_result; }
 inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline bool fail(const char* text, ...) { std::va_list kern_va; va_start(kern_va, text); const std::string kern_text = converted::formatted(text, kern_va); va_end(kern_va); const std::vector<converted::Value> kern_out = converted::engine_call("engine.fail", {converted::value_of(kern_text)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 struct Out_Reader_get_u8 { cityjobs::Reader Self; unsigned char Result; };
@@ -1253,6 +1384,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1275,6 +1407,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1297,6 +1430,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1319,6 +1453,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1341,6 +1476,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1363,6 +1499,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1386,6 +1523,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1409,6 +1547,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1432,6 +1571,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1455,6 +1595,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1478,6 +1619,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1493,7 +1635,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<double> a2 = draw_list(draw, [&]() -> double { return draw.number(); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1502,6 +1644,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1517,7 +1660,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<unsigned int> a2 = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1526,6 +1669,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1541,7 +1685,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<double> a2 = draw_list(draw, [&]() -> double { return draw.number(); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1550,6 +1694,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1565,7 +1710,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<Vec2> a2 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1574,6 +1719,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1589,7 +1735,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<MapFeatures::Spot> a2 = draw_list(draw, [&]() -> MapFeatures::Spot { return draw_MapFeatures__Spot(draw); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data), reinterpret_cast<const unsigned char*>(a1.data + a1.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1598,6 +1744,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1613,7 +1760,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       cityjobs::Reader a1 = draw_cityjobs__Reader(draw);
       GeoChunk a2 = draw_kern__GeoChunk(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a1), arg(a2), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1622,6 +1769,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1636,7 +1784,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1645,6 +1793,31 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // run_buildings
+    converted::Tally tally("run_buildings");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] converted::wide::Span<const unsigned char>& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return converted_city_jobs_cpp::cityjobs::run_buildings(a0, a1); }); return std::move(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data), reinterpret_cast<const unsigned char*>(a0.data + a0.size)}};
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1661,7 +1834,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       double a2 = draw.number();
       converted::wide::Span<const unsigned char> a3 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a3.data), reinterpret_cast<const unsigned char*>(a3.data + a3.size)}};
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -1670,6 +1843,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1692,10 +1866,34 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // buildings_input
+    converted::Tally tally("buildings_input");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] const FootprintStream& a0, [[maybe_unused]] BuildingOptions& a1) { return converted::counted([&] { return converted_city_jobs_cpp::cityjobs::buildings_input(a0, a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const FootprintStream& a0 = *converted::engine_object<FootprintStream>(1 + draw.below(6));
+      BuildingOptions a1 = draw_kern__BuildingOptions(draw);
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // read_chunks
@@ -1714,6 +1912,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1735,6 +1934,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1758,6 +1958,7 @@ KERN_TEST(converted_city_jobs_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

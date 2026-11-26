@@ -18,6 +18,7 @@
 
 namespace converted_terrain {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -39,7 +40,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Vec4 {
+struct KERN_BLUEPRINT_TYPE Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
   
@@ -48,13 +49,14 @@ struct Vec4 {
   constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Renderer;
-namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct KERN_BLUEPRINT_TYPE Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-struct GeoProjector {
+struct KERN_BLUEPRINT_TYPE GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
@@ -70,7 +72,7 @@ struct GeoProjector {
 
 
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class KERN_BLUEPRINT_TYPE AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -199,7 +201,14 @@ struct Terrain {
   /// Regions changed since the last call (city roads/areas re-lay themselves on them).
   void take_changes(std::vector<Vec4>& out) { out.insert(out.end(), changes_.begin(), changes_.end()); changes_.clear(); }
 
-  /// Builds elevation, collision tiles around focus and anchor, render tiles, water meshes.
+  /// Builds elevation, render tiles and water meshes in slices of `budget_ms` - nothing of the physics: the
+  /// collision is written by collide() alone.
+  
+  /// Writes the ground's collision into the physics world - only here, in a fixed step of the world, never by
+  /// the clock (what the bodies stand on must not depend on how fast the machine is): the tiles under the
+  /// focus and the anchor (and their neighbours) before the step, whatever they cost; of the other wanted
+  /// tiles `more` (the nearest first); what is no longer wanted goes once every wanted tile stands. A tile
+  /// whose ground did not change is not written again (a re-laid street, the same heights).
   
   /// Where the focus will be in a while (its velocity x 12 s): the elevation window is loaded
   /// around there, so a fast jet never flies past the edge of the known ground.
@@ -225,7 +234,7 @@ struct Terrain {
     i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
   };
   struct RenderTile { u32 mesh = 0; bool skirt = true; };
-  struct CollisionTile { physics::Body body; };
+  struct CollisionTile { physics::Body body; std::vector<Vec3> pts; };  // (pts: the ground it was built of)
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
@@ -501,13 +510,14 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static Terrain::CollisionTile draw_Terrain__CollisionTile(converted::Draw& draw) {
   Terrain::CollisionTile s{};
   s.body = draw_kern__physics__Body(draw);
+  s.pts = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Terrain::CollisionTile& s) { return converted::Value::structure({arg(s.body)}); }
-[[maybe_unused]] static bool same(const Terrain::CollisionTile& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.body, (*got.rows)[0]), ".body"); }
-[[maybe_unused]] static bool defined(const Terrain::CollisionTile& s) { return defined(s.body); }
-[[maybe_unused]] static std::string text(const Terrain::CollisionTile& s) { return std::string("{") + text(s.body) + "}"; }
-[[maybe_unused]] static void take(Terrain::CollisionTile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); }
+[[maybe_unused]] static converted::Value arg(const Terrain::CollisionTile& s) { return converted::Value::structure({arg(s.body), arg(s.pts)}); }
+[[maybe_unused]] static bool same(const Terrain::CollisionTile& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.body, (*got.rows)[0]), ".body") && converted::at_place(same(want.pts, (*got.rows)[1]), ".pts"); }
+[[maybe_unused]] static bool defined(const Terrain::CollisionTile& s) { return defined(s.body) && defined(s.pts); }
+[[maybe_unused]] static std::string text(const Terrain::CollisionTile& s) { return std::string("{") + text(s.body) + ", " + text(s.pts) + "}"; }
+[[maybe_unused]] static void take(Terrain::CollisionTile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); converted::take_as<std::vector<Vec3>>(s.pts, (*v.rows)[1]); }
 [[maybe_unused]] static TerrainStats draw_TerrainStats(converted::Draw& draw) {
   TerrainStats s{};
   s.windows = static_cast<unsigned int>(draw.below(40));

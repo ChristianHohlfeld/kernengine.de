@@ -13,6 +13,7 @@
 
 namespace converted_sound_fx_cpp {
 namespace converted = ::kern::converted;
+[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
@@ -37,7 +38,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { enum class KERN_BLUEPRINT_TYPE JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -48,11 +49,11 @@ struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
-namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class KERN_BLUEPRINT_TYPE Rolloff : u8 { inverse = 0, linear, exponential }; }
 namespace audio { using ClipId = u32; }
 namespace audio { using VoiceId = u64; }
-namespace audio { struct PlayParams {
+namespace audio { struct KERN_BLUEPRINT_TYPE PlayParams {
   f32 volume = 1;       // linear gain
   f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
   f32 pan = 0;          // -1 left .. 1 right (2D voices)
@@ -109,8 +110,8 @@ struct SoundFx {
   Mixer* mixer_ = nullptr;
   Loop rotor_, prop_wash_, engine_, turbine_, roar_, wind_, siren_;
 };
-namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
-namespace audio { struct SynthPatch {
+namespace audio { enum class KERN_BLUEPRINT_TYPE Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace audio { struct KERN_BLUEPRINT_TYPE SynthPatch {
   Wave wave = Wave::square;
   f32 volume = 0.5;
   // envelope (seconds): attack, sustain (with optional punch), release
