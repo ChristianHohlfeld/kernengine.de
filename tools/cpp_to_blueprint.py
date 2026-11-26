@@ -12520,6 +12520,17 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 
 
 
+# The second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1, from 26.11.2026): the test holds the source with its own
+# numbers - f32 stays f32, nothing is rewritten (widen gives the piece as it is) and the names of the prelude are the
+# engine's own. What the Blueprint gives is compared with what C++ gives: where the language computes otherwise than the
+# source (a Float of 64 bit for an f32), the comparison says so. The first pass (with the numbers of the language) stays.
+SOURCE_NUMBERS = os.environ.get("KERN_TEST_SOURCE_NUMBERS") == "1"
+SOURCE_PRELUDE = """// the source's own numbers (KERN_TEST_SOURCE_NUMBERS=1): what C++ computes, compared with the Blueprint
+using kern::f32; using kern::f64;
+using kern::u8; using kern::u16; using kern::u32; using kern::u64;
+using kern::i8; using kern::i16; using kern::i32; using kern::i64;
+using kern::Vec2; using kern::Vec3; using converted::wide::Span;"""
+
 
 class Held:
     """What a test holds of the source (TestWriter.gather)."""
@@ -12600,7 +12611,10 @@ class TestWriter:
     @classmethod
     def widen(cls, text):
         """A piece of C++ as the Blueprint language computes it: number literals without the f that
-        makes them 32-bit, float as double, the functions of numbers those of kern::math."""
+        makes them 32-bit, float as double, the functions of numbers those of kern::math. In the pass of the
+        source's own numbers (KERN_TEST_SOURCE_NUMBERS=1: SOURCE_NUMBERS) the piece stays as the source has it."""
+        if SOURCE_NUMBERS:
+            return text
         return cls.in_code(text, cls.widen_code)
 
     @staticmethod
@@ -15780,7 +15794,7 @@ class TestWriter:
                 f"namespace {ns} {{", "namespace converted = ::kern::converted;",
                 "[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
-                WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
+                SOURCE_PRELUDE if SOURCE_NUMBERS else WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
                 '#pragma GCC diagnostic ignored "-Wunused-variable"', '#pragma GCC diagnostic ignored "-Wnarrowing"', '#pragma GCC diagnostic ignored "-Wunused-but-set-variable"',
