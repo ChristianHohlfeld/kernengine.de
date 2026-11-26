@@ -106,7 +106,7 @@ mkey="$(printf '%s ' "${mflags[@]}" "$({ "$CC" --version || true; } | head -1)" 
 mcache="$cache_root/musl-math-$mkey"
 mkdir -p "$mcache"
 pids=()
-for c in "$here"/third_party/musl_math/src/*.c; do
+for c in "$here"/third_party/musl_math/src/*.c "$here"/src/math/*.c; do
   o="$mcache/$(basename "$c" .c).o"
   objects+=("$o")
   newest_header="$({ ls -t "$here"/third_party/musl_math/src/*.h || true; } | head -1)"

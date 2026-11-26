@@ -2377,7 +2377,7 @@ nativ und in Wasm gebaut. Stand 26.11.2026, jeweils mit Beleg:
 | Keine FMA-Kontraktion (`-ffp-contract=off`) | gilt in jedem Bau, der Code erzeugt: `kern/build.sh` (C und C++, nativ und Wasm), `kern/tools/build_native.sh`, `kern/tests/run.sh`, `kern/games/spawncity/tests/run_tests.sh`, `kern/games/murmel/tests/engine.sh`, `tools/blueprint_cpp.sh`, `kern/tools/lehrer.sh`, `tools/converter_cases/compare.sh`, die Prüfung des Konverters (`-fsyntax-only`). Der JIT schreibt einzelne `f64.mul`/`f64.add`, und Wasm hat kein FMA ohne relaxed-simd | `grep -rn ffp-contract` |
 | Auswertungsreihenfolge wie die Quelle | die Formel-Knoten bilden den Baum von clang nach. Zu prüfen ist, wo der Konverter zusammenfasst (Formel-Lambdas, `math_compare`) | – |
 | sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log10, pow, hypot: dieselbe Funktion überall | **die Sprache: ja** (`kern::dm` = musl_math, auch die f-Varianten, gleich gebaut für alle Ziele; Knoten in `nodes.h` `math::sin` … rufen `dm::` in f64). **Die Quelle: nein** – SpawnCity ruft `std::sin` (197-mal), `std::atan2` (123), `std::hypot` (239) …, `kern::dm` nie. Nativ ist das die libm des Systems (glibc), in Wasm die von wasi-libc. Quelle und Blueprint rufen also verschiedene Funktionen, und nativ und Wasm geben im letzten Bit verschiedene Werte | `grep -c "std::sin(" kern/games/spawncity/src/*` ; `kern/include/kern/core/dmath.h` |
-| Fehlende Funktionen in musl_math | sinh, cosh, tanh, asinh, acosh, atanh, log2, exp2 (nur Tabelle `exp2f_data.c`), log1p, cbrt, ldexp – jeweils f und d. Der Konverter schreibt sie heute als Formeln aus exp/log/pow (`converted::wide::tanh_bp` …): das ist eine andere Funktion als `std::tanh` | `ls kern/third_party/musl_math/src` |
+| Fehlende Funktionen in musl_math | acosh, atanh, log2, exp2 (nur Tabelle `exp2f_data.c`), log1p, cbrt, ldexp – jeweils f und d. Der Konverter schreibt log2/log10/cbrt heute als Formeln aus exp/log/pow (`converted::wide::log2_bp` …): das ist eine andere Funktion als `std::log2`. sinh, cosh, tanh, asinh hat die Engine seit 26.11.2026 selbst (unten) | `ls kern/third_party/musl_math/src` |
 | sqrt, fabs, floor, ceil, trunc, fmod, remainder, copysign | IEEE-genau, überall gleich (`std::`). Der JIT schreibt Modulo, Round, Min, Max, Clamp und Square Root nicht selbst (bis 26.11.2026 tat er es: `a - trunc(a/b)*b` statt `fmod`, `copysign(floor(abs(a)+0.5), a)` statt `std::round`); er ruft für sie die Funktion des Knotens (`Instance::inline_pure`). Selbst schreibt er nur, was Wasm Bit für Bit wie der Knoten rechnet (Add, Sub, Mul, Div, Abs, Negate, Copy Sign, Lerp, Floor, Compare); eine Ganzzahl hat dabei kein −0 | Fall `number_edges` in `kern/tests/logic_cases.h` (Interpreter, JIT im Job build, Klasse), `kern/src/logic/codegen.cpp` |
 | NaN und −0 | der Knoten nimmt `min_of/max_of` (`b < a ? b : a`), `f64.min/f64.max` von Wasm gäben anderes (NaN gewinnt, −0 < +0): darum ruft der JIT für Min, Max, Clamp und Square Root die Funktion des Knotens (s. o.). Der Vergleichstest vergleicht NaN, ±Inf und −0 nach ihren Bits (B5) | Fall `number_edges`, `kern/core/base.h` `min_of` |
 | f32-Knoten | fehlen (Stufe 3): ein f32-Knoten rechnet in f32 und ruft die f-Funktion von musl (`sinf` …), nicht f64 mit Rundung am Ende | – |
@@ -2422,9 +2422,22 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   auf gerade, musls powf nicht: 90.109375f², 663 von 2 Mio. Werten). Jede GCC-Übersetzung sagt dazu eine Zeile „note: disable
   pass tree-powcabs“. Ein GCC ohne diesen Pass bricht den Bau ab („unknown pass“). Der Test vergleicht auch auf GCC alles, auch
   `pow(x, 2)`. Auch clang braucht `-fmath-errno`: ohne es macht es aus `__builtin_pow(x, 2)` (libc++, Wasm) `x*x` (CI 45810300304).
-- Gebaut (fbf8eee2): `kern/third_party/musl_math/src/std_names.c` (Hüllen, ohne sinh/tanh/cosh: die fehlen der Engine, und der
-  Konverter lässt eine Funktion, die sie ruft, mit Ort warten) und `kern/third_party/musl_math/flags.sh` (`kern_math_flags`).
+- Gebaut (fbf8eee2): `kern/third_party/musl_math/src/std_names.c` (Hüllen) und `kern/third_party/musl_math/flags.sh` (`kern_math_flags`).
   Engine-Test `math_of_the_standard_library_is_the_engines` (nativ) und `kern/tests/math_names_wasm_test.mjs` (Wasm).
+- **Welche aus musl, welche eigene der Engine** (26.11.2026): sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log10, pow,
+  hypot (je f und d) sind musl (`kern/third_party/musl_math`, MIT). **sinh, cosh, tanh, asinh** (je f und d) sind eigener Code der
+  Engine (`kern/src/math/hyperbolic.c`, Lizenz der Engine): aus den Definitionen geschrieben, nur mit + − * / und musls exp, expm1,
+  log sowie sqrt (IEEE-genau), mit den Fallunterscheidungen für kleine und große Argumente (kleines x: x bzw. 1; expm1 gegen die
+  Auslöschung nahe 0; über 709 `exp(a/2)²/2` gegen den frühen Überlauf; asinh über ein log1p mit zurückgegebenem Rundungsfehler, über
+  2^28 `log(a) + ln 2`). Die f-Varianten rechnen in f64 und runden einmal auf f32. Jeder Bau nimmt `kern/src/math/*.c`, wo er
+  musl_math nimmt (dieselben Schalter), die Hüllen unter den Standardnamen (std::sinh …) stehen in derselben Datei, `flags.sh` hält
+  `-fno-builtin-sinh` …. `kern::dm::sinh` …, die Formel-Funktionen `sinh cosh tanh asinh` (Blueprint, `kern::math::sinh` in `nodes.h`)
+  und `std::sinh` eines Programms rufen dieselbe Funktion; der Konverter schreibt `std::sinh` als `kern::math::sinh` (Fall
+  `tools/converter_cases` hyperbolic). Genauigkeit gegen 200-stellige Werte (`kern/tests/hyperbolic_reference.py` → `.h`):
+  Schranke f64 2 ULP (gemessen: tanh 1,95, asinh 1,66, sinh 1,64, cosh 0,98), f32 1 ULP (gemessen 0,50); Ränder und Identitäten
+  (±0, ±Inf, NaN, Überlaufschwelle 710,4758…/89,4159…, sinh x = x für kleine x, ungerade/gerade bitgleich, asinh(sinh x) = x
+  auf 4 ULP): Engine-Test `hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges`; bitgleich nativ und Wasm:
+  `math_of_the_standard_library_is_the_engines` (Digest erweitert).
 - Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
   umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
 

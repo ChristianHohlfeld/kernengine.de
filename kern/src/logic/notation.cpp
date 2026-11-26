@@ -5688,8 +5688,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       const bool counted = after < words.size() && words[after] == "len";
       const std::string n = "a" + std::to_string(after);
       if (words[k] == "text") params += "const char* " + a, args += counted ? "kern::logic::export_text_in(" + a + ", " + n + ")" : "kern::logic::export_text_in(" + a + ")";
-      else if (words[k] == "bytes") params += "const kern::u8* " + a, args += "kern::logic::export_bytes_in(" + a + ", " + n + ")";
-      else if (words[k] == "floats") params += "const kern::f32* " + a, args += "kern::logic::export_floats_in(" + a + ", " + n + ")";
+      else if (words[k] == "bytes") params += "const kern::u8* " + a, args += "kern::logic::export_bytes_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ", " + n + ")";   // (as the list of the input: List<U8> - a list with its width)
+      else if (words[k] == "floats") params += "const kern::f32* " + a, args += "kern::logic::export_floats_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ", " + n + ")";
       else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
       else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
     }

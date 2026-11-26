@@ -20,7 +20,7 @@ enum Code : u8 {
   kConst, kInput, kAdd, kSub, kMul, kDiv, kRem, kNeg, kBitNot, kNot, kBitAnd, kBitOr, kBitXor, kShl, kShr,
   kLt, kLe, kGt, kGe, kEq, kNe, kAnd, kOr, kSelect, kCast, kBitCast,
   kMin, kMax, kAbs, kClamp, kLerp,
-  kSqrt, kFloor, kCeil, kTrunc, kRound, kSin, kCos, kTan, kAsin, kAcos, kAtan, kExp, kExpm1, kLog, kLog10,
+  kSqrt, kFloor, kCeil, kTrunc, kRound, kSin, kCos, kTan, kAsin, kAcos, kAtan, kExp, kExpm1, kLog, kLog10, kSinh, kCosh, kTanh, kAsinh,
   kAtan2, kPow, kHypot, kCopysign, kFmin, kFmax, kFmod,
   kIsnan, kIsinf, kIsfinite, kSignbit,
 };
@@ -36,6 +36,8 @@ constexpr FormulaFunction kFunctions[] = {
     {"round", kRound, 1, Takes::floating},   {"sin", kSin, 1, Takes::floating},       {"cos", kCos, 1, Takes::floating},
     {"tan", kTan, 1, Takes::floating},       {"asin", kAsin, 1, Takes::floating},     {"acos", kAcos, 1, Takes::floating},
     {"atan", kAtan, 1, Takes::floating},     {"exp", kExp, 1, Takes::floating},       {"expm1", kExpm1, 1, Takes::floating},
+    {"sinh", kSinh, 1, Takes::floating},     {"cosh", kCosh, 1, Takes::floating},     {"tanh", kTanh, 1, Takes::floating},
+    {"asinh", kAsinh, 1, Takes::floating},
     {"log", kLog, 1, Takes::floating},       {"log10", kLog10, 1, Takes::floating},   {"atan2", kAtan2, 2, Takes::floating},
     {"pow", kPow, 2, Takes::floating},       {"hypot", kHypot, 2, Takes::floating},   {"copysign", kCopysign, 2, Takes::floating},
     {"fmin", kFmin, 2, Takes::floating},     {"fmax", kFmax, 2, Takes::floating},     {"fmod", kFmod, 2, Takes::floating},
@@ -132,6 +134,10 @@ Step step_of(u8 code, Kind k, Kind to) {
           case kAtan: return [](u64 a, u64, u64) { return out(num::atan(in<T>(a))); };
           case kExp: return [](u64 a, u64, u64) { return out(num::exp(in<T>(a))); };
           case kExpm1: return [](u64 a, u64, u64) { return out(num::expm1(in<T>(a))); };
+          case kSinh: return [](u64 a, u64, u64) { return out(num::sinh(in<T>(a))); };
+          case kCosh: return [](u64 a, u64, u64) { return out(num::cosh(in<T>(a))); };
+          case kTanh: return [](u64 a, u64, u64) { return out(num::tanh(in<T>(a))); };
+          case kAsinh: return [](u64 a, u64, u64) { return out(num::asinh(in<T>(a))); };
           case kLog: return [](u64 a, u64, u64) { return out(num::log(in<T>(a))); };
           case kLog10: return [](u64 a, u64, u64) { return out(num::log10(in<T>(a))); };
           case kAtan2: return [](u64 a, u64 b, u64) { return out(num::atan2(in<T>(a), in<T>(b))); };

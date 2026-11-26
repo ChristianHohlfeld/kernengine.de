@@ -1849,6 +1849,10 @@ void add_math(Library& lib) {
   KERN_FLOAT1(atan, "Atan", "std::atan (radians)");
   KERN_FLOAT1(exp, "Exp", "std::exp");
   KERN_FLOAT1(expm1, "Exp Minus 1", "std::expm1");
+  KERN_FLOAT1(sinh, "Sinh", "std::sinh (the engine's own: kern/src/math/hyperbolic.c)");
+  KERN_FLOAT1(cosh, "Cosh", "std::cosh (the engine's own)");
+  KERN_FLOAT1(tanh, "Tanh", "std::tanh (the engine's own)");
+  KERN_FLOAT1(asinh, "Asinh", "std::asinh (the engine's own)");
   KERN_FLOAT1(log, "Log", "std::log (of 0: -inf, of a negative number: NaN)");
   KERN_FLOAT1(log10, "Log 10", "std::log10");
 #undef KERN_FLOAT1
@@ -2247,7 +2251,7 @@ void add_formula(Library& lib) {
                    "A formula as one node, in C++: every name in it becomes an input, of the type Types names for it (in the order the names first "
                    "appear). Each operation is the node's of its type - nothing converts but num_cast<To, From>(x). Numbers: 0.5f an f32, 0.5 an "
                    "f64, a whole number the type of what it meets. Operators + - * / % << >> & | ^ ~, comparisons (a bool), && || !, c ? a : b; "
-                   "functions min max abs clamp lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 exp expm1 log log10 pow hypot "
+                   "functions min max abs clamp lerp sqrt floor ceil trunc round sin cos tan asin acos atan atan2 exp expm1 log log10 pow hypot sinh cosh tanh asinh "
                    "copysign fmin fmax fmod isnan isinf isfinite signbit.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b"), param("types", "Types", ParamDef::Kind::text, "f32 f32")};
   d.outputs = {data("result", "", PinType::f32)};

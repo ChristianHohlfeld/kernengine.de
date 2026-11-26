@@ -42,7 +42,7 @@ for c in "$kern"/third_party/box3d/src/*.c; do
     "$cc" -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$kern/third_party/box3d/include" -I"$kern/third_party/box3d/src" -c "$c" -o "$o" & pids+=($!)
   fi
 done
-for c in "$kern"/third_party/musl_math/src/*.c; do
+for c in "$kern"/third_party/musl_math/src/*.c "$kern"/src/math/*.c; do
   o="$out/musl-$tool/$(basename "$c" .c).o"; objects+=("$o")
   if [ ! -f "$o" ] || [ "$c" -nt "$o" ]; then "$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$c" -o "$o" & pids+=($!); fi
 done

@@ -37,7 +37,7 @@ for f in "$bench"/*.cpp "$root/kern/src/logic/engine_host.cpp"; do  # (engine_ho
   "$cxx" "${flags[@]}" -c "$f" -o "$dir/$(basename "$f").o" &
   [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
 done
-for f in "$root"/kern/third_party/musl_math/src/*.c; do  # (the language's own sin, cos, exp ..., as kern/build.sh)
+for f in "$root"/kern/third_party/musl_math/src/*.c "$root"/kern/src/math/*.c; do  # (the language's own sin, cos, exp ..., as kern/build.sh)
   "${BENCH_CC:-clang-18}" -std=c17 -O3 -flto=thin -ffp-contract=off -fno-math-errno -w -c "$f" -o "$dir/musl_$(basename "$f").o" &
   [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
 done

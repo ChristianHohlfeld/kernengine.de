@@ -17,7 +17,7 @@ cxx="${HOST_CXX:-c++}" cc="${HOST_CC:-cc}"
 # (the gameplay nodes as the library knows them - names, pins, settings - need nothing of the game)
 sources=("$root/tools/blueprint_cpp.cpp" "$root/kern/src/game/logic_node_shapes.cpp" "$root/kern/src/game/world_export.cpp")
 while IFS= read -r f; do sources+=("$f"); done < <(find "$root/kern/src/logic" "$root/kern/src/core" -name '*.cpp' | sort)
-key="$({ cat "${sources[@]}"; find "$root/kern/include" -name '*.h' | sort | xargs cat; cat "$root"/kern/third_party/musl_math/src/*.c; echo "$cxx $cc"; } | sha256sum | cut -c1-16)"
+key="$({ cat "${sources[@]}"; find "$root/kern/include" -name '*.h' | sort | xargs cat; cat "$root"/kern/third_party/musl_math/src/*.c "$root"/kern/src/math/*.c; echo "$cxx $cc"; } | sha256sum | cut -c1-16)"
 . "$root/kern/tools/run_dir.sh"
 dir="$KERN_RUN_DIR/kern-blueprint-cpp/$key"
 bin="$dir/blueprint_cpp"
@@ -27,7 +27,7 @@ if [ ! -x "$bin" ]; then
   export cxx cc dir root mathflags
   printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
     '"$cxx" -std=c++20 -O1 -ffp-contract=off $mathflags -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
-  printf '%s\n' "$root"/kern/third_party/musl_math/src/*.c | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
+  printf '%s\n' "$root"/kern/third_party/musl_math/src/*.c "$root"/kern/src/math/*.c | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c \
     '"$cc" -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$1" -o "$dir/obj/$(basename "$1").o"' _ {}
   "$cxx" "$dir"/obj/*.o -lm -o "$bin.tmp.$$"
   mv "$bin.tmp.$$" "$bin"
