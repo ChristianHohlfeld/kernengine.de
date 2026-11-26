@@ -20,16 +20,16 @@ struct S_Sphere { [[maybe_unused]] static Value to(EngineObjects& o, const kern:
 struct S_Vec4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Vec4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
 Value S_Aabb::to(EngineObjects& o, const kern::Aabb& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.min), ev::Conv<ev::Vector>::to(o, x.max)}); }
 void S_Aabb::from(EngineObjects& o, const Value& v, kern::Aabb& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.min); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.max); }
-Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Num<f32>>::to(o, x.fov), ev::Conv<ev::Num<f32>>::to(o, x.near), ev::Conv<ev::Num<f32>>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Num<f32>>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
-void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
-Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.m)}); }
-void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.m); }
-Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.x), ev::Conv<ev::Num<f32>>::to(o, x.y), ev::Conv<ev::Num<f32>>::to(o, x.z), ev::Conv<ev::Num<f32>>::to(o, x.w)}); }
-void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.w); }
-Value S_Sphere::to(EngineObjects& o, const kern::Sphere& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.center), ev::Conv<ev::Num<f32>>::to(o, x.radius)}); }
-void S_Sphere::from(EngineObjects& o, const Value& v, kern::Sphere& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.center); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.radius); }
-Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.x), ev::Conv<ev::Num<f32>>::to(o, x.y), ev::Conv<ev::Num<f32>>::to(o, x.z), ev::Conv<ev::Num<f32>>::to(o, x.w)}); }
-void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.w); }
+Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Num<::kern::f32>>::to(o, x.fov), ev::Conv<ev::Num<::kern::f32>>::to(o, x.near), ev::Conv<ev::Num<::kern::f32>>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Num<::kern::f32>>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
+void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
+Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.m)}); }
+void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.m); }
+Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.x), ev::Conv<ev::Num<::kern::f32>>::to(o, x.y), ev::Conv<ev::Num<::kern::f32>>::to(o, x.z), ev::Conv<ev::Num<::kern::f32>>::to(o, x.w)}); }
+void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.w); }
+Value S_Sphere::to(EngineObjects& o, const kern::Sphere& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.center), ev::Conv<ev::Num<::kern::f32>>::to(o, x.radius)}); }
+void S_Sphere::from(EngineObjects& o, const Value& v, kern::Sphere& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.center); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.radius); }
+Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.x), ev::Conv<ev::Num<::kern::f32>>::to(o, x.y), ev::Conv<ev::Num<::kern::f32>>::to(o, x.z), ev::Conv<ev::Num<::kern::f32>>::to(o, x.w)}); }
+void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.w); }
 
 // engine.fail: kern::fail
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
@@ -66,53 +66,53 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 // engine.now_ms: kern::now_ms
 bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::now_ms();
-  ev::give<ev::Num<f64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f64>>(o, out, 0, r);
   return true;
 }
 
 // engine.wall_ms: kern::wall_ms
 bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::wall_ms();
-  ev::give<ev::Num<f64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f64>>(o, out, 0, r);
   return true;
 }
 
 // engine.hash_u32: kern::hash_u32
 bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   decltype(auto) r = kern::hash_u32(std::move(a0));
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.submit: kern::jobs::submit
 bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<::kern::u8>>>(o, in, 1, a1);
   decltype(auto) r = kern::jobs::submit(std::move(a0), std::move(a1));
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.take: kern::jobs::take
 bool c8(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<::kern::u8>>>(o, in, 1, a1);
   decltype(auto) r = kern::jobs::take(std::move(a0), a1);
   ev::give<ev::Bool>(o, out, 0, r);
-  ev::give<ev::List<ev::Num<u8>>>(o, out, 1, a1);
+  ev::give<ev::List<ev::Num<::kern::u8>>>(o, out, 1, a1);
   return true;
 }
 
 // engine.jobs.cancel: kern::jobs::cancel
 bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   kern::jobs::cancel(std::move(a0));
   return true;
 }
@@ -120,7 +120,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
 // engine.jobs.pump: kern::jobs::pump
 bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Num<f64>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::f64>>(o, in, 0, a0);
   kern::jobs::pump(std::move(a0));
   return true;
 }
@@ -128,7 +128,7 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.jobs.pending: kern::jobs::pending
 bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::pending();
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
@@ -171,29 +171,29 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.jobs.take_queued: kern::jobs::take_queued
 bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::take_queued();
-  ev::give<ev::List<ev::Num<u8>>>(o, out, 0, r);
+  ev::give<ev::List<ev::Num<::kern::u8>>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.run: kern::jobs::run
 bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<::kern::u8>>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-  ev::take<ev::List<ev::Num<u8>>>(o, in, 2, a2);
+  ev::take<ev::List<ev::Num<::kern::u8>>>(o, in, 2, a2);
   kern::jobs::run(std::move(a0), kern::Span<unsigned char const>(a1.data(), a1.size()), a2);
-  ev::give<ev::List<ev::Num<u8>>>(o, out, 0, a2);
+  ev::give<ev::List<ev::Num<::kern::u8>>>(o, out, 0, a2);
   return true;
 }
 
 // engine.jobs.done: kern::jobs::done
 bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   std::vector<unsigned char> a1;
-  ev::take<ev::List<ev::Num<u8>>>(o, in, 1, a1);
+  ev::take<ev::List<ev::Num<::kern::u8>>>(o, in, 1, a1);
   kern::jobs::done(std::move(a0), kern::Span<unsigned char const>(a1.data(), a1.size()));
   return true;
 }
@@ -205,7 +205,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec2>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   decltype(auto) r = kern::dot(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -216,7 +216,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec2>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   decltype(auto) r = kern::cross(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -225,7 +225,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec2>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   decltype(auto) r = kern::length(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -236,7 +236,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   decltype(auto) r = kern::dot(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -256,7 +256,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   decltype(auto) r = kern::length(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -265,7 +265,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   decltype(auto) r = kern::length_sq(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -276,7 +276,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   decltype(auto) r = kern::distance(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -287,7 +287,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   decltype(auto) r = kern::distance_sq(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -307,7 +307,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a2);
   decltype(auto) r = kern::lerp(std::move(a0), std::move(a1), std::move(a2));
   ev::give<ev::Vector>(o, out, 0, r);
   return true;
@@ -349,7 +349,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.hex_color: kern::hex_color
 bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 0, a0);
   decltype(auto) r = kern::hex_color(std::move(a0));
   ev::give<ev::Vector>(o, out, 0, r);
   return true;
@@ -369,7 +369,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a1);
   decltype(auto) r = kern::Quat::axis_angle(std::move(a0), std::move(a1));
   ev::give<ev::Struct<S_Quat>>(o, out, 0, r);
   return true;
@@ -478,13 +478,13 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.mat4.perspective: kern::Mat4::perspective
 bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a3);
   decltype(auto) r = kern::Mat4::perspective(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
   ev::give<ev::Struct<S_Mat4>>(o, out, 0, r);
   return true;
@@ -493,17 +493,17 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 // engine.mat4.ortho: kern::Mat4::ortho
 bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a4);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a4);
   auto a5 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 5, a5);
+  ev::take<ev::Num<::kern::f32>>(o, in, 5, a5);
   decltype(auto) r = kern::Mat4::ortho(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
   ev::give<ev::Struct<S_Mat4>>(o, out, 0, r);
   return true;
@@ -610,7 +610,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
   ev::take<ev::Struct<S_Camera>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a1);
   decltype(auto) r = kern::projection_matrix(a0, std::move(a1));
   ev::give<ev::Struct<S_Mat4>>(o, out, 0, r);
   return true;

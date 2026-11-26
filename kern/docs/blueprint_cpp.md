@@ -506,11 +506,21 @@ Quelle als Fehler:
 - ein Shift geht um die Weite modulo der Breite (wie x86 und WebAssembly); `>>` einer signed-Zahl bringt das Vorzeichen;
 - Fließkomma → ganze Zahl: auf null zu; NaN → 0; außerhalb der Enden das nähere Ende (wie `trunc_sat` von WebAssembly);
 - `fmin`/`fmax` von 0 und −0: −0 bzw. 0;
-- **ein Platz der Sprache rechnet mit seinem Typ** (OFFEN, Entscheidung main 26.11.): `Count += n` (Add to Variable
-  eines `i64`) ist in der Klasse heute der eingebaute Operator – bei Überlauf UB (UBSan, CI 45835265511:
-  `3 + 9223372036854775807` in bp_Structs.h), der Interpreter bricht um. Weg: in der Klasse ist jeder Platz der Sprache
-  (Variable, Feld, lokale Variable) ein Typ, dessen Operatoren die aus numbers.h sind (wie `num::Typed<T>` der Formel);
-  an der Tür der Engine gibt er seinen rohen Wert an einer Stelle. Kein Compiler-Schalter (`-fwrapv` ist abgelehnt);
+- **ein Platz der Sprache rechnet mit seinem Typ**: in der Klasse ist jede Zahl der Sprache – Variable, Feld eines
+  Structs der Sprache (auch der Spiegel eines Engine-Structs), lokale Variable, Ein- und Ausgang einer Funktion, Eintrag
+  einer Liste, Schlüssel und Wert einer Map, Eingang einer Formel – ein `kern::logic::num::Typed<T>`. Die Klasse nennt sie
+  `i64`, `f32` … (die Namen der Sprache im Bereich der Klasse, `EngineNodesOf` in engine_nodes.gen.h); `Count += n`,
+  `a * b`, `x << n`, `a < b` bleiben der Text und sind die Funktionen aus numbers.h (`Count += n` ist `add(Count, n)`, bricht
+  um wie der Add-Knoten). Ein eingebauter Operator von C++ kommt auf einem Platz nicht vor: zwei Operanden verschiedener
+  Typen (oder ein Fließkomma-Literal anderen Typs: `x + 0.5` bei `f32 x`) nimmt der Compiler nicht an – statt still auf
+  den Operator von C++ auszuweichen, ist es ein Fehler (`= delete`), wie der Leser es ablehnt. Eine Funktion von C++ (ein
+  Knoten der Engine, eine Funktion von PureNodes) bekommt die Zahl selbst – genau als ihren Typ (`Typed<i32>` gibt ein
+  `i32`, nie ein `f64`: das wäre eine Umwandlung, `num_cast`). An der Tür der Engine gibt der Platz seine Zahl an einer
+  Stelle (`engine_values::Direct<Num<T>>`), eine Zahl der Engine wird dort ein Platz; die Kleber nach außen (native_glue,
+  Exporte, Callbacks) ebenso. Ohne Compiler-Schalter (`-fwrapv` ist abgelehnt). Beleg: der Klassen-Fall `Wrap` (jede
+  ganze Zahl und f32, Add to Variable auf Variable, Feld, lokaler Variable und Listen-Eintrag, Add/Multiply/Divide und
+  Formeln an allen Paaren der Ränder; blueprint_native_test unter UBSan ohne Meldung, Klasse == Interpreter) und
+  `numbers_places_compute_as_numbers_h` (Interpreter und JIT == numbers.h, f32 == C++ in f32 ohne höhere Zwischengenauigkeit);
 - **das eine NaN**: welches NaN eine Rechnung gibt (Vorzeichen, Nutzlast), legen IEEE 754 und C++ nicht fest – x86 gibt
   für `0 * inf` ein negatives, und ein Compiler darf die Operanden von `a + b` tauschen, dann kommt das NaN des anderen
   durch (GCC mit -O1 tut es). Die Sprache legt es fest: solange gerechnet wird, ist ein NaN „ein NaN“ (kein Schritt zahlt

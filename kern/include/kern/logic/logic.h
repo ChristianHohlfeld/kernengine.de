@@ -310,6 +310,8 @@ struct Value {
   /// The number this is, as T: of a number of T itself its value; of one of another type (C++ of the engine that
   /// reads a value - no wire converts) as num::cast converts it; of anything else 0.
   template <num::Number T> T as() const;
+  /// The number as the type T, converted as static_cast<T> does - what the conversion node (num.cast) gives.
+  template <num::Number T> T cast_to() const;
   /// A number's bits (num::bits_of), of a bool 0 or 1.
   u64 bits() const { return type == PinType::boolean ? (b ? 1u : 0u) : static_cast<u64>(i); }
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
@@ -436,10 +438,21 @@ struct Value {
   json::Value to_json(const struct Graph& g, const struct TypeRef& declared) const;
   bool operator==(const Value& o) const;
 };
-template <num::Number T> T Value::as() const {
+/// How often a number was read as another number type than its own (Value::as) - a node that takes another type than
+/// its pin says, a silent conversion: the tests run every node and ask that it stays 0 (logic_no_node_takes_another_number_type).
+/// A conversion is the conversion node's (Value::cast_to), nowhere else.
+inline u64& numbers_read_as_another_type() {
+  static u64 count = 0;
+  return count;
+}
+template <num::Number T> T Value::cast_to() const {
   if (type == PinType::boolean) return num::cast<T>(b);
   if (!is_number(type)) return T(0);
   return num::visit(kind_of(type), [this](auto t) { return num::cast<T>(num::of_bits<typename decltype(t)::type>(static_cast<u64>(i))); });
+}
+template <num::Number T> T Value::as() const {
+  if (is_number(type) && type != number_type<T>()) ++numbers_read_as_another_type();
+  return cast_to<T>();
 }
 
 // ---------------------------------------------------------------------------

@@ -187,13 +187,15 @@ template <> struct Direct<Text> {
 };
 /// A number of the type T of the signature: the class holds T itself (no number is converted at the door).
 template <class T> struct Direct<Num<T>> {
+  // (the one place where a number of the class - a place of the language, numbers.h Typed - is handed to the engine
+  // as the number itself, and where one the engine gives becomes a place: of the very type, nothing converts)
   template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) {
-    static_assert(std::is_same_v<B, T>, "a pin of a number type the class holds as another type");
-    Conv<Num<T>>::from(o, Value::of_number<T>(b), c);
+    static_assert(std::is_same_v<num::raw<B>, T>, "a pin of a number type the class holds as another type");
+    Conv<Num<T>>::from(o, Value::of_number<T>(num::raw_value(b)), c);
   }
   template <class B, class C> static B make(EngineObjects& o, const C& c) {
-    static_assert(std::is_same_v<B, T>, "a pin of a number type the class holds as another type");
-    return Conv<Num<T>>::to(o, c).template as<T>();
+    static_assert(std::is_same_v<num::raw<B>, T>, "a pin of a number type the class holds as another type");
+    return B(Conv<Num<T>>::to(o, c).template as<T>());
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -532,6 +534,10 @@ template <class D, class S, class C, class B> struct FieldsOf<D, Struct<S>, C, B
 template <class D, class Tag, class C, class B> struct PlaceOps {
   using kern_place_value = B;   // (what stands there, read - kern::to reads it first)
   operator B() const { return self().ref().kern_read(); }
+  /// (a number: also the number itself, to a function of C++ that takes it)
+  template <class U>
+    requires(num::is_typed<B> && std::same_as<U, num::raw<B>>)
+  operator U() const { return self().ref().kern_read(); }
   /// A Set: what is set (the Blueprint's value, as the interpreter's Set gives it).
   template <class X> B operator=(const X& x) const {
     B b(x);

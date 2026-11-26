@@ -660,6 +660,173 @@ struct Calls : kern::Blueprint {
 // Local variables of functions: every call starts with their defaults; two functions have one of
 // the same name; numbers, a text, a list, a struct; a pure function sets its own; a call that is
 // interrupted by another call of the same function has its own back.
+/// The edge values of a number type for kWrap: 0, 1, 2, -1, -2, the ends and beside them; of f32 also a fraction, a
+/// sum that rounds, huge ones (inf), NaN.
+template <class X> std::vector<X> wrap_edges() {
+  using L = std::numeric_limits<X>;
+  if constexpr (std::is_floating_point_v<X>)
+    return {X(0), X(1), X(-1), X(0.1f), X(3.0f), X(16777216.0f), X(1e-30f), L::max(), -L::max(), L::infinity(), L::quiet_NaN()};
+  else if constexpr (std::is_signed_v<X>)
+    return {X(0), X(1), X(2), X(-1), X(-2), L::max(), static_cast<X>(L::max() - 1), L::min(), static_cast<X>(L::min() + 1), static_cast<X>(L::max() / 2 + 1)};
+  else
+    return {X(0), X(1), X(2), L::max(), static_cast<X>(L::max() - 1), static_cast<X>(L::max() / 2), static_cast<X>(L::max() / 2 + 1)};
+}
+/// Add to Variable and the operations on every kind of place of each number type, at the edges: a place of the
+/// class is a number of the language (numbers.h Typed) - Count += x goes round as the Add node does (C++'s own += on
+/// an i64 would be undefined there), f32 rounds every step (numbers_places_compute_as_numbers_h, blueprint_native).
+inline const char* kWrap = R"kn(
+struct Wrap : kern::Blueprint {
+  KERN_STRUCT(Box) { i8 F_i8 = 0; i16 F_i16 = 0; i32 F_i32 = 0; i64 F_i64 = 0; u8 F_u8 = 0; u16 F_u16 = 0; u32 F_u32 = 0; u64 F_u64 = 0; f32 F_f32 = 0.0f; };
+
+  i8 V_i8 = 0;
+  i16 V_i16 = 0;
+  i32 V_i32 = 0;
+  i64 V_i64 = 0;
+  u8 V_u8 = 0;
+  u16 V_u16 = 0;
+  u32 V_u32 = 0;
+  u64 V_u64 = 0;
+  f32 V_f32 = 0.0f;
+  List<i8> L_i8 = List<i8>{0};
+  List<i16> L_i16 = List<i16>{0};
+  List<i32> L_i32 = List<i32>{0};
+  List<i64> L_i64 = List<i64>{0};
+  List<u8> L_u8 = List<u8>{0};
+  List<u16> L_u16 = List<u16>{0};
+  List<u32> L_u32 = List<u32>{0};
+  List<u64> L_u64 = List<u64>{0};
+  List<f32> L_f32 = List<f32>{0.0f};
+  Box Held = Box{0, 0, 0, 0, 0, 0, 0, 0, 0.0f};
+
+  struct Add_i8Result { i8 var = 0; i8 field = 0; i8 local = 0; i8 listed = 0; i8 sum = 0; i8 product = 0; i8 quotient = 0; i8 formula = 0; i8 shifted = 0; };
+  Add_i8Result Add_i8(i8 x = 0, i8 y = 0) {
+    i8 Mine = 0;
+    V_i8 = x;
+    V_i8 += y;
+    Held.F_i8 = x;
+    Held.F_i8 += y;
+    Mine = x;
+    Mine += y;
+    L_i8[0] = x;
+    L_i8[0] += y;
+    return {V_i8, struct_break<Box>(Held).F_i8, Mine, list_get<i8>(L_i8, 0), math_add<i8>(x, y), math_mul<i8>(x, y), math_div<i8>(x, y), kern::formula<i8, i8>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i8, i8>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i16Result { i16 var = 0; i16 field = 0; i16 local = 0; i16 listed = 0; i16 sum = 0; i16 product = 0; i16 quotient = 0; i16 formula = 0; i16 shifted = 0; };
+  Add_i16Result Add_i16(i16 x = 0, i16 y = 0) {
+    i16 Mine = 0;
+    V_i16 = x;
+    V_i16 += y;
+    Held.F_i16 = x;
+    Held.F_i16 += y;
+    Mine = x;
+    Mine += y;
+    L_i16[0] = x;
+    L_i16[0] += y;
+    return {V_i16, struct_break<Box>(Held).F_i16, Mine, list_get<i16>(L_i16, 0), math_add<i16>(x, y), math_mul<i16>(x, y), math_div<i16>(x, y), kern::formula<i16, i16>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i16, i16>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i32Result { i32 var = 0; i32 field = 0; i32 local = 0; i32 listed = 0; i32 sum = 0; i32 product = 0; i32 quotient = 0; i32 formula = 0; i32 shifted = 0; };
+  Add_i32Result Add_i32(i32 x = 0, i32 y = 0) {
+    i32 Mine = 0;
+    V_i32 = x;
+    V_i32 += y;
+    Held.F_i32 = x;
+    Held.F_i32 += y;
+    Mine = x;
+    Mine += y;
+    L_i32[0] = x;
+    L_i32[0] += y;
+    return {V_i32, struct_break<Box>(Held).F_i32, Mine, list_get<i32>(L_i32, 0), math_add<i32>(x, y), math_mul<i32>(x, y), math_div<i32>(x, y), kern::formula<i32, i32>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i32, i32>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_i64Result { i64 var = 0; i64 field = 0; i64 local = 0; i64 listed = 0; i64 sum = 0; i64 product = 0; i64 quotient = 0; i64 formula = 0; i64 shifted = 0; };
+  Add_i64Result Add_i64(i64 x = 0, i64 y = 0) {
+    i64 Mine = 0;
+    V_i64 = x;
+    V_i64 += y;
+    Held.F_i64 = x;
+    Held.F_i64 += y;
+    Mine = x;
+    Mine += y;
+    L_i64[0] = x;
+    L_i64[0] += y;
+    return {V_i64, struct_break<Box>(Held).F_i64, Mine, list_get<i64>(L_i64, 0), math_add<i64>(x, y), math_mul<i64>(x, y), math_div<i64>(x, y), kern::formula<i64, i64>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<i64, i64>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u8Result { u8 var = 0; u8 field = 0; u8 local = 0; u8 listed = 0; u8 sum = 0; u8 product = 0; u8 quotient = 0; u8 formula = 0; u8 shifted = 0; };
+  Add_u8Result Add_u8(u8 x = 0, u8 y = 0) {
+    u8 Mine = 0;
+    V_u8 = x;
+    V_u8 += y;
+    Held.F_u8 = x;
+    Held.F_u8 += y;
+    Mine = x;
+    Mine += y;
+    L_u8[0] = x;
+    L_u8[0] += y;
+    return {V_u8, struct_break<Box>(Held).F_u8, Mine, list_get<u8>(L_u8, 0), math_add<u8>(x, y), math_mul<u8>(x, y), math_div<u8>(x, y), kern::formula<u8, u8>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u8, u8>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u16Result { u16 var = 0; u16 field = 0; u16 local = 0; u16 listed = 0; u16 sum = 0; u16 product = 0; u16 quotient = 0; u16 formula = 0; u16 shifted = 0; };
+  Add_u16Result Add_u16(u16 x = 0, u16 y = 0) {
+    u16 Mine = 0;
+    V_u16 = x;
+    V_u16 += y;
+    Held.F_u16 = x;
+    Held.F_u16 += y;
+    Mine = x;
+    Mine += y;
+    L_u16[0] = x;
+    L_u16[0] += y;
+    return {V_u16, struct_break<Box>(Held).F_u16, Mine, list_get<u16>(L_u16, 0), math_add<u16>(x, y), math_mul<u16>(x, y), math_div<u16>(x, y), kern::formula<u16, u16>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u16, u16>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u32Result { u32 var = 0; u32 field = 0; u32 local = 0; u32 listed = 0; u32 sum = 0; u32 product = 0; u32 quotient = 0; u32 formula = 0; u32 shifted = 0; };
+  Add_u32Result Add_u32(u32 x = 0, u32 y = 0) {
+    u32 Mine = 0;
+    V_u32 = x;
+    V_u32 += y;
+    Held.F_u32 = x;
+    Held.F_u32 += y;
+    Mine = x;
+    Mine += y;
+    L_u32[0] = x;
+    L_u32[0] += y;
+    return {V_u32, struct_break<Box>(Held).F_u32, Mine, list_get<u32>(L_u32, 0), math_add<u32>(x, y), math_mul<u32>(x, y), math_div<u32>(x, y), kern::formula<u32, u32>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u32, u32>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_u64Result { u64 var = 0; u64 field = 0; u64 local = 0; u64 listed = 0; u64 sum = 0; u64 product = 0; u64 quotient = 0; u64 formula = 0; u64 shifted = 0; };
+  Add_u64Result Add_u64(u64 x = 0, u64 y = 0) {
+    u64 Mine = 0;
+    V_u64 = x;
+    V_u64 += y;
+    Held.F_u64 = x;
+    Held.F_u64 += y;
+    Mine = x;
+    Mine += y;
+    L_u64[0] = x;
+    L_u64[0] += y;
+    return {V_u64, struct_break<Box>(Held).F_u64, Mine, list_get<u64>(L_u64, 0), math_add<u64>(x, y), math_mul<u64>(x, y), math_div<u64>(x, y), kern::formula<u64, u64>([](auto a, auto b) { return a * b + a - b; }, x, y), kern::formula<u64, u64>([](auto a, auto b) { return a << b; }, x, y)};
+  }
+
+  struct Add_f32Result { f32 var = 0.0f; f32 field = 0.0f; f32 local = 0.0f; f32 listed = 0.0f; f32 sum = 0.0f; f32 product = 0.0f; f32 quotient = 0.0f; f32 formula = 0.0f; };
+  Add_f32Result Add_f32(f32 x = 0.0f, f32 y = 0.0f) {
+    f32 Mine = 0.0f;
+    V_f32 = x;
+    V_f32 += y;
+    Held.F_f32 = x;
+    Held.F_f32 += y;
+    Mine = x;
+    Mine += y;
+    L_f32[0] = x;
+    L_f32[0] += y;
+    return {V_f32, struct_break<Box>(Held).F_f32, Mine, list_get<f32>(L_f32, 0), math_add<f32>(x, y), math_mul<f32>(x, y), math_div<f32>(x, y), kern::formula<f32, f32>([](auto a, auto b) { return a * b + a - b; }, x, y)};
+  }
+
+};
+)kn";
+
 inline const char* kLocals = R"kn(
 struct Locals : kern::Blueprint {
   KERN_STRUCT(Hit) { Text Who = ""; f64 Damage = 1.0; };
@@ -1697,6 +1864,18 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Both", {N(-1), N(-1)}});
     c.calls.push_back({"Scale", {N(0), N(0)}});
   }
+  if (Case& c = read("Wrap", kWrap); c.error.empty()) {
+    // (every pair of the edge values of each type: a place goes round, f32 rounds - the class as the interpreter)
+    auto each = [&](auto t) {
+      using X = typename decltype(t)::type;
+      const std::string fn = "Add_" + std::string(logic::num::kind_name(logic::num::kind_of<X>()));
+      for (X x : wrap_edges<X>())
+        for (X y : wrap_edges<X>()) c.calls.push_back({fn, {Value::of_number<X>(x), Value::of_number<X>(y)}});
+    };
+    each(std::type_identity<i8>{}), each(std::type_identity<i16>{}), each(std::type_identity<i32>{}), each(std::type_identity<i64>{});
+    each(std::type_identity<u8>{}), each(std::type_identity<u16>{}), each(std::type_identity<u32>{}), each(std::type_identity<u64>{});
+    each(std::type_identity<f32>{});
+  }
   if (Case& c = read("Locals", kLocals); c.error.empty()) {
     for (i64 n : {3, 0, 5, 1}) c.calls.push_back({"SumTo", {I(n)}});
     c.calls.push_back({"Join", {T("a"), T("b"), N(2)}});
@@ -1997,9 +2176,10 @@ inline std::string c_string(const std::string& s) {
 inline std::string builtin_cpp_type(PinType t) {
   // (a number: the C++ type itself)
   if (t == PinType::boolean) return "bool";
-  if (logic::is_number(t)) return "kern::" + std::string(logic::pin_type_name(t));
+  // (a number of the class: a place of the language - numbers.h Typed, what the class names f32)
+  if (logic::is_number(t)) return "kern::logic::num::Typed<kern::" + std::string(logic::pin_type_name(t)) + ">";
   if (t == PinType::boolean_list) return "kern::List<bool>";
-  if (logic::is_list(t) && logic::is_number(logic::element_of(t))) return "kern::List<kern::" + std::string(logic::pin_type_name(logic::element_of(t))) + ">";
+  if (logic::is_list(t) && logic::is_number(logic::element_of(t))) return "kern::List<kern::logic::num::Typed<kern::" + std::string(logic::pin_type_name(logic::element_of(t))) + ">>";
   switch (t) {
     case PinType::vector: return "kern::Vec3";
     case PinType::text: return "kern::logic::Text";

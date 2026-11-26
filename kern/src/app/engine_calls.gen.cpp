@@ -26,28 +26,28 @@ struct S_RendererOptions { [[maybe_unused]] static Value to(EngineObjects& o, co
 struct S_ShadowOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::ShadowOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::ShadowOptions& x); };
 struct S_Touch { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Touch& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Touch& x); };
 struct S_Vec4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Vec4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
-Value S_AoOptions::to(EngineObjects& o, const kern::AoOptions& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Enum<E_AoQuality>>::to(o, x.quality), ev::Conv<ev::Bool>::to(o, x.half_resolution), ev::Conv<ev::Num<f32>>::to(o, x.radius), ev::Conv<ev::Num<f32>>::to(o, x.power), ev::Conv<ev::Bool>::to(o, x.adaptive)}); }
-void S_AoOptions::from(EngineObjects& o, const Value& v, kern::AoOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(1)) ev::Conv<ev::Enum<E_AoQuality>>::from(o, *f, x.quality); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.half_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.radius); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.power); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.adaptive); }
+Value S_AoOptions::to(EngineObjects& o, const kern::AoOptions& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Enum<E_AoQuality>>::to(o, x.quality), ev::Conv<ev::Bool>::to(o, x.half_resolution), ev::Conv<ev::Num<::kern::f32>>::to(o, x.radius), ev::Conv<ev::Num<::kern::f32>>::to(o, x.power), ev::Conv<ev::Bool>::to(o, x.adaptive)}); }
+void S_AoOptions::from(EngineObjects& o, const Value& v, kern::AoOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(1)) ev::Conv<ev::Enum<E_AoQuality>>::from(o, *f, x.quality); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.half_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.radius); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.power); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.adaptive); }
 Value S_BloomOptions::to(EngineObjects& o, const kern::BloomOptions& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Bool>::to(o, x.forced), ev::Conv<ev::Bool>::to(o, x.grade)}); }
 void S_BloomOptions::from(EngineObjects& o, const Value& v, kern::BloomOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(1)) ev::Conv<ev::Bool>::from(o, *f, x.forced); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.grade); }
-Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Num<f32>>::to(o, x.fov), ev::Conv<ev::Num<f32>>::to(o, x.near), ev::Conv<ev::Num<f32>>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Num<f32>>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
-void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
-Value S_Frame::to(EngineObjects& o, const kern::Frame& x) { return Value::structure({ev::Conv<ev::Num<f64>>::to(o, x.time), ev::Conv<ev::Num<f32>>::to(o, x.dt), ev::Conv<ev::Num<u64>>::to(o, x.index)}); }
-void S_Frame::from(EngineObjects& o, const Value& v, kern::Frame& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f64>>::from(o, *f, x.time); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.dt); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u64>>::from(o, *f, x.index); }
-Value S_Gamepad::to(EngineObjects& o, const kern::Gamepad& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.connected), ev::Conv<ev::Num<f32>>::to(o, x.lx), ev::Conv<ev::Num<f32>>::to(o, x.ly), ev::Conv<ev::Num<f32>>::to(o, x.rx), ev::Conv<ev::Num<f32>>::to(o, x.ry), ev::Conv<ev::Num<f32>>::to(o, x.lt), ev::Conv<ev::Num<f32>>::to(o, x.rt), ev::Conv<ev::Num<u32>>::to(o, x.buttons)}); }
-void S_Gamepad::from(EngineObjects& o, const Value& v, kern::Gamepad& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.connected); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.lx); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.ly); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rx); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.ry); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.lt); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rt); if (const Value* f = v.field(7)) ev::Conv<ev::Num<u32>>::from(o, *f, x.buttons); }
-Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.m)}); }
-void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.m); }
-Value S_RenderStats::to(EngineObjects& o, const kern::RenderStats& x) { return Value::structure({ev::Conv<ev::Num<u32>>::to(o, x.draw_calls), ev::Conv<ev::Num<u32>>::to(o, x.shadow_draw_calls), ev::Conv<ev::Num<u32>>::to(o, x.shadow_resolution), ev::Conv<ev::Bool>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.shadow_reused), ev::Conv<ev::Num<f64>>::to(o, x.triangles), ev::Conv<ev::Num<u32>>::to(o, x.instances), ev::Conv<ev::Num<u32>>::to(o, x.culled_meshes), ev::Conv<ev::Num<u32>>::to(o, x.visible_meshes), ev::Conv<ev::Num<f64>>::to(o, x.cpu_ms), ev::Conv<ev::Num<f64>>::to(o, x.gpu_ms), ev::Conv<ev::Enum<E_BloomState>>::to(o, x.bloom)}); }
-void S_RenderStats::from(EngineObjects& o, const Value& v, kern::RenderStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u32>>::from(o, *f, x.draw_calls); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u32>>::from(o, *f, x.shadow_draw_calls); if (const Value* f = v.field(2)) ev::Conv<ev::Num<u32>>::from(o, *f, x.shadow_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.ao); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.shadow_reused); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f64>>::from(o, *f, x.triangles); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u32>>::from(o, *f, x.instances); if (const Value* f = v.field(7)) ev::Conv<ev::Num<u32>>::from(o, *f, x.culled_meshes); if (const Value* f = v.field(8)) ev::Conv<ev::Num<u32>>::from(o, *f, x.visible_meshes); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f64>>::from(o, *f, x.cpu_ms); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f64>>::from(o, *f, x.gpu_ms); if (const Value* f = v.field(11)) ev::Conv<ev::Enum<E_BloomState>>::from(o, *f, x.bloom); }
-Value S_RendererOptions::to(EngineObjects& o, const kern::RendererOptions& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.width), ev::Conv<ev::Num<i32>>::to(o, x.height), ev::Conv<ev::Bool>::to(o, x.shadows), ev::Conv<ev::Struct<S_ShadowOptions>>::to(o, x.shadow), ev::Conv<ev::Struct<S_BloomOptions>>::to(o, x.bloom), ev::Conv<ev::Struct<S_AoOptions>>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.grade)}); }
-void S_RendererOptions::from(EngineObjects& o, const Value& v, kern::RendererOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.width); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.shadows); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_ShadowOptions>>::from(o, *f, x.shadow); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_BloomOptions>>::from(o, *f, x.bloom); if (const Value* f = v.field(5)) ev::Conv<ev::Struct<S_AoOptions>>::from(o, *f, x.ao); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.grade); }
-Value S_ShadowOptions::to(EngineObjects& o, const kern::ShadowOptions& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.resolution), ev::Conv<ev::Num<f32>>::to(o, x.extent), ev::Conv<ev::Num<f32>>::to(o, x.bias), ev::Conv<ev::Num<i32>>::to(o, x.filter)}); }
-void S_ShadowOptions::from(EngineObjects& o, const Value& v, kern::ShadowOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.resolution); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.extent); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.bias); if (const Value* f = v.field(3)) ev::Conv<ev::Num<i32>>::from(o, *f, x.filter); }
-Value S_Touch::to(EngineObjects& o, const kern::Touch& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.id), ev::Conv<ev::Vector>::to(o, x.start), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Vector>::to(o, x.previous), ev::Conv<ev::Bool>::to(o, x.began)}); }
-void S_Touch::from(EngineObjects& o, const Value& v, kern::Touch& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.start); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.previous); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.began); }
-Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.x), ev::Conv<ev::Num<f32>>::to(o, x.y), ev::Conv<ev::Num<f32>>::to(o, x.z), ev::Conv<ev::Num<f32>>::to(o, x.w)}); }
-void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.w); }
+Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Num<::kern::f32>>::to(o, x.fov), ev::Conv<ev::Num<::kern::f32>>::to(o, x.near), ev::Conv<ev::Num<::kern::f32>>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Num<::kern::f32>>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
+void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
+Value S_Frame::to(EngineObjects& o, const kern::Frame& x) { return Value::structure({ev::Conv<ev::Num<::kern::f64>>::to(o, x.time), ev::Conv<ev::Num<::kern::f32>>::to(o, x.dt), ev::Conv<ev::Num<::kern::u64>>::to(o, x.index)}); }
+void S_Frame::from(EngineObjects& o, const Value& v, kern::Frame& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f64>>::from(o, *f, x.time); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.dt); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.index); }
+Value S_Gamepad::to(EngineObjects& o, const kern::Gamepad& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.connected), ev::Conv<ev::Num<::kern::f32>>::to(o, x.lx), ev::Conv<ev::Num<::kern::f32>>::to(o, x.ly), ev::Conv<ev::Num<::kern::f32>>::to(o, x.rx), ev::Conv<ev::Num<::kern::f32>>::to(o, x.ry), ev::Conv<ev::Num<::kern::f32>>::to(o, x.lt), ev::Conv<ev::Num<::kern::f32>>::to(o, x.rt), ev::Conv<ev::Num<::kern::u32>>::to(o, x.buttons)}); }
+void S_Gamepad::from(EngineObjects& o, const Value& v, kern::Gamepad& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.connected); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.lx); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.ly); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.rx); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.ry); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.lt); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.rt); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.buttons); }
+Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.m)}); }
+void S_Mat4::from(EngineObjects& o, const Value& v, kern::Mat4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.m); }
+Value S_RenderStats::to(EngineObjects& o, const kern::RenderStats& x) { return Value::structure({ev::Conv<ev::Num<::kern::u32>>::to(o, x.draw_calls), ev::Conv<ev::Num<::kern::u32>>::to(o, x.shadow_draw_calls), ev::Conv<ev::Num<::kern::u32>>::to(o, x.shadow_resolution), ev::Conv<ev::Bool>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.shadow_reused), ev::Conv<ev::Num<::kern::f64>>::to(o, x.triangles), ev::Conv<ev::Num<::kern::u32>>::to(o, x.instances), ev::Conv<ev::Num<::kern::u32>>::to(o, x.culled_meshes), ev::Conv<ev::Num<::kern::u32>>::to(o, x.visible_meshes), ev::Conv<ev::Num<::kern::f64>>::to(o, x.cpu_ms), ev::Conv<ev::Num<::kern::f64>>::to(o, x.gpu_ms), ev::Conv<ev::Enum<E_BloomState>>::to(o, x.bloom)}); }
+void S_RenderStats::from(EngineObjects& o, const Value& v, kern::RenderStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.draw_calls); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.shadow_draw_calls); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.shadow_resolution); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.ao); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.shadow_reused); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f64>>::from(o, *f, x.triangles); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.instances); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.culled_meshes); if (const Value* f = v.field(8)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.visible_meshes); if (const Value* f = v.field(9)) ev::Conv<ev::Num<::kern::f64>>::from(o, *f, x.cpu_ms); if (const Value* f = v.field(10)) ev::Conv<ev::Num<::kern::f64>>::from(o, *f, x.gpu_ms); if (const Value* f = v.field(11)) ev::Conv<ev::Enum<E_BloomState>>::from(o, *f, x.bloom); }
+Value S_RendererOptions::to(EngineObjects& o, const kern::RendererOptions& x) { return Value::structure({ev::Conv<ev::Num<::kern::i32>>::to(o, x.width), ev::Conv<ev::Num<::kern::i32>>::to(o, x.height), ev::Conv<ev::Bool>::to(o, x.shadows), ev::Conv<ev::Struct<S_ShadowOptions>>::to(o, x.shadow), ev::Conv<ev::Struct<S_BloomOptions>>::to(o, x.bloom), ev::Conv<ev::Struct<S_AoOptions>>::to(o, x.ao), ev::Conv<ev::Bool>::to(o, x.grade)}); }
+void S_RendererOptions::from(EngineObjects& o, const Value& v, kern::RendererOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.width); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.shadows); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_ShadowOptions>>::from(o, *f, x.shadow); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_BloomOptions>>::from(o, *f, x.bloom); if (const Value* f = v.field(5)) ev::Conv<ev::Struct<S_AoOptions>>::from(o, *f, x.ao); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.grade); }
+Value S_ShadowOptions::to(EngineObjects& o, const kern::ShadowOptions& x) { return Value::structure({ev::Conv<ev::Num<::kern::i32>>::to(o, x.resolution), ev::Conv<ev::Num<::kern::f32>>::to(o, x.extent), ev::Conv<ev::Num<::kern::f32>>::to(o, x.bias), ev::Conv<ev::Num<::kern::i32>>::to(o, x.filter)}); }
+void S_ShadowOptions::from(EngineObjects& o, const Value& v, kern::ShadowOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.resolution); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.extent); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.bias); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.filter); }
+Value S_Touch::to(EngineObjects& o, const kern::Touch& x) { return Value::structure({ev::Conv<ev::Num<::kern::i32>>::to(o, x.id), ev::Conv<ev::Vector>::to(o, x.start), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Vector>::to(o, x.previous), ev::Conv<ev::Bool>::to(o, x.began)}); }
+void S_Touch::from(EngineObjects& o, const Value& v, kern::Touch& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.start); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.previous); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.began); }
+Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.x), ev::Conv<ev::Num<::kern::f32>>::to(o, x.y), ev::Conv<ev::Num<::kern::f32>>::to(o, x.z), ev::Conv<ev::Num<::kern::f32>>::to(o, x.w)}); }
+void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.w); }
 
 // engine.input.down: kern::Input::down
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
@@ -105,7 +105,7 @@ bool c5(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 1, a0);
   decltype(auto) r = self->button(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -116,7 +116,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 1, a0);
   decltype(auto) r = self->button_pressed(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -127,7 +127,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   decltype(auto) r = self->wheel();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -145,7 +145,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   decltype(auto) r = self->touch_count();
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
@@ -196,7 +196,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 1, a0);
   self->pointer_buttons(std::move(a0));
   return true;
 }
@@ -206,7 +206,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->add_wheel(std::move(a0));
   return true;
 }
@@ -216,9 +216,9 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Input>(o, in, 0, "input");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Num<i32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::i32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Num<i32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::i32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec2>>();
   ev::take<ev::Vector>(o, in, 3, a2);
   self->touch(std::move(a0), std::move(a1), std::move(a2));
@@ -373,7 +373,7 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   decltype(auto) r = self->axis(a0.c_str());
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -386,7 +386,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::i64>>();
-  ev::take<ev::Num<i64>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::i64>>(o, in, 3, a2);
   decltype(auto) r = self->save_int(a0.c_str(), a1.c_str(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -401,7 +401,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Num<f64>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f64>>(o, in, 3, a2);
   decltype(auto) r = self->save_float(a0.c_str(), a1.c_str(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -446,9 +446,9 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::i64>>();
-  ev::take<ev::Num<i64>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::i64>>(o, in, 3, a2);
   decltype(auto) r = self->load_int(a0.c_str(), a1.c_str(), std::move(a2));
-  ev::give<ev::Num<i64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i64>>(o, out, 0, r);
   return true;
 }
 
@@ -461,9 +461,9 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Num<f64>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f64>>(o, in, 3, a2);
   decltype(auto) r = self->load_float(a0.c_str(), a1.c_str(), std::move(a2));
-  ev::give<ev::Num<f64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f64>>(o, out, 0, r);
   return true;
 }
 
@@ -550,9 +550,9 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   self->ui_text(a0.c_str(), a1.c_str(), std::move(a2), std::move(a3));
   return true;
 }
@@ -566,13 +566,13 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 5, a4);
+  ev::take<ev::Num<::kern::f32>>(o, in, 5, a4);
   auto a5 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 6, a5);
+  ev::take<ev::Num<::kern::f32>>(o, in, 6, a5);
   self->ui_bar(a0.c_str(), a1.c_str(), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
   return true;
 }
@@ -586,9 +586,9 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   decltype(auto) r = self->ui_button(a0.c_str(), a1.c_str(), std::move(a2), std::move(a3));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -603,11 +603,11 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a1;
   ev::take<ev::Text>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   decltype(auto) r = self->ui_menu(a0.c_str(), a1.c_str(), std::move(a2), std::move(a3));
-  ev::give<ev::Num<i32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i32>>(o, out, 0, r);
   return true;
 }
 
@@ -627,7 +627,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Num<i32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::i32>>(o, in, 2, a1);
   self->ui_event(a0, std::move(a1));
   return true;
 }
@@ -689,9 +689,9 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<double>>();
-  ev::take<ev::Num<f64>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f64>>(o, in, 2, a1);
   decltype(auto) r = self->arg_number(a0.c_str(), std::move(a1));
-  ev::give<ev::Num<f64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f64>>(o, out, 0, r);
   return true;
 }
 
@@ -702,7 +702,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   std::string a0;
   ev::take<ev::Text>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::u32>>(o, in, 2, a1);
   self->set_args(a0.c_str(), std::move(a1));
   return true;
 }
@@ -712,7 +712,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->width();
-  ev::give<ev::Num<i32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i32>>(o, out, 0, r);
   return true;
 }
 
@@ -721,7 +721,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->height();
-  ev::give<ev::Num<i32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i32>>(o, out, 0, r);
   return true;
 }
 
@@ -730,7 +730,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->aspect();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -843,7 +843,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_head_yaw();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -852,7 +852,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->set_xr_head_yaw(std::move(a0));
   return true;
 }
@@ -938,7 +938,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_vignette();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -947,7 +947,7 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->set_xr_vignette(std::move(a0));
   return true;
 }
@@ -957,7 +957,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_vignette_mesh();
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
@@ -966,7 +966,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 1, a0);
   self->set_xr_vignette_mesh(std::move(a0));
   return true;
 }
@@ -1014,7 +1014,7 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope_fbo();
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
@@ -1023,7 +1023,7 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
-  ev::take<ev::Num<u32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::u32>>(o, in, 1, a0);
   self->set_xr_scope_fbo(std::move(a0));
   return true;
 }
@@ -1033,7 +1033,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->xr_scope_size();
-  ev::give<ev::Num<i32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i32>>(o, out, 0, r);
   return true;
 }
 
@@ -1042,7 +1042,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Num<i32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::i32>>(o, in, 1, a0);
   self->set_xr_scope_size(std::move(a0));
   return true;
 }
@@ -1071,7 +1071,7 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   decltype(auto) r = self->stereo_ipd();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -1080,7 +1080,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::Engine>(o, in, 0, "engine");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->set_stereo_ipd(std::move(a0));
   return true;
 }
@@ -1159,7 +1159,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 // engine.project_json.num: kern::project_json::num
 bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 0, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 0, a0);
   decltype(auto) r = kern::project_json::num(std::move(a0));
   out[0] = Value::object(o.ref(ev::handle_of<kern::json::Value>(o, std::forward<decltype(r)>(r))));
   return true;

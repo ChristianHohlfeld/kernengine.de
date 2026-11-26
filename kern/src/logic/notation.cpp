@@ -5415,9 +5415,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   auto builtin = [](PinType t) -> std::string {
     // (a number: the C++ type itself - kern::f32 ...)
     if (t == PinType::boolean) return "bool";
-    if (is_number(t)) return "kern::" + std::string(pin_type_name(t));
+    // (a number of the class: a place of the language - kern::logic::num::Typed<kern::f32>, what the class names f32)
+    if (is_number(t)) return "kern::logic::num::Typed<kern::" + std::string(pin_type_name(t)) + ">";
     if (t == PinType::boolean_list) return "kern::List<bool>";
-    if (is_list(t) && is_number(element_of(t))) return "kern::List<kern::" + std::string(pin_type_name(element_of(t))) + ">";
+    if (is_list(t) && is_number(element_of(t))) return "kern::List<kern::logic::num::Typed<kern::" + std::string(pin_type_name(element_of(t))) + ">>";
     switch (t) {
       case PinType::vector: return "kern::Vec3";
       case PinType::text: return "kern::logic::Text";
@@ -5440,6 +5441,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";
       const std::vector<TypeRef> in = callback_inputs({t, of});
       for (std::size_t k = 0; k < in.size(); ++k) c += (k ? ", " : "") + inner(in[k]);
+      // (a Callback is called with the numbers themselves - the engine calls it: kern::f64, not the class's place)
+      for (std::size_t at; (at = c.find("kern::logic::num::Typed<")) != std::string::npos;) {
+        const std::size_t end = c.find('>', at);
+        c = c.substr(0, at) + c.substr(at + 24, end - at - 24) + c.substr(end + 1);
+      }
       return c + ")>";
     }
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);

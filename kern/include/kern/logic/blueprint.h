@@ -99,7 +99,7 @@ struct Machine {
 /// inputs, the formula as the lambda's body. Each input is a logic::num::Typed of its type there, whose operators and
 /// functions are those of numbers.h: the lambda computes what the node computes, bit for bit (logic.h, Formula).
 template <class... T, class F> constexpr auto formula(F&& f, std::type_identity_t<T>... values) {
-  return logic::num::untyped(f(logic::num::Typed<T>(values)...));
+  return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
 }
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
@@ -132,17 +132,17 @@ template <class T> auto only(T&& r) {
 }
 template <class Res> struct given { using type = decltype(only(std::declval<Res>())); };
 template <class Res> requires gives_nothing<Res> struct given<Res> { using type = void; };
-template <auto F, class L, class Res, class P, class... A> Callback<typename given<Res>::type(A...)> bound(Res (L::*)(const P&, A...), const P& place) {
-  using R = typename given<Res>::type;
-  return {[](void* p, A... a) -> R {
+template <auto F, class L, class Res, class P, class... A> Callback<num::raw<typename given<Res>::type>(num::raw<A>...)> bound(Res (L::*)(const P&, A...), const P& place) {
+  using R = num::raw<typename given<Res>::type>;
+  return {[](void* p, num::raw<A>... a) -> R {
             if constexpr (std::is_void_v<R>) (the_library<L>.*F)(*static_cast<const P*>(p), a...);
             else return only((the_library<L>.*F)(*static_cast<const P*>(p), a...));
           },
           const_cast<P*>(&place)};
 }
-template <auto F, class L, class Res, class... A> Callback<typename given<Res>::type(A...)> free(Res (L::*)(A...)) {
-  using R = typename given<Res>::type;
-  return {[](void*, A... a) -> R {
+template <auto F, class L, class Res, class... A> Callback<num::raw<typename given<Res>::type>(num::raw<A>...)> free(Res (L::*)(A...)) {
+  using R = num::raw<typename given<Res>::type>;
+  return {[](void*, num::raw<A>... a) -> R {
             if constexpr (std::is_void_v<R>) (the_library<L>.*F)(a...);
             else return only((the_library<L>.*F)(a...));
           },
@@ -166,7 +166,7 @@ struct BlueprintCore : logic::PureNodes {
   template <class K, class V> using Map = logic::Map<K, V>;
   template <class K> using Set = logic::Set<K>;
   /// A function of a library the engine calls, with the place it is bound to: Callback<Float(f64, f64)>.
-  template <class S> using Callback = logic::Callback<S>;
+  template <class S> using Callback = logic::Callback<typename logic::num::raw_signature<S>::type>;   // (the numbers themselves: the engine calls it)
   /// Make Callback: callback<&Terrain_lib::height_at>(self) - the library's function, its first input bound to
   /// the place (a const reference: read when the engine calls); callback<&Lib::fn>() binds none.
   template <auto F, class P> static auto callback(const P& place) { return logic::callbacks::bound<F>(F, place); }
@@ -620,8 +620,8 @@ struct BlueprintCore : logic::PureNodes {
   template <class L> static Text text_of_bytes(const L& bytes, Int at, Int count) { return logic::texts::of_bytes(logic::items_of(read_of(bytes)), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Bytes of Text: its bytes, a List<U8> (one request for memory, as std::vector<u8> of the text's range makes it).
-  static List<u8> text_bytes(const Text& a) {
-    List<u8> r;
+  static List<logic::num::Typed<u8>> text_bytes(const Text& a) {
+    List<logic::num::Typed<u8>> r;
     logic::texts::insert_bytes(r, 0, a.view());
     return r;
   }
@@ -735,9 +735,9 @@ struct BlueprintCore : logic::PureNodes {
     return logic::format::text_of(Format.view(), args, sizeof...(V), most);
   }
   template <class T>
-    requires(logic::num::Number<T> && !std::is_same_v<T, bool>)
+    requires(logic::num::Number<logic::num::raw<T>> && !std::is_same_v<T, bool>)
   static logic::format::Arg format_arg(T v) {
-    return logic::format::arg(v);   // (a whole number: its bits, as C's varargs; an f32 promoted to a double)
+    return logic::format::arg(logic::num::raw_value(v));   // (a whole number: its bits, as C's varargs; an f32 promoted to a double)
   }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
   /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
@@ -819,7 +819,7 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Bytes of Struct cannot be read");
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
-    Fixed<u8, kLayout.size> out;   // (the bytes: std::array<u8, N>)
+    Fixed<logic::num::Typed<u8>, kLayout.size> out;   // (the bytes: std::array of the class's u8, N)
     std::size_t k = 0;
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;
@@ -839,14 +839,14 @@ struct BlueprintCore : logic::PureNodes {
   }
   // (a field's own bits: it is of the layout's number type - numbers.h's bits_of)
   template <class B, class T>
-    requires logic::num::Number<T>
+    requires logic::num::Number<logic::num::raw<T>>
   static void put_bytes(B* out, const logic::bytes::Field& f, T v) {
-    logic::bytes::put(out, f, logic::num::seen_bits(v));  // (a NaN: the one NaN - numbers.h, seen)
+    logic::bytes::put(out, f, logic::num::seen_bits(logic::num::raw_value(v)));  // (a NaN: the one NaN - numbers.h, seen)
   }
   template <class B, class T>
-    requires logic::num::Number<T>
+    requires logic::num::Number<logic::num::raw<T>>
   static void take_bytes(T& to, const logic::bytes::Field& f, B&& byte) {
-    to = logic::num::of_bits<T>(logic::bytes::take(f, byte));
+    to = logic::num::of_bits<logic::num::raw<T>>(logic::bytes::take(f, byte));
   }
 
   // ---- steps ----
@@ -871,7 +871,7 @@ struct BlueprintCore : logic::PureNodes {
 
   // ---- values with a setting ----
   // (the operator is known when the class is compiled: the same expressions as compare, chosen then)
-  template <Setting Op, class T> static Bool math_compare(std::type_identity_t<T> a, std::type_identity_t<T> b) {
+  template <Setting Op, class P, class T = logic::num::raw<P>> static Bool math_compare(std::type_identity_t<T> a, std::type_identity_t<T> b) {
     if constexpr (Op.view() == "==") return logic::num::eq(a, b);
     else if constexpr (Op.view() == "!=") return logic::num::ne(a, b);
     else if constexpr (Op.view() == "<") return logic::num::lt(a, b);

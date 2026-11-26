@@ -1905,7 +1905,7 @@ void add_math(Library& lib) {
     d.run = [](Context& c) {
       const Value x = c.in(std::size_t{0});
       const PinType to = number_setting(c.node(), "to", F::number);
-      c.out(std::size_t{0}, with_number(to, [&](auto t) { return Value::of_number(x.as<typename decltype(t)::type>()); }));
+      c.out(std::size_t{0}, with_number(to, [&](auto t) { return Value::of_number(x.template cast_to<typename decltype(t)::type>()); }));
       return kStop;
     };
     lib.add(std::move(d));

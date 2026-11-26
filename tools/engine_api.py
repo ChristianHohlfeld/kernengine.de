@@ -560,7 +560,7 @@ class Calls:
         """`ev`, `types`: how the file the tag stands in names engine_values and the tool's own types (E_, S_)."""
         u = self.u
         if bt in c2b.NUMS and bt != "bool":   # (a number: of the type of the signature - engine_values::Num<T>)
-            return f"{ev}Num<{bt}>"
+            return f"{ev}Num<::kern::{bt}>"
         if bt == "bool":
             return ev + "Bool"
         if c2b.wire(bt) in SCALAR_TAG:
@@ -1125,10 +1125,9 @@ class Calls:
                 "// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).",
                 *adapters, "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
-                "  // (the number types of the language, by their C++ names - a Blueprint's class names them in its own scope)",
-                "  using i8 = ::kern::i8;", "  using i16 = ::kern::i16;", "  using i32 = ::kern::i32;", "  using i64 = ::kern::i64;",
-                "  using u8 = ::kern::u8;", "  using u16 = ::kern::u16;", "  using u32 = ::kern::u32;", "  using u64 = ::kern::u64;",
-                "  using f32 = ::kern::f32;", "  using f64 = ::kern::f64;",
+                "  // (the number types of the language, by their C++ names - a Blueprint's class names them in its own scope: places",
+                "  // whose operators are those of the language, numbers.h Typed; a function of C++ is handed the number itself)",
+                *[f"  using {t} = ::kern::logic::num::Typed<::kern::{t}>;" for t in ("i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64")],
                 "  using Bool = bool;", "  using Int = i64;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = u64;", "  using Actor = logic::ActorHandle;",
                 "  using U8 = u8;", "  using U16 = u16;", "  using U32 = u32;", "  using I8 = i8;", "  using I16 = i16;", "  using I32 = i32;",
                 "  template <class T> using List = logic::List<T>;", "",

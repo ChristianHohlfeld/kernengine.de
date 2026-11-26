@@ -219,7 +219,8 @@ class WasmGen {
     const PinDef& pin = in_.inputs_at(node)[static_cast<std::size_t>(k)];
     const Instance::SourceRef s = in_.source_of(node, k);
     if (s.node < 0) {
-      f64c(in_.literal_of(node, k).as_number());
+      // (OFFEN: the JIT holds the numbers of the flow it computes itself as f64 - exact up to 2^53; a typed way is open)
+      f64c(in_.literal_of(node, k).cast_to<f64>());
       return;
     }
     (void)depth;

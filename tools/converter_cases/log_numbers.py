@@ -34,6 +34,9 @@ CALLS = re.compile(r"^it calls (.+?)\(\), which waits")
 TEST = re.compile(r"its test cannot compare it yet \((.*)\)")
 CLANG = re.compile(r"^--- (\S+?): (?:clang: )?\S*?:\d+:\d+: error: (.*)$")
 DROPPED = re.compile(r"^--- (\S+?): without the (\w+) (.+?): (.*)$")
+# (the hint where the width of size_t can change the result - LP64's u64 against 32 bits: its count and its places)
+SIZE_T = re.compile(r"^(\d+) places? where the width of size_t can change the result")
+SIZE_T_AT = re.compile(r"^--- size_t: (\S+): (.*)$")
 
 
 def fatal(line):
@@ -45,7 +48,7 @@ def fatal(line):
 
 
 def numbers(path):
-    out = {"fatal": [], "functions": {}, "written": None, "compared": None, "clang": collections.Counter(), "dropped": collections.Counter()}
+    out = {"fatal": [], "functions": {}, "written": None, "compared": None, "clang": collections.Counter(), "dropped": collections.Counter(), "size_t": None, "size_t_at": []}
     blueprint = None
     for raw in open(path, encoding="utf-8", errors="replace"):
         line = STAMP.sub("", raw.rstrip("\n"))
@@ -65,6 +68,13 @@ def numbers(path):
             out["written"] = tuple(int(x) for x in WRITTEN.match(line).groups())
         if COMPARED.match(line):
             out["compared"] = int(COMPARED.match(line).group(1))
+        m = SIZE_T.match(line)
+        if m:
+            out["size_t"] = int(m.group(1))
+        m = SIZE_T_AT.match(line)
+        if m:
+            out["size_t_at"].append(f"{m.group(1)}: {m.group(2)}")
+            continue
         m = CLANG.match(line)
         if m:
             out["clang"][re.sub(r"converted_\w+?::", "converted_<test>::", m.group(2))] += 1
@@ -105,6 +115,9 @@ def summary(name, n, top=25):
     if n["clang"]:
         lines.append(f"the compiler on the tests: {sum(n['clang'].values())} errors")
         lines += [f"  {c:5}  {x[:200]}" for x, c in n["clang"].most_common(top)]
+    if n["size_t"] is not None:
+        lines.append(f"where the width of size_t can change the result (a hint): {n['size_t']}")
+        lines += ["  " + x[:200] for x in n["size_t_at"][:top]]
     if n["dropped"]:
         lines.append(f"pieces the tests go without: {sum(n['dropped'].values())}")
         lines += [f"  {c:5}  {x}" for x, c in n["dropped"].most_common(10)]

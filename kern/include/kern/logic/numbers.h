@@ -331,71 +331,163 @@ template <Floating T> inline bool isinf(T a) { return std::isinf(a); }
 template <Floating T> inline bool isfinite(T a) { return std::isfinite(a); }
 template <Floating T> inline bool signbit(T a) { return std::signbit(a); }
 
-// ---- a formula in C++: a number of one type whose operators are the functions above ----
-/// What the inputs of a Formula node are in a Blueprint's C++ (kern::formula, blueprint.h): a number of the type T
-/// whose operators and functions are those of this header - a * b + 1u on Typed<u32> is add(mul(a, b), 1), and goes
-/// round at 2^32 as the Add and Multiply nodes do (C++'s own operators would promote a u8, and leave a signed
-/// overflow, a division by 0 or a shift by the width open). Two of different types do not meet: the compiler refuses
-/// a + b of a Typed<u32> and a Typed<i64>, as the formula does (num_cast<To, From> says the conversion). A whole
-/// number written out takes the type of what it meets (7 with a u8 is a u8); a floating one is its own type (0.5f an
-/// f32, 0.5 an f64).
-template <Number T> struct Typed {
-  T v;
-  template <class L>
-    requires(std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>))
-  constexpr Typed(L x) : v(static_cast<T>(x)) {}  // NOLINT (implicit: a number written out is one of its type)
-  constexpr explicit operator bool() const requires std::same_as<T, bool> { return v; }
+// ---- a place of the language in C++: a number of one type whose operators are the functions above ----
+/// What a number of the language is in a Blueprint's C++ class: a variable, a field of a struct, a local variable, an
+/// input or output of a function, an entry of a list, an input of a Formula node (kern::formula, blueprint.h) - the
+/// class names them i64, f32 ... (the names of the language in the class's scope: engine_nodes.gen.h). Its operators
+/// and functions are those of this header: Count += x on a Typed<i64> is add(Count, x), and goes round at 2^64 as the
+/// Add node does; a * b + 1u on Typed<u32> is add(mul(a, b), 1). C++'s own operators would promote a u8, and leave a
+/// signed overflow, a division by 0 or a shift by the width open - none of them is ever applied to a place: an
+/// operator of a Typed and something it does not take (a Typed of another type, a floating number of another type)
+/// is refused by the compiler, as the formula refuses it (num_cast<To, From> says the conversion). A whole number
+/// written out takes the type of what it meets (7 with a u8 is a u8); a floating one is its own type (0.5f an f32,
+/// 0.5 an f64). Where a function of C++ takes the number itself (the engine's, a node's), the Typed gives it - as
+/// that very type, never as another (that would be a conversion: a Typed<i32> is no f64).
+template <Number T> struct Typed;
+namespace detail {
+template <class X> struct raw_of { using type = X; };
+template <class X> struct raw_of<Typed<X>> { using type = X; };
+template <class X> inline constexpr bool is_typed = false;
+template <class X> inline constexpr bool is_typed<Typed<X>> = true;
+/// What a Typed<T> takes as a T without a conversion: a T, and - for a whole number - a whole number written out.
+template <class T, class L> concept Takes = std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>);
+}  // namespace detail
+/// The number type of a place (i64 of a Typed<i64>), or the type itself.
+template <class X> using raw = typename detail::raw_of<std::remove_cvref_t<X>>::type;
+template <class X> inline constexpr bool is_typed = detail::is_typed<std::remove_cvref_t<X>>;
+/// The number of a place, or the number itself.
+template <class X> constexpr raw<X> raw_value(const X& x) {
+  if constexpr (is_typed<X>) return x.v;
+  else return x;
+}
 
-  friend constexpr Typed operator+(Typed a, Typed b) requires Arithmetic<T> { return add(a.v, b.v); }
-  friend constexpr Typed operator-(Typed a, Typed b) requires Arithmetic<T> { return sub(a.v, b.v); }
-  friend constexpr Typed operator*(Typed a, Typed b) requires Arithmetic<T> { return mul(a.v, b.v); }
-  friend constexpr Typed operator/(Typed a, Typed b) requires Arithmetic<T> { return div(a.v, b.v); }
-  friend constexpr Typed operator%(Typed a, Typed b) requires Integer<T> { return rem(a.v, b.v); }
+/// A signature of a function with the numbers themselves (a Callback the engine calls: f64(f64, f64) of the class's places).
+template <class S> struct raw_signature;
+template <class R, class... A> struct raw_signature<R(A...)> { using type = raw<R>(raw<A>...); };
+
+template <Number T> struct Typed {
+  T v{};
+  constexpr Typed() = default;
+  template <class L>
+    requires detail::Takes<T, L>
+  constexpr Typed(L x) : v(static_cast<T>(x)) {}  // NOLINT (implicit: a number of the type, or one written out)
+  /// The number itself, to a function of C++ that takes it - as T, never as another type.
+  template <class U>
+    requires std::same_as<U, T>
+  constexpr operator U() const { return v; }  // NOLINT
+
+  template <class B> requires detail::Takes<T, raw<B>> && (!is_typed<B> || std::same_as<raw<B>, T>) && Arithmetic<T>
+  constexpr Typed& operator+=(const B& b) { v = add(v, static_cast<T>(raw_value(b))); return *this; }
+  template <class B> requires detail::Takes<T, raw<B>> && (!is_typed<B> || std::same_as<raw<B>, T>) && Arithmetic<T>
+  constexpr Typed& operator-=(const B& b) { v = sub(v, static_cast<T>(raw_value(b))); return *this; }
+  template <class B> requires detail::Takes<T, raw<B>> && (!is_typed<B> || std::same_as<raw<B>, T>) && Arithmetic<T>
+  constexpr Typed& operator*=(const B& b) { v = mul(v, static_cast<T>(raw_value(b))); return *this; }
+  template <class B> requires detail::Takes<T, raw<B>> && (!is_typed<B> || std::same_as<raw<B>, T>) && Arithmetic<T>
+  constexpr Typed& operator/=(const B& b) { v = div(v, static_cast<T>(raw_value(b))); return *this; }
+
   friend constexpr Typed operator-(Typed a) requires Arithmetic<T> { return neg(a.v); }
+  friend constexpr Typed operator+(Typed a) requires Arithmetic<T> { return a; }
   friend constexpr Typed operator~(Typed a) requires Integer<T> { return bit_not(a.v); }
   friend constexpr Typed operator!(Typed a) requires std::same_as<T, bool> { return !a.v; }
-  friend constexpr Typed operator&(Typed a, Typed b) requires Integer<T> { return bit_and(a.v, b.v); }
-  friend constexpr Typed operator|(Typed a, Typed b) requires Integer<T> { return bit_or(a.v, b.v); }
-  friend constexpr Typed operator^(Typed a, Typed b) requires Integer<T> { return bit_xor(a.v, b.v); }
-  friend constexpr Typed operator&&(Typed a, Typed b) requires std::same_as<T, bool> { return a.v && b.v; }
-  friend constexpr Typed operator||(Typed a, Typed b) requires std::same_as<T, bool> { return a.v || b.v; }
-  friend constexpr Typed<bool> operator==(Typed a, Typed b) { return eq(a.v, b.v); }
-  friend constexpr Typed<bool> operator!=(Typed a, Typed b) { return ne(a.v, b.v); }
-  friend constexpr Typed<bool> operator<(Typed a, Typed b) requires Arithmetic<T> { return lt(a.v, b.v); }
-  friend constexpr Typed<bool> operator<=(Typed a, Typed b) requires Arithmetic<T> { return le(a.v, b.v); }
-  friend constexpr Typed<bool> operator>(Typed a, Typed b) requires Arithmetic<T> { return gt(a.v, b.v); }
-  friend constexpr Typed<bool> operator>=(Typed a, Typed b) requires Arithmetic<T> { return ge(a.v, b.v); }
 
-  // (the formula's functions: found by their argument - min(a, b) of two Typed<f32>)
-  friend constexpr Typed min(Typed a, Typed b) requires Arithmetic<T> { return num::min(a.v, b.v); }
-  friend constexpr Typed max(Typed a, Typed b) requires Arithmetic<T> { return num::max(a.v, b.v); }
+  // (the formula's functions of one number: found by their argument - sqrt(a) of a Typed<f32>; of two and three below)
   friend constexpr Typed abs(Typed a) requires Arithmetic<T> { return num::abs(a.v); }
-  friend constexpr Typed clamp(Typed x, Typed lo, Typed hi) requires Arithmetic<T> { return num::clamp(x.v, lo.v, hi.v); }
-  friend constexpr Typed lerp(Typed a, Typed b, Typed t) requires Floating<T> { return num::lerp(a.v, b.v, t.v); }
 #define KERN_TYPED_1(name) friend Typed name(Typed a) requires Floating<T> { return num::name(a.v); }
-#define KERN_TYPED_2(name) friend Typed name(Typed a, Typed b) requires Floating<T> { return num::name(a.v, b.v); }
 #define KERN_TYPED_IS(name) friend Typed<bool> name(Typed a) requires Floating<T> { return num::name(a.v); }
   KERN_TYPED_1(sqrt) KERN_TYPED_1(floor) KERN_TYPED_1(ceil) KERN_TYPED_1(trunc) KERN_TYPED_1(round)
   KERN_TYPED_1(sin) KERN_TYPED_1(cos) KERN_TYPED_1(tan) KERN_TYPED_1(asin) KERN_TYPED_1(acos) KERN_TYPED_1(atan)
   KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(log) KERN_TYPED_1(log10)
-  KERN_TYPED_2(atan2) KERN_TYPED_2(pow) KERN_TYPED_2(hypot) KERN_TYPED_2(copysign) KERN_TYPED_2(fmin) KERN_TYPED_2(fmax) KERN_TYPED_2(fmod)
   KERN_TYPED_IS(isnan) KERN_TYPED_IS(isinf) KERN_TYPED_IS(isfinite) KERN_TYPED_IS(signbit)
 #undef KERN_TYPED_1
-#undef KERN_TYPED_2
 #undef KERN_TYPED_IS
 };
-// (a shift: of the type of the value shifted, the amount a whole number of any type. The value is a Typed itself - or a
-// whole number written out, which is then C++'s own type, an i32 for 1 in 1 << n, and takes no type from the amount)
 namespace detail {
+/// The type two operands of an operator compute in: a Typed's, where the other is of it or a number it takes.
+template <class A, class B> struct meet {};
+template <class T, class B> requires(is_typed<B> ? std::same_as<raw<B>, T> : Takes<T, B>) struct meet<Typed<T>, B> { using type = T; };
+template <class A, class T> requires(!is_typed<A> && Takes<T, A>) struct meet<A, Typed<T>> { using type = T; };
+template <class A, class B> concept Meet = requires { typename meet<std::remove_cvref_t<A>, std::remove_cvref_t<B>>::type; };
+template <class A, class B> using met = typename meet<std::remove_cvref_t<A>, std::remove_cvref_t<B>>::type;
+template <class A, class B> concept Mismatch = (is_typed<A> || is_typed<B>) && !Meet<A, B>;
 template <class L> using written = std::conditional_t<std::is_signed_v<L>, std::conditional_t<sizeof(L) <= 4, i32, i64>, std::conditional_t<sizeof(L) <= 4, u32, u64>>;
 template <class L> concept Written = std::is_integral_v<L> && !std::same_as<L, bool>;
 }  // namespace detail
+// (the formula's functions of two and three numbers: a Typed and what it meets - min(a, 2.0) of a Typed<f64>)
+namespace detail {
+template <class A, class B, class C> struct meet3 {};
+template <class A, class B, class C> requires Meet<A, B> && Meet<A, C> struct meet3<A, B, C> { using type = met<A, B>; };
+template <class A, class B, class C> requires(!Meet<A, B> && Meet<B, C> && Takes<met<B, C>, std::remove_cvref_t<A>>) struct meet3<A, B, C> { using type = met<B, C>; };
+template <class A, class B, class C> concept Meet3 = requires { typename meet3<A, B, C>::type; };
+}  // namespace detail
+#define KERN_TYPED_FN2(name, need)                                                                                    \
+  template <class A, class B> requires detail::Meet<A, B> && need<detail::met<A, B>>                                 \
+  constexpr Typed<detail::met<A, B>> name(const A& a, const B& b) {                                                  \
+    using T = detail::met<A, B>;                                                                                     \
+    return num::name(static_cast<T>(raw_value(a)), static_cast<T>(raw_value(b)));                                  \
+  }
+KERN_TYPED_FN2(min, Arithmetic) KERN_TYPED_FN2(max, Arithmetic)
+KERN_TYPED_FN2(atan2, Floating) KERN_TYPED_FN2(pow, Floating) KERN_TYPED_FN2(hypot, Floating) KERN_TYPED_FN2(copysign, Floating)
+KERN_TYPED_FN2(fmin, Floating) KERN_TYPED_FN2(fmax, Floating) KERN_TYPED_FN2(fmod, Floating)
+#undef KERN_TYPED_FN2
+template <class A, class B, class C> requires detail::Meet3<A, B, C> && Arithmetic<typename detail::meet3<A, B, C>::type>
+constexpr auto clamp(const A& x, const B& lo, const C& hi) {
+  using T = typename detail::meet3<A, B, C>::type;
+  return Typed<T>(num::clamp(static_cast<T>(raw_value(x)), static_cast<T>(raw_value(lo)), static_cast<T>(raw_value(hi))));
+}
+template <class A, class B, class C> requires detail::Meet3<A, B, C> && Floating<typename detail::meet3<A, B, C>::type>
+constexpr auto lerp(const A& a, const B& b, const C& t) {
+  using T = typename detail::meet3<A, B, C>::type;
+  return Typed<T>(num::lerp(static_cast<T>(raw_value(a)), static_cast<T>(raw_value(b)), static_cast<T>(raw_value(t))));
+}
+// (the operators of two operands: a Typed and one it meets - else no operator at all: not C++'s own either, which
+// would convert and compute as C++ does, not as the language)
+#define KERN_TYPED_OP(op, fn, need, R)                                                                              \
+  template <class A, class B> requires detail::Meet<A, B> && need<detail::met<A, B>>                                 \
+  constexpr R operator op(const A& a, const B& b) {                                                                  \
+    using T = detail::met<A, B>;                                                                                     \
+    return fn(static_cast<T>(raw_value(a)), static_cast<T>(raw_value(b)));                                          \
+  }                                                                                                                  \
+  template <class A, class B> requires detail::Mismatch<A, B> void operator op(const A&, const B&) = delete;
+template <class T> concept IsBool = std::same_as<T, bool>;
+#define KERN_R Typed<detail::met<A, B>>
+KERN_TYPED_OP(+, add, Arithmetic, KERN_R)
+KERN_TYPED_OP(-, sub, Arithmetic, KERN_R)
+KERN_TYPED_OP(*, mul, Arithmetic, KERN_R)
+KERN_TYPED_OP(/, div, Arithmetic, KERN_R)
+KERN_TYPED_OP(%, rem, Integer, KERN_R)
+KERN_TYPED_OP(&, bit_and, Integer, KERN_R)
+KERN_TYPED_OP(|, bit_or, Integer, KERN_R)
+KERN_TYPED_OP(^, bit_xor, Integer, KERN_R)
+KERN_TYPED_OP(==, eq, Number, Typed<bool>)
+KERN_TYPED_OP(!=, ne, Number, Typed<bool>)
+KERN_TYPED_OP(<, lt, Arithmetic, Typed<bool>)
+KERN_TYPED_OP(<=, le, Arithmetic, Typed<bool>)
+KERN_TYPED_OP(>, gt, Arithmetic, Typed<bool>)
+KERN_TYPED_OP(>=, ge, Arithmetic, Typed<bool>)
+#undef KERN_R
+#undef KERN_TYPED_OP
+template <class A, class B> requires detail::Meet<A, B> && IsBool<detail::met<A, B>>
+constexpr Typed<bool> operator&&(const A& a, const B& b) { return static_cast<bool>(raw_value(a)) && static_cast<bool>(raw_value(b)); }
+template <class A, class B> requires detail::Meet<A, B> && IsBool<detail::met<A, B>>
+constexpr Typed<bool> operator||(const A& a, const B& b) { return static_cast<bool>(raw_value(a)) || static_cast<bool>(raw_value(b)); }
+template <class A, class B> requires detail::Mismatch<A, B> void operator&&(const A&, const B&) = delete;
+template <class A, class B> requires detail::Mismatch<A, B> void operator||(const A&, const B&) = delete;
+// (a shift: of the type of the value shifted, the amount a whole number of any type. The value is a Typed itself - or a
+// whole number written out, which is then C++'s own type, an i32 for 1 in 1 << n, and takes no type from the amount)
 template <Integer T, Integer N> constexpr Typed<T> operator<<(Typed<T> a, Typed<N> n) { return shl(a.v, n.v); }
 template <Integer T, Integer N> constexpr Typed<T> operator>>(Typed<T> a, Typed<N> n) { return shr(a.v, n.v); }
 template <Integer T, detail::Written L> constexpr Typed<T> operator<<(Typed<T> a, L n) { return shl(a.v, n); }
 template <Integer T, detail::Written L> constexpr Typed<T> operator>>(Typed<T> a, L n) { return shr(a.v, n); }
 template <detail::Written L, Integer N> constexpr Typed<detail::written<L>> operator<<(L a, Typed<N> n) { return shl(static_cast<detail::written<L>>(a), n.v); }
 template <detail::Written L, Integer N> constexpr Typed<detail::written<L>> operator>>(L a, Typed<N> n) { return shr(static_cast<detail::written<L>>(a), n.v); }
+template <class A, class B> requires(is_typed<A> || is_typed<B>) && (!Integer<raw<A>> || !Integer<raw<B>>) void operator<<(const A&, const B&) = delete;
+template <class A, class B> requires(is_typed<A> || is_typed<B>) && (!Integer<raw<A>> || !Integer<raw<B>>) void operator>>(const A&, const B&) = delete;
+template <Integer T, class B> requires detail::Meet<Typed<T>, B> constexpr Typed<T>& operator%=(Typed<T>& a, const B& b) { a.v = rem(a.v, static_cast<T>(raw_value(b))); return a; }
+template <Integer T, class B> requires detail::Meet<Typed<T>, B> constexpr Typed<T>& operator&=(Typed<T>& a, const B& b) { a.v = bit_and(a.v, static_cast<T>(raw_value(b))); return a; }
+template <Integer T, class B> requires detail::Meet<Typed<T>, B> constexpr Typed<T>& operator|=(Typed<T>& a, const B& b) { a.v = bit_or(a.v, static_cast<T>(raw_value(b))); return a; }
+template <Integer T, class B> requires detail::Meet<Typed<T>, B> constexpr Typed<T>& operator^=(Typed<T>& a, const B& b) { a.v = bit_xor(a.v, static_cast<T>(raw_value(b))); return a; }
+template <Integer T, class B> requires Integer<raw<B>> constexpr Typed<T>& operator<<=(Typed<T>& a, const B& n) { a.v = shl(a.v, raw_value(n)); return a; }
+template <Integer T, class B> requires Integer<raw<B>> constexpr Typed<T>& operator>>=(Typed<T>& a, const B& n) { a.v = shr(a.v, raw_value(n)); return a; }
 
 /// What a formula gives in C++: the number of a Typed, a number written out as it is.
 template <class R> constexpr auto untyped(R r) {

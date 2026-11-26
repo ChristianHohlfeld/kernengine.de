@@ -691,6 +691,73 @@ def annotate(o, st):
         bound_type(o)
 
 
+# ---- a hint: where the width of size_t can change what a source computes ----
+# The subset's data model is LP64: size_t is u64 on every platform (kern/docs/blueprint_cpp.md, "Zahl-Typen"), and the
+# Blueprint computes so. C++ built for a platform where size_t has 32 bits (wasm32) computes some expressions otherwise: a
+# subtraction, a negation or a decrement below 0 goes round at 2^32 instead of 2^64, a multiplication or a shift to the left
+# beyond 2^32 loses the bits above - and a conversion of such a result into a wider type or a floating one shows it. Such a
+# place is no error (the Blueprint is the LP64 one), but it is said, with its place: SIZE_T_HINTS, printed with the totals.
+SIZE_T_HINTS = {}
+
+
+def is_size_t(t):
+    q, d = (t or {}).get("qualType", ""), (t or {}).get("desugaredQualType", "")
+    q = re.sub(r"^const\s+", "", q).strip()
+    return q in ("size_t", "std::size_t", "usize", "kern::usize") or (q.endswith("size_type") and d.replace("const ", "").strip() in ("unsigned long", "unsigned long long"))
+
+
+def size_t_hints(tree, decls):
+    """Notes in SIZE_T_HINTS each place of the functions `decls` where the width of size_t can change the result."""
+    def line(o):
+        text = tree.text(o.get("_file", ""))
+        a = (o.get("_at") or (None,))[0]
+        return f"{o.get('_file', '?')}:{text.count(chr(10), 0, a) + 1 if text and a is not None else 0}"
+
+    def bare(o):
+        while o.get("kind") in ("ImplicitCastExpr", "ParenExpr") and o.get("inner"):
+            o = o["inner"][0]
+        return o
+
+    def risky(o):
+        o = bare(o)
+        k, op = o.get("kind"), o.get("opcode")
+        if not is_size_t(o.get("type")):
+            return None
+        if k == "BinaryOperator" and op in ("-", "*", "<<"):
+            return {"-": "a subtraction", "*": "a multiplication", "<<": "a shift to the left"}[op]
+        if k == "CompoundAssignOperator" and op in ("-=", "*=", "<<="):
+            return {"-=": "a subtraction", "*=": "a multiplication", "<<=": "a shift to the left"}[op]
+        if k == "UnaryOperator" and op in ("-", "--"):
+            return "a negation" if op == "-" else "a decrement"
+        return None
+
+    def wide(t):
+        q = (t or {}).get("desugaredQualType") or (t or {}).get("qualType", "")
+        q = re.sub(r"^const\s+", "", q).strip()
+        return q in ("double", "float", "long", "long long", "unsigned long long", "long double") or (q == "unsigned long" and not is_size_t(t))
+
+    def walk(o):
+        if isinstance(o, list):
+            for x in o:
+                walk(x)
+            return
+        if not isinstance(o, dict):
+            return
+        what = risky(o)
+        if what:
+            SIZE_T_HINTS.setdefault(line(o), f"{what} on size_t (where size_t has 32 bits, it goes round at 2^32)")
+        if o.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and o.get("inner") and wide(o.get("type")):
+            inner = o["inner"][0]
+            if is_size_t(bare(inner).get("type")) and (w := risky(inner)):
+                SIZE_T_HINTS[line(o)] = f"{w} on size_t, converted to {(o.get('type') or {}).get('qualType')} (where size_t has 32 bits, another number)"
+        for k, v in o.items():
+            if k != "type" and isinstance(v, (dict, list)):
+                walk(v)
+
+    for d in decls:
+        walk(d.get("inner", []))
+
+
 def bound_type(v):
     """`const auto& ring = rings[i];` - the compiler names the type of a reference it deduced by the name
     the library gives it (`const value_type &`) and does not say what that is; what the reference is bound
@@ -16653,6 +16720,7 @@ def convert_unit(job):
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
+        size_t_hints(tree, mine)
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
         # variable is called what the Blueprint has in the end (a constant met after it was named): then,
@@ -16755,7 +16823,7 @@ def convert_unit(job):
         headers = [header] if os.path.exists(header) and world.program(header) and world.unit_of(header) not in own else []
     unit.interface_constants(headers)
     variables, functions, members, types = unit.parts()
-    return {"name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
+    return {"size_t": dict(SIZE_T_HINTS), "name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
             "said": [f"    {f.cpp} ({f.lines}): " + (("written" + ("" if f.pure else f" (a step: {'; '.join(f.effects)})")) if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
@@ -17560,6 +17628,7 @@ def main(argv):
                     print(f"{u}: {e['cpp']}() was written and waits now ({e['wait']})", flush=True)
             given[u] = asks[u]
             results[u] = r
+            SIZE_T_HINTS.update(r.get("size_t", {}))   # (the hints of a part converted in another process)
             tables[u], exports[u] = r["table"], r["exports"]
             value = (r["table"], r["exports"])
             if value not in gave[u]:
@@ -17808,6 +17877,9 @@ def main(argv):
     states = set(world.parts.values())
     print(f"\n{done_n} of {total} functions of the program are written as Blueprints ({done_lines} of {total_lines} lines)" + (f", and {others} of the engine's headers that they call" if others else "")
           + f": {len(order)} Blueprints - {sum(1 for u in order if u in sources)} of source files, {sum(1 for u in order if u in states)} of states, {sum(1 for u in order if u not in sources and u not in states)} of headers and of shapes")
+    print(f"\n{len(SIZE_T_HINTS)} places where the width of size_t can change the result (a hint - the Blueprint computes with the u64 of LP64):")
+    for at, what in sorted(SIZE_T_HINTS.items()):
+        print(f"--- size_t: {at}: {what}")
     if test:
         if os.path.isdir(test) and whole:
             for name in os.listdir(test):   # (tests of files that have nothing converted any more)

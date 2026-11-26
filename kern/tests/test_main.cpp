@@ -2417,6 +2417,62 @@ TEST(numbers_size_t_edges) {
   CHECK(cls == cpp && cpp == size_edges::kWant);
 }
 
+// A place of the language computes in its type (blueprint_native::kWrap): Add to Variable on a variable, a field of a
+// struct, a local variable and an entry of a list, and Add, Multiply, Divide and two formulas, for every pair of the edge
+// values of each type - in the interpreter and the JIT what numbers.h gives (a whole number goes round at its width, a shift
+// goes by the amount mod the width), and an f32 what C++ computes in f32, each step rounded (no higher precision between
+// them). The class gives the same, under UBSan without a report (blueprint_native_test: its Count += x is numbers.h's add).
+namespace {
+template <class X> bool same_number(const logic::Value& v, X want) {
+  return v.type == logic::number_type<X>() && (logic::num::same_seen(v.as<X>(), want) || (want != want && v.as<X>() != v.as<X>()));
+}
+template <class X> int wrap_mismatches(logic::Instance& inst) {
+  namespace num = logic::num;
+  const std::string fn = "Add_" + std::string(num::kind_name(num::kind_of<X>()));
+  int bad = 0;
+  for (X x : blueprint_native::wrap_edges<X>())
+    for (X y : blueprint_native::wrap_edges<X>()) {
+      std::vector<logic::Value> out;
+      if (!inst.call(fn, {logic::Value::of_number<X>(x), logic::Value::of_number<X>(y)}, out)) { ++bad; continue; }
+      std::vector<X> want;
+      if constexpr (std::is_floating_point_v<X>) {
+        volatile X a = x, b = y;   // (C++'s own f32 arithmetic, at run time: each step rounded to f32)
+        const X sum = a + b, product = a * b, quotient = a / b, formula = a * b + a - b;
+        want = {sum, sum, sum, sum, sum, product, quotient, formula};
+      } else {
+        const X sum = num::add(x, y);
+        want = {sum, sum, sum, sum, sum, num::mul(x, y), num::div(x, y), num::sub(num::add(num::mul(x, y), x), y), num::shl(x, y)};
+      }
+      bool ok = out.size() == want.size();
+      for (std::size_t k = 0; ok && k < want.size(); ++k) ok = same_number(out[k], want[k]);
+      if (!ok && bad++ < 4) std::printf("  %s(%s, %s) gives another number than numbers.h\n", fn.c_str(), logic::number_as_text(logic::Value::of_number(x)).c_str(), logic::number_as_text(logic::Value::of_number(y)).c_str());
+    }
+  return bad;
+}
+}  // namespace
+TEST(numbers_places_compute_as_numbers_h) {
+  // (C++'s own wrap of an unsigned and of a narrow signed number - where C++ defines it: the same as numbers.h's)
+  CHECK(static_cast<u8>(u8(250) + u8(10)) == logic::num::add<u8>(250, 10) && static_cast<i8>(i8(127) + i8(1)) == logic::num::add<i8>(127, 1));
+  CHECK(static_cast<u64>(~u64{0} * 3u) == logic::num::mul<u64>(~u64{0}, 3));
+  CHECK(logic::num::add<i64>(3, std::numeric_limits<i64>::max()) == std::numeric_limits<i64>::min() + 2);
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kWrap, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    CHECK(inst && !inst->disabled());
+    if (!inst) continue;
+    const int bad = wrap_mismatches<i8>(*inst) + wrap_mismatches<i16>(*inst) + wrap_mismatches<i32>(*inst) + wrap_mismatches<i64>(*inst) + wrap_mismatches<u8>(*inst) +
+                    wrap_mismatches<u16>(*inst) + wrap_mismatches<u32>(*inst) + wrap_mismatches<u64>(*inst) + wrap_mismatches<f32>(*inst);
+    CHECK(bad == 0);
+  }
+}
+
 // Which NaN an operation gives, IEEE 754 and C++ leave open (0 * inf on x86 a negative one; a compiler may swap the operands of
 // a + b). The language fixes it (numbers.h, seen): wherever the bits of a number are seen - Bit Cast, the bytes of a struct and
 // Copy Bytes, a number as a text, saving - a NaN is the one quiet NaN. The same expression with its operands swapped gives there
@@ -4273,8 +4329,13 @@ TEST(logic_tier_cases_interpreter) {
     logic::Runtime rt(host);
     const logic::Graph g = logic_cases::parse(c);
     CHECK(!g.nodes.empty());
+    // (no node takes another number type than its pin says - a conversion is the conversion node's: Value::as counts
+    // every number read as another type, logic.h numbers_read_as_another_type)
+    logic::numbers_read_as_another_type() = 0;
     logic::Instance* inst = rt.add(g, 0, c.name);
     const std::string r = logic_cases::play(rt, host, inst);
+    if (const u64 other = logic::numbers_read_as_another_type()) std::printf("  %s: %llu numbers read as another type than their own\n", c.name, static_cast<unsigned long long>(other));
+    CHECK(logic::numbers_read_as_another_type() == 0);
     if (std::string(c.name) == "math_loops") {
       CHECK(inst->get("Sum").as_number() == 315);
       CHECK(inst->get("Odd").as_int() == 10);
@@ -4625,7 +4686,7 @@ struct Arena : kern::Blueprint {
   // (the glue of its class: a struct is held field by field)
   std::string glue;
   CHECK(logic::native_glue(g, "Arena", glue, &error) && glue.find("template <> struct Held<::Arena::Weapon> {") != std::string::npos && glue.find("template <> struct Held<::Arena::Slot> {") != std::string::npos);
-  CHECK(glue.find("return v.type == type && v.fields() == 2 && is_value<::Arena::Weapon>(*v.field(0)) && is_value<kern::i64>(*v.field(1));") != std::string::npos);
+  CHECK(glue.find("return v.type == type && v.fields() == 2 && is_value<::Arena::Weapon>(*v.field(0)) && is_value<kern::logic::num::Typed<kern::i64>>(*v.field(1));") != std::string::npos);
   CHECK(glue.find("return Value::structure({to_value(s.Name), to_value(s.Type), to_value(s.Damage), to_value(s.Falloff)});") != std::string::npos);
 
   // What does not fit is said by the check.
@@ -5489,7 +5550,7 @@ TEST(logic_native_blueprints) {
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
   for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {",
                            // (the argument is made, the function runs between the two calls a host can measure by, what it gave is handed back)
-                           "      kern::f64 in0 = native_arg<kern::f64>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
+                           "      kern::logic::num::Typed<kern::f64> in0 = native_arg<kern::logic::num::Typed<kern::f64>>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
                            "      kern::logic::native_call(false);\n      results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }",
                            // (the object, for the program's C++ that calls the class directly)
@@ -5524,7 +5585,7 @@ TEST(logic_native_blueprints) {
   // an event's handler is reached through the glue: the node's place in the graph, its values from its outputs
   CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"f64","value":0}],
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
-  CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
+  CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::logic::num::Typed<kern::f64>>(*self.kern_world.instance, 1, 2), "
                   "native_out<kern::logic::Text>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
 }
 
@@ -7778,7 +7839,7 @@ struct Probe : kern::Blueprint {
   KERN_STRUCT(MeshData) { List<f32> positions = List<f32>{}; List<f32> normals = List<f32>{}; List<f32> colors = List<f32>{}; List<f32> uvs = List<f32>{}; List<f32> extra = List<f32>{}; u32 extra_size = 0; List<u32> indices = List<u32>{}; };
   KERN_STRUCT(audio_PlayParams) { f32 volume = 1.0f; f32 pitch = 1.0f; f32 pan = 0.0f; bool the_loop = false; audio_Bus bus = audio_Bus::sfx; f32 fade_in = 0.0f; f32 start = 0.0f; i32 priority = 0; bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; f32 min_distance = 1.0f; f32 max_distance = 50.0f; audio_Rolloff rolloff = audio_Rolloff::inverse; f32 spread = 0.0f; f32 doppler = 1.0f; };
   KERN_STRUCT(game_Transform) { Vector position = Vector{0.0, 0.0, 0.0}; Vector rotation = Vector{0.0, 0.0, 0.0}; Vector scale = Vector{1.0, 1.0, 1.0}; };
-  KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0f, 0.0f, 0.0f, 1.0f}; };
 
   // what the calls are given
   List<f32> Samples = List<f32>{};
@@ -8189,7 +8250,7 @@ TEST(engine_calls_class_calls_the_engine_itself) {
   b.kern_world.host = &door;
   CHECK(a.kern_world.engine == &itself.objects && !b.kern_world.engine && !door.engine_objects());
   for (engine_probe::Probe* p : {&a, &b}) {
-    for (f32 x : tone) p->Samples.push_back(static_cast<f64>(x));
+    for (f32 x : tone) p->Samples.push_back(x);
     p->Sounds();
     p->Numbers();
   }
@@ -8206,7 +8267,7 @@ TEST(engine_calls_class_calls_the_engine_itself) {
   audio::Mixer m;
   CHECK(m.init(48000, 16));
   const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
-  CHECK(static_cast<i64>(c) == static_cast<i64>(a.Clip));
+  CHECK(static_cast<i64>(c) == static_cast<i64>(a.Clip.v));
   CHECK(static_cast<u64>(m.play(c, audio::PlayParams{})) == a.Voice);
   std::vector<f32> wrote(600);
   m.render(wrote.data(), 300);
@@ -8329,12 +8390,12 @@ TEST(engine_places_class_names_the_engines_list) {
   // ... and what the class read: what the door read
   CHECK(shown(a) == shown(b));
   CHECK(a.X == 6 && a.Items == 7 && a.Set == 9 && a.Beside == 0 && a.LengthAfter == 2 && a.Removed);
-  CHECK(std::bit_cast<u64>(static_cast<f64>(a.P0)) == std::bit_cast<u64>(2.0 * static_cast<f64>(static_cast<f32>(0.3333333333333333))));
+  CHECK(std::bit_cast<u64>(static_cast<f64>(a.P0.v)) == std::bit_cast<u64>(2.0 * static_cast<f64>(static_cast<f32>(0.3333333333333333))));
   // what naming the place costs: a field read, a field set, the length - no memory asked for (C++: none either)
   i64 x = 0, length = 0;
   const long asked = memory_asked_by([&] {
     a.engine_building_builder_chunks(a.n7, a.Builder);
-    x = a.n7.result[0].x;
+    x = static_cast<i32>(a.n7.result[0].x);
     a.n7.result[0].items = 11;
     length = a.list_length<EnginePlaces::GeoChunk>(a.n7.result);
   });
@@ -8358,7 +8419,7 @@ TEST(engine_places_class_names_the_engines_list) {
   const WeldStats welded = kern::weld(c[0].mesh);
   for (EnginePlaces* p : {&a, &b}) p->Weld();
   CHECK(held && same(held->chunks(), c) && shown(a) == shown(b) && welded.indexed && welded.unique_vertices == 4 && c[0].mesh.indices.size() == 6);
-  CHECK(static_cast<i64>(a.Stats.unique_vertices) == welded.unique_vertices && static_cast<i64>(a.Stats.bytes_after) == static_cast<i64>(welded.bytes_after) && a.Stats.indexed);
+  CHECK(static_cast<i64>(a.Stats.unique_vertices.v) == welded.unique_vertices && static_cast<i64>(a.Stats.bytes_after.v) == static_cast<i64>(welded.bytes_after) && a.Stats.indexed);
   // the object ends while its place is bound: the class does not write where it was, and says what the door says
   itself.told.clear(), door.told.clear();
   for (EnginePlaces* p : {&a, &b}) {
@@ -8597,7 +8658,7 @@ TEST(engine_interface_with_pointers) {
     u8 room[3] = {0, 0, 0xee};
     CHECK(t->receive(from, room, 2) == 3 && from.id == 9 && room[0] == 1 && room[1] == 2 && room[2] == 0xee);
   }
-  CHECK(inst->get("Sent").i == 3 && static_cast<i64>(cls.Sent) == 3 && static_cast<i64>(cls.Bytes) == 3);
+  CHECK(inst->get("Sent").i == 3 && static_cast<i64>(cls.Sent.v) == 3 && static_cast<i64>(cls.Bytes.v) == 3);
   objects.clear();
 }
 

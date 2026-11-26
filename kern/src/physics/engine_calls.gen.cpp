@@ -34,48 +34,48 @@ struct S_physics_ShapeSettings { [[maybe_unused]] static Value to(EngineObjects&
 struct S_physics_TouchEvent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::TouchEvent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::TouchEvent& x); };
 struct S_physics_Version { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Version& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Version& x); };
 struct S_physics_WorldSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::WorldSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::WorldSettings& x); };
-Value S_MeshData::to(EngineObjects& o, const kern::MeshData& x) { return Value::structure({ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.positions), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.normals), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.colors), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.uvs), ev::Conv<ev::List<ev::Num<f32>>>::to(o, x.extra), ev::Conv<ev::Num<u32>>::to(o, x.extra_size), ev::Conv<ev::List<ev::Num<u32>>>::to(o, x.indices)}); }
-void S_MeshData::from(EngineObjects& o, const Value& v, kern::MeshData& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.positions); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.normals); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.colors); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.uvs); if (const Value* f = v.field(4)) ev::Conv<ev::List<ev::Num<f32>>>::from(o, *f, x.extra); if (const Value* f = v.field(5)) ev::Conv<ev::Num<u32>>::from(o, *f, x.extra_size); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Num<u32>>>::from(o, *f, x.indices); }
-Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.x), ev::Conv<ev::Num<f32>>::to(o, x.y), ev::Conv<ev::Num<f32>>::to(o, x.z), ev::Conv<ev::Num<f32>>::to(o, x.w)}); }
-void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.w); }
-Value S_physics_Body::to(EngineObjects& o, const kern::physics::Body& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.id)}); }
-void S_physics_Body::from(EngineObjects& o, const Value& v, kern::physics::Body& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.id); }
-Value S_physics_BodySettings::to(EngineObjects& o, const kern::physics::BodySettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_BodyType>>::to(o, x.type), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.linear_velocity), ev::Conv<ev::Vector>::to(o, x.angular_velocity), ev::Conv<ev::Num<f32>>::to(o, x.linear_damping), ev::Conv<ev::Num<f32>>::to(o, x.angular_damping), ev::Conv<ev::Num<f32>>::to(o, x.gravity_scale), ev::Conv<ev::Bool>::to(o, x.enable_sleep), ev::Conv<ev::Bool>::to(o, x.awake), ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Bool>::to(o, x.bullet), ev::Conv<ev::Num<u64>>::to(o, x.user)}); }
-void S_physics_BodySettings::from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_BodyType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.linear_velocity); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.angular_velocity); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.linear_damping); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.angular_damping); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.gravity_scale); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.enable_sleep); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.awake); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.bullet); if (const Value* f = v.field(12)) ev::Conv<ev::Num<u64>>::from(o, *f, x.user); }
-Value S_physics_Capsule::to(EngineObjects& o, const kern::physics::Capsule& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.center1), ev::Conv<ev::Vector>::to(o, x.center2), ev::Conv<ev::Num<f32>>::to(o, x.radius)}); }
-void S_physics_Capsule::from(EngineObjects& o, const Value& v, kern::physics::Capsule& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.center1); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.center2); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.radius); }
-Value S_physics_CharacterMover_Settings::to(EngineObjects& o, const kern::physics::CharacterMover::Settings& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.radius), ev::Conv<ev::Num<f32>>::to(o, x.height), ev::Conv<ev::Num<f32>>::to(o, x.step_height), ev::Conv<ev::Num<f32>>::to(o, x.max_speed), ev::Conv<ev::Num<f32>>::to(o, x.accelerate), ev::Conv<ev::Num<f32>>::to(o, x.friction), ev::Conv<ev::Num<f32>>::to(o, x.air_control), ev::Conv<ev::Num<f32>>::to(o, x.stop_speed), ev::Conv<ev::Num<f32>>::to(o, x.jump_speed), ev::Conv<ev::Num<f32>>::to(o, x.sprint), ev::Conv<ev::Num<f32>>::to(o, x.gravity), ev::Conv<ev::Num<f32>>::to(o, x.max_slope_deg), ev::Conv<ev::Num<f32>>::to(o, x.push_strength), ev::Conv<ev::Num<u64>>::to(o, x.mask_bits)}); }
-void S_physics_CharacterMover_Settings::from(EngineObjects& o, const Value& v, kern::physics::CharacterMover::Settings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.radius); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.step_height); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_speed); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.accelerate); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.friction); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.air_control); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.stop_speed); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.jump_speed); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f32>>::from(o, *f, x.sprint); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.gravity); if (const Value* f = v.field(11)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_slope_deg); if (const Value* f = v.field(12)) ev::Conv<ev::Num<f32>>::from(o, *f, x.push_strength); if (const Value* f = v.field(13)) ev::Conv<ev::Num<u64>>::from(o, *f, x.mask_bits); }
-Value S_physics_ContactPoint::to(EngineObjects& o, const kern::physics::ContactPoint& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<f32>>::to(o, x.separation), ev::Conv<ev::Num<f32>>::to(o, x.impulse)}); }
-void S_physics_ContactPoint::from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.separation); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.impulse); }
-Value S_physics_HitEvent::to(EngineObjects& o, const kern::physics::HitEvent& x) { return Value::structure({ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_a), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_b), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<f32>>::to(o, x.approach_speed)}); }
-void S_physics_HitEvent::from(EngineObjects& o, const Value& v, kern::physics::HitEvent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_a); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_b); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_a); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_b); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(5)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.approach_speed); }
-Value S_physics_Joint::to(EngineObjects& o, const kern::physics::Joint& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.id)}); }
-void S_physics_Joint::from(EngineObjects& o, const Value& v, kern::physics::Joint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.id); }
-Value S_physics_JointSettings::to(EngineObjects& o, const kern::physics::JointSettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_JointType>>::to(o, x.type), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b), ev::Conv<ev::Struct<S_physics_Pose>>::to(o, x.frame_a), ev::Conv<ev::Struct<S_physics_Pose>>::to(o, x.frame_b), ev::Conv<ev::Bool>::to(o, x.collide_connected), ev::Conv<ev::Bool>::to(o, x.enable_spring), ev::Conv<ev::Num<f32>>::to(o, x.hertz), ev::Conv<ev::Num<f32>>::to(o, x.damping_ratio), ev::Conv<ev::Bool>::to(o, x.enable_limit), ev::Conv<ev::Num<f32>>::to(o, x.lower), ev::Conv<ev::Num<f32>>::to(o, x.upper), ev::Conv<ev::Bool>::to(o, x.enable_motor), ev::Conv<ev::Num<f32>>::to(o, x.motor_speed), ev::Conv<ev::Num<f32>>::to(o, x.max_motor_torque), ev::Conv<ev::Num<f32>>::to(o, x.max_motor_force), ev::Conv<ev::Vector>::to(o, x.motor_velocity), ev::Conv<ev::Num<f32>>::to(o, x.length), ev::Conv<ev::Num<f32>>::to(o, x.linear_hertz), ev::Conv<ev::Num<f32>>::to(o, x.angular_hertz), ev::Conv<ev::Num<f32>>::to(o, x.linear_damping_ratio), ev::Conv<ev::Num<f32>>::to(o, x.angular_damping_ratio), ev::Conv<ev::Vector>::to(o, x.linear_velocity), ev::Conv<ev::Vector>::to(o, x.angular_velocity), ev::Conv<ev::Num<f32>>::to(o, x.max_velocity_force), ev::Conv<ev::Num<f32>>::to(o, x.max_velocity_torque), ev::Conv<ev::Num<f32>>::to(o, x.max_spring_force), ev::Conv<ev::Num<f32>>::to(o, x.max_spring_torque), ev::Conv<ev::Bool>::to(o, x.enable_steering), ev::Conv<ev::Bool>::to(o, x.enable_steering_limit), ev::Conv<ev::Num<f32>>::to(o, x.steering_hertz), ev::Conv<ev::Num<f32>>::to(o, x.steering_damping_ratio), ev::Conv<ev::Num<f32>>::to(o, x.target_steering), ev::Conv<ev::Num<f32>>::to(o, x.max_steering_torque), ev::Conv<ev::Num<f32>>::to(o, x.steering_lower), ev::Conv<ev::Num<f32>>::to(o, x.steering_upper), ev::Conv<ev::Num<f32>>::to(o, x.max_torque), ev::Conv<ev::Num<f32>>::to(o, x.constraint_hertz), ev::Conv<ev::Num<f32>>::to(o, x.constraint_damping_ratio), ev::Conv<ev::Num<u64>>::to(o, x.user)}); }
-void S_physics_JointSettings::from(EngineObjects& o, const Value& v, kern::physics::JointSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_JointType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_a); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_b); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Pose>>::from(o, *f, x.frame_a); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_physics_Pose>>::from(o, *f, x.frame_b); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.collide_connected); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.enable_spring); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.hertz); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.damping_ratio); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.enable_limit); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.lower); if (const Value* f = v.field(11)) ev::Conv<ev::Num<f32>>::from(o, *f, x.upper); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.enable_motor); if (const Value* f = v.field(13)) ev::Conv<ev::Num<f32>>::from(o, *f, x.motor_speed); if (const Value* f = v.field(14)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_motor_torque); if (const Value* f = v.field(15)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_motor_force); if (const Value* f = v.field(16)) ev::Conv<ev::Vector>::from(o, *f, x.motor_velocity); if (const Value* f = v.field(17)) ev::Conv<ev::Num<f32>>::from(o, *f, x.length); if (const Value* f = v.field(18)) ev::Conv<ev::Num<f32>>::from(o, *f, x.linear_hertz); if (const Value* f = v.field(19)) ev::Conv<ev::Num<f32>>::from(o, *f, x.angular_hertz); if (const Value* f = v.field(20)) ev::Conv<ev::Num<f32>>::from(o, *f, x.linear_damping_ratio); if (const Value* f = v.field(21)) ev::Conv<ev::Num<f32>>::from(o, *f, x.angular_damping_ratio); if (const Value* f = v.field(22)) ev::Conv<ev::Vector>::from(o, *f, x.linear_velocity); if (const Value* f = v.field(23)) ev::Conv<ev::Vector>::from(o, *f, x.angular_velocity); if (const Value* f = v.field(24)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_velocity_force); if (const Value* f = v.field(25)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_velocity_torque); if (const Value* f = v.field(26)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_spring_force); if (const Value* f = v.field(27)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_spring_torque); if (const Value* f = v.field(28)) ev::Conv<ev::Bool>::from(o, *f, x.enable_steering); if (const Value* f = v.field(29)) ev::Conv<ev::Bool>::from(o, *f, x.enable_steering_limit); if (const Value* f = v.field(30)) ev::Conv<ev::Num<f32>>::from(o, *f, x.steering_hertz); if (const Value* f = v.field(31)) ev::Conv<ev::Num<f32>>::from(o, *f, x.steering_damping_ratio); if (const Value* f = v.field(32)) ev::Conv<ev::Num<f32>>::from(o, *f, x.target_steering); if (const Value* f = v.field(33)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_steering_torque); if (const Value* f = v.field(34)) ev::Conv<ev::Num<f32>>::from(o, *f, x.steering_lower); if (const Value* f = v.field(35)) ev::Conv<ev::Num<f32>>::from(o, *f, x.steering_upper); if (const Value* f = v.field(36)) ev::Conv<ev::Num<f32>>::from(o, *f, x.max_torque); if (const Value* f = v.field(37)) ev::Conv<ev::Num<f32>>::from(o, *f, x.constraint_hertz); if (const Value* f = v.field(38)) ev::Conv<ev::Num<f32>>::from(o, *f, x.constraint_damping_ratio); if (const Value* f = v.field(39)) ev::Conv<ev::Num<u64>>::from(o, *f, x.user); }
+Value S_MeshData::to(EngineObjects& o, const kern::MeshData& x) { return Value::structure({ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.positions), ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.normals), ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.colors), ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.uvs), ev::Conv<ev::List<ev::Num<::kern::f32>>>::to(o, x.extra), ev::Conv<ev::Num<::kern::u32>>::to(o, x.extra_size), ev::Conv<ev::List<ev::Num<::kern::u32>>>::to(o, x.indices)}); }
+void S_MeshData::from(EngineObjects& o, const Value& v, kern::MeshData& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.positions); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.normals); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.colors); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.uvs); if (const Value* f = v.field(4)) ev::Conv<ev::List<ev::Num<::kern::f32>>>::from(o, *f, x.extra); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::u32>>::from(o, *f, x.extra_size); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Num<::kern::u32>>>::from(o, *f, x.indices); }
+Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.x), ev::Conv<ev::Num<::kern::f32>>::to(o, x.y), ev::Conv<ev::Num<::kern::f32>>::to(o, x.z), ev::Conv<ev::Num<::kern::f32>>::to(o, x.w)}); }
+void S_Quat::from(EngineObjects& o, const Value& v, kern::Quat& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.w); }
+Value S_physics_Body::to(EngineObjects& o, const kern::physics::Body& x) { return Value::structure({ev::Conv<ev::Num<::kern::u64>>::to(o, x.id)}); }
+void S_physics_Body::from(EngineObjects& o, const Value& v, kern::physics::Body& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.id); }
+Value S_physics_BodySettings::to(EngineObjects& o, const kern::physics::BodySettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_BodyType>>::to(o, x.type), ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.linear_velocity), ev::Conv<ev::Vector>::to(o, x.angular_velocity), ev::Conv<ev::Num<::kern::f32>>::to(o, x.linear_damping), ev::Conv<ev::Num<::kern::f32>>::to(o, x.angular_damping), ev::Conv<ev::Num<::kern::f32>>::to(o, x.gravity_scale), ev::Conv<ev::Bool>::to(o, x.enable_sleep), ev::Conv<ev::Bool>::to(o, x.awake), ev::Conv<ev::Bool>::to(o, x.enabled), ev::Conv<ev::Bool>::to(o, x.bullet), ev::Conv<ev::Num<::kern::u64>>::to(o, x.user)}); }
+void S_physics_BodySettings::from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_BodyType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.linear_velocity); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.angular_velocity); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.linear_damping); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.angular_damping); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.gravity_scale); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.enable_sleep); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.awake); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.bullet); if (const Value* f = v.field(12)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.user); }
+Value S_physics_Capsule::to(EngineObjects& o, const kern::physics::Capsule& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.center1), ev::Conv<ev::Vector>::to(o, x.center2), ev::Conv<ev::Num<::kern::f32>>::to(o, x.radius)}); }
+void S_physics_Capsule::from(EngineObjects& o, const Value& v, kern::physics::Capsule& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.center1); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.center2); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.radius); }
+Value S_physics_CharacterMover_Settings::to(EngineObjects& o, const kern::physics::CharacterMover::Settings& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.radius), ev::Conv<ev::Num<::kern::f32>>::to(o, x.height), ev::Conv<ev::Num<::kern::f32>>::to(o, x.step_height), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_speed), ev::Conv<ev::Num<::kern::f32>>::to(o, x.accelerate), ev::Conv<ev::Num<::kern::f32>>::to(o, x.friction), ev::Conv<ev::Num<::kern::f32>>::to(o, x.air_control), ev::Conv<ev::Num<::kern::f32>>::to(o, x.stop_speed), ev::Conv<ev::Num<::kern::f32>>::to(o, x.jump_speed), ev::Conv<ev::Num<::kern::f32>>::to(o, x.sprint), ev::Conv<ev::Num<::kern::f32>>::to(o, x.gravity), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_slope_deg), ev::Conv<ev::Num<::kern::f32>>::to(o, x.push_strength), ev::Conv<ev::Num<::kern::u64>>::to(o, x.mask_bits)}); }
+void S_physics_CharacterMover_Settings::from(EngineObjects& o, const Value& v, kern::physics::CharacterMover::Settings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.radius); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.step_height); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_speed); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.accelerate); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.friction); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.air_control); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.stop_speed); if (const Value* f = v.field(8)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.jump_speed); if (const Value* f = v.field(9)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.sprint); if (const Value* f = v.field(10)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.gravity); if (const Value* f = v.field(11)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_slope_deg); if (const Value* f = v.field(12)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.push_strength); if (const Value* f = v.field(13)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.mask_bits); }
+Value S_physics_ContactPoint::to(EngineObjects& o, const kern::physics::ContactPoint& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<::kern::f32>>::to(o, x.separation), ev::Conv<ev::Num<::kern::f32>>::to(o, x.impulse)}); }
+void S_physics_ContactPoint::from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.separation); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.impulse); }
+Value S_physics_HitEvent::to(EngineObjects& o, const kern::physics::HitEvent& x) { return Value::structure({ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_a), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_b), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<::kern::f32>>::to(o, x.approach_speed)}); }
+void S_physics_HitEvent::from(EngineObjects& o, const Value& v, kern::physics::HitEvent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_a); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_b); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_a); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_b); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(5)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.approach_speed); }
+Value S_physics_Joint::to(EngineObjects& o, const kern::physics::Joint& x) { return Value::structure({ev::Conv<ev::Num<::kern::u64>>::to(o, x.id)}); }
+void S_physics_Joint::from(EngineObjects& o, const Value& v, kern::physics::Joint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.id); }
+Value S_physics_JointSettings::to(EngineObjects& o, const kern::physics::JointSettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_JointType>>::to(o, x.type), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b), ev::Conv<ev::Struct<S_physics_Pose>>::to(o, x.frame_a), ev::Conv<ev::Struct<S_physics_Pose>>::to(o, x.frame_b), ev::Conv<ev::Bool>::to(o, x.collide_connected), ev::Conv<ev::Bool>::to(o, x.enable_spring), ev::Conv<ev::Num<::kern::f32>>::to(o, x.hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.damping_ratio), ev::Conv<ev::Bool>::to(o, x.enable_limit), ev::Conv<ev::Num<::kern::f32>>::to(o, x.lower), ev::Conv<ev::Num<::kern::f32>>::to(o, x.upper), ev::Conv<ev::Bool>::to(o, x.enable_motor), ev::Conv<ev::Num<::kern::f32>>::to(o, x.motor_speed), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_motor_torque), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_motor_force), ev::Conv<ev::Vector>::to(o, x.motor_velocity), ev::Conv<ev::Num<::kern::f32>>::to(o, x.length), ev::Conv<ev::Num<::kern::f32>>::to(o, x.linear_hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.angular_hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.linear_damping_ratio), ev::Conv<ev::Num<::kern::f32>>::to(o, x.angular_damping_ratio), ev::Conv<ev::Vector>::to(o, x.linear_velocity), ev::Conv<ev::Vector>::to(o, x.angular_velocity), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_velocity_force), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_velocity_torque), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_spring_force), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_spring_torque), ev::Conv<ev::Bool>::to(o, x.enable_steering), ev::Conv<ev::Bool>::to(o, x.enable_steering_limit), ev::Conv<ev::Num<::kern::f32>>::to(o, x.steering_hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.steering_damping_ratio), ev::Conv<ev::Num<::kern::f32>>::to(o, x.target_steering), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_steering_torque), ev::Conv<ev::Num<::kern::f32>>::to(o, x.steering_lower), ev::Conv<ev::Num<::kern::f32>>::to(o, x.steering_upper), ev::Conv<ev::Num<::kern::f32>>::to(o, x.max_torque), ev::Conv<ev::Num<::kern::f32>>::to(o, x.constraint_hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.constraint_damping_ratio), ev::Conv<ev::Num<::kern::u64>>::to(o, x.user)}); }
+void S_physics_JointSettings::from(EngineObjects& o, const Value& v, kern::physics::JointSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_JointType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_a); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_b); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Pose>>::from(o, *f, x.frame_a); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_physics_Pose>>::from(o, *f, x.frame_b); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.collide_connected); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.enable_spring); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.hertz); if (const Value* f = v.field(8)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.damping_ratio); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.enable_limit); if (const Value* f = v.field(10)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.lower); if (const Value* f = v.field(11)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.upper); if (const Value* f = v.field(12)) ev::Conv<ev::Bool>::from(o, *f, x.enable_motor); if (const Value* f = v.field(13)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.motor_speed); if (const Value* f = v.field(14)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_motor_torque); if (const Value* f = v.field(15)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_motor_force); if (const Value* f = v.field(16)) ev::Conv<ev::Vector>::from(o, *f, x.motor_velocity); if (const Value* f = v.field(17)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.length); if (const Value* f = v.field(18)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.linear_hertz); if (const Value* f = v.field(19)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.angular_hertz); if (const Value* f = v.field(20)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.linear_damping_ratio); if (const Value* f = v.field(21)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.angular_damping_ratio); if (const Value* f = v.field(22)) ev::Conv<ev::Vector>::from(o, *f, x.linear_velocity); if (const Value* f = v.field(23)) ev::Conv<ev::Vector>::from(o, *f, x.angular_velocity); if (const Value* f = v.field(24)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_velocity_force); if (const Value* f = v.field(25)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_velocity_torque); if (const Value* f = v.field(26)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_spring_force); if (const Value* f = v.field(27)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_spring_torque); if (const Value* f = v.field(28)) ev::Conv<ev::Bool>::from(o, *f, x.enable_steering); if (const Value* f = v.field(29)) ev::Conv<ev::Bool>::from(o, *f, x.enable_steering_limit); if (const Value* f = v.field(30)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.steering_hertz); if (const Value* f = v.field(31)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.steering_damping_ratio); if (const Value* f = v.field(32)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.target_steering); if (const Value* f = v.field(33)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_steering_torque); if (const Value* f = v.field(34)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.steering_lower); if (const Value* f = v.field(35)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.steering_upper); if (const Value* f = v.field(36)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.max_torque); if (const Value* f = v.field(37)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.constraint_hertz); if (const Value* f = v.field(38)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.constraint_damping_ratio); if (const Value* f = v.field(39)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.user); }
 Value S_physics_MotionLocks::to(EngineObjects& o, const kern::physics::MotionLocks& x) { return Value::structure({ev::Conv<ev::List<ev::Bool>>::to(o, x.linear), ev::Conv<ev::List<ev::Bool>>::to(o, x.angular)}); }
 void S_physics_MotionLocks::from(EngineObjects& o, const Value& v, kern::physics::MotionLocks& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Bool>>::from(o, *f, x.linear); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Bool>>::from(o, *f, x.angular); }
-Value S_physics_MoverPlane::to(EngineObjects& o, const kern::physics::MoverPlane& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<f32>>::to(o, x.offset), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body)}); }
-void S_physics_MoverPlane::from(EngineObjects& o, const Value& v, kern::physics::MoverPlane& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.offset); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body); }
+Value S_physics_MoverPlane::to(EngineObjects& o, const kern::physics::MoverPlane& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<::kern::f32>>::to(o, x.offset), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body)}); }
+void S_physics_MoverPlane::from(EngineObjects& o, const Value& v, kern::physics::MoverPlane& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.offset); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body); }
 Value S_physics_Pose::to(EngineObjects& o, const kern::physics::Pose& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.position), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation)}); }
 void S_physics_Pose::from(EngineObjects& o, const Value& v, kern::physics::Pose& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); }
-Value S_physics_QueryFilter::to(EngineObjects& o, const kern::physics::QueryFilter& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.mask_bits), ev::Conv<ev::Num<u64>>::to(o, x.category_bits)}); }
-void S_physics_QueryFilter::from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.mask_bits); if (const Value* f = v.field(1)) ev::Conv<ev::Num<u64>>::from(o, *f, x.category_bits); }
-Value S_physics_RayHit::to(EngineObjects& o, const kern::physics::RayHit& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.hit), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<f32>>::to(o, x.fraction)}); }
-void S_physics_RayHit::from(EngineObjects& o, const Value& v, kern::physics::RayHit& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.hit); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.fraction); }
-Value S_physics_Shape::to(EngineObjects& o, const kern::physics::Shape& x) { return Value::structure({ev::Conv<ev::Num<u64>>::to(o, x.id)}); }
-void S_physics_Shape::from(EngineObjects& o, const Value& v, kern::physics::Shape& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<u64>>::from(o, *f, x.id); }
-Value S_physics_ShapeMaterial::to(EngineObjects& o, const kern::physics::ShapeMaterial& x) { return Value::structure({ev::Conv<ev::Num<f32>>::to(o, x.density), ev::Conv<ev::Num<f32>>::to(o, x.friction), ev::Conv<ev::Num<f32>>::to(o, x.restitution), ev::Conv<ev::Num<f32>>::to(o, x.rolling_resistance), ev::Conv<ev::Bool>::to(o, x.sensor), ev::Conv<ev::Num<u64>>::to(o, x.category_bits), ev::Conv<ev::Num<u64>>::to(o, x.mask_bits), ev::Conv<ev::Num<i32>>::to(o, x.group_index), ev::Conv<ev::Bool>::to(o, x.contact_events), ev::Conv<ev::Bool>::to(o, x.sensor_events), ev::Conv<ev::Bool>::to(o, x.hit_events), ev::Conv<ev::Num<u64>>::to(o, x.user), ev::Conv<ev::Enum<E_physics_Surface>>::to(o, x.surface)}); }
-void S_physics_ShapeMaterial::from(EngineObjects& o, const Value& v, kern::physics::ShapeMaterial& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<f32>>::from(o, *f, x.density); if (const Value* f = v.field(1)) ev::Conv<ev::Num<f32>>::from(o, *f, x.friction); if (const Value* f = v.field(2)) ev::Conv<ev::Num<f32>>::from(o, *f, x.restitution); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.rolling_resistance); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.sensor); if (const Value* f = v.field(5)) ev::Conv<ev::Num<u64>>::from(o, *f, x.category_bits); if (const Value* f = v.field(6)) ev::Conv<ev::Num<u64>>::from(o, *f, x.mask_bits); if (const Value* f = v.field(7)) ev::Conv<ev::Num<i32>>::from(o, *f, x.group_index); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.contact_events); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.sensor_events); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.hit_events); if (const Value* f = v.field(11)) ev::Conv<ev::Num<u64>>::from(o, *f, x.user); if (const Value* f = v.field(12)) ev::Conv<ev::Enum<E_physics_Surface>>::from(o, *f, x.surface); }
-Value S_physics_ShapeSettings::to(EngineObjects& o, const kern::physics::ShapeSettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_ShapeKind>>::to(o, x.kind), ev::Conv<ev::Vector>::to(o, x.center), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.size), ev::Conv<ev::Num<f32>>::to(o, x.radius), ev::Conv<ev::Num<f32>>::to(o, x.length), ev::Conv<ev::List<ev::Vector>>::to(o, x.points), ev::Conv<ev::List<ev::Num<u32>>>::to(o, x.indices), ev::Conv<ev::Struct<S_physics_ShapeMaterial>>::to(o, x.material)}); }
-void S_physics_ShapeSettings::from(EngineObjects& o, const Value& v, kern::physics::ShapeSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_ShapeKind>>::from(o, *f, x.kind); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.center); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.size); if (const Value* f = v.field(4)) ev::Conv<ev::Num<f32>>::from(o, *f, x.radius); if (const Value* f = v.field(5)) ev::Conv<ev::Num<f32>>::from(o, *f, x.length); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Vector>>::from(o, *f, x.points); if (const Value* f = v.field(7)) ev::Conv<ev::List<ev::Num<u32>>>::from(o, *f, x.indices); if (const Value* f = v.field(8)) ev::Conv<ev::Struct<S_physics_ShapeMaterial>>::from(o, *f, x.material); }
+Value S_physics_QueryFilter::to(EngineObjects& o, const kern::physics::QueryFilter& x) { return Value::structure({ev::Conv<ev::Num<::kern::u64>>::to(o, x.mask_bits), ev::Conv<ev::Num<::kern::u64>>::to(o, x.category_bits)}); }
+void S_physics_QueryFilter::from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.mask_bits); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.category_bits); }
+Value S_physics_RayHit::to(EngineObjects& o, const kern::physics::RayHit& x) { return Value::structure({ev::Conv<ev::Bool>::to(o, x.hit), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Num<::kern::f32>>::to(o, x.fraction)}); }
+void S_physics_RayHit::from(EngineObjects& o, const Value& v, kern::physics::RayHit& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Bool>::from(o, *f, x.hit); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.fraction); }
+Value S_physics_Shape::to(EngineObjects& o, const kern::physics::Shape& x) { return Value::structure({ev::Conv<ev::Num<::kern::u64>>::to(o, x.id)}); }
+void S_physics_Shape::from(EngineObjects& o, const Value& v, kern::physics::Shape& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.id); }
+Value S_physics_ShapeMaterial::to(EngineObjects& o, const kern::physics::ShapeMaterial& x) { return Value::structure({ev::Conv<ev::Num<::kern::f32>>::to(o, x.density), ev::Conv<ev::Num<::kern::f32>>::to(o, x.friction), ev::Conv<ev::Num<::kern::f32>>::to(o, x.restitution), ev::Conv<ev::Num<::kern::f32>>::to(o, x.rolling_resistance), ev::Conv<ev::Bool>::to(o, x.sensor), ev::Conv<ev::Num<::kern::u64>>::to(o, x.category_bits), ev::Conv<ev::Num<::kern::u64>>::to(o, x.mask_bits), ev::Conv<ev::Num<::kern::i32>>::to(o, x.group_index), ev::Conv<ev::Bool>::to(o, x.contact_events), ev::Conv<ev::Bool>::to(o, x.sensor_events), ev::Conv<ev::Bool>::to(o, x.hit_events), ev::Conv<ev::Num<::kern::u64>>::to(o, x.user), ev::Conv<ev::Enum<E_physics_Surface>>::to(o, x.surface)}); }
+void S_physics_ShapeMaterial::from(EngineObjects& o, const Value& v, kern::physics::ShapeMaterial& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.density); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.friction); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.restitution); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.rolling_resistance); if (const Value* f = v.field(4)) ev::Conv<ev::Bool>::from(o, *f, x.sensor); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.category_bits); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.mask_bits); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.group_index); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.contact_events); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.sensor_events); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.hit_events); if (const Value* f = v.field(11)) ev::Conv<ev::Num<::kern::u64>>::from(o, *f, x.user); if (const Value* f = v.field(12)) ev::Conv<ev::Enum<E_physics_Surface>>::from(o, *f, x.surface); }
+Value S_physics_ShapeSettings::to(EngineObjects& o, const kern::physics::ShapeSettings& x) { return Value::structure({ev::Conv<ev::Enum<E_physics_ShapeKind>>::to(o, x.kind), ev::Conv<ev::Vector>::to(o, x.center), ev::Conv<ev::Struct<S_Quat>>::to(o, x.rotation), ev::Conv<ev::Vector>::to(o, x.size), ev::Conv<ev::Num<::kern::f32>>::to(o, x.radius), ev::Conv<ev::Num<::kern::f32>>::to(o, x.length), ev::Conv<ev::List<ev::Vector>>::to(o, x.points), ev::Conv<ev::List<ev::Num<::kern::u32>>>::to(o, x.indices), ev::Conv<ev::Struct<S_physics_ShapeMaterial>>::to(o, x.material)}); }
+void S_physics_ShapeSettings::from(EngineObjects& o, const Value& v, kern::physics::ShapeSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_ShapeKind>>::from(o, *f, x.kind); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.center); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.size); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.radius); if (const Value* f = v.field(5)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.length); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Vector>>::from(o, *f, x.points); if (const Value* f = v.field(7)) ev::Conv<ev::List<ev::Num<::kern::u32>>>::from(o, *f, x.indices); if (const Value* f = v.field(8)) ev::Conv<ev::Struct<S_physics_ShapeMaterial>>::from(o, *f, x.material); }
 Value S_physics_TouchEvent::to(EngineObjects& o, const kern::physics::TouchEvent& x) { return Value::structure({ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_a), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_b), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b)}); }
 void S_physics_TouchEvent::from(EngineObjects& o, const Value& v, kern::physics::TouchEvent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_a); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_physics_Shape>>::from(o, *f, x.shape_b); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_a); if (const Value* f = v.field(3)) ev::Conv<ev::Struct<S_physics_Body>>::from(o, *f, x.body_b); }
-Value S_physics_Version::to(EngineObjects& o, const kern::physics::Version& x) { return Value::structure({ev::Conv<ev::Num<i32>>::to(o, x.major), ev::Conv<ev::Num<i32>>::to(o, x.minor), ev::Conv<ev::Num<i32>>::to(o, x.revision)}); }
-void S_physics_Version::from(EngineObjects& o, const Value& v, kern::physics::Version& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<i32>>::from(o, *f, x.major); if (const Value* f = v.field(1)) ev::Conv<ev::Num<i32>>::from(o, *f, x.minor); if (const Value* f = v.field(2)) ev::Conv<ev::Num<i32>>::from(o, *f, x.revision); }
-Value S_physics_WorldSettings::to(EngineObjects& o, const kern::physics::WorldSettings& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::Bool>::to(o, x.enable_sleep), ev::Conv<ev::Bool>::to(o, x.enable_continuous), ev::Conv<ev::Num<f32>>::to(o, x.restitution_threshold), ev::Conv<ev::Num<i32>>::to(o, x.restitution_iterations), ev::Conv<ev::Bool>::to(o, x.restitution_propagation), ev::Conv<ev::Num<f32>>::to(o, x.hit_event_threshold), ev::Conv<ev::Num<f32>>::to(o, x.contact_hertz), ev::Conv<ev::Num<f32>>::to(o, x.contact_damping_ratio), ev::Conv<ev::Num<f32>>::to(o, x.contact_speed), ev::Conv<ev::Num<f32>>::to(o, x.maximum_linear_speed)}); }
-void S_physics_WorldSettings::from(EngineObjects& o, const Value& v, kern::physics::WorldSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(1)) ev::Conv<ev::Bool>::from(o, *f, x.enable_sleep); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.enable_continuous); if (const Value* f = v.field(3)) ev::Conv<ev::Num<f32>>::from(o, *f, x.restitution_threshold); if (const Value* f = v.field(4)) ev::Conv<ev::Num<i32>>::from(o, *f, x.restitution_iterations); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.restitution_propagation); if (const Value* f = v.field(6)) ev::Conv<ev::Num<f32>>::from(o, *f, x.hit_event_threshold); if (const Value* f = v.field(7)) ev::Conv<ev::Num<f32>>::from(o, *f, x.contact_hertz); if (const Value* f = v.field(8)) ev::Conv<ev::Num<f32>>::from(o, *f, x.contact_damping_ratio); if (const Value* f = v.field(9)) ev::Conv<ev::Num<f32>>::from(o, *f, x.contact_speed); if (const Value* f = v.field(10)) ev::Conv<ev::Num<f32>>::from(o, *f, x.maximum_linear_speed); }
+Value S_physics_Version::to(EngineObjects& o, const kern::physics::Version& x) { return Value::structure({ev::Conv<ev::Num<::kern::i32>>::to(o, x.major), ev::Conv<ev::Num<::kern::i32>>::to(o, x.minor), ev::Conv<ev::Num<::kern::i32>>::to(o, x.revision)}); }
+void S_physics_Version::from(EngineObjects& o, const Value& v, kern::physics::Version& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.major); if (const Value* f = v.field(1)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.minor); if (const Value* f = v.field(2)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.revision); }
+Value S_physics_WorldSettings::to(EngineObjects& o, const kern::physics::WorldSettings& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.gravity), ev::Conv<ev::Bool>::to(o, x.enable_sleep), ev::Conv<ev::Bool>::to(o, x.enable_continuous), ev::Conv<ev::Num<::kern::f32>>::to(o, x.restitution_threshold), ev::Conv<ev::Num<::kern::i32>>::to(o, x.restitution_iterations), ev::Conv<ev::Bool>::to(o, x.restitution_propagation), ev::Conv<ev::Num<::kern::f32>>::to(o, x.hit_event_threshold), ev::Conv<ev::Num<::kern::f32>>::to(o, x.contact_hertz), ev::Conv<ev::Num<::kern::f32>>::to(o, x.contact_damping_ratio), ev::Conv<ev::Num<::kern::f32>>::to(o, x.contact_speed), ev::Conv<ev::Num<::kern::f32>>::to(o, x.maximum_linear_speed)}); }
+void S_physics_WorldSettings::from(EngineObjects& o, const Value& v, kern::physics::WorldSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.gravity); if (const Value* f = v.field(1)) ev::Conv<ev::Bool>::from(o, *f, x.enable_sleep); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.enable_continuous); if (const Value* f = v.field(3)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.restitution_threshold); if (const Value* f = v.field(4)) ev::Conv<ev::Num<::kern::i32>>::from(o, *f, x.restitution_iterations); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.restitution_propagation); if (const Value* f = v.field(6)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.hit_event_threshold); if (const Value* f = v.field(7)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.contact_hertz); if (const Value* f = v.field(8)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.contact_damping_ratio); if (const Value* f = v.field(9)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.contact_speed); if (const Value* f = v.field(10)) ev::Conv<ev::Num<::kern::f32>>::from(o, *f, x.maximum_linear_speed); }
 
 // engine.physics.surface_name: kern::physics::surface_name
 bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
@@ -105,7 +105,7 @@ bool c2(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   auto a1 = ev::blank<std::remove_cvref_t<kern::physics::Surface>>();
   ev::take<ev::Enum<E_physics_Surface>>(o, in, 1, a1);
   decltype(auto) r = kern::physics::surface_friction(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -244,7 +244,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->mesh_count();
-  ev::give<ev::Num<u64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u64>>(o, out, 0, r);
   return true;
 }
 
@@ -287,9 +287,9 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<int>>();
-  ev::take<ev::Num<i32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::i32>>(o, in, 2, a1);
   self->step(std::move(a0), std::move(a1));
   return true;
 }
@@ -326,7 +326,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::physics::Pose const&>>();
   ev::take<ev::Struct<S_physics_Pose>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   self->set_target_pose(std::move(a0), a1, std::move(a2));
   return true;
 }
@@ -483,7 +483,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   decltype(auto) r = self->mass(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -517,9 +517,9 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<kern::u64, std::allocator<kern::u64> >&>>();
-  ev::take<ev::List<ev::Num<u64>>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<::kern::u64>>>(o, in, 2, a1);
   self->body_masks(std::move(a0), a1);
-  ev::give<ev::List<ev::Num<u64>>>(o, out, 0, a1);
+  ev::give<ev::List<ev::Num<::kern::u64>>>(o, out, 0, a1);
   return true;
 }
 
@@ -530,7 +530,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   std::vector<kern::u64> a1;
-  ev::take<ev::List<ev::Num<u64>>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Num<::kern::u64>>>(o, in, 2, a1);
   self->set_body_masks(std::move(a0), kern::Span<kern::u64 const>(a1.data(), a1.size()));
   return true;
 }
@@ -581,7 +581,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   decltype(auto) r = self->body_user(std::move(a0));
-  ev::give<ev::Num<u64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u64>>(o, out, 0, r);
   return true;
 }
 
@@ -592,7 +592,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Shape>>();
   ev::take<ev::Struct<S_physics_Shape>>(o, in, 1, a0);
   decltype(auto) r = self->shape_user(std::move(a0));
-  ev::give<ev::Num<u64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u64>>(o, out, 0, r);
   return true;
 }
 
@@ -626,7 +626,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   self->set_mass(std::move(a0), std::move(a1));
   return true;
 }
@@ -638,11 +638,11 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 3, a2);
   std::vector<float> a3;
-  ev::take<ev::List<ev::Num<f32>>>(o, in, 4, a3);
+  ev::take<ev::List<ev::Num<::kern::f32>>>(o, in, 4, a3);
   if (a3.size() < 6) { o.error = "the list inertia has fewer than 6 entries"; return false; }
   self->set_mass_data(std::move(a0), std::move(a1), std::move(a2), a3.empty() ? nullptr : a3.data());
   return true;
@@ -655,9 +655,9 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   self->set_joint_thresholds(std::move(a0), std::move(a1), std::move(a2));
   return true;
 }
@@ -682,9 +682,9 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   self->set_joint_motor(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
   return true;
 }
@@ -696,7 +696,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   self->set_wheel_steering(std::move(a0), std::move(a1));
   return true;
 }
@@ -708,7 +708,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   decltype(auto) r = self->wheel_steering(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -719,7 +719,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   decltype(auto) r = self->joint_angle(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -730,7 +730,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   decltype(auto) r = self->joint_speed(std::move(a0));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -741,11 +741,11 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Joint>>();
   ev::take<ev::Struct<S_physics_Joint>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   self->set_joint_spring(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
   return true;
 }
@@ -759,7 +759,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   decltype(auto) r = self->hinge_lever(std::move(a0), std::move(a1));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -794,9 +794,9 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<std::vector<std::pair<kern::physics::Body, float>, std::allocator<std::pair<kern::physics::Body, float> > >&>>();
-  ev::take<ev::List<ev::Pair<ev::Struct<S_physics_Body>, ev::Num<f32>>>>(o, in, 2, a1);
+  ev::take<ev::List<ev::Pair<ev::Struct<S_physics_Body>, ev::Num<::kern::f32>>>>(o, in, 2, a1);
   self->touching(std::move(a0), a1);
-  ev::give<ev::List<ev::Pair<ev::Struct<S_physics_Body>, ev::Num<f32>>>>(o, out, 0, a1);
+  ev::give<ev::List<ev::Pair<ev::Struct<S_physics_Body>, ev::Num<::kern::f32>>>>(o, out, 0, a1);
   return true;
 }
 
@@ -841,7 +841,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
@@ -868,7 +868,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a4 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 5, a4);
   decltype(auto) r = self->cast_mover(std::move(a0), a1, std::move(a2), std::move(a3), std::move(a4));
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -898,13 +898,13 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 3, a2);
+  ev::take<ev::Num<::kern::f32>>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Num<u64>>(o, in, 5, a4);
+  ev::take<ev::Num<::kern::u64>>(o, in, 5, a4);
   self->explode(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   return true;
 }
@@ -984,7 +984,7 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->body_count();
-  ev::give<ev::Num<u32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u32>>(o, out, 0, r);
   return true;
 }
 
@@ -993,7 +993,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->awake_body_count();
-  ev::give<ev::Num<i32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::i32>>(o, out, 0, r);
   return true;
 }
 
@@ -1002,7 +1002,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::World>(o, in, 0, "world");
   if (!self) return false;
   decltype(auto) r = self->step_count();
-  ev::give<ev::Num<u64>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::u64>>(o, out, 0, r);
   return true;
 }
 
@@ -1026,7 +1026,7 @@ bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 4, a3);
+  ev::take<ev::Num<::kern::f32>>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 5, a4);
   decltype(auto) r = self->begin(*a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4));
@@ -1058,7 +1058,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->update(std::move(a0));
   return true;
 }
@@ -1103,7 +1103,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::MouseGrab>(o, in, 0, "mouse_grab");
   if (!self) return false;
   decltype(auto) r = self->max_force();
-  ev::give<ev::Num<f32>>(o, out, 0, r);
+  ev::give<ev::Num<::kern::f32>>(o, out, 0, r);
   return true;
 }
 
@@ -1124,7 +1124,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   kern::physics::World* a0 = ev::object<kern::physics::World>(o, in, 1, "world");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 2, a1);
+  ev::take<ev::Num<::kern::f32>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<bool>>();
@@ -1171,7 +1171,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
-  ev::take<ev::Num<f32>>(o, in, 1, a0);
+  ev::take<ev::Num<::kern::f32>>(o, in, 1, a0);
   self->jump(std::move(a0));
   return true;
 }

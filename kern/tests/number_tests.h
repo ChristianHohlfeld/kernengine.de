@@ -82,15 +82,19 @@ TEST(numbers_nodes_interpreter) {
   logic::Instance* inst = rt.add(g, 0, "numbers");
   CHECK(inst != nullptr);
   int wrong = 0, calls = 0;
+  u64 other = 0;   // (numbers a node read as another type than its own - logic.h numbers_read_as_another_type: none)
   for (const auto& [fn, args] : numbers_calls(g)) {
     std::vector<logic::Value> got;
     ++calls;
-    const bool ok = inst->call(fn, args, got) && got.size() == 1 && same_value(got[0], node_reference(fn, args));
+    logic::numbers_read_as_another_type() = 0;
+    const bool called = inst->call(fn, args, got);
+    if (logic::numbers_read_as_another_type() && other++ < 5) std::printf("  numbers: %s reads a number as another type than its own\n", fn.c_str());
+    const bool ok = called && got.size() == 1 && same_value(got[0], node_reference(fn, args));
     if (!ok && ++wrong <= 10)
       std::printf("  numbers: %s(%s%s%s) gives %s, numbers.h %s\n", fn.c_str(), args[0].as_text().c_str(), args.size() > 1 ? ", " : "", args.size() > 1 ? args[1].as_text().c_str() : "",
                   got.empty() ? "nothing" : got[0].as_text().c_str(), node_reference(fn, args).as_text().c_str());
   }
-  CHECK(wrong == 0);
+  CHECK(wrong == 0 && other == 0);
   CHECK(calls > 20000);
   // (no wire converts: an f32 into an f64 input, an i32 into an i64 one is an error of the graph)
   const char* mixed = R"({"variables":[{"name":"X","type":"f32","value":0.5},{"name":"Y","type":"f64","value":0}],

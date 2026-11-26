@@ -80,21 +80,21 @@ template <class T> T& blueprint() { return *blueprint_object<T>; }
 // (Function::exported, KERN_EXPORT_AS; the glue of the class writes the export - logic::native_glue)
 /// A number as the export takes it in (i32, u32, f32, f64): the input is of that type itself (Function::wire).
 template <class In, class C> In export_in(C x) {
-  static_assert(std::is_same_v<In, C>, "an export's number is of its C type (i32, u32, f32, f64)");
-  return x;
+  static_assert(std::is_same_v<num::raw<In>, C>, "an export's number is of its C type (i32, u32, f32, f64)");
+  return In(x);
 }
 /// A text that comes in: its characters, copied (the host's memory is the host's).
 inline Text export_text_in(const char* text, u32 length) { return Text(std::string_view(text ? text : "", text ? length : 0)); }
 /// A text that comes in without its length: up to its 0.
 inline Text export_text_in(const char* text) { return Text(std::string_view(text ? text : "")); }
 /// Bytes that come in: a List<u8>, one entry each.
-inline List<u8> export_bytes_in(const u8* bytes, u32 length) { return List<u8>(typename List<u8>::Items(bytes, bytes + length)); }
+inline List<num::Typed<u8>> export_bytes_in(const u8* bytes, u32 length) { return List<num::Typed<u8>>(typename List<num::Typed<u8>>::Items(bytes, bytes + length)); }
 /// Floats that come in (f32, as the host gives them): a List<f32>, one entry each.
-inline List<f32> export_floats_in(const f32* floats, u32 length) { return List<f32>(typename List<f32>::Items(floats, floats + length)); }
+inline List<num::Typed<f32>> export_floats_in(const f32* floats, u32 length) { return List<num::Typed<f32>>(typename List<num::Typed<f32>>::Items(floats, floats + length)); }
 /// A number as the export gives it (i32, u32, f32, f64): the output is of that type itself.
 template <class C, class Out> C export_out(const Out& x) {
-  static_assert(std::is_same_v<C, Out>, "an export's number is of its C type (i32, u32, f32, f64)");
-  return x;
+  static_assert(std::is_same_v<C, num::raw<Out>>, "an export's number is of its C type (i32, u32, f32, f64)");
+  return num::raw_value(x);
 }
 
 // What an export gives its host by a pointer - a text, bytes, floats - is a piece {pointer, length}: the export

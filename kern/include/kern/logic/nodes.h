@@ -33,6 +33,13 @@
 #include "kern/math/math.h"
 
 namespace kern {
+/// A key of a map or set of a Blueprint's class that is a number of the language (numbers.h Typed): the number's hash.
+template <class T> struct KeyHash<logic::num::Typed<T>, void> {
+  u64 operator()(const logic::num::Typed<T>& key) const {
+    if constexpr (std::is_integral_v<T>) return KeyHash<T>{}(key.v);
+    else return KeyHash<u64>{}(logic::num::bits_of(key.v));
+  }
+};
 
 /// A node's setting as a template argument: flow_switch_int<"3">, math_compare<"<=">.
 template <std::size_t N> struct Setting {
@@ -257,17 +264,21 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   List() = default;
   List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
   List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
+  /// (a list of numbers a function of C++ gave - std::vector<f32> - is a list of places of that very type: List<f32>)
+  template <class R>
+    requires(num::is_typed<T> && std::same_as<R, num::raw<T>>)
+  List(const std::vector<R>& items) : Items(items.begin(), items.end()) {}  // NOLINT
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   Item& operator[](I index) {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   const Item& operator[](I index) const {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     static const Item zero{};
     return zero;
@@ -301,16 +312,16 @@ template <class T, std::size_t N> struct Fixed {
   operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
   operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   Item& operator[](I index) {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
     return beside::entry<Item>();
   }
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   const Item& operator[](I index) const {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
     static const Item zero{};
     return zero;
@@ -376,6 +387,18 @@ struct Held<T> {
     if constexpr (std::is_same_v<T, i64>)
       if (v.type == PinType::enumeration) return v.i;
     return v.as<T>();
+  }
+};
+// A number of the language in a Blueprint's class (numbers.h Typed): held as the number it is.
+template <num::Number T> struct Held<num::Typed<T>> {
+  static constexpr PinType type = Held<T>::type;
+  static num::Typed<T> from(const Value& v) { return Held<T>::from(v); }
+};
+template <num::Number T> struct Held<std::vector<num::Typed<T>>> {
+  static constexpr PinType type = Held<std::vector<T>>::type;
+  static std::vector<num::Typed<T>> from(const Value& v) {
+    const auto& items = v.items<T>();
+    return std::vector<num::Typed<T>>(items.begin(), items.end());
   }
 };
 template <> struct Held<Vec3> {
@@ -507,6 +530,8 @@ template <class T>
 Value to_value(T v) {
   return Value::of_number(v);
 }
+template <num::Number T> Value to_value(num::Typed<T> v) { return to_value(v.v); }
+template <num::Number T> Value to_value(const std::vector<num::Typed<T>>& v) { return Value::of(std::vector<T>(v.begin(), v.end())); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(const Text& v) { return Value::text(v.str()); }
@@ -666,16 +691,16 @@ template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>:
   using Entries::Entries;
   Map() = default;
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   Item& operator[](I index) {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires num::Integer<I>
+    requires num::Integer<num::raw<I>>
   const Item& operator[](I index) const {
-    const i64 at = static_cast<i64>(index);
+    const i64 at = static_cast<i64>(num::raw_value(index));
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
     static const Item zero{};
     return zero;
@@ -1184,7 +1209,7 @@ template <class List> std::string of_bytes(const List& bytes, i64 at, i64 count)
   const std::size_t from = static_cast<std::size_t>(at);
   const std::size_t n = std::min(static_cast<std::size_t>(static_cast<u64>(count)), bytes.size() - from);
   r.resize(n);
-  for (std::size_t k = 0; k < n; ++k) r[k] = static_cast<char>(static_cast<u8>(static_cast<i64>(bytes[from + k])));
+  for (std::size_t k = 0; k < n; ++k) r[k] = static_cast<char>(static_cast<u8>(static_cast<i64>(num::raw_value(bytes[from + k]))));
   return r;
 }
 }  // namespace texts
@@ -2061,7 +2086,7 @@ inline u64 byte_of(i64 v) { return static_cast<u64>(v) & 0xffu; }
 template <class E> u64 byte_at(const E* items, std::size_t count, i64 from, u32 i) {
   if (from >= 0 && static_cast<u64>(from) >= count) return 0;  // (and no sum beyond the end of an i64)
   const i64 k = from + static_cast<i64>(i);
-  return k >= 0 && static_cast<u64>(k) < count ? byte_of(static_cast<i64>(items[static_cast<std::size_t>(k)])) : 0;
+  return k >= 0 && static_cast<u64>(k) < count ? byte_of(static_cast<i64>(num::raw_value(items[static_cast<std::size_t>(k)]))) : 0;
 }
 
 // ---- the bytes of a list of numbers (Copy Bytes) ----
@@ -2080,6 +2105,8 @@ constexpr u64 widened(Code c, u64 w) {
 template <num::Number T> u64 entry_bits(Code, T v) { return num::seen_bits(v); }  // (a NaN: the one NaN - numbers.h, seen)
 /// The entry those bits of the number `c` are.
 template <num::Number T> void set_entry(T& to, Code c, u64 w) { to = num::of_bits<T>(widened(c, w)); }
+template <num::Number T> u64 entry_bits(Code c, num::Typed<T> v) { return entry_bits(c, v.v); }
+template <num::Number T> void set_entry(num::Typed<T>& to, Code c, u64 w) { set_entry(to.v, c, w); }
 /// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list
 /// has at most 2^24 entries, of at most 8 bytes) is the same as one further out - what is beyond
 /// that is cut to it, so that no sum leaves an i64.
@@ -2194,6 +2221,7 @@ template <class T>
 void native_set(T& variable, const Value& v) {
   variable = v.as<T>();
 }
+template <num::Number T> void native_set(num::Typed<T>& variable, const Value& v) { variable = v.as<T>(); }
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
@@ -2261,28 +2289,28 @@ struct PureNodes {
   // ---- numbers: every operation of every number type, as C++ computes it (kern/logic/numbers.h) ----
   // A node of these has the number type as its setting "Type" (math_add<f32>): its pins are of that type. Where C++
   // leaves the result open, numbers.h fixes one (there: why and which).
-  template <num::Arithmetic T> static T math_add(T a, T b) { return num::add(a, b); }
-  template <num::Arithmetic T> static T math_sub(T a, T b) { return num::sub(a, b); }
-  template <num::Arithmetic T> static T math_mul(T a, T b) { return num::mul(a, b); }
-  template <num::Arithmetic T> static T math_div(T a, T b) { return num::div(a, b); }
-  template <num::Arithmetic T> static T math_rem(T a, T b) { return num::rem(a, b); }
-  template <num::Arithmetic T> static T math_negate(T a) { return num::neg(a); }
-  template <num::Arithmetic T> static T math_abs(T a) { return num::abs(a); }
-  template <num::Arithmetic T> static T math_min(T a, T b) { return num::min(a, b); }
-  template <num::Arithmetic T> static T math_max(T a, T b) { return num::max(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_add(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::add(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_sub(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::sub(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_mul(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::mul(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_div(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::div(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_rem(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::rem(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_negate(std::type_identity_t<T> a) { return num::neg(a); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_abs(std::type_identity_t<T> a) { return num::abs(a); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_min(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::min(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_max(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::max(a, b); }
   /// Value between Min and Max (the two in either order): max(min(value, hi), lo) of numbers.h.
-  template <num::Arithmetic T> static T math_clamp(T value, T min, T max) { return num::clamp(value, min, max); }
+  template <class P, num::Arithmetic T = num::raw<P>> static T math_clamp(std::type_identity_t<T> value, std::type_identity_t<T> min, std::type_identity_t<T> max) { return num::clamp(value, min, max); }
   /// A + (B - A) × Alpha, each step in T.
-  template <num::Floating T> static T math_lerp(T a, T b, T alpha) { return num::lerp(a, b, alpha); }
+  template <class P, num::Floating T = num::raw<P>> static T math_lerp(std::type_identity_t<T> a, std::type_identity_t<T> b, std::type_identity_t<T> alpha) { return num::lerp(a, b, alpha); }
   // (comparisons: of one type, as C++ compares them - a NaN is unequal to everything)
-  template <num::Number T> static Bool math_equal(T a, T b) { return num::eq(a, b); }
-  template <num::Number T> static Bool math_not_equal(T a, T b) { return num::ne(a, b); }
-  template <num::Arithmetic T> static Bool math_less(T a, T b) { return num::lt(a, b); }
-  template <num::Arithmetic T> static Bool math_less_equal(T a, T b) { return num::le(a, b); }
-  template <num::Arithmetic T> static Bool math_greater(T a, T b) { return num::gt(a, b); }
-  template <num::Arithmetic T> static Bool math_greater_equal(T a, T b) { return num::ge(a, b); }
+  template <class P, num::Number T = num::raw<P>> static Bool math_equal(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::eq(a, b); }
+  template <class P, num::Number T = num::raw<P>> static Bool math_not_equal(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::ne(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static Bool math_less(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::lt(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static Bool math_less_equal(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::le(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static Bool math_greater(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::gt(a, b); }
+  template <class P, num::Arithmetic T = num::raw<P>> static Bool math_greater_equal(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::ge(a, b); }
   /// Compare with the operator of the node's setting (== != < <= > >=), as C++ compares.
-  template <num::Arithmetic T> static Bool compare(std::string_view op, T a, T b) {
+  template <class P, num::Arithmetic T = num::raw<P>> static Bool compare(std::string_view op, std::type_identity_t<T> a, std::type_identity_t<T> b) {
     if (op == "==" || op == "=") return num::eq(a, b);
     if (op == "!=" || op == "≠") return num::ne(a, b);
     if (op == "<") return num::lt(a, b);
@@ -2291,55 +2319,55 @@ struct PureNodes {
     return num::ge(a, b);
   }
   // (bits of whole numbers; a shift's amount is a whole number of any type, taken mod the width)
-  template <num::Integer T> static T math_and(T a, T b) { return num::bit_and(a, b); }
-  template <num::Integer T> static T math_or(T a, T b) { return num::bit_or(a, b); }
-  template <num::Integer T> static T math_xor(T a, T b) { return num::bit_xor(a, b); }
-  template <num::Integer T> static T math_not(T a) { return num::bit_not(a); }
-  template <num::Integer T> static T math_shift_left(T a, i64 by) { return num::shl(a, by); }
-  template <num::Integer T> static T math_shift_right(T a, i64 by) { return num::shr(a, by); }
-  template <num::Integer T> static T math_rotate_left(T a, i64 by) { return num::rotl(a, by); }
-  template <num::Integer T> static T math_rotate_right(T a, i64 by) { return num::rotr(a, by); }
-  template <num::Integer T> static i32 math_count_ones(T a) { return num::popcount(a); }
-  template <num::Integer T> static i32 math_leading_zeros(T a) { return num::countl_zero(a); }
-  template <num::Integer T> static i32 math_trailing_zeros(T a) { return num::countr_zero(a); }
+  template <class P, num::Integer T = num::raw<P>> static T math_and(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::bit_and(a, b); }
+  template <class P, num::Integer T = num::raw<P>> static T math_or(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::bit_or(a, b); }
+  template <class P, num::Integer T = num::raw<P>> static T math_xor(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::bit_xor(a, b); }
+  template <class P, num::Integer T = num::raw<P>> static T math_not(std::type_identity_t<T> a) { return num::bit_not(a); }
+  template <class P, num::Integer T = num::raw<P>> static T math_shift_left(std::type_identity_t<T> a, i64 by) { return num::shl(a, by); }
+  template <class P, num::Integer T = num::raw<P>> static T math_shift_right(std::type_identity_t<T> a, i64 by) { return num::shr(a, by); }
+  template <class P, num::Integer T = num::raw<P>> static T math_rotate_left(std::type_identity_t<T> a, i64 by) { return num::rotl(a, by); }
+  template <class P, num::Integer T = num::raw<P>> static T math_rotate_right(std::type_identity_t<T> a, i64 by) { return num::rotr(a, by); }
+  template <class P, num::Integer T = num::raw<P>> static i32 math_count_ones(std::type_identity_t<T> a) { return num::popcount(a); }
+  template <class P, num::Integer T = num::raw<P>> static i32 math_leading_zeros(std::type_identity_t<T> a) { return num::countl_zero(a); }
+  template <class P, num::Integer T = num::raw<P>> static i32 math_trailing_zeros(std::type_identity_t<T> a) { return num::countr_zero(a); }
   // (the functions of <cmath>: radians, as C++'s; the engine's own sin, exp ... - kern::dm, musl)
-  template <num::Floating T> static T math_sqrt(T a) { return num::sqrt(a); }
-  template <num::Floating T> static T math_floor(T a) { return num::floor(a); }
-  template <num::Floating T> static T math_ceil(T a) { return num::ceil(a); }
-  template <num::Floating T> static T math_trunc(T a) { return num::trunc(a); }
-  template <num::Floating T> static T math_round(T a) { return num::round(a); }
-  template <num::Floating T> static T math_copysign(T a, T b) { return num::copysign(a, b); }
-  template <num::Floating T> static T math_fmin(T a, T b) { return num::fmin(a, b); }
-  template <num::Floating T> static T math_fmax(T a, T b) { return num::fmax(a, b); }
-  template <num::Floating T> static T math_sin(T a) { return num::sin(a); }
-  template <num::Floating T> static T math_cos(T a) { return num::cos(a); }
-  template <num::Floating T> static T math_tan(T a) { return num::tan(a); }
-  template <num::Floating T> static T math_asin(T a) { return num::asin(a); }
-  template <num::Floating T> static T math_acos(T a) { return num::acos(a); }
-  template <num::Floating T> static T math_atan(T a) { return num::atan(a); }
-  template <num::Floating T> static T math_atan2(T y, T x) { return num::atan2(y, x); }
-  template <num::Floating T> static T math_exp(T a) { return num::exp(a); }
-  template <num::Floating T> static T math_expm1(T a) { return num::expm1(a); }
-  template <num::Floating T> static T math_log(T a) { return num::log(a); }
-  template <num::Floating T> static T math_log10(T a) { return num::log10(a); }
-  template <num::Floating T> static T math_pow(T a, T b) { return num::pow(a, b); }
-  template <num::Floating T> static T math_hypot(T a, T b) { return num::hypot(a, b); }
-  template <num::Floating T> static Bool math_isnan(T a) { return num::isnan(a); }
-  template <num::Floating T> static Bool math_isinf(T a) { return num::isinf(a); }
-  template <num::Floating T> static Bool math_isfinite(T a) { return num::isfinite(a); }
-  template <num::Floating T> static Bool math_signbit(T a) { return num::signbit(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_sqrt(std::type_identity_t<T> a) { return num::sqrt(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_floor(std::type_identity_t<T> a) { return num::floor(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_ceil(std::type_identity_t<T> a) { return num::ceil(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_trunc(std::type_identity_t<T> a) { return num::trunc(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_round(std::type_identity_t<T> a) { return num::round(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_copysign(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::copysign(a, b); }
+  template <class P, num::Floating T = num::raw<P>> static T math_fmin(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::fmin(a, b); }
+  template <class P, num::Floating T = num::raw<P>> static T math_fmax(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::fmax(a, b); }
+  template <class P, num::Floating T = num::raw<P>> static T math_sin(std::type_identity_t<T> a) { return num::sin(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_cos(std::type_identity_t<T> a) { return num::cos(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_tan(std::type_identity_t<T> a) { return num::tan(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_asin(std::type_identity_t<T> a) { return num::asin(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_acos(std::type_identity_t<T> a) { return num::acos(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_atan(std::type_identity_t<T> a) { return num::atan(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_atan2(std::type_identity_t<T> y, std::type_identity_t<T> x) { return num::atan2(y, x); }
+  template <class P, num::Floating T = num::raw<P>> static T math_exp(std::type_identity_t<T> a) { return num::exp(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_expm1(std::type_identity_t<T> a) { return num::expm1(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_log(std::type_identity_t<T> a) { return num::log(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_log10(std::type_identity_t<T> a) { return num::log10(a); }
+  template <class P, num::Floating T = num::raw<P>> static T math_pow(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::pow(a, b); }
+  template <class P, num::Floating T = num::raw<P>> static T math_hypot(std::type_identity_t<T> a, std::type_identity_t<T> b) { return num::hypot(a, b); }
+  template <class P, num::Floating T = num::raw<P>> static Bool math_isnan(std::type_identity_t<T> a) { return num::isnan(a); }
+  template <class P, num::Floating T = num::raw<P>> static Bool math_isinf(std::type_identity_t<T> a) { return num::isinf(a); }
+  template <class P, num::Floating T = num::raw<P>> static Bool math_isfinite(std::type_identity_t<T> a) { return num::isfinite(a); }
+  template <class P, num::Floating T = num::raw<P>> static Bool math_signbit(std::type_identity_t<T> a) { return num::signbit(a); }
   // (conversions: one node for each, From and To its settings - static_cast<To>(x), numbers.h's cast)
-  template <num::Number To, num::Number From> static To num_cast(From x) { return num::cast<To>(x); }
+  template <class To0, class From0, num::Number To = num::raw<To0>, num::Number From = num::raw<From0>> static To num_cast(std::type_identity_t<From> x) { return num::cast<To>(x); }
   /// (the same in a formula: num_cast<f64, i64>(n) of the formula's input n - kern::formula, numbers.h Typed)
-  template <num::Number To, num::Number From> static num::Typed<To> num_cast(num::Typed<From> x) { return num::cast<To>(x.v); }
-  template <num::Number To, num::Number From> static num::Typed<To> num_bit_cast(num::Typed<From> x) { return num::reinterpret<To>(x.v); }
+  template <class To0, class From0, num::Number To = num::raw<To0>, num::Number From = num::raw<From0>> static num::Typed<To> num_cast(num::Typed<From> x) { return num::cast<To>(x.v); }
+  template <class To0, class From0, num::Number To = num::raw<To0>, num::Number From = num::raw<From0>> static num::Typed<To> num_bit_cast(num::Typed<From> x) { return num::reinterpret<To>(x.v); }
   /// The bits of x as the type To of the same size (std::bit_cast: f32 <-> u32, f64 <-> u64 ...).
-  template <num::Number To, num::Number From> static To num_bit_cast(From x) { return num::reinterpret<To>(x); }
+  template <class To0, class From0, num::Number To = num::raw<To0>, num::Number From = num::raw<From0>> static To num_bit_cast(std::type_identity_t<From> x) { return num::reinterpret<To>(x); }
   /// A number as a text (To Text): logic::number_as_text - a whole number in decimal, a floating one the shortest
   /// decimal that gives it again, inf, -inf, nan.
-  template <num::Number T> static Text num_text(T x) { return number_as_text(Value::of_number(x)); }
+  template <class P, num::Number T = num::raw<P>> static Text num_text(std::type_identity_t<T> x) { return number_as_text(Value::of_number(x)); }
   /// A whole number's bits in hexadecimal (lower case, no 0x) - std::to_chars(..., 16) of the unsigned bits of its type.
-  template <num::Integer T> static Text num_text_hex(T x) {
+  template <class P, num::Integer T = num::raw<P>> static Text num_text_hex(std::type_identity_t<T> x) {
     char b[20];
     auto [end, ec] = std::to_chars(b, b + sizeof b, static_cast<std::make_unsigned_t<T>>(x), 16);
     (void)ec;
@@ -2366,7 +2394,7 @@ struct PureNodes {
 
   // ---- values ----
   /// A number written out, of the type of the node's setting.
-  template <num::Number T> static T value_number(T value) { return value; }
+  template <class P, num::Number T = num::raw<P>> static T value_number(std::type_identity_t<T> value) { return value; }
   static Bool value_bool(Bool value) { return value; }
   static Text value_text(Text value) { return value; }
 
