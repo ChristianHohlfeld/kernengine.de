@@ -42,6 +42,7 @@
 #include "logic_cases.h"
 #include "math_names.h"
 #include "hyperbolic_reference.h"
+#include "elementary_reference.h"
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
@@ -2238,6 +2239,12 @@ TEST(logic_formulas) {
   // remainder: IEEE 754's - x - n * y, n the whole number nearest x / y (of two, the even one); by 0 it is 0
   CHECK(value("remainder(370, 360)") == 10 && value("remainder(190, 360)") == -170 && value("remainder(180, 360)") == 180 && value("remainder(540, 360)") == -180);
   CHECK(value("remainder(-190, 360)") == 170 && value("remainder(5.5, 2)") == -0.5 && value("remainder(7, 0)") == 0 && std::signbit(value("remainder(-720, 360)")));
+  // the engine's own log2 log1p exp2 cbrt acosh atanh ldexp (kern/src/math): exact where the value is; outside their
+  // domain 0, as log; ldexp's n the whole number it is
+  CHECK(value("log2(1024) + log2(0.125) + exp2(10) + exp2(-2) + cbrt(-27) + ldexp(3, 4) + ldexp(1, -1.9)") == 10 - 3 + 1024 + 0.25 - 3 + 48 + 0.5);
+  CHECK(value("log2(0) + log2(-2) + log1p(-1) + log1p(-3) + acosh(1) + acosh(0.5) + atanh(1) + atanh(-2) + atanh(0) + log1p(0)") == 0);
+  CHECK(value("log1p(x)", {1e-3}) == kern::dm::log1p(1e-3) && value("acosh(x)", {2.5}) == kern::dm::acosh(2.5) && value("atanh(x)", {-0.5}) == kern::dm::atanh(-0.5));
+  CHECK(value("ldexp(5, 2000)") == std::numeric_limits<double>::infinity() && value("ldexp(5, -2000)") == 0 && std::isnan(value("ldexp(5, x)", {std::numeric_limits<double>::quiet_NaN()})));
   // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
   CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
   CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);
@@ -12816,6 +12823,181 @@ TEST(hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges) {
   }
   if (odd != n || bounded != n || back != n) std::printf("  of %d: odd/even %d, bounded %d, asinh(sinh(x)) = x %d\n", n, odd, bounded, back);
   CHECK(odd == n && bounded == n && back == n);
+}
+
+TEST(elementary_functions_of_the_engine_are_accurate_exact_and_right_at_their_edges) {
+  // log2, log1p, exp2, cbrt (kern/src/math/elementary.c), acosh, atanh (hyperbolic.c) are the engine's own, written from
+  // their definitions over musl's exp and log; ldexp and remainder are exact (elementary.c). (1) Against
+  // elementary_reference.h (kern/tests/elementary_reference.py: 200 digits with Python decimal, ldexp and remainder exact
+  // with Fraction): the error in ulp of the exact value - at most 2 ulp for f64 (measured: acosh 1.24, log2 1.19, atanh
+  // 1.17, log1p 0.86, exp2 0.66, cbrt 0.50), at most 1 ulp for f32 (computed in f64, rounded once: measured 0.50); ldexp
+  // and remainder 0 ulp - the very bits, also subnormal, at the ties and where they overflow. (2) Their edges and
+  // identities, bit for bit.
+  using F = double (*)(double);
+  using G = float (*)(float);
+  const F f64s[] = {[](double x) { return kern::dm::log2(x); }, [](double x) { return kern::dm::log1p(x); },
+                    [](double x) { return kern::dm::exp2(x); }, [](double x) { return kern::dm::cbrt(x); },
+                    [](double x) { return kern::dm::acosh(x); }, [](double x) { return kern::dm::atanh(x); }};
+  const G f32s[] = {[](float x) { return kern::dm::log2(x); }, [](float x) { return kern::dm::log1p(x); },
+                    [](float x) { return kern::dm::exp2(x); }, [](float x) { return kern::dm::cbrt(x); },
+                    [](float x) { return kern::dm::acosh(x); }, [](float x) { return kern::dm::atanh(x); }};
+  const char* names[] = {"log2", "log1p", "exp2", "cbrt", "acosh", "atanh"};
+  // (the reference is hi + rest ulps of hi, an ulp of a double 2^(e - 52), e >= -1022; of a float 2^(e - 23), e >= -126)
+  auto ulps = [](double got, const elementary_reference::Row& row, bool single) {
+    if (!std::isfinite(got)) return 1e9;
+    const int e = row.hi == 0 ? -1022 : std::ilogb(row.hi);
+    const double ud = std::ldexp(1.0, std::max(e, -1022) - 52);
+    const double u = single ? std::ldexp(1.0, std::max(e, -126) - 23) : ud;
+    return std::fabs((got - row.hi) / u - row.rest * (ud / u));
+  };
+  double worst[2][6] = {};
+  double worst_at[2][6] = {};
+  for (const auto& row : elementary_reference::kAccurateDouble) {
+    const double e = ulps(f64s[row.fn](row.x), row, false);
+    if (e > worst[0][row.fn]) worst[0][row.fn] = e, worst_at[0][row.fn] = row.x;
+  }
+  for (const auto& row : elementary_reference::kAccurateFloat) {
+    const double e = ulps(static_cast<double>(f32s[row.fn](static_cast<float>(row.x))), row, true);
+    if (e > worst[1][row.fn]) worst[1][row.fn] = e, worst_at[1][row.fn] = row.x;
+  }
+  for (int k = 0; k < 6; ++k) {
+    if (worst[0][k] > 2.0) std::printf("  %s (f64): %.3f ulp at %a\n", names[k], worst[0][k], worst_at[0][k]);
+    if (worst[1][k] > 1.0) std::printf("  %s (f32): %.3f ulp at %a\n", names[k], worst[1][k], worst_at[1][k]);
+    CHECK(worst[0][k] <= 2.0);
+    CHECK(worst[1][k] <= 1.0);
+  }
+  CHECK(std::size(elementary_reference::kAccurateDouble) > 1500 && std::size(elementary_reference::kAccurateFloat) > 1400);
+  int exact_wrong = 0;
+  for (const auto& row : elementary_reference::kExactDouble) {
+    const double got = row.fn == 0 ? kern::dm::ldexp(row.x, static_cast<int>(row.y)) : kern::dm::remainder(row.x, row.y);
+    if (math_names::bits(got) != math_names::bits(row.want) && exact_wrong++ < 5)
+      std::printf("  %s(%a, %a) (f64): %a, exact %a\n", row.fn == 0 ? "ldexp" : "remainder", row.x, row.y, got, row.want);
+  }
+  for (const auto& row : elementary_reference::kExactFloat) {
+    const float x = static_cast<float>(row.x), want = static_cast<float>(row.want);
+    const float got = row.fn == 0 ? kern::dm::ldexp(x, static_cast<int>(row.y)) : kern::dm::remainder(x, static_cast<float>(row.y));
+    if (math_names::bits(got) != math_names::bits(want) && exact_wrong++ < 5)
+      std::printf("  %s(%a, %a) (f32): %a, exact %a\n", row.fn == 0 ? "ldexp" : "remainder", row.x, row.y, static_cast<double>(got), row.want);
+  }
+  CHECK(exact_wrong == 0);
+  CHECK(std::size(elementary_reference::kExactDouble) > 3000 && std::size(elementary_reference::kExactFloat) > 3000);
+
+  const double inf = std::numeric_limits<double>::infinity(), nan = std::numeric_limits<double>::quiet_NaN();
+  const float inff = std::numeric_limits<float>::infinity(), nanf = std::numeric_limits<float>::quiet_NaN();
+  const double tiny = std::numeric_limits<double>::denorm_min(), big = std::numeric_limits<double>::max();
+  const float tinyf = std::numeric_limits<float>::denorm_min(), bigf = std::numeric_limits<float>::max();
+  auto same = [](auto a, auto b) { return math_names::bits(a) == math_names::bits(b); };
+  // ±0 keep their sign (exp2: 1, log2: -inf, acosh(1): +0).
+  for (double z : {0.0, -0.0}) {
+    const float zf = static_cast<float>(z);
+    CHECK(same(kern::dm::log1p(z), z) && same(kern::dm::cbrt(z), z) && same(kern::dm::atanh(z), z) && same(kern::dm::ldexp(z, 5), z) &&
+          same(kern::dm::ldexp(z, -5000), z) && same(kern::dm::remainder(z, 3.0), z) && kern::dm::exp2(z) == 1.0 && kern::dm::log2(z) == -inf);
+    CHECK(same(kern::dm::log1p(zf), zf) && same(kern::dm::cbrt(zf), zf) && same(kern::dm::atanh(zf), zf) && same(kern::dm::ldexp(zf, 5), zf) &&
+          same(kern::dm::remainder(zf, 3.f), zf) && kern::dm::exp2(zf) == 1.f && kern::dm::log2(zf) == -inff);
+  }
+  CHECK(same(kern::dm::acosh(1.0), 0.0) && same(kern::dm::log2(1.0), 0.0) && same(kern::dm::acosh(1.f), 0.f) && same(kern::dm::log2(1.f), 0.f));
+  // A zero remainder has the sign of x; remainder by ±inf is x; by 0, or of ±inf, NaN.
+  CHECK(same(kern::dm::remainder(-3.0, 3.0), -0.0) && same(kern::dm::remainder(3.0, -3.0), 0.0) && same(kern::dm::remainder(-6.f, 2.f), -0.f));
+  CHECK(kern::dm::remainder(5.5, inf) == 5.5 && kern::dm::remainder(-5.5, -inf) == -5.5 && kern::dm::remainder(5.5f, inff) == 5.5f);
+  CHECK(std::isnan(kern::dm::remainder(5.5, 0.0)) && std::isnan(kern::dm::remainder(inf, 2.0)) && std::isnan(kern::dm::remainder(-inf, inf)) &&
+        std::isnan(kern::dm::remainder(1.f, -0.f)) && std::isnan(kern::dm::remainder(nan, 2.0)) && std::isnan(kern::dm::remainder(2.0, nan)));
+  // ±inf; NaN; outside the domain NaN (log1p(-1), atanh(±1): ±inf).
+  CHECK(kern::dm::log2(inf) == inf && kern::dm::log1p(inf) == inf && kern::dm::exp2(inf) == inf && same(kern::dm::exp2(-inf), 0.0) &&
+        kern::dm::cbrt(inf) == inf && kern::dm::cbrt(-inf) == -inf && kern::dm::acosh(inf) == inf && kern::dm::ldexp(inf, -3000) == inf &&
+        kern::dm::ldexp(-inf, 7) == -inf);
+  CHECK(kern::dm::log2(inff) == inff && kern::dm::log1p(inff) == inff && kern::dm::exp2(inff) == inff && same(kern::dm::exp2(-inff), 0.f) &&
+        kern::dm::cbrt(-inff) == -inff && kern::dm::acosh(inff) == inff && kern::dm::ldexp(-inff, -300) == -inff);
+  for (double v : {nan, -1.0, -inf, -tiny}) CHECK(std::isnan(kern::dm::log2(v)));
+  for (float v : {nanf, -1.f, -inff, -tinyf}) CHECK(std::isnan(kern::dm::log2(v)));
+  for (double v : {nan, -1.0000000000000002, -2.0, -inf}) CHECK(std::isnan(kern::dm::log1p(v)));
+  for (double v : {nan, 0.9999999999999999, 0.0, -1.0, -inf}) CHECK(std::isnan(kern::dm::acosh(v)));
+  for (float v : {nanf, 0.99999994f, 0.f, -1.f, -inff}) CHECK(std::isnan(kern::dm::acosh(v)));
+  for (double v : {nan, 1.0000000000000002, -1.5, inf}) CHECK(std::isnan(kern::dm::atanh(v)));
+  for (float v : {nanf, 1.0000001f, -1.5f, inff}) CHECK(std::isnan(kern::dm::atanh(v)));
+  CHECK(std::isnan(kern::dm::exp2(nan)) && std::isnan(kern::dm::cbrt(nan)) && std::isnan(kern::dm::ldexp(nan, 3)) && std::isnan(kern::dm::exp2(nanf)) &&
+        std::isnan(kern::dm::cbrt(nanf)) && std::isnan(kern::dm::ldexp(nanf, 3)) && std::isnan(kern::dm::log1p(-2.f)));
+  CHECK(kern::dm::log1p(-1.0) == -inf && kern::dm::log1p(-1.f) == -inff && kern::dm::atanh(1.0) == inf && kern::dm::atanh(-1.0) == -inf &&
+        kern::dm::atanh(-1.f) == -inff);
+  // Where they overflow and end in nothing: exp2 and ldexp at the largest double and float and below the smallest (a tie
+  // to even at half the smallest subnormal: 0), the subnormals between.
+  CHECK(std::isfinite(kern::dm::exp2(1023.9999999999999)) && kern::dm::exp2(1024.0) == inf && kern::dm::exp2(-1074.0) == tiny &&
+        kern::dm::exp2(-1074.5) == tiny && same(kern::dm::exp2(-1075.0), 0.0) && kern::dm::exp2(-1022.0) == std::numeric_limits<double>::min());
+  CHECK(std::isfinite(kern::dm::exp2(127.99999f)) && kern::dm::exp2(128.f) == inff && kern::dm::exp2(-149.f) == tinyf && same(kern::dm::exp2(-150.f), 0.f));
+  CHECK(kern::dm::ldexp(1.0, 1024) == inf && kern::dm::ldexp(big, 1) == inf && kern::dm::ldexp(-big, 1) == -inf && kern::dm::ldexp(0.5, 1024) == 0x1p1023 &&
+        kern::dm::ldexp(std::numeric_limits<double>::min(), -52) == tiny && same(kern::dm::ldexp(1.0, -1075), 0.0) &&
+        same(kern::dm::ldexp(-1.0, -1075), -0.0) && kern::dm::ldexp(3.0, -1076) == tiny && kern::dm::ldexp(3.0, -1075) == 2 * tiny &&
+        kern::dm::ldexp(tiny, 1074) == 1.0 && kern::dm::ldexp(tiny, 2097) == 0x1p1023 && kern::dm::ldexp(tiny, 2098) == inf &&
+        kern::dm::ldexp(1.0, std::numeric_limits<int>::max()) == inf && same(kern::dm::ldexp(-1.0, std::numeric_limits<int>::min()), -0.0) &&
+        kern::dm::ldexp(big, -2097) == 2 * tiny && kern::dm::ldexp(big, -2098) == tiny && same(kern::dm::ldexp(-big, -2099), -0.0));
+  CHECK(kern::dm::ldexp(1.f, 128) == inff && kern::dm::ldexp(bigf, 1) == inff && kern::dm::ldexp(1.f, -149) == tinyf && same(kern::dm::ldexp(1.f, -150), 0.f) &&
+        kern::dm::ldexp(3.f, -151) == tinyf && kern::dm::ldexp(3.f, -150) == 2 * tinyf && kern::dm::ldexp(tinyf, 149) == 1.f &&
+        kern::dm::ldexp(bigf, -277) == tinyf && kern::dm::ldexp(1.f, std::numeric_limits<int>::max()) == inff &&
+        same(kern::dm::ldexp(-1.f, std::numeric_limits<int>::min()), -0.f));
+  // Exact where the value is: log2(2^k) is k, exp2(k) is 2^k - for every power of 2, subnormal ones too.
+  int powers = 0, powers_right = 0;
+  for (int k = -1074; k <= 1023; ++k) {
+    ++powers;
+    const double p = kern::dm::ldexp(1.0, k);
+    if (kern::dm::log2(p) == k && kern::dm::exp2(static_cast<double>(k)) == p) ++powers_right;
+  }
+  for (int k = -149; k <= 127; ++k) {
+    ++powers;
+    const float p = kern::dm::ldexp(1.f, k);
+    if (kern::dm::log2(p) == static_cast<float>(k) && kern::dm::exp2(static_cast<float>(k)) == p) ++powers_right;
+  }
+  if (powers_right != powers) std::printf("  log2(2^k) = k = log2(exp2(k)): %d of %d\n", powers_right, powers);
+  CHECK(powers_right == powers);
+  // cbrt of a cube is its root, exactly (m^3 is a double for m < 2^17; also times 2^(3j), also subnormal).
+  int cubes = 0, cubes_right = 0;
+  for (int m = 1; m < (1 << 17); m += 7) {
+    const double c = static_cast<double>(m) * m * m;
+    for (int j : {-358, -200, 0, 5, 300}) {
+      ++cubes;
+      if (kern::dm::cbrt(kern::dm::ldexp(c, 3 * j)) == kern::dm::ldexp(static_cast<double>(m), j) &&
+          kern::dm::cbrt(-kern::dm::ldexp(c, 3 * j)) == -kern::dm::ldexp(static_cast<double>(m), j))
+        ++cubes_right;
+    }
+  }
+  if (cubes_right != cubes) std::printf("  cbrt(m^3) = m: %d of %d\n", cubes_right, cubes);
+  CHECK(cubes_right == cubes);
+  // Odd functions bit for bit; ldexp undoes itself; remainder: |r| <= |y| / 2, odd in x, even in y, unchanged when x and y
+  // are both scaled by 2^s (exact); acosh(cosh x) = x and atanh(tanh x) = x within 4 ulp, log2(exp2 x) within 2 ulp.
+  std::uint64_t s = 0x2545f4914f6cdd1dull;
+  int odd = 0, undo = 0, rem = 0, back = 0, n = 0;
+  auto ulp_of = [](double v) { return std::ldexp(1.0, std::max(std::ilogb(v), -1022) - 52); };
+  for (int i = 0; i < 4000; ++i) {
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double u = static_cast<double>(s >> 11) / 9007199254740992.0;
+    const double x = u * std::ldexp(1.0, static_cast<int>(s % 60) - 50);   // (0 .. 1024)
+    s = s * 6364136223846793005ull + 1442695040888963407ull;
+    const double y = (static_cast<double>(s >> 11) / 9007199254740992.0 - 0.5) * std::ldexp(1.0, static_cast<int>(s % 80) - 40);
+    const float xf = static_cast<float>(x), yf = static_cast<float>(y);
+    ++n;
+    if (same(kern::dm::cbrt(-x), -kern::dm::cbrt(x)) && same(kern::dm::atanh(-u), -kern::dm::atanh(u)) && same(kern::dm::cbrt(-xf), -kern::dm::cbrt(xf)) &&
+        same(kern::dm::atanh(-static_cast<float>(u)), -kern::dm::atanh(static_cast<float>(u))))
+      ++odd;
+    const int sh = static_cast<int>(s % 1001) - 500;
+    if (x == 0 || (kern::dm::ldexp(kern::dm::ldexp(x, sh), -sh) == x && kern::dm::ldexp(kern::dm::ldexp(y, -sh), sh) == y)) ++undo;
+    if (y != 0) {
+      const double r = kern::dm::remainder(x, y);
+      const float rf = kern::dm::remainder(xf, yf);
+      const int sc = static_cast<int>(s % 401) - 200;
+      if (std::fabs(r) <= std::fabs(y) / 2 && same(kern::dm::remainder(-x, y), -r) && same(kern::dm::remainder(x, -y), r) &&
+          same(kern::dm::remainder(kern::dm::ldexp(x, sc), kern::dm::ldexp(y, sc)), kern::dm::ldexp(r, sc)) &&
+          (yf == 0 || (std::fabs(rf) <= std::fabs(yf) / 2 && same(kern::dm::remainder(-xf, yf), -rf))))
+        ++rem;
+    } else {
+      ++rem;
+    }
+    const double c = 1.0 + u * 19.0, t = u - 0.5, l = 0.5 + u * 1.5;
+    if (std::fabs(kern::dm::acosh(kern::dm::cosh(c)) - c) <= 4 * ulp_of(c) &&
+        (t == 0 || std::fabs(kern::dm::atanh(kern::dm::tanh(t)) - t) <= 4 * ulp_of(t)) &&
+        std::fabs(kern::dm::exp2(kern::dm::log2(l)) - l) <= 2 * ulp_of(l))
+      ++back;
+  }
+  if (odd != n || undo != n || rem != n || back != n)
+    std::printf("  of %d: odd %d, ldexp undone %d, remainder %d, acosh(cosh)/atanh(tanh)/exp2(log2) %d\n", n, odd, undo, rem, back);
+  CHECK(odd == n && undo == n && rem == n && back == n);
 }
 
 TEST(determinism_is_bit_identical_across_builds_and_platforms) {

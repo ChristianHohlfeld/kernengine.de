@@ -1,5 +1,5 @@
 // The standard library's mathematics is the engine's (kern/third_party/musl_math/src/std_names.c, kern/src/math/hyperbolic.c,
-// flags.sh): std::sin, sinf, atan2, sinh ... give the bits kern::dm gives - for f32 and f64, over edge values and a series of drawn ones, called
+// kern/src/math/elementary.c, flags.sh): std::sin, sinf, atan2, sinh, log2, ldexp ... give the bits kern::dm gives - for f32 and f64, over edge values and a series of drawn ones, called
 // directly, as a compiler may combine them (sin and cos of one value: sincos) and with a constant the compiler knows (it
 // must not compute it itself). Shared by the native tests (test_main.cpp) and the WebAssembly module
 // (math_names_wasm_test.cpp): both say how many differ and a digest of all the results - the same on every target
@@ -80,6 +80,16 @@ template <class T> void compare_all(Result& r) {
     r.take("cosh", x, x, std::cosh(x), kern::dm::cosh(x));
     r.take("tanh", x, x, std::tanh(x), kern::dm::tanh(x));
     r.take("asinh", x, x, std::asinh(x), kern::dm::asinh(x));
+    r.take("acosh", x, x, std::acosh(x), kern::dm::acosh(x));
+    r.take("atanh", x, x, std::atanh(x), kern::dm::atanh(x));
+    // (kern/src/math/elementary.c)
+    r.take("log2", x, x, std::log2(x), kern::dm::log2(x));
+    r.take("log1p", x, x, std::log1p(x), kern::dm::log1p(x));
+    r.take("exp2", x, x, std::exp2(x), kern::dm::exp2(x));
+    r.take("cbrt", x, x, std::cbrt(x), kern::dm::cbrt(x));
+    r.take("remainder", x, y, std::remainder(x, y), kern::dm::remainder(x, y));
+    const int n = opaque(static_cast<int>((k * 37) % 2400) - 1200);   // (beyond both ends of every format)
+    r.take("ldexp", x, T(n), std::ldexp(x, n), kern::dm::ldexp(x, n));
     // (sin and cos of one value side by side: what a compiler may make one call of, sincos)
     const T s = std::sin(x), c = std::cos(x);
     r.take("sin beside cos", x, x, s, kern::dm::sin(x));
@@ -102,6 +112,20 @@ inline void compare_constants(Result& r) {
   r.take("tanh(-1.5f) constant", -1.5f, -1.5f, std::tanh(-1.5f), kern::dm::tanh(opaque(-1.5f)));
   r.take("cosh(2.5) constant", 2.5, 2.5, std::cosh(2.5), kern::dm::cosh(opaque(2.5)));
   r.take("asinh(3.0) constant", 3.0, 3.0, std::asinh(3.0), kern::dm::asinh(opaque(3.0)));
+  r.take("acosh(2.5) constant", 2.5, 2.5, std::acosh(2.5), kern::dm::acosh(opaque(2.5)));
+  r.take("atanh(0.5f) constant", 0.5f, 0.5f, std::atanh(0.5f), kern::dm::atanh(opaque(0.5f)));
+  r.take("log2(10.0) constant", 10.0, 10.0, std::log2(10.0), kern::dm::log2(opaque(10.0)));
+  r.take("log2(3.f) constant", 3.f, 3.f, std::log2(3.f), kern::dm::log2(opaque(3.f)));
+  r.take("log1p(1e-5f) constant", 1e-5f, 1e-5f, std::log1p(1e-5f), kern::dm::log1p(opaque(1e-5f)));
+  r.take("log1p(0.75) constant", 0.75, 0.75, std::log1p(0.75), kern::dm::log1p(opaque(0.75)));
+  r.take("exp2(0.3) constant", 0.3, 0.3, std::exp2(0.3), kern::dm::exp2(opaque(0.3)));
+  r.take("exp2(-2.25f) constant", -2.25f, -2.25f, std::exp2(-2.25f), kern::dm::exp2(opaque(-2.25f)));
+  r.take("cbrt(27.5f) constant", 27.5f, 27.5f, std::cbrt(27.5f), kern::dm::cbrt(opaque(27.5f)));
+  r.take("cbrt(-1e-300) constant", -1e-300, -1e-300, std::cbrt(-1e-300), kern::dm::cbrt(opaque(-1e-300)));
+  r.take("ldexp(3.0, -1075) constant", 3.0, -1075.0, std::ldexp(3.0, -1075), kern::dm::ldexp(opaque(3.0), opaque(-1075)));
+  r.take("ldexp(1.5f, 20) constant", 1.5f, 20.f, std::ldexp(1.5f, 20), kern::dm::ldexp(opaque(1.5f), opaque(20)));
+  r.take("remainder(10.5f, 3.f) constant", 10.5f, 3.f, std::remainder(10.5f, 3.f), kern::dm::remainder(opaque(10.5f), opaque(3.f)));
+  r.take("remainder(1e300, 7.0) constant", 1e300, 7.0, std::remainder(1e300, 7.0), kern::dm::remainder(opaque(1e300), opaque(7.0)));
   r.take("hypot(3e200, 4e200) constant", 3e200, 4e200, std::hypot(3e200, 4e200), kern::dm::hypot(opaque(3e200), opaque(4e200)));
 }
 

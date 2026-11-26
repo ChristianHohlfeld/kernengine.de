@@ -855,6 +855,8 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 ///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
 ///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
 ///                lerp(a, b, t) remainder(x, y) (IEEE 754's: x - n * y, n the whole number nearest x / y)
+///                sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt ldexp(x, n) (x * 2^n, exact) - the
+///                engine's own (kern/src/math), as std:: of a program
 ///   constants    pi
 /// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
 /// are those of 0 and of nothing (0).
