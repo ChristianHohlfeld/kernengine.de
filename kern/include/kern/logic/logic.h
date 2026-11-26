@@ -1161,13 +1161,13 @@ class NativeBlueprint {
     (void)type;
     return nullptr;
   }
-  /// A class with exports (Function::exported): this object becomes the one its exports call
-  /// (kern/logic/blueprint_class.h, bind_blueprint) - false, with an error (kern::fail), while another object of
-  /// the class is bound. A class without exports: true, nothing. (The program's runtime binds each of its
-  /// Blueprints when it starts - kern/game/program.h.)
-  virtual bool bind_exports() { return true; }
-  /// ... and its exports call it no more (when it is the one they call).
-  virtual void unbind_exports() {}
+  /// This object becomes the one of its class that the program's C++ (blueprint<T>()) and its exports call
+  /// (kern/logic/blueprint_class.h, bind_blueprint_object) - false, with an error (kern::fail), while another object
+  /// of the class is bound. (The program's runtime binds each of its Blueprints when it starts - kern/game/program.h;
+  /// a world's are bound by the program that calls them, bind_blueprint.)
+  virtual bool bind_class() { return true; }
+  /// ... and it is called so no more (when it is the one bound).
+  virtual void unbind_class() {}
 };
 /// The key of the class T, one in the whole program (an inline variable has one address): what
 /// NativeBlueprint::object is asked by.
@@ -1350,11 +1350,11 @@ class Instance {
   /// Where it runs as its compiled class T, the object of that class (null: it runs otherwise, or as
   /// another class) - what the program's own C++ calls directly (kern/logic/blueprint_class.h).
   template <class T> T* native_object() const { return blueprint_ ? static_cast<T*>(blueprint_->object(&class_key<T>)) : nullptr; }
-  /// Its class's exports call it from now on (NativeBlueprint::bind_exports) - false, with an error, while another
-  /// object of the class is bound; one that runs otherwise has no exports: true.
-  bool bind_exports() { return !blueprint_ || blueprint_->bind_exports(); }
-  void unbind_exports() {
-    if (blueprint_) blueprint_->unbind_exports();
+  /// It is the object of its class the program calls from now on (NativeBlueprint::bind_class) - false, with an
+  /// error, while another object of the class is bound; one that runs otherwise has no class: true.
+  bool bind_class() { return !blueprint_ || blueprint_->bind_class(); }
+  void unbind_class() {
+    if (blueprint_) blueprint_->unbind_class();
   }
   i32 id() const { return id_; }
 

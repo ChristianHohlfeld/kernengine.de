@@ -26,7 +26,8 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   "settings": {
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
     "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } } } ],
-    "heapReserveMb": 0
+    "heapReserveMb": 0,
+    "loopBudget": 200000
   },
   "levels": ["levels/start.klevel", "levels/wald.klevel"],
   "startLevel": "levels/start.klevel",
@@ -83,6 +84,9 @@ Ein Programm hat **genau einen**, ausdrücklichen Einstieg und keine schwachen S
 // ein Spiel, dessen App C++ ist
 int kern_main() { static MeinSpiel app; return kern::run(app); }
 
+// ein Spiel, dessen App C++ ist und das ein Projekt hat (Einstellungen, Programm-Blueprints neben der App)
+int kern_main() { static MeinSpiel app; return kern::run(app, kern::game::embedded_project()); }
+
 // ein Spiel aus seinem Projekt (die App ist ein Programm-Blueprint)
 int kern_main() { return kern::run(kern::game::embedded_project()); }
 ```
@@ -97,6 +101,16 @@ int kern_main() { return kern::run(kern::game::embedded_project()); }
   Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder
   zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
   `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
+- `kern::run(App&, const Project&)` (`kern/game/program.h`): die App ist C++, das Programm des Projekts läuft neben ihr
+  (`Program::start(project, app)`) – seine Blueprints (Menüs, Bibliotheken, die das C++ der App als ihre Klassen ruft)
+  sind ab vor `App::start` bis nach `App::stop` gebunden. Ein Blueprint des Projekts, der ebenfalls `App` implementiert,
+  weist den Start ab und wird genannt (ein Programm hat eine App); ein Projekt ohne Blueprints ist ein leeres Programm.
+  Geprüft: `program_beside_an_app_of_cpp`.
+- **Die Programm-Laufzeit bindet ihre Klassen.** Jeder Programm-Blueprint ist eine Instanz – eine Bibliothek auch, wie
+  der Akteur einer Welt –, und jeder, der als seine Klasse läuft, ist beim Start gebunden (`NativeBlueprint::bind_class`):
+  was das C++ des Programms ruft (`kern::logic::blueprint<T>()`) und was ein Export ruft, ohne dass das Programm selbst
+  bindet. Die Schleifenwache der Programm-Logik ist die Einstellung `loopBudget` des Projekts (Vorgabe 200000,
+  `logic::Runtime::budget`).
 - **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
   Programm-Blueprint. Die Programm-Laufzeit bindet beim Start jeden ihrer Blueprints, der als Klasse mit Exporten
   läuft (`NativeBlueprint::bind_exports`), und löst sie am Ende (danach meldet ein Export „no instance … is bound“);
@@ -220,8 +234,9 @@ Level, beide gelesen, ein Export im Level abgewiesen).
   Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`). Welten, die
   das Programm macht, bekommen das Projekt (`program_world_has_the_project`). Exporte: die Programm-Laufzeit bindet
   und löst sie; ein Export in einer Welt wird abgewiesen (`program_binds_the_exports`).
-  OFFEN (SpawnCity): `Game::start` bindet die Klassen des Ordners „Program“ noch an die Logik der Welt
-  (`blueprints::bind(*world_->logic_runtime())`) – sie stehen bis zum Schaltschritt im Level und das Spiel hat eine
-  App aus C++; das Binden fällt weg, sobald der Konverter sie ins Projekt schreibt (`spawncity.kproject`).
+  SpawnCity startet mit `kern::run(sc::app(), embedded_project())`; `Game::start` bindet keine Programm-Klassen mehr
+  an die Logik der Welt – die Programm-Laufzeit bindet sie. Sie stehen nach dem nächsten vollen Lauf des Konverters im
+  Projekt (7a); bis dahin stehen die Klassen des Ordners „Program“ noch im Level und sind ungebunden (Spiel rot bis
+  zum vollen Lauf).
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

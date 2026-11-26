@@ -285,11 +285,10 @@ bool Game::start(kern::Engine& e) {
     if (!combat::bind_sandbox(*logic)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_fun(*logic)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
     if (!combat::bind_race(*logic)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
-    // The Blueprints the game calls directly, as their classes (level_blueprints.h): each bound once to the
-    // object the logic runs it as. Their loops run under the logic's guard; the game's own functions loop
-    // long (a code encoded bit by bit), so the guard is the one the tests run them with (rules::kLoopBudget).
+    // The rules' loops run under the world logic's guard, the one the tests run them with (rules::kLoopBudget). (The
+    // Blueprints the game calls directly, as their classes - level_blueprints.h - are the program's: the program's
+    // runtime binds them when it starts, before App::start - kern::run(App&, const Project&), kern/docs/project.md 4.)
     logic->budget = rules::kLoopBudget;
-    if (!blueprints::bind(*logic)) return kern::fail("a Blueprint the game calls as its class is missing from the level or not built as its class");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

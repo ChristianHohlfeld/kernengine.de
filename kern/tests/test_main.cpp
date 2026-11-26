@@ -1331,6 +1331,10 @@ TEST(game_project_round_trip) {
   CHECK(!settings("{\"profiles\":[{\"renderer\":{}}]}") && error == "settings: profiles[0]: a profile has a name");
   CHECK(!settings("{\"profiles\":[{\"name\":\"a\"},{\"name\":\"a\"}]}") && error == "settings: profiles[1]: the profile a stands twice");
   CHECK(!settings("{\"heapReserveMb\":-5}") && error == "settings: heapReserveMb: from 0 to 4095");
+  CHECK(settings("{\"loopBudget\":2000000000}") && q.loop_budget == 2000000000u);
+  CHECK(settings("{}") && q.loop_budget == 200000u);
+  CHECK(!settings("{\"loopBudget\":0}") && error.find("settings: loopBudget: a whole number from 1") == 0);
+  CHECK(!settings("{\"loopBudget\":1.5}") && error.find("settings: loopBudget:") == 0);
   CHECK(!settings("[]") && error == "settings: must be an object");
   CHECK(!game::from_text("{\"format\":\"kern-project\",\"settings\":{\"mobile\":{}}}", back, &error) && error.find("settings: mobile") == 0);
   // a level is a world: its old member "project" is an error with the place
@@ -8354,9 +8358,74 @@ TEST(program_world_has_the_project) {
 }
 
 // The exports belong to the program (kern/docs/project.md 4.): the program's runtime binds each of its Blueprints that
-// runs as a class with exports when it starts (NativeBlueprint::bind_exports) and unbinds them at its end - two objects
+// runs as a class when it starts (NativeBlueprint::bind_class: what its exports call) and unbinds them at its end - two objects
 // of one such class in the program: the start is refused and names the Blueprint. An export in a Blueprint of a world
 // is refused where the level is read (with the place), by validate (Play does not start) and in the editor (studio).
+// A game whose App is C++ and that has a project (kern::run(App&, const Project&), kern/docs/project.md 4.): the program
+// runs beside the App - its Blueprints, a library too, are bound as their classes, so the App's C++ calls them
+// (blueprint<T>()) without binding them itself; at the end they are unbound. One App: a Blueprint of the project that
+// implements App refuses the start, named; a project without Blueprints is an empty program.
+TEST(program_beside_an_app_of_cpp) {
+  struct Lib final : logic::NativeBlueprint {
+    void attach(const logic::BlueprintWorld&) override {}
+    void run(int, int) override {}
+    bool call(std::string_view, std::span<const logic::Value>, logic::Results& results) override { results.clear(); return false; }
+    bool get(std::string_view, logic::Value&) const override { return false; }
+    bool set(std::string_view, const logic::Value&) override { return false; }
+    void* object(const void* type) override { return type == &logic::class_key<Lib> ? this : nullptr; }
+    bool bind_class() override { return logic::bind_blueprint_object<Lib>(*this, "Lib"); }
+    void unbind_class() override { if (logic::blueprint_object<Lib> == this) logic::unbind_blueprint<Lib>(); }
+  };
+  struct Cpp final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } cpp;
+  std::string error;
+  logic::Graph lib, app;
+  CHECK(logic::from_cpp("struct Codes : kern::Library {\n"
+                        "  struct twiceResult { Int Result = 0; };\n"
+                        "  KERN_PURE twiceResult twice(Int x = 0) {\n"
+                        "    return {kern::formula([](Float x) -> Float { return (x * 2.0); }, kern::to<Float>(x))};\n"
+                        "  }\n"
+                        "};\n", lib, nullptr, &error));
+  CHECK(error.empty() && lib.library);
+  logic::register_native_blueprint(logic::graph_hash(lib), [] { return std::unique_ptr<logic::NativeBlueprint>(new Lib()); });
+  game::Project pr;
+  pr.name = "Beside";
+  pr.blueprints.push_back({"Codes", lib});
+  game::Program program;
+  CHECK(!logic::blueprint_object<Lib>);
+  pr.settings.loop_budget = 12345;
+  CHECK(program.start(pr, cpp, &error) && program.app() == &cpp && program.runtime()->budget == 12345u);
+  CHECK(logic::blueprint_object<Lib> && program.runtime()->instances()[0]->native_object<Lib>() == logic::blueprint_object<Lib>);
+  program.end();
+  CHECK(!logic::blueprint_object<Lib>);
+  // an empty project: an empty program, the App of C++
+  game::Project empty;
+  CHECK(program.start(empty, cpp, &error) && program.app() == &cpp && program.runtime()->instances().empty());
+  program.end();
+  // one App: a Blueprint of the project that implements App too - refused, named
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", app, nullptr, &error));
+  CHECK(error.empty());
+  pr.blueprints.push_back({"Main", app});
+  CHECK(!program.start(pr, cpp, &error) && !program.running() && !logic::blueprint_object<Lib>);
+  CHECK(error.find("the program's App is C++, and the project Beside has one too: Main implements App") != std::string::npos);
+}
+
 TEST(program_binds_the_exports) {
   struct Exported final : logic::NativeBlueprint {
     void attach(const logic::BlueprintWorld&) override {}
@@ -8365,8 +8434,8 @@ TEST(program_binds_the_exports) {
     bool get(std::string_view, logic::Value&) const override { return false; }
     bool set(std::string_view, const logic::Value&) override { return false; }
     void* object(const void* type) override { return type == &logic::class_key<Exported> ? this : nullptr; }
-    bool bind_exports() override { return logic::bind_blueprint_object<Exported>(*this, "Exported"); }
-    void unbind_exports() override { if (logic::blueprint_object<Exported> == this) logic::unbind_blueprint<Exported>(); }
+    bool bind_class() override { return logic::bind_blueprint_object<Exported>(*this, "Exported"); }
+    void unbind_class() override { if (logic::blueprint_object<Exported> == this) logic::unbind_blueprint<Exported>(); }
   };
   std::string error;
   logic::Graph app, hud;
@@ -8407,7 +8476,7 @@ TEST(program_binds_the_exports) {
   game::Project two = pr;
   two.blueprints.push_back({"Hud2", hud});
   CHECK(!program.start(two, &error) && !program.running() && !logic::blueprint_object<Exported>);
-  CHECK(error.find("the exports of its Blueprint Hud2") != std::string::npos && error.find("Exported is bound already") != std::string::npos);
+  CHECK(error.find("the class of its Blueprint Hud2") != std::string::npos && error.find("Exported is bound already") != std::string::npos);
   // in a world: the level is refused where it is read, validate says it, and Play does not start
   game::Level l = game::basic_level();
   game::Actor holder;
