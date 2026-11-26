@@ -1692,6 +1692,13 @@ class Unit:
                 if seen:
                     deepest = max(len(q) for q in seen)
                     best = [q for q in seen if len(q) == deepest]
+            # (a class declared in a class - kern::logic::Instance::Frame - is found by its short name only in that
+            # class: from anywhere else `Frame` is never it, also where it is the longest name)
+            def reached(q):
+                outer = q[: len(q) - len(last)].rstrip(":")
+                return not (outer in self.tree.records and not (self.lookup_scope or "").startswith(outer + "::")
+                            and not t.startswith(outer.split("::")[-1] + "::"))
+            best = [q for q in best if reached(q)]
             if best:
                 longest = max(len(q) for q in best)
                 best = [q for q in best if len(q) == longest]
@@ -2072,7 +2079,6 @@ class Unit:
         """A type of the engine is a value of a Blueprint only where its header says so (KERN_BLUEPRINT_TYPE,
         kern/core/base.h): the engine's other types stay inside it."""
         if not self.marked(o):
-            import sys as _s; _s.stderr.write(f"DBG {q} file={o.get('_file')} id={o.get('id')} loc={o.get('loc')} inner={[c.get('kind') for c in o.get('inner',())][:6]}\n")
             raise Wait(f"the engine's type {q.split('::')[-1]}, which is not one for Blueprints (its header does not mark it KERN_BLUEPRINT_TYPE)")
 
     def enum(self, q):

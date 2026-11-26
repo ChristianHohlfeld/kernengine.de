@@ -25,6 +25,9 @@
 #   placement.py where the Blueprints stand (place_blueprints, apply_to_level): what a Blueprint of the project uses is
 #             the program's; a source of its own (another folder) the program uses that stands in the level stops the run;
 #             --classes takes the header only (the project says which Blueprints the program calls as their classes).
+#   frame.cpp the engine's Frame named as a program writes it (`using namespace kern; ... const Frame& frame`), beside
+#             the class Frame inside kern::logic::Instance: the engine's (marked for Blueprints), never the class of a
+#             class (Murmel::update: "Frame not KERN_BLUEPRINT_TYPE") - written and compared.
 #   ownget.cpp an object of the engine a state holds as its own (std::unique_ptr<GameWorld>): its get() is the handle
 #             (Murmel's welt_.get(), B8) - written and compared.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as the game's are:
@@ -96,6 +99,10 @@ convert ownget
 logged ownget "Holder::world (unique_ptr::get()) is written" '^ +Holder::world \([0-9]+\): written$'
 logged ownget "both are compared" '^2 functions of the Blueprints are compared'
 
+convert frame
+logged frame "seconds_of (const Frame&: the engine's kern::Frame) is written" '^ +seconds_of \([0-9]+\): written$'
+logged frame "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+
 convert bytes
 check bytes "sc_take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
 
@@ -127,6 +134,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame bytes table program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
