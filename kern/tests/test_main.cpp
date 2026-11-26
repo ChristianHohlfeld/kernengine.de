@@ -4343,17 +4343,18 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Flag").as_bool());
       CHECK(std::fabs(inst->get("Avg").as_number() - (std::sqrt(315.0) + (14 - std::sqrt(315.0)) * 0.25)) < 1e-9);
     }
-    if (std::string(c.name) == "number_edges") {   // (what the nodes compute: the JIT and the classes must give the same - logic_wasm_test, blueprint_native)
-      CHECK(inst->get("ModBig").as_number() == std::fmod(1e20, 3.0));
-      CHECK(inst->get("ModSign").as_number() == -1);   // (fmod(-1, 1) is -0)
-      CHECK(inst->get("RoundHalf").as_int() == 0);     // (round(0.49999999999999994) - not floor(x + 0.5))
-      CHECK(inst->get("RoundBig").as_int() == 4503599627370497LL);
-      CHECK(inst->get("MinNaN").as_number() == 1);     // (min_of(1, NaN): b < a is false - a)
-      CHECK(inst->get("MinZero").as_number() == 1);    // (min_of(0, -0): 0)
-      CHECK(inst->get("MaxZero").as_number() == -1);   // (max_of(-0, 0): -0)
-      CHECK(inst->get("SqrtNaN").as_number() == 0);    // (sqrt(max_of(0, NaN)): sqrt(0))
-      CHECK(inst->get("ClampNaN").as_number() == 5);
-      CHECK(inst->get("FloorZero").as_number() == 1);  // (Floor of -0 is the Int 0)
+    if (std::string(c.name) == "number_edges") {   // (what C++ computes - numbers.h; the JIT and the classes must give the same - logic_wasm_test, blueprint_native)
+      auto f = [&](const char* v) { return inst->get(v).as<f64>(); };
+      CHECK(f("ModBig") == std::fmod(1e20, 3.0));
+      CHECK(f("ModSign") == std::copysign(1.0, std::fmod(-1.0, 1.0)));   // (-0: -1)
+      CHECK(f("RoundHalf") == std::round(0.49999999999999994) && f("RoundHalf") == 0);   // (not floor(x + 0.5))
+      CHECK(f("RoundBig") == std::round(4503599627370497.0));
+      CHECK(f("MinNaN") == logic::num::min(1.0, std::numeric_limits<f64>::quiet_NaN()));   // (b < a ? b : a: a)
+      CHECK(f("MinZero") == std::copysign(1.0, logic::num::min(0.0, -0.0)) && f("MinZero") == 1);
+      CHECK(f("MaxZero") == std::copysign(1.0, logic::num::max(-0.0, 0.0)) && f("MaxZero") == -1);
+      CHECK(std::isnan(f("SqrtNaN")));                                     // (sqrt of a NaN: a NaN, IEEE)
+      CHECK(f("ClampNaN") == 5);
+      CHECK(f("FloorZero") == std::copysign(1.0, std::floor(-0.0)) && f("FloorZero") == -1);   // (floor(-0) is -0)
     }
     if (std::string(c.name) == "gates_and_sequences") {
       // Log = ((0*10+1)*10+1)... once per Go: 6 Go calls -> 111111
