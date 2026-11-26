@@ -407,7 +407,7 @@ std::string cast_loss(logic::PinType from, logic::PinType to) {
 /// Texts are how a value is typed in on the page (i64 and u64 beyond 2^53 are more than a number of JavaScript
 /// holds); a list's items are each read so (the place of a bad one is said).
 bool read_literal(const json::Value& in, const logic::TypeRef& t, const logic::Graph& g, json::Value& out, std::string& why) {
-  if (logic::is_list(t.type) && logic::is_number(logic::element_of(t.type)) && in.is_array()) {
+  if (logic::is_list(t.type) && (logic::is_number(logic::element_of(t.type)) || logic::element_of(t.type) == logic::PinType::vector) && in.is_array()) {
     json::Value items = json::Value::array();
     for (std::size_t k = 0; k < in.size(); ++k) {
       json::Value x;
@@ -415,6 +415,18 @@ bool read_literal(const json::Value& in, const logic::TypeRef& t, const logic::G
       items.push(std::move(x));
     }
     out = logic::Value::from_json(items, t.type, g, t.of).to_json(g, t);
+    return true;
+  }
+  if (t.type == logic::PinType::vector && in.is_array()) {
+    // (a Vector: three f32, each read as one - X, Y, Z)
+    json::Value parts = json::Value::array();
+    for (std::size_t k = 0; k < 3; ++k) {
+      json::Value x;
+      if (!read_literal(k < in.size() ? in[k] : json::Value(0.0), {logic::PinType::f32, {}}, g, x, why)) { why = std::string(k == 0 ? "X" : k == 1 ? "Y" : "Z") + ": " + why; return false; }
+      if (!x.is_number()) { why = std::string(k == 0 ? "X" : k == 1 ? "Y" : "Z") + ": a Vector's X, Y and Z are finite numbers here"; return false; }
+      parts.push(x);
+    }
+    out = logic::Value::from_json(parts, t.type, g, t.of).to_json(g, t);
     return true;
   }
   if (!logic::is_number(t.type) || t.type == logic::PinType::boolean) {
