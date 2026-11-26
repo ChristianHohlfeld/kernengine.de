@@ -547,7 +547,7 @@ export class OriginalView {
     };
     for (const b of t.buttons || []) {
       if (b.id === "enter") put("enter", $("enterCarButton"));
-      else if (b.id === "cam") put("cam", mode === "car" ? $("vehicleCamButton") : document.querySelector('#jetHud [data-a="cam"]'));
+      else if (b.id === "cam") put("cam", mode === "car" ? $("vehicleCamButton") : mode === "drone" ? $("soloCamera") : document.querySelector('#jetHud [data-a="cam"]'));
       else if (JET_DOM[b.id]) put(b.id, document.querySelector(`#jetHud [data-a="${JET_DOM[b.id]}"]`));
       else if (TOUCH_DOM[b.id]) put(b.id, $(TOUCH_DOM[b.id]));
     }

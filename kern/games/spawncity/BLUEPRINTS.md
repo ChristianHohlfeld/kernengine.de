@@ -88,9 +88,9 @@ Bereich prüfte, ging mit ihm und kommt mit ihm zurück:
 
 Die Seite bekommt das HUD weiter als JSON (`sc_hud`), den Ton über die eigenen Exporte (`sc_audio_*`).
 Eingabe-Aktionen, Widgets und Mixer der Engine kommen erst, wenn die Seite des Originals das zulässt.
-Die Daumenknöpfe der Drohne (`touch_play.cpp`) zeigen noch ⇄ FPS, STRIKE und die Waffe: Knöpfe entfernter
-Bereiche, die nichts tun; eine Kamera-Taste hat das Touch-Layout der Drohne nicht (die Seite des Originals
-hat `#soloCamera`).
+Die Daumenknöpfe der Drohne (`touch_play.cpp`): Höhen-Pad, ARM, STOP und die Kamera (`cam`, mit ihrem Namen
+FPV / FOLLOW / THIRD, über dem rechten Stick; auf der Seite des Originals ist es `#soloCamera`) - ⇄ FPS, STRIKE
+und die Waffe gingen mit ihren Bereichen (`test_controls` controls_touch_drone).
 
 ---
 

@@ -261,6 +261,40 @@ KERN_TEST(controls_touch_foot) {
   KERN_CHECK(!k.TouchPlay_held(t.t, "jump").Result, "jump released");
 }
 
+// The drone of the small game: the altitude pad, ARM, STOP and the camera - no weapon, no mode switch, no air strike
+// (their areas are not in it, BLUEPRINTS.md); a tap on the camera is the next camera, ARM is a press.
+KERN_TEST(controls_touch_drone) {
+  CONTROLS_BOUND(Tp, "touch_play_cpp");
+  Touch t{k, {}};
+  k.TouchPlay_set_frame(t.t, 844, 390, 0, 0, 0, 0);
+  Tp::TouchLayout l;
+  l.mode = Tp::TouchMode::drone;
+  l.camera = "FOLLOW";
+  k.TouchPlay_set_layout(t.t, l);
+  auto has = [&](const char* id) { return t.button(id) != nullptr; };
+  KERN_CHECK(has("clearance") && has("arm") && has("stop") && has("cam"), "the drone's buttons: pad, ARM, STOP, camera");
+  KERN_CHECK(!has("wpn") && !has("mode") && !has("strike") && !has("emp") && t.t.buttons_.size() == 4, "nothing of the removed areas (%zu buttons)", t.t.buttons_.size());
+  const Tp::TouchBtn* cam = t.button("cam");
+  KERN_CHECK(cam && str(cam->label) == "🎥 FOLLOW", "the camera's name on its button");
+  auto tap = [&](const char* id, i32 finger, f64 at) {
+    const Tp::TouchBtn* b = t.button(id);
+    if (!b) return false;
+    const f32 x = static_cast<f32>(b->x + b->w / 2), y = static_cast<f32>(b->y + b->h / 2);
+    const bool owned = t.pointer(0, finger, x, y, at);
+    t.pointer(2, finger, x, y, at + 80);
+    return owned;
+  };
+  KERN_CHECK(tap("cam", 1, 0) && k.TouchPlay_take_pressed(t.t, "cam").Result && !k.TouchPlay_take_pressed(t.t, "cam").Result, "a tap on the camera: one press");
+  KERN_CHECK(tap("arm", 2, 200) && k.TouchPlay_take_pressed(t.t, "arm").Result, "a tap on ARM");
+  // the camera stands above the look stick, clear of it and of ARM / STOP
+  const Tp::TouchBtn* arm = t.button("arm");
+  KERN_CHECK(cam && arm && cam->y + cam->h <= 390 - 168 && cam->y + cam->h <= arm->y, "the camera above the stick and ARM");
+  // XBOX CONTROLLER on: no sticks, no pad, no ARM / STOP - the camera stays
+  l.pad_drone = true;
+  k.TouchPlay_set_layout(t.t, l);
+  KERN_CHECK(has("cam") && !has("arm") && !has("clearance") && t.t.buttons_.size() == 1, "with the pad: the camera alone");
+}
+
 KERN_TEST(controls_touch_vehicles) {
   CONTROLS_BOUND(Tp, "touch_play_cpp");
   Touch t{k, {}};

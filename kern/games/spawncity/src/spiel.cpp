@@ -268,6 +268,7 @@ void SpawnCity::read_input(kern::Engine& e, f32 dt) {
   TouchLayout layout;
   if (touch_mode_) layout.mode = TouchMode::drone;
   layout.armed = t.armed;
+  layout.camera = cam_mode_ == 0 ? "FPV" : cam_mode_ == 1 ? "FOLLOW" : "THIRD";
   touch_.set_layout(layout);
   // left stick: WASD (x = D - A, y = S - W), the touch stick, LS
   Vec2 left{key(in, Key::d) - key(in, Key::a), key(in, Key::s) - key(in, Key::w)};
