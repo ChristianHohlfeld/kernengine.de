@@ -12470,6 +12470,12 @@ class TestWriter:
                 if r is not None and function_key(self.tree, r) in self.u.world.getters:
                     obj = re.sub(r"\b(const|volatile)\b|&", "", qtype(r).split("(")[0]).strip()
                     a, b = span(n)
+                    mine = self.u.functions.get(d["id"])
+                    if self.u.state is None or self.u.state.split("::")[-1] != obj.split("::")[-1] or (mine is not None and not mine.state):
+                        # (only a call compared on the state's object has one: a function that is no part of that Blueprint has none)
+                        line = raw.count("\n", 0, a) + 1
+                        raise Wait(f"{os.path.basename(file)}:{line}: it calls {r.get('name')}() - the one object of the state {obj.split('::')[-1]} - "
+                                   f"in {d.get('name')}(), which is no function of that Blueprint")
                     edits.append((a, 1, 0, b, f"(*static_cast<{obj}*>(kern_state_now))"))
                     return
             if k == "CallExpr" and len(ks) > 1:
