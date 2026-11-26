@@ -74,3 +74,11 @@ Befund aus k6.log: Runden 9–21 konvertieren dieselben 30 Blueprints (Warten ei
 **ENTSCHEIDUNG DES BESITZERS OFFEN — Zahlen:** Murmels App als Programm-Blueprint: Level-Wechsel Frame 348 statt 349, geschafft 770 statt 772 (f32 gewonnen_seit_ in der Quelle gegen 64-Bit-Float der Sprache; mit f64 in der Quelle nativ ebenfalls 348/770 — befund_zahlen.md). Vorschlag Koordinator: eine Zahl-Art (64 Bit), `float` in Subset-Quellen = Konverter-Fehler mit Ort und Grund, Quelle umstellen, erwartete Werte einmal für beide Seiten. Erwartete Werte NICHT geändert (Rechteprüfung verweigert). Murmel-Teil liegt als stash „murmel-programm-wartet" (Worktree w-einstieg2) und Patch murmel_programm.patch im Scratchpad — nicht dauerhaft gesichert.
 
 **Offen:** 3f Rest (Testrahmen, Zeile in main.cpp); Murmel im Editor ganz durchspielen (hängt an der Zahlen-Entscheidung); SpawnCity auf Engine-Ton/-Eingabe/-Speichern; Spielspezifisches aus kern/ (Soldat, Waffen, Micro Duck); cost-Mehrverbrauch Murmel; Performance-Schritt.
+
+## Nachtrag 26.11. 11:20 — ZAHLEN: Vorrang eins
+
+Besitzer 10:49–10:53: „Gerundet ist nicht, wie wir es haben wollten." / „Wir haben Fließkomma, Determinismus in der gesamten Engine." / „Inakzeptabel." Befund: Float der Sprache = f64 (schon auf main), Quelle = f32; die Vergleichstests übersetzen die Quelle „mit den Zahlen eines Blueprints" und verdecken das. Ganzzahlen mit Breite am Platz/Int64 sind laut erster Messung gleich; einfacher Int nur bis 2^53.
+Zurückgenommen: Regel „kern::Float 64 Bit + Runden" (64919bc5); Murmel wieder f32, 349/772, App wieder C++.
+Freigegeben: koordination/zahlen/zahlen_typen.md — Zahl-Typen der Sprache = die des Subsets (f32, f64, i8…u64), getypte Operationen, Umwandlungen als Knoten, UB der Quelle = Konverter-Fehler, Engine-Funktionen gerufen statt nachgerechnet, Vorgaben Float = f32 / Int = i64. Stufen 1–8.
+Stufe 1 (ehrlicher Testrahmen, KERN_TEST_SOURCE_NUMBERS, 8e3dc4c6 angefangen) auf work-projekt; Stufen 2–8 auf Zweig work-zahlen. Ziel-Beleg: ehrlicher Durchgang für Murmel und SpawnCity ohne Abweichung grün, wird Gate; alter Durchgang entfällt.
+Nichts gilt als „bitgenau" und nichts geht dafür nach work, bis das steht. Murmel-Programm-Blueprint: koordination/zahlen/murmel_programm.patch (gegen cc4c2673).
