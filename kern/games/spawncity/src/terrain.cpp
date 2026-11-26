@@ -1420,7 +1420,7 @@ void Terrain::collide(Vec3 focus, Vec3 anchor, u32 more) {
     ++stats_.rebuilds;
     ++built;
   }
-  if (!missing) {
+  if (!missing && collision_.size() > want_collision_.size()) {
     // every wanted tile stands: what is no longer wanted goes (never before - no holes)
     const kern::Set<u64> keep(want_collision_.begin(), want_collision_.end());
     for (auto it = collision_.begin(); it != collision_.end();) {
