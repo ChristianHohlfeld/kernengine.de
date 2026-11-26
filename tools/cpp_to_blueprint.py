@@ -502,7 +502,10 @@ def unit_dump(path, flags):
 def namespace_dumps(unit, space):
     """What a tree (unit_dump) has in a namespace directly in the translation unit - each time it is opened -, as the
     declarations in it."""
-    return [c for kind, name, o in unit if kind == "NamespaceDecl" and name == space for c in kids(o)]
+    def inside(o):   # (a block `extern "C" { ... }` is no scope: what it declares stands in the namespace)
+        for c in kids(o):
+            yield from (inside(c) if c.get("kind") == "LinkageSpecDecl" else [c])
+    return [c for kind, name, o in unit if kind == "NamespaceDecl" and name == space for c in inside(o)]
 
 
 def exported_names(path):

@@ -45,6 +45,8 @@
 #             rec[3]`): a view to read is an input by value that takes a list or an array - the reader reads the call
 #             (before: "the reference input values is float_list, but rec is float_list[3]", the Blueprints not read).
 #   objects.cpp once more, from a folder of another length: the same texts and the same level, byte for byte.
+#   inner.cpp an export inside the program's namespace (KERN_EXPORT: `extern "C"` there, as a game's main.cpp has them):
+#             what the block declares stands in the namespace - the export is written (one tree, unit_dump).
 #   patch.cpp a struct and an enum of the engine (kern::audio::SynthPatch, Wave) the file names with `using kern::audio::Wave;`:
 #             in its test the enum stands before every `using` of it (before: `using audio::Wave;` in front of the enum
 #             itself - the test went without it, its function was not compared).
@@ -175,6 +177,9 @@ logged views "push_extra handed a list and a place in it is written" '^ +extra_f
 logged views "fill (a view to write through) is written" '^ +fill \([0-9]+\): written'
 logged views "all eight are written and compared" '^8 functions of the Blueprints are compared'
 
+convert inner
+check inner "the export inside the namespace is written" yes 'KERN_EXPORT_AS\("case_doubled"'
+
 convert patch
 logged patch "bright is written" '^ +bright \([0-9]+\): written$'
 logged patch "it is compared" '^1 functions? of the Blueprints (is|are) compared'
@@ -211,6 +216,6 @@ python3 "$here/compiles.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views patch program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
