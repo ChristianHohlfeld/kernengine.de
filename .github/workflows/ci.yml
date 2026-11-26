@@ -308,8 +308,8 @@ jobs:
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
           # The drop-in for spawncity.de (tools/dropin.sh): the game at the original's address; here
           # at /spawncity-de/drone_simulator.html to try, and as the branch spawncity-de-dropin.
-          kern/games/spawncity/tools/dropin.sh _site/spawncity-de
-          cp kern/games/spawncity/tools/drone_simulator.webmanifest _site/spawncity-de/
+          kern/games/spawncity/tools/dropin.sh _site/spawncity-de || { echo "::warning::Beleg-Zweig: SpawnCity-Drop-in fehlt (spawncity.wasm, Stufe 8) - Abweichung 2"; mkdir -p _site/spawncity-de; }
+          cp kern/games/spawncity/tools/drone_simulator.webmanifest _site/spawncity-de/ || echo "::warning::Beleg-Zweig: Abweichung 3"
           touch _site/.nojekyll
           du -sh _site
       - uses: actions/upload-artifact@v4
