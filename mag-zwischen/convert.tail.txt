@@ -1,0 +1,80 @@
+  ragdoll: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  rigid_spec: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  road_graph: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  tiles: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  town_sync_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_FirmwareRuntime: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  car_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  combat_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  engine_geo_buildings: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  game_events_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_gaps_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_look_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_military_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_net_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_projsync: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_toss: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_town_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  interiors: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  jet_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  life: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  life_art: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  look: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  mp_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  mp_rules_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  mvt_cpp: the project - the program's city_jobs_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  net_session: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  people_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  perf_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  ragdoll_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  vehicle_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_art_cpp: the project - the program's world_marks_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  drone: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_geo_roads: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_barricades_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_life: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project/dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3/Facades.cpp: warning: it implements ShaderExtension without fragment_discard: the interface's own runs there (engine.shader_extension.fragment_discard)
+/dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3/Facades.cpp: warning: it implements ShaderExtension without fragment_input: the interface's own runs there (engine.shader_extension.fragment_input)
+/dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3/WaterLook.cpp: warning: it implements ShaderExtension without fragment_discard: the interface's own runs there (engine.shader_extension.fragment_discard)
+/dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3/WaterLook.cpp: warning: it implements ShaderExtension without fragment_input: the interface's own runs there (engine.shader_extension.fragment_input)
+/dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3/game_controls_cpp.cpp: line 1, column 36: the library "engine_input_actions" is not there: no Blueprint of that name
+  (the texts: /dev/shm/spawncity-jobs-chris/work-kandidat-7-voll-080426-161/tmp/kern-cpp-to-blueprint-ihyvoye3)
+
+  game_life_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_look: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_net: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  look_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  net_session_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  drone_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_controls_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_details_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_swarm_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_vehicle_damage_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  terrain: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  tiles_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_jobs_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  terrain_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_destruction_sync: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_destruction_sync_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_traffic_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  road_graph_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  world_marks: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_traffic_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  destruction_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  game_world: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  lamps_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  life_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  people_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  world_marks_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  game_world_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  life_art_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  interiors_cpp: the project - the program's Game uses it - a Blueprint of the program finds its libraries only in the project
+  Game: the project - it exports sc_tile_data, sc_tile_failed, sc_offline, sc_dem_data and 8 more - exports belong to the program
+the Blueprints were not read: the level and the project are as they were
+
+real	178m27,335s
+user	1864m37,050s
+sys	81m6,486s
