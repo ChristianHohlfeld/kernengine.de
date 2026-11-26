@@ -9,7 +9,8 @@
 // arithmetic and stay std::.
 //
 // Use kern::dm:: instead of std:: for sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log,
-// log10, pow and hypot in everything that feeds the simulation.
+// log10, pow, hypot, sinh, cosh, tanh and asinh in everything that feeds the simulation. (sinh, cosh, tanh, asinh are
+// the engine's own, kern/src/math/hyperbolic.c - musl has them not here.)
 #pragma once
 
 #include <type_traits>
@@ -25,6 +26,10 @@ float kern_musl_asinf(float); float kern_musl_acosf(float); float kern_musl_atan
 float kern_musl_atan2f(float, float); float kern_musl_expf(float); float kern_musl_expm1f(float);
 float kern_musl_logf(float); float kern_musl_log10f(float); float kern_musl_powf(float, float);
 float kern_musl_hypotf(float, float);
+// The engine's own (kern/src/math/hyperbolic.c, not musl - musl_math has none): from the definitions, over musl's exp,
+// expm1 and log and sqrt.
+double kern_math_sinh(double); double kern_math_cosh(double); double kern_math_tanh(double); double kern_math_asinh(double);
+float kern_math_sinhf(float); float kern_math_coshf(float); float kern_math_tanhf(float); float kern_math_asinhf(float);
 }
 
 namespace kern::dm {
@@ -45,6 +50,16 @@ KERN_DM_UNARY(expm1)
 KERN_DM_UNARY(log)
 KERN_DM_UNARY(log10)
 #undef KERN_DM_UNARY
+#define KERN_DM_OWN(name)                                                           \
+  inline float name(float x) { return kern_math_##name##f(x); }                     \
+  inline double name(double x) { return kern_math_##name(x); }                      \
+  template <class T, class = std::enable_if_t<std::is_integral_v<T>>>               \
+  inline double name(T x) { return kern_math_##name(static_cast<double>(x)); }
+KERN_DM_OWN(sinh)
+KERN_DM_OWN(cosh)
+KERN_DM_OWN(tanh)
+KERN_DM_OWN(asinh)
+#undef KERN_DM_OWN
 
 // Two arguments promote as std:: does: both float -> float, anything else -> double.
 #define KERN_DM_BINARY(name)                                                                          \

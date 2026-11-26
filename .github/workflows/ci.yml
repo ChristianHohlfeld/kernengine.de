@@ -126,7 +126,7 @@ jobs:
   native:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60   # (no cache: 23-25 min, 30.3 on a slow runner - run 45851778529 was cut off; room for slow runners)
     steps:
       - uses: actions/checkout@v4
       - name: Native unit tests (ASan/UBSan)
@@ -210,7 +210,7 @@ jobs:
   build:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45   # (no cache: 12-16 min; room for slow runners)
     env:
       KERN_RUN_DIR: /home/runner/kern-run   # (the folder of this job's run - kern/tools/run_dir.sh; a fresh runner: nothing from another run)
     steps:
@@ -369,7 +369,7 @@ jobs:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45   # (no cache: 10-17 min; room for slow runners)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

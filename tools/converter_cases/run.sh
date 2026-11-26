@@ -65,13 +65,28 @@
 #             another state, Look) and that declares no constructor: C++'s own constructor, which makes that field, is
 #             its function (LookApp::LookApp - before: every function reading ext_ waited, "declare one: `LookApp();` ... =
 #             default"); Look, whose fields start with nothing computed, has no such function (nothing to make).
+#   far.cpp + far_b.cpp + far_rules.cpp  a function (reach) that calls one of another file (far::pole_radius), whose pieces
+#             name a class of a third file's header (rules::Blueprint : kern::logic::ActorBlueprint, far_rules.h) that the
+#             caller does not include: its test holds the pieces with the headers of their files - written and compared
+#             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
+#             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
+#             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
+#             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
+#             List<Blast> is needed").
+#   pieces.cpp exports that give a text and bytes by a pointer and their length (`export_text<&f>(x, out_len)`,
+#             export_bytes): the test calls the source with a place for the length and compares the piece the two say -
+#             written and compared (before: "the test has no values of unsigned int *").
+#   running.cpp the logic the Blueprints run in as the engine names it in its own namespace (GameWorld::logic_runtime gives a
+#             `logic::Runtime*`, kern::game::blueprints_running takes one): the test's stand-ins name it by its full name - written
+#             and compared (before: "no type named 'Runtime' in namespace converted_...::logic", the stand-in of GameWorld went).
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
-#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
-#             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
-#             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
-#             subset's (f32 intermediate, f32 sum of 1/60 against a threshold, long long past 2^53) - one of them right is a fault of the list.
+#   hyperbolic.cpp std::sinh, cosh, tanh, asinh of f64 and f32: the engine's own (kern/src/math/hyperbolic.c) - written and the same as the source.
+#   numbers_same.cpp, numbers_engine.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the comparison with the source as C++
+#             computes it, its own numbers, under UBSan: each case's tests are built and run (compare.sh, tools/source_numbers.py):
+#             u32 that wraps, u64, the engine's own types, an f32 intermediate, an f32 sum of 1/60 against a threshold, a long long past 2^53.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -93,9 +108,10 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   mkdir -p "$out/src" "$out/texts" "$out/pt/converted"
   local f files=()
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
-  echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
+  # (a case with actors of its own in the level - Blueprints the program calls by an actor's name: <case>.klevel)
+  if [ -f "$here/$1.klevel" ]; then cp "$here/$1.klevel" "$out/cases.klevel"; else echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"; fi
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
-  (cd "$out" && KERN_TEST_SOURCE_NUMBERS="${SOURCE_NUMBERS:-}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
     || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(cat "$out/cases.klevel" "$out/cases.kproject" | grep -c '"logic"')" = 0 ]; then
@@ -187,6 +203,7 @@ logged actors "the five of Crowd are written and compared" '^5 functions of the 
 
 convert bytes
 check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
+classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table
 check table "width_and_glock is written, the table as weapons' Specs" yes 'weapons_Spec\{"MP", 55\.0, 180\.0\}'
@@ -228,6 +245,24 @@ logged chain "each round says why it is needed" '^round 2: 2 Blueprints - what C
 if grep -q '^round 4' "$top/chain/convert.log"; then echo "FAIL chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fail=1
 else echo "ok   chain: all of the chain waits in one round (three rounds: the first, the chain, the one that finds nothing new)"; fi
 
+convert pieces
+logged pieces "case_label (export_text with out_len) is written" '^ +case_label \([0-9]+\): written$'
+logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes \([0-9]+\): written$'
+logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
+tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
+
+convert running
+logged running "Runner::running (logic_runtime, blueprints_running) is written" '^ +Runner::running \([0-9]+\): written'
+logged running "it is compared" '^1 functions? of the Blueprints (is|are) compared'
+
+convert blasts
+logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
+logged blasts "both are compared" '^2 functions of the Blueprints are compared'
+
+convert far far_b far_rules
+logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
+logged far "all three are compared" '^3 functions of the Blueprints are compared'
+
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
 if grep -q 'has no constructor of its own' "$top/look/convert.log"; then echo "FAIL look: nothing waits for a constructor written down"; fail=1; else echo "ok   look: nothing waits for a constructor written down"; fi
@@ -262,48 +297,46 @@ if out=$("$root/tools/blueprint_cpp.sh" --apply "$top/program/refuses.klevel" --
 elif echo "$out" | grep -q 'is an export (case_score) - exports belong to the program'; then echo "ok   program: a level refuses an export (with the reason)"
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
 
-# ---- the numbers of the source (kern/docs/blueprint_cpp.md "Zahlen"): the second pass of the comparison ----
-# Converted with KERN_TEST_SOURCE_NUMBERS=1, a case has two tests: as always (the source with the numbers of the Blueprint
-# language) and test_<x>_source.cpp (the source as C++ computes it - f32 stays f32). They are built and run (compare.sh);
-# tools/source_numbers.py --right: every function written, compared in both passes, the same in both.
-# numbers_same (u32 that wraps, u64): right today - and it must stay so.
-right() {   # right <case>: the case's tests, built and run, say every function is written and the same in both passes
+# ---- the numbers of the source (kern/docs/blueprint_cpp.md "Zahl-Typen", "Der Beweis") ----
+# A case's tests compare each function with its source as C++ computes it - its own numbers, under UBSan. They are built and
+# run (compare.sh); tools/source_numbers.py --right: every function written, compared and the same, UBSan silent.
+right() {   # right <case>: the case's tests, built and run, say every function is written and the same as its source
   INCLUDES="-I$top/$1/src" "$here/compare.sh" "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/pt/converted" "$top/$1/built" > "$top/$1/compare.build" 2>&1 ||
     { tail -20 "$top/$1/compare.build"; return 2; }
   if grep -q "does not compile" "$top/$1/compare.build"; then grep "does not compile" "$top/$1/compare.build"; return 2; fi
   python3 "$root/tools/source_numbers.py" "$top/$1/pt/converted" "$top/$1/built/compare.log" --right > "$top/$1/numbers.txt" &&
     grep -qE '^([0-9]+) of \1 functions of the program are written' "$top/$1/convert.log"   # (and none waits)
 }
-SOURCE_NUMBERS=1 convert numbers_same
-logged numbers_same "both passes compare both functions" '^2 functions are compared once more with their source as C\+\+ computes it'
-if right numbers_same; then echo "ok   numbers_same: written, and the same as the source in both passes (u32 that wraps, u64)"
-else echo "FAIL numbers_same: written, and the same as the source in both passes"; cat "$top/numbers_same/numbers.txt" 2>/dev/null; fail=1; fi
-# numbers_engine: the engine's own types (kern::Quat, physics::Pose, physics::BodyType) - in the second pass the test holds them as
-# the engine has them, never a copy; right today, and it must stay so.
-SOURCE_NUMBERS=1 convert numbers_engine
-tested numbers_engine "the second pass holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
-tested numbers_engine "the second pass holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
-logged numbers_engine "both passes compare the three functions" '^3 functions are compared once more with their source as C\+\+ computes it'
-if right numbers_engine; then echo "ok   numbers_engine: written, and the same as the source in both passes (the engine's own types)"
-else echo "FAIL numbers_engine: written, and the same as the source in both passes"; cat "$top/numbers_engine/numbers.txt" 2>/dev/null; fail=1; fi
-# Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
-# the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
-# (red): the number types have come, and the case goes up to numbers_same.
-#   numbers_f32  an intermediate in f32 (a*b): the Blueprint computes it in 64 bit
-#   numbers_sum  an f32 sum of 1/60 against a threshold: past 1 after 60 frames in 64 bit, after 61 in f32
-#   numbers_i64  a long long past 2^53 (a Blueprint's Int is exact up to 2^53: the function waits)
-for c in numbers_f32 numbers_sum numbers_i64; do
-  SOURCE_NUMBERS=1 convert $c
-  if right $c; then echo "FAIL $c: expected red until the number types - but it is right: take it out of the list (to numbers_same)"; cat "$top/$c/numbers.txt"; fail=1
-  elif [ $? = 2 ]; then echo "FAIL $c: its tests do not build"; fail=1
-  else echo "ok   $c: expected red until the number types: $({ grep -m1 -P '^    \S+ \(\d+\): (?!written)' "$top/$c/convert.log" || grep -m1 -E 'differs|not compared' "$top/$c/numbers.txt"; } | sed 's/^ *//' | cut -c1-220)"; fi
-done
+numbers() {   # numbers <case> <how many are compared> <what it holds>
+  convert $1
+  logged $1 "its $2 functions are compared with their source" "^$2 functions? of the Blueprints (is|are) compared"
+  if right $1; then echo "ok   $1: written, and the same as its source ($3)"
+  else echo "FAIL $1: written, and the same as its source ($3)"; cat "$top/$1/numbers.txt" 2>/dev/null; fail=1; fi
+}
+#   numbers_same    u32 that wraps, u64
+#   numbers_engine  the engine's own types (kern::Quat, physics::Pose, physics::BodyType): the test holds them as the engine has them
+#   numbers_f32     an intermediate in f32 (a*b, then compared in f64)
+#   numbers_sum     an f32 sum of 1/60 against a threshold (past 1 after 61 frames in f32)
+#   numbers_i64     a long long past 2^53 (FNV): i64 that wraps
+#   hyperbolic      std::sinh, cosh, tanh, asinh of f64 and of f32 - the engine's own (kern/src/math/hyperbolic.c)
+numbers numbers_same 2 "u32 that wraps, u64"
+numbers numbers_engine 3 "the engine's own types"
+tested numbers_engine "the test holds the engine's own Quat and Pose, not copies" '^using Quat = ::kern::Quat;'
+tested numbers_engine "the test holds the engine's own enum" 'using BodyType = :: kern :: physics :: BodyType;'
+numbers numbers_f32 1 "an f32 intermediate"
+check numbers_f32 "the product is an f32 product, converted where C++ converts it" yes 'num_cast<f64, f32>'
+numbers numbers_sum 1 "an f32 sum against a threshold"
+numbers numbers_i64 2 "a long long past 2^53"
+numbers hyperbolic 6 "the engine's sinh, cosh, tanh, asinh, f64 and f32"
+check hyperbolic "std::sinh and std::cosh are the engine's" yes 'sinh\(.*cosh\('
+check hyperbolic "std::asinh is the engine's" yes 'asinh\('
+check hyperbolic "std::tanh of an f32 is tanh of the f32 (its f-variant)" yes 'kern::formula<f32>\(\[\]\(auto x\) \{ return tanh\(x\); \}'
 
 python3 "$here/compiles.py" || fail=1
 python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain running pieces blasts far look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

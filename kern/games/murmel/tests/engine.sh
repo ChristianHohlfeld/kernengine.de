@@ -11,7 +11,7 @@ for c in "$kern"/third_party/box3d/src/*.c; do
   o="$out/box3d/$(basename "$c" .c).o"
   [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
 done
-for c in "$kern"/third_party/musl_math/src/*.c; do
+for c in "$kern"/third_party/musl_math/src/*.c "$kern"/src/math/*.c; do
   o="$out/musl/$(basename "$c" .c).o"
   [ -f "$o" ] || jobs+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c $c -o $o")
 done

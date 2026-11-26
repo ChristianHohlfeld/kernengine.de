@@ -1,5 +1,5 @@
-// The standard library's mathematics is the engine's (kern/third_party/musl_math/src/std_names.c, flags.sh): std::sin,
-// sinf, atan2 ... give the bits kern::dm gives - for f32 and f64, over edge values and a series of drawn ones, called
+// The standard library's mathematics is the engine's (kern/third_party/musl_math/src/std_names.c, kern/src/math/hyperbolic.c,
+// flags.sh): std::sin, sinf, atan2, sinh ... give the bits kern::dm gives - for f32 and f64, over edge values and a series of drawn ones, called
 // directly, as a compiler may combine them (sin and cos of one value: sincos) and with a constant the compiler knows (it
 // must not compute it itself). Shared by the native tests (test_main.cpp) and the WebAssembly module
 // (math_names_wasm_test.cpp): both say how many differ and a digest of all the results - the same on every target
@@ -75,6 +75,11 @@ template <class T> void compare_all(Result& r) {
     r.take("pow", x, y, std::pow(x, y), kern::dm::pow(x, y));
     r.take("pow2", x, T(2), std::pow(x, T(2)), kern::dm::pow(x, T(2)));   // (GCC: -fdisable-tree-powcabs, flags.sh)
     r.take("hypot", x, y, std::hypot(x, y), kern::dm::hypot(x, y));
+    // (the engine's own: kern/src/math/hyperbolic.c, under the standard names as musl's)
+    r.take("sinh", x, x, std::sinh(x), kern::dm::sinh(x));
+    r.take("cosh", x, x, std::cosh(x), kern::dm::cosh(x));
+    r.take("tanh", x, x, std::tanh(x), kern::dm::tanh(x));
+    r.take("asinh", x, x, std::asinh(x), kern::dm::asinh(x));
     // (sin and cos of one value side by side: what a compiler may make one call of, sincos)
     const T s = std::sin(x), c = std::cos(x);
     r.take("sin beside cos", x, x, s, kern::dm::sin(x));
@@ -93,6 +98,10 @@ inline void compare_constants(Result& r) {
   r.take("cos(1e5) constant", 1e5, 1e5, std::cos(1e5), kern::dm::cos(opaque(1e5)));
   r.take("log10(7.0) constant", 7.0, 7.0, std::log10(7.0), kern::dm::log10(opaque(7.0)));
   r.take("pow(1.0001, 12345.0) constant", 1.0001, 12345.0, std::pow(1.0001, 12345.0), kern::dm::pow(opaque(1.0001), opaque(12345.0)));
+  r.take("sinh(0.75f) constant", 0.75f, 0.75f, std::sinh(0.75f), kern::dm::sinh(opaque(0.75f)));
+  r.take("tanh(-1.5f) constant", -1.5f, -1.5f, std::tanh(-1.5f), kern::dm::tanh(opaque(-1.5f)));
+  r.take("cosh(2.5) constant", 2.5, 2.5, std::cosh(2.5), kern::dm::cosh(opaque(2.5)));
+  r.take("asinh(3.0) constant", 3.0, 3.0, std::asinh(3.0), kern::dm::asinh(opaque(3.0)));
   r.take("hypot(3e200, 4e200) constant", 3e200, 4e200, std::hypot(3e200, 4e200), kern::dm::hypot(opaque(3e200), opaque(4e200)));
 }
 

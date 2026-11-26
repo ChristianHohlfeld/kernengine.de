@@ -46,7 +46,7 @@ for c in "$kern"/third_party/box3d/src/*.c; do
   third+=("$o")
   [ -f "$o" ] || work+=("$cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w ${san[*]} -I$kern/third_party/box3d/include -I$kern/third_party/box3d/src -c $c -o $o")
 done
-for c in "$kern"/third_party/musl_math/src/*.c; do
+for c in "$kern"/third_party/musl_math/src/*.c "$kern"/src/math/*.c; do
   o="$cache/musl-$key/$(basename "$c" .c).o"
   third+=("$o")
   [ -f "$o" ] || work+=("$cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w ${san[*]} -c $c -o $o")

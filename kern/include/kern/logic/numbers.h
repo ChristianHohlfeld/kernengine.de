@@ -322,6 +322,11 @@ template <Floating T> inline T atan(T a) { return dm::atan(a); }
 template <Floating T> inline T atan2(T y, T x) { return dm::atan2(y, x); }
 template <Floating T> inline T exp(T a) { return dm::exp(a); }
 template <Floating T> inline T expm1(T a) { return dm::expm1(a); }
+/// sinh, cosh, tanh, asinh: the engine's own (kern/src/math/hyperbolic.c, kern::dm), the f-variant for f32.
+template <Floating T> inline T sinh(T a) { return dm::sinh(a); }
+template <Floating T> inline T cosh(T a) { return dm::cosh(a); }
+template <Floating T> inline T tanh(T a) { return dm::tanh(a); }
+template <Floating T> inline T asinh(T a) { return dm::asinh(a); }
 template <Floating T> inline T log(T a) { return dm::log(a); }
 template <Floating T> inline T log10(T a) { return dm::log10(a); }
 template <Floating T> inline T pow(T a, T b) { return dm::pow(a, b); }
@@ -396,7 +401,7 @@ template <Number T> struct Typed {
 #define KERN_TYPED_IS(name) friend Typed<bool> name(Typed a) requires Floating<T> { return num::name(a.v); }
   KERN_TYPED_1(sqrt) KERN_TYPED_1(floor) KERN_TYPED_1(ceil) KERN_TYPED_1(trunc) KERN_TYPED_1(round)
   KERN_TYPED_1(sin) KERN_TYPED_1(cos) KERN_TYPED_1(tan) KERN_TYPED_1(asin) KERN_TYPED_1(acos) KERN_TYPED_1(atan)
-  KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(log) KERN_TYPED_1(log10)
+  KERN_TYPED_1(exp) KERN_TYPED_1(expm1) KERN_TYPED_1(sinh) KERN_TYPED_1(cosh) KERN_TYPED_1(tanh) KERN_TYPED_1(asinh) KERN_TYPED_1(log) KERN_TYPED_1(log10)
   KERN_TYPED_IS(isnan) KERN_TYPED_IS(isinf) KERN_TYPED_IS(isfinite) KERN_TYPED_IS(signbit)
 #undef KERN_TYPED_1
 #undef KERN_TYPED_IS

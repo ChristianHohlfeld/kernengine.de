@@ -105,7 +105,7 @@ k="$root/kern"; obj="$out/obj"; mkdir -p "$obj"
 read -r -a mathflags <<< "$(kern_math_flags "${CXX:-c++}")"
 flags=(-std=c++20 -O1 -ffp-contract=off "${mathflags[@]}" -fno-exceptions -fno-rtti -w -I"$k/include" -I"$k/third_party/box3d/include" -I"$k/tests" -I"$out/gen")
 for c in "$k"/third_party/box3d/src/*.c; do cc -std=c17 -O2 -DBOX3D_DISABLE_SIMD -ffp-contract=off -w -I"$k/third_party/box3d/include" -I"$k/third_party/box3d/src" -c "$c" -o "$obj/box3d_$(basename "$c" .c).o" & done; wait
-for c in "$k"/third_party/musl_math/src/*.c; do cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$c" -o "$obj/musl_$(basename "$c" .c).o" & done; wait
+for c in "$k"/third_party/musl_math/src/*.c "$k"/src/math/*.c; do cc -std=c17 -O2 -ffp-contract=off -fno-math-errno -w -c "$c" -o "$obj/musl_$(basename "$c" .c).o" & done; wait
 export obj; printf '%s\n' $(find "$k/src" -name '*.cpp' | sort) "$k/tests/gl_stub.cpp" "$out"/gen/*.cpp "$here/tools/all_program_run.cpp" |
   xargs -P "${LINK_JOBS:-3}" -I{} bash -c 'o="$obj/$(echo "$0" | sed "s|/|_|g").o"; "$cxx" "$@" -c "$0" -o "$o" 2> "$o.log" || { echo "does not compile: $0 ($(grep -c error: "$o.log") errors)"; rm -f "$o"; }' {} "${flags[@]}"
 if "$cxx" "$obj"/*.o -lm -o "$out/all_program_run" 2> "$out/link.log"; then
