@@ -48,11 +48,12 @@ const LG_STRUCT_COLOR = "#3f6fd6";
 let lgStructNames = new Set();  // the structs of the Blueprint that is shown (lgNormalize)
 const lgBuiltin = t => t in LG_TYPE_NAMES;
 const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
-const lgColor = t => LG_TYPE_COLORS[t] || (lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
-const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
+const lgColor = t => LG_TYPE_COLORS[t] || (lgIsObject(t) ? LG_OBJECT_COLOR : lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
+const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsObject(t) ? (lgObjectOf(t) ? lgObjectOf(t) + " Object" : "Object") : lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
 const lgTyped = x => {
   if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
   if (x && x.type === "callback") { x.type = "callback<" + (x.of || "()") + ">"; return; }  // (a Callback: "callback<float(float,float)>" - only its own signature fits it)
+  if (x && x.type === "object") { x.type = "object<" + (x.of || "") + ">"; return; }  // (an object of the engine: "object<App>" - kern/docs/engine_object.md)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
   if (x?.of && (x.type === "int" || x.type === "int_list") && LG_WIDTHS.includes(x.of)) x.type = x.type === "int" ? x.of : x.of + "_list";  // (an Int of a fixed width: "u32", "u8_list")
 };
@@ -66,6 +67,10 @@ const lgIsKeyed = t => typeof t === "string" && /^(map|set)<.*>$/.test(t);
 /** A Callback: a function of a library the engine calls - "callback<float(float,float)>" (Make Callback). */
 const LG_CALLBACK_COLOR = "#8f6bd8";
 const lgIsCallback = t => typeof t === "string" && /^callback<.*>$/.test(t);
+/** An object of the engine of a class: "object<App>" (Object<kern::App>) - it goes where an object of that class goes, nowhere else. */
+const LG_OBJECT_COLOR = "#4fc3c9";
+const lgIsObject = t => typeof t === "string" && /^object<.*>$/.test(t);
+const lgObjectOf = t => t.slice(7, -1);
 const lgFromNamed = s => { const [kind, of] = String(s).split(":"); return of === undefined ? kind : kind.endsWith("_list") ? of + "_list" : of; };
 const lgKeyed = t => {
   const inner = t.slice(4, -1), at = inner.indexOf(">");
@@ -1479,6 +1484,7 @@ export class LogicEditor {
         <div class="lg-drow"><label>Name</label><div><input data-fk="name" value="${lgEsc(f.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label title="A function another actor's Blueprint (or the Level's) has: this Blueprint only says what it looks like and calls it on an actor. It has no body here.">Of another Blueprint</label><div><input type="checkbox" data-fk="external"${ext ? " checked" : ""}></div></div>
         ${ext ? "" : `<div class="lg-drow"><label title="A pure function only computes: it has no exec pins where it is called and runs whenever its outputs are read">Pure</label><div><input type="checkbox" data-fk="pure"${f.pure ? " checked" : ""}></div></div>`}
+        ${ext || !(f.overrides || this.data?.implements) ? "" : `<div class="lg-drow"><label title="A function of the interface of the engine this Blueprint implements (KERN_OVERRIDE): the engine calls it. A function of the interface's name must say so.">Overrides ${lgEsc(this.data?.implements || "")}</label><div><input type="checkbox" data-fk="overrides"${f.overrides ? " checked" : ""}></div></div>`}
         <div class="lg-drow"><label>Description</label><div><input data-fk="help" value="${lgEsc(f.help || "")}"></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Inputs</div>${rows(f.inputs, "in")}<div class="lg-dacts"><button data-act="fn-in">+ Input</button></div></div>
@@ -1629,6 +1635,7 @@ export class LogicEditor {
           const k = f.dataset.fk;
           if (k === "name") { const to = f.value.trim(); if (edit({op: "rename", to})?.ok !== false) this.selFn = to; }
           else if (k === "pure") edit({op: "pure", value: f.checked});
+          else if (k === "overrides") edit({op: "overrides", value: f.checked});
           else if (k === "external") { const p = this.centerWorld(); edit({op: "external", value: f.checked, x: p.x, y: p.y}); }
           else edit({op: "help", text: f.value});
         };
@@ -2216,6 +2223,8 @@ export class LogicEditor {
     const from = d.out ? d.type : row.dataset.type, to = d.out ? row.dataset.type : d.type;
     if ((from === "exec") !== (to === "exec")) return false;
     if (from === to) return true;
+    // an object of the engine goes where one of its class is wanted (from === to, above) - nowhere else
+    if (lgIsObject(from) || lgIsObject(to)) return false;
     // a generic node nothing is wired to yet takes the wire's type (Select, Reroute, the list nodes)
     const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
     if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;

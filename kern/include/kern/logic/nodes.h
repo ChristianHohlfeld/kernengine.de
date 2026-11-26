@@ -586,6 +586,10 @@ template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
   static ActorHandle from(const Value& v) { return {v.as_actor()}; }
 };
+template <class I> struct Held<Object<I>> {
+  static constexpr PinType type = PinType::object;
+  static Object<I> from(const Value& v) { return Object<I>{v.as_object()}; }
+};
 template <> struct Held<Int64> {
   static constexpr PinType type = PinType::int64;
   static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
@@ -705,6 +709,7 @@ inline Value to_value(const Text& v) { return Value::text(v.str()); }
 inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
 inline Value to_value(Int64 v) { return Value::int64(v.bits); }
+template <class I> Value to_value(Object<I> v) { return Value::object(v.ref); }
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
 template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }
@@ -2397,6 +2402,7 @@ inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
+template <class I> void native_set(Object<I>& variable, const Value& v) { variable = Object<I>{v.as_object()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
 template <class T, std::size_t N> void native_set(Fixed<T, N>& variable, const Value& v) { variable = from_value<Fixed<T, N>>(v.converted(pin_type_of<Fixed<T, N>>())); }
 template <class E>
@@ -2453,6 +2459,8 @@ struct PureNodes {
   using Vector = Vec3;
   using Text = std::string;
   using Actor = ActorHandle;
+  /// An object of the engine of the class I (kern/docs/engine_object.md): Object<kern::App>.
+  template <class I> using Object = logic::Object<I>;
   static constexpr f64 kDegrees = 3.14159265358979323846 / 180.0;
 
   // ---- Int64: 64 bits, as u64 and i64 of C++ (WebAssembly's i64) ----

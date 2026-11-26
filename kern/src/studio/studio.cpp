@@ -230,6 +230,8 @@ bool Studio::load_level(game::Level level, bool reset_history) {
   end_gizmo(false);
   level_ = std::move(level);
   selection_.clear();
+  logic_sheets_.clear();   // (the sheets that were open are another document's: its owners' ids name others here)
+  logic_loose_.clear();
   if (reset_history) {
     history_.clear();
     HistoryEntry e;

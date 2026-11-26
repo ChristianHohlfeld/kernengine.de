@@ -4157,7 +4157,9 @@ static logic::Graph every_node_graph(bool wired) {
                       // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
                       {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
                       // (bytes - Bytes of Text, Bytes of S: a List<U8>)
-                      {"L8", PinType::integer_list, "u8"}};
+                      {"L8", PinType::integer_list, "u8"},
+                      // (an object of the engine: what Engine Object of Blueprint gives, as its Interface says by default)
+                      {"VO", PinType::object, "App"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
@@ -7814,7 +7816,7 @@ TEST(engine_footprint_stream_values) {
 }  // namespace
 
 namespace implements_probe {
-struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
   Float Time = 0.25;
   Int Program = 0;
@@ -7823,25 +7825,25 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 
   // ---- functions ----
   struct nameResult { Text result = ""; };
-  KERN_PURE nameResult name() {
+  KERN_OVERRIDE KERN_PURE nameResult name() {
     return {"water"};
   }
 
   struct vertexResult { Text result = ""; };
-  KERN_PURE vertexResult vertex() {
+  KERN_OVERRIDE KERN_PURE vertexResult vertex() {
     return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
   }
 
-  void bind(Int program = 0) {
+  KERN_OVERRIDE void bind(Int program = 0) {
     Program = program;
   }
 
-  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) {
     Cache = cache;
     Frames += 1;
   }
 };
-struct Running : kern::Blueprint, kern::Implements<"App"> {
+struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
     Float time = 0.0;
@@ -7857,24 +7859,24 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 
   // ---- functions ----
   struct startResult { Bool result = false; };
-  startResult start(Int engine = 0) {
+  KERN_OVERRIDE startResult start(Int engine = 0) {
     Engine = engine;
     return {true};
   }
 
-  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
     Updates += 1;
     Last = frame.time;
   }
 
-  void stop(Int engine = 0) {
+  KERN_OVERRIDE void stop(Int engine = 0) {
     Stopped = true;
   }
 };
 }  // namespace implements_probe
 
 namespace implements_probe {
-struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
     Int64 id = Int64{0x0};
@@ -7887,12 +7889,12 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
 
   // ---- functions ----
   struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
-  KERN_PURE addressResult address() {
+  KERN_OVERRIDE KERN_PURE addressResult address() {
     return {net_Address{Int64{0x7}}};
   }
 
   struct sendResult { Bool result = false; };
-  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
     Last = to;
     Bytes = bytes;
     Sent = list_length<U8>(data);
@@ -7900,7 +7902,7 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
   }
 
   struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
-  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
     return {Bytes, Last, List<Int>{1, 2, 3}};
   }
 };
@@ -8007,16 +8009,10 @@ TEST(engine_blueprints_running) {
     const logic::Value first = out[0].item(0);
     CHECK(first.field(0) && first.field(0)->as_text() == "Water" && first.field(2) && first.field(2)->as_int() == static_cast<i64>(water.functions.size()));
   }
-  // one by one, without a copy: the name where the logic holds it; an index of no Blueprint names none
-  CHECK(game::blueprint_count(rt) == 2 && &game::blueprint_name(rt, 1) == &rt.instances()[1]->name() && game::blueprint_name(rt, 2).empty());
-  CHECK(std::string(game::blueprint_tier(rt, 0)) == "interpreter" && std::string(game::blueprint_tier(rt, 9)).empty());
-  CHECK(game::blueprint_functions(rt, 0) == water.functions.size() && game::blueprint_nodes(rt, 1) == game.nodes.size() && game::blueprint_nodes(rt, 2) == 0);
-  CHECK(!game::blueprint_disabled(rt, 0) && !game::blueprint_disabled(rt, 5));
-  const Value logic_handle = Value::integer(objects.adopt(rt));
-  std::vector<Value> one{Value::zero(logic::PinType::text)};
-  CHECK(logic::call_engine(objects, "engine.game.blueprint_name", {logic_handle, Value::integer(1)}, one) && one[0].as_text() == "Running");
-  one = {Value::zero(logic::PinType::integer)};
-  CHECK(logic::call_engine(objects, "engine.game.blueprint_count", {logic_handle}, one) && one[0].as_int() == 2);
+  // (one way: the list - no second way of the same by index, whose index could name a Blueprint that is gone)
+  for (const char* gone : {"engine.game.blueprint_count", "engine.game.blueprint_name", "engine.game.blueprint_tier", "engine.game.blueprint_functions",
+                           "engine.game.blueprint_nodes", "engine.game.blueprint_disabled"})
+    CHECK(logic::engine_function(gone) == nullptr);
   objects.clear();
 }
 
@@ -8073,7 +8069,7 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
-  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
+  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<kern::ShaderExtension> {\n  KERN_OVERRIDE void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
   const std::vector<logic::Issue> issues = logic::check(wrong);
   const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
   CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is int, not float"));
@@ -8085,52 +8081,173 @@ TEST(engine_interface_a_blueprint_implements) {
   objects.clear();
 }
 
+// Which functions of a Blueprint the engine calls, the Blueprint says (KERN_OVERRIDE, Function::overrides) - the name alone
+// decides nothing: a typo of an interface's function is an error with the functions it has, a function of an interface's
+// name that does not say so is an error, KERN_OVERRIDE without an interface is one; a function of the interface the
+// Blueprint has not is said as a note (the interface's own runs). The interface is its C++ type in the text.
+TEST(engine_interface_overrides_are_said) {
+  auto issues = [](const char* text, std::string* error) {
+    logic::Graph g;
+    std::vector<logic::Issue> r;
+    if (logic::from_cpp(text, g, nullptr, error)) r = logic::check(g);
+    return r;
+  };
+  auto has = [](const std::vector<logic::Issue>& v, bool error, const std::string& text) {
+    for (const logic::Issue& i : v)
+      if (i.error == error && i.text == text) return true;
+    for (const logic::Issue& i : v) std::printf("    (%s) %s\n", i.error ? "error" : "note", i.text.c_str());
+    return false;
+  };
+  std::string error;
+  const auto typo = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void upadte() {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(typo, true, "function \"upadte\" overrides App::upadte, which App has not (it has configure, extensions, start, update, resized, stop)"));
+  const auto unsaid = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  void stop(Int engine = 0) {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(unsaid, true, "function \"stop\" has the name of App::stop but does not say that it overrides it: KERN_OVERRIDE (the engine calls it), or another name"));
+  const auto alone = issues("struct A : kern::Blueprint {\n  // ---- functions ----\n  KERN_OVERRIDE void stop() {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(alone, true, "function \"stop\" overrides a function of an interface of the engine (KERN_OVERRIDE), but the Blueprint implements none (kern::Implements<...>)"));
+  // (an App with what it must have - start and update, its pure ones - and stop, each saying so: no error, and a note
+  // for each it leaves to the interface; read and written again as it is)
+  const char* const said = blueprint_native::kImplementsGame;
+  const auto good = issues(said, &error);
+  CHECK(error.empty() && no_errors(good) && has(good, false, "it implements App without resized: the interface's own runs there (engine.app.resized)") &&
+        has(good, false, "it implements App without configure: the interface's own runs there (engine.app.configure)"));
+  logic::Graph g;
+  std::string text;
+  CHECK(logic::from_cpp(said, g, nullptr, &error) && g.functions.size() == 3 && g.functions[2].name == "stop" && g.functions[2].overrides &&
+        logic::to_cpp(g, "Running", text, &error, logic::library(), false) && text.ends_with(said));   // (written as it was: after the text's head)
+  // (without a pure one: the error says which)
+  const auto bare = issues("struct A : kern::Blueprint, kern::Implements<kern::App> {\n  // ---- functions ----\n  KERN_OVERRIDE void stop(Int engine = 0) {\n  }\n};\n", &error);
+  CHECK(error.empty() && has(bare, true, "it implements App: it has no function start (the interface's has no body - engine.app.start)"));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back, &error) && back.functions.size() == 3 && back.functions[2].overrides);
+  // (the interface is a type: no text, and only a type of the engine that is one)
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint, kern::Implements<\"App\"> {\n};\n", g, nullptr, &error) &&
+        error.find("the interface of the engine by its C++ type expected (kern::Implements<kern::App>)") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint, kern::Implements<kern::Appp> {\n};\n", g, nullptr, &error) &&
+        error.find("kern::Implements<kern::Appp>: the engine has no interface Appp") != std::string::npos);
+  CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  // ---- variables ----\n  KERN_OVERRIDE Int X = 0;\n};\n", g, nullptr, &error));
+}
+
 // Engine Object of Blueprint (func.engine_object, Runtime::engine_object): the object of the engine another Blueprint is -
-// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - its handle in the
-// host's objects, made once: the same handle every time; 0 where there is no Blueprint that runs, one that implements
-// nothing, or a host without objects of the engine.
+// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - as an Object<I> of
+// the interface its setting names (kern/docs/engine_object.md): the handle in the host's objects and their world, made
+// once - the same every time. Where it cannot be one, the host is told why - each of the four reasons in its own words -
+// and the node gives no object (never a 0 that looks like a handle).
 TEST(engine_object_of_a_blueprint) {
   struct Host : FakeLogicHost {
     logic::EngineObjects objects;
     bool has = true;
     logic::EngineObjects* engine_objects() override { return has ? &objects : nullptr; }
-    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : 0; }
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : name == "Nobody" ? 13 : 0; }
   } host;
   logic::Runtime rt(host);
   logic::Graph water, asks;
   std::string error;
   CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
-  CHECK(logic::from_cpp("struct Asks : kern::Blueprint {\n"
-                        "  // ---- functions ----\n"
-                        "  struct waterResult { Int result = 0; };\n"
-                        "  waterResult water() {\n"
-                        "    return {func_engine_object(actor_find(\"Water\"))};\n"
-                        "  }\n"
-                        "\n"
-                        "  struct selfResult { Int result = 0; };\n"
-                        "  selfResult self() {\n"
-                        "    return {func_engine_object(actor_find(\"Asks\"))};\n"
-                        "  }\n"
-                        "};\n", asks, nullptr, &error));
+  const char* const kAsks =
+      "struct Asks : kern::Blueprint {\n"
+      "  // ---- functions ----\n"
+      "  struct waterResult { Object<kern::ShaderExtension> result = Object<kern::ShaderExtension>{}; };\n"
+      "  waterResult water() {\n"
+      "    return {func_engine_object<kern::ShaderExtension>(actor_find(\"Water\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct asAppResult { Object<kern::App> result = Object<kern::App>{}; };\n"
+      "  asAppResult asApp() {\n"
+      "    return {func_engine_object<kern::App>(actor_find(\"Water\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct selfResult { Object<kern::App> result = Object<kern::App>{}; };\n"
+      "  selfResult self() {\n"
+      "    return {func_engine_object<kern::App>(actor_find(\"Asks\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct nobodyResult { Bool result = false; };\n"
+      "  nobodyResult nobody() {\n"
+      "    return {object_valid<kern::App>(func_engine_object<kern::App>(actor_find(\"Nobody\")))};\n"
+      "  }\n"
+      "\n"
+      "  struct handleResult { Int result = 0; };\n"
+      "  handleResult handle() {\n"
+      "    return {object_handle<kern::ShaderExtension>(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
+      "  }\n"
+      "};\n";
+  CHECK(logic::from_cpp(kAsks, asks, nullptr, &error));
+  if (!error.empty()) std::printf("  engine_object_of_a_blueprint: %s\n", error.c_str());
   CHECK(no_errors(logic::check(asks)));
+  std::string again;
+  CHECK(logic::to_cpp(asks, "Asks", again, &error, logic::library(), false) && again.ends_with(kAsks));   // (the one way it is written: after the text's head)
+  if (!again.ends_with(kAsks)) std::printf("%s\n", again.c_str());
   logic::Instance* const w = rt.add(water, 11, "Water");
   logic::Instance* const a = rt.add(asks, 12, "Asks");
   rt.begin();
   CHECK(w && a);
   if (!w || !a) return;
   std::vector<logic::Value> got;
-  CHECK(a->call("water", {}, got) && got.size() == 1);
-  const i64 h = got.empty() ? 0 : got[0].as_int();
+  CHECK(a->call("water", {}, got) && got.size() == 1 && got[0].type == logic::PinType::object);
+  const logic::ObjectRef h = got.empty() ? logic::ObjectRef{} : got[0].as_object();
+  CHECK(h.valid() && h.world == host.objects.world());
   ShaderExtension* const ext = host.objects.get<ShaderExtension>(h);
-  CHECK(h != 0 && ext && std::string(ext->name()) == "water");
-  CHECK(rt.engine_object(11) == h && rt.engine_object(11) == h);   // (made once)
-  CHECK(a->call("self", {}, got) && got.size() == 1 && got[0].as_int() == 0);   // (it implements nothing)
-  CHECK(rt.engine_object(99) == 0);   // (no Blueprint there)
+  CHECK(ext && std::string(ext->name()) == "water");
+  CHECK(host.errors.empty());
+  std::string why;
+  CHECK(rt.engine_object(11, "ShaderExtension", why) == h && rt.engine_object(11, "ShaderExtension", why) == h);   // (made once)
+  CHECK(a->call("handle", {}, got) && got.size() == 1 && got[0].as_int() == h.handle);   // (Handle of Object: the one way to an Int)
+  // (each reason in its own words, at the caller - and no object)
+  CHECK(a->call("asApp", {}, got) && got.size() == 1 && !got[0].as_object().valid());
+  CHECK(host.errors.size() == 1 && host.errors.back() == "Asks: Engine Object of Blueprint: the Blueprint Water implements ShaderExtension, not App");
+  CHECK(a->call("self", {}, got) && got.size() == 1 && !got[0].as_object().valid());
+  CHECK(host.errors.size() == 2 && host.errors.back() == "Asks: Engine Object of Blueprint: the Blueprint Asks implements no interface of the engine (App was asked for)");
+  CHECK(a->call("nobody", {}, got) && got.size() == 1 && !got[0].as_bool());
+  CHECK(host.errors.size() == 3 && host.errors.back() == "Asks: Engine Object of Blueprint: actor 13 has no Blueprint that runs");
   host.has = false;
   logic::Runtime other(host);
   other.add(water, 11, "Water");
-  CHECK(other.engine_object(11) == 0);   // (a host without objects of the engine)
+  CHECK(!other.engine_object(11, "ShaderExtension", why).valid() && why == "this host has no objects of the engine - the Blueprint Water cannot be one");
+  // (a setting that names no interface of the engine is refused where it is read, and checked)
+  logic::Graph wrong;
+  CHECK(!logic::from_cpp("struct Wrong : kern::Blueprint {\n  // ---- functions ----\n  struct fResult { Int result = 0; };\n  fResult f() {\n    return {object_handle<kern::App>(func_engine_object<kern::Nothing>(actor_find(\"Water\")))};\n  }\n};\n", wrong, nullptr, &error) &&
+        error.find("the engine has no interface kern::Nothing") != std::string::npos);
   host.objects.clear();
+}
+
+// An object of the engine is a type of its own (kern/docs/engine_object.md): Object<I> goes where an Object of the same
+// class goes - or an input of any (Is Valid Object) -, never where another class or a number is, and no number becomes
+// one; an ObjectRef names its object only in its own world, and says why elsewhere.
+TEST(object_refs_know_their_world) {
+  using logic::PinType;
+  using logic::TypeRef;
+  CHECK(logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "App"}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "ShaderExtension"}));
+  CHECK(!logic::fits(TypeRef{PinType::integer, ""}, TypeRef{PinType::object, "App"}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::integer, ""}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::text, ""}));
+  CHECK(!logic::convertible(PinType::integer, PinType::object) && !logic::convertible(PinType::object, PinType::boolean));
+  CHECK(!logic::Value::integer(7).converted(PinType::object).as_object().valid());
+  CHECK(logic::engine_class_name("kern::physics::World") == "physics_World" && logic::engine_class_cpp("physics_World") == "kern::physics::World");
+  CHECK(logic::engine_class_name(logic::cpp_name_of<kern::App>()) == "App");
+  logic::EngineObjects one, two;
+  CHECK(one.world() != 0 && two.world() != 0 && one.world() != two.world());
+  logic::EngineObjects same(one.world());
+  CHECK(same.world() == one.world());
+  struct Thing { int x = 7; };
+  const logic::ObjectRef r = one.ref(one.own(std::make_unique<Thing>()));
+  const logic::ObjectRef t = two.ref(two.own(std::make_unique<Thing>()));
+  CHECK(r.valid() && t.valid() && r.handle == t.handle && !(r == t));   // (the same handle, another world)
+  CHECK(one.get<Thing>(r) && one.get<Thing>(r)->x == 7);
+  CHECK(!one.get<Thing>(t) && one.error == "an object of world " + std::to_string(two.world()) + " used in world " + std::to_string(one.world()) + " - it names nothing here");
+  CHECK(!one.get<Thing>(logic::ObjectRef{}) && one.error == "no object of the engine (an Object that refers to none)");
+  CHECK(!one.ref(0).valid());
+  // (as a variable: none to begin with, written and read as no object; a number typed in is no object)
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::App> Main = Object<kern::App>{};\n};\n", g, nullptr, &error) &&
+        g.variables.size() == 1 && g.variables[0].type == PinType::object && g.variables[0].of == "App");
+  if (!error.empty()) std::printf("  object_refs_know_their_world: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::App> Main = 3;\n};\n", g, nullptr, &error));
+  CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::Nothing> Main = Object<kern::Nothing>{};\n};\n", g, nullptr, &error) &&
+        error.find("the engine has no interface Nothing") != std::string::npos);
 }
 
 // The program's fixed step (kern/game/runtime.h FixedStep, kern/docs/project.md 6.): a world calls it once in every fixed
@@ -8187,7 +8304,7 @@ TEST(game_world_fixed_step) {
   logic::Runtime program(program_host);
   logic::Graph stepper;
   error.clear();
-  CHECK(logic::from_cpp("struct Stepper : kern::Blueprint, kern::Implements<\"game_FixedStep\"> {\n"
+  CHECK(logic::from_cpp("struct Stepper : kern::Blueprint, kern::Implements<kern::game::FixedStep> {\n"
                         "  // ---- functions ----\n"
                         "  void fixed_step(Float dt) {\n"
                         "    debug_print(\"step\", false);\n"
@@ -8197,7 +8314,8 @@ TEST(game_world_fixed_step) {
   CHECK(error.empty() && stepper.implements == "game_FixedStep");
   CHECK(program.add(stepper, 7, "Stepper") != nullptr);
   program.begin();
-  game::FixedStep* const object = program_host.objects.get<game::FixedStep>(program.engine_object(7));
+  std::string fixed_why;
+  game::FixedStep* const object = program_host.objects.get<game::FixedStep>(program.engine_object(7, "game_FixedStep", fixed_why));
   CHECK(object != nullptr);
   if (!object) return;
   f.world->set_fixed_step(object);
@@ -8278,7 +8396,7 @@ TEST(program_from_the_project) {
   pr.name = "Probe";
   game::ProgramBlueprint main;
   main.name = "Main";
-  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                      "  // ---- types ----\n"
                      "  KERN_STRUCT(Frame) {\n"
                      "    Float time = 0.0;\n"
@@ -8288,16 +8406,16 @@ TEST(program_from_the_project) {
                      "\n"
                      "  // ---- functions ----\n"
                      "  struct startResult { Bool result = false; };\n"
-                     "  startResult start(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE startResult start(Int engine = 0) {\n"
                      "    debug_print(\"start\", false);\n"
                      "    return {true};\n"
                      "  }\n"
                      "\n"
-                     "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
                      "    debug_print(\"update\", false);\n"
                      "  }\n"
                      "\n"
-                     "  void stop(Int engine = 0) {\n"
+                     "  KERN_OVERRIDE void stop(Int engine = 0) {\n"
                      "    debug_print(\"stop\", false);\n"
                      "  }\n"
                      "\n"
@@ -8374,7 +8492,7 @@ TEST(program_from_the_project) {
 TEST(program_world_has_the_project) {
   logic::Graph main;
   std::string error;
-  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<kern::App> {\n"
                         "  struct startResult { Bool result = false; };\n"
                         "  startResult start(Int engine = 0) {\n"
                         "    return {true};\n"
@@ -12715,9 +12833,11 @@ TEST(micro_duck_example_level_runs) {
   CHECK(f.world->walker_state(l.world.player) != "Idle");  // autonomous
 }
 
-// A Blueprint too large for one canvas (logic_edit.cpp, kCanvasNodes) shows one function's body at a time: the
-// editor's state has the nodes and wires of that sheet only, the lists every node shares once, and what the page
-// needs of the others as counts. Opening such a Blueprint took time with the square of its nodes before.
+// Every Blueprint is shown sheet by sheet, whatever its size (logic_edit.cpp, logic_json): one function's body at a
+// time, the events on a sheet of their own - the editor's state has the nodes and wires of that sheet only, the lists
+// every node shares once, and what the page needs of the others as counts. The sheet that is open is kept for each
+// owner: back at a Blueprint its sheet is open again, and another Blueprint with a function of the same name does not
+// open on it.
 TEST(studio_blueprint_sheets) {
   StudioFixture f;
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
@@ -12759,6 +12879,18 @@ TEST(studio_blueprint_sheets) {
   json::Value level;
   CHECK(json::parse(game::to_text(f.s->level()), level));
   level.set("logic", std::move(g));
+  // (an actor whose Blueprint has a function of the same name, F7)
+  CHECK(level["actors"].is_array() && level["actors"].size() > 0);
+  const u32 other = level["actors"].size() > 0 ? static_cast<u32>(level["actors"][0]["id"].as_number()) : 0;
+  json::Value small;
+  CHECK(json::parse(R"({"functions":[{"name":"F7"}],"nodes":[{"id":1,"type":"event.begin"},{"id":10,"type":"func.entry","params":{"function":"F7"}},)"
+                    R"({"id":11,"type":"func.return","params":{"function":"F7"}}],"links":[[10,"then",11,"exec"]]})", small));
+  if (json::Value* actors = level.find("actors"); actors && actors->size() > 0) {
+    json::Value& first = actors->at(0);
+    json::Value* parts = first.find("components");
+    if (!parts) parts = &first.set("components", json::Value::object());
+    parts->set("logic", std::move(small));
+  }
   json::Value open = json::Value::object();
   open.set("cmd", "open"); open.set("text", json::stringify(level)); open.set("name", "sheets.klevel");
   CHECK(f.s->command(open)["ok"].as_bool());
@@ -12798,12 +12930,29 @@ TEST(studio_blueprint_sheets) {
   CHECK(f.cmd(R"({"cmd":"logicReveal","node":1})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["sheet"].as_string().empty());
   CHECK(!f.cmd(R"({"cmd":"logicReveal","node":999999})")["ok"].as_bool());
-  // a small Blueprint shows all of itself: no sheets
+  // the open sheet is the owner's: the other Blueprint opens on its own (the events), not on its F7; back at the
+  // level, F7 is open again
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  json::Value to_other = json::Value::object();
+  to_other.set("cmd", "logicOpen"); to_other.set("owner", other);
+  CHECK(other != 0 && f.s->command(to_other)["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["owner"].as_number() == other && l["sheet"].as_string().empty() && l["sheets"].size() == 1 && l["nodes"].size() == 1);
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheet"].as_string() == "F7" && l["nodes"].size() == 2 && l["links"].size() == 1);
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["owner"].as_number() == 0 && l["sheet"].as_string() == "F7" && l["nodes"].size() == 42);
+  // a small Blueprint is shown sheet by sheet as well: no size switches how it is shown
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"robot_avoid"})")["ok"].as_bool());
   l = f.s->state()["logic"];
-  CHECK(l["sheets"].is_null() && l["nodes"].size() == 9 && l["counts"]["nodes"].as_number() == 9);
+  CHECK(l["sheets"].is_array() && l["sheet"].as_string().empty() && l["counts"]["nodes"].as_number() == 9);
+  std::size_t events = 0;
+  for (const logic::Node& n : f.s->level().logic.nodes) events += f.s->level().logic.bodies(logic::library()).count(n.id) ? 0 : 1;
+  CHECK(l["nodes"].size() == events && l["sheets"].size() == f.s->level().logic.functions.size());
 }
 
 TEST(studio_robot_template_compiles) {
@@ -13261,7 +13410,7 @@ TEST(studio_logic_implements) {
   CHECK(st["logic"]["implements"].as_string().empty());
   CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
-  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<kern::ShaderExtension> {\n") != std::string::npos);
   bool missing = false;
   const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;

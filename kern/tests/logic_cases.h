@@ -810,13 +810,15 @@ inline const std::vector<Case>& cases() {
       // Get Variable on Actor and Has Blueprint, on a Blueprint (here its own: the Level's) and on an actor
       // that has none: a number, a whole number read as a decimal one, a variable it does not have, one of a
       // type that does not become the one read (a list as a number: the zero), an enum's value and a list
-      // of structs - each as the reader's own type.
+      // of structs - each as the reader's own type. Engine Object of Blueprint on the Level, which implements
+      // nothing: no object (Is Valid Object false, Handle of Object 0), and the host is told why - in every tier.
       {"on_actor",
        R"({"enums":[{"name":"Kind","values":["A","B","C"]}],"structs":[{"name":"Row","fields":[{"name":"Count","type":"int","value":0},{"name":"Tag","type":"text","value":""}]}],)"
        R"("variables":[{"name":"Speed","type":"float","value":2.5},{"name":"Laps","type":"int","value":3},{"name":"Mode","type":"enum","of":"Kind","value":2},)"
        R"({"name":"Rows","type":"struct_list","of":"Row","value":[{"Count":4,"Tag":"x"}]},{"name":"Has","type":"bool","value":false},{"name":"HasNone","type":"bool","value":false},)"
        R"({"name":"RSpeed","type":"float","value":0},{"name":"RLaps","type":"float","value":0},{"name":"RNone","type":"float","value":0},{"name":"RWrong","type":"float","value":0},)"
-       R"({"name":"RMode","type":"enum","of":"Kind","value":0},{"name":"RRows","type":"struct_list","of":"Row","value":[]}],)"
+       R"({"name":"RMode","type":"enum","of":"Kind","value":0},{"name":"RRows","type":"struct_list","of":"Row","value":[]},)"
+       R"({"name":"IsApp","type":"bool","value":true},{"name":"AppHandle","type":"int","value":7}],)"
        R"("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Has"}},{"id":3,"type":"func.has_blueprint","values":{"target":0}},)"
        R"({"id":4,"type":"var.set","params":{"variable":"HasNone"}},{"id":5,"type":"func.has_blueprint","values":{"target":99}},)"
        R"({"id":6,"type":"var.set","params":{"variable":"RSpeed"}},{"id":7,"type":"func.get_on","params":{"variable":"Speed","type":"float"},"values":{"this":0}},)"
@@ -825,10 +827,13 @@ inline const std::vector<Case>& cases() {
        R"({"id":12,"type":"var.set","params":{"variable":"RWrong"}},{"id":13,"type":"func.get_on","params":{"variable":"Rows","type":"float"},"values":{"this":0}},)"
        R"({"id":14,"type":"var.set","params":{"variable":"RMode"}},{"id":15,"type":"func.get_on","params":{"variable":"Mode","type":"Kind"},"values":{"this":0}},)"
        R"({"id":16,"type":"var.set","params":{"variable":"RRows"}},{"id":17,"type":"func.get_on","params":{"variable":"Rows","type":"Row_list"},"values":{"this":0}},)"
-       R"({"id":18,"type":"var.add","params":{"variable":"Laps"},"values":{"amount":1}}],)"
+       R"({"id":18,"type":"var.add","params":{"variable":"Laps"},"values":{"amount":1}},)"
+       R"({"id":19,"type":"var.set","params":{"variable":"IsApp"}},{"id":20,"type":"object.valid"},{"id":21,"type":"func.engine_object","params":{"interface":"App"},"values":{"target":0}},)"
+       R"({"id":22,"type":"var.set","params":{"variable":"AppHandle"}},{"id":23,"type":"object.handle"}],)"
        R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"],[4,"then",6,"exec"],[7,"value",6,"value"],[6,"then",8,"exec"],)"
        R"([9,"value",8,"value"],[8,"then",10,"exec"],[11,"value",10,"value"],[10,"then",12,"exec"],[13,"value",12,"value"],[12,"then",14,"exec"],[15,"value",14,"value"],)"
-       R"([14,"then",16,"exec"],[17,"value",16,"value"],[16,"then",18,"exec"]]})"},
+       R"([14,"then",16,"exec"],[17,"value",16,"value"],[16,"then",18,"exec"],[18,"then",19,"exec"],[21,"result",20,"object"],[20,"result",19,"value"],)"
+       R"([19,"then",22,"exec"],[21,"result",23,"object"],[23,"result",22,"value"]]})"},
       // Int64: 64 bits as u64 and i64 of C++ - every Int64 node, on values beyond 2^53 (a Float
       // times 10^17, halves of 32 bits), dividing by 0 and the smallest i64 by -1, shifts by more
       // than 63 (the amount's last 6 bits), Floats beyond the ends and no number, texts that are

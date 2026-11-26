@@ -3164,14 +3164,20 @@ def actors_called(f, met=None):
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states) - and, with `implements` ([name, pure functions]: World.state_implements),
-    the interface of the engine it is the object of: once it has every pure function of it (until then the
+    variables of a state (World.states) - and, with `implements` ([name, pure functions, all its functions, its C++
+    name]: World.state_implements),
+    the interface of the engine it is the object of (by its C++ type), each of its functions of the interface's names
+    marked KERN_OVERRIDE: once it has every pure function of it (until then the
     engine has no object of it - what waits keeps the interface's functions from it, as from any caller)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
     defines = lambda t, f: re.search(r"(?m)^\s*(?:KERN_\w+\s+)*[\w:<>,]+\s+" + re.escape(f) + r"\(", t)   # (a function's text: its head names it)
     whole = bool(state and implements) and all(any(defines(t, p) for t in functions) for p in implements[1])
     out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
-           + (f', kern::Implements<"{implements[0]}">' if whole else "") + " {"]
+           + (f', kern::Implements<{implements[3]}>' if whole else "") + " {"]
+    if whole:
+        # (each function of the interface's names is what the engine calls: it says so - KERN_OVERRIDE, Function::overrides)
+        functions = [re.sub(r"(?m)^([ \t]*(?:KERN_EXPORT_AS\([^)]*\)\s+)?)(?=(?:KERN_PURE\s+)?[\w:<>,]+\s+(" + "|".join(map(re.escape, implements[2])) + r")\()", r"\1KERN_OVERRIDE ", t, count=1)
+                     for t in functions]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -4046,7 +4052,7 @@ class Emit:
         return n.get("kind") == "CXXThisExpr"
 
     def implementing_state(self, n):
-        """The Blueprint (its actor's name) whose one object `n` is, where that is a state that derives from an
+        """The Blueprint (its actor's name) and the interface of the engine it implements, whose one object `n` is, where that is a state that derives from an
         interface of the engine (World.state_implements: Facades, a ShaderExtension) and `n` its getter called -
         `sc::facades()` (World.getters); else None."""
         n = bare(n)
@@ -4062,7 +4068,7 @@ class Emit:
         q = next((s for s in self.u.world.states if s == q or s.endswith("::" + q) or q.endswith("::" + s)), None)
         if q is None or q not in self.u.world.state_implements:
             return None
-        return self.u.world.states[q]
+        return self.u.world.states[q], self.u.world.state_implements[q][0]
 
     def at_state(self, n):
         """Is this the one object of the state, reached through a field that holds it (`g->` of a struct a method
@@ -10169,8 +10175,11 @@ class Emit:
             implementing = self.implementing_state(kids(b)[0]) if op == "&" and kids(b) else None
             if implementing is not None:
                 # (&sc::facades(): the one object of a state that is an object of an interface of the engine - what
-                # the engine is handed as that object is its handle: Engine Object of Blueprint on its Blueprint)
-                return f"func_engine_object(actor_find({text_literal(implementing)}))", "Int"
+                # the engine is handed as that object: Engine Object of Blueprint on its Blueprint, as that interface;
+                # its handle, as long as the engine's functions take their objects as Ints - kern/docs/engine_object.md)
+                actor, interface = implementing
+                cpp = "kern::" + interface.replace("_", "::")
+                return f"object_handle<{cpp}>(func_engine_object<{cpp}>(actor_find({text_literal(actor)})))", "Int"
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":
@@ -11553,6 +11562,7 @@ class Api:
         self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
         self.implicit_makers = {}   # a class of the engine without a constructor of its own -> the one C++ gives it
         self.unsaid = []   # declarations with a whole number beside a pointer that is no kern::Count<Per> (engine_api.py stops on them)
+        self.false_places = []   # declarations that say KERN_PLACE and are no place - where and why (engine_api.py stops on them)
 
     def unsaid_count(self, d, p, after):
         """A pointer to data (not a handle, not a text) with a whole number beside it that does not say in its
@@ -11944,6 +11954,8 @@ class Api:
         counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
         place, index = False, 0
+        if ret == "void" and self.says(d, "KERN_PLACE"):
+            self.false_places.append(f"{self.home(d)}::{d['name']} ({self.where(d)}): it gives nothing")
         if ret != "void":
             bt, gives_place, handle = self.handed(ret)
             raws["result"] = ret
@@ -11952,8 +11964,18 @@ class Api:
             # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
             # (or an entry of an array the object holds, at the one input - `return buses_[static_cast<u32>(b)];`: its
             # length is known, `index`; an input outside it names no entry, the call fails as it fails without an object)
+            # It is one only where its declaration says so (KERN_PLACE, kern/core/base.h) - a body is not read for it; one
+            # that says so and cannot be one is reported with its place and why (Api.false_places: the generator stops).
             looked = self.looks_up(d) if gives_place and handle is None and method and len(outs) == 1 else None
-            place = looked == 0 and not ins[1:] or bool(looked) and len(ins[1:]) == 1 and ins[1][2] is None
+            fits = looked == 0 and not ins[1:] or bool(looked) and len(ins[1:]) == 1 and ins[1][2] is None
+            if self.says(d, "KERN_PLACE") and not fits:
+                why = ("it is no method of an object of the engine" if not method else
+                       "it gives no reference (not const) to something the object holds" if not gives_place else
+                       "what it gives is an object of the engine itself (its handle, no place)" if handle is not None else
+                       "its body does more than look up a member (`return member_;`, `return member_[i];`)" if looked is None else
+                       "it takes more than the one index of the entry it looks up")
+                self.false_places.append(f"{self.home(d)}::{d['name']} ({self.where(d)}): {why}")
+            place = fits and self.says(d, "KERN_PLACE")
             index = looked if place else 0
         qualified = self.home(d) + "::" + d["name"]
         # (a function that formats a text writes it somewhere - the last error, the log: a step)
@@ -12011,11 +12033,22 @@ class Api:
 
     def reads_clock(self, d):
         """Does the declaration say that the function reads a clock (`KERN_CLOCK f64 now_ms();`, kern/core/base.h)?"""
+        return self.says(d, "KERN_CLOCK")
+
+    def says(self, d, mark):
+        """Does the declaration begin with `mark` (KERN_CLOCK, KERN_PLACE - kern/core/base.h) on its line?"""
         text = self.tree.text(d.get("_file", ""))
         a = d.get("_at", (None, None))[0]
         if a is None or not text:
             return False
-        return re.match(r"\s*KERN_CLOCK\b", text[text.rfind("\n", 0, a) + 1:]) is not None
+        return re.match(r"\s*" + mark + r"\b", text[text.rfind("\n", 0, a) + 1:]) is not None
+
+    def where(self, d):
+        """file:line of a declaration."""
+        text = self.tree.text(d.get("_file", ""))
+        a = d.get("_at", (None, None))[0]
+        line = text.count("\n", 0, a) + 1 if text and a is not None else 0
+        return f"{d.get('_file', '?')}:{line}"
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
@@ -15965,7 +15998,7 @@ def engine_interface_of(tree, rec):
                 return None
         if any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(rec)):
             return None
-    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
+    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")}), sorted({c["name"] for c in methods}), q]
 
 
 def state_classes(world, surveys):

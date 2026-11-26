@@ -1936,7 +1936,7 @@ struct P_engine_character_mover_settings {
 };
 
 // The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).
-// kern::App that a Blueprint's class is (kern::Implements<"App">: kern::logic::implementation)
+// kern::App that a Blueprint's class is (kern::Implements<kern::App>: kern::logic::implementation)
 template <class B> class ClassImplements_App final : public kern::App {
  public:
   explicit ClassImplements_App(B& b) : b_(b) {}
@@ -1996,11 +1996,11 @@ template <class B> class ClassImplements_App final : public kern::App {
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
   mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<kern::App&>().extensions())>().data)>>> kern_kept_extensions;
 };
-template <> struct InterfaceOf<"App"> {
+template <> struct InterfaceOf<kern::App> {
   template <class B> using adapter = ClassImplements_App<B>;
 };
 
-// kern::game::FixedStep that a Blueprint's class is (kern::Implements<"game_FixedStep">: kern::logic::implementation)
+// kern::game::FixedStep that a Blueprint's class is (kern::Implements<kern::game::FixedStep>: kern::logic::implementation)
 template <class B> class ClassImplements_game_FixedStep final : public kern::game::FixedStep {
  public:
   explicit ClassImplements_game_FixedStep(B& b) : b_(b) {}
@@ -2018,11 +2018,11 @@ template <class B> class ClassImplements_game_FixedStep final : public kern::gam
   mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
 };
-template <> struct InterfaceOf<"game_FixedStep"> {
+template <> struct InterfaceOf<kern::game::FixedStep> {
   template <class B> using adapter = ClassImplements_game_FixedStep<B>;
 };
 
-// kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
+// kern::ShaderExtension that a Blueprint's class is (kern::Implements<kern::ShaderExtension>: kern::logic::implementation)
 template <class B> class ClassImplements_ShaderExtension final : public kern::ShaderExtension {
  public:
   explicit ClassImplements_ShaderExtension(B& b) : b_(b) {}
@@ -2150,11 +2150,11 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
   mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<const kern::ShaderExtension&>().attributes())>().data)>>> kern_kept_attributes;
 };
-template <> struct InterfaceOf<"ShaderExtension"> {
+template <> struct InterfaceOf<kern::ShaderExtension> {
   template <class B> using adapter = ClassImplements_ShaderExtension<B>;
 };
 
-// kern::net::Transport that a Blueprint's class is (kern::Implements<"net_Transport">: kern::logic::implementation)
+// kern::net::Transport that a Blueprint's class is (kern::Implements<kern::net::Transport>: kern::logic::implementation)
 template <class B> class ClassImplements_net_Transport final : public kern::net::Transport {
  public:
   explicit ClassImplements_net_Transport(B& b) : b_(b) {}
@@ -2210,7 +2210,7 @@ template <class B> class ClassImplements_net_Transport final : public kern::net:
   mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
   ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
 };
-template <> struct InterfaceOf<"net_Transport"> {
+template <> struct InterfaceOf<kern::net::Transport> {
   template <class B> using adapter = ClassImplements_net_Transport<B>;
 };
 
@@ -7326,77 +7326,6 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.game.blueprints_running", {to_value(logic)}, {PinType::structure_list})[0]);
-  }
-  /// The same without a copy, one by one (each a node of the engine - engine.game.blueprint_*): how many Blueprints the logic runs, and of the one at `at` (in the order it runs them) its name where the logic holds it, how it runs, the functions and nodes of its graph, whether it stopped. An index the logic has no Blueprint at names none: "", 0, false.
-  Int engine_game_blueprint_count(Int logic) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_count"); return Int{}; }
-      decltype(auto) kern_r = kern::game::blueprint_count(*kern_a0);
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.game.blueprint_count", {to_value(logic)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  Text engine_game_blueprint_name(Int logic, Int at) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_name"); return Text{}; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, at, kern_a1);
-      decltype(auto) kern_r = kern::game::blueprint_name(*kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.blueprint_name", {to_value(logic), to_value(at)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  Text engine_game_blueprint_tier(Int logic, Int at) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_tier"); return Text{}; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, at, kern_a1);
-      decltype(auto) kern_r = kern::game::blueprint_tier(*kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.game.blueprint_tier", {to_value(logic), to_value(at)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  Int engine_game_blueprint_functions(Int logic, Int at) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_functions"); return Int{}; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, at, kern_a1);
-      decltype(auto) kern_r = kern::game::blueprint_functions(*kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.game.blueprint_functions", {to_value(logic), to_value(at)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  Int engine_game_blueprint_nodes(Int logic, Int at) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_nodes"); return Int{}; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, at, kern_a1);
-      decltype(auto) kern_r = kern::game::blueprint_nodes(*kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
-    }
-    return from_value<Int>(this->kern_engine("engine.game.blueprint_nodes", {to_value(logic), to_value(at)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
-  }
-  Bool engine_game_blueprint_disabled(Int logic, Int at) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
-      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprint_disabled"); return Bool{}; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, at, kern_a1);
-      decltype(auto) kern_r = kern::game::blueprint_disabled(*kern_a0, std::move(kern_a1));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
-    }
-    return from_value<Bool>(this->kern_engine("engine.game.blueprint_disabled", {to_value(logic), to_value(at)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   void engine_sound_bank_mixer(Int sound_bank) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

@@ -62,7 +62,10 @@ class EngineObjects {
     return Kinds{{kind<T>(), static_cast<void*>(at)}, {kind<Bases>(), static_cast<void*>(static_cast<Bases*>(at))}...};
   }
 
-  EngineObjects() = default;
+  /// Its world (kern/docs/engine_object.md): a number of its own in the process, from 1 on. Two sides a test
+  /// compares, set up alike, are given the same one.
+  EngineObjects() : world_(next_world()) {}
+  explicit EngineObjects(WorldId world) : world_(world) {}
   EngineObjects(const EngineObjects&) = delete;
   EngineObjects& operator=(const EngineObjects&) = delete;
   /// What it owns ends in the reverse order it came.
@@ -98,6 +101,25 @@ class EngineObjects {
         if (!calling_on_) calling_on_ = handle;   // (made for this call: the object the call is on, as one found)
         return static_cast<T*>(p);
       }
+    return nullptr;
+  }
+  /// The world of these objects: what an ObjectRef of them says.
+  WorldId world() const { return world_; }
+  /// An object of the engine of these objects as a Blueprint holds it (handle 0: none).
+  ObjectRef ref(i64 handle) const { return handle ? ObjectRef{handle, world_} : ObjectRef{}; }
+  /// The object an ObjectRef refers to, as a T. Null - and `error` says why - where it is none, of another world
+  /// (it names nothing here, not the object with the same handle), or no object of that class.
+  template <class T> T* get(ObjectRef r) {
+    if (!r.valid()) {
+      error = "no object of the engine (an Object that refers to none)";
+      return nullptr;
+    }
+    if (r.world != world_) {
+      error = "an object of world " + std::to_string(r.world) + " used in world " + std::to_string(world_) + " - it names nothing here";
+      return nullptr;
+    }
+    if (T* p = get<T>(r.handle)) return p;
+    error = "handle " + std::to_string(r.handle) + " names no object of that class in world " + std::to_string(world_);
     return nullptr;
   }
   /// Ends an object of a handle this owns (its destructor): true if it did. A handle the host keeps
@@ -193,6 +215,11 @@ class EngineObjects {
     void* owner = nullptr;          // what `end` ends, if not the object itself: what holds it (MadeWith)
     Kinds kinds;  // its class first, then those it derives from
   };
+  static WorldId next_world() {
+    static WorldId next = 0;
+    return ++next;
+  }
+  WorldId world_;
   i64 put(Kinds kinds, void (*end)(void*));
   void place(i64 handle, Kinds kinds, void (*end)(void*), void* owner = nullptr);
   void forget_lent(i64 lender);

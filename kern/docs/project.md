@@ -94,7 +94,7 @@ int kern_main() { return kern::run(kern::game::embedded_project()); }
   Engine). Sie wendet die Einstellungen vor dem Renderer an, ruft extensions, startet den Renderer, danach start,
   update in jedem Frame und stop. Ein zweites `run` wird abgewiesen (1, mit Grund im Log); die erste App bleibt.
 - `kern::run(Project)` (`kern/game/program.h`) startet die Programm-Laufzeit des Projekts. Die App ist das Objekt der
-  Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder
+  Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<kern::App>`). Gibt es keinen oder
   zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
   `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
 - **Exporte gehören zum Programm.** Ein Export (`KERN_EXPORT_AS`, `Function::exported`) steht nur in einem
@@ -122,7 +122,7 @@ Ein Blueprint nennt seine Bibliotheken in `uses` (beim Namen).
 
 Was ein Programm in **jedem festen Schritt** einer Welt tun muss (zum Beispiel Kräfte, die Box3D nach jedem Schritt
 löscht), gibt es der Welt ausdrücklich: ein Objekt, das `kern::game::FixedStep` ist (`kern/game/runtime.h`) – C++ des
-Programms oder das Objekt der Engine eines Programm-Blueprints mit `kern::Implements<"game_FixedStep">` –, mit
+Programms oder das Objekt der Engine eines Programm-Blueprints mit `kern::Implements<kern::game::FixedStep>` –, mit
 `GameWorld::set_fixed_step(objekt)` (eins; `nullptr` nimmt es zurück, bevor das Objekt endet). Die Reihenfolge eines
 festen Schritts ist festgelegt:
 

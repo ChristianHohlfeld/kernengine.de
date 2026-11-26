@@ -442,8 +442,6 @@ bool libraries_follow(game::Level& level, const game::Project* project, u32 owne
   }
   return true;
 }
-/// The most nodes a canvas shows at once: a Blueprint with more shows one function's body at a time (logic_json).
-constexpr std::size_t kCanvasNodes = 2000;
 /// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
 /// with them (logic::link): the rules that follow calls see what a library's function does.
 std::vector<logic::Issue> linked_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
@@ -544,17 +542,22 @@ json::Value Studio::logic_json() const {
     wired.insert(pin_key(l.to, l.in, false));
   }
   const std::unordered_map<u32, std::string> body_names = g->bodies(lib);
-  // Sheets. A canvas with tens of thousands of nodes serves nobody: a Blueprint above kCanvasNodes shows one
-  // function's body at a time (logic_sheet_; "" = what stands in no function - the events), a smaller one all of
-  // it at once. What the page needs of the nodes it does not get is counted here (counts) or asked (logicFind,
-  // logicReveal).
-  const bool sheets = g->nodes.size() > kCanvasNodes;
-  std::string sheet = sheets ? logic_sheet_ : std::string();
-  if (sheets && !sheet.empty() && !g->function(sheet)) sheet.clear();   // (renamed or removed: the events)
+  // Sheets: the view shows one function's body at a time, and what stands in no function - the events - on a sheet of
+  // its own (""), whatever the size of the Blueprint: one way to see a Blueprint, as in any Blueprint editor. Which
+  // sheet is open is kept for each owner (logic_sheets_): back at a Blueprint, its sheet is open again - never one
+  // of the same name of another Blueprint. What the page needs of the nodes it does not get is counted here (counts)
+  // or asked (logicFind, logicReveal).
+  const auto open = logic_sheets_.find(logic_owner_);
+  std::string sheet = open == logic_sheets_.end() ? std::string() : open->second;
+  if (!sheet.empty() && !g->function(sheet)) sheet.clear();   // (renamed or removed: the events)
+  const auto loose_of = logic_loose_.find(logic_owner_);
   auto shown = [&](u32 id) {
-    if (!sheets) return true;
     const auto it = body_names.find(id);
-    return it == body_names.end() ? sheet.empty() : it->second == sheet;
+    if (it != body_names.end()) return it->second == sheet;
+    // (a node no function has by its wires: on the sheet it was put on in this session, else with the events)
+    if (loose_of != logic_loose_.end())
+      if (const auto put = loose_of->second.find(id); put != loose_of->second.end() && g->function(put->second)) return put->second == sheet;
+    return sheet.empty();
   };
   // (lists of choices that are the same for every node of the Blueprint - its functions, variables, machines,
   // the level's events and sounds, the types a parameter takes: said once, in "choices"; a parameter names its list)
@@ -752,7 +755,7 @@ json::Value Studio::logic_json() const {
     counts.set("links", static_cast<u32>(g->links.size()));
     o.set("counts", std::move(counts));
   }
-  if (sheets) {
+  {
     // (the sheets: each function with a body - how many nodes, and the node it starts at)
     std::unordered_map<std::string, u32> size;
     u32 events = static_cast<u32>(g->nodes.size());
@@ -773,7 +776,7 @@ json::Value Studio::logic_json() const {
   }
   json::Value links = json::Value::array();
   for (const logic::Link& l : g->links) {
-    if (sheets && !(shown(l.from) && shown(l.to))) continue;
+    if (!(shown(l.from) && shown(l.to))) continue;
     json::Value x = json::Value::array();
     x.push(l.from);
     x.push(l.out);
@@ -874,8 +877,7 @@ json::Value Studio::logic_json() const {
     o.set("otherTypes", std::move(types));
   }
   o.set("machines", graph["machines"]);
-  if (!sheets) o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
-  else {
+  {
     // (a comment box stands on the sheet of the nodes in it; one around nothing, on the events' sheet)
     json::Value boxes = json::Value::array();
     for (const logic::CommentBox& c : g->comments) {
@@ -954,9 +956,13 @@ void Studio::check_logic_breakpoints() {
       logic_program_ = false;
       logic_open_ = true;
       logic_view_ = "graph";
-      logic_sheet_.clear();
       const logic::Graph* g = owner ? (a && a->logic ? &*a->logic : nullptr) : &level_.logic;
       const logic::Node* n = g ? g->find(node) : nullptr;
+      if (n) {   // (the sheet the node stands on)
+        const auto bodies = g->bodies(logic::library());
+        const auto at = bodies.find(node);
+        logic_sheets_[owner] = at == bodies.end() ? std::string() : at->second;
+      }
       report("Breakpoint: " + (n ? logic::library().title(*n) : std::string("node")) + " ran - the game is paused (Resume continues)", "warn");
       json::Value ui = json::Value::object();
       ui.set("action", "logicBreak");
@@ -1419,7 +1425,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       logic_owner_ = static_cast<u32>(at + 1);
       logic_open_ = true;
       logic_view_ = "graph";
-      logic_sheet_.clear();
+      logic_sheets_.erase(logic_owner_);
       touch();
       return ok_result();
     }
@@ -1428,8 +1434,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     logic_program_ = false;
     logic_owner_ = owner;
     logic_open_ = true;
-    logic_view_ = "graph";
-    logic_sheet_.clear();
+    logic_view_ = "graph";   // (its sheet is the one it had open last - logic_sheets_)
     touch();
     return ok_result();
   }
@@ -1444,9 +1449,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     return ok_result();
   }
   if (name == "logicSheet") {
-    // The function whose body the graph view shows ("" = the events) - in a Blueprint that has sheets (logic_json).
+    // The function whose body the graph view shows ("" = the events), for the Blueprint that is open (logic_json).
     logic_view_ = "graph";
-    logic_sheet_ = str("function");
+    logic_sheets_[logic_owner_] = str("function");
     touch();
     return ok_result();
   }
@@ -1458,7 +1463,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const auto bodies = g->bodies(logic::library());
     const auto it = bodies.find(node);
     logic_view_ = "graph";
-    logic_sheet_ = it == bodies.end() ? std::string() : it->second;
+    logic_sheets_[logic_owner_] = it == bodies.end() ? std::string() : it->second;
     touch();
     return ok_result();
   }
@@ -1655,8 +1660,22 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       // it is made, the Blueprint holds all of it. After it, it holds what it uses - and the
       // Blueprints that use it follow.
       if (!g->uses.empty()) logic::take_libraries(*g, blueprints_of(l, logic_project()), nullptr, true);
+      // (what the edit adds stands on the sheet that is open: a node that is no function's by its wires yet stays
+      // there - logic_loose_ -, a new function opens on its own sheet, a renamed one stays open)
+      std::unordered_set<u32> had;
+      for (const logic::Node& n : g->nodes) had.insert(n.id);
+      std::vector<std::string> named;
+      for (const logic::Function& f : g->functions) named.push_back(f.name);
       if (!fn(*g, l) || !libraries_follow(l, logic_project(), owner, *g, error)) return false;
-      return !logic_program_ || program_library_follows(owner, *g, error);
+      if (logic_program_ && !program_library_follows(owner, *g, error)) return false;
+      std::string& sheet = logic_sheets_[owner];
+      std::vector<std::string> fresh;
+      for (const logic::Function& f : g->functions)
+        if (std::find(named.begin(), named.end(), f.name) == named.end()) fresh.push_back(f.name);
+      if (fresh.size() == 1 && (named.size() < g->functions.size() || !g->function(sheet))) sheet = fresh[0];
+      for (const logic::Node& n : g->nodes)
+        if (!had.count(n.id) && !sheet.empty()) logic_loose_[owner][n.id] = sheet;
+      return true;
     });
     if (!done && !error.empty()) return fail_result(error);
     result.set("ok", done || error.empty());
@@ -2162,6 +2181,13 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
             drop_links([&](const logic::Link& l) { return (l.to == id && l.in == "exec") || (l.from == id && l.out == "then"); });
           }
         }
+        return true;
+      }
+      if (op == "overrides") {
+        // (it is a function of the interface the Blueprint implements: the engine calls it - Function::overrides;
+        // check() says where that does not fit)
+        if (f->external) { error = "a function of another Blueprint is not this one's to override with"; return false; }
+        f->overrides = c["value"].as_bool();
         return true;
       }
       if (op == "help") { f->help = str("text"); return true; }

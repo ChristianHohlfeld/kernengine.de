@@ -8,6 +8,7 @@
 
 #include <array>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -488,9 +489,12 @@ class Studio {
   json::Value project_json() const;
   bool logic_open_ = false;
   std::string logic_view_ = "graph";
-  /// The function whose body the graph view shows, in a Blueprint too large for one canvas (logic_edit.cpp,
-  /// kCanvasNodes): "" is what stands in no function - the events. A smaller Blueprint shows all of it at once.
-  std::string logic_sheet_;
+  /// The sheet the graph view shows, for each owner (0: the level's Blueprint): the function whose body it is, or ""
+  /// - what stands in no function, the events (logic_edit.cpp, logic_json). Every Blueprint is shown sheet by sheet.
+  std::map<u32, std::string> logic_sheets_;
+  /// The nodes put on a function's sheet that no function has by its wires (yet): owner -> node -> that sheet - they
+  /// stay where they were put while the editor runs (logic_json).
+  std::map<u32, std::map<u32, std::string>> logic_loose_;
   // Blueprint debugging: breakpoints (owner, node) pause the game after the step in which the node ran.
   std::vector<std::pair<u32, u32>> logic_breakpoints_;
   std::pair<u32, u32> logic_break_hit_{0, 0};

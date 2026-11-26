@@ -29,6 +29,26 @@ std::string number_text(f64 n) {
 }
 }  // namespace
 
+std::string engine_class_name(std::string_view cpp) {
+  if (cpp.starts_with("::")) cpp.remove_prefix(2);
+  if (cpp.starts_with("kern::")) cpp.remove_prefix(6);
+  std::string r;
+  for (std::size_t k = 0; k < cpp.size(); ++k) {
+    if (cpp[k] == ':' && k + 1 < cpp.size() && cpp[k + 1] == ':') {
+      r += '_';
+      ++k;
+    } else {
+      r += cpp[k];
+    }
+  }
+  return r;
+}
+std::string engine_class_cpp(std::string_view name) {
+  std::string r = "kern::";
+  for (char c : name) r += c == '_' ? std::string("::") : std::string(1, c);
+  return r;
+}
+
 const char* pin_type_name(PinType t) { return static_cast<u32>(t) < static_cast<u32>(PinType::count) ? kPinTypeNames[static_cast<u32>(t)].data() : "?"; }
 
 namespace {
@@ -59,6 +79,7 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
 }
 std::string type_text(const TypeRef& t) {
   if (t.type == PinType::callback) return "callback<" + t.of + ">";  // ("callback<float(float,float)>")
+  if (t.type == PinType::object) return "object<" + t.of + ">";  // ("object<App>")
   if (is_keyed(t.type)) return std::string(pin_type_name(t.type)) + "<" + t.of + ">";  // ("map<int>float>", "set<text>")
   // (a list of a fixed length says its length: "float_list[16]" - in messages; a setting names no such type)
   const std::string length = t.count ? "[" + std::to_string(t.count) + "]" : std::string();
@@ -75,6 +96,13 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
       if (!callback_type_ok(x.type)) return false;
     if (callback_of(r, in) != t.of) return false;  // (one spelling)
     out = t;
+    return true;
+  }
+  if (text.size() > 8 && text.substr(0, 7) == "object<" && text.back() == '>') {
+    // (an object of the engine of a class the engine names: for now its interfaces - kern/docs/engine_object.md)
+    const std::string of(text.substr(7, text.size() - 8));
+    if (!engine_interface(of)) return false;
+    out = {PinType::object, of};
     return true;
   }
   for (PinType keyed : {PinType::map, PinType::set}) {
@@ -96,7 +124,7 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     }
   }
   PinType builtin;
-  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && !declared_type(builtin)) {
+  if (pin_type_from_name(text, builtin) && builtin != PinType::exec && builtin != PinType::object && !declared_type(builtin)) {
     // (the types' own names only: a setting holds the one name of its type)
     if (text != pin_type_name(builtin)) return false;
     out = {builtin, {}};
@@ -126,6 +154,7 @@ std::string type_label(const TypeRef& t) {
     for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + type_label(in[k]);
     return s + ")";
   }
+  if (t.type == PinType::object) return t.of.empty() ? "Object" : t.of + " Object";  // ("App Object")
   if (t.type == PinType::map) return "Map of " + type_label(key_type(t)) + " to " + type_label(value_type(t));
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
@@ -143,6 +172,9 @@ bool fits(const TypeRef& from, const TypeRef& to) {
   // in C++ a List<U8> is no List<Int>; one Int of a width is an Int, the place it goes to holds it)
   // (an input of kAnyWidth reads a list of Ints of each width - in C++ a function over its items)
   if (from.type == PinType::integer_list && to.type == PinType::integer_list) return to.of == kAnyWidth || width_bits(from.of) == width_bits(to.of);
+  // (an object of the engine goes where an object of its own class is wanted - never where another class is, never
+  // from or to anything else)
+  if (from.type == PinType::object) return from.of == to.of;
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
@@ -154,6 +186,7 @@ bool convertible(PinType from, PinType to) {
   // gives each of them)
   if (declared_type(from) || declared_type(to)) return false;
   if (from == PinType::callback || to == PinType::callback) return false;  // (only the engine calls one: it is nothing else)
+  if (from == PinType::object || to == PinType::object) return false;  // (an object of the engine is no number, no text: Handle of Object says it as an Int)
   if (is_keyed(from) || is_keyed(to)) return false;  // (a map is a map of its keys and values, a set a set of its keys)
   if (element_of(from) == PinType::int64 || element_of(to) == PinType::int64) return false;  // (64 bits: the Int64 nodes say what they are as another type)
   if (to == PinType::text) return true;  // everything prints
@@ -328,6 +361,7 @@ std::string Value::as_text() const {
     case PinType::vector: return "(" + number_text(v.x) + ", " + number_text(v.y) + ", " + number_text(v.z) + ")";
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
+    case PinType::object: return i ? "object " + std::to_string(i) + " of world " + std::to_string(world) : "no object";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
     case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)
     case PinType::callback: return call ? "callback" : "unbound";  // (in messages: a Blueprint does not print one)
@@ -413,6 +447,7 @@ Value Value::converted(PinType to) const {
     case PinType::int64: return zero(to);  // (nothing else is one: Int to Int64, Float to Int64 say how)
     case PinType::enumeration: return enumeration(as_int());
     case PinType::structure: return zero(to);  // (nothing but a struct is one: its default - zero_of)
+    case PinType::object: return zero(to);  // (nothing but an object of the engine is one: no number becomes one)
     case PinType::enumeration_list:
       if (type == PinType::integer_list) {  // (what a node computed on the places of an enum's values: those values)
         Value r = *this;
@@ -549,6 +584,7 @@ bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g,
     case PinType::actor: return a.a == b.a;
     case PinType::int64: return a.i == b.i;
     case PinType::callback: return !a.call == !b.call;  // (what it calls is compared by calling it: the stand-in of the engine)
+    case PinType::object: return a.i == b.i && a.world == b.world;
     default: break;
   }
   if (a.type == PinType::structure) {
@@ -884,6 +920,7 @@ bool Value::operator==(const Value& o) const {
     // (an enum's value is no number and no text: it is equal to an enum's value only - and a
     // struct to a struct)
     if (type == PinType::enumeration || o.type == PinType::enumeration || type == PinType::structure || o.type == PinType::structure) return false;
+    if (type == PinType::object || o.type == PinType::object) return false;  // (an object of the engine is no number)
     if ((type == PinType::text) != (o.type == PinType::text)) return as_text() == o.as_text();
     if (is_list(type) || is_list(o.type) || is_keyed(type) || is_keyed(o.type)) return false;
     return as_number() == o.as_number();
@@ -901,6 +938,7 @@ bool Value::operator==(const Value& o) const {
     case PinType::int64: return i == o.i;
     case PinType::enumeration: return i == o.i;
     case PinType::callback: return !call == !o.call;  // (bound or not: what it calls, a call says)
+    case PinType::object: return i == o.i && world == o.world;
     default: break;
   }
   if (element_of(type) == PinType::structure) {
@@ -1737,6 +1775,7 @@ json::Value graph_to_json(const Graph& g) {
       json::Value o = json::Value::object();
       o.set("name", f.name);
       if (f.pure) o.set("pure", true);
+      if (f.overrides) o.set("overrides", true);
       if (f.external) o.set("external", true);
       if (!f.remote.empty()) o.set("remote", f.remote);
       if (!f.from.empty()) o.set("from", f.from);
@@ -1862,7 +1901,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
   auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
     if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
-    if (is_keyed(type) || type == PinType::callback) {  // (a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
+    if (is_keyed(type) || type == PinType::callback || type == PinType::object) {  // (an object's: its class; a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
       of = v["of"].as_string();
       TypeRef t;
       return type_from_text(type_text({type, of}), g, t);
@@ -2007,6 +2046,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (f.name.empty() || f.name.size() > 64 + (f.from.empty() ? 0 : f.from.size() + 2)) return bad("a function needs a name (1-64 characters)");
     if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
     f.pure = v["pure"].as_bool();
+    f.overrides = v["overrides"].as_bool();
     f.external = v["external"].as_bool();
     f.remote = v["remote"].as_string();
     if (!f.remote.empty() && !f.external) return bad("function \"" + f.name + "\" has the name of another Blueprint's function, but is none of another Blueprint");
@@ -2214,10 +2254,10 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (f.name == s.fields[b].name) err(0, "struct \"" + s.name + "\" has two fields called \"" + f.name + "\"");
       if (f.type.type == PinType::exec || f.type.type >= PinType::count) { err(0, what + " has no type"); sound = false; }
       TypeRef named = f.type;  // (what names a type of the Blueprint: of a map its values, of a set its keys)
-      if (is_keyed(f.type.type) || f.type.type == PinType::callback) {
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback || f.type.type == PinType::object) {
         TypeRef sure;
         if (!type_from_text(type_text(f.type), g, sure)) { err(0, what + " is " + type_text(f.type) + ", which this Blueprint cannot have"); sound = false; continue; }
-        if (f.type.type == PinType::callback) continue;
+        if (f.type.type == PinType::callback || f.type.type == PinType::object) continue;
         named = f.type.type == PinType::map ? value_type(f.type) : key_type(f.type);
       }
       if (element_of(named.type) == PinType::enumeration && !g.enumeration(named.of)) { err(0, what + " is of the enum \"" + named.of + "\", which this Blueprint does not have"); sound = false; }
@@ -2235,7 +2275,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   // What is of an enum's or a struct's type names one the Blueprint has, and its default holds
   // values of the enums only.
   auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
-    if (is_keyed(type) || type == PinType::callback) {
+    if (is_keyed(type) || type == PinType::callback || type == PinType::object) {
       TypeRef sure;
       if (!type_from_text(type_text({type, of}), g, sure)) { err(0, what + " is " + type_text({type, of}) + ", which this Blueprint cannot have"); return; }
       held_ok(0, what, Value::from_json(value, type, g, of), {type, of}, 0);
@@ -2360,7 +2400,26 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (g.uses[o] == g.uses[k]) err(0, "the library \"" + g.uses[k] + "\" is used twice");
   // The object of an interface of the engine (Graph::implements): the engine calls its functions of the names of the
   // interface's - each with the inputs and outputs of the interface's function (its node's after the object), every
-  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"). Which of its functions the engine calls,
+  // the Blueprint says (Function::overrides) - a name alone decides nothing: a function of an interface's name that does
+  // not say so, and one that says so the interface has not (a typo), are errors; one the interface has that the
+  // Blueprint has not is said too - the interface's own runs there.
+  if (g.implements.empty()) {
+    for (const Function& f : g.functions)
+      if (f.overrides) err(0, "function \"" + f.name + "\" overrides a function of an interface of the engine (KERN_OVERRIDE), but the Blueprint implements none (kern::Implements<...>)");
+  } else if (const EngineInterface* const i = engine_interface(g.implements)) {
+    std::string names;
+    for (const EngineVirtual& v : i->functions) names += (names.empty() ? "" : ", ") + std::string(v.name);
+    for (const Function& f : g.functions) {
+      const bool there = std::any_of(i->functions.begin(), i->functions.end(), [&](const EngineVirtual& v) { return f.name == v.name; });
+      if (f.overrides && !there) err(0, "function \"" + f.name + "\" overrides " + g.implements + "::" + f.name + ", which " + g.implements + " has not (it has " + names + ")");
+      if (!f.overrides && there && f.from.empty() && !f.external)
+        err(0, "function \"" + f.name + "\" has the name of " + g.implements + "::" + f.name + " but does not say that it overrides it: KERN_OVERRIDE (the engine calls it), or another name");
+    }
+    for (const EngineVirtual& v : i->functions)
+      if (!v.pure && !*v.waits && !g.function(v.name))
+        warn(0, "it implements " + g.implements + " without " + v.name + ": the interface's own runs there (" + v.node + ")");
+  }
   if (!g.implements.empty()) {
     const EngineInterface* const i = engine_interface(g.implements);
     if (!i) {
@@ -3836,12 +3895,43 @@ bool Runtime::has_blueprint(ActorRef target) {
   return i && !i->disabled_;
 }
 
-i64 Runtime::engine_object(ActorRef target) {
+ObjectRef Runtime::engine_object(ActorRef target, std::string_view interface, std::string& why) {
+  why.clear();
   Instance* i = find(target);
-  if (!i || i->disabled_) return 0;
-  if (i->engine_object_ == 0)
-    if (EngineObjects* objects = host_.engine_objects()) i->engine_object_ = engine_implement(*objects, *i);
+  const std::string on = target ? (i ? "the Blueprint " + i->name() : "actor " + std::to_string(target)) : std::string("the Level");
+  if (!i || i->disabled_) {
+    why = on + " has no Blueprint that runs";
+    return {};
+  }
+  const std::string& implements = i->graph().implements;
+  if (implements.empty()) {
+    why = on + " implements no interface of the engine (" + std::string(interface) + " was asked for)";
+    return {};
+  }
+  if (implements != interface) {
+    why = on + " implements " + implements + ", not " + std::string(interface);
+    return {};
+  }
+  if (i->engine_object_.valid()) return i->engine_object_;
+  EngineObjects* const objects = host_.engine_objects();
+  if (!objects) {
+    why = "this host has no objects of the engine - " + on + " cannot be one";
+    return {};
+  }
+  const i64 handle = engine_implement(*objects, *i);
+  if (!handle) {
+    why = "this build has no interface " + implements + " (the part of the engine that declares it is not linked)";
+    return {};
+  }
+  i->engine_object_ = objects->ref(handle);
   return i->engine_object_;
+}
+
+ObjectRef Runtime::engine_object(const Instance& caller, ActorRef target, std::string_view interface) {
+  std::string why;
+  const ObjectRef r = engine_object(target, interface, why);
+  if (!r.valid()) host_.error(caller.name() + ": Engine Object of Blueprint: " + why);
+  return r;
 }
 
 void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {

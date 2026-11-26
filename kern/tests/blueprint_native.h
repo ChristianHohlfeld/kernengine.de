@@ -1146,6 +1146,9 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
       break;
+    case PinType::object:  // (no object, and one of a world: what a caller hands over - the class takes it as it is)
+      r = {Value::object({}), Value::object({7, 2})};
+      break;
     case PinType::enumeration:
       for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
       break;
@@ -1299,9 +1302,10 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
     if (d->kind != logic::NodeKind::pure || std::find(of_the_game.begin(), of_the_game.end(), d->type) != of_the_game.end()) continue;
-    // (what another actor's Blueprint holds or whether there is one asks the runtime the class runs in - a class
-    // called by itself has none: the tier case on_actor plays them, in every stage, as the engine runs them)
-    if (d->type == "func.get_on" || d->type == "func.has_blueprint") continue;
+    // (what another actor's Blueprint holds, whether there is one and the object of the engine it is ask the runtime the
+    // class runs in - a class called by itself has none: the tier case on_actor plays them, in every stage, as the
+    // engine runs them)
+    if (d->type == "func.get_on" || d->type == "func.has_blueprint" || d->type == "func.engine_object") continue;
     std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
     if (d->type == "math.formula") {
       variants.clear();
@@ -1518,7 +1522,7 @@ struct EnginePlaces : kern::Blueprint {
 // an App with start, update (a struct of the engine) and stop. Called by the names of the interface's functions, as the
 // engine's adapter calls them (engine_interface_a_blueprint_implements plays them through the adapters).
 inline const char* kImplementsWater = R"kn(
-struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   // ---- variables ----
   Float Time = 0.25;
   Int Program = 0;
@@ -1527,20 +1531,20 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 
   // ---- functions ----
   struct nameResult { Text result = ""; };
-  KERN_PURE nameResult name() {
+  KERN_OVERRIDE KERN_PURE nameResult name() {
     return {"water"};
   }
 
   struct vertexResult { Text result = ""; };
-  KERN_PURE vertexResult vertex() {
+  KERN_OVERRIDE KERN_PURE vertexResult vertex() {
     return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
   }
 
-  void bind(Int program = 0) {
+  KERN_OVERRIDE void bind(Int program = 0) {
     Program = program;
   }
 
-  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+  KERN_OVERRIDE void frame_uniforms(Int cache = 0, Int renderer = 0) {
     Cache = cache;
     Frames += 1;
   }
@@ -1548,7 +1552,7 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
 )kn";
 
 inline const char* kImplementsGame = R"kn(
-struct Running : kern::Blueprint, kern::Implements<"App"> {
+struct Running : kern::Blueprint, kern::Implements<kern::App> {
   // ---- types ----
   KERN_STRUCT(Frame) {
     Float time = 0.0;
@@ -1564,17 +1568,17 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 
   // ---- functions ----
   struct startResult { Bool result = false; };
-  startResult start(Int engine = 0) {
+  KERN_OVERRIDE startResult start(Int engine = 0) {
     Engine = engine;
     return {true};
   }
 
-  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+  KERN_OVERRIDE void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
     Updates += 1;
     Last = frame.time;
   }
 
-  void stop(Int engine = 0) {
+  KERN_OVERRIDE void stop(Int engine = 0) {
     Stopped = true;
   }
 };
@@ -1583,7 +1587,7 @@ struct Running : kern::Blueprint, kern::Implements<"App"> {
 // A Blueprint as a transport of the engine (net::Transport): what the engine hands it through a pointer with a count
 // beside it is a list; what it writes through a reference and a pointer are outputs of the function.
 inline const char* kImplementsLoop = R"kn(
-struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+struct Loop : kern::Blueprint, kern::Implements<kern::net::Transport> {
   // ---- types ----
   KERN_STRUCT(net_Address) {
     Int64 id = Int64{0x0};
@@ -1596,12 +1600,12 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
 
   // ---- functions ----
   struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
-  KERN_PURE addressResult address() {
+  KERN_OVERRIDE KERN_PURE addressResult address() {
     return {net_Address{Int64{0x7}}};
   }
 
   struct sendResult { Bool result = false; };
-  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+  KERN_OVERRIDE sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
     Last = to;
     Bytes = bytes;
     Sent = list_length<U8>(data);
@@ -1609,7 +1613,7 @@ struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
   }
 
   struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
-  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+  KERN_OVERRIDE receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
     return {Bytes, Last, List<Int>{1, 2, 3}};
   }
 };
@@ -2001,6 +2005,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
   if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
+  if (t == PinType::object) return "kern::logic::Object<" + logic::engine_class_cpp(of) + ">";  // (an object of the engine: Object<kern::App>)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
@@ -2023,6 +2028,9 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
     case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
+    case PinType::object:  // (its handle and its world, as they are)
+      std::snprintf(b, sizeof b, "{kern::logic::ObjectRef{%lldLL, %uu}}", static_cast<long long>(v.i), static_cast<unsigned>(v.world));
+      return cpp_type(PinType::object, of) + b;
     case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
     case PinType::structure: {
       const logic::StructType* s = g ? g->structure(of) : nullptr;
@@ -2063,6 +2071,7 @@ inline std::string value_source(const Value& v) {
     case PinType::vector: return L + "vector(" + cpp_value(v) + ")";
     case PinType::text: return L + "text(" + cpp_value(v) + ")";
     case PinType::actor: return L + "actor(" + std::to_string(v.a) + "u)";
+    case PinType::object: return L + "object(kern::logic::ObjectRef{" + std::to_string(v.i) + "LL, " + std::to_string(v.world) + "u})";
     case PinType::enumeration: return L + "enumeration(" + std::to_string(v.i) + ")";
     case PinType::structure: return v.rows ? rows("structure") : L + "zero(kern::logic::PinType::structure)";
     case PinType::structure_list: return rows("structures");

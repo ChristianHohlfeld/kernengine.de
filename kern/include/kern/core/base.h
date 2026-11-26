@@ -31,6 +31,12 @@
 /// call to the next with nothing else changed. Its node says so (tools/engine_api.py: EngineFunction::clock) -
 /// a test that plays a program twice does not expect it to give the same twice.
 #define KERN_CLOCK
+/// KERN_PLACE before a method of an object of the engine that gives a reference to something the object holds
+/// (`KERN_PLACE std::vector<ShotEvent>& shots() { return shots_; }`): its node is a place of the engine - it binds that
+/// place, and the nodes of places work there, not on a copy (kern/docs/blueprint_cpp.md, "Plätze der Engine"). Only
+/// what says so is one: tools/engine_api.py stops with the place and the reason where one that says so cannot be one
+/// (its body does more than look the member up, the reference is const, it takes more than an index).
+#define KERN_PLACE
 
 namespace kern {
 

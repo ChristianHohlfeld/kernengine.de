@@ -75,7 +75,11 @@ enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set,
   /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
-  callback, count
+  callback,
+  /// An object of the engine (kern/docs/engine_object.md): Object<I> - TypeRef::of names its class or interface
+  /// by the rule of the engine's names in Blueprints (kern::App: "App", kern::physics::World: "physics_World").
+  /// Its value is an ObjectRef: a handle in the objects of one world and that world - never a number.
+  object, count
 };
 constexpr u8 kValueTypes = 9;  // boolean ... int64
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
@@ -87,10 +91,15 @@ constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinT
 /// The names of the pin types, in the order of PinType.
 inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
                                                      "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
-                                                     "map",       "set",      "callback"};
+                                                     "map",       "set",      "callback",   "object"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
+/// A class of the engine as a Blueprint names it - the one rule of the engine's names (kern/docs/engine_object.md):
+/// its C++ name under kern::, "::" written "_". kern::App is "App", kern::physics::World "physics_World".
+std::string engine_class_name(std::string_view cpp);
+/// The C++ name of a class of the engine a Blueprint names: "physics_World" is "kern::physics::World".
+std::string engine_class_cpp(std::string_view name);
 /// The type with that name (also "number", "double", "boolean", "integer", "string").
 constexpr bool pin_type_from_name(std::string_view name, PinType& out) {
   for (u32 i = 0; i < static_cast<u32>(PinType::count); ++i)
@@ -154,6 +163,37 @@ struct ActorHandle {
   bool operator==(const ActorHandle&) const = default;
 };
 
+/// The number of a world: of one collection of objects of the engine (EngineObjects::world) - of a GameWorld, of a
+/// program's runtime. 0 is none. A reference to an object of the engine or (kern/docs/engine_object.md) to an actor
+/// says in which world it is: looked up in another one, it names nothing - and says so.
+using WorldId = u32;
+
+/// An object of the engine as a Blueprint holds it (PinType::object, Object<I> in its C++): its handle in the
+/// objects of its world, and that world. Which class it is of says its type (TypeRef::of), not the value.
+/// {0, 0} is no object - what a variable of the type starts as; nothing that fails gives anything else
+/// without saying why (kern/docs/engine_object.md).
+struct ObjectRef {
+  i64 handle = 0;
+  WorldId world = 0;
+  constexpr bool valid() const { return handle != 0 && world != 0; }
+  friend constexpr bool operator==(ObjectRef, ObjectRef) = default;
+};
+/// An object of the engine of the class I in a Blueprint's class: Object<kern::App> (I is the engine's C++ type, a
+/// tag only - nothing of it is used). Object<I>{} is none; no number becomes one (kern/docs/engine_object.md).
+/// The C++ name of a type, as the compiler spells it ("kern::App") - how a Blueprint's class names the class of
+/// an Object<I> it asks for (engine_class_name makes the Blueprint's name of it).
+template <class T> constexpr std::string_view cpp_name_of() {
+  constexpr std::string_view f = __PRETTY_FUNCTION__;  // (gcc and clang: "... [with T = kern::App; ...]" / "... [T = kern::App]")
+  constexpr std::size_t at = f.find("T = ") + 4;
+  constexpr std::size_t end = f.find_first_of(";]", at);
+  return f.substr(at, end - at);
+}
+template <class I> struct Object {
+  ObjectRef ref;
+  constexpr bool valid() const { return ref.valid(); }
+  friend constexpr bool operator==(const Object&, const Object&) = default;
+};
+
 /// The key of an entry of a map or a set, as the interpreter holds it: a whole number (Int, the
 /// place of an enum's value, Bool as 0 or 1) or a text.
 /// (A map holds keys of one type: a whole number or a text, never both.)
@@ -213,6 +253,8 @@ struct Value {
   Vec3 v;
   std::string s;
   ActorRef a = 0;
+  /// The world of an object of the engine (PinType::object: `i` is its handle there - ObjectRef). 0 otherwise.
+  WorldId world = 0;
   /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
   /// whoever changes one (edit) changes its own.
   std::shared_ptr<const ListItems> list;
@@ -232,6 +274,10 @@ struct Value {
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// An object of the engine (none: ObjectRef{}).
+  static Value object(ObjectRef x) { Value r; r.type = PinType::object; r.i = x.handle; r.world = x.world; return r; }
+  /// What an object of the engine refers to; of a value of another type: none (no number becomes an object).
+  ObjectRef as_object() const { return type == PinType::object ? ObjectRef{i, world} : ObjectRef{}; }
   /// An Int64: its 64 bits (held in `i`, as they are).
   static Value int64(u64 bits) { Value r; r.type = PinType::int64; r.i = static_cast<i64>(bits); return r; }
   /// A value of an enum: its place among the enum's values (the first is 0).
@@ -578,6 +624,10 @@ struct Function {
   /// setting "scope" (the function); two functions may each have a local of one name.
   std::vector<FunctionPin> locals;
   bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of the interface of the engine the Blueprint implements (Graph::implements): the engine calls it, in
+  /// place of the interface's own. Said, not guessed from the name: check refuses a function of an interface's name
+  /// without it and one with it the interface has not. In the Blueprint's C++: KERN_OVERRIDE void update(...).
+  bool overrides = false;
   /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
@@ -640,10 +690,12 @@ struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
-  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
-  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
-  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
-  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  /// The interface of the engine this Blueprint is the object of, by the one rule of the engine's names
+  /// (engine_class_name: kern::ShaderExtension is "ShaderExtension", kern::net::Transport "net_Transport"; empty:
+  /// none) - the engine calls its functions that say they override one of the interface's (Function::overrides;
+  /// kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a
+  /// running one). In C++ the type itself, the last base:
+  ///   struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... KERN_OVERRIDE Text vertex() ... };
   std::string implements;
   bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
@@ -868,6 +920,9 @@ struct ParamDef {
   /// Kind::type with `widths` and `with_lists`: a single Int of a width too - the values of a map (Map<Int, U8>: the
   /// map is the place, a value it gives is what it holds)
   bool width_values = false;
+  /// Kind::choice: the setting names a class (an interface) of the engine by the rule of the engine's names
+  /// ("App", "physics_World"). In a Blueprint's C++ it is that C++ type: func_engine_object<kern::App>(...).
+  bool engine_class = false;
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.
@@ -1533,7 +1588,7 @@ class Instance {
   int active_ = 0;                    // chains of this instance that are running (nested: events, calls)
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
-  i64 engine_object_ = 0;   // (the object of the engine it is, once asked for: Runtime::engine_object)
+  ObjectRef engine_object_;   // (the object of the engine it is, once asked for: Runtime::engine_object)
   bool begun_ = false;
   bool ended_ = false;                // End Play has run (Runtime::end, remove)
 };
@@ -1609,12 +1664,16 @@ class Runtime {
   /// Has Blueprint: does `target` (0: the Level) have a Blueprint that runs - one without errors that
   /// has not been stopped? What Call on Actor and Get Variable on Actor reach when it has one.
   bool has_blueprint(ActorRef target);
-  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` (0: the Level's) is - of the
-  /// interface its graph implements (Graph::implements: App, ShaderExtension ...) - as its handle in the host's
-  /// objects (Host::engine_objects), which own it; made once per Blueprint, the same handle every time. 0: no
-  /// Blueprint that runs there, it implements none, the host has no objects of the engine or this build no adapter
-  /// of the interface (engine_implement). What the engine is handed where it takes such an object (App::extensions).
-  i64 engine_object(ActorRef target);
+  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` (0: the Level's) is as the
+  /// interface `interface` (a name by the rule of the engine's names: "App", "ShaderExtension") - in the host's
+  /// objects (Host::engine_objects), which own it; made once per Blueprint, the same every time
+  /// (kern/docs/engine_object.md). None, and `why` says which: no Blueprint that runs there, it implements no
+  /// interface or another one, the host has no objects of the engine, or this build has no adapter of the interface
+  /// (engine_implement). What the engine is handed where it takes such an object (App::extensions).
+  ObjectRef engine_object(ActorRef target, std::string_view interface, std::string& why);
+  /// The same for the node (in every tier): what fails is told to the host - "<caller>: Engine Object of
+  /// Blueprint: <why>" - and gives none.
+  ObjectRef engine_object(const Instance& caller, ActorRef target, std::string_view interface);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.
