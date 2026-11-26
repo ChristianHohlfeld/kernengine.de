@@ -16,6 +16,7 @@
 #include "kern/game/embedded.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
+#include "kern/logic/engine_libraries.h"
 #include "kern/logic/logic.h"
 
 namespace kern::test {
@@ -131,10 +132,17 @@ inline const kern::json::Value* level_document(const std::string& path, std::str
   if (!at->second.first && why) *why = at->second.second;
   return at->second.first.get();
 }
-/// The Blueprint called `name` - one of the project's (the program's) or that of an actor of that name in one of the
-/// project's levels -, read from the embedded texts (false: none has one of that name, or two levels have one - `error`
-/// says which). A name stands once, in the project or in a level (kern/docs/project.md 5.).
+inline const kern::logic::Graph* blueprint_of(std::string_view actor, std::string* error = nullptr);
+/// The Blueprint called `name` - a library of the engine (kern/logic/engine_libraries.h: a name of the engine is the
+/// engine's), one of the project's (the program's) or that of an actor of that name in one of the project's levels -,
+/// read from the embedded texts as a level is read (graph_from_level_json, then hold_engine: what it uses of the engine's
+/// libraries, given again). False: none has one of that name, two levels have one, or it does not read - `error` says
+/// which. A name stands once, in the project or in a level (kern/docs/project.md 5.).
 inline bool read_blueprint(std::string_view name, kern::logic::Graph& out, std::string& error) {
+  if (const kern::logic::Graph* engine = kern::logic::engine_library(name)) {
+    out = *engine;
+    return true;
+  }
   std::string why;
   const kern::game::Project* p = project(&why);
   if (!p) {
@@ -166,7 +174,9 @@ inline bool read_blueprint(std::string_view name, kern::logic::Graph& out, std::
       break;
     }
   }
-  if (found) return kern::logic::graph_from_json(*found, out, &error);
+  if (found)
+    return kern::logic::graph_from_level_json(*found, out, &error) &&
+           kern::logic::hold_engine(out, [](std::string_view n) { return blueprint_of(n, nullptr); }, &error);
   std::string levels;
   for (const std::string& path : p->levels) levels += (levels.empty() ? "" : ", ") + path;
   error = "neither the project " + p->name + " nor its levels (" + (levels.empty() ? "none" : levels) + ") have a Blueprint \"" + std::string(name) + "\"";
@@ -178,7 +188,7 @@ namespace kern::test {
 
 /// The Blueprint of this name (read_blueprint), read once for all the tests (null: there is none of that name, and
 /// `error` says why).
-inline const kern::logic::Graph* blueprint_of(std::string_view actor, std::string* error = nullptr) {
+inline const kern::logic::Graph* blueprint_of(std::string_view actor, std::string* error) {
   static std::map<std::string, std::pair<std::unique_ptr<kern::logic::Graph>, std::string>, std::less<>> known;
   auto at = known.find(actor);
   if (at == known.end()) {

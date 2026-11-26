@@ -2332,3 +2332,65 @@ Was das Spiel gibt, ist nur sein eingebettetes Projekt (mit seinen Levels) und d
 beantworten (sonst der Stellvertreter, der jeden Aufruf aufschreibt); `KERN_COST_WHERE=<funktion>` zeigt, wo Quelle und
 Klasse Speicher verlangen. Beispiel eines zweiten Spiels: `kern/games/murmel/tests/convert.sh` (wandelt die App um, baut
 die Vergleichstests und fährt sie gegen Stellvertreter und Engine).
+
+#### Der zweite Durchgang: gegen die Quelle, wie C++ sie rechnet
+
+Mit `KERN_TEST_SOURCE_NUMBERS=1` schreibt der Konverter zu jedem Blueprint einen zweiten Test, `test_<x>_source.cpp`. Dort
+steht die Quelle so, wie sie ist: `f32` bleibt `f32`, `1.0f` bleibt `1.0f`, und die Typen sind die der Engine (`kern::Vec3` …).
+Der erste Test bleibt unverändert und entscheidet wie bisher, was geschrieben wird und was wartet. Der zweite ändert daran
+nichts. Ein Stück der Quelle, das dort nicht kompiliert, fehlt nur in diesem Test, und das Protokoll zählt es
+(„not compared with the source's own numbers“). Jede Funktion, die in einem Test abweicht, bekommt eine Zeile
+`off: <funktion>: n of m calls differ; the largest difference d (Aufruf: Stelle: Quelle, Blueprint)`.
+`tools/source_numbers.py <testordner> <ausgabe der tests>` sagt dann je Funktion: geschrieben; verglichen wie bisher:
+gleich/abweichend; verglichen mit der Quelle, wie sie ist: gleich, abweichend in n von m Aufrufen (größte Abweichung) oder
+nicht verglichen. Am Ende stehen die Summen. Gebaut und gefahren werden die Tests mit `tools/converter_cases/compare.sh`
+(Fälle `numbers_*` in `tools/converter_cases/run.sh`, die Probe der CI mit `source_numbers=1`). Solange die Zahl-Typen der
+Sprache nicht die des Teilsatzes sind (Abschnitt „Zahlen“), ist der zweite Durchgang eine Messung und kein Tor.
+
+## Zahlen (Entwurf – nicht gebaut; Stufe 1 = der zweite Durchgang oben)
+
+Bitgenau heißt: Der Blueprint rechnet, was C++ rechnet. Nichts wird umgedeutet oder gerundet, was die Quelle nicht selbst
+tut. Die Sprache bekommt dafür die Zahl-Typen des Teilsatzes (bool, i8 … i64, u8 … u64, f32, f64) als Pin-Typen. Jede
+Umwandlung, die clang in der Quelle hat (ImplicitCastExpr), wird ein sichtbarer Knoten. Der ganze Weg in Stufen steht im
+Entwurf des Besitzers. Hier stehen die Regeln, die für jede Stufe gelten.
+
+### Verhalten, das C++ nicht festlegt, ist ein Fehler des Konverters
+
+Wo die Quelle etwas tut, dessen Ergebnis C++ offenlässt (undefiniertes Verhalten), schreibt der Konverter keinen Blueprint
+mit einem stillen Ersatzwert. Er meldet einen Fehler mit Datei, Zeile und Grund. Die Quelle wird dann richtig gemacht
+(ein eigener Commit mit Test), oder sie sagt ausdrücklich, was sie will (`wrap_add`, `std::clamp` vor der Umwandlung …).
+Das gilt für:
+- Überlauf vorzeichenbehafteter Ganzzahlen (`i32`/`i64` `+ - *`, `-INT_MIN`, `INT_MIN / -1`). Vorzeichenlose brechen
+  definiert um, die bleiben.
+- Float → Int außerhalb des Bereichs des Zieltyps, und NaN → Int. Heute legt `logic::whole` 0 und die Enden fest; das
+  bleibt das Verhalten des Knotens, aber eine Quelle, die dorthin kommen kann, ist zu melden.
+- Ganzzahl-Division und Modulo durch 0. Heute gibt der Knoten 0 (`math::div`), und der Test vergleicht einen solchen
+  Aufruf nicht (`g_open`).
+- Schieben um die Breite oder mehr, um eine negative Zahl, und Linksschieben einer negativen Zahl.
+- Zugriff außerhalb einer Liste (heute: der Test vergleicht den Aufruf nicht, `g_open`).
+Was sich nicht vorher ausschließen lässt (ein Wert aus einer Eingabe), meldet der Konverter als Warnung mit Ort, und der
+Vergleichstest zählt die Aufrufe, die dorthin kommen („in n the source left what C++ defines“), statt sie still auszulassen.
+Float-Division durch 0 ist kein solcher Fall: IEEE 754 legt Inf/NaN fest, und clang hält sich daran.
+
+### Determinismus der Fließkomma-Rechnung
+
+Eine Rechnung muss in allen Stufen dieselben Bits geben: nativ, im Interpreter, im JIT (Wasm im Browser), in der Klasse,
+nativ und in Wasm gebaut. Stand 26.11.2026, jeweils mit Beleg:
+
+| Regel | heute | Beleg |
+|---|---|---|
+| Zwischenwerte ohne höhere Genauigkeit (FLT_EVAL_METHOD 0) | gilt: x86-64 (SSE) und wasm32 rechnen `float` in 32 und `double` in 64 Bit. Aber: die Sprache rechnet jede Zahl in f64. Ein `f32`-Ausdruck der Quelle wird also in 64 Bit gerechnet und erst am Platz gerundet: das ist ein anderes Ergebnis | Fall `numbers_f32` (175 von 300 Aufrufen), Murmel `punkte` |
+| Keine FMA-Kontraktion (`-ffp-contract=off`) | gilt in jedem Bau, der Code erzeugt: `kern/build.sh` (C und C++, nativ und Wasm), `kern/tools/build_native.sh`, `kern/tests/run.sh`, `kern/games/spawncity/tests/run_tests.sh`, `kern/games/murmel/tests/engine.sh`, `tools/blueprint_cpp.sh`, `kern/tools/lehrer.sh`, `tools/converter_cases/compare.sh`, die Prüfung des Konverters (`-fsyntax-only`). Der JIT schreibt einzelne `f64.mul`/`f64.add`, und Wasm hat kein FMA ohne relaxed-simd | `grep -rn ffp-contract` |
+| Auswertungsreihenfolge wie die Quelle | die Formel-Knoten bilden den Baum von clang nach. Zu prüfen ist, wo der Konverter zusammenfasst (Formel-Lambdas, `math_compare`) | – |
+| sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log10, pow, hypot: dieselbe Funktion überall | **die Sprache: ja** (`kern::dm` = musl_math, auch die f-Varianten, gleich gebaut für alle Ziele; Knoten in `nodes.h` `math::sin` … rufen `dm::` in f64). **Die Quelle: nein** – SpawnCity ruft `std::sin` (197-mal), `std::atan2` (123), `std::hypot` (239) …, `kern::dm` nie. Nativ ist das die libm des Systems (glibc), in Wasm die von wasi-libc. Quelle und Blueprint rufen also verschiedene Funktionen, und nativ und Wasm geben im letzten Bit verschiedene Werte | `grep -c "std::sin(" kern/games/spawncity/src/*` ; `kern/include/kern/core/dmath.h` |
+| Fehlende Funktionen in musl_math | sinh, cosh, tanh, asinh, acosh, atanh, log2, exp2 (nur Tabelle `exp2f_data.c`), log1p, cbrt, ldexp – jeweils f und d. Der Konverter schreibt sie heute als Formeln aus exp/log/pow (`converted::wide::tanh_bp` …): das ist eine andere Funktion als `std::tanh` | `ls kern/third_party/musl_math/src` |
+| sqrt, fabs, floor, ceil, trunc, fmod, remainder, copysign | IEEE-genau, überall gleich (`std::`). Aber der JIT weicht ab: `math.mod` rechnet `a - trunc(a/b)*b` statt `fmod` (für große a/b nicht genau), `math.round` rechnet `copysign(floor(abs(a)+0.5), a)` statt `std::round` (falsch bei 0.49999999999999994 und nahe 2^52) | `kern/src/logic/codegen.cpp` Z. 276-283 |
+| NaN und −0 | der Interpreter nimmt `min_of/max_of` (`b < a ? b : a`), der JIT `f64.min/f64.max` von Wasm (NaN gewinnt, −0 < +0). Für NaN und ±0 geben die zwei Stufen verschiedene Werte. Der Vergleichstest sieht es nicht, denn ein Ergebnis mit NaN/Inf gilt als „left the numbers“ und wird nicht verglichen (`converted::defined`) | `codegen.cpp` Z. 266-267, `kern/core/base.h` `min_of` |
+| f32-Knoten | fehlen (Stufe 3): ein f32-Knoten rechnet in f32 und ruft die f-Funktion von musl (`sinf` …), nicht f64 mit Rundung am Ende | – |
+
+Daraus folgt für die Stufen: (1) Die Quelle eines Programms ruft die Mathematik der Engine (`kern::dm`/`kern::math`) oder
+der Konverter bildet `std::sin` auf genau die musl-Funktion ab. Und nativ wie in Wasm wird dieselbe musl gelinkt, nicht
+die libm des Systems. (2) musl_math bekommt die fehlenden Funktionen (aus musl, gleich gebaut). (3) Der JIT nimmt für mod,
+round, min und max dieselbe Rechnung wie Interpreter und Klasse (oder ruft deren C++-Funktion). Ein Engine-Test vergleicht
+die Stufen an den Rändern: ±0, NaN, ±Inf, 0.5-Grenzen, 2^52 und große Quotienten. (4) Der Vergleichstest vergleicht auch NaN
+und Inf bitgenau, statt solche Aufrufe auszulassen.

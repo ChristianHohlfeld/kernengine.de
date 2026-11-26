@@ -64,6 +64,10 @@
 #   views.cpp views of the program's own and the engine's: kern::Span<const f32> and const f32* (to read) are inputs by
 #             value, handed an array of a fixed length, a list, a pointer into a list - both in one program; kern::Span<f32>
 #             (to write through) is a reference input. A range-for over a view only reads: sum_of is a value.
+#   numbers_same.cpp, numbers_f32.cpp, numbers_sum.cpp, numbers_i64.cpp  the second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1:
+#             the source as C++ computes it): each case's tests are built and run (compare.sh, tools/source_numbers.py). numbers_same
+#             (u32 that wraps, u64) is right; the other three are expected red until the number types of the language are the
+#             subset's (f32 intermediate, f32 sum of 1/60 against a threshold, long long past 2^53) - one of them right is a fault of the list.
 # Each case is a program of its own, its Blueprints read into a project and a level of their own, as a game's are:
 # the engine's reader refuses what is wrong (a function read as a value that changes something, an export in a level).
 set -euo pipefail
@@ -79,7 +83,7 @@ convert() {   # convert <case> [<file> ...]: the case's program (its files), con
   for f in "$@"; do cp "$here/$f.h" "$here/$f.cpp" "$out/src/"; files+=("src/$f.cpp"); done
   echo '{"name":"Cases","nextId":1,"actors":[]}' > "$out/cases.klevel"
   echo '{"format":"kern-project","version":1,"name":"Cases","levels":["cases.klevel"],"startLevel":"cases.klevel","blueprints":[]}' > "$out/cases.kproject"
-  (cd "$out" && FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
+  (cd "$out" && KERN_TEST_SOURCE_NUMBERS="${SOURCE_NUMBERS:-}" FUNCTIONS=1 python3 "$root/tools/cpp_to_blueprint.py" --convert cases --folder Cases -I"$root/kern/include" -I"$root/kern/third_party/box3d/include" -Isrc \
      --level "$out/cases.klevel" --project "$out/cases.kproject" --test "$out/pt/converted" --texts "$out/texts" -- "${files[@]}" > "$out/convert.log" 2>&1) \
     || { grep -v '^round' "$out/convert.log" | tail -20; echo "FAIL $1: the converter"; fail=1; return; }
   if grep -q "the Blueprints were not read" "$out/convert.log" || [ "$(cat "$out/cases.klevel" "$out/cases.kproject" | grep -c '"logic"')" = 0 ]; then
@@ -238,6 +242,35 @@ if out=$("$root/tools/blueprint_cpp.sh" --apply "$top/program/refuses.klevel" --
   echo "FAIL program: a level refuses an export"; fail=1
 elif echo "$out" | grep -q 'is an export (case_score) - exports belong to the program'; then echo "ok   program: a level refuses an export (with the reason)"
 else echo "FAIL program: a level refuses an export, with the reason: $out"; fail=1; fi
+
+# ---- the numbers of the source (kern/docs/blueprint_cpp.md "Zahlen"): the second pass of the comparison ----
+# Converted with KERN_TEST_SOURCE_NUMBERS=1, a case has two tests: as always (the source with the numbers of the Blueprint
+# language) and test_<x>_source.cpp (the source as C++ computes it - f32 stays f32). They are built and run (compare.sh);
+# tools/source_numbers.py --right: every function written, compared in both passes, the same in both.
+# numbers_same (u32 that wraps, u64): right today - and it must stay so.
+right() {   # right <case>: the case's tests, built and run, say every function is written and the same in both passes
+  INCLUDES="-I$top/$1/src" "$here/compare.sh" "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/pt/converted" "$top/$1/built" > "$top/$1/compare.build" 2>&1 ||
+    { tail -20 "$top/$1/compare.build"; return 2; }
+  if grep -q "does not compile" "$top/$1/compare.build"; then grep "does not compile" "$top/$1/compare.build"; return 2; fi
+  python3 "$root/tools/source_numbers.py" "$top/$1/pt/converted" "$top/$1/built/compare.log" --right > "$top/$1/numbers.txt" &&
+    grep -qE '^([0-9]+) of \1 functions of the program are written' "$top/$1/convert.log"   # (and none waits)
+}
+SOURCE_NUMBERS=1 convert numbers_same
+logged numbers_same "both passes compare both functions" '^2 functions are compared once more with their source as C\+\+ computes it'
+if right numbers_same; then echo "ok   numbers_same: written, and the same as the source in both passes (u32 that wraps, u64)"
+else echo "FAIL numbers_same: written, and the same as the source in both passes"; cat "$top/numbers_same/numbers.txt" 2>/dev/null; fail=1; fi
+# Expected red until the number types of the language are the subset's (kern/docs/blueprint_cpp.md "Zahlen", Entwurf): what
+# the Blueprint computes is not what C++ computes - each case says where. Such a case that is right is a fault of this list
+# (red): the number types have come, and the case goes up to numbers_same.
+#   numbers_f32  an intermediate in f32 (a*b): the Blueprint computes it in 64 bit
+#   numbers_sum  an f32 sum of 1/60 against a threshold: past 1 after 60 frames in 64 bit, after 61 in f32
+#   numbers_i64  a long long past 2^53 (a Blueprint's Int is exact up to 2^53: the function waits)
+for c in numbers_f32 numbers_sum numbers_i64; do
+  SOURCE_NUMBERS=1 convert $c
+  if right $c; then echo "FAIL $c: expected red until the number types - but it is right: take it out of the list (to numbers_same)"; cat "$top/$c/numbers.txt"; fail=1
+  elif [ $? = 2 ]; then echo "FAIL $c: its tests do not build"; fail=1
+  else echo "ok   $c: expected red until the number types: $({ grep -m1 -P '^    \S+ \(\d+\): (?!written)' "$top/$c/convert.log" || grep -m1 -E 'differs|not compared' "$top/$c/numbers.txt"; } | sed 's/^ *//' | cut -c1-220)"; fi
+done
 
 python3 "$here/compiles.py" || fail=1
 python3 "$here/libraries.py" || fail=1

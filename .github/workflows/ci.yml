@@ -18,6 +18,9 @@ on:
       probe:
         description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job; 'all_program': every Blueprint as a class of the program, each file compiled (tools/all_program.sh)"
         default: ""
+      source_numbers:
+        description: "With probe: '1' = the second pass of the comparison too (KERN_TEST_SOURCE_NUMBERS=1: each Blueprint's test once more with the source's own numbers, test_<x>_source.cpp); the probe then starts from a level and a project without Blueprints, builds the tests it wrote and runs them (tools/converter_cases/compare.sh, tools/source_numbers.py)"
+        default: ""
       beleg:
         description: "Only the proof of one lowering in the form 'two builds': the driver tests/lowered/builds/<file> (e.g. 'game_town') - no other job (tests/lowered/BELEGE.md)"
         default: ""
@@ -57,6 +60,7 @@ jobs:
       - name: Convert
         env:
           SOURCES: ${{ inputs.probe }}
+          KERN_TEST_SOURCE_NUMBERS: ${{ inputs.source_numbers }}
         run: |
           W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts" "$W/keep"
           if [ "$SOURCES" = all_program ]; then  # (the whole game as classes: kern/games/spawncity/tools/all_program.sh)
@@ -66,6 +70,9 @@ jobs:
             tail -n 200 "$W/convert.log"; cp "$W/all/files.txt" "$W/texts/" 2>/dev/null; cp -r "$W/all/logs" "$W/all/link.log" "$W/all/run.log" "$W/all/refresh.log" "$W/all/web.log" "$W/texts/" 2>/dev/null; exit $rc
           fi
           cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"; cp kern/games/spawncity/level/spawncity.kproject "$W/pt/l.kproject"
+          if [ "$KERN_TEST_SOURCE_NUMBERS" = 1 ]; then   # (the tests are built: from a level and a project of no Blueprint but what this probe writes - the level's others may be older than the engine)
+            python3 -c "import json,sys; d=sys.argv[1]; l=json.load(open(d+'/l.klevel')); l['actors']=[]; json.dump(l,open(d+'/l.klevel','w')); p=json.load(open(d+'/l.kproject')); p['blueprints']=[]; p['levels']=['l.klevel']; p['startLevel']='l.klevel'; json.dump(p,open(d+'/l.kproject','w'))" "$W/pt"
+          fi
           cd kern/games/spawncity
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 TEST_KEEP="$W/keep" python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract --folder Source --classes level_blueprints.h \
@@ -73,6 +80,14 @@ jobs:
           rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"
           # (what the texts name of the engine's libraries that they do not have: tools/engine_api.py --check - its status itself, no pipe)
           python3 ../../../tools/engine_api.py --check "$W/texts"; echo "engine_api --check rc=$?"
+          if [ "$KERN_TEST_SOURCE_NUMBERS" = 1 ] && [ $rc = 0 ]; then   # (the tests it wrote, built and run: both passes, function by function)
+            game_sources=(); for f in src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || game_sources+=("$PWD/$f"); done
+            CASES_OBJ="$W/engine" KERN_JOBS=4 CLANGXX=clang++ INCLUDES="-I$PWD/src" ../../../tools/converter_cases/compare.sh "$W/pt/l.kproject" "$W/pt/l.klevel" "$W/pt/converted" "$W/built" "${game_sources[@]}"; echo "compare rc=$?"
+            grep -E "^(ok|FAIL) +converted_|^[0-9]+ tests," "$W/built/compare.log" | tail -n 80
+            grep -E "interp && native \||problems.empty\(\) \|" "$W/built/compare.log" | cut -c1-400 | head -n 20   # (a Blueprint that does not run in the test: why)
+            python3 ../../../tools/source_numbers.py "$W/pt/converted" "$W/built/compare.log" | tee "$W/texts/numbers.txt"
+            cp "$W/built/compare.log" "$W/texts/" 2>/dev/null
+          fi
           exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
         if: always()
@@ -106,7 +121,7 @@ jobs:
   converter-cases:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45   # (the cases of the numbers build their comparison tests with the engine)
     steps:
       - uses: actions/checkout@v4
       - name: Converter cases

@@ -3,7 +3,9 @@
 // zur nächsten Münze, dann ins Ziel. Der Lauf ist deterministisch; am Ende steht ein erwarteter Zustand (Level-Wechsel
 // im erwarteten Frame, Punkte, Töne, "Geschafft!"), und dieselbe Spur ergibt sich bei einem zweiten Lauf noch einmal.
 //
-//   murmel_test [--spur]     (--spur: jede Sekunde eine Zeile)
+//   murmel_test [--spur] [--ergebnis <datei>]   (--spur: jede Sekunde eine Zeile; --ergebnis: der Lauf als Text, Zeile
+//                                                für Zeile - die Spur, die Frames, Punkte, Töne, Widgets; tests/run.sh
+//                                                vergleicht ihn zwischen den Wegen)
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -139,7 +141,18 @@ void pruefe(bool ok, const char* was) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  const bool zeigen = argc > 1 && std::strcmp(argv[1], "--spur") == 0;
+  bool zeigen = false;
+  const char* ergebnis = nullptr;
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--spur") == 0) {
+      zeigen = true;
+    } else if (std::strcmp(argv[i], "--ergebnis") == 0 && i + 1 < argc) {
+      ergebnis = argv[++i];
+    } else {
+      std::printf("murmel_test: %s: unbekannt (--spur, --ergebnis <datei>)\n", argv[i]);
+      return 2;
+    }
+  }
   murmel::Murmel& spiel = murmel::spiel();
   pruefe(run(spiel, game::embedded_project()) == 0, "kern::run nimmt die App mit dem Projekt");
   // die Stände in einem Ordner für den Test, ohne Bestwert zu Beginn (kern/docs/app.md 5.)
@@ -175,6 +188,17 @@ int main(int argc, char** argv) {
   pruefe(a.erster_text.find("Bestwert 0") != std::string::npos, "der erste Lauf beginnt ohne Bestwert");
   pruefe(b.erster_text.find("Bestwert 65") != std::string::npos, "der Bestwert überlebt den Neustart (der Stand murmel beim Host)");
   pruefe(a.spur == b.spur && a.wechsel == b.wechsel && a.geschafft == b.geschafft, "der zweite Lauf ist derselbe");
+  // der Lauf als Text: tests/run.sh vergleicht ihn zwischen den Wegen
+  if (ergebnis) {
+    if (FILE* f = std::fopen(ergebnis, "w")) {
+      for (const std::string& z : a.spur) std::fprintf(f, "%s\n", z.c_str());
+      std::fprintf(f, "wechsel=%d geschafft=%d punkte=%.0f toene=%u\nanzeige=%s\nmitte=%s\nende=%s\nnach_wahl=%d %d\n", a.wechsel, a.geschafft, a.punkte,
+                   a.toene, a.text.c_str(), a.widgets_mitte.c_str(), a.widgets_ende.c_str(), a.nach_wahl_level, a.nach_wahl_fertig ? 1 : 0);
+      std::fclose(f);
+    } else {
+      pruefe(false, "die Datei des Ergebnisses ist zu schreiben");
+    }
+  }
   std::printf(fehler ? "murmel_test: %d Fehler\n" : "murmel_test: gut\n", fehler);
   return fehler ? 1 : 0;
 }
