@@ -121,6 +121,7 @@ writes anew.
 Needs clang++ (CLANGXX overrides the binary).
 """
 import collections
+import codecs
 import copy
 import io
 import itertools
@@ -408,30 +409,100 @@ def c_string(v):
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
-def run_clang(path, namespace, flags, name=False):
-    """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
-    between runs: a tree of another state of the sources is another tree). `name`: of the declarations whose
-    name has `namespace` in it, as it is (a function outside every namespace - see outside_dumps)."""
-    # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
-    # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
-    # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
-    # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", namespace if name else f"{namespace}::", *flags, path]
-    if STEADY:
-        cmd = ["setarch", "-R", *cmd]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0 and not r.stdout:
-        sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
-        return []
-    s = r.stdout
-    out, dec, i = [], json.JSONDecoder(), 0
+# Where the identity of a declaration comes from (kern/docs/blueprint_cpp.md, "Konverter: woher die Identität einer
+# Deklaration kommt"): a source file is read by ONE run of the compiler - one tree, the declarations of every namespace
+# in it (the program's, its further ones, the engine's, the file's own unnamed one, what stands outside every
+# namespace). clang names a node by its address; such a name is an identity only inside that one tree - two runs are
+# never matched by addresses (they would meet or not by chance: the length of a path moved them).
+def unit_dump(path, flags):
+    """The compiler's tree of a source file - one run, no filter -, as the declarations directly in the translation
+    unit: [(kind, name, object)] in their order, each annotated (annotate). What stands in a system header (the
+    standard library, the C library: a file outside the program's and the engine's folders) is passed over without
+    being read as JSON - only its last place is kept, as clang names a file only where it changes."""
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", *flags, path]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    start, end = "\n    {\n", "\n    }"
+    out, st = [], {"file": ""}
+    dec = codecs.getincrementaldecoder("utf-8")("replace")
+    def last_file(chunk):
+        # (the last place of the chunk that names its file: a location - "offset" on the line before -, not includedFrom)
+        at = len(chunk)
+        while True:
+            at = chunk.rfind('"file": "', 0, at)
+            if at < 0:
+                return None
+            line = chunk.rfind("\n", 0, at)
+            prev = chunk.rfind("\n", 0, line) if line > 0 else -1
+            stop = chunk.find("\n", at)
+            if line > 0 and stop > 0 and '"offset": ' in chunk[prev + 1:line]:
+                return json.loads(chunk[at + 8:stop].rstrip(","))
+    def system(file):
+        f = os.path.abspath(file) if file else ""
+        return bool(f) and not f.startswith((ROOT + os.sep, os.path.dirname(os.path.abspath(path)) + os.sep, os.getcwd() + os.sep))
+    def wanted(head):
+        # (where the child stands: the file of its own location - clang names it only where it changes)
+        a = head.find('\n      "loc": {')
+        b = head.find("\n      }", a + 1) if a >= 0 else -1
+        f = last_file(head[a:b + 1]) if a >= 0 and b > a else None
+        return not system(f or st["file"])
+    # (the children of the unit, one after another: each begins with "    {" and ends with "    }" at their indent -
+    # what is read is never searched again; a child passed over is not kept, only its last place)
+    TAIL = 1 << 12
+    buf, began, child, keep = "", False, None, None
     while True:
-        j = s.find("{", i)
-        if j < 0:
+        data = proc.stdout.read(1 << 22)
+        buf += dec.decode(data, final=not data)
+        if not began:
+            i = buf.find('\n  "inner": [')
+            if i < 0 and data:
+                continue
+            if i < 0:
+                break
+            buf, began = buf[i + len('\n  "inner": ['):], True
+        while True:
+            if child is None:
+                i = buf.find(start)
+                if i < 0:
+                    buf = buf[-len(start):]
+                    break
+                buf, child, keep, seen = buf[i + 1:], [], None, 0
+            if keep is None and (len(buf) >= TAIL or buf.find(end) >= 0):
+                keep = wanted(buf[:TAIL])
+            j = buf.find(end, max(0, seen - len(end)))
+            if j < 0:
+                if keep is False:   # (passed over: only where its places are)
+                    f = last_file(buf)
+                    if f is not None:
+                        st["file"] = f
+                    buf = buf[-TAIL:]
+                elif keep:
+                    child.append(buf[:-len(end)])
+                    buf = buf[-len(end):]
+                seen = len(buf)
+                break
+            piece, buf = buf[:j + len(end)], buf[j + len(end):]
+            if keep is False:
+                f = last_file(piece)
+                if f is not None:
+                    st["file"] = f
+            else:
+                child.append(piece)
+                o = json.loads("".join(child))
+                annotate(o, st)
+                out.append((o.get("kind"), o.get("name"), o))
+            child = None
+        if not data:
             break
-        o, i = dec.raw_decode(s, j)
-        out.append(o)
+    proc.wait()
+    if proc.returncode != 0 and not out:
+        sys.stderr.write(f"{path}: clang failed\n")
     return out
+
+
+def namespace_dumps(unit, space):
+    """What a tree (unit_dump) has in a namespace directly in the translation unit - each time it is opened -, as the
+    declarations in it."""
+    return [c for kind, name, o in unit if kind == "NamespaceDecl" and name == space for c in kids(o)]
 
 
 def exported_names(path):
@@ -444,35 +515,24 @@ def exported_names(path):
     return sorted(set(re.findall(r"\b" + ENGINE.upper() + r"_EXPORT\s*\(\s*([A-Za-z_]\w*)\s*\)", text)))
 
 
-def outside_dumps(path, flags):
-    """What a source file of the program has outside every namespace for its host: each function it exports
-    (C linkage: clang names it by its own name, unmangled), dumped by that name - the dump of a namespace does
-    not have it -, and the file's own unnamed namespace outside every namespace (what those functions use there,
-    `(anonymous namespace)::`, of this file only - a declaration a dump of the program's namespace has at the
-    same place is that one). Annotated (annotate)."""
+def outside_dumps(unit, path):
+    """What a source file of the program has outside every namespace for its host, from its tree (unit_dump): each
+    function it exports (C linkage: clang names it by its own name, unmangled), and the file's own unnamed namespace
+    outside every namespace (what those functions use there, `(anonymous namespace)::`, of this file only)."""
     names = exported_names(path) if not is_header(path) else []
     if not names:
         return []
     me, out = os.path.abspath(path), []
-    for name in names:
-        st = {"file": ""}
-        for o in run_clang(path, name, flags, name=True):
-            annotate(o, st)
-            if o.get("kind") == "FunctionDecl" and o.get("name") == name and o.get("mangledName") == name and os.path.abspath(o.get("_file") or "?") == me:
-                out.append(o)
-    st = {"file": ""}
-    for o in run_clang(path, "(anonymous namespace)", flags):
-        annotate(o, st)
-        mangled = o.get("mangledName")
-        if os.path.abspath(o.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
-            out.append(o)
+    for kind, name, o in unit:
+        for d in ([o] if kind == "FunctionDecl" else kids(o) if kind == "LinkageSpecDecl" else []):
+            if d.get("kind") == "FunctionDecl" and d.get("name") in names and d.get("mangledName") == d.get("name") and os.path.abspath(d.get("_file") or "?") == me:
+                out.append(d)
+    for c in namespace_dumps(unit, None):
+        mangled = c.get("mangledName")
+        if os.path.abspath(c.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
+            out.append(c)
     return out
 
-
-# (clang names a node by its address. With address randomization off the addresses are the same in
-# every run on the same source - the tree of the program and the tree of the engine it uses, dumped
-# by two runs, then name each other's nodes.)
-STEADY = subprocess.run(["setarch", "-R", "true"], capture_output=True).returncode == 0 if os.name == "posix" else False
 
 
 def unit_order(path, flags):
@@ -847,25 +907,16 @@ class Tree:
         self.path = os.path.abspath(path)
         self.namespace = namespace
         self.spaces = tuple(s for s in spaces if s != namespace)
-        self.dumps = run_clang(path, namespace, flags)
-        st = {"file": ""}
-        for o in self.dumps:
-            annotate(o, st)
-        # (the further namespaces of the program, each dumped as the engine's is: by its own name)
-        self.more = [(space, run_clang(path, space, flags) if STEADY else []) for space in self.spaces]
-        for _, dumps in self.more:
-            st = {"file": ""}
-            for o in dumps:
-                annotate(o, st)
-        if STEADY:
-            place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
-            had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
-            self.more.append(("", [o for o in outside_dumps(self.path, flags) if place(o) not in had]))
+        # (one run of the compiler, one tree: the program's namespace, its further ones, the engine's, what stands
+        # outside every namespace - see unit_dump)
+        self.unit = unit_dump(path, flags)
+        self.dumps = namespace_dumps(self.unit, namespace)
+        self.more = [(space, namespace_dumps(self.unit, space)) for space in self.spaces]
+        place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
+        had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
+        self.more.append(("", [o for o in outside_dumps(self.unit, self.path) if place(o) not in had]))
         # the engine the program is written against: its types and the functions its headers define
-        self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
-        st = {"file": ""}
-        for o in self.engine:
-            annotate(o, st)
+        self.engine = namespace_dumps(self.unit, ENGINE) if ENGINE and ENGINE != namespace else []
         self.texts = {}
         self.flags = flags
         self.layouts = None   # (see `layout`: the compiler's layouts of the records, read when one is asked for)
@@ -16307,27 +16358,19 @@ def objects_made(tree):
         visit(o, False)
     # (the program's entry, outside every namespace - `int kern_main() { static MyGame app; return kern::run(app); }`,
     # kern/app/run.h: the object made there is the program's one object of its App, as one in a function of the program)
-    for o in entry_dumps(tree.path, tree.flags):
+    for o in entry_dumps(tree):
         visit(o, False)
     return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
 
 
-def entry_dumps(path, flags):
+def entry_dumps(tree):
     """The program's entry `kern_main()` (kern/app/run.h), where this source file defines it - outside every namespace,
-    so the dump of the program's namespace does not have it: dumped by its name, annotated. [] where it has none."""
-    if is_header(path):
+    in the file's tree (unit_dump). [] where it has none."""
+    if is_header(tree.path):
         return []
-    try:
-        if not re.search(r"\bkern_main\s*\(\s*\)\s*\{", open(path, encoding="utf-8", errors="replace").read()):
-            return []
-    except OSError:
-        return []
-    me, out, st = os.path.abspath(path), [], {"file": ""}
-    for o in run_clang(path, "kern_main", flags, name=True):
-        annotate(o, st)
-        if o.get("kind") == "FunctionDecl" and o.get("name") == "kern_main" and os.path.abspath(o.get("_file") or "?") == me:
-            out.append(o)
-    return out
+    me = os.path.abspath(tree.path)
+    return [o for kind, name, o in tree.unit if kind == "FunctionDecl" and name == "kern_main" and os.path.abspath(o.get("_file") or "?") == me
+            and any(c.get("kind") == "CompoundStmt" for c in kids(o))]
 
 
 def engine_interface_of(tree, rec):
