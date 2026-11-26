@@ -202,7 +202,7 @@ logged actors "an Actor made of numbers waits, with the reason" '^ +made_of \([0
 logged actors "the five of Crowd are written and compared" '^5 functions of the Blueprints are compared'
 
 convert bytes
-check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at, length\)'
+check bytes "take_bytes is written, the view a copy of the host's bytes" yes 'list_copy_bytes<"u8", "u8">\(part, 0, data, data_at_i, num_cast<i64, u32>\(length\)\)'
 classes bytes "the classes compile: the glue hands the export the host's bytes as the list of its input (List<U8>)"
 
 convert table

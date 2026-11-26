@@ -4395,6 +4395,7 @@ class Emit:
         self.assigned_ids = assigned
         copies = []
         exported = export_name(d)
+        at_lines = []   # (an export's places as the language's i64: made first)
         # (a function of an interface of the engine the state implements - `void update(kern::Engine&, const kern::Frame&)
         # override` of an App: the engine calls it with values, in the order of its C++ parameters - Graph::implements)
         overrides = f.state and u.state in u.world.state_implements and any(x.get("kind") == "OverrideAttr" for x in d.get("inner", []))
@@ -4433,9 +4434,15 @@ class Emit:
                 aname = u.fresh(lname + "_at", self.taken)
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
-                f.params += [(lname, f"List<{entries}>"), (aname, IDX)]
+                # (an export's place is the u32 its C word `at` says - in the function the language's i64 of it)
+                f.params += [(lname, f"List<{entries}>"), (aname, "u32" if exported else IDX)]
                 f.kinds += ["", ""]
-                self.pointers[p["id"]] = (lname, aname, entries)
+                if exported:
+                    held = self.temp(aname + "_i", IDX)
+                    at_lines.append(f"{held} = {num_cast(IDX, 'u32', aname)};")
+                    self.pointers[p["id"]] = (lname, held, entries)
+                else:
+                    self.pointers[p["id"]] = (lname, aname, entries)
                 continue
             t = u.place(raw)
             # A reference of C++ is a reference input: the place the call names. T& - the function changes it
@@ -4517,6 +4524,7 @@ class Emit:
                 # stands: a field made as its class makes it)
                 inits[init["anyInit"]["id"]] = (e, e is not None and not (e.get("_at", (None,))[0] is not None and e["_at"][0] == here))
             lines += self.made_parts(self.tree.owner.get(d["id"]), self.self_name if f.ctor else None, inits, own=True)
+        lines += at_lines
         for p, name, t in copies:
             c = self.temp(name + "_", t, self.u.fixed(qtype(p)) if t.startswith("List<") else None)
             self.names[p["id"]] = c
@@ -15674,7 +15682,10 @@ class TestWriter:
         # (in the second pass a type of the engine is the engine's own - engine_record: the source names it as it is)
         own_types = "".join("|" + re.escape(q[len(ENGINE) + 2:]) + r"\b" for q in sorted([*tree.records, *tree.enums], key=len, reverse=True)
                             if q.startswith(ENGINE + "::") and (self.engine_record(q) or self.engine_record(q, ("enums",))))
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::|dm::" + own_types + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - as the source calls it)
+        # (what the engine's headers define that the source uses as it is - its containers and its vector mathematics: the
+        # engine's own in the test as in the program)
+        engine_own = "".join(f"|{n}\\b" for n in ("Map", "Set", "Span", "Vec2", "Vec3", "Vec4", "Quat", "Mat4", *VECTOR_FUNCTIONS))
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::|dm::" + own_types + engine_own + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
