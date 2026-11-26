@@ -148,7 +148,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor U8 U16 U32 I8 I16 I32 List Fixed Callback callback loop machine entry detached kern""".split())   # (kOwnWords, kern/src/logic/notation.cpp)
-FORMULA_WORDS = set("min max clamp abs copysign floor ceil round trunc sqrt pow exp expm1 log log10 sin cos tan asin acos atan atan2 lerp hypot fmin fmax fmod isnan isinf isfinite signbit "
+FORMULA_WORDS = set("min max clamp abs copysign floor ceil round trunc sqrt pow exp expm1 log log10 sin cos tan asin acos atan atan2 lerp hypot fmin fmax fmod isnan isinf isfinite signbit sinh cosh tanh asinh "
                     "num_cast num_bit_cast true false auto".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
@@ -456,13 +456,6 @@ ACTOR = "kern::logic::ActorHandle"
 def is_actor(t):
     """Is the C++ type (cleaned) kern::logic::ActorHandle - as the engine's own headers spell it too (logic::ActorHandle)?"""
     return re.fullmatch(r"(?:(?:::)?kern::)?logic::ActorHandle", (t or "").strip()) is not None
-# A place (a variable, a field, an input, what a function gives, an entry of a list) of a whole number of a fixed width
-# is, in the Blueprint, a place of that width: U8 ... I32 (kern/docs/blueprint_cpp.md "Whole numbers of a fixed width") -
-# storing there keeps the low bits, as C++ stores them. What flows through a pin, what an expression is, is an Int:
-# `wire`. (char: its sign is the platform's - an Int, read as char_of reads it.)
-WIDTH = {"unsigned char": "U8", "signed char": "I8", "unsigned short": "U16", "short": "I16", "unsigned int": "U32", "int": "I32"}
-WIDTHS = {"U8": 8, "I8": 8, "U16": 16, "I16": 16, "U32": 32, "I32": 32}
-ZERO.update({w: "0" for w in WIDTHS})
 
 
 def wire(t):
@@ -497,7 +490,8 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "copysign": "copysign", "copysignf": "copysign", "hypot": "hypot", "hypotf": "hypot", "log10": "log10", "log10f": "log10", "expm1": "expm1", "expm1f": "expm1",
         "remainder": "remainder", "remainderf": "remainder",
         # (the engine's own hyperbolic functions, kern/src/math/hyperbolic.c: what std::sinh ... of a program is)
-        "sinh": "sinh", "sinhf": "sinh", "cosh": "cosh", "coshf": "cosh", "tanh": "tanh", "tanhf": "tanh", "asinh": "asinh", "asinhf": "asinh"}
+        "sinh": "sinh", "sinhf": "sinh", "cosh": "cosh", "coshf": "cosh", "tanh": "tanh", "tanhf": "tanh", "asinh": "asinh", "asinhf": "asinh",
+        "isnan": "isnan", "isinf": "isinf", "isfinite": "isfinite", "signbit": "signbit"}
 
 
 # The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
@@ -601,13 +595,14 @@ def scan_plan(fmt):
             continue
         width = int(m.group(2)) if m.group(2) else 0
         if conv in "fFeEgGaA":
-            out.append(("double" if size == "l" else "float", "Float", width))
+            # (Scan Text reads a number as an f64 - strtod; into a float C reads it with strtof, rounded once: not the f64 rounded again)
+            out.append(("double" if size == "l" else "float", "f64" if size == "l" else "f32", width))
         elif conv in "s[":
             out.append(("char[]", "Text", width))
         else:
             signed = conv in "din"
             c = {"H": "signed char" if signed else "unsigned char", "h": "short" if signed else "unsigned short", "": "int" if signed else "unsigned int"}.get(size)
-            out.append((c, "Int", width) if c else ("long" if signed else "unsigned long", "Int64", width))
+            out.append((c, "i64", width) if c else ("long" if signed else "unsigned long", "u64", width))
     return out if len(out) <= 16 else None
 
 
@@ -1030,7 +1025,7 @@ BYTE_CODES = {"bool": "bool", "uint8_t": "u8", "std::uint8_t": "u8", "u8": "u8",
               "unsigned int": "u32", "long long": "i64", "unsigned long long": "u64"}
 BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f32": 4, "f64": 8}
 # (the Blueprint type of a field of each such number)
-BYTE_FIELD = {"bool": "bool", "u8": "U8", "i8": "I8", "u16": "U16", "i16": "I16", "u32": "U32", "i32": "I32", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float"}
+BYTE_FIELD = {c: c for c in BYTE_WIDTH}   # (each its own type: the language's are C++'s)
 # A pointer to bytes: what C++ reads any object's bytes through (and a void*, which is read as one of these)
 BYTE_POINTER = re.compile(r"const\s+(?:void|unsigned\s+char|uint8_t|std::uint8_t|u8|std::byte)\s*\*$")
 
@@ -1889,7 +1884,7 @@ RUN_FOLDER = [None]   # the folder of the Blueprints this run writes (--folder):
 CLASS_TYPE = re.compile(r"(?:::)?kern_blueprint_[0-9a-f]{16}::([A-Za-z_]\w*)(?:::([A-Za-z_]\w*))?")
 # The language's own types, as a Blueprint's class has them (kern/logic/nodes.h; BlueprintCore names them Int, U8 ...
 # Text, List): what they are in the notation. (A Bool is C++'s bool, a Float its double, a Vector kern::Vec3.)
-LANGUAGE_TYPES = {"kern::logic::Whole": "Int", "kern::logic::Text": "Text", "kern::logic::Int64": "Int64", "kern::logic::Truth": "bool"}
+LANGUAGE_TYPES = {"kern::logic::Text": "Text", "kern::logic::Truth": "bool"}
 SHAPES = "shapes"   # the library of the types the converter makes of the notation's own (a row of a list of lists, a pair)
 
 
@@ -2207,8 +2202,6 @@ class Unit:
 
     def shape64(self, t):
         """A Blueprint type with Int for every Int64 - of the pairs and rows the converter makes, by their parts."""
-        if t == "Int64":
-            return "Int"
         pair = next((k for k, n_ in self.structs.items() if n_ == t and isinstance(k, tuple) and k[0] == "pair"), None)
         if pair is not None:
             return f"pair<{self.shape64(pair[1])}, {self.shape64(pair[2])}>"
@@ -2507,7 +2500,7 @@ class Unit:
             return None
         inner = m.group(1).strip()
         if inner == "void":
-            return "U8"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER: a List<U8>)
+            return "u8"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER: a List<U8>)
         if "*" in inner or "&" in inner:
             return None
         t = self.place(inner)
@@ -2560,7 +2553,7 @@ class Unit:
             table = self.fresh(name + "_numbers")
             self.names.add(table)
             self.variable_lines.append(f"  /// The number of each value of {name}, in their order")
-            self.variable_lines.append(f"  KERN_CONST List<Int> {table} = List<Int>{{{', '.join(str(x) for _, x in numbered)}}};")
+            self.variable_lines.append(f"  KERN_CONST List<{IDX}> {table} = List<{IDX}>{{{', '.join(str(x) for _, x in numbered)}}};")
             self.enum_numbers[name] = table
         return name
 
@@ -2773,12 +2766,12 @@ class Unit:
         (its struct, its enum). None: neither. `t` is cleaned (Unit.clean)."""
         if t in LANGUAGE_TYPES:
             return LANGUAGE_TYPES[t]
-        m = re.fullmatch(r"kern::logic::Sized<(.+)>", t)
-        if m:
-            inner = self.clean(m.group(1))
-            if inner not in WIDTH:
-                raise Wait(f"the language's whole number of the width {inner}")
-            return WIDTH[inner]
+        m = re.fullmatch(r"kern::logic::num::Typed<(.+)>", t)
+        if m:   # (a place of the language: a number of its type - numbers.h)
+            inner = exact_type(self.clean(m.group(1)))
+            if inner is None:
+                raise Wait(f"the language's place of a {m.group(1)}")
+            return inner
         m = re.fullmatch(r"kern::(?:logic::)?(List|Fixed)<(.+)>", t)
         if m:
             entry = template_args(t)[0]
@@ -2847,12 +2840,8 @@ class Unit:
         (notation.cpp: cpp_type)."""
         t, of = p.get("type", "float"), p.get("of") or ""
         base = t[:-len("_list")] if t.endswith("_list") else t
-        words = {"bool": "bool", "float": "Float", "vector": "Vector", "text": "Text", "int64": "Int64"}
-        if base == "int":
-            word = (of[0].upper() + of[1:]) if of else "Int"
-            if of and word not in WIDTHS:
-                raise Wait(f"a whole number of the width {of} of the Blueprint {lib}")
-        elif base in words:
+        words = {"bool": "bool", "vector": "Vector", "text": "Text", **{n: n for n in NUMS}}
+        if base in words:
             word = words[base]
         elif base in ("struct", "enum"):
             word = self.class_named(lib, of)
@@ -2869,16 +2858,16 @@ class Unit:
         """A value as the level holds it (a default of a field), written in the notation as a value of the type `t`."""
         if t == "bool" and isinstance(v, bool):
             return "true" if v else "false"
-        if (t == "Int" or t in WIDTHS) and isinstance(v, int) and not isinstance(v, bool):
-            return str(v)
-        if t == "Float" and isinstance(v, (int, float)) and not isinstance(v, bool):
-            return flit(float(v))
+        if t in INTS and isinstance(v, (int, str)) and not isinstance(v, bool) and re.fullmatch(r"-?\d+", str(v)):
+            return number_literal(int(v), t)
+        if t in FLOATS and isinstance(v, (int, float, str)) and not isinstance(v, bool):
+            if isinstance(v, str) and v not in ("inf", "-inf", "nan"):
+                raise Wait(f"{what} {v!r} as a {t}")
+            return number_literal(float(v), t)
         if t == "Text" and isinstance(v, str):
             return text_literal(v.encode("utf-8"))
         if t == "Vector" and isinstance(v, list) and len(v) == 3:
-            return "Vector{" + ", ".join(flit(float(x)) for x in v) + "}"
-        if t == "Int64" and str(v) == "0":
-            return ZERO["Int64"]
+            return "Vector{" + ", ".join(f32_literal(float(x))[:-1] for x in v) + "}"
         if t.startswith(("List<", "Map<", "Set<")) and v in ([], None):
             return self.zero(t)
         if t.startswith("List<") and isinstance(v, list):
@@ -3730,6 +3719,8 @@ class Const:
             v = self.number(kids(n)[-1])
             t = self.unit.clean(qtype(n))
             if NUMBER.get(t) == "Int":
+                if isinstance(v, float):   # (a floating number to a whole one: toward zero - beyond its ends C++ leaves it undefined)
+                    return number_cast(v, "f64", exact_type(t))
                 return self.fit(int(v), n)
             if t == "bool":
                 return 1.0 if v != 0 else 0.0
@@ -3784,6 +3775,13 @@ class Const:
             elif op == "%" and isint and b != 0: r = a - (abs(a) // abs(b)) * (1 if (a < 0) == (b < 0) else -1) * b
             else:
                 raise Wait(f"a constant computed with {op}")
+            if isint:
+                t = self.unit.clean(qtype(n))
+                bits = self.BITS.get(t)
+                if bits and t not in UNSIGNED and t != "whole64u" and op in ("+", "-", "*", "<<") and not -(1 << (bits - 1)) <= r < 1 << (bits - 1):
+                    raise Wait(f"a constant {t} that leaves its range ({op}: C++ leaves it undefined)")
+                if op in ("<<", ">>") and bits and not 0 <= int(b) < bits:
+                    raise Wait(f"a constant shifted by {int(b)} (C++ leaves a shift by the width or more undefined)")
             return self.fit(r, n) if isint else r
         if k == "DeclRefExpr":
             ref = n.get("referencedDecl", {})
@@ -3817,7 +3815,8 @@ class Const:
             # (sin, cos, tan ... : the number the language's own function gives - the engine computes it, with its
             # own mathematics, the same on every machine: what a Blueprint calling the function has)
             if MATH.get(name) in ENGINE_MATH and len(args) == ENGINE_MATH[MATH[name]] and all(math.isfinite(a) for a in args):
-                return engine_formula(f"{MATH[name]}({', '.join(repr(float(a)) for a in args)})")
+                ft = exact_type(self.unit.clean(qtype(n))) or "f64"   # (of an f32: the f-variant - its literals with f)
+                return engine_formula(f"{MATH[name]}({', '.join(number_literal(float(a), ft) for a in args)})")
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
@@ -4084,15 +4083,14 @@ class Const:
                 return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
             if k == "CXXStdInitializerListExpr":
                 return self.literal(kids(n)[0], t)
-            if k == "StringLiteral" and it == "Int":
+            if k == "StringLiteral" and it in ("i8", "u8"):
                 # `constexpr char kDigits[] = "0123";` - an array of characters: its bytes and the zero after them
                 # (as many as the array has), each as a char holds it (signed: from -128)
                 raw = c_string(n["value"])
                 m = re.search(r"\[(\d+)\]", qtype(n))
                 size = int(m.group(1)) if m else len(raw) + 1
                 held = list(raw[:size]) + [0] * max(0, size - len(raw))
-                signed = not re.search(r"\bunsigned\b", qtype(n))
-                return t + "{" + ", ".join(str(x - 256 if signed and x >= 128 else x) for x in held) + "}"
+                return t + "{" + ", ".join(str(x - 256 if it == "i8" and x >= 128 else x) for x in held) + "}"
             raise Wait(f"a list constant written as {k}")
         raise Wait(f"a constant of type {t}")
 
@@ -4432,7 +4430,7 @@ class Emit:
                 aname = u.fresh(lname + "_at", self.taken)
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
-                f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
+                f.params += [(lname, f"List<{entries}>"), (aname, IDX)]
                 f.kinds += ["", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
@@ -4841,18 +4839,6 @@ class Emit:
         d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) or b.get("referencedDecl", {})
         return self.text_buffer(d) if d.get("kind") == "VarDecl" and d.get("id") in self.names else None
 
-    WIDE = W64 + ("long", "long long", "unsigned long", "unsigned long long")
-
-    def bits64(self, x):
-        """A u64/i64 under casts that keep its 64 bits (`static_cast<long long>(cx)` of an i64): the value the
-        Blueprint holds as an Int64, with all 64 bits - None: not one (an Int is exact to 2^53 only)."""
-        y = bare(x)
-        while self.ctype(y) not in W64:
-            if self.ctype(y) not in self.WIDE or y.get("kind") not in CAST or not kids(y):
-                return None
-            y = bare(kids(y)[-1])
-        return y
-
     def format_values(self, fmt, args, kinds, done=None):
         """The format and the values Format Text takes for a printf format and its arguments. A u64/i64 that an
         integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
@@ -4872,15 +4858,9 @@ class Emit:
             if m.group(5) != "%":
                 x, t = args[k], kinds[k]
                 k += 1
-                w = self.bits64(x) if t == "Int" else None
-                if w is None:
-                    self.operand(done, x, t, lambda: self.ex(x, t))
-                else:
-                    node = {"d": "int64_text_signed", "i": "int64_text_signed", "u": "int64_text", "x": "int64_text_hex"}.get(m.group(5))
-                    if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
-                        raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
-                    spec = f"%{m.group(1)}{m.group(2)}s"
-                    self.operand(done, x, "Text", lambda: f"{node}({self.ex(w, 'Int64')})")
+                # (a whole number goes in as an i64 - its value, or the bits of a u64 -, a floating one as the f64 C hands
+                # printf: the compiler's tree has the conversions of the arguments)
+                self.operand(done, x, t, lambda: self.ex(x, t))
             out.append(spec)
             at += m.end()
         return "".join(out), [e[2] for e in done[start:]]
@@ -4901,7 +4881,7 @@ class Emit:
                 return None
             c = m.group(5)
             if c != "%":
-                out.append("Float" if c in "fFeEgG" else "Text" if c == "s" else "Int")
+                out.append("f64" if c in "fFeEgG" else "Text" if c == "s" else IDX)
             at += m.end()
         return out
 
@@ -5205,7 +5185,7 @@ class Emit:
                     self.picked = getattr(self, "picked", 0) + 1
                     pid = f"{v['id']}_at{self.picked}"
                     pt = {"qualType": "unsigned long"}
-                    last = {"kind": "_Text", "_text": self.whole_math("-", f"list_length<{lt[5:-1]}>({self.ex(lst, lt)})", "1"), "_type": "Int",
+                    last = {"kind": "_Text", "_text": self.whole_math("-", f"list_length<{lt[5:-1]}>({self.ex(lst, lt)})", "1"), "_type": IDX,
                             "type": dict(pt), **{k: node[k] for k in ("_at", "_file") if k in node}}
                     decl = {"kind": "VarDecl", "id": pid, "name": f"{v.get('name', 'ref')}_at", "type": dict(pt), "init": "c",
                             "_file": v.get("_file", ""), "_at": v.get("_at", (None, None)), "inner": [last]}
@@ -5244,11 +5224,11 @@ class Emit:
                 key = self.temp("key", kt)
                 lines, at, _ = self.put_row(base, key)
                 self.hoist([f"{key} = {self.ex(kids(slot)[2], kt)};"] + lines)
-                row = self.temp(f"{v.get('name') or 'ref'}_row", "Int")
+                row = self.temp(f"{v.get('name') or 'ref'}_row", IDX)
                 self.hoist([f"{row} = {at};"])
                 was = slot.get("type", {})
                 stood = {k: slot[k] for k in ("_at", "_file") if k in slot}
-                held = self.entry(base, {"kind": "_Text", "_text": row, "_type": "Int", "_steady": True}, vt)   # (the row: set here alone)
+                held = self.entry(base, {"kind": "_Text", "_text": row, "_type": IDX, "_steady": True}, vt)   # (the row: set here alone)
                 call = dict(slot)
                 slot.clear()
                 slot.update({**held, "type": was, **stood, "_call": call})   # (the source has m[key] there: TestWriter.guard)
@@ -5459,7 +5439,7 @@ class Emit:
                 raise Wait(f"an array of values C++ makes one by one (the field {c['name']} of a {q.split('::')[-1]})")
             saved, self.pre = self.pre, []
             try:
-                want = "Int" if held is not None and held[0] in ("object", "owned") else ft
+                want = ft
                 if e is not None:
                     text = self.ex(e, want)
                 elif node is not None and bare(node).get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "ExprWithCleanups"):
@@ -5828,9 +5808,9 @@ class Emit:
         if kind == "array":
             last = str(n - 1)
         else:
-            count = self.temp("count", "Int")
+            count = self.temp("count", IDX)
             last = self.whole_math("-", count, "1")
-        at = self.temp("at", "Int")
+        at = self.temp("at", IDX)
         forward = kind == "list"
         steps = [] if kind == "array" else [f"{count} = {kind}_length<{', '.join(targs)}>({place});"]   # (Length gives an Int)
         return steps + self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};",
@@ -5839,7 +5819,7 @@ class Emit:
     def entries_ended(self, h, kind, row, lv, forward=False):
         """The steps that end every entry of a list or map at `lv`, from the last to the first (forward: from the
         first to the last)."""
-        count, at = self.temp("count", "Int"), self.temp("at", "Int")
+        count, at = self.temp("count", IDX), self.temp("at", IDX)
         last = self.whole_math("-", count, "1")
         return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
                 *self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
@@ -6078,7 +6058,6 @@ class Emit:
                         continue
                 if ("&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw)) or self.u.clean(raw) == "std::_Bit_reference":
                     raise Wait("a reference to something it changes")
-                wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
                 made = None
                 if self.u.object_of(raw) and not ("&" in raw or "*" in raw):
@@ -6091,7 +6070,7 @@ class Emit:
                             raise Wait("an object of the engine as a local that is not made by a constructor of it")
                         made = self.u.object_of(raw)
                 kept = None
-                if init is not None and "auto" in v.get("type", {}).get("qualType", "") and not wide_init:
+                if init is not None and "auto" in v.get("type", {}).get("qualType", ""):
                     # (auto: the type is the value's - as the Blueprint holds it)
                     kept = self.copied_type(init)
                 if self.text_buffer(v) is not None:
@@ -6105,7 +6084,7 @@ class Emit:
                     else:
                         raise Wait("a text buffer that begins with something else than a text")
                     continue
-                name = self.local(v, self.whole64() if wide_init else kept)
+                name = self.local(v, kept)
                 if made is not None:
                     out += self.take_pre() + [f"{name} = {self.ex(init, object_type(made))};"]   # (the Object <class>.make gives)
                     self.scopes[-1].append((name, made))
@@ -6284,17 +6263,20 @@ class Emit:
         counting = (v is not None and NUMBER.get(self.ctype(v)) == "Int" and v.get("init") and c.get("kind") == "BinaryOperator" and c.get("opcode") in ("<", "<=")
                     and self.refers(kids(c)[0], v["id"]) and i.get("kind") == "UnaryOperator" and i.get("opcode") == "++" and self.refers(kids(i)[0], v["id"])
                     and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break
-                    and not self.asks_engine(kids(c)[1]))
+                    and not self.asks_engine(kids(c)[1])
+                    # (compared in its own type: `int i < v.size()` compares as size_t - from a negative start no step -,
+                    # and a count of the language goes from first to last as an i64)
+                    and self.tp_or_none(kids(c)[0]) == self.u.place(qtype(v)) and self.tp_or_none(kids(c)[0]) in INTS)
         if counting:
             node = self.u.next_node
             self.u.next_node += 1
-            first = self.ex(kids(v)[-1], "Int")
-            last = self.ex(kids(c)[1], "Int")
+            first = self.ex(kids(v)[-1], IDX)
+            last = self.ex(kids(c)[1], IDX)
             if c["opcode"] == "<":
                 last = self.minus_one(kids(c)[1], last)
-            self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+            self.u.members.append(f"  struct : kern::Node<{node}> {{ i64 index = 0; }} n{node};")
             self.names[v["id"]] = f"n{node}.index"
-            self.types[v["id"]] = "Int"
+            self.types[v["id"]] = IDX
             lines = self.loop_body(self.enter_loop(body), [body])
             return self.take_pre() + [f"for (auto it{node} = flow_for(n{node}, {first}, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
         out = []
@@ -6369,21 +6351,21 @@ class Emit:
             # (what, from = 0 or npos) - the form with a count of the characters of a const char* has a third
             if not 1 <= len(a) <= 2:
                 raise Wait(f"text: {name}() of so many characters of a const char*")
-            frm = self.ex(a[1], "Int") if len(a) == 2 and self.given(a[1]) else str(self.TEXT_FIND[name])
-            return f"text_{name}({self.ex(base, 'Text')}, {self.text_or_char(a[0])}, {frm})", "Int"
+            frm = self.ex(a[1], IDX) if len(a) == 2 and self.given(a[1]) else str(self.TEXT_FIND[name])
+            return f"text_{name}({self.ex(base, 'Text')}, {self.text_or_char(a[0])}, {frm})", IDX
         if name == "substr" and len(a) <= 2:
-            at = self.ex(a[0], "Int") if a and self.given(a[0]) else "0"
-            count = self.ex(a[1], "Int") if len(a) == 2 and self.given(a[1]) else "-1"
+            at = self.ex(a[0], IDX) if a and self.given(a[0]) else "0"
+            count = self.ex(a[1], IDX) if len(a) == 2 and self.given(a[1]) else "-1"
             return f"text_sub({self.ex(base, 'Text')}, {at}, {count})", "Text"
         if name in ("starts_with", "ends_with") and len(a) == 1:
             return f"text_{name}({self.ex(base, 'Text')}, {self.text_or_char(a[0])})", "bool"
         if name == "at" and len(a) == 1:
-            return self.char_of(self.ex(base, "Text"), self.ex(a[0], "Int"), qtype(b)), "Int"
+            return self.char_of(self.ex(base, "Text"), self.ex(a[0], IDX), qtype(b)), self.char_type(qtype(b))
         if name == "front" and not a:
-            return self.char_of(self.ex(base, "Text"), "0", qtype(b)), "Int"
+            return self.char_of(self.ex(base, "Text"), "0", qtype(b)), self.char_type(qtype(b))
         if name == "back" and not a:
             t = self.ex(base, "Text")
-            return self.char_of(t, self.whole_math("-", f"text_length({t})", "1"), qtype(b)), "Int"
+            return self.char_of(t, self.whole_math("-", f"text_length({t})", "1"), qtype(b)), self.char_type(qtype(b))
         if name == "compare":
             raise Wait("the value of compare() of a text other than against 0 (C++ says only its sign)")
         return None
@@ -6417,7 +6399,7 @@ class Emit:
         k = b.get("kind")
         if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and self.char_pointer(kids(b)[0]) and not self.char_pointer(kids(b)[1]):
             text, at = self.c_text(kids(b)[0])
-            return text, self.whole_math(b["opcode"], at, self.ex(kids(b)[1], "Int"))
+            return text, self.whole_math(b["opcode"], at, self.ex(kids(b)[1], IDX))
         if k == "CXXMemberCallExpr" and callee(b).get("name") in ("c_str", "data") and len(kids(b)) == 1 and kids(callee(b)):
             base = kids(callee(b))[0]
             if "string_view" in self.u.clean(qtype(base)):
@@ -6471,11 +6453,11 @@ class Emit:
         except Wait:
             return None
         lt = self.tp(lst)
-        if lt not in ("List<Int>", "List<U8>", "List<I8>"):
+        if lt not in ("List<u8>", "List<i8>"):
             return None
         for op, k in reversed(steps):
-            at = self.whole_math(op, at, self.ex(k, "Int"))
-        return f"text_of_bytes({self.place_arg(lst, lt, 'const', [])}, {at}, {self.ex(count, 'Int')})"
+            at = self.whole_math(op, at, self.ex(k, IDX))
+        return f"text_of_bytes({self.place_arg(lst, lt, 'const', [])}, {at}, {self.ex(count, IDX)})"
 
     def text_range(self, first, last):
         """`text.begin(), text.end()` of one text (std::string, std::string_view): the text - None: no such range."""
@@ -6510,7 +6492,7 @@ class Emit:
                   and self.refers(kids(self.unwrap(kids(x)[2]))[0], v["id"])]
         if not set_by:
             return None
-        name = self.local(v, "Int")
+        name = self.local(v, IDX)
         del self.names[v["id"]]
         self.text_ptrs[v["id"]] = {"text": None, "at": name}
         return [f"{name} = 0;"]
@@ -6647,10 +6629,10 @@ class Emit:
             return {"<": f"text_less({p}, {q})", ">": f"text_less({q}, {p})", "<=": f"logic_not(text_less({q}, {p}))", ">=": f"logic_not(text_less({p}, {q}))"}[op], "bool"
         if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_c_text(kids(b)[0]):
             text, at = self.c_text(kids(b)[0])
-            return self.char_of(text, at, qtype(b)), "Int"
+            return self.char_of(text, at, qtype(b)), self.char_type(qtype(b))
         if k == "ArraySubscriptExpr" and len(kids(b)) == 2 and self.is_c_text(kids(b)[0]) and not self.text_buffer_of(kids(b)[0]):
             text, at = self.c_text(kids(b)[0])
-            return self.char_of(text, self.whole_math("+", at, self.ex(kids(b)[1], "Int")), qtype(b)), "Int"
+            return self.char_of(text, self.whole_math("+", at, self.ex(kids(b)[1], IDX)), qtype(b)), self.char_type(qtype(b))
         if k == "BinaryOperator" and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]) and self.char_pointer(kids(b)[1]):
             x, y = kids(b)
             if not (self.is_c_text(x) and self.is_c_text(y)):
@@ -6660,9 +6642,9 @@ class Emit:
                 raise Wait("places of two texts compared (pointers into different texts)")
             op = b["opcode"]
             if op == "-":
-                return self.whole_math("-", ax, ay), "Int"
+                return self.whole_math("-", ax, ay), IDX
             if op in COMPARE:
-                return f'math_compare<"{op}">({self.conv(ax, "Int", "Float")}, {self.conv(ay, "Int", "Float")})', "bool"
+                return self.compare(op, ax, ay), "bool"
             return None
         if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and self.is_c_text(b):
             text, at = self.c_text(b)
@@ -6670,17 +6652,6 @@ class Emit:
         if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.text_ptrs:
             text, at = self.c_text(b)
             return f"text_sub({text}, {at}, -1)", "Text"
-        if k in CAST and kids(b) and self.is64(b):
-            # a whole number C read as a 64-bit pattern (an i64, a u64): its 64 bits, as C gives them
-            inner = self.unwrap(kids(b)[-1])
-            if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
-                return self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)
-        if k in CAST and kids(b) and self.ctype(b) in NARROW_WHOLE:
-            # a whole number C read cut to 32 bits or less: of its 64 bits (exact, as C cuts them)
-            inner = self.unwrap(kids(b)[-1])
-            if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
-                bits = self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)[0]
-                return self.cut_low(f"int64_low({bits})", self.ctype(b)), "Int"
         return None
 
     def parsed(self, b, name, a, bits=False):
@@ -6692,17 +6663,15 @@ class Emit:
         if kind in ("double", "float"):
             call = f"text_parse_float{'32' if kind == 'float' else ''}({text}, {at})"
         else:
-            base = self.ex(a[2], "Int") if len(a) == 3 else "10"
+            base = self.ex(a[2], IDX) if len(a) == 3 else "10"
             call = f"text_parse_{'uint' if kind == 'unsigned' else 'int'}({text}, {at}, {base})"
         if len(a) >= 2 and not self.nothing(a[1]):
             self.end_into(a[1], text, f"{call}.end")
         if kind in ("double", "float"):
-            return f"{call}.value", "Float"
-        if bits:
-            return f"{call}.value", "Int64"
-        if kind == "int":   # (atoi: the long strtol reads, cut to an int)
-            return self.cut_low(f"int64_low({call}.value)", "int"), "Int"
-        return f"int64_to_int({call}.value)", "Int"   # (a long: its bits read with their sign, as a Blueprint holds every long)
+            return f"{call}.value", "f32" if kind == "float" else "f64"
+        if kind == "int":   # (atoi: the long strtol reads, as an int - C's atoi is (int)strtol)
+            return num_cast("i32", "i64", f"{call}.value"), "i32"
+        return f"{call}.value", "u64" if kind == "unsigned" else "i64"
 
     def scanned(self, a, used=True):
         """sscanf(s, "%f %d", &x, &y): Scan Text at the place the C string stands - one step, after it the
@@ -6745,13 +6714,8 @@ class Emit:
             have = {"whole64u": "unsigned long", "whole64s": "long", "long long": "long", "unsigned long long": "unsigned long"}.get(have, have)
             if have != c and not (c == "char" and have in ("signed char", "char")):
                 raise Wait(f"a value sscanf writes into a {have} where its format says {c}")
-            if t == "Int64" and self.tp(place) == "Int":
-                # (a long long the program counts with - not a bit pattern: its 64 bits as an Int holds them)
-                befores.append(f"int64_of_int({self.ex(place, 'Int')})")
-                stores.append((place, "Int64>Int"))
-                continue
-            if self.tp(place) != t:
-                raise Wait(f"a value sscanf writes as {t} into a {self.tp(place)}")
+            if t == "f32":
+                raise Wait("sscanf of a float (%f): C reads it rounded once to f32 (strtof), Scan Text reads an f64 - write a double and convert it")
             befores.append(self.ex(place, t))
             stores.append((place, t))
         if not used and not plan:
@@ -6759,14 +6723,12 @@ class Emit:
             return "0"
         node = self.u.next_node
         self.u.next_node += 1
-        fields = ["Int count = 0;"] + [f"{t} v{k} = {ZERO[t]};" for k, (_, t, _) in enumerate(plan)]
+        fields = [f"{IDX} count = 0;"] + [f"{t} v{k} = {ZERO[t]};" for k, (_, t, _) in enumerate(plan)]
         self.u.members.append(f"  struct {{ {' '.join(fields)} }} n{node};")
         lines = self.take_pre() + [f"text_scan<{text_literal(raw)}>({', '.join([f'n{node}', text, at] + befores)});"]
         for k, (place, t) in enumerate(stores):
             if place is None:
                 lines.append(f"{t} = n{node}.v{k};")
-            elif t == "Int64>Int":
-                lines += self.store(place, self.typed(f"int64_to_int(n{node}.v{k})", "Int"))
             else:
                 lines += self.store(place, self.typed(f"n{node}.v{k}", t))
         self.hoist(lines)
@@ -6782,20 +6744,20 @@ class Emit:
         if name == "push_back" and len(a) == 1:
             return self.store(base, lambda _t: f'text_append({t}, {self.text_or_char(a[0])}, "")')
         if name == "reserve" and len(a) == 1 and self.given(a[0]):
-            return self.store(base, lambda _t: f"text_reserve({t}, {self.ex(a[0], 'Int')})")
+            return self.store(base, lambda _t: f"text_reserve({t}, {self.ex(a[0], IDX)})")
         if name == "pop_back" and not a:
             return self.store(base, lambda _t: f"text_erase({t}, {self.whole_math('-', f'text_length({t})', '1')}, 1)")
         if name in ("append", "assign") and len(a) == 1 and self.tp_or_none(a[0]) == "Text":
             value = f'text_append({t}, {self.ex(a[0], "Text")}, "")' if name == "append" else self.ex(a[0], "Text")
             return self.store(base, lambda _t: value)
         if name == "insert" and len(a) == 2 and self.numeric(a[0]) and self.tp_or_none(a[1]) == "Text":
-            return self.store(base, lambda _t: f"text_insert({t}, {self.ex(a[0], 'Int')}, {self.ex(a[1], 'Text')})")
+            return self.store(base, lambda _t: f"text_insert({t}, {self.ex(a[0], IDX)}, {self.ex(a[1], 'Text')})")
         if name == "erase" and len(a) == 2 and all(self.numeric(x) or not self.given(x) for x in a):
-            at = self.ex(a[0], "Int") if self.given(a[0]) else "0"
-            count = self.ex(a[1], "Int") if self.given(a[1]) else "-1"
+            at = self.ex(a[0], IDX) if self.given(a[0]) else "0"
+            count = self.ex(a[1], IDX) if self.given(a[1]) else "-1"
             return self.store(base, lambda _t: f"text_erase({t}, {at}, {count})")
         if name == "replace" and len(a) == 3 and self.numeric(a[0]) and self.numeric(a[1]) and self.tp_or_none(a[2]) == "Text":
-            return self.store(base, lambda _t: f"text_replace({t}, {self.ex(a[0], 'Int')}, {self.ex(a[1], 'Int')}, {self.ex(a[2], 'Text')})")
+            return self.store(base, lambda _t: f"text_replace({t}, {self.ex(a[0], IDX)}, {self.ex(a[1], IDX)}, {self.ex(a[2], 'Text')})")
         raise Wait(f"text: {name}() as a step")
 
     def char_of(self, text, index, raw):
@@ -6815,7 +6777,7 @@ class Emit:
     def text_piece(self, n):
         """What `text += x` appends: a text - or one byte, a char (Text of Code: its 8 bits, as a char holds them)."""
         if re.sub(r"^const\s+", "", self.u.clean(self.ctype(n))).strip() in ("char", "signed char", "unsigned char"):
-            return f"text_of_code({self.ex(n, 'Int')})"
+            return f"text_of_code({self.ex(n, IDX)})"
         return self.ex(n, "Text")
 
     def for_each_char(self, s, v, raw, src, body):
@@ -6835,19 +6797,19 @@ class Emit:
         has_break = self.jumps(body)[0]
         loop = self.enter_loop(body)
         if has_break:
-            at, count = self.temp("at", "Int"), self.temp("count", "Int")
+            at, count = self.temp("at", IDX), self.temp("count", IDX)
             if changes:
                 self.char_places[v["id"]] = (text, at, raw)
-            first = [] if changes else [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
+            first = [] if changes else [f"{self.local(v, self.char_type(raw))} = {self.char_of(text, at, raw)};"]
             lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
             cond = f'{self.compare("<", at, count)}'
             return before + [f"{count} = text_length({text});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
         node = self.u.next_node
         self.u.next_node += 1
-        self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+        self.u.members.append(f"  struct : kern::Node<{node}> {{ i64 index = 0; }} n{node};")
         if changes:
             self.char_places[v["id"]] = (text, f"n{node}.index", raw)
-        first = [] if changes else [f"{self.local(v, 'Int')} = {self.char_of(text, f'n{node}.index', raw)};"]
+        first = [] if changes else [f"{self.local(v, self.char_type(raw))} = {self.char_of(text, f'n{node}.index', raw)};"]
         lines = first + self.loop_body(loop, [body])
         last = self.whole_math("-", f"text_length({text})", "1")
         return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
@@ -7061,13 +7023,13 @@ class Emit:
         has_break = self.jumps(body)[0]
         if has_break:
             # a loop a break ends: it counts itself, and its condition has the break's flag
-            at = self.temp("at", "Int")
-            count = self.temp("count", "Int")
+            at = self.temp("at", IDX)
+            count = self.temp("count", IDX)
             index = at
         else:
             node = self.u.next_node
             self.u.next_node += 1
-            self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+            self.u.members.append(f"  struct : kern::Node<{node}> {{ i64 index = 0; }} n{node};")
             index = f"n{node}.index"
         entry = f"{place}[{index}]"
         loop = self.enter_loop(body)
@@ -7095,8 +7057,8 @@ class Emit:
         else:
             # (an entry copied into a variable of its own: a variable of the type C++ declares it with - `for (int b : bytes)`
             # an I32 -, a whole number of the entry's width where it says `auto`)
-            mine = self.u.place(raw) if wire(it) == "Int" and NUMBER.get(self.u.clean(raw).strip()) == "Int" else it
-            first = [f"{self.local(v, mine)} = {entry};"]
+            mine = self.u.place(raw) if it in NUMS and NUMBER.get(self.u.clean(raw).strip()) else it
+            first = [f"{self.local(v, mine)} = {self.conv(entry, it, mine)};"]
         if not keyed and v.get("kind") == "DecompositionDecl":
             self.bind(v, it)   # (for (const auto& [a, b] : list): a and b are the parts of the entry)
         length = count_text if keyed else f"list_length<{it}>({place})"
@@ -7275,31 +7237,33 @@ class Emit:
             then, other = self.effect_stmt(x), self.effect_stmt(y)
             return [f"if ({cond}) {{", *["  " + ln for ln in then], *(["} else {", *["  " + ln for ln in other]] if other else []), "}"]
         if k == "CompoundAssignOperator":
+            # a op= b is a = a op b computed in the type C++ computes it in (the compiler's tree says it: computeLHSType,
+            # computeResultType - a u8 += is an int sum, an f32 += of a double a double one), converted back to a's type
             a, b = kids(n)
             op = n["opcode"][:-1]
             ta = self.tp(a)
-            computed = n.get("type", {}) if "computeResultType" not in n else n["computeResultType"]
-            if op == "+" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT and self.u.clean(qtype({"type": computed})) == self.ctype(a)
-                                                       or self.wraps_sum(a, self.u.clean(qtype({"type": computed})), b)):
-                return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
-            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": op, "type": computed, "inner": [a, b]})
-            lines = self.store(a, lambda t: self.put(synth, t))
-            if synth.get("_w64"):
-                n["_w64"] = True
-            return lines
+            lhs_t = n.get("computeLHSType") or a.get("type", {})
+            res_t = n.get("computeResultType") or n.get("type", {})
+            same = self.u.clean(qtype({"type": lhs_t})) == self.ctype(a) == self.u.clean(qtype({"type": res_t}))
+            if op == "+" and same and self.plain_variable(a) and ta in INTS + FLOATS and self.tp_or_none(b) == ta:
+                return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]   # (Add to Variable: the sum in a's type)
+            left = a if same or self.u.clean(qtype({"type": lhs_t})) == self.ctype(a) else {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": lhs_t, "inner": [a]}
+            synth = {"kind": "BinaryOperator", "opcode": op, "type": res_t, "inner": [left, b]}
+            return self.store(a, lambda t: self.put(synth, t))
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
-            if n["opcode"] == "++" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT or self.wraps_sum(a, "int", None)):
-                return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
-            one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
+            if ta not in INTS + FLOATS:
+                raise Wait(f"++ of a {ta}")
+            promoted = self.ctype(a) in self.PROMOTED
+            if n["opcode"] == "++" and self.plain_variable(a) and not promoted:
+                return [f"{self.lvalue(a)} += {number_literal(1, ta)};"]
             # (x++ is x += 1: a type smaller than int counts as an int, the sum goes back into x's type - a u16 at 65535 + 1 is 0)
-            computed = {"qualType": "int"} if self.ctype(a) in self.PROMOTED else a.get("type", {})
-            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": computed, "inner": [a, one]})
-            lines = self.store(a, lambda t: self.put(synth, t))
-            if synth.get("_w64"):
-                n["_w64"] = True
-            return lines
+            computed = {"qualType": "int"} if promoted else a.get("type", {})
+            left = {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": computed, "inner": [a]} if promoted else a
+            one = {"kind": "IntegerLiteral", "value": "1", "type": computed}
+            synth = {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": computed, "inner": [left, one]}
+            return self.store(a, lambda t: self.put(synth, t))
         if self.is_local_call(n):
             self.local_call(n)
             return []
@@ -7307,11 +7271,11 @@ class Emit:
             name = callee_name(n)
             ops = kids(n)[1:]
             if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name in ("operator++", "operator--", "operator+=", "operator-="):
-                by = "1" if name[-1] != "=" else self.ex(ops[1], "Int")
+                by = "1" if name[-1] != "=" else self.ex(ops[1], IDX)
                 back = self.is_reverse_iter(ops[0])   # (forward for it is down the list)
                 if name == "operator++" and self.plain_variable(ops[0]) and not back:
                     return [f"{self.lvalue(ops[0])} += 1;"]
-                return self.store(ops[0], lambda t: self.whole_math("+" if (name in ("operator++", "operator+=")) != back else "-", self.ex(ops[0], "Int"), by))
+                return self.store(ops[0], lambda t: self.whole_math("+" if (name in ("operator++", "operator+=")) != back else "-", self.ex(ops[0], IDX), by))
             if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name == "operator=":
                 target = self.unwrap(ops[0])
                 if target.get("kind") == "DeclRefExpr":
@@ -7400,7 +7364,7 @@ class Emit:
                 lt = self.tp(l0)
                 it = lt[5:-1]
                 before, lv, after = self.variable_of(l0, lt)
-                a, b, held = self.temp("first", "Int"), self.temp("last", "Int"), self.temp("held", it)
+                a, b, held = self.temp("first", IDX), self.temp("last", IDX), self.temp("held", it)
                 lines = [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};",
                          f'while (loop({self.compare("<", a, b)})) {{',
                          f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
@@ -7415,7 +7379,7 @@ class Emit:
                 lt = self.tp(l0)
                 it = lt[5:-1]
                 before, lv, after = self.variable_of(l0, lt)
-                fill, a, b = self.temp("fill", it), self.temp("first", "Int"), self.temp("last", "Int")
+                fill, a, b = self.temp("fill", it), self.temp("first", IDX), self.temp("last", IDX)
                 lines = [f"{fill} = {self.ex(kids(n)[3], it)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
                 return before + lines + self.count_loop(a, b, lambda i: [f"{lv}[{i}] = {fill};"]) + after
             if name == "swap" and len(kids(n)) == 3:
@@ -7504,7 +7468,7 @@ class Emit:
                     ends = self.entries_ended(h, kind, self.rows(base)[1], lv) if h is not None and kind == "map" else []
                     return before + ends + [f"{kind}_clear({lv});"] + after
                 if name == "reserve" and len(args) == 1:
-                    return before + [f"{kind}_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
+                    return before + [f"{kind}_reserve({lv}, {self.ex(args[0], IDX)});"] + after
                 raise Wait(f"{kind}: {name}()")
             if base is not None and not self.is_this(base) and self.tp(base).startswith("List<"):
                 it = self.tp(base)[5:-1]
@@ -7524,13 +7488,13 @@ class Emit:
                 if name == "pop_back":
                     h = self.entry_life(self.ctype(base))
                     if h is not None:   # (the last entry ends)
-                        at = self.temp("at", "Int")
+                        at = self.temp("at", IDX)
                         return before + [f"{at} = math_sub<i64>(list_length<{it}>({lv}), 1);",
                                          *self.ended_entry(h, f"{lv}[{at}]"), f"list_remove_at({lv}, {at});"] + after
                     return before + [f"list_remove_at({lv}, math_sub<i64>(list_length<{it}>({lv}), 1));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
-                    return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
-                if name == "insert" and len(args) == 3 and it == "Int" and self.text_range(args[1], args[2]) is not None:
+                    return before + [f"list_reserve({lv}, {self.ex(args[0], IDX)});"] + after
+                if name == "insert" and len(args) == 3 and it == "u8" and self.text_range(args[1], args[2]) is not None:
                     # bytes.insert(at, text.begin(), text.end()): the bytes of the text there (Insert Text Bytes)
                     text = self.text_range(args[1], args[2])
                     _, at = self.place(args[0])
@@ -7553,7 +7517,7 @@ class Emit:
             c = self.ctype(lst)
             span = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+?)\s*>$", c)   # (a view of a list of bytes: that list)
             entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else span.group(1) if span else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
-            if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) not in ("List<U8>", "List<I8>", "List<Int>"):
+            if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) not in ("List<u8>", "List<i8>"):
                 return None
             out.append((lst, at))
         return out
@@ -7578,7 +7542,7 @@ class Emit:
             # (the bytes of a struct of numbers - Bytes of Struct, a list of a fixed length where the call is - as bytes)
             v, q = held
             st, text, size = self.u.byte_layout(q)
-            src, frm, of = self.temp("bytes", "List<U8>", size), "0", "u8"
+            src, frm, of = self.temp("bytes", "List<u8>", size), "0", "u8"
             self.hoist([f"{src} = struct_bytes<{st}, {text_literal(text)}>({self.ex(v, st)});"])
         else:
             of = pointer_code(self.u, a[1])
@@ -7592,7 +7556,7 @@ class Emit:
             if not st.startswith("List<") or BYTE_FIELD[of] != st[5:-1]:
                 return None
             src = self.place_arg(s, st, "const", [])
-        count = self.ex(a[2], "Int")
+        count = self.ex(a[2], IDX)
         before, lv, after = self.variable_of(dst, lt)
         return before + [f"list_copy_bytes<{text_literal(into)}, {text_literal(of)}>({lv}, {at}, {src}, {frm}, {count});"] + after
 
@@ -7620,14 +7584,14 @@ class Emit:
         dt, st = self.tp(dst), self.tp(src)   # (lists of bytes: of u8, i8 or char - a byte copied keeps its bits, as a place of its width keeps them)
         before, lv, after = self.variable_of(dst, dt)
         sv = self.place_arg(src, st, "const", [])
-        count, to, fro = self.temp("count", "Int"), self.temp("to", "Int"), self.temp("from", "Int")
-        lines = [f"{count} = {self.ex(a[2], 'Int')};", f"{to} = {at};", f"{fro} = {frm};"]
-        last = self.temp("last", "Int")
+        count, to, fro = self.temp("count", IDX), self.temp("to", IDX), self.temp("from", IDX)
+        lines = [f"{count} = {self.ex(a[2], IDX)};", f"{to} = {at};", f"{fro} = {frm};"]
+        last = self.temp("last", IDX)
         lines.append(f"{last} = {self.whole_math('-', count, '1')};")
         up = self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', to, i)}] = list_get<{st[5:-1]}>({sv}, {self.whole_math('+', fro, i)});"])
         if name == "memcpy" or not self.same_list(dst, src):
             return before + lines + up + after
-        k = self.temp("k", "Int")
+        k = self.temp("k", IDX)
         down = [f"{k} = {last};", f'while (loop({self.compare(">=", k, "0")})) {{',
                 f"  {lv}[{self.whole_math('+', to, k)}] = list_get<{st[5:-1]}>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
         return before + lines + [f'if ({self.compare("<=", to, fro)}) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
@@ -7666,7 +7630,7 @@ class Emit:
         except Wait:
             zero_bytes = False
         it = t[5:-1] if t.startswith("List<") else t
-        if not zero_bytes or (it not in ("Int", "Float", "bool") and it not in WIDTHS and it != self.whole64()):
+        if not zero_bytes or (it not in NUMS):
             raise Wait("raw memory (memset) that is not the zero of numbers")
         return self.store(dst, lambda want: self.u.zero(want))
 
@@ -8078,11 +8042,10 @@ class Emit:
             raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, which has no such variable")
         t = self.tp(n)
         their, of = target["variables"][name]
-        simple = {"bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Text": "text"}
-        if t in simple:   # (a value on its own: as on a wire - logic::convertible)
-            numbers = ("bool", "int", "float")
-            if not (simple[t] == their or (simple[t] in numbers and their in numbers) or t == "Text" or (t == "Vector" and their in ("int", "float"))):
-                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, a {their}, as a {t} (it does not become one)")
+        simple = {"Vector": "vector", "Text": "text", **{x: x for x in NUMS}}
+        if t in simple:   # (a value on its own: of its own type - no wire converts)
+            if simple[t] != their:
+                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, a {their}, as a {t} (no wire converts)")
         else:
             why = self.crosses(t, their, of, target, 1)   # (an enum's value, a struct, a list: of their kind, as in a struct)
             if why:
@@ -8182,17 +8145,15 @@ class Emit:
         value of an enum with as many values, a struct whose fields cross one by one in their order,
         a list of any of these. None where it does, else what it is instead."""
         u = self.u
-        simple = {"bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Text": "text"}
+        simple = {"Vector": "vector", "Text": "text", **{x: x for x in NUMS}}
         if depth > 16:
             raise Wait("a struct of an actor's Blueprint that holds itself")
         if t.startswith("List<") and t.endswith(">"):
             if not their.endswith("_list"):
                 return f"a {their}, and the call gives a {t}"
             return self.crosses(t[5:-1], their[:-5], of, target, depth + 1)
-        if t in WIDTHS:   # (an Int of a fixed width: the Int it holds - it crosses as an int, as on a wire)
-            return None if their == "int" else f"a {their}, and the call gives a {t}"
-        if t in simple:   # (a value on its own is converted as on a wire - in every stage the same; a field of a struct and an item of a list are not)
-            return None if simple[t] == their or depth == 0 else f"a {their}, and the call gives a {t}"
+        if t in simple:   # (a value of its own type: no wire converts)
+            return None if simple[t] == their else f"a {their}, and the call gives a {t}"
         if t in u.enum_values:
             if u.enum_numbers.get(t):
                 return f"a {their}, and the call gives {t}, an enum whose values are numbers of their own"
@@ -8391,7 +8352,7 @@ class Emit:
                 lst, at = self.place(a)
                 if self.tp(lst) != out_pins[pin_out]:
                     raise Wait(f"numbers the engine writes as {out_pins[pin_out][5:-1]} into a list of {self.tp(lst)[5:-1] if self.tp(lst).startswith('List<') else self.tp(lst)}")
-                held = self.temp("at", "Int")
+                held = self.temp("at", IDX)
                 first.append(f"{held} = {at};")
                 nodes[pin_out] = ("into", lst, held)
                 continue
@@ -8478,7 +8439,7 @@ class Emit:
                 _, lst, at = nodes[o]
                 it = bt[5:-1]
                 before, lv, after = self.variable_of(lst, bt)
-                last = self.temp("last", "Int")
+                last = self.temp("last", IDX)
                 lines += before + [f"{last} = {self.whole_math('-', f'list_length<{it}>(n{node}.{o})', '1')};"]
                 lines += self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', at, i)}] = list_get<{it}>(n{node}.{o}, {i});"]) + after
             elif nodes.get(o) is not None:
@@ -8563,7 +8524,7 @@ class Emit:
 
     def entry(self, lst, index, row):
         """The entry of a list at a place, as an expression of its own (the place: an expression or a text)."""
-        at = index if isinstance(index, dict) else {"kind": "_Text", "_text": index, "_type": "Int"}
+        at = index if isinstance(index, dict) else {"kind": "_Text", "_text": index, "_type": IDX}
         return {"kind": "ArraySubscriptExpr", "_bt": row, "type": {"qualType": "int"}, "inner": [lst, at]}
 
     def held_by(self, n):
@@ -8587,7 +8548,7 @@ class Emit:
         base, at = e
         kind, _ = self.keyed(base)
         lt, row, kt, _ = self.rows(base)
-        return f"{kind}_key_at<{row}>({self.ex(base, lt)}, {at if isinstance(at, str) else self.ex(at, 'Int')})", kt
+        return f"{kind}_key_at<{row}>({self.ex(base, lt)}, {at if isinstance(at, str) else self.ex(at, IDX)})", kt
 
     def iter_node(self, n):
         """An iterator's expression without what only converts it (an iterator made a const_iterator)."""
@@ -8608,7 +8569,7 @@ class Emit:
         if b.get("kind") == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) in ("operator->", "operator*") and len(kids(b)) == 2 and self.is_reverse_iter(kids(b)[1]):
             # (through a list from its end: the entry before the place the iterator holds)
             home = self.home(kids(b)[1])
-            return self.entry(home, self.whole_math("-", self.ex(kids(b)[1], "Int"), "1"), self.tp(home)[5:-1])
+            return self.entry(home, self.whole_math("-", self.ex(kids(b)[1], IDX), "1"), self.tp(home)[5:-1])
         return None
 
     def home(self, n):
@@ -8719,8 +8680,8 @@ class Emit:
         if name == "erase" and len(a) == 1:
             h = self.entry_life(self.ctype(base)) if kind == "map" else None   # (what ends with the entry taken out)
             if self.is_iter(a[0]):   # (erase(it): the entry at that place goes - the next one is there then)
-                at = self.temp("at", "Int")
-                place = self.ex(a[0], "Int")
+                at = self.temp("at", IDX)
+                place = self.ex(a[0], IDX)
                 before, lv, after = self.variable_of(base, lt)
                 ends = self.ended_entry(h, f"{lv}[{at}]") if h is not None else []
                 return before + [f"{at} = {place};", *ends, f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
@@ -8728,7 +8689,7 @@ class Emit:
             lines = [f"{key} = {self.ex(a[0], kt)};"]
             before, lv, after = self.variable_of(base, lt)
             if h is not None:   # (the key's entry, if there is one, ends)
-                at = self.temp("at", "Int")
+                at = self.temp("at", IDX)
                 lines += [f"{at} = {self.found_at(kind, row, lv, key)};", f'if (math_compare<">=", i64>({at}, 0)) {{',
                           *["  " + x for x in self.ended_entry(h, f"{lv}[{at}]")], "}"]
             node = self.u.next_node
@@ -8781,12 +8742,12 @@ class Emit:
         lt, row, kt, vt = self.rows(base)
         lst = self.ex(base, lt)
         if name == "size" and not a:
-            return f"{kind}_length<{row}>({lst})", "Int"
+            return f"{kind}_length<{row}>({lst})", IDX
         if name == "empty" and not a:
             return f'math_compare<"==", i64>({kind}_length<{row}>({lst}), 0)', "bool"
         if name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the length
-            return ("0" if "begin" in name else f"{kind}_length<{row}>({lst})"), "Int"
+            return ("0" if "begin" in name else f"{kind}_length<{row}>({lst})"), IDX
         if name in ("find", "count", "contains", "at") and len(a) == 1:
             key = self.ex(a[0], kt)
             if name == "contains":
@@ -8924,7 +8885,7 @@ class Emit:
         entries = ptr[2]
         if lst.get("_type") != f"List<{entries}>":
             return None
-        name = self.temp((v.get("name") or "p") + "_at", "Int")
+        name = self.temp((v.get("name") or "p") + "_at", IDX)
         self.pointers[v["id"]] = (lst["_text"], name, entries)
         return [f"{name} = {at};"]
 
@@ -8955,22 +8916,20 @@ class Emit:
         later = self.changed_while_named(getattr(self, "rest_stmts", None) or [], v["id"])
         if size is None or self.steps_in(x) or self.reads(x) & later:
             return None   # (x changed while p is used: p reads what x has then)
-        if t == "double":
-            bits = f"int64_bits_of_float({self.ex(x, 'Float')})"
-        elif t == "float":
-            bits = f"int64_of_int(math_bits_of_float32({self.ex(x, 'Float')}))"
-        elif size == 8:
-            bits = self.ex64(x)
+        xt = self.tp(x)
+        if xt in FLOATS:   # (its bits: Bit Cast)
+            bits = num_cast("u64", "u32", f"num_bit_cast<u32, f32>({self.ex(x, xt)})") if xt == "f32" else f"num_bit_cast<u64, f64>({self.ex(x, xt)})"
         else:
-            bits = f"int64_of_int({self.ex(x, 'Int')})"
-        held = self.temp("bits", "Int64")
+            bits = num_cast("u64", xt, self.ex(x, xt))
+        held = self.temp("bits", "u64")
         pointee = self.u.clean(re.sub(r"\*\s*(?:const)?\s*$", "", raw)).strip()
-        e = WIDTH[pointee] if pointee in ("unsigned char", "signed char") else "Int"   # (the bytes as what C++ reads them through: u8, i8 - a char, void, std::byte: an Int)
+        e = "i8" if pointee == "signed char" else "u8"   # (the bytes as what C++ reads them through: u8, i8 - void, std::byte: u8)
         lt = f"List<{e}>"
         made = self.temp("bytes", lt, size)
-        at = self.temp((v.get("name") or "p") + "_at", "Int")
+        at = self.temp((v.get("name") or "p") + "_at", IDX)
         self.pointers[v["id"]] = (made, at, e)
-        return [f"{held} = {bits};"] + [f"{made}[{i}] = int64_low(int64_and(int64_shift_right_unsigned({held}, {8 * i}), int64_of_int(255)));" for i in range(size)] + [f"{at} = 0;"]
+        return [f"{held} = {bits};"] + [f"{made}[{i}] = " + (f"num_cast<{e}, u64>({held})" if i == 0 else f"kern::formula<u64>([](auto b) {{ return num_cast<{e}, u64>(b >> {8 * i}); }}, {held})") + ";"
+                                        for i in range(size)] + [f"{at} = 0;"]
 
     def entry_pointer(self, v):
         """`T* p = &list[i];`, `T* p = there ? &list[i] : nullptr;` - a pointer of the function to an entry of a list
@@ -8991,7 +8950,7 @@ class Emit:
                 self.u.btype(re.sub(r"\*(?:\s*const)?$", "", raw).strip())
             except Wait:
                 return None   # (what it points at has no type here: no entry of a list of the Blueprint)
-            name = self.temp((v.get("name") or "p") + "_at", "Int")
+            name = self.temp((v.get("name") or "p") + "_at", IDX)
             self.unbound[v["id"]] = name
             return [f"{name} = -1;"]
         if self.given_to(v):
@@ -9008,7 +8967,7 @@ class Emit:
                 a, c = place_of(yes), place_of(no)
                 if a is None or c is None:
                     return None
-                return f"logic_select<Int>({self.bx(cond)}, {a}, {c})"
+                return f"logic_select<{IDX}>({self.bx(cond)}, {a}, {c})"
             if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b):
                 e = self.unwrap(kids(b)[0])
                 k = e.get("kind")
@@ -9017,7 +8976,7 @@ class Emit:
                     if self.is_this(base) or not (self.tp_or_none(base) or "").startswith("List<") or self.is_slot(e):
                         return None
                     found.append(base)
-                    return self.ex(idx, "Int")
+                    return self.ex(idx, IDX)
             return None
         # (the place is worked out apart: a branch of `there ? &list[i] : nullptr` that needs steps of its own
         # would run them whether it is taken or not - such a pointer waits)
@@ -9034,7 +8993,7 @@ class Emit:
         pre, got = self.lazily(lambda: self.spot(home))
         if got is None or pre or not got[1].startswith("List<"):
             return None
-        name = self.temp((v.get("name") or "p") + "_at", "Int")
+        name = self.temp((v.get("name") or "p") + "_at", IDX)
         self.pointers[v["id"]] = (got[0], name, got[1][5:-1])
         return [f"{name} = {at};"]
 
@@ -9096,7 +9055,7 @@ class Emit:
         if bound is not None and re.sub(r"\s+", "", bound[0]) != re.sub(r"\s+", "", got[0]):
             raise Wait("a pointer that is given entries of two lists")
         self.pointers[vid] = (got[0], name, got[1][5:-1])
-        return [f"{name} = {self.ex(idx, 'Int')};"]
+        return [f"{name} = {self.ex(idx, IDX)};"]
 
     def repointed(self, v):
         """Is a pointer of the function moved (`++p`, `p += 1`), or is its own address taken (`&p`: something else
@@ -9137,7 +9096,7 @@ class Emit:
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
-        held = addressed_record(self.tree, a) if entries in ("U8", "Int") else None
+        held = addressed_record(self.tree, a) if entries in ("u8", "i8") else None
         if held is not None:
             # the address of a value handed to a pointer to bytes (`crc(&frame, n)`): the value's bytes - as many
             # as it has, a list of that fixed length, made where the call is (Bytes of Struct)
@@ -9185,14 +9144,14 @@ class Emit:
             ops = kids(b)[1:] if k == "CXXOperatorCallExpr" else kids(b)
             if op in ("+", "-") and len(ops) == 2:
                 lst, at = self.place(ops[0])
-                return lst, self.whole_math(op, at, self.ex(ops[1], "Int"))
+                return lst, self.whole_math(op, at, self.ex(ops[1], IDX))
         raw = bare(n)
         while raw.get("kind") == "ImplicitCastExpr" and raw.get("castKind") != "ArrayToPointerDecay" and kids(raw):
             raw = bare(kids(raw)[0])
         if raw.get("kind") == "ImplicitCastExpr" and raw.get("castKind") == "ArrayToPointerDecay" and (self.tp_or_none(kids(raw)[0]) or "").startswith("List<"):
             return kids(raw)[0], "0"
         if self.is_iter(b):   # (an iterator: the place it stands at, in the list it goes through)
-            return self.home(b), self.ex(b, "Int")
+            return self.home(b), self.ex(b, IDX)
         raise Wait("a place in a list of another shape")
 
     def tp_or_none(self, n):
@@ -9210,7 +9169,7 @@ class Emit:
         """Steps for every whole number from first to last (a For Loop of its own)."""
         node = self.u.next_node
         self.u.next_node += 1
-        self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+        self.u.members.append(f"  struct : kern::Node<{node}> {{ i64 index = 0; }} n{node};")
         return [f"for (auto it{node} = flow_for(n{node}, {first}, {last}); it{node}.next();) {{", *["  " + ln for ln in body(f"n{node}.index")], "}"]
 
     def unique_entries(self, base, lv, it, rng, end):
@@ -9224,10 +9183,10 @@ class Emit:
             return b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") == want and kids(callee(b)) and self.same_list(kids(callee(b))[0], base)
         if not (whole(rng[0], "begin") and whole(rng[1], "end") and whole(end, "end")):
             raise Wait("list: std::unique of a part of a list")
-        if it not in ("Int", "Float", "Text") and it not in WIDTHS and it not in self.u.enum_values:   # (entries of a width: their numbers)
+        if it not in INTS + FLOATS + ("Text",) and it not in self.u.enum_values:   # (entries of a width: their numbers)
             raise Wait(f"list: std::unique of {it} (its ==)")
         cpp = self.entry_cpp(base)
-        kept, n = self.temp("kept", "Int"), self.temp("count", "Int")
+        kept, n = self.temp("kept", IDX), self.temp("count", IDX)
         def body(r):
             same = self.is_equal(self.at_place(base, kept, it), self.at_place(base, r, it), it, cpp)
             return [f"if (logic_not({same})) {{", f"  {kept} += 1;", f"  {lv}[{kept}] = {lv}[{r}];", "}"]
@@ -9243,7 +9202,7 @@ class Emit:
         """v.erase(place): the entry at that place goes, the ones after it move down."""
         h = self.entry_life(self.ctype(base))
         if h is not None:   # (the entry taken out ends)
-            held = self.temp("at", "Int")
+            held = self.temp("at", IDX)
             return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
         return [f"list_remove_at({lv}, {at});"]
 
@@ -9261,9 +9220,9 @@ class Emit:
                 inner = self.unwrap(kids(inner)[0])
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove" and len(kids(inner)) == 4:
                 # v.erase(std::remove(v.begin(), v.end(), x), v.end()): every entry that is x goes
-                if it not in ("Int", "Text") and it not in WIDTHS and it not in self.u.enum_values:
+                if it not in INTS + ("Text",) and it not in self.u.enum_values:
                     raise Wait(f"list: every {it} that equals a value is removed")
-                if it in WIDTHS and self.u.clean(self.ctype(kids(inner)[3])) != self.u.clean(self.entry_cpp(base)):
+                if it in INTS and self.tp_or_none(kids(inner)[3]) != it:
                     # (an entry of a width equals a value of its own type when their numbers are equal; a value of another
                     # type C++ compares after its conversions - u32 == -1 holds for 4294967295)
                     raise Wait("algorithm: std::remove of a value of another type")
@@ -9279,7 +9238,7 @@ class Emit:
             (l0, first), (l1, last) = self.place(args[0]), self.place(args[1])
             if not (self.same_list(l0, base) and self.same_list(l1, base)):
                 raise Wait("list: erase() at a place of another list")
-            a, b = self.temp("first", "Int"), self.temp("last", "Int")
+            a, b = self.temp("first", IDX), self.temp("last", IDX)
             return [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"] + self.count_loop(a, b, lambda i: [f"list_remove_at({lv}, {a});"])
         if name == "insert" and len(args) in (2, 3):
             lst, at = self.place(args[0])
@@ -9294,19 +9253,19 @@ class Emit:
                 e = self.unwrap(args[0])
                 while e.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(e)) == 1:
                     e = self.unwrap(kids(e)[0])   # (v.end() made a const_iterator)
-                a, b = self.temp("first", "Int"), self.temp("last", "Int")
+                a, b = self.temp("first", IDX), self.temp("last", IDX)
                 lines = [f"{a} = 0;", f"{b} = {self.whole_math('-', f'text_length({text})', '1')};"]
                 if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") in ("end", "cend"):
-                    n0 = self.temp("length", "Int")
+                    n0 = self.temp("length", IDX)
                     lines += [f"{n0} = list_length<{it}>({lv});",
                               f"list_resize({lv}, {self.whole_math('+', n0, f'text_length({text})')}, {self.u.zero(it)});"]
                     return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, i)}] = {byte(i)};"])
-                p = self.temp("place", "Int")
+                p = self.temp("place", IDX)
                 return [f"{p} = {at};"] + lines + self.count_loop(a, b, lambda i: [f"list_insert({lv}, {self.whole_math('+', p, i)}, {byte(i)});"])
             end = "end" in callee(self.unwrap(args[0])).get("name", "") if self.unwrap(args[0]).get("kind") == "CXXMemberCallExpr" else False
             lines = []
             if not end:
-                p = self.temp("place", "Int")
+                p = self.temp("place", IDX)
                 lines.append(f"{p} = {at};")
             def put(value, offset):
                 return f"list_add({lv}, {value});" if end else f"list_insert({lv}, {self.whole_math('+', p, offset) if offset != '0' else p}, {value});"
@@ -9330,12 +9289,12 @@ class Emit:
                 if src is None:
                     src = self.temp("from", st)
                     lines.append(f"{src} = {self.ex(s0, st)};")
-                a, b = self.temp("first", "Int"), self.temp("last", "Int")
+                a, b = self.temp("first", IDX), self.temp("last", IDX)
                 lines += [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
                 if end:
                     # at the end, in one go (one request for memory at most, as in C++): the list that much
                     # longer (Set Length), then each new entry set where it stands
-                    n0 = self.temp("length", "Int")
+                    n0 = self.temp("length", IDX)
                     lines += [f"{n0} = list_length<{it}>({lv});",
                               f"list_resize({lv}, {self.whole_math('+', n0, self.whole_math('+', self.whole_math('-', b, a), '1'))}, {self.u.zero(it)});"]
                     return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, self.whole_math('-', i, a))}] = list_get<{it}>({src}, {i});"])
@@ -9359,14 +9318,14 @@ class Emit:
         if name in ("resize", "assign") and len(args) in (1, 2) and not (name == "assign" and len(args) == 1):
             # the list that long, in one go (Set Length): cut at its end or filled up
             if name == "resize":
-                return [f"list_resize({lv}, {self.ex(args[0], 'Int')}, {self.put(args[1], it) if len(args) == 2 else self.u.zero(it)});"]
+                return [f"list_resize({lv}, {self.ex(args[0], IDX)}, {self.put(args[1], it) if len(args) == 2 else self.u.zero(it)});"]
             # (assign: what it is given is worked out before the list is emptied)
-            n, fill = self.temp("count", "Int"), self.temp("fill", it)
-            return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
+            n, fill = self.temp("count", IDX), self.temp("fill", it)
+            return [f"{n} = {self.ex(args[0], IDX)};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
         if name == "fill" and len(args) == 1:
             # every entry this value (std::array::fill): worked out once, then set where each entry stands -
             # the loop C++ runs, nothing asked for
-            fill, last = self.temp("fill", it), self.temp("last", "Int")
+            fill, last = self.temp("fill", it), self.temp("last", IDX)
             return [f"{fill} = {self.ex(args[0], it)};", f"{last} = {self.whole_math('-', f'list_length<{it}>({lv})', '1')};"] + self.count_loop("0", last, lambda i: [f"{lv}[{i}] = {fill};"])
         if name == "swap" and len(args) == 1 and self.tp_or_none(args[0]) == f"List<{it}>":
             return self.swapped_lists(lv, args[0], f"List<{it}>")
@@ -9466,7 +9425,7 @@ class Emit:
             if got[1] != "bool":
                 raise Wait("an order that gives no Bool")
             return got[0]
-        if self.tp(x) not in ("Int", "Float") and not self.is64(x):
+        if self.tp(x) not in INTS + FLOATS:
             raise Wait(f"the order of {self.tp(x)} (an algorithm without its own)")
         return self.bx({"kind": "BinaryOperator", "opcode": "<", "type": {"qualType": "bool"}, "inner": [x, y]})
 
@@ -9482,7 +9441,7 @@ class Emit:
                 raise Wait("algorithm: std::find of a struct without an == of the program's")
             got = self.invoke(self.u.function(op), [y], obj=x)
             return got[0]
-        if it not in ("Int", "Float", "bool") and it not in WIDTHS and it not in self.u.enum_values and not self.is64(x):
+        if it not in NUMS and it not in self.u.enum_values:
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
 
@@ -9577,7 +9536,7 @@ class Emit:
             raise Wait(f"algorithm: std::{name} of a {lt}")
         it = lt[5:-1]
         if len(a) == 2:
-            if it not in ("Int", "Float", "bool", "Text", "Int64") and it not in WIDTHS and it not in self.u.enum_values:
+            if it not in NUMS + ("Text",) and it not in self.u.enum_values:
                 raise Wait(f"algorithm: std::{name} of {it} by its own < (a list of {it} has no order of its own: a function says it)")
             order = "nullptr"
         else:
@@ -9608,7 +9567,7 @@ class Emit:
             x = self.held_once(a[2], wire(it))
         else:
             g, given, lines = self.function_value(name, a[2])
-        at, end, go = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "bool")
+        at, end, go = self.temp("at", IDX), self.temp("end", IDX), self.temp("go", "bool")
         entry = self.at_place(l0, at, it)
         def test():
             if name == "find":
@@ -9637,7 +9596,7 @@ class Emit:
         l0, lt, first, last = self.range_of(name, a[0], a[1])
         it = lt[5:-1]
         g, given, lines = self.function_value(name, a[2])
-        count, at, end = self.temp("count", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
+        count, at, end = self.temp("count", IDX), self.temp("at", IDX), self.temp("end", IDX)
         def test():
             got = self.invoke(g, given + [self.at_place(l0, at, it)])
             if got[1] != "bool":
@@ -9647,7 +9606,7 @@ class Emit:
         more = f'{self.compare("<", at, end)}'
         self.hoist(lines + [f"{count} = 0;", f"{at} = {first};", f"{end} = {last};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
                             f"  if ({hit}) {{", f"    {count} += 1;", "  }", f"  {at} += 1;", "}"])
-        return count, "Int"
+        return count, IDX
 
     def partitioned(self, a):
         """std::stable_partition(first, last, f): the entries f holds for first, then the others - each part in
@@ -9662,7 +9621,7 @@ class Emit:
         it = lt[5:-1]
         g, given, lines = self.function_value("stable_partition", a[2])
         before, lv, after = self.variable_of(l0, lt)
-        at, end, go, kept, rest = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "bool"), self.temp("kept", "Int"), self.temp("rest", lt)
+        at, end, go, kept, rest = self.temp("at", IDX), self.temp("end", IDX), self.temp("go", "bool"), self.temp("kept", IDX), self.temp("rest", lt)
         def test():
             got = self.invoke(g, given + [self.at_place(l0, at, it)])
             if got[1] != "bool":
@@ -9706,7 +9665,7 @@ class Emit:
         if len(a) == 3:
             g, given, lines = self.function_value(name, a[2])
             cmp = (g, given)
-        best, at, end = self.temp("best", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
+        best, at, end = self.temp("best", IDX), self.temp("at", IDX), self.temp("end", IDX)
         x, y = self.at_place(l0, at, it), self.at_place(l0, best, it)
         pre, better = self.lazily(lambda: self.is_less(x, y, cpp, cmp) if name == "min_element" else self.is_less(y, x, cpp, cmp))
         more = f'{self.compare("<", at, end)}'
@@ -9730,7 +9689,7 @@ class Emit:
         """The steps of remove_if over the places first..end of the list `l0` (its variable `lv`), with the
         function `fn`: the entries it does not hold for stay, in their order, and the list ends after them."""
         g, given, lines = self.function_value(name, fn)
-        read, kept, stop = self.temp("at", "Int"), self.temp("kept", "Int"), self.temp("end", "Int")
+        read, kept, stop = self.temp("at", IDX), self.temp("kept", IDX), self.temp("end", IDX)
         pre, gone = self.lazily(lambda: self.invoke(g, given + [self.at_place(l0, read, it)])[0])
         node = self.u.next_node
         self.u.next_node += 1
@@ -9785,31 +9744,8 @@ class Emit:
         if n.get("kind") == "CallExpr" and callee_name(n) == "move" and "&&" in by:
             n["_taken"] = True
 
-    # whole numbers a Blueprint's Int holds as C++ computes them (`x += 1` is x + 1): int (past its end C++ leaves it
-    # open) and the 64-bit ones; the others wrap around at their size
-    UNCUT = frozenset(("int", "long", "long long", "unsigned long", "unsigned long long"))
+    # (the whole numbers C++ computes as an int: x += 1, ++x of them is an int sum)
     PROMOTED = frozenset(("bool", "char", "signed char", "unsigned char", "short", "unsigned short"))
-
-    def held_as(self, a, synth):
-        """`a op= b` and `++a` computed in the type C++ computes them in: the result converted back to a's whole-number
-        type where that keeps less of it (C++ [expr.ass]: E1 = E1 op E2, the value converted to E1's type)."""
-        have, want = self.u.clean(qtype(synth)), self.ctype(a)
-        if have == want or NUMBER.get(have) != "Int" or NUMBER.get(want) != "Int":
-            return synth
-        try:
-            if self.narrow("x", have, want, None) == "x":
-                return synth
-        except Wait:
-            pass   # (a conversion the formula does not know: the cast says so where it is written)
-        return {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": a.get("type", {}), "inner": [synth]}
-
-    def wraps_sum(self, a, computed, b):
-        """`a += b` (`++a`: b None) where a is a variable of a fixed width (U8 ... I32) and C++ computes the sum in a
-        whole number of as many bits or more: the sum, stored in a (Add to Variable), keeps the bits C++ keeps."""
-        i = bare(a).get("referencedDecl", {}).get("id")
-        w = self.types.get(i)
-        return (w in WIDTHS and self.CUT_BITS.get(computed, 0) >= WIDTHS[w] and computed not in ("char",)
-                and (b is None or self.tp(b) == "Int" and not self.is64(b)))
 
     def plain_variable(self, n):
         n = bare(n)
@@ -9895,7 +9831,7 @@ class Emit:
             if k not in ("ref", "const"):
                 continue
             t = self.tp(b)
-            if k == "const" and t in ("Int", "Float", "bool", "Vector"):
+            if k == "const" and t in NUMS + ("Vector",):
                 continue
             c, x, y = kids(b)
             which = self.bx(c)
@@ -9945,7 +9881,7 @@ class Emit:
         the loop to another list."""
         if self.frozen is None or re.fullmatch(r"-?\d+|n\d+\.index", index):
             return index
-        at = self.temp("at", "Int")
+        at = self.temp("at", IDX)
         self.frozen.append(f"{at} = {index};")
         return at
 
@@ -10098,17 +10034,17 @@ class Emit:
                 if self.pointer_of(base) is not None:   # (an entry through a pointer into a list: counted from its place)
                     lname, aname, et = self.pointer_of(base)
                     self.f.indexes = True
-                    return f"{lname}[{self.fixed(self.whole_math('+', aname, self.ex(idx, 'Int')))}]", et
+                    return f"{lname}[{self.fixed(self.whole_math('+', aname, self.ex(idx, IDX)))}]", et
             if self.is_vec(base):
                 return None
             got = self.spot(base)
             if got is not None and got[1].startswith("Map<") and k == "ArraySubscriptExpr":   # (the value of a map's entry at its place: entry)
                 self.f.indexes = True
-                return f"{got[0]}[{self.fixed(self.ex(idx, 'Int'))}]", template_args(got[1])[1]
+                return f"{got[0]}[{self.fixed(self.ex(idx, IDX))}]", template_args(got[1])[1]
             if got is None or not got[1].startswith("List<"):
                 return None
             self.f.indexes = True
-            return f"{got[0]}[{self.fixed(self.ex(idx, 'Int'))}]", got[1][5:-1]
+            return f"{got[0]}[{self.fixed(self.ex(idx, IDX))}]", got[1][5:-1]
         if k == "CXXMemberCallExpr" and callee(b).get("name") in ("front", "back", "at") and kids(callee(b)):
             base = kids(callee(b))[0]
             a = kids(b)[1:]
@@ -10120,7 +10056,7 @@ class Emit:
                 return None
             self.f.indexes = True
             it = got[1][5:-1]
-            at = self.ex(a[0], "Int") if name == "at" else "0" if name == "front" else self.whole_math("-", f"list_length<{it}>({got[0]})", "1")
+            at = self.ex(a[0], IDX) if name == "at" else "0" if name == "front" else self.whole_math("-", f"list_length<{it}>({got[0]})", "1")
             return f"{got[0]}[{self.fixed(at)}]", it
         return None
 
@@ -10207,7 +10143,7 @@ class Emit:
         k = t.get("kind")
         if k == "DeclRefExpr" and (t.get("referencedDecl") or {}).get("id") in self.char_places:
             text, at, _ = self.char_places[t["referencedDecl"]["id"]]   # (a byte of a text where it stands: Set Code)
-            return [f"text_set_code({text}, {at}, {value('Int')});"]
+            return [f"text_set_code({text}, {at}, {value(IDX)});"]
         if k == "DeclRefExpr":
             if self.held_type(t) in self.u.rows:   # (the entry of a list inside a list a name stands for - `auto& ring : rings` -
                 # is held as a struct of that list: its place is that field, as `spot` says)
@@ -10266,7 +10202,7 @@ class Emit:
                     raise Wait(f"vector: .{t.get('name')}")
                 old = self.ex(base, "Vector")
                 parts = [f"vector_break({old}).x", f"vector_break({old}).y", f"vector_break({old}).z"]
-                parts[["x", "y", "z"].index(t["name"])] = value("Float")
+                parts[["x", "y", "z"].index(t["name"])] = value("f32")
                 return self.store(base, lambda _t: f"vector_make({', '.join(parts)})")
             st = self.tp(base)
             if st in self.u.struct_fields:
@@ -10287,17 +10223,17 @@ class Emit:
             if self.is_vec(base):
                 # a component of a vector by its number, as the vector's operator[] picks it (0: x, 1: y, any
                 # other: z) - the number and the value worked out once, the vector set anew where it stands
-                at, put = self.temp("at", "Float"), self.temp("put", "Float")
-                lines = [f"{at} = {self.ex(idx, 'Float')};", f"{put} = {value('Float')};"]
+                at, put = self.temp("at", "i32"), self.temp("put", "f32")
+                lines = [f"{at} = {self.ex(idx, 'i32')};", f"{put} = {value('f32')};"]
                 old = self.ex(base, "Vector")
-                parts = [f"kern::formula([](Float i, Float v, Float c) -> Float {{ return {cond} ? v : c; }}, {at}, {put}, vector_break({old}).{c})"
-                         for cond, c in (("i == 0.0", "x"), ("i == 1.0", "y"), ("i != 0.0 && i != 1.0", "z"))]
+                parts = [f"kern::formula<i32, f32, f32>([](auto i, auto v, auto c) {{ return {cond} ? v : c; }}, {at}, {put}, vector_break({old}).{c})"
+                         for cond, c in (("i == 0", "x"), ("i == 1", "y"), ("i != 0 && i != 1", "z"))]
                 return lines + self.store(base, lambda _t: f"vector_make({', '.join(parts)})")
             lt = self.tp(base)
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list is set")
             before, var, after = self.variable_of(base, lt)
-            return before + [f"{var}[{self.ex(idx, 'Int')}] = {value(lt[5:-1])};"] + after
+            return before + [f"{var}[{self.ex(idx, IDX)}] = {value(lt[5:-1])};"] + after
         if k == "ConditionalOperator" and t.get("valueCategory") == "lvalue":
             # (c ? a : b) = v: the value first (C++ sequences the right of = before its left), then the condition
             # picks the place that gets it
@@ -10854,7 +10790,11 @@ class Emit:
         for, as for the std::array. A cast to anything else waits."""
         c = self.ctype(b)
         if not c.startswith("std::array<"):
-            return self.number_bits(b, x)   # (between a float and a whole number of its width)
+            # (between a float and a whole number of its width: Bit Cast - its bits read as the other type)
+            to, frm = self.tp(b), self.tp(x)
+            if to not in NUMS or frm not in NUMS or to == "bool" or frm == "bool" or BYTE_WIDTH[to] != BYTE_WIDTH[frm]:
+                raise Wait(f"std::bit_cast from a {frm} to a {to}")
+            return f"num_bit_cast<{to}, {frm}>({self.ex(x, frm)})", to
         entry = template_args(c)[0] if c.startswith("std::array<") else None
         q = record_of(self.tree, bare(x))
         if entry is None or self.u.clean(entry) != "unsigned char" or q is None:
@@ -10862,7 +10802,7 @@ class Emit:
         st, text, size = self.u.byte_layout(q)
         if self.u.fixed(qtype(b)) != size:
             raise Wait("std::bit_cast to bytes of another size")   # (C++ does not take that either)
-        lt = "List<U8>"   # (std::array<u8, N>: Bytes of Struct gives bytes)
+        lt = "List<u8>"   # (std::array<u8, N>: Bytes of Struct gives bytes)
         tmp = self.temp("bytes", lt, size)
         self.hoist([f"{tmp} = struct_bytes<{st}, {text_literal(text)}>({self.ex(x, st)});"])
         return tmp, lt
@@ -11142,28 +11082,25 @@ class Emit:
             t = self.tp(b)
             return Const(u).literal(b, t), t   # (std::numeric_limits<T>::max(): the number it is)
         vec = [self.is_vec(x) for x in a]
-        if name == "isfinite" and len(a) == 1 and self.numeric(a[0]):
-            x = self.ex(a[0], "Float")
-            return f'math_compare<"==">(kern::formula([](Float x) -> Float {{ return x - x; }}, {x}), 0.0)', "bool"
         if not self.own(ref.get("id")):
             # the engine's functions of vectors
             if name == "length" and vec == [True]:
-                return f"vector_length({self.ex(a[0], 'Vector')})", "Float"
+                return f"vector_length({self.ex(a[0], 'Vector')})", "f32"
             if name == "length_sq" and vec == [True]:
                 v = self.ex(a[0], "Vector")
-                return f"vector_dot({v}, {v})", "Float"
+                return f"vector_dot({v}, {v})", "f32"
             if name == "dot" and vec == [True, True]:
-                return f"vector_dot({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "Float"
+                return f"vector_dot({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "f32"
             if name == "distance" and vec == [True, True]:
-                return f"vector_distance({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "Float"
+                return f"vector_distance({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "f32"
             if name == "distance_sq" and vec == [True, True]:
                 d = f"vector_sub({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})"
-                return f"vector_dot({d}, {d})", "Float"
+                return f"vector_dot({d}, {d})", "f32"
             if name == "cross" and vec == [True, True]:
                 if self.ctype(a[0]) == "kern::Vec2":
                     x, y = self.ex(a[0], "Vector"), self.ex(a[1], "Vector")
-                    return (f"kern::formula([](Float ax, Float ay, Float bx, Float by) -> Float {{ return kern::math::single(kern::math::single(ax * by) - kern::math::single(ay * bx)); }}, "
-                            f"vector_break({x}).x, vector_break({x}).y, vector_break({y}).x, vector_break({y}).y)"), "Float"
+                    return (f"kern::formula<f32, f32, f32, f32>([](auto ax, auto ay, auto bx, auto by) {{ return ax * by - ay * bx; }}, "
+                            f"vector_break({x}).x, vector_break({x}).y, vector_break({y}).x, vector_break({y}).y)"), "f32"
                 return f"vector_cross({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')})", "Vector"
             if name == "lerp" and len(a) == 3 and vec[:2] == [True, True]:
                 return f"vector_lerp({self.ex(a[0], 'Vector')}, {self.ex(a[1], 'Vector')}, {self.ex(a[2], 'f32')})", "Vector"
@@ -11254,25 +11191,22 @@ class Emit:
                 # std::to_string: what sprintf gives with the format of its type (C++ [string.conversions])
                 c = self.ctype(a[0])
                 fmt = {"int": "%d", "short": "%d", "signed char": "%d", "char": "%d", "unsigned int": "%u", "unsigned short": "%u", "unsigned char": "%u",
-                       "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "float": "%f", "double": "%f"}.get(c)
-                w = self.bits64(a[0])
-                if w is not None:   # (a u64, an i64, also under a cast that keeps its 64 bits: the decimal of its bits, as the type says)
-                    return f"int64_text{'_signed' if c in ('whole64s', 'long', 'long long') else ''}({self.ex(w, 'Int64')})", "Text"
+                       "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "whole64s": "%lld", "whole64u": "%llu", "float": "%f", "double": "%f"}.get(c)
                 if fmt is None:
                     raise Wait(f"std::to_string of a {c}")
-                return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
+                return f'text_format<"{fmt}">(-1, {self.ex(a[0], "f64" if fmt == "%f" else IDX)})', "Text"
             if name == "bit_cast" and len(a) == 1:
                 return self.bit_cast(b, a[0])
             if name in C_PARSE and len(a) == C_PARSE[name][1]:
                 return self.parsed(b, name, a)
             if name == "sscanf" and len(a) >= 2:
-                return self.scanned(a), "Int"
+                return self.scanned(a), IDX
             if name in ("snprintf", "printf", "sprintf", "to_string", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
                 raise Wait("text formatting and parsing (snprintf, to_string, atof ...)")
             if name in ("find", "find_if", "find_if_not") and len(a) == 3 and self.is_iter(b):
-                return self.first_match(name, a), "Int"
+                return self.first_match(name, a), IDX
             if name in ("min_element", "max_element") and len(a) in (2, 3) and self.is_iter(b):
-                return self.extreme(name, a), "Int"
+                return self.extreme(name, a), IDX
             if name in ("any_of", "none_of", "all_of") and len(a) == 3:
                 return self.any_match(name, a)
             if name == "count_if" and len(a) == 3:
@@ -11310,22 +11244,22 @@ class Emit:
             if name in ("operator*", "operator->") and len(ops) == 1:
                 return self.value(self.entry_of(b))
             if name in ("operator==", "operator!=") and len(ops) == 2:
-                same = f'{self.compare("==", self.ex(ops[0], "Int"), self.ex(ops[1], "Int"))}'
+                same = f'{self.compare("==", self.ex(ops[0], IDX), self.ex(ops[1], IDX))}'
                 return (same if name == "operator==" else f"logic_not({same})"), "bool"
             if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
                 return self.compare(name[8:], self.ex(ops[1], IDX), self.ex(ops[0], IDX)), "bool"
             if name in ("operator+", "operator-") and len(ops) == 2:
                 if self.is_reverse_iter(ops[1]):   # (how far one is behind the other)
-                    return self.whole_math("-", self.ex(ops[1], "Int"), self.ex(ops[0], "Int")), "Int"
-                return self.whole_math("-" if name[-1] == "+" else "+", self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
+                    return self.whole_math("-", self.ex(ops[1], IDX), self.ex(ops[0], IDX)), IDX
+                return self.whole_math("-" if name[-1] == "+" else "+", self.ex(ops[0], IDX), self.ex(ops[1], IDX)), IDX
             if name in ("operator++", "operator--"):
                 var = self.stepped_place(ops[0])
                 if len(ops) == 2:   # (it++: what it was before)
-                    old = self.temp("was", "Int")
+                    old = self.temp("was", IDX)
                     self.hoist([f"{old} = {var};"] + self.effect(b))
-                    return old, "Int"
+                    return old, IDX
                 self.hoist(self.effect(b))
-                return var, "Int"
+                return var, IDX
         if ops and not b.get("_op") and self.is_iter(ops[0]):
             # an iterator is the place it stands at
             if name in ("operator*", "operator->") and len(ops) == 1:
@@ -11339,20 +11273,20 @@ class Emit:
                         lt, row, kt, _ = self.rows(fb)
                         there = self.found(self.keyed(fb)[0], row, self.ex(fb, lt), self.ex(kids(f_)[1], kt))
                         return (there if name == "operator!=" else f"logic_not({there})"), "bool"
-                same = f'{self.compare("==", self.ex(ops[0], "Int"), self.ex(ops[1], "Int"))}'
+                same = f'{self.compare("==", self.ex(ops[0], IDX), self.ex(ops[1], IDX))}'
                 return (same if name == "operator==" else f"logic_not({same})"), "bool"
             if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
                 return self.compare(name[8:], self.ex(ops[0], IDX), self.ex(ops[1], IDX)), "bool"
             if name in ("operator+", "operator-") and len(ops) == 2:
-                return self.whole_math(name[-1], self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
+                return self.whole_math(name[-1], self.ex(ops[0], IDX), self.ex(ops[1], IDX)), IDX
             if name in ("operator++", "operator--"):
                 var = self.stepped_place(ops[0])
                 if len(ops) == 2:   # (it++: what it was before)
-                    old = self.temp("was", "Int")
+                    old = self.temp("was", IDX)
                     self.hoist([f"{old} = {var};"] + self.effect(b))
-                    return old, "Int"
+                    return old, IDX
                 self.hoist(self.effect(b))
-                return var, "Int"
+                return var, IDX
         if ops and not b.get("_op") and name in ("operator==", "operator!=") and len(ops) == 2 and is_actor(self.u.clean(qtype(ops[0]))):
             same = f"actor_equal({self.ex(ops[0], 'Actor')}, {self.ex(ops[1], 'Actor')})"   # (Same Actor: the same world and id)
             return (same if name == "operator==" else f"logic_not({same})"), "bool"
@@ -11404,9 +11338,9 @@ class Emit:
             if got is not None:
                 return got
             self.f.indexes = True
-            return f"list_get<{t0[5:-1]}>({self.ex(ops[0], t0)}, {self.ex(ops[1], 'Int')})", t0[5:-1]
+            return f"list_get<{t0[5:-1]}>({self.ex(ops[0], t0)}, {self.ex(ops[1], IDX)})", t0[5:-1]
         if t0 == "Text" and name == "operator[]" and len(ops) == 2:
-            return self.char_of(self.ex(ops[0], "Text"), self.ex(ops[1], "Int"), qtype(b)), "Int"   # (s[i]: its byte - s[s.size()] is 0)
+            return self.char_of(self.ex(ops[0], "Text"), self.ex(ops[1], IDX), qtype(b)), self.char_type(qtype(b))   # (s[i]: its byte - s[s.size()] is 0)
         if t0 == "Text":
             if name == "operator+" and self.tp(ops[1]) == "Text":
                 return f'text_append({self.ex(ops[0], "Text")}, {self.ex(ops[1], "Text")}, "")', "Text"
@@ -11421,7 +11355,7 @@ class Emit:
             # the == of a class of the program says is that class's own matter.)
             it = t0[5:-1]
             cpp = re.match(r"std::vector<(.+)>$", self.u.clean(qtype(ops[0])))
-            if it in ("Int", "Float", "bool", "Text", "Int64") or it in WIDTHS or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
+            if it in NUMS + ("Text",) or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
                 r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
                 return (r if name == "operator==" else f"logic_not({r})"), "bool"
         raise Wait(f"the operator {name[8:]} of {t0}")
@@ -11481,14 +11415,15 @@ class Emit:
             # Int of a long, a U8 of an int - C++'s conversion of it, as a cast to that number says it: kern::logic::Sized
             # stores what static_cast<T> gives, Whole what static_cast<i64> gives)
             c = self.ctype(b)
-            if c.startswith("kern::logic::Sized<") or c == "kern::logic::Whole":
+            if c.startswith("kern::logic::num::Typed<"):
+                # (a place of the language made of a number: the number converted to its type, as C++ converts it)
                 if self.language_value(a[0]):
                     return self.ex(a[0], t), t
                 cast = {"kind": "CXXStaticCastExpr", "castKind": "IntegralCast", "valueCategory": "prvalue", "inner": [a[0]],
-                        "type": {"qualType": self.u.clean(template_args(c)[0]) if c != "kern::logic::Whole" else "long"}}
-                if wire(self.tp(a[0])) not in ("Int", "Float", "bool", "Int64"):
+                        "type": {"qualType": self.u.clean(template_args(c)[0])}}
+                if self.tp(a[0]) not in NUMS:
                     raise Wait(f"a {t} of a Blueprint's class made of a {self.tp(a[0])}")
-                return self.ex(cast, wire(t)), wire(t)
+                return self.ex(cast, t), t
             return self.ex(a[0], t), t
         if self.is_box(b):
             it = t[5:-1]
@@ -11508,9 +11443,9 @@ class Emit:
             if not a:
                 return ZERO["Vector"], "Vector"
             if len(a) in (2, 3) and all(self.numeric(x) for x in a):
-                parts = [self.ex(x, "Float") for x in a] + ["0.0"] * (3 - len(a))
-                if all(re.fullmatch(r"-?[\d.e+-]+", p) for p in parts):
-                    return "Vector{" + ", ".join(parts) + "}", "Vector"
+                parts = [self.ex(x, "f32") for x in a] + ["0.0f"] * (3 - len(a))
+                if all(literal_number(p, "f32") is not None for p in parts):
+                    return "Vector{" + ", ".join(p[:-1] for p in parts) + "}", "Vector"
                 return f"vector_make({', '.join(parts)})", "Vector"
             raise Wait("a vector made of something else")
         if t == "Text":
@@ -11520,7 +11455,7 @@ class Emit:
                 return self.ex(a[0], "Text"), "Text"
             if len(a) == 2 and self.numeric(a[0]) and re.sub(r"^const\s+", "", self.u.clean(self.ctype(a[1]))).strip() in ("char", "signed char", "unsigned char"):
                 # (count, character): the character so many times (Repeat Text)
-                return f"text_repeat({self.text_or_char(a[1])}, {self.ex(a[0], 'Int')})", "Text"
+                return f"text_repeat({self.text_or_char(a[1])}, {self.ex(a[0], IDX)})", "Text"
             if len(a) == 2 and self.numeric(a[1]):
                 # (characters, count): so many characters from a place - of a text (a C string at a place), or of a
                 # list of bytes read as characters (reinterpret_cast<const char*>(bytes.data()) + at)
@@ -11529,7 +11464,7 @@ class Emit:
                     return got, "Text"
                 if self.is_c_text(a[0]):
                     text, at = self.c_text(a[0])
-                    return f"text_sub({text}, {at}, {self.ex(a[1], 'Int')})", "Text"
+                    return f"text_sub({text}, {at}, {self.ex(a[1], IDX)})", "Text"
             raise Wait("a text made of something else")
         if t in u.struct_fields:
             fields = u.struct_fields[t]
@@ -11570,9 +11505,9 @@ class Emit:
                 else:
                     vals.append(d)
             return f"struct_make<{t}>({', '.join(vals)})", t
-        if t in ("Float", "Int", "bool") and len(a) == 1:
+        if t in NUMS and len(a) == 1:
             return self.ex(a[0], t), t
-        if t in ("Float", "Int", "bool") and not a:
+        if t in NUMS and not a:
             return u.zero(t), t
         if t in u.enum_values and not a:
             return u.zero(t), t
@@ -11617,7 +11552,7 @@ class Emit:
                 else:
                     lst = None
                 if lst is not None and self.tp_or_none(lst) == t:
-                    n = self.ex(a[1], "Int")
+                    n = self.ex(a[1], IDX)
                     if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
                         return self.ex(lst, t), t
                 # a view to read of the entries a pointer points at, as many as it says - `{bytes, length}` of a pointer into
@@ -11632,19 +11567,19 @@ class Emit:
                 widths = {"u8": 1, "i8": 1}   # (bytes: their count is the count of the entries - of wider numbers it would be a formula)
                 if held is not None and args_ and re.match(r"const\b", args_[0].strip()) and code in widths and BYTE_FIELD.get(code) == it and held[2] == it:
                     lname, aname, _ = held
-                    n = self.ex(a[1], "Int")
+                    n = self.ex(a[1], IDX)
                     made = self.temp("part", t)
                     self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {n}, {u.zero(it)});",
                                 f"list_copy_bytes<{text_literal(code)}, {text_literal(code)}>({made}, 0, {lname}, {aname}, {n});"])
                     return made, t
                 raise Wait("a view (Span) of a part of a list")
-            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
+            if len(a) in (1, 2) and self.tp_or_none(a[0]) in INTS + FLOATS and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
                 # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:
                 # two of them are the range below)
                 made = self.temp("made", t)
-                self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
+                self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], IDX)}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
-            if len(a) == 2 and t == "List<U8>" and self.text_range(a[0], a[1]) is not None:
+            if len(a) == 2 and t == "List<u8>" and self.text_range(a[0], a[1]) is not None:
                 # std::vector<u8>(text.begin(), text.end()): the bytes of the text (Bytes of Text)
                 return f"text_bytes({self.text_range(a[0], a[1])})", t
             if len(a) == 2:
@@ -11659,7 +11594,7 @@ class Emit:
                     return self.ex(s0, st), t   # (the whole list: a copy of it)
                 # (the entries read where the list stands - nothing is copied but them, as in C++)
                 src = self.place_arg(s0, st, "const", [])
-                made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+                made, i0, i1 = self.temp("made", t), self.temp("first", IDX), self.temp("last", IDX)
                 self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
                             f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
@@ -11678,7 +11613,7 @@ class Emit:
                 if not self.same_list(s0, s1) or not st.startswith("List<") or not (st[5:-1] == kt or self.u.alike(st[5:-1], kt)):
                     raise Wait("a set made of a range of another type")
                 src = self.place_arg(s0, st, "const", [])
-                made, i0, i1, node = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int"), self.keyed_node()
+                made, i0, i1, node = self.temp("made", t), self.temp("first", IDX), self.temp("last", IDX), self.keyed_node()
                 self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};"]
                            + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
                 return made, t
@@ -11706,7 +11641,7 @@ class Emit:
             if not self.u.alike(it, kt):
                 raise Wait("a list made of a range of another type")
             entry = lambda i: self.conv(f"set_key_at<{row}>({src}, {i})", kt, it)
-        made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+        made, i0, i1 = self.temp("made", t), self.temp("first", IDX), self.temp("last", IDX)
         self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
                     f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                    + self.count_loop(i0, i1, lambda i: [f"list_add({made}, {entry(i)});"]))
@@ -11730,7 +11665,7 @@ class Emit:
         if self.actor_bind(b) is not None:
             return self.has_blueprint(b, self.actor_bind(b))
         if self.actor_value(b) is not None:
-            return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "bool")
+            return self.call_on(b, self.actor_value(b), "f64" if name == "number" else "bool")
         if self.other_state(b) is not None:
             got = self.state_call(b)
             if isinstance(got, list):
@@ -11754,7 +11689,7 @@ class Emit:
             lt = self.tp(base)
             it = lt[5:-1]
             if name in ("operator bool", "has_value"):
-                return f'math_compare<">">(kern::to<Float>(list_length<{it}>({self.ex(base, lt)})), 0.0)', "bool"
+                return self.compare(">", f"list_length<{it}>({self.ex(base, lt)})", "0"), "bool"
             if name == "value":
                 return f"list_get<{it}>({self.ex(base, lt)}, 0)", it
             if name == "value_or" and len(kids(b)) == 2:
@@ -11773,10 +11708,10 @@ class Emit:
             return f"object_valid<{object_class(t)}>({self.ex(base, t)})", "bool"
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
-            return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
+            return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), IDX
         if bt.startswith("List<") and name in ("rbegin", "crbegin", "rend", "crend") and not a and self.is_reverse_iter(b):
             # through the list from its end: it begins holding the place behind the last entry and ends holding the first
-            return (f"list_length<{bt[5:-1]}>({self.ex(base, bt)})" if "begin" in name else "0"), "Int"
+            return (f"list_length<{bt[5:-1]}>({self.ex(base, bt)})" if "begin" in name else "0"), IDX
         if bt.startswith(("Map<", "Set<")):
             got = self.keyed_call(b, base, name, a)
             if got is not None:
@@ -11786,7 +11721,7 @@ class Emit:
             it = bt[5:-1]
             lst = self.ex(base, bt)
             if name == "size" and not a:
-                return f"list_length<{it}>({lst})", "Int"
+                return f"list_length<{it}>({lst})", IDX
             if name == "empty" and not a:
                 return f'math_compare<"==", i64>(list_length<{it}>({lst}), 0)', "bool"
             if name in ("at", "front", "back"):
@@ -11795,7 +11730,7 @@ class Emit:
                     return got
                 self.f.indexes = True
             if name in ("at",) and len(a) == 1:
-                return f"list_get<{it}>({lst}, {self.ex(a[0], 'Int')})", it
+                return f"list_get<{it}>({lst}, {self.ex(a[0], IDX)})", it
             if name == "front" and not a:
                 return f"list_get<{it}>({lst}, 0)", it
             if name == "back" and not a:
@@ -11808,18 +11743,18 @@ class Emit:
                 if not self.same_list(at_list, base):
                     raise Wait("list: erase() at a place of another list")
                 before, lv, after = self.variable_of(base, bt)
-                held = self.temp("at", "Int")
+                held = self.temp("at", IDX)
                 self.hoist(before + [f"{held} = {at};"] + self.entry_removed(base, lv, held) + after)
-                return held, "Int"
+                return held, IDX
             raise Wait(f"list: {name}()")
         if bt == "Text":
             got = self.text_member(b, base, name, a)
             if got is not None:
                 return got
             if name in ("size", "length") and not a:
-                return f"text_length({self.ex(base, 'Text')})", "Int"
+                return f"text_length({self.ex(base, 'Text')})", IDX
             if name == "empty" and not a:
-                return f'math_compare<"==">(kern::to<Float>(text_length({self.ex(base, "Text")})), 0.0)', "bool"
+                return self.compare("==", f'text_length({self.ex(base, "Text")})', "0"), "bool"
             if name in ("c_str", "data") and not a:
                 return self.ex(base, "Text"), "Text"
             if name.startswith("operator ") and not a and self.tp_or_none(b) == "Text":
@@ -11846,9 +11781,8 @@ def engine_skipped(q):
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
 # bits, as C++ has them; a list of them a List<Int64>)
-# (the pin types of the engine's door until its pins have the types of their signatures - stage 6 of the number types:
-# Int an i64, Float an f64, Int64 a u64; an entry of a fixed width - of a List<U8> - its own type, u8)
-ENGINE_PIN = {"bool": "boolean", "Int": "i64", "Float": "f64", "Vector": "vector", "Text": "text", "Int64": "u64", "Actor": "actor"}
+# (a number's pin is its own type - Api.pin)
+ENGINE_PIN = {"Vector": "vector", "Text": "text", "Actor": "actor"}
 # (the form of a number of each type - EnginePin::shape, kern/logic/engine_api.h: a letter each)
 NUM_SHAPE = {"bool": "b", "f64": "n", "f32": "f", "i64": "i", "u64": "l", "i32": "w", "u32": "u", "i16": "s", "u16": "r", "i8": "k", "u8": "y"}
 
@@ -11941,8 +11875,6 @@ class Api:
             return ENGINE_PIN[bt], ""
         if object_class(bt):
             return "object", engine_class_name(object_class(bt))
-        if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is a list of u8)
-            return bt.lower(), ""
         if callback_parts(bt):
             return "callback", callback_of(bt)
         if bt in self.u.enum_values:
@@ -11963,8 +11895,8 @@ class Api:
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in NUM_SHAPE:
             return NUM_SHAPE[bt]
-        if bt in ENGINE_PIN or bt in WIDTHS:
-            return {"bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l", "Actor": "a"}[wire(bt)]
+        if bt in ENGINE_PIN:
+            return {"Vector": "v", "Text": "t", "Actor": "a"}[bt]
         if object_class(bt):
             return "o"   # (an object of the engine - or none; `h` where it is always one: what a maker gives)
         if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
@@ -12438,9 +12370,7 @@ class Api:
 
 
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
-WIDE_MATH = {"sin": "kern::math::sin", "cos": "kern::math::cos", "tan": "kern::math::tan", "asin": "kern::math::asin", "acos": "kern::math::acos", "atan": "kern::math::atan",
-             "atan2": "kern::math::atan2", "exp": "kern::math::exp", "log": "kern::math::log", "pow": "kern::math::pow", "sqrt": "kern::math::sqrt", "fmod": "kern::math::mod",
-             "copysign": "kern::math::copysign", "remainder": "kern::math::remainder", "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
+
 # What a test needs where the source reads through a pointer into a list (Unit.pointed): the lists the test
 # handed it, so that an entry through such a pointer is checked against its list as converted::at checks one -
 # outside it the call is marked (C++ leaves open what it reads there). A pointer into nothing the test handed
@@ -12500,34 +12430,13 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 TEXT_TYPE = re.compile(r"(?:const\s+)?std::(?:basic_string|string|string_view|basic_string_view|u8string|u16string|u32string|wstring)\b")
 # A view the test hands a function (kern::Span): its entries are a list a pointer of the source points into (`bytes.data`).
 SPAN_TYPE = re.compile(r"(?:const\s+)?(?:kern::)?Span<")
-WIDE_PRELUDE = """// the numbers of the Blueprint language (kern/test/converted.h): a number is 64-bit, a vector's components 32-bit
-using converted::wide::f32; using converted::wide::f64;
-using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
-using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
-using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
-using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
-using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
-using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;"""
-
-
-
-# The second pass of the comparison (KERN_TEST_SOURCE_NUMBERS=1, from 26.11.2026): the test holds the source with its own
-# numbers - f32 stays f32, nothing is rewritten (widen gives the piece as it is) and the names of the prelude are the
-# engine's own. What the Blueprint gives is compared with what C++ gives: where the language computes otherwise than the
-# source (a Float of 64 bit for an f32), the comparison says so. The first pass (with the numbers of the language) stays.
-SOURCE_NUMBERS = os.environ.get("KERN_TEST_SOURCE_NUMBERS") == "1"
-# What is written does not hang on this pass: the test that decides what waits is the first one (with the numbers of the
-# language), as without the variable. With the variable each Blueprint gets one more test, test_<name>_source.cpp, made
-# after that decision with HONEST on: a piece of the source that does not compile there is left out of it and counted
-# (said in the run's last lines), it does not make a function wait.
-HONEST = [False]
-SOURCE_PRELUDE = """// the source's own numbers (KERN_TEST_SOURCE_NUMBERS=1): what C++ computes, compared with the Blueprint
+# The test holds the source with its own numbers (kern/docs/blueprint_cpp.md "Der Beweis"): f32 stays f32, nothing is
+# rewritten, the names of the prelude are the engine's own. What the Blueprint gives is compared with what C++ gives.
+SOURCE_PRELUDE = """// the source's own numbers: what C++ computes, compared with the Blueprint
 using kern::f32; using kern::f64;
 using kern::u8; using kern::u16; using kern::u32; using kern::u64;
 using kern::i8; using kern::i16; using kern::i32; using kern::i64;
-using kern::Vec2; using kern::Vec3; using converted::wide::Span;"""
+using kern::Vec2; using kern::Vec3; using kern::Span;"""
 
 
 class Held:
@@ -12606,26 +12515,6 @@ class TestWriter:
             at = m.end()
         return out + [text[at:]]
 
-    @classmethod
-    def widen(cls, text):
-        """A piece of C++ as the Blueprint language computes it: number literals without the f that
-        makes them 32-bit, float as double, the functions of numbers those of kern::math. In the pass of the
-        source's own numbers (KERN_TEST_SOURCE_NUMBERS=1: SOURCE_NUMBERS) the piece stays as the source has it."""
-        if HONEST[0]:
-            return text
-        return cls.in_code(text, cls.widen_code)
-
-    @staticmethod
-    def widen_code(text):
-        text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
-        text = re.sub(r"\bfloat\b", "double", text)
-        # (what sscanf reads into a place that is now the test's number - a float as double, a component as
-        # Num32: as the C type its conversion says, then given to the place - converted::scan_c)
-        text = re.sub(r"(?<![\w:.>])(?:::)?(?:std::)?sscanf\s*\(", "converted::scan_c(", text)
-        text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
-        text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
-        return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
-
     def piece(self, d):
         a, b = d["_at"]
         text = self.tree.said(self.cut(d["_file"], a, b))
@@ -12680,10 +12569,10 @@ class TestWriter:
         def wide(n):
             return self.u.clean(qtype(n)) in ("long", "unsigned long", "long long", "unsigned long long")
         def narrow(n):
-            """A sum, difference or product computed as an int (i32, and what is promoted to it): C++ leaves open what it
-            gives outside the range (signed overflow) - the test computes it exactly and marks the call there."""
+            """A sum, difference or product computed as a signed whole number (int - and what is promoted to it -, long): C++
+            leaves open what it gives outside the range (signed overflow) - the test computes it exactly and marks the call there."""
             computed = n.get("computeResultType") if n.get("kind") == "CompoundAssignOperator" and n.get("computeResultType") else n.get("type", {})
-            return self.u.clean(qtype({"type": computed})) == "int"
+            return self.u.clean(qtype({"type": computed})) in ("int", "long", "long long", "whole64s")
         def fixed(n):
             n = bare(n)
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
@@ -13044,32 +12933,14 @@ class TestWriter:
                         xa, xb = span(x)
                         edits.append((xa, 2, depth + 1, xa, "static_cast<double>("))
                         edits.append((xb, 0, -depth - 1, xb, ")"))
-            elif n.get("_w64") and k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "/", "%", "<<", ">>", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=") and len(ks) == 2:
-                # a 64-bit bit pattern (a Blueprint's Whole64): computed around 2^64 - only what C++ leaves open marks the call
-                op = n["opcode"]
-                (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
-                name = {"+": "plus", "-": "minus", "*": "times", "/": "quot", "%": "rem", "<<": "shl", ">>": "shr"}[op[:-1] if k == "CompoundAssignOperator" else op]
-                edits.append((a, 2, depth, a, f"converted::{name}_bits" + ("_to(" if k == "CompoundAssignOperator" else "(")))
-                swap(xb, ya, op, ", ")
-                edits.append((b, 0, -depth, b, ")"))
-            elif n.get("_w64") and k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1:
-                (a, b), (xa, xb) = span(n), span(ks[0])
-                name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec") + "_bits"
-                if n.get("isPostfix"):
-                    edits.append((a, 2, depth, a, f"converted::{name}("))
-                    swap(xb, b, n["opcode"], ")")
-                else:
-                    swap(a, xa, n["opcode"], f"converted::{name}(")
-                    edits.append((b, 0, -depth, b, ")"))
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and (wide(n) or narrow(n)) and whole(ks[0]) and whole(ks[1]):
-                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign);
-                # an int: C++ leaves open what it gives outside its range (converted.h kept_narrow)
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and narrow(n) and whole(ks[0]) and whole(ks[1]):
+                # a signed whole number (int, long): C++ leaves open what it gives outside its range (converted.h kept_signed)
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"+": "plus", "-": "minus", "*": "times"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
                 swap(xb, ya, op, ", ")
                 edits.append((b, 0, -depth, b, ")"))
-            elif (k == "UnaryOperator" and n.get("opcode") == "-" and len(ks) == 1 and not n.get("_w64") and whole(n) and whole(ks[0])
+            elif (k == "UnaryOperator" and n.get("opcode") == "-" and len(ks) == 1 and whole(n) and whole(ks[0])
                   and self.u.clean(qtype(n)) in ("int", "long", "long long") and not fixed(ks[0])):
                 # the negation of the least number of a signed type: C++ leaves open what it gives (converted.h neg)
                 (a, b), (xa, xb) = span(n), span(ks[0])
@@ -13084,7 +12955,7 @@ class TestWriter:
                 else:
                     swap(a, xa, n["opcode"], f"converted::{name}(")
                     edits.append((b, 0, -depth, b, ")"))
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("/", "%", "<<", ">>", "/=", "%=", "<<=", ">>=") and len(ks) == 2 and whole(ks[0]) and whole(ks[1]) and (not fixed(ks[1]) or wide(n)):
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("/", "%", "<<", ">>", "/=", "%=", "<<=", ">>=") and len(ks) == 2 and whole(ks[0]) and whole(ks[1]) and not fixed(ks[1]):
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"/": "quot", "%": "rem", "<<": "shl", ">>": "shr"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
@@ -13353,7 +13224,7 @@ class TestWriter:
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
         if m:   # (a view of a list: of entries the test keeps - converted::kept_span; as constant as the source says)
             const, inner = self.span_of(raw, m.group(1))
-            return f"converted::wide::Span<{const}{self.spell(inner)}>"
+            return f"kern::Span<{const}{self.spell(inner)}>"
         m = re.fullmatch(r"const\s+(.+?)\s*\*\s*(?:const)?", raw.strip())
         if m and self.u.clean(m.group(1)) in ("float", "double", "long double", *NUMBER):
             # (numbers the engine gives at a place of its own - RoadStream::data(): the test keeps the ones its stand-in
@@ -13364,11 +13235,11 @@ class TestWriter:
         if count_per(c) is not None:
             return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
-            return ("float" if c == "float" else c) if HONEST[0] else "double"   # (the second pass: the source's own numbers)
+            return "float" if c == "float" else c   # (the source's own numbers)
         if c in NUMBER:
             return c
         if c in ("kern::Vec3", "kern::Vec2") or self.u.find_type(c) in ("kern::Vec3", "kern::Vec2"):
-            return c.split("::")[-1]   # (the test's vector: converted::wide)
+            return c.split("::")[-1]   # (the engine.s vector)
         if (c in TEXT or c.startswith("std::basic_string<char")) and "string_view" not in c and "*" not in c:
             return "std::string"
         if re.match(r"std::(?:basic_string_view<char(?:,\s*std::char_traits<char>)?>|string_view)$", c):
@@ -13385,7 +13256,7 @@ class TestWriter:
         m = KEYED_KERN.match(c)
         if m:   # (a map, a set: the program's kern::Map, kern::Set - the language's very containers, of the test's values)
             a = template_args(c)
-            return f"converted::wide::Set<{self.spell(a[0])}>" if m.group(1) == "Set" else f"converted::wide::Map<{self.spell(a[0])}, {self.spell(a[1])}>"
+            return f"kern::Set<{self.spell(a[0])}>" if m.group(1) == "Set" else f"kern::Map<{self.spell(a[0])}, {self.spell(a[1])}>"
         if c.startswith("std::pair<"):
             a = template_args(c)
             return f"std::pair<{self.spell(a[0])}, {self.spell(a[1])}>"
@@ -13513,7 +13384,7 @@ class TestWriter:
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
-            return "static_cast<float>(draw.number())" if HONEST[0] and c == "float" else "draw.number()"   # (an f32 of the source: an f32 value)
+            return "static_cast<float>(draw.number())" if c == "float" else "draw.number()"   # (an f32 of the source: an f32 value)
         if c == "bool":
             return "draw.flag()"
         if c in NUMBER:
@@ -13932,7 +13803,7 @@ class TestWriter:
                 inner = template_args(re.sub(r"^const\s+|\s*&$", "", raw))[0]
                 const = "const " if re.match(r"const\b", inner) else ""
                 inner = re.sub(r"^const\s+", "", inner)
-                params.append((f"converted::wide::Span<{const}{self.spell(inner)}> {name}", default))
+                params.append((f"kern::Span<{const}{self.spell(inner)}> {name}", default))
                 values.append(f"converted::value_of({self.wrap(f'converted::as_list({name})', f'std::vector<{self.spell(inner)}>')})")
             elif self.spell(raw) == "const char*":   # (a text in so many words: as it is given)
                 params.append((f"const char* {name}", default))
@@ -14696,7 +14567,7 @@ class TestWriter:
             if d.get("isImplicit"):
                 return   # (what the compiler makes of a class - its copy, its assignment: it makes it in the test too; its place is the class's name, no source)
             if tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
-                return   # (the engine's functions of numbers: in the test's source the formula's, see `widen`)
+                return   # (the engine's functions of numbers: the engine's own, in the test as in the program)
             if ENGINE_NODES and (u.api().declared_only(d) or u.api().declared_only(tree.decl.get(i, d))):
                 return   # (a node of the engine - a method of its object, defined in its header or not: the test has its stand-in)
             f = converted.get(d["id"])
@@ -14964,7 +14835,7 @@ class TestWriter:
         return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else []) + [d["name"]])
 
     def enum_text(self, q, local=None):
-        if q.startswith(ENGINE + "::logic::") or (HONEST[0] and self.engine_record(q, ("enums",))):   # (and in the second pass every enum of the engine for Blueprints: the engine's own)
+        if q.startswith(ENGINE + "::logic::") or self.engine_record(q, ("enums",)):   # (and every enum of the engine for Blueprints: the engine's own)
             # (an enum of the engine's logic - logic::NodeKind of a NodeDef the source fills -: the real one, which the
             # logic of the test is; a copy of it would be another type than the field of the real struct. Written with
             # spaces, `:: kern :: logic :: NodeKind`: the renamer, which makes a held name the test's, leaves it as it is)
@@ -15406,7 +15277,7 @@ class TestWriter:
     def write(self):
         u, tree = self.u, self.tree
         src = tree.said(tree.text(self.path))
-        stem = u.job.replace("/", "__") + ("_source" if HONEST[0] else "")   # (the test is the Blueprint's - or a part's (Game/game_net_cpp: Game__game_net_cpp): named like it; the second pass's: <name>_source)
+        stem = u.job.replace("/", "__")   # (the test is the Blueprint's - or a part's (Game/game_net_cpp: Game__game_net_cpp): named like it; the second pass's: <name>_source)
         skipped = []
         G = self.setup()
         unguarded = self.unguarded
@@ -15439,7 +15310,6 @@ class TestWriter:
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         # (by their full names: a local variable of a function may have the name of one - `const f32 length = kern::length(d)`)
-        pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span", "Map", "Set")]
         # (an enum of a class of the engine the test has a stand-in of - logic::Runtime::Chain - stands in that stand-in)
         self.object_enums.clear()
         in_objects = set()
@@ -15454,15 +15324,15 @@ class TestWriter:
         # the first is said, where what follows it can use it)
         for d, text, _, named in sorted(self.const_pieces(G.consts, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
-            if self.widen(text) not in said_consts:   # (the program and the engine both say what pi is: once)
-                said_consts.add(self.widen(text))
+            if (text) not in said_consts:   # (the program and the engine both say what pi is: once)
+                said_consts.add((text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
                 const_gives[const_chunks[-1][1]] = [a for a, *_ in named]   # (what it declares: no `using` of it before it)
         # the enums without a name whose values the source names: their own text, like a constant's
         for d, text, named in sorted(self.unnamed_pieces(G.unnamed, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
-            if self.widen(text) not in said_consts:
-                said_consts.add(self.widen(text))
+            if (text) not in said_consts:
+                said_consts.add((text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
         # the functions
         fn_chunks, cases, outs, case_of = [], [], [], {}
@@ -15499,9 +15369,9 @@ class TestWriter:
             if piece.get("program") and any(a in own_said for a, _ in piece.get("pairs", ())):
                 continue   # (a variable of the program this test has from its header's declaration: once)
             if piece["kind"] in ("const", "unnamed"):
-                if self.widen(piece["text"]) in said_consts:
+                if (piece["text"]) in said_consts:
                     continue
-                said_consts.add(self.widen(piece["text"]))
+                said_consts.add((piece["text"]))
             # (the stand-in of a function of the engine this file does not see: before the pieces that call it)
             foreign_chunks.append(((first[0], first[1] - (0.75 if piece["kind"] == "engine" else 0.5), i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
@@ -15783,7 +15653,7 @@ class TestWriter:
                 object_defs.append((("foreign", place), piece["stand_in"][1]))
         forward_chunks = self.forward_chunks(pairs, G) + self.directive_chunks(ns)
         rename = self.renamer(pairs)
-        wide = lambda text: rename(self.widen(text))
+        wide = lambda text: rename((text))
         # the pieces of other files: named as there - a file's own names first, see `exports`
         outer = [pair for p in G.foreign.values() if not p.get("local") for pair in p.get("pairs", ())]
         named_spaces = [tuple(s) for p in G.foreign.values() for s in p.get("spaces", ())]
@@ -15793,15 +15663,15 @@ class TestWriter:
             if h not in renamers:
                 mine = [pair for p in G.foreign.values() if p.get("local") and p.get("home") == h for pair in p.get("pairs", ())] if h else []
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
-            return lambda text: renamers[h](self.widen(text))
+            return lambda text: renamers[h]((text))
         # a name of the program or the engine that is still written out in full: not the test's own
         # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
         # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
         # the real engine in the test)
         # (in the second pass a type of the engine is the engine's own - engine_record: the source names it as it is)
         own_types = "".join("|" + re.escape(q[len(ENGINE) + 2:]) + r"\b" for q in sorted([*tree.records, *tree.enums], key=len, reverse=True)
-                            if HONEST[0] and q.startswith(ENGINE + "::") and (self.engine_record(q) or self.engine_record(q, ("enums",))))
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::" + (r"|dm::" if HONEST[0] else "") + own_types + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - in the second pass as the source calls it)
+                            if q.startswith(ENGINE + "::") and (self.engine_record(q) or self.engine_record(q, ("enums",))))
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::|dm::" + own_types + r")(\w+)")   # (kern::dm: the engine's own deterministic mathematics - as the source calls it)
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -15834,15 +15704,13 @@ class TestWriter:
                 return first
             add(None, "\n".join([
                 f"// Generated by tools/cpp_to_blueprint.py from {os.path.basename(self.path)} - do not edit. The Blueprint \"{u.name}\" of the level is this",
-                *(["// file's C++, converted. Here the source of every converted function stands once more, as it is - with the",
-                   "// source's own numbers (f32 stays f32: KERN_TEST_SOURCE_NUMBERS=1); the Blueprint must give exactly what C++ gives."] if HONEST[0] else
-                  ["// file's C++, converted. Here the source of every converted function stands once more, compiled with the numbers",
-                   "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (kern/test/converted.h)."]),
-                *system, *own, '#include "kern/test/converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
+                "// file's C++, converted. Here the source of every converted function stands once more, as it is - with the",
+                "// source's own numbers (an f32 an f32); the Blueprint must give exactly what C++ gives (kern/test/converted.h).",
+                *system, *own, '#include "kern/test/converted.h"', *[f"#ifndef {n}\n#define {n} {(v)}\n#endif" for n, v in macros], "",
                 f"namespace {ns} {{", "namespace converted = ::kern::converted;",
                 "[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
-                SOURCE_PRELUDE if HONEST[0] else WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
+                SOURCE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
                 '#pragma GCC diagnostic ignored "-Wunused-variable"', '#pragma GCC diagnostic ignored "-Wnarrowing"', '#pragma GCC diagnostic ignored "-Wunused-but-set-variable"',
@@ -15860,14 +15728,14 @@ class TestWriter:
                         add(key, wide(piece["stand_in"][0]))
                         continue
                     directives = "".join(t + " " for t in (self.directive_text(scope, q, ns) for scope, q in piece.get("directives", ())) if t)
-                    if piece["kind"] == "enum" and HONEST[0] and piece.get("q") and self.engine_record(piece["q"], ("enums",)):   # (the second pass: the engine's own enum)
+                    if piece["kind"] == "enum" and piece.get("q") and self.engine_record(piece["q"], ("enums",)):   # (the second pass: the engine's own enum)
                         add(key, directives + self.enum_text(piece["q"]))
                         continue
                     if piece["kind"] != "record":
                         add(key, directives + self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
                         continue
-                    if HONEST[0] and piece.get("q") and self.engine_record(piece["q"]):   # (the second pass: the engine's own type, as below)
+                    if piece.get("q") and self.engine_record(piece["q"]):   # (the second pass: the engine's own type, as below)
                         add(key, directives + piece["head"] + f"using {piece['q'].rsplit('::', 1)[-1]} = ::{piece['q']};" + piece["tail"])
                         continue
                     text, inner, lines_ = "", [], 0
@@ -15890,7 +15758,7 @@ class TestWriter:
                     continue
                 q = key[1]
                 d = tree.records[q]
-                if HONEST[0] and self.engine_record(q):
+                if self.engine_record(q):
                     # (the second pass: a type of the engine is the engine's own - kern::Quat with axis_angle -, never a copy;
                     # its helpers stand in its namespace, see below)
                     add(("record", q), self.wrapped(q, f"using {q.rsplit('::', 1)[-1]} = ::{q};", records=records))
@@ -15931,7 +15799,7 @@ class TestWriter:
                     outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
                     # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
                     spaces = self.spaces_of(outer_scope) if self.outside_its_class(home, records) else classes_of(outer_scope)
-                    if HONEST[0] and self.engine_record(q):   # (a type of the engine, itself: its helpers in its own namespace - where a call from converted.h finds them)
+                    if self.engine_record(q):   # (a type of the engine, itself: its helpers in its own namespace - where a call from converted.h finds them)
                         hl = [*hl[:-5], f"}} namespace {q.rsplit('::', 1)[0]} {{ using ::kern::converted::arg; using ::kern::converted::same; using ::kern::converted::defined; using ::kern::converted::text; using ::kern::converted::take;",
                               *hl[-5:], f"}} namespace {ns} {{"]
                     elif spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
@@ -15990,7 +15858,7 @@ class TestWriter:
                         piece = key
                 if piece is None:
                     done = [case_of[key[1]] for key, _ in cases if key not in dropped]
-                    return None, skipped + [(f, ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + ": " + message) for f in done]
+                    return None, skipped + [(f, "its source does not compile" + ": " + message) for f in done]
                 found.setdefault(piece, message)
             # a piece of the source that does not compile may be why later ones do not: the first one goes - and with
             # it every other one whose complaint names nothing of a piece that does not compile either (a complaint
@@ -16032,10 +15900,10 @@ class TestWriter:
                         what = tree.decl.get(key[1], {}).get("name", key[1]) if key[0] in ("member", "function", "case") else key[1]
                         sys.stderr.write(f"--- {stem}: without the {key[0]} {what}: {message}\n")
         else:
-            return None, skipped + [(case_of[key[1]], ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + "") for key, _ in cases]
+            return None, skipped + [(case_of[key[1]], "its source does not compile" + "") for key, _ in cases]
         for key, _ in cases:
             if key in dropped:
-                skipped.append((case_of[key[1]], ("its source does not compile with its own numbers (KERN_TEST_SOURCE_NUMBERS=1)" if HONEST[0] else "its source does not compile with a Blueprint's numbers yet") + ": " + why[key]))
+                skipped.append((case_of[key[1]], "its source does not compile" + ": " + why[key]))
         if not any(key not in dropped for key, _ in cases):
             return None, skipped
         return text, skipped
@@ -16648,17 +16516,6 @@ def convert_unit(job):
             if not more:
                 break
             barred.update(more)
-        # the second pass (KERN_TEST_SOURCE_NUMBERS=1): what is written stands - decided above by the first test -, and its
-        # functions are compared once more with the source as C++ computes it (HONEST: no widen, the engine's types)
-        unit.test_source = (None, [])
-        if SOURCE_NUMBERS and writer is not None and unit.test[0]:
-            honest = TestWriter(unit, os.path.relpath(os.path.dirname(main_file), test), flags)
-            honest.path, honest.test_dir = main_file, test
-            HONEST[0] = True
-            try:
-                unit.test_source = honest.write()
-            finally:
-                HONEST[0] = False
         # what the tests of other files need of this one to hold the source of its functions they call - also of those
         # whose own test does not compare them yet (exported: every try's)
         exports = writer.exports() if writer is not None else ({}, {})
@@ -16688,7 +16545,7 @@ def convert_unit(job):
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports,
-            "test_source": (getattr(unit, "test_source", (None, []))[0], [(f.cpp, why) for f, why in getattr(unit, "test_source", (None, []))[1]]), "errors": said.getvalue(),
+"errors": said.getvalue(),
             "names": sorted((unit.names - world.taken) | set(unit.type_line)),
             "externs": {"\n".join(unit.externs[x][2]): unit.extern_inputs[x] for x in unit.extern_inputs if x in unit.externs}}
 
@@ -16942,9 +16799,9 @@ def shape_line(name, struct):
     """The declaration of a shape (a type this tool makes of the notation's own - a row of a list, a pair) as
     the level holds it, written as this tool writes it (Unit.element, Unit.pair). None: it is no such shape."""
     def notation(f):
-        t = f.get("type", "float")
+        t = f.get("type", "")
         base = t[:-5] if t.endswith("_list") else t
-        word = {"int": "Int", "float": "Float", "bool": "bool", "vector": "Vector", "text": "Text", "int64": "Int64", "actor": "Actor"}.get(base)
+        word = {"vector": "Vector", "text": "Text", "actor": "Actor", **{x: x for x in NUMS}}.get(base)
         if word is None and base == "struct":
             word = f.get("of")
         if word is None and base == "object" and f.get("of"):
@@ -17692,7 +17549,6 @@ def main(argv):
     total = done_n = total_lines = done_lines = 0
     waits, wait_lines = collections.Counter(), collections.Counter()
     compared, not_compared, tests_written = 0, collections.Counter(), set()
-    honest_compared, honest_not = 0, collections.Counter()
     for u in sorted(results, key=lambda u: (u not in program, u)):
         r = results[u]
         if u in program:
@@ -17716,20 +17572,6 @@ def main(argv):
                 if not os.path.exists(name) or open(name).read() != body:
                     open(name, "w").write(body)
                 tests_written.add(os.path.abspath(name))
-            body, skipped = r.get("test_source") or (None, [])
-            if SOURCE_NUMBERS:   # (the second pass: compared once more with the source's own numbers - test_<name>_source.cpp)
-                honest_compared += (body or "").count("converted::Tally tally(")
-                for cpp, why in skipped:
-                    if why != "it gives nothing":
-                        honest_not[why.split(": ", 1)[0] if why.startswith("its source does not compile") else why] += 1
-                        if os.environ.get("FUNCTIONS"):
-                            print(f"    not compared with the source's own numbers: {cpp}: {why}")
-                if body:
-                    name = os.path.join(test, f"test_{u.replace('/', '__')}_source.cpp")
-                    os.makedirs(test, exist_ok=True)
-                    if not os.path.exists(name) or open(name).read() != body:
-                        open(name, "w").write(body)
-                    tests_written.add(os.path.abspath(name))
     if texts:
         os.makedirs(texts, exist_ok=True)
         for u in order:
@@ -17775,9 +17617,6 @@ def main(argv):
         nothing = not_compared.pop("it gives nothing", 0)
         print(f"{compared} functions of the Blueprints are compared with their source, bit for bit, by the tests in {test} - each once, in the Blueprint it stands in"
               + (f"; {nothing} give nothing" if nothing else "") + ("; not compared: " + ", ".join(f"{n} ({w})" for w, n in not_compared.most_common()) if not_compared else ""))
-        if SOURCE_NUMBERS:
-            print(f"{honest_compared} functions are compared once more with their source as C++ computes it (its own numbers - KERN_TEST_SOURCE_NUMBERS=1), by the tests test_*_source.cpp"
-                  + ("; not so compared: " + ", ".join(f"{n} ({w})" for w, n in honest_not.most_common()) if honest_not else ""))
     print("\nwhat the others wait for: functions (lines)")
     for w, n in sorted(waits.items(), key=lambda kv: -wait_lines[kv[0]])[:int(os.environ.get("TOP", "40"))]:
         print(f"  {n:4} ({wait_lines[w]:6})   {w}")
