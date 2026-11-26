@@ -1,8 +1,10 @@
 # Projekt, Level, Programm – wie ein Spiel auf Kern aufgebaut ist
 
-Dieser Text beschreibt, wie man ein Spiel auf Kern anlegt, ohne ein bestehendes Spiel als Vorlage zu nehmen. Er ist
-der Entwurf (Stand 25.11.2026), nach dem die Engine gebaut wird. Wo die Engine heute noch anders arbeitet, steht das
-unter „Stand“ am Ende.
+Dieser Text beschreibt, wie man ein Spiel auf Kern anlegt, ohne ein bestehendes Spiel als Vorlage zu nehmen, und wie
+die Engine es fährt (Stand 26.11.2026: alles hier ist gebaut und mit den genannten Tests belegt; was offen ist, steht
+unter „Stand“ am Ende). Wo es weitergeht: die App-Laufzeit – Ton, Eingabe, Speichern, Widgets – in [app.md](app.md),
+Akteure zur Laufzeit in [runtime_actors.md](runtime_actors.md), Blueprint und C++ in [blueprint_cpp.md](blueprint_cpp.md)
+und [engine_object.md](engine_object.md), der Editor in [studio.md](studio.md) („Das Projekt“, „Play Project“).
 
 ## 1. Die Begriffe
 
@@ -27,7 +29,8 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
     "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } }, "world": { "shadowDistance": 70 } } ],
     "heapReserveMb": 0,
-    "loopBudget": 200000
+    "loopBudget": 200000,
+    "input": { "actions": [ { "name": "springen", "keys": ["space"], "pad": ["a"] } ], "axes": [ … ] }
   },
   "levels": ["levels/start.klevel", "levels/wald.klevel"],
   "startLevel": "levels/start.klevel",
@@ -44,7 +47,9 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   des Profils darüber; gewählt beim Start mit dem Startparameter `profile=<name>`, ein unbekannter Name ist ein Fehler
   im Log mit den vorhandenen Namen) und `heapReserveMb` (0–4095). Die Engine wendet sie vor dem Start des Renderers an;
   `kern::run` übergibt sie (4.). Das feste Telefon-Feld `"mobile"` früherer Dateien, ein Profil ohne Namen oder mit
-  doppeltem Namen: Fehler mit Stelle. Ein Level hat keinen Abschnitt `"project"`.
+  doppeltem Namen: Fehler mit Stelle. Ein Level hat keinen Abschnitt `"project"`. `loopBudget` ist die Schleifenwache
+  der Programm-Logik (4.), `input` die Eingabe-Aktionen des Spiels (app.md 4.: ein Spiel fragt nach der Aktion, nie
+  nach einer Taste).
 - **Welt-Einstellungen je Gerät:** ein Profil kann `world` tragen – Schlüssel des Abschnitts `"world"` eines Levels
   (`WorldSettings`, etwa `shadowDistance`, `substeps`). Startet eine Welt des Projekts ein Level (`GameWorld::start`,
   `start_level`), gilt diese **Reihenfolge**: die Welt-Einstellungen des Levels, darüber die Schlüssel des gewählten
@@ -301,7 +306,23 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
 3. Im Level die Akteure und ihre Blueprints anlegen.
 4. Optional ein fester Schritt: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … game_FixedStep“ und
    `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
-5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::game::embedded_project())` (kern/game/embedded.h, siehe 4.).
+5. Im Editor spielen: Play → **Play Project** (studio.md „Play Project“) spielt das Programm, wie das Spiel es spielt –
+   die App im Viewport, ihre Levels, Widgets, Aktionen und Töne; Esc beendet. (Play allein spielt nur das offene Level.)
+6. Bauen: Der Bau erzeugt den Einstieg `kern::run(kern::game::embedded_project())` (kern/game/embedded.h, siehe 4.).
+7. Testen (9.).
+
+## 9. Testen
+
+- **Engine:** `kern/tests/run.sh [filter]` baut die Engine nativ (ASan/UBSan) und fährt `kern/tests/test_main.cpp`;
+  die Tests dieses Texts heißen wie unter „Stand“ genannt. Danach vergleicht er jeden Blueprint-Fall als C++-Klasse
+  mit dem Interpreter (blueprint_cpp.md „Der Beweis“).
+- **Ein Spiel:** seine Tests registriert es mit `KERN_TEST(name) { KERN_CHECK(bedingung, "…", …); }`
+  (`kern/test/test.h`); `kern/tools/test_main.cpp` fährt sie. Die Vergleichstests, die der Konverter schreibt
+  (Quelle gegen Blueprint, `kern/test/converted.h`), stehen in derselben Liste (blueprint_cpp.md „Quelle gegen
+  Blueprint“). Beispiel: `kern/games/murmel` (`run.sh`, CI-Job `murmel`).
+- **Konverter:** `tools/converter_cases/run.sh` – kleine Fälle je Form von C++ (auch `program`, `door`, `actors`).
+- **Editor und Browser:** `kern/tests/e2e/studio_e2e.mjs` (Studio, Projekt, Play Project), `blueprint_e2e.mjs`,
+  `input_e2e.mjs`; ein Spiel im Browser: CI-Job `murmel-web`.
 
 ## Stand (26.11.2026, Zweig work-projekt)
 
@@ -318,12 +339,14 @@ Projekt; eine eigene Quelle im Level, die das Programm benutzt, hält den Lauf a
   `tools/converter_cases/run.sh`. Akteure einer Welt vom Programm aus (7.).
 - Gebaut im Editor: „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen mit seinen
   Levels (das Start-Level ist das offene Level), speichern, Levels, Start-Level, Einstellungen, Programm-Blueprints im
-  Blueprint-Editor; Play spielt das offene Level mit den Bibliotheken des Projekts. Test `studio_project`, e2e.
+  Blueprint-Editor; Play spielt das offene Level mit den Bibliotheken des Projekts. „Play Project“
+  (`kern/src/studio/project_play.cpp`): das Programm mit seiner App im Viewport – `game::ProgramApp` auf einer
+  `AppRuntime` im Host des Editors (`kern::AppHost`, app.md 1.). Tests `studio_project`, `studio_play_project`, e2e.
 - Zweites Spiel: `kern/games/murmel` (App in C++, zwei Levels, Wechsel, Punkte über die Levels) – nativ und im
-  Browser belegt (CI-Jobs `murmel`, `murmel-web`); seine App als Blueprint wartet noch am Testrahmen der Vergleichstests
-  (er gehört heute SpawnCity: Namensraum `sc`).
-- Offen: „Play Project“ im Editor (die Programm-Laufzeit mit der App im Viewport; braucht die Engine – `Engine`,
-  `Input` – als Teil, den auch der Editor linkt, nicht nur die App-Laufzeit),
-  Feld-Anfangswerte, die keine Konstante sind, im Vergleichstest.
+  Browser belegt (CI-Jobs `murmel`, `murmel-web`). Seine App ist C++ (`kern::run(app, projekt)`): „Play Project“
+  spielt nur ein Programm, dessen App ein Programm-Blueprint ist – Murmel dort zu spielen braucht seine App als
+  Blueprint (sie wartet noch am Testrahmen der Vergleichstests).
+- Offen: Feld-Anfangswerte, die keine Konstante sind (`ShaderExtension* ext_[1] = {&look()}` in einem Zustand ohne
+  eigenen Konstruktor), im Konverter und Vergleichstest.
 - SpawnCity: `kern::run(sc::app(), embedded_project())`; seine Programm-Klassen stehen im Projekt.
 

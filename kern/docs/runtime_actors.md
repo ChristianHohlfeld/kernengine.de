@@ -21,7 +21,7 @@ Geschosse, Gegner), entstehen aus **Vorlagen** des Levels.
 ## `spawn`
 
 ```cpp
-ActorId GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
+logic::ActorHandle GameWorld::spawn(std::string_view template_name, const Transform& at, ActorId id = 0);
 ```
 
 - Eine Kopie der Vorlage mit ihren Kindern, Komponenten und ihrem Blueprint. Begin Play der Kopie läuft sofort, auch
@@ -48,7 +48,9 @@ Knoten der Engine `GameWorld spawn` (aus dem Header).
 
 **Rückgabe – der Akteur-Verweis:** `GameWorld::spawn` gibt `logic::ActorHandle` (die Id der Wurzel und die Welt,
 `GameWorld::world_id()`; project.md 7.), der Knoten „Spawn Actor“ und der Knoten der Engine `GameWorld spawn` den Pin
-`actor` – nie eine Zahl. Wer in C++ die Id braucht, liest `.id`.
+`actor` – nie eine Zahl. Wer in C++ die Id braucht, liest `.id`. Den Verweis eines Akteurs des Levels beim Namen gibt
+`GameWorld::actor_named(name)` (Knoten der Engine) – damit erreicht ein Programm-Blueprint den Blueprint eines Akteurs
+seiner Welt (project.md 7. „Vom Programm aus“).
 
 ## Eigenschaften setzen: typisiert, oder der Pfad mit Prüfung
 

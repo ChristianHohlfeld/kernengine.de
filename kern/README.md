@@ -1,4 +1,4 @@
-# Kern – die SpawnCity-Engine
+# Kern – eine 3D-Engine für viele Spiele im Browser
 
 Kern ist eine eigenständige 3D-Engine in **C++20**, die mit wasi-sdk nach **WebAssembly** kompiliert wird und im Browser über **WebGL2** zeichnet. Kein three.js, kein Emscripten, keine Engine-Logik in JavaScript. Im Browser bleibt nur eine dünne Plattformschicht (`kern/web/`) übrig, weil WebGL2, Canvas, Eingabe und `requestAnimationFrame` dort nur über JavaScript erreichbar sind.
 
@@ -8,6 +8,27 @@ SpawnCity läuft auf Kern (`games/spawncity/` + `sim/kern_spawncity*.mjs`). Die 
 - `kern/examples/orbrun`: ein vollständiges Spiel in C++ mit prozeduraler Stadt, Fahrphysik, Verkehr, Tag/Nacht und einer eigenen Shader-Erweiterung
 
 Dazu kommen die **Spiel-Laufzeit** (`kern::game`: Levels aus Actors und Komponenten, auf Box3D gespielt) und **Kern Studio** (`kern/src/studio`, `kern/web/studio`), der Engine-Editor im Stil der Unreal Engine: Viewports mit Fly Mode und Unreal-Navigation, Gizmos, Outliner, Details, World Settings, Content Drawer, Play und Simulate im Viewport sowie Spiele als eigenständige HTML-Datei. Beim Start ist Orb Run als Level geladen. Ausführliche Dokumentation: [`docs/studio.md`](docs/studio.md).
+
+## Dokumentation – ein Spiel auf Kern, Schritt für Schritt
+
+| Was | Wo |
+|---|---|
+| **Ein Spiel anlegen:** Projekt, Levels, Programm, Einstieg `kern::run`, ein zweites Spiel Schritt für Schritt, Testen | [`docs/project.md`](docs/project.md) (8. Schritt für Schritt, 9. Testen) |
+| **Die App-Laufzeit:** was ein Spiel von der Engine bekommt – Start mit Grund, Host (`AppHost`) | [`docs/app.md`](docs/app.md) 1. |
+| … Ton (der eine Mischer) | [`docs/app.md`](docs/app.md) 3. |
+| … Eingabe (Aktionen statt Tasten, Gamepad, Touch) | [`docs/app.md`](docs/app.md) 4. |
+| … Speichern und Laden | [`docs/app.md`](docs/app.md) 5. |
+| … Widgets (Text, Balken, Knopf, Menü, Statuszeile) | [`docs/app.md`](docs/app.md) 6. |
+| … Bauen (natives Spiel, Spieltest, Export) | [`docs/app.md`](docs/app.md) 7. |
+| **Akteure zur Laufzeit:** Vorlagen, `spawn`, Eigenschaften, Klänge einer Welt | [`docs/runtime_actors.md`](docs/runtime_actors.md) |
+| … der Akteur-Verweis `Actor` (Id und Welt), Akteure einer Welt vom Programm aus | [`docs/project.md`](docs/project.md) 7. |
+| **Blueprint ↔ C++:** ein Blueprint ist C++ im Teilsatz und umgekehrt; Bibliotheken, Knoten und Schnittstellen der Engine; der Beweis | [`docs/blueprint_cpp.md`](docs/blueprint_cpp.md) |
+| … Objekte der Engine im Blueprint (`Object<I>`) | [`docs/engine_object.md`](docs/engine_object.md) |
+| … ein Programm aus C++ konvertieren (wohin der Konverter schreibt) | [`docs/project.md`](docs/project.md) 7a. |
+| **Der Editor (Kern Studio):** Bedienung, Projekt, Play / Simulate, **Play Project**, Blueprint-Editor, Protokoll | [`docs/studio.md`](docs/studio.md) |
+| **Testen:** Engine-Tests, Tests eines Spiels (`KERN_TEST`), Vergleichstests Quelle ↔ Blueprint, Browser-Tests | [`docs/project.md`](docs/project.md) 9., [`docs/blueprint_cpp.md`](docs/blueprint_cpp.md) „Der Beweis (Tests)“, [`docs/book/02-building-and-testing.md`](docs/book/02-building-and-testing.md) |
+| Physik, Netz, Micro Duck, Lehrer | [`docs/physics.md`](docs/physics.md), [`docs/net.md`](docs/net.md), [`docs/walker.md`](docs/walker.md), [`docs/lehrer.md`](docs/lehrer.md) |
+| Das Buch (alles der Reihe nach) | [`docs/book/`](docs/book/) (englisch), [`docs/buch/`](docs/buch/) (deutsch) |
 
 ## Aufbau
 
@@ -37,6 +58,10 @@ kern/
                          werden hier einmal gelesen - für jeden Host (Test: tests/e2e/input_e2e.mjs)
   web/app.mjs            Host für C++-Spiele (Frame-Loop, Größe, Kontextverlust; Eingabe über BrowserInput)
   web/studio/            Studio-Seite (index.html, studio.css, studio.mjs), Spiel-Host (game.mjs, play.html)
+  docs/project.md        Projekt, Levels, Programm, Einstieg, Testen (der Weg zu einem eigenen Spiel)
+  docs/app.md            die App-Laufzeit: Ton, Eingabe, Speichern, Widgets, Bauen
+  docs/runtime_actors.md Akteure zur Laufzeit (Vorlagen, spawn)
+  docs/blueprint_cpp.md  Blueprint = C++ im Teilsatz; docs/engine_object.md: Objekte der Engine im Blueprint
   docs/studio.md         Dokumentation von Studio, Komponenten, Format und Protokoll
   docs/physics.md        Box3D richtig benutzen: Regeln, No-Gos und Messungen (vor Physik-Änderungen lesen)
   docs/walker.md         Micro Duck: Pollen Robotics' trainierte Laufpolicy auf Box3D (Modell, Servo, Takt, Messungen)
