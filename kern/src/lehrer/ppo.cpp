@@ -629,7 +629,7 @@ template <typename T>
 void put_all(std::vector<u8>& out, const std::vector<T>& v) {
   const u64 n = v.size();
   out.insert(out.end(), reinterpret_cast<const u8*>(&n), reinterpret_cast<const u8*>(&n) + 8);
-  out.insert(out.end(), reinterpret_cast<const u8*>(v.data()), reinterpret_cast<const u8*>(v.data()) + n * sizeof(T));
+  if(n)out.insert(out.end(), reinterpret_cast<const u8*>(v.data()), reinterpret_cast<const u8*>(v.data()) + n * sizeof(T));
 }
 template <typename T>
 bool get_all(const u8* d, std::size_t size, std::size_t& at, std::vector<T>& v, std::size_t expect = ~std::size_t{0}) {
