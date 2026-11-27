@@ -48,6 +48,10 @@ class ThreadBackend : public Backend {
   void collect(const Policy& policy, i32 steps, i32 iteration, std::vector<Rollout>& out) override;
   ParallelFor update_parallel() override { return pool_; }
   i32 workers() const { return static_cast<i32>(groups_.size()); }
+  // Exact native Lehrer state; only valid for DuckEnv groups initialized
+  // with checkpoint recording enabled before their first reset.
+  std::vector<u8> save() const;
+  bool load(const u8* data,std::size_t size);
 
  private:
   struct Group {
