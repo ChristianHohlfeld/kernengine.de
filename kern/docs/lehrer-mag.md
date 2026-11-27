@@ -1,8 +1,8 @@
 # Lehrer: MAG als optionaler Trainingsrechner
 
-Im Lehrer unter **Training → Rechenbackend** ist **Lokal** bei jedem Öffnen der Seite vorausgewählt.
+Im Lehrer unter **Training → Rechenbackend** ist **Lokal** für neue Trainings vorausgewählt. Bei hinterlegter MAG-Adresse wird beim Öffnen geprüft, ob ein bestehender Trainingslauf übernommen werden muss.
 Das lokale WASM-Training, die Keyframes, die Aufgaben, das Level und der ONNX-Import bleiben unverändert.
-Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird einmalig auf dem Gerät gespeichert; danach bleiben die Verbindungseinstellungen eingeklappt. Kein Anwendungstoken; die Zugriffsberechtigung liegt vollständig bei Tailscale. Kein automatischer Wechsel und kein CPU-Fallback bei einem HIP-Fehler.
+Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird einmalig auf dem Gerät gespeichert; danach bleiben die Verbindungseinstellungen eingeklappt. Kein Anwendungstoken; die Zugriffsberechtigung liegt vollständig bei Tailscale. Keine automatische Umleitung eines neuen lokalen Trainings auf MAG und kein CPU-Fallback bei einem HIP-Fehler.
 
 ## Installation auf MAG (Ubuntu, Benutzer chris)
 
@@ -88,9 +88,14 @@ Bei unvollständiger Wiederherstellung startet kein neuer Job; prüfen:
 **nur nachdem der Trainer beendet ist**. Bei Neustart des Servers sind vorher eingefrorene
 Prozesse ohnehin beendet; der Checkpoint bleibt unter /var/lib/kern-lehrer/jobs.
 
-Die Browser-Verbindung darf unterbrochen werden. Mit "Mit MAG wiederverbinden" kann der
-aktuelle Lauf auch nach Tab-Neuladen kontrolliert werden; aus Sicherheitsgründen wird dann
-nur der Download angeboten, keine automatische Übernahme in ein möglicherweise anderes Level.
+Die Browser-Verbindung darf unterbrochen werden. Beim Öffnen des Lehrers, nach Tab-Neuladen
+und bei Rückkehr aus dem Hintergrund wird ein bestehender MAG-Lauf anhand des Serverzustands
+automatisch wiedergefunden. Ein Reload sendet weder einen Start- noch einen Stoppbefehl.
+Eine zuvor ausdrücklich angeforderte Beendigung wird ausschließlich für dieselbe Job-ID
+erneut zugestellt, falls nötig. Ein wiederverbundener Lauf übernimmt Fortschritt und Steuerung;
+der Download ist verfügbar, aber kein automatischer Import in ein möglicherweise anderes Level.
+"Mit MAG wiederverbinden" bleibt für eine manuelle Abfrage verfügbar. Ohne laufenden Job bleibt
+Lokal die Voreinstellung. Der Server liefert den letzten Fortschrittsstand, nicht die gesamte Kurvenhistorie.
 Ein Neustart des Dienstes setzt einen laufenden Job nicht automatisch fort. Ein Checkpoint
 enthält den Lernzustand, nicht jeden laufenden Physikzustand; keine bitgleiche Fortsetzung
 nach Prozessneustart versprechen.
