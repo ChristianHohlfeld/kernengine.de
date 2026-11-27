@@ -114,24 +114,43 @@ __global__ void dense_kernel(const f32* x, int rows, int in, int out, const f32*
   }
   if (r < rows && o < out) y[size_t(r)*out+o] = sum;
 }
-__global__ void gradient_kernel(const f32* x, const f32* d, int rows, int in, int out, f32* gw, f32* gb) {
-  const size_t k = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (k >= size_t(in) * out + out) return;
-  if (k >= size_t(in) * out) {
-    int o = int(k - size_t(in) * out);
-    f32 s = gb[o];
-    for (int r = 0; r < rows; ++r) s += d[size_t(r) * out + o];
-    gb[o] = s; return;
+// Each weight still reduces the rows in exactly the original order (four
+// products per addition), but neighboring weights share input/delta tiles.
+__global__ void gradient_kernel(const f32* x, const f32* d, int rows, int in, int out, f32* gw) {
+  constexpr int OC=32, IC=8, RC=16;
+  __shared__ f32 inputs[RC][IC];
+  __shared__ f32 deltas[RC][OC];
+  const int t=int(threadIdx.x), c=t%OC, a=t/OC;
+  const int i=int(blockIdx.y)*IC+a, o=int(blockIdx.x)*OC+c;
+  const bool valid=i<in && o<out;
+  f32 sum=valid ? gw[size_t(i)*out+o] : 0.0f;
+  for(int base=0;base<rows;base+=RC){
+    if(t<RC*IC){
+      const int row=base+t/IC, col=int(blockIdx.y)*IC+t%IC;
+      inputs[t/IC][t%IC]=row<rows && col<in ? x[size_t(row)*in+col] : 0.0f;
+    }
+    for(int k=t;k<RC*OC;k+=IC*OC){
+      const int row=base+k/OC, col=int(blockIdx.x)*OC+k%OC;
+      deltas[k/OC][k%OC]=row<rows && col<out ? d[size_t(row)*out+col] : 0.0f;
+    }
+    __syncthreads();
+    const int count=rows-base<RC ? rows-base : RC;
+    if(valid){
+      int r=0;
+      for(;r+4<=count;r+=4)
+        sum += inputs[r][a]*deltas[r][c]+inputs[r+1][a]*deltas[r+1][c]+inputs[r+2][a]*deltas[r+2][c]+inputs[r+3][a]*deltas[r+3][c];
+      for(;r<count;++r) sum += inputs[r][a]*deltas[r][c];
+    }
+    __syncthreads();
   }
-  const int i = int(k / out), o = int(k % out);
-  f32 s = gw[k];
-  int r = 0;
-  for (; r + 4 <= rows; r += 4) {
-    const size_t a = size_t(r) * in + i, z = size_t(r) * out + o;
-    s += x[a] * d[z] + x[a+in] * d[z+out] + x[a+2*in] * d[z+2*out] + x[a+3*in] * d[z+3*out];
-  }
-  for (; r < rows; ++r) s += x[size_t(r) * in + i] * d[size_t(r) * out + o];
-  gw[k] = s;
+  if(valid) gw[size_t(i)*out+o]=sum;
+}
+__global__ void bias_gradient_kernel(const f32* d, int rows, int out, f32* gb) {
+  const int o=int(blockIdx.x)*int(blockDim.x)+int(threadIdx.x);
+  if(o>=out) return;
+  f32 sum=gb[o];
+  for(int r=0;r<rows;++r) sum+=d[size_t(r)*out+o];
+  gb[o]=sum;
 }
 void dense_on(Target target, const f32* x, int rows, int in, int out, const f32* w, const f32* b, f32* y) {
   Lane& d = *devices().all[target.id]->lanes[target.lane];
@@ -154,7 +173,9 @@ void gradient_on(Target target, const f32* x, const f32* delta, int rows, int in
   d.x.need(nx); d.y.need(ny); d.w.need(nw); d.b.need(out);
   d.x.put(x,nx,d.stream); d.y.put(delta,ny,d.stream);
   d.w.put(gw,nw,d.stream); d.b.put(gb,out,d.stream);
-  hipLaunchKernelGGL(gradient_kernel, dim3((nw+out+255)/256), dim3(256), 0, d.stream, d.x.p, d.y.p, rows, in, out, d.w.p, d.b.p);
+  hipLaunchKernelGGL(gradient_kernel, dim3((out+31)/32, (in+7)/8), dim3(256), 0, d.stream, d.x.p, d.y.p, rows, in, out, d.w.p);
+  check(hipGetLastError());
+  hipLaunchKernelGGL(bias_gradient_kernel, dim3((out+255)/256), dim3(256), 0, d.stream, d.y.p, rows, out, d.b.p);
   check(hipGetLastError());
   d.w.read(nw,d.stream); d.b.read(out,d.stream);
   check(hipStreamSynchronize(d.stream));
