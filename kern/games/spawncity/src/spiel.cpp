@@ -71,7 +71,6 @@ bool SpawnCity::start(kern::Engine& e) {
   if (!controls::bind(*world_)) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors: %s", kern::last_error());
   if (!bind_settings(*world_, settings_table_)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
   settings_ = Settings(settings_table_);  // every setting at the table's default (the page replays the player's own with "set")
-  if (kern::logic::Runtime* logic = world_->logic_runtime()) logic->budget = rules::kLoopBudget;
   // The drone: a copy of the level's template, parked far below the world until the ground under the start is there.
   drone_actor_ = world_->spawn("Drone", kern::game::Transform{{0, 0, -200}, {0, 0, 0}, {1, 1, 1}}).id;
   if (!drone_actor_) return kern::fail("SpawnCity: the level's template \"Drone\": %s (tools/level_templates.sh puts it in)", kern::last_error());
