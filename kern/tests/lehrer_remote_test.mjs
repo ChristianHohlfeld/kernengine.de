@@ -20,7 +20,7 @@ function trainer(backend){
 }
 const local=trainer("local");
 local.remotePractice=()=>{throw Error("local must never contact MAG")};
-local.spawn=()=>{throw Error("local worker path")};
+local.runLocal=()=>{throw Error("local worker path")};
 await local.start();
 assert.equal(local.message,"local worker path");
 const mag=trainer("mag");
@@ -125,4 +125,11 @@ assert.equal(discovered,1);
 opening.el.trRemoteUrl.value="";
 opening.discoverRemote();
 assert.equal(discovered,1);
+const stopLocal=trainer("local");
+const stopping=stopLocal.run={iteration:7,paused:true,workers:[]};
+stopLocal.stop();
+assert.equal(stopLocal.run,stopping);
+assert.equal(stopping.localStopping,true);
+assert.equal(stopping.paused,false);
+assert.match(stopLocal.message,/checkpoint/);
 console.log("Lehrer local/MAG selection and remote result passed");
