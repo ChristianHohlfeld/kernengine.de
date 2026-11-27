@@ -168,3 +168,10 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - work-projekt 4114a9d8 = + Leser-Fix (Gate 45904779045 läuft). work-zahlen 6b69a590 „bereit zum Mischen" (CI 45905588340: native, converter-cases 179/0, murmel 349/772, murmel-web grün; rot nur SpawnCity-bedingt).
 - NEU: Zweig work-final 674bfa96 (Worktree /home/claude/w-final) = work-projekt 4114a9d8 + work-zahlen 6b69a590, Merge ohne Konflikt, CI 45908491637. DAS ist der Stand für main.
 - Aufträge: zahlen8 auf work-final (NaN-Vergleich elementweise, placelib/worldrules portieren, alte kern::math-f64 raus, ActorBlueprint::argument getypt, Klangvorschau); konverter9 pusht work-konverter und mischt selbst in work-final; kleinspiel4 mischt work-final in work-spiel, stellt Spiel auf getypte Sprache um.
+
+## Nachtrag 27.11. 05:45
+- ~00:30: auch die Fable-Agenten endeten am Wochenlimit (Reset 2.12. 13 Uhr). Koordinator arbeitet allein.
+- work-konverter 16dfcf14 gepusht (Stand konverter9: freie Funktionen am Welt-Akteur, App als Zustand, Exporte out_len, loopBudget der Welt aus dem Projekt).
+- work-final 022cb3ab = + WIP zahlen8 (logic_library_place getypt, ActorBlueprint-Zahlen, alte f64-Mathe raus) + Merge work-konverter 16dfcf14 (Konflikt HONEST gelöst, worldapp/appstate getypt, engine_api neu). CI 45941270541.
+- work-spiel 25c2f1a2 = Level/Projekt getypt (WIP kleinspiel4) + Merge work-final + Zeile 74 (logic->budget) gestrichen. = work-kandidat-11, mag-Auftrag kandidat-11-054016 (voll).
+- Offen: test_controls/test_settings auf neue Aufrufform (zeigt der mag-Lauf), CI work-final, dann Level aus mag-Ergebnis nach work-spiel → work-final → Gate → Changelog → main.
