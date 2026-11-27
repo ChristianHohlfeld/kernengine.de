@@ -40,15 +40,17 @@ def encode_archive(meta,payload):
     meta=dict(meta,sha256=hashlib.sha256(payload).hexdigest())
     header=json.dumps(meta,allow_nan=False,separators=(",",":")).encode()
     if len(header)>8*1024*1024:raise ValueError("checkpoint header too large")
-    return ARCHIVE_MAGIC+struct.pack("<I",len(header))+header+payload
+    body=ARCHIVE_MAGIC+struct.pack("<I",len(header))+header+payload
+    return body+hashlib.sha256(body).digest()
 
 def decode_archive(data):
-    if len(data)<12 or data[:8]!=ARCHIVE_MAGIC:raise ValueError("Expected a complete .kernckpt archive, not ONNX")
+    if len(data)<44 or data[:8]!=ARCHIVE_MAGIC:raise ValueError("Expected a complete .kernckpt archive, not ONNX")
+    if hashlib.sha256(data[:-32]).digest()!=data[-32:]:raise ValueError("checkpoint archive checksum mismatch")
     size=struct.unpack_from("<I",data,8)[0]
-    if not 0<size<=8*1024*1024 or 12+size>=len(data):raise ValueError("invalid checkpoint header")
+    if not 0<size<=8*1024*1024 or 12+size>=len(data)-32:raise ValueError("invalid checkpoint header")
     meta=json.loads(data[12:12+size])
     if not isinstance(meta,dict):raise ValueError("invalid checkpoint metadata")
-    payload=data[12+size:]
+    payload=data[12+size:-32]
     if meta.get("sha256")!=hashlib.sha256(payload).hexdigest():raise ValueError("checkpoint checksum mismatch")
     return meta,payload
 
@@ -492,6 +494,16 @@ class Handler(BaseHTTPRequestHandler):
                 digest=hashlib.sha256(raw).hexdigest()
                 rows=meta.get("rows",[])
                 if not isinstance(rows,list) or len(rows)>it:raise ValueError("invalid progress history")
+                last=0
+                for row in rows:
+                    if not isinstance(row,dict) or type(row.get("iteration")) is not int or not last<row["iteration"]<=it:
+                        raise ValueError("invalid progress row")
+                    for key in ("steps","episodes","meanReturn","meanLength","meanStd","collectSeconds","learnSeconds","sps"):
+                        val=row.get(key)
+                        if type(val) not in (int,float) or not math.isfinite(val):
+                            raise ValueError("invalid progress value")
+                    json.dumps(row,allow_nan=False)
+                    last=row["iteration"]
                 with server.job_lock:
                     if server.closing:
                         self.reply(503,{"error":"MAG service is shutting down"});return
@@ -507,8 +519,6 @@ class Handler(BaseHTTPRequestHandler):
                             f.write(payload);f.flush();os.fsync(f.fileno())
                         with (job.dir/"training.log").open("x",encoding="utf-8") as f:
                             for row in rows:
-                                if not isinstance(row,dict) or type(row.get("iteration")) is not int or not 0<row["iteration"]<=it:
-                                    raise ValueError("invalid progress row")
                                 f.write("KERN_PROGRESS "+json.dumps(row,allow_nan=False)+"\n")
                         if rows:
                             job.stats=rows[-1]
