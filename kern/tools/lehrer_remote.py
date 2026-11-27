@@ -59,11 +59,12 @@ class Job:
         self.stats, self.report = None,None
         self.gpus = 0
         self.network = None
+        self.network_iteration = 0
         self.thread = threading.Thread(target=self.run, name="lehrer-"+job_id, daemon=False)
     def public(self):
         with self.lock:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
-                        report=self.report,network=self.network,workers=self.server.workers,
+                        report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.server.workers,
                         gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"])
     def change(self,state,message):
         with self.lock:
@@ -100,6 +101,7 @@ class Job:
         if path.is_file() and path.stat().st_size:
             with self.lock:
                 self.network = str(path.stat().st_mtime_ns)
+                self.network_iteration = self.stats["iteration"] if self.stats else 0
     def run(self):
         server = self.server
         entered = False
@@ -279,7 +281,7 @@ class Handler(BaseHTTPRequestHandler):
                 with server.job_lock:
                     job=server.job
                     if job and (job.id==data["id"] or job.state not in TERMINAL):
-                        if job.config!=cfg:
+                        if job.id!=data["id"] or job.config!=cfg:
                             self.reply(409,{"error":"MAG already has a different training job"});return
                     else:
                         job=Job(server,data["id"],cfg)

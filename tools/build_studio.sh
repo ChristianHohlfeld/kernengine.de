@@ -27,8 +27,9 @@ if [ "$skip_wasm" = 0 ]; then "$root/kern/build.sh" --studio ${KERN_COMMERCIAL:+
 [ -s "$wasm" ] || { echo "missing $wasm (run without --skip-wasm)" >&2; exit 1; }
 
 python3 - "$root" "$wasm" "$out" <<'PY'
-import base64, re, sys, pathlib
+import base64, re, sys, pathlib, subprocess
 root, wasm, out = map(pathlib.Path, sys.argv[1:4])
+version = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
 web = root / "kern/web"
 html = (web / "studio/index.html").read_text()
 css = (web / "studio/studio.css").read_text()
@@ -59,7 +60,7 @@ def strip(text):
     return re.sub(r"^export (?=(const|let|function|async function|class) )", "", text, flags=re.M)
 bundle = "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "audio", "app", "game", "logic", "trainer", "studio"))
 boot = """<script type="module">
-""" + bundle + """
+""" + "window.KERN_TRAINER_BUILD = " + repr(version) + ";\n" + bundle + """
 // ---- single-file boot ----
 {
   const text = id => document.getElementById(id).textContent;
