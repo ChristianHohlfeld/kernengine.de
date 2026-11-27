@@ -1,0 +1,15 @@
+round 1: 19 Blueprints - 19 for the first time
+round 2: 7 Blueprints - 7 for the first time
+drone_art_cpp names what the engine's libraries do not have (tools/engine_api.py --libraries):
+  engine_math_math: the type or function Mat4_mul - the engine does not write it - in `a = engine_math_math::Mat4_mul(body, a_2).Result;`
+  engine_math_math: the type or function Mat4_mul - the engine does not write it - in `a_4 = engine_math_math::Mat4_mul(body, a_5).Result;`
+  engine_math_math: the type or function Mat4_mul - the engine does not write it - in `a_3 = engine_math_math::Mat4_mul(a_4, a_6).Result;`
+  engine_math_math: the type or function Mat4_mul - the engine does not write it - in `p = engine_math_math::Mat4_mul(a_3, a_7).Result;`
+  engine_math_math: the type or function Mat4_mul - the engine does not write it - in `a_8 = engine_math_math::Mat4_mul(body, a_9).Result;`
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+
+real	2m12,603s
+user	11m34,340s
+sys	1m2,116s
