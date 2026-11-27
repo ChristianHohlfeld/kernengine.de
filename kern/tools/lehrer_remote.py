@@ -16,13 +16,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TERMINAL = {"done", "stopped", "error"}
 MAX_BODY = 65536
+STOP_GRACE = 90
+JOB_ID = re.compile(r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")
+
+def atomic_json(path, data):
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(data, f, allow_nan=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+    fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try: os.fsync(fd)
+    finally: os.close(fd)
 
 def validate(data, build, workers):
     if not isinstance(data, dict) or set(data) - {"id","build","task","iterations","envs","seed","initStd","learningRate"}:
         raise ValueError("invalid job fields")
     if data.get("build") != build:
         raise ValueError("Studio and MAG builds differ; update one before training")
-    if not isinstance(data.get("id"),str) or not re.fullmatch(r"[a-f0-9-]{36}",data["id"]):
+    if not isinstance(data.get("id"),str) or not JOB_ID.fullmatch(data["id"]):
         raise ValueError("invalid job id")
     task = data.get("task")
     if not isinstance(task,str) or len(task.encode()) > 16384:
@@ -47,19 +60,44 @@ def validate(data, build, workers):
     return cfg
 
 class Job:
-    def __init__(self, server, job_id, config):
+    def __init__(self, server, job_id, config, recovered=None):
         self.server, self.id, self.config = server, job_id, config
         self.dir = server.root / job_id
-        self.dir.mkdir(mode=0o700,exist_ok=False)
+        if recovered is None:
+            self.dir.mkdir(mode=0o700,exist_ok=False)
         self.state, self.message = "waiting", "Waiting for MAG's GPU lease"
         self.proc = None
         self.stop = threading.Event()
+        self.finished = threading.Event()
         self.lock = threading.RLock()
         self.stats, self.report = None,None
         self.gpus = 0
         self.network = None
         self.network_iteration = 0
         self.thread = threading.Thread(target=self.run, name="lehrer-"+job_id, daemon=False)
+        if recovered is not None:
+            self.state = recovered["state"]
+            self.message = recovered["message"]
+            self.stats = recovered.get("stats")
+            self.report = recovered.get("report")
+            self.gpus = recovered.get("gpus",0)
+            self.network = recovered.get("network")
+            self.network_iteration = recovered.get("networkIteration",0)
+            # Never claim an interrupted native process is still alive or
+            # silently restart it from a checkpoint with different physics.
+            if self.state not in TERMINAL:
+                self.state = "error"
+                self.message = "MAG service restarted; training interrupted. Last saved network and checkpoint retained."
+            self.finished.set()
+            path = self.dir/"network.onnx"
+            if not path.is_file() or not path.stat().st_size:
+                self.network = None
+                self.network_iteration = 0
+
+    def persist(self):
+        # Caller holds the job lock, or is initializing before publication.
+        atomic_json(self.dir/"job.json", {"config":self.config, "public":self.public()})
+
     def public(self):
         with self.lock:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
@@ -69,11 +107,13 @@ class Job:
     def change(self,state,message):
         with self.lock:
             self.state,self.message = state,message
+            self.persist()
     def control(self, action):
         with self.lock:
             if self.state in TERMINAL:
                 return
             if action == "stop":
+                if self.stop.is_set(): return
                 self.stop.set()
                 if self.proc and self.proc.poll() is None:
                     # Continue a stopped process before asking it to checkpoint and finish.
@@ -81,12 +121,23 @@ class Job:
                         os.killpg(self.proc.pid,signal.SIGCONT)
                         os.killpg(self.proc.pid,signal.SIGTERM)
                 self.change("stopping","Saving the last training iteration")
+                if self.proc and self.proc.poll() is None:
+                    threading.Thread(target=self.stop_watchdog,args=(self.proc,),daemon=True).start()
             elif action in ("pause","resume") and self.state in ("running","paused") and self.proc and self.proc.poll() is None:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(self.proc.pid,signal.SIGSTOP if action=="pause" else signal.SIGCONT)
                 self.change("paused" if action=="pause" else "running", "Paused on MAG" if action=="pause" else "Learning on MAG")
             else:
                 raise ValueError("training is not ready to pause or resume")
+    def stop_watchdog(self, proc):
+        if self.finished.wait(STOP_GRACE): return
+        with self.lock:
+            if proc.poll() is None:
+                # A stuck HIP call must not hold MAG forever. Report the
+                # forced stop as an error, never a successful checkpoint.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid,signal.SIGKILL)
+
     def acquire(self, stack, filename):
         file = stack.enter_context(open(filename,"rb"))
         while not self.stop.is_set():
@@ -102,6 +153,7 @@ class Job:
             with self.lock:
                 self.network = str(path.stat().st_mtime_ns)
                 self.network_iteration = self.stats["iteration"] if self.stats else 0
+                self.persist()
     def run(self):
         server = self.server
         entered = False
@@ -156,7 +208,9 @@ class Job:
                                         log.write(line); log.flush()
                                         if line.startswith(("imitating the demonstration:", "  round ")):
                                             with self.lock:
-                                                if self.state == "running": self.message = line.strip()[:300]
+                                                if self.state == "running":
+                                                    self.message = line.strip()[:300]
+                                                    self.persist()
                                         if line.startswith("KERN_PROGRESS "):
                                             stats = json.loads(line[len("KERN_PROGRESS "):])
                                             with self.lock:
@@ -165,6 +219,8 @@ class Job:
                                                 if self.state == "running": self.message = "Learning on MAG"
                                             if stats.get("snapshot"):
                                                 self.snapshot()
+                                            else:
+                                                with self.lock: self.persist()
                                     code = self.proc.wait()
                                     self.snapshot()
                                     if code != 0:
@@ -180,7 +236,12 @@ class Job:
                         with contextlib.suppress(ProcessLookupError):
                             os.killpg(self.proc.pid,signal.SIGCONT)
                             os.killpg(self.proc.pid,signal.SIGTERM)
-                        self.proc.wait()
+                        try:
+                            self.proc.wait(timeout=STOP_GRACE)
+                        except subprocess.TimeoutExpired:
+                            with contextlib.suppress(ProcessLookupError):
+                                os.killpg(self.proc.pid,signal.SIGKILL)
+                            self.proc.wait(timeout=15)
                     if entered:
                         # Keep GPU locks until restoration is requested. The GPU guard
                         # resumes only when the locks are released.
@@ -192,8 +253,11 @@ class Job:
         finally:
             # Early cancelled lease already has its terminal state.
             with self.lock:
-                if self.state not in TERMINAL:
-                    self.change(state,message)
+                try:
+                    if self.state not in TERMINAL:
+                        self.change(state,message)
+                finally:
+                    self.finished.set()
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
@@ -211,7 +275,23 @@ class Server(ThreadingHTTPServer):
         self.gpu_lock = args.gpu_lock
         self.hook = ["/usr/bin/sudo","-n",args.hook] if args.hook else []
         self.job,self.job_lock = None,threading.RLock()
+        self.current_file = self.root/"current.json"
+        if self.current_file.exists():
+            record = json.loads(self.current_file.read_text())
+            jid = record["id"]
+            if not isinstance(jid,str) or not JOB_ID.fullmatch(jid):
+                raise ValueError("invalid persisted job id")
+            meta = json.loads((self.root/jid/"job.json").read_text())
+            if meta["public"]["id"] != jid: raise ValueError("persisted job id mismatch")
+            self.job = Job(self,jid,meta["config"],recovered=meta["public"])
+            self.job.persist()
         super().__init__(("127.0.0.1",args.port),Handler)
+
+    def publish(self, job):
+        job.persist()
+        atomic_json(self.current_file, {"id":job.id})
+        self.job = job
+        job.thread.start()
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt,*args):
@@ -299,7 +379,7 @@ class Handler(BaseHTTPRequestHandler):
                             self.reply(409,{"error":"MAG already has a different training job"});return
                     else:
                         job=Job(server,data["id"],cfg)
-                        server.job=job;job.thread.start()
+                        server.publish(job)
                 self.reply(200,job.public());return
             with server.job_lock:
                 job=server.job
@@ -308,8 +388,13 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path.startswith(prefix) and self.path[len(prefix):] in ("pause","resume","stop"):
                     job.control(self.path[len(prefix):]);self.reply(200,job.public());return
             self.reply(404,{"error":"not found"})
-        except (ValueError,TypeError,KeyError,FileExistsError) as exc:
+        except FileExistsError:
+            self.reply(409,{"error":"Job ID already exists; reconnect instead of starting again"})
+        except (ValueError,TypeError,KeyError) as exc:
             self.reply(400,{"error":str(exc)})
+        except OSError as exc:
+            print("MAG job storage error:",repr(exc),flush=True)
+            self.reply(503,{"error":"MAG job storage unavailable"})
 
 def main():
     p=argparse.ArgumentParser()
