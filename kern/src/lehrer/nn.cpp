@@ -1,6 +1,7 @@
 // The Lehrer's networks (see nn.h). Weights are stored input-major (w[i * out + o]) so that both
 // passes run as contiguous axpy loops the compiler vectorises without reassociating sums.
 #include "kern/lehrer/nn.h"
+#include "kern/lehrer/hip_dense.h"
 #include "kern/core/dmath.h"
 
 #include <cmath>
@@ -34,6 +35,9 @@ namespace {
 
 // y[r][o] = b[o] + sum_i x[r][i] w[i][o] for rows r: four rows share each pass over w.
 void dense(const f32* x, i32 rows, i32 in, i32 out, const f32* w, const f32* b, f32* y) {
+#ifdef KERN_LEHRER_HIP
+  if (rows >= 16) { hip_lehrer_dense(x, rows, in, out, w, b, y); return; }
+#endif
   i32 r = 0;
   for (; r + 4 <= rows; r += 4) {
     f32* y0 = y + static_cast<std::size_t>(r) * out;
@@ -108,6 +112,11 @@ void Mlp::backward(const Cache& cache, const f32* dout, f32* grad, f32* dx) cons
     f32* gw = grad + w_[static_cast<std::size_t>(l)];
     f32* gb = grad + b_[static_cast<std::size_t>(l)];
     const f32* d = delta.data();
+#ifdef KERN_LEHRER_HIP
+    if (batch >= 16) hip_lehrer_gradient(x, d, batch, in, o_n, gw, gb);
+    else
+#endif
+    {
     // Bias and weight gradients: gw[i][o] += sum_r x[r][i] d[r][o], four rows per pass.
     for (i32 r = 0; r < batch; ++r)
       for (i32 o = 0; o < o_n; ++o) gb[o] += d[static_cast<std::size_t>(r) * o_n + o];
@@ -131,6 +140,7 @@ void Mlp::backward(const Cache& cache, const f32* dout, f32* grad, f32* dx) cons
         f32* gwi = gw + static_cast<std::size_t>(i) * o_n;
         for (i32 o = 0; o < o_n; ++o) gwi[o] += a * dr[o];
       }
+    }
     }
     if (l == 0 && !dx) break;
     // Input gradient: dx[r][i] = sum_o d[r][o] w[i][o] = d . w^T (with w transposed once: [o][i]).

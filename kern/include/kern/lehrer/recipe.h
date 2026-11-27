@@ -51,4 +51,7 @@ void begin_practice(Ppo& learner, const Recipe& recipe);
 /// Before each PPO iteration: the actor joins in once the critic has warmed up.
 void before_learning(Ppo& learner, const Recipe& recipe);
 
+/// Common clean-robot evaluation for native and WASM trainers; empty for stand.
+std::string evaluate_training(const Recipe& recipe, Ppo& learner, i32 episodes);
+
 }  // namespace kern::lehrer

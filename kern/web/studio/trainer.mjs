@@ -281,6 +281,11 @@ export class Trainer {
         `<div class="tr-buttons"><button class="btn small" id="scApply" type="button">Apply JSON</button></div>` +
         `<p class="tr-note">The direction to the goal is a training command in the free inputs 55/56, not an invented IMU sensor: the real robot needs an external position for it. A scenario's network is not a move of the duck; download it as .onnx.</p>`) +
       sec("run", "Training",
+        field("Compute backend", '<select class="sel" id="trCompute"><option value="local" selected>Local</option><option value="mag">MAG · CPU + HIP GPUs</option></select>') +
+        `<div id="trRemoteSettings" hidden>` +
+        field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8443" spellcheck="false" autocomplete="off">') +
+        field("MAG token", '<input class="txt" id="trRemoteToken" type="password" autocomplete="off" spellcheck="false">') +
+        `<div class="tr-buttons"><button class="btn small" id="trReconnect" type="button">Reconnect to MAG</button></div></div>` +
         `<div class="tr-buttons"><button class="btn go" id="trStart" type="button">Start</button><button class="btn" id="trPause" type="button">Pause</button><button class="btn" id="trStop" type="button">Stop</button></div>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
         `<div class="tr-buttons"><button class="btn small" id="trTest" type="button">Try the network on the duck</button><button class="btn small" id="trDownload" type="button">Download .onnx</button></div>` +
@@ -295,13 +300,16 @@ export class Trainer {
       sec("help", "How it works",
         `<p class="tr-note">A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.</p>` +
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
-        `<p class="tr-note">Training goes on while you edit, play or leave this workspace; keep the tab open, and a phone on its charger. More workers use more cores. The same seed and the same number of ducks produce the same network bit for bit, on every device.</p>` +
+        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local training is the default and does not contact MAG. CPU determinism is tested; HIP is a separate native build.</p>` +
         `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
     this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
       `<div class="tr-test"><span id="trTesting" data-i18n-skip></span><button class="btn primary" id="trAgain" type="button">Again</button><button class="btn" id="trPosing" type="button">Back to posing</button></div>`;
     const el = this.el = {};
     for (const node of [...this.host.querySelectorAll("[id]"), ...this.bar.querySelectorAll("[id]")]) el[node.id] = node;
+    try { el.trRemoteUrl.value = localStorage.getItem("kern-lehrer.remote-url") || ""; } catch { /* storage blocked */ }
+    el.trCompute.onchange = () => this.sync();
+    el.trReconnect.onclick = () => void this.reconnectRemote();
     this.setScenario(TRAINER_SCENARIO);
     el.scName.value = tr(TRAINER_SCENARIO.name);
     this.wire();
@@ -401,7 +409,10 @@ export class Trainer {
     // A network that waited for the level to stop playing goes in now.
     if (this.handover && this.editable) {
       const why = this.deliver();
-      if (why) { if (this.run) this.end(this.run); this.status(why, true); }
+      if (why) {
+        if (this.run?.remote) this.note = "Network saved on MAG; level import failed: " + why;
+        else { if (this.run) this.end(this.run); this.status(why, true); }
+      }
     }
     this.covered = !!s.logic?.open;  // the Blueprint editor lies over the viewports, the stage with them
     document.getElementById("main").classList.toggle("trainer-open", open);
@@ -438,9 +449,16 @@ export class Trainer {
       }
     }
     // The run.
+    const remoteSelected = el.trCompute.value === "mag";
+    el.trRemoteSettings.hidden = !remoteSelected;
+    el.trCompute.disabled = !!run;
+    el.trRemoteUrl.disabled = !!run || !remoteSelected;
+    el.trRemoteToken.disabled = !!run || !remoteSelected;
+    el.trReconnect.disabled = !!run || !remoteSelected;
+    el.trWorkers.disabled = !!run || remoteSelected;
     el.trStart.disabled = !!run;
-    el.trPause.disabled = !run;
-    el.trStop.disabled = !run;
+    el.trPause.disabled = !run || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
+    el.trStop.disabled = !run || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
     el.trTest.disabled = !this.onnx?.move || !open;
@@ -622,6 +640,21 @@ export class Trainer {
     const run = this.run = {task, name, move, label, token: `run-${Date.now().toString(36)}`, workers: [], collectors: [], learner: null, workerUrl: null, wake: null, policy: null, steps: 24,
       count: whole("trWorkers", 1, 64, 1), envs: whole("trEnvs", 1, 256, 8), total: whole("trIterations", 1, 100000, 1), seed: whole("trSeed", 1, 4294967295, 1),
       iteration: 0, paused: false, history: []};
+    if (el.trCompute.value === "mag") {
+      try {
+        const connection = this.remoteConnection();
+        const build = window.KERN_TRAINER_BUILD;
+        if (!/^[a-f0-9]{40}$/.test(build || "")) throw Error("Remote training needs a versioned Studio build.");
+        const body = {id: crypto.randomUUID(), build, task: name, iterations: run.total, envs: run.envs, seed: run.seed};
+        for (const [field,id] of [["initStd","trInitStd"],["learningRate","trLr"]]) {
+          const value = trainerNumber(el[id].value);
+          if (value > 0) body[field] = value;
+        }
+        run.remote = {...connection, body, id: null, state: "waiting", stopping: false, busy: false, network: null};
+      } catch (error) {
+        this.end(run); this.status(error.message, true); return;
+      }
+    }
     this.onnx = null;
     this.handover = null;
     this.note = "";
@@ -630,6 +663,7 @@ export class Trainer {
     this.draw();
     const live = () => this.run === run;
     try {
+      if (run.remote) { await this.remotePractice(run); return; }
       if (!this.module) {
         this.status("Loading the Lehrer ...");
         this.module = await WebAssembly.compileStreaming(fetch(TRAINER_WASM)).catch(async () => WebAssembly.compile(await (await fetch(TRAINER_WASM)).arrayBuffer()));
@@ -677,6 +711,138 @@ export class Trainer {
     }
   }
 
+
+  remoteConnection() {
+    const url = new URL(this.el.trRemoteUrl.value);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
+      throw Error("MAG needs an HTTPS origin (without a path).");
+    const token = this.el.trRemoteToken.value.trim();
+    if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw Error("Enter the MAG training token.");
+    try { localStorage.setItem("kern-lehrer.remote-url", url.origin); } catch { /* storage blocked */ }
+    return {url: url.origin, token};
+  }
+
+  // Explicit recovery after a tab reload: never import into a possibly different level.
+  // The result is available for download and the original job can be paused/stopped.
+  async reconnectRemote() {
+    if (this.run) return;
+    let run;
+    try {
+      const connection = this.remoteConnection();
+      run = this.run = {task: "stand", label: "mag", move: null, workers: [], collectors: [],
+        total: 1, iteration: 0, paused: false, history: [], remote: {...connection,
+          state: "waiting", id: null, busy: true, stopping: false, network: null}};
+      this.history = run.history;
+      this.status("Reconnecting to MAG ...");
+      const data = await this.remoteRequest(run, "/v1/current");
+      if (this.run !== run) return;
+      if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
+      run.remote.id = data.id; run.remote.busy = false;
+      run.task = data.taskKind; run.label = "mag-" + data.id; run.token = run.label;
+      run.total = data.total; run.envs = data.envs;
+      this.onnx = null; this.handover = null;
+      this.note = "Reconnected: download the network to import it into the intended level.";
+      await this.remotePractice(run);
+    } catch (error) {
+      if (run && this.run === run) this.end(run);
+      this.status(error.message, true);
+    }
+  }
+
+  // A second transport, not a second trainer. The existing run, stats, goal
+  // and ONNX delivery are shared with the local worker path.
+  async remoteRequest(run, path, body, binary = false) {
+    const remote = run.remote;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const headers = {Authorization: "Bearer " + remote.token};
+      if (body !== undefined) headers["Content-Type"] = "application/json";
+      const response = await fetch(remote.url + path, {method: body === undefined ? "GET" : "POST",
+        headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,
+        cache: "no-store", credentials: "omit", redirect: "error", referrerPolicy: "no-referrer"});
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const error = Error(data.error || "MAG HTTP " + response.status);
+        error.http = response.status;
+        throw error;
+      }
+      return binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
+    } finally { clearTimeout(timeout); }
+  }
+
+  async remotePractice(run) {
+    const remote = run.remote, live = () => this.run === run;
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    this.status("Connecting to MAG ...");
+    while (live()) {
+      try {
+        let data;
+        if (!remote.id) {
+          data = await this.remoteRequest(run, "/v1/jobs", remote.body);
+          if (data.id !== remote.body.id) throw Object.assign(Error("MAG returned a different job id"), {http: 400});
+          remote.id = data.id;
+          run.token = "mag-" + data.id;
+        } else {
+          data = await this.remoteRequest(run, "/v1/jobs/" + remote.id);
+        }
+        if (!live()) return;
+        remote.state = data.state;
+        run.count = data.workers;
+        run.paused = data.state === "paused";
+        if (data.stats && data.stats.iteration > run.iteration) {
+          run.iteration = data.stats.iteration;
+          this.stats(run, data.stats, data.stats.collectSeconds + data.stats.learnSeconds);
+        }
+        if (data.report) this.goal(run, data.report);
+        // Stop is independent of model download (even an invalid ONNX cannot block it).
+        if (remote.stopping && !["stopping", "done", "stopped", "error"].includes(data.state)) {
+          await this.remoteRequest(run, "/v1/jobs/" + remote.id + "/stop", {});
+          await wait(200); continue;
+        }
+        if (data.network && data.network !== remote.network) {
+          try {
+            const bytes = await this.remoteRequest(run, "/v1/jobs/" + remote.id + "/network/" + encodeURIComponent(data.network), undefined, true);
+            if (!live()) return;
+            try { this.acceptNetwork(run, bytes, data.networkIteration ?? run.iteration); }
+            catch (error) { this.note = "Network saved on MAG; level import failed: " + error.message; }
+            remote.network = data.network;
+          } catch (error) {
+            if (error.http !== 409) throw error;
+            await wait(200); continue;
+          }
+        }
+        if (["done", "stopped", "error"].includes(data.state)) {
+          this.end(run); this.status(data.message, data.state === "error"); return;
+        }
+        this.status(remote.stopping ? "Stop requested; waiting for MAG to finish." :
+          data.message + (data.gpus ? ` · ${data.workers} CPU threads · ${data.gpus} HIP GPU(s)` : ""));
+        await wait(1000);
+      } catch (error) {
+        if (!live()) return;
+        if (error.http && error.http < 500 && (!remote.id || error.http === 404 || error.http === 403)) {
+          this.end(run); this.status(error.message + (remote.id ? " — check MAG if the job is still running." : ""), true); return;
+        }
+        this.status("MAG connection interrupted; job may still be running. Reconnecting ...", true);
+        await wait(2000);
+      }
+    }
+  }
+
+  async remoteControl(run, action) {
+    const remote = run.remote;
+    if (!remote.id || remote.busy) return;
+    remote.busy = true; this.sync();
+    try {
+      const data = await this.remoteRequest(run, "/v1/jobs/" + remote.id + "/" + action, {});
+      if (this.run !== run) return;
+      remote.state = data.state; run.paused = data.state === "paused";
+      this.status(data.message);
+    } catch (error) {
+      if (this.run === run) this.status("MAG control not confirmed: " + error.message, true);
+    } finally { remote.busy = false; if (this.run === run) this.sync(); }
+  }
+
   async practice(run) {
     const live = () => this.run === run;
     while (live() && run.iteration < run.total) {
@@ -704,14 +870,18 @@ export class Trainer {
   async export(run) {
     const d = await trainerCall(run.learner, {type: "export"}, "onnx");
     if (this.run !== run) return;
-    const bytes = new Uint8Array(d.onnx);
+    this.acceptNetwork(run, new Uint8Array(d.onnx), run.iteration);
+  }
+
+  acceptNetwork(run, bytes, iteration) {
+    if (this.run !== run) return;
     this.onnx = {bytes, name: run.label, task: run.task, move: null};
     if (run.move) {
-      this.handover = {name: run.move, onnx: toBase64(bytes), run: run.token, iteration: run.iteration};
+      this.handover = {name: run.move, onnx: toBase64(bytes), run: run.token, iteration};
       const why = this.deliver();
       if (why) throw Error(why);
     } else {
-      this.note = `The network is ready to download (iteration ${run.iteration}).`;
+      this.note = `The network is ready to download (iteration ${iteration}).`;
     }
     this.sync();
   }
@@ -742,7 +912,7 @@ export class Trainer {
     const set = (id, text) => this.text(this.host.querySelector(`[data-stat="${id}"] b`), text);
     set("it", s.iteration);
     set("steps", Math.round(s.steps).toLocaleString());
-    set("sps", Math.round(run.collectors.length * run.envs * run.steps / seconds).toLocaleString());
+    set("sps", Math.round(run.remote ? s.sps : run.collectors.length * run.envs * run.steps / seconds).toLocaleString());
     if (s.episodes) {
       set("ret", s.meanReturn.toFixed(2));
       set("len", (s.meanLength * 0.02).toFixed(2));
@@ -768,6 +938,7 @@ export class Trainer {
   pause() {
     const run = this.run;
     if (!run) return;
+    if (run.remote) { void this.remoteControl(run, run.paused ? "resume" : "pause"); return; }
     run.paused = !run.paused;
     this.status(run.paused ? "Paused." : "Learning ...");
   }
@@ -775,6 +946,11 @@ export class Trainer {
   stop() {
     const run = this.run;
     if (!run) return;
+    if (run.remote) {
+      run.remote.stopping = true;
+      this.status("Stop requested; waiting for MAG to save and release its resources.");
+      return;
+    }
     this.end(run);
     this.status(`Stopped after ${run.iteration} iterations.`);
   }

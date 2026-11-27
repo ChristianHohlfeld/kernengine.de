@@ -166,6 +166,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Lehrer remote transport and MAG lease (mock trainer)
+        run: |
+          python3 kern/tests/lehrer_remote_test.py
+          node kern/tests/lehrer_remote_test.mjs
+          bash -n kern/tools/lehrer.sh
       - name: Install wasi-sdk 25
         run: |
           set -euo pipefail
