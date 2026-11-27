@@ -190,7 +190,9 @@ void hip_lehrer_gradient(const f32* x, const f32* d, i32 rows, i32 in, i32 out, 
   gradient_on(pick(),x,d,rows,in,out,gw,gb);
 }
 bool hip_lehrer_check() {
-  constexpr int rows=19, in=23, out=31;
+  // Multiple workgroups in both dimensions, with partial tiles and a
+  // non-multiple-of-four gradient tail.
+  constexpr int rows=67, in=65, out=97;
   std::vector<f32> x(rows*in), w(in*out), b(out), d(rows*out);
   unsigned seed=17;
   auto fill=[&](auto& a){ for(auto& v:a) { seed=seed*1664525u+1013904223u; v=float(int(seed%20001)-10000)/12345.0f; } };
