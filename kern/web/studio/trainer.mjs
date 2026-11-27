@@ -734,7 +734,18 @@ export class Trainer {
           state: "waiting", id: null, busy: true, stopping: false, network: null}};
       this.history = run.history;
       this.status("Reconnecting to MAG ...");
-      const data = await this.remoteRequest(run, "/v1/current");
+      let data;
+      try {
+        data = await this.remoteRequest(run, "/v1/current");
+      } catch (error) {
+        if (this.run !== run) return;
+        // The known idle response is not a connection failure. Other 404s
+        // (e.g. a wrong server/path) remain errors.
+        if (error.http !== 404 || error.message !== "no MAG training job") throw error;
+        this.end(run);
+        this.status("Connected to MAG. Ready to start training.");
+        return;
+      }
       if (this.run !== run) return;
       if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
       run.remote.id = data.id; run.remote.busy = false;
