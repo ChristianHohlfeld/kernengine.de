@@ -1,0 +1,80 @@
+  terrain: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  tiles_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_jobs_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  terrain_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  SpawnCity: the project - it exports sc_tile_requests, sc_tile_data, sc_tile_failed, sc_offline and 16 more - exports belong to the program
+
+561 of 564 functions of the program are written as Blueprints (6695 of 6698 lines), and 3 of the engine's headers that they call: 45 Blueprints - 12 of source files, 1 of states, 32 of headers and of shapes
+
+59 places where the width of size_t can change the result (a hint - the Blueprint computes with the u64 of LP64):
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_jobs.cpp:104: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_jobs.cpp:83: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_jobs.cpp:90: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_jobs.cpp:97: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:1047: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:1061: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:51: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:536: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:613: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/city_stream.cpp:785: a decrement on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/mvt.cpp:142: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/mvt.cpp:319: a subtraction on size_t, converted to u64 (where size_t has 32 bits, another number)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/mvt.cpp:34: a subtraction on size_t, converted to u64 (where size_t has 32 bits, another number)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/mvt.cpp:41: a subtraction on size_t, converted to u64 (where size_t has 32 bits, another number)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/mvt.cpp:50: a subtraction on size_t, converted to u64 (where size_t has 32 bits, another number)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/spiel.cpp:432: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/spiel.cpp:561: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/spiel.cpp:627: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1078: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1081: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1082: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1087: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1090: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1103: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1112: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1124: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1169: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1175: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1178: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1246: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1252: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1253: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1257: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1260: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1270: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1279: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1281: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1288: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:1304: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:134: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:137: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:138: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:144: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:161: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:163: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:164: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:168: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:258: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:259: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:280: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:403: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:428: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:430: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:438: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:483: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:721: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:849: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/terrain.cpp:890: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/tiles.cpp:314: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+539 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (     1)   it calls SpawnCity::start(), which waits
+     1 (     1)   it calls SpawnCity::update(), which waits
+     1 (     1)   it calls SpawnCity::stop(), which waits
+
+real	7m16,118s
+user	19m43,476s
+sys	1m29,701s

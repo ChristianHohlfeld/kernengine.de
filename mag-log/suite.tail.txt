@@ -1,0 +1,80 @@
+      |                                                                                             ^ ~~~~~~~~   ~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_e9c9e40a5aeab2da::Arondight45_DroneFC_Core::Runtime_to_cdeg(f32)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_e9c9e40a5aeab2da.h:598:19: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_e9c9e40a5aeab2da.h:598:32)>' requested here
+  598 |     value = kern::formula<f32>([](auto a) { return a < -32767.0f ? -32767.0f : 32767.0f < a ? 32767.0f : a; }, kern::formula<f32>([](auto degrees) { return degrees * 1e+02f; }, degrees));
+      |                   ^
+20 errors generated.
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/tests/test_terrain.cpp:13:
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints.h:18:
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:79: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  286 |     alpha = kern::formula<f32>([](auto a) { return a < 0.0f ? 0.0f : 1.0f < a ? 1.0f : a; }, kern::formula<f32, f32>([](auto sample_dt, auto kMeasuredAccelerationFilterTauS) { return sample_dt / (kMeasuredAccelerationFilterTauS + sample_dt); }, sample_dt, kMeasuredAccelerationFilterTauS));
+      |                                                                               ^ ~~~~   ~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_update_acceleration_estimator(fc_StateController &, fc_V3, f32)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:19: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:32)>' requested here
+  286 |     alpha = kern::formula<f32>([](auto a) { return a < 0.0f ? 0.0f : 1.0f < a ? 1.0f : a; }, kern::formula<f32, f32>([](auto sample_dt, auto kMeasuredAccelerationFilterTauS) { return sample_dt / (kMeasuredAccelerationFilterTauS + sample_dt); }, sample_dt, kMeasuredAccelerationFilterTauS));
+      |                   ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:90: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  400 |     dt_ = kern::formula<f32>([](auto dt_) { return dt_ < 0.0002f ? 0.0002f : 0.02f < dt_ ? 0.02f : dt_; }, dt_);
+      |                                                                                          ^ ~~~~~   ~~~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_run(fc_StateController &, const fc_RC &, const fc_NavigationState &, f32, bool, f32, bool)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:17: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:30)>' requested here
+  400 |     dt_ = kern::formula<f32>([](auto dt_) { return dt_ < 0.0002f ? 0.0002f : 0.02f < dt_ ? 0.02f : dt_; }, dt_);
+      |                 ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:104: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  487 |     desired_yaw_rate = kern::formula<f32>([](auto a) { return a < -1.8e+02f ? -1.8e+02f : 1.8e+02f < a ? 1.8e+02f : a; }, kern::formula<f32, f32, f32>([](auto yaw_rate_dps, auto kHeadingKp, auto yaw_error) { return yaw_rate_dps + kHeadingKp * yaw_error; }, intent.yaw_rate_dps, kHeadingKp, yaw_error));
+      |                                                                                                        ^ ~~~~~~~~   ~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_run(fc_StateController &, const fc_RC &, const fc_NavigationState &, f32, bool, f32, bool)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:30: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:43)>' requested here
+  487 |     desired_yaw_rate = kern::formula<f32>([](auto a) { return a < -1.8e+02f ? -1.8e+02f : 1.8e+02f < a ? 1.8e+02f : a; }, kern::formula<f32, f32, f32>([](auto yaw_rate_dps, auto kHeadingKp, auto yaw_error) { return yaw_rate_dps + kHeadingKp * yaw_error; }, intent.yaw_rate_dps, kHeadingKp, yaw_error));
+      |                              ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/tests/test_settings.cpp:7:
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints.h:18:
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:79: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  286 |     alpha = kern::formula<f32>([](auto a) { return a < 0.0f ? 0.0f : 1.0f < a ? 1.0f : a; }, kern::formula<f32, f32>([](auto sample_dt, auto kMeasuredAccelerationFilterTauS) { return sample_dt / (kMeasuredAccelerationFilterTauS + sample_dt); }, sample_dt, kMeasuredAccelerationFilterTauS));
+      |                                                                               ^ ~~~~   ~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_update_acceleration_estimator(fc_StateController &, fc_V3, f32)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:19: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:286:32)>' requested here
+  286 |     alpha = kern::formula<f32>([](auto a) { return a < 0.0f ? 0.0f : 1.0f < a ? 1.0f : a; }, kern::formula<f32, f32>([](auto sample_dt, auto kMeasuredAccelerationFilterTauS) { return sample_dt / (kMeasuredAccelerationFilterTauS + sample_dt); }, sample_dt, kMeasuredAccelerationFilterTauS));
+      |                   ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:90: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  400 |     dt_ = kern::formula<f32>([](auto dt_) { return dt_ < 0.0002f ? 0.0002f : 0.02f < dt_ ? 0.02f : dt_; }, dt_);
+      |                                                                                          ^ ~~~~~   ~~~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_run(fc_StateController &, const fc_RC &, const fc_NavigationState &, f32, bool, f32, bool)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:17: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:400:30)>' requested here
+  400 |     dt_ = kern::formula<f32>([](auto dt_) { return dt_ < 0.0002f ? 0.0002f : 0.02f < dt_ ? 0.02f : dt_; }, dt_);
+      |                 ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:104: error: conditional expression is ambiguous; 'float' can be converted to 'kern::logic::num::Typed<float>' and vice versa
+  487 |     desired_yaw_rate = kern::formula<f32>([](auto a) { return a < -1.8e+02f ? -1.8e+02f : 1.8e+02f < a ? 1.8e+02f : a; }, kern::formula<f32, f32, f32>([](auto yaw_rate_dps, auto kHeadingKp, auto yaw_error) { return yaw_rate_dps + kHeadingKp * yaw_error; }, intent.yaw_rate_dps, kHeadingKp, yaw_error));
+      |                                                                                                        ^ ~~~~~~~~   ~
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/include/kern/logic/blueprint.h:102:30: note: in instantiation of function template specialization 'kern_blueprint_ec2dce65ba1b2729::Arondight45_StateControl::StateController_run(fc_StateController &, const fc_RC &, const fc_NavigationState &, f32, bool, f32, bool)::(anonymous class)::operator()<kern::logic::num::Typed<float>>' requested here
+  102 |   return logic::num::untyped(f(logic::num::Typed<logic::num::raw<T>>(values)...));
+      |                              ^
+/dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:30: note: in instantiation of function template specialization 'kern::formula<kern::logic::num::Typed<float>, (lambda at /dev/shm/spawncity-jobs-chris/kandidat-18-080624/kern/games/spawncity/src/level_blueprints/kern_blueprint_ec2dce65ba1b2729.h:487:43)>' requested here
+  487 |     desired_yaw_rate = kern::formula<f32>([](auto a) { return a < -1.8e+02f ? -1.8e+02f : 1.8e+02f < a ? 1.8e+02f : a; }, kern::formula<f32, f32, f32>([](auto yaw_rate_dps, auto kHeadingKp, auto yaw_error) { return yaw_rate_dps + kHeadingKp * yaw_error; }, intent.yaw_rate_dps, kHeadingKp, yaw_error));
+      |                              ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+1 warning generated.
+20 errors generated.
+1 warning generated.
+1 warning generated.
+1 warning generated.
+3 warnings generated.
+2 warnings generated.
+
+real	4m32,698s
+user	72m2,511s
+sys	1m51,836s
