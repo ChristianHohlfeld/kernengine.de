@@ -301,7 +301,7 @@ export class Trainer {
       sec("help", "How it works",
         `<p class="tr-note">A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.</p>` +
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
-        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local training is the default and does not contact MAG. CPU determinism is tested; HIP is a separate native build.</p>` +
+        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local is the default for new training. If a MAG address was saved, the Lehrer checks for an existing job when opened; reloading the page never stops or starts a remote job. CPU determinism is tested; HIP is a separate native build.</p>` +
         `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
     this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
@@ -314,7 +314,7 @@ export class Trainer {
       clearTimeout(this.remoteProbeTimer);
       this.remoteProbeTimer = null;
       this.sync();
-      if (el.trCompute.value === "mag") void this.reconnectRemote({automatic:true});
+      if (el.trCompute.value === "mag" && el.trRemoteUrl.value.trim()) void this.reconnectRemote({automatic:true});
     };
     el.trReconnect.onclick = () => void this.reconnectRemote();
     this.setScenario(TRAINER_SCENARIO);
@@ -896,8 +896,14 @@ export class Trainer {
             catch (error) { this.note = "Network saved on MAG; level import failed: " + error.message; }
             remote.network = data.network;
           } catch (error) {
-            if (error.http !== 409) throw error;
-            await wait(200); continue;
+            // A snapshot transfer can fail independently of the job. Keep
+            // control attached and retry, rather than treating a download
+            // 404 as a missing training job.
+            if (!live()) return;
+            this.note = "Network download interrupted; retrying.";
+            this.sync();
+            await wait(error.http === 409 ? 200 : 1500);
+            continue;
           }
         }
         if (["done", "stopped", "error"].includes(data.state)) {
