@@ -319,7 +319,7 @@ export class Trainer {
     const cores = Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
     const stats = TRAINER_STATS.map(([id, label]) => `<div class="tr-stat" data-stat="${id}"><b>-</b><span>${label}</span></div>`).join("");
     this.host.innerHTML =
-      sec("task", "Task", field("Teach", `<select class="sel" id="trTask">${TRAINER_TASKS.map(([id, label]) => `<option value="${id}">${escHtml(tr(label))}</option>`).join("")}</select>`)) +
+      sec("task", "Task", field("Teach", `<select class="sel" id="trTask">${TRAINER_TASKS.map(([id, label]) => `<option value="${id}">${escHtml(tr(label))}</option>`).join("")}</select>`) + '<p class="tr-note" id="trRecoveredTask" hidden></p>') +
       sec("motion", "Motion from keyframes",
         field("Name", `<input class="txt" id="trName" maxlength="38" spellcheck="false" autocomplete="off">`) +
         field("Length", num("trDuration"), "s") +
@@ -443,11 +443,11 @@ export class Trainer {
     };
     el.trHome.onclick = () => command({cmd: "trainerStage"});
     el.trPosing.onclick = () => command({cmd: "trainerStage"});
-    el.trAgain.onclick = () => { if (this.s?.testing) command({cmd: "trainerTest", move: this.s.testing}); };
+    el.trAgain.onclick = () => { if (this.s?.testing === "lehrer_preview") this.previewNetwork(); else if (this.s?.testing) command({cmd: "trainerTest", move: this.s.testing}); };
     el.trStart.onclick = () => this.start();
     el.trPause.onclick = () => this.pause();
     el.trStop.onclick = () => this.stop();
-    el.trTest.onclick = () => { if (this.onnx?.move) command({cmd: "trainerTest", move: this.onnx.move}); };
+    el.trTest.onclick = () => this.previewNetwork();
     el.trDownload.onclick = () => { if (this.onnx) trainerDownload(`${this.onnx.name}_kern.onnx`, this.onnx.bytes, "application/octet-stream"); };
     el.scExample.onclick = () => { this.setScenario(TRAINER_SCENARIO); el.scName.value = tr(TRAINER_SCENARIO.name); };
     el.scApply.onclick = () => {
@@ -511,11 +511,15 @@ export class Trainer {
   sync() {
     const el = this.el, s = this.s, run = this.run;
     if (!el) return;
-    const open = !!s, task = this.task, motion = s?.motion;
+    const open = !!s, task = run?.task ?? this.task, motion = s?.motion;
     el.trTask.value = task;
     el.trTask.disabled = !!run;
-    this.host.querySelector('[data-tsec="motion"]').hidden = task !== "motion";
-    this.host.querySelector('[data-tsec="scenario"]').hidden = task !== "scenario";
+    this.host.querySelector('[data-tsec="motion"]').hidden = task !== "motion" || !!run?.recovered;
+    if(el.trRecoveredTask) {
+      el.trRecoveredTask.hidden=!run?.recovered;
+      this.text(el.trRecoveredTask,run?.recovered ? "Recovered training: "+(run.label||run.task) : "");
+    }
+    this.host.querySelector('[data-tsec="scenario"]').hidden = task !== "scenario" || !!run?.recovered;
     if (motion) {
       if (document.activeElement !== el.trName) el.trName.value = motion.name;
       if (document.activeElement !== el.trDuration) el.trDuration.value = motion.duration;
@@ -539,6 +543,7 @@ export class Trainer {
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
     el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
+    for(const id of ["trEnvs","trIterations","trSeed","trInitStd","trLr"])if(el[id])el[id].disabled=!!run;
     el.trStart.disabled = !!run || !!this.localBusy || (!remoteSelected && !!this.localSaved);
     if(el.trLocalRecovery){
       el.trLocalRecovery.hidden=remoteSelected || !this.localSaved || !!run;
@@ -551,11 +556,11 @@ export class Trainer {
     el.trStop.disabled = !run || !!run?.localStopping || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
-    el.trTest.disabled = !this.onnx?.move || !open;
+    el.trTest.disabled = !(this.onnx?.preview || this.onnx?.move) || !open;
     this.text(el.trStatus, this.statusText);
     el.trStatus.classList.toggle("err", this.statusError);
     this.text(el.trNote, this.note);
-    el.trProgress.style.width = run ? `${Math.min(100, 100 * run.iteration / run.total).toFixed(1)}%` : this.onnx ? "100%" : "0";
+    el.trProgress.style.width = run ? `${Math.min(100, 100 * run.iteration / run.total).toFixed(1)}%` : this.lastProgress != null ? this.lastProgress + "%" : "0";
     const shown = run?.task ?? this.onnx?.task ?? task;
     for (const tile of this.host.querySelectorAll("[data-stat]")) {
       const id = tile.dataset.stat;
@@ -750,6 +755,7 @@ export class Trainer {
     this.onnx = null;
     this.handover = null;
     this.note = "";
+    this.lastProgress=null;
     this.history = run.history;
     for (const tile of this.host.querySelectorAll("[data-stat] b")) this.text(tile, "-");
     this.draw();
@@ -818,9 +824,10 @@ export class Trainer {
       this.el.trCompute.value="local";
       const {learner:ignoredLearner,collectors:ignoredCollectors,...metadata}=r;
       run=this.run={...metadata,move:null,workers:[],collectors:[],learner:null,workerUrl:null,
-        wake:null,policy:null,paused:false,localLease:release};
+        wake:null,policy:null,paused:false,recovered:true,localLease:release};
       release=null;
       this.history=run.history;
+      this.restoreRunFields(run);
       this.onnx=null;this.handover=null;
       await this.runLocal(run,saved);
     }catch(error){
@@ -931,6 +938,42 @@ export class Trainer {
     return {url: url.origin};
   }
 
+  restoreRunFields(run) {
+    this.task=run.task;
+    const cfg=run.config||{};
+    for(const [id,value] of [["trTask",run.task],["trWorkers",run.count],["trEnvs",run.envs],
+      ["trIterations",run.total],["trSeed",run.seed],["trInitStd",cfg.initStd??""],["trLr",cfg.learningRate??""]])
+      if(this.el[id] && value!==undefined && value!==null)this.el[id].value=String(value);
+  }
+
+  recoveredConfig(run,data,record) {
+    const cfg=data.config || record?.config || {};
+    run.name=typeof cfg.task==="string"?cfg.task:data.taskKind;
+    run.config={initStd:cfg.initStd,learningRate:cfg.learningRate};
+    run.seed=cfg.seed;
+    run.label=data.taskKind;
+    if(run.name.startsWith("motion:") || run.name.startsWith("scenario:")){
+      try{run.label=JSON.parse(run.name.slice(run.name.indexOf(":")+1)).name||run.label;}catch{}
+    }
+    run.recovered=true;
+    this.restoreRunFields(run);
+  }
+
+  async restoreRemoteHistory(run) {
+    try{
+      const data=await this.remoteRequest(run,"/v1/jobs/"+run.remote.id+"/history");
+      if(this.run!==run || !Array.isArray(data.history))return;
+      const points=new Map(run.history.map(p=>[p.it,p]));
+      for(const p of data.history)if(Number.isInteger(p.it)&&Number.isFinite(p.ret)&&Number.isFinite(p.len))points.set(p.it,p);
+      run.history=[...points.values()].sort((a,b)=>a.it-b.it);
+      this.history=run.history;
+      this.draw();
+    }catch(error){
+      // Older MAG builds have no history endpoint. Live control still works.
+      if(error.http!==404 && this.run===run)this.note="Progress history temporarily unavailable.";
+    }
+  }
+
   remoteRecord(url) {
     try {
       const record = JSON.parse(localStorage.getItem("kern-lehrer.remote-job") || "null");
@@ -941,7 +984,7 @@ export class Trainer {
   rememberRemote(remote, id = remote.id) {
     if (!id) return;
     try {
-      localStorage.setItem("kern-lehrer.remote-job", JSON.stringify({url:remote.url, id, stopping:!!remote.stopping}));
+      localStorage.setItem("kern-lehrer.remote-job", JSON.stringify({url:remote.url, id, stopping:!!remote.stopping, config:remote.body || remote.config || (this.remoteRecord(remote.url)?.id===id?this.remoteRecord(remote.url)?.config:undefined)}));
     } catch { /* recovery can still discover the active job on the server */ }
   }
 
@@ -998,13 +1041,16 @@ export class Trainer {
       run.remote.id = data.id; run.remote.busy = false;
       run.remote.state = data.state;
       run.remote.stopping = !terminal && record?.id === data.id && !!record.stopping;
+      run.remote.config=data.config || (record?.id===data.id?record.config:undefined);
       this.rememberRemote(run.remote);
       run.task = data.taskKind; run.label = "mag-" + data.id; run.token = run.label;
       run.total = data.total; run.envs = data.envs;
       run.count = data.workers; run.paused = data.state === "paused";
+      this.recoveredConfig(run,data,record?.id===data.id?record:null);
       this.onnx = null; this.handover = null;
-      this.note = "Reconnected: download the network to import it into the intended level.";
-      await this.remotePractice(run);
+      this.note = "Reconnected: the latest saved network can be previewed without changing this level.";
+      if(data.config)await this.restoreRemoteHistory(run);
+      if(this.run===run)await this.remotePractice(run);
     } catch (error) {
       if (run && this.run !== run) return;
       if (run) this.end(run);
@@ -1074,7 +1120,8 @@ export class Trainer {
         run.paused = data.state === "paused";
         if (data.stats && data.stats.iteration > run.iteration) {
           run.iteration = data.stats.iteration;
-          this.stats(run, data.stats, data.stats.collectSeconds + data.stats.learnSeconds);
+          this.stats(run, data.stats, data.stats.collectSeconds + data.stats.learnSeconds,
+            !run.history?.some(p=>p.it===data.stats.iteration));
         }
         if (data.report) this.goal(run, data.report);
         // Stop is independent of model download (even an invalid ONNX cannot block it).
@@ -1101,7 +1148,9 @@ export class Trainer {
           }
         }
         if (["done", "stopped", "error"].includes(data.state)) {
-          this.forgetRemote(remote.url, remote.id);
+          if(data.config)await this.restoreRemoteHistory(run);
+          remote.stopping=false;
+          this.rememberRemote(remote);
           this.end(run); this.status(data.message, data.state === "error"); return;
         }
         this.status(remote.stopping ? "Stop requested; waiting for MAG to finish." :
@@ -1168,7 +1217,13 @@ export class Trainer {
 
   acceptNetwork(run, bytes, iteration) {
     if (this.run !== run) return;
-    this.onnx = {bytes, name: run.label, task: run.task, move: null};
+    let duration=null;
+    if(run.task==="jump")duration=2;
+    if(run.task==="motion" && typeof run.name==="string" && run.name.startsWith("motion:")){
+      try{duration=JSON.parse(run.name.slice(7)).duration;}catch{}
+    }
+    const preview=Number.isFinite(duration)&&duration>0?{kind:run.task,duration}:null;
+    this.onnx = {bytes, name: run.label, task: run.task, move: null, preview, iteration};
     if (run.move) {
       this.handover = {name: run.move, onnx: toBase64(bytes), run: run.token, iteration};
       const why = this.deliver();
@@ -1177,6 +1232,14 @@ export class Trainer {
       this.note = `The network is ready to download (iteration ${iteration}).`;
     }
     this.sync();
+  }
+
+  previewNetwork() {
+    const net=this.onnx;
+    if(!net)return;
+    const r=net.preview ? this.engine.command({cmd:"trainerPreview",...net.preview,onnx:toBase64(net.bytes)})
+      : net.move ? this.engine.command({cmd:"trainerTest",move:net.move}) : null;
+    if(r&&!r.ok)this.toast(r.error);
   }
 
   /**
@@ -1252,7 +1315,10 @@ export class Trainer {
 
   /** Ends the run: its workers go; the newest exported network stays (one that waits for the level still goes in). */
   end(run) {
-    if (this.run === run) this.run = null;
+    if (this.run === run) {
+      this.lastProgress=Math.min(100,100*run.iteration/run.total);
+      this.run = null;
+    }
     for (const w of run.workers) w.terminate();
     if (run.workerUrl) URL.revokeObjectURL(run.workerUrl);
     run.wake?.release?.().catch(() => {});
@@ -1276,7 +1342,7 @@ export class Trainer {
     g.strokeRect(pad, 8, w - 2 * pad, h - 8 - pad);
     if (history.length < 2) return;
     const line = (key, color) => {
-      const v = history.map(p => p[key]), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+      const v = history.map(p => p[key]), lo = v.reduce((a,b)=>Math.min(a,b),Infinity), hi = v.reduce((a,b)=>Math.max(a,b),-Infinity), span = hi - lo || 1;
       g.strokeStyle = color;
       g.lineWidth = 2;
       g.beginPath();
