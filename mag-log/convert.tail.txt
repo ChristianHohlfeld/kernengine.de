@@ -1,0 +1,80 @@
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+
+where the Blueprints stand (kern/docs/project.md):
+  Arondight45_DroneFC_Core: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  blueprint_call: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  controls: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_geo_roads: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_input_actions: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_math_math: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  settings: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  shapes: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  sound_fx: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  spiel: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  touch_play: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  Arondight45_StateControl: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  engine_physics_physics: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  spiel_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  tiles: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  Arondight45_HardwareSensors: the project - the program's Arondight45_FirmwareRuntime uses it - a Blueprint of the program finds its libraries only in the project
+  common: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  rigid_spec: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  terrain: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  Arondight45_FirmwareRuntime: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  drone: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  SpawnCity: the project - it implements App - the program's App (kern::run starts the program with its object)
+
+179 of 220 functions of the program are written as Blueprints (1342 of 1897 lines), and 1 of the engine's headers that they call: 24 Blueprints - 1 of source files, 1 of states, 22 of headers and of shapes
+
+3 places where the width of size_t can change the result (a hint - the Blueprint computes with the u64 of LP64):
+--- size_t: /dev/shm/spawncity-jobs-chris/probe-app-081734/kern/games/spawncity/src/spiel.cpp:432: a multiplication on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/probe-app-081734/kern/games/spawncity/src/spiel.cpp:561: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+--- size_t: /dev/shm/spawncity-jobs-chris/probe-app-081734/kern/games/spawncity/src/spiel.cpp:627: a subtraction on size_t (where size_t has 32 bits, it goes round at 2^32)
+155 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/probe-app-081734/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     2 (   108)   it calls CityStream::ground_height(), which waits
+     1 (    79)   it calls SpawnCity::settings_command(), which waits
+     1 (    72)   set_layout() is defined in another file
+     1 (    52)   it calls SpawnCity::apply_settings(), which waits
+     1 (    46)   bind() is defined in another file
+     1 (    35)   building_at() is defined in another file
+     1 (    32)   schema_json() is defined in another file
+     1 (    24)   update() is defined in another file
+     2 (    21)   clear() is defined in another file
+     1 (    16)   collide() is defined in another file
+     1 (    12)   view_json() is defined in another file
+     1 (     8)   init() is defined in another file
+     1 (     7)   it calls SpawnCity::place(), which waits
+     2 (     6)   provide() is defined in another file
+     5 (     5)   input() is defined in another file
+     1 (     4)   it calls SpawnCity::touch(), which waits
+     1 (     4)   set() is defined in another file
+     1 (     4)   pointer() is defined in another file
+     1 (     3)   provide_image() is defined in another file
+     1 (     3)   it calls SpawnCity::set_touch_frame(), which waits
+     2 (     2)   take_requests() is defined in another file
+     2 (     2)   fail() is defined in another file
+     1 (     1)   go_offline() is defined in another file
+     1 (     1)   take_image_requests() is defined in another file
+     1 (     1)   fail_image() is defined in another file
+     1 (     1)   it calls SpawnCity::touch_view_json(), which waits
+     1 (     1)   its test cannot compare it yet (its source does not compile: no member named 'hud_json' in 'converted_SpawnCity__main_cpp::SpawnCity' - that went with hud_json: use of undeclared identifier 'unproject'; did you mean 'sc::unproject'?)
+     1 (     1)   it calls SpawnCity::command(), which waits
+     1 (     1)   it calls SpawnCity::audio_init(), which waits
+     1 (     1)   set_frame() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	6m10,196s
+user	12m14,054s
+sys	0m44,124s
