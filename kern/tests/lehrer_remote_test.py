@@ -128,39 +128,70 @@ class RemoteTest(unittest.TestCase):
         self.assertEqual(data["state"],"done")
         self.assertEqual(data["stats"]["iteration"],2)
 
+class FakeSystemd:
+    def __init__(self):
+        self.active={unit:"active" for unit in (*exclusive.FREEZE,*exclusive.STOP)}
+        self.frozen={unit:"running" for unit in exclusive.FREEZE}
+        self.actions=[]
+        self.fail=None
+    def ctl(self,*args):
+        op,unit=args[:2]
+        if op=="show":
+            return self.active[unit] if args[3]=="ActiveState" else self.frozen[unit]
+        self.actions.append((op,unit))
+        if self.fail==(op,unit):
+            raise subprocess.CalledProcessError(1,args,stderr="test")
+        if op=="freeze":self.frozen[unit]="frozen"
+        elif op=="thaw":self.frozen[unit]="running"
+        elif op=="stop":self.active[unit]="inactive"
+        elif op=="start":self.active[unit]="active"
+        else:raise AssertionError(args)
+        return ""
+
 class LeaseTest(unittest.TestCase):
     def test_restore_only_originally_running_units_in_reverse_order(self):
         with tempfile.TemporaryDirectory() as tmp:
-            state=Path(tmp)/"lease.json"
-            calls=[]
-            def ctl(*args):
-                calls.append(args)
-                if args[0]=="show":
-                    if args[2]=="-p" and args[3]=="ActiveState":
-                        return "inactive" if args[1]=="mag-model@noah.service" else "active"
-                    return "frozen" if args[1]=="mag-model@lena.service" else "running"
-                return ""
-            with patch.object(exclusive,"STATE",state),patch.object(exclusive,"ctl",ctl):
+            state=Path(tmp)/"lease.json";system=FakeSystemd()
+            system.active["mag-model@noah.service"]="inactive"
+            system.frozen["mag-model@lena.service"]="frozen"
+            before=(system.active.copy(),system.frozen.copy())
+            with patch.object(exclusive,"STATE",state),patch.object(exclusive,"ctl",system.ctl):
                 exclusive.enter()
-                actions=[c for c in calls if c[0]!="show"]
+                actions=system.actions.copy()
                 self.assertNotIn(("freeze","mag-model@lena.service"),actions)
                 self.assertNotIn(("freeze","mag-model@noah.service"),actions)
                 self.assertEqual(actions[0],("freeze","mag-modeld.service"))
+                self.assertEqual(system.active["mag-h3d.service"],"inactive")
+                self.assertTrue(all(system.frozen[u]=="frozen" for u in exclusive.FREEZE if system.active[u]=="active"))
                 exclusive.leave()
                 self.assertFalse(state.exists())
-                restored=[c for c in calls if c[0] in ("thaw","start")]
-                self.assertEqual(restored,[("thaw" if op=="freeze" else "start",unit) for op,unit in reversed(actions)])
+                self.assertEqual(system.actions[len(actions):],[("thaw" if op=="freeze" else "start",unit) for op,unit in reversed(actions)])
+                self.assertEqual((system.active,system.frozen),before)
+                exclusive.leave()  # idempotent
     def test_partial_enter_failure_restores(self):
         with tempfile.TemporaryDirectory() as tmp:
-            state=Path(tmp)/"lease.json";calls=[]
-            def ctl(*args):
-                calls.append(args)
-                if args[0]=="show":return "active" if args[3]=="ActiveState" else "running"
-                if args==("freeze","mag-model@noah.service"):raise subprocess.CalledProcessError(1,args,stderr="test")
-                return ""
-            with patch.object(exclusive,"STATE",state),patch.object(exclusive,"ctl",ctl):
+            state=Path(tmp)/"lease.json";system=FakeSystemd()
+            system.fail=("freeze","mag-model@noah.service")
+            before=(system.active.copy(),system.frozen.copy())
+            with patch.object(exclusive,"STATE",state),patch.object(exclusive,"ctl",system.ctl):
                 with self.assertRaises(subprocess.CalledProcessError):exclusive.enter()
-                self.assertIn(("thaw","mag-modeld.service"),calls)
+                self.assertIn(("thaw","mag-modeld.service"),system.actions)
                 self.assertFalse(state.exists())
+                self.assertEqual((system.active,system.frozen),before)
+    def test_failed_restore_is_reported_and_retryable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)/"lease.json";system=FakeSystemd()
+            unit="mag-model@qwen.service"
+            with patch.object(exclusive,"STATE",state),patch.object(exclusive,"ctl",system.ctl):
+                exclusive.enter()
+                system.fail=("thaw",unit)
+                with self.assertRaisesRegex(RuntimeError,"restoration incomplete"):exclusive.leave()
+                self.assertEqual(json.loads(state.read_text()),[[unit,"freeze"]])
+                with self.assertRaisesRegex(RuntimeError,"previous lease"):exclusive.enter()
+                system.fail=None
+                exclusive.leave()
+                self.assertFalse(state.exists())
+                self.assertTrue(all(v=="running" for v in system.frozen.values()))
+                self.assertTrue(all(v=="active" for v in system.active.values()))
 
 if __name__=="__main__":unittest.main()
