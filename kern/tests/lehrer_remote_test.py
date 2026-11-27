@@ -43,11 +43,12 @@ if "--resume" in args:
 for it in range(first,total+1):
     time.sleep(.04)
     tmp=out.with_suffix(".tmp");tmp.write_bytes(b"onnx");os.replace(tmp,out)
-    payload=struct.pack("<Ii",0x4b4c4e32,it)
-    for part in (b"KERNPPO2fake",b"collectors",b"",b"onnx"):
+    row=json.dumps(dict(iteration=it,steps=it*20,episodes=1,meanReturn=.1,meanLength=20,meanStd=.1,collectSeconds=.02,learnSeconds=.02,sps=500,snapshot=True,report={"meanErrorDeg":2}))
+    payload=struct.pack("<Ii",0x4b4c4e33,it)
+    for part in (b"KERNPPO2fake",b"collectors",b"",b"onnx",row.encode()):
         payload+=struct.pack("<Q",len(part))+part
     tmp=ckpt.with_suffix(".tmp");tmp.write_bytes(payload);os.replace(tmp,ckpt)
-    print("KERN_PROGRESS "+json.dumps(dict(iteration=it,steps=it*20,episodes=1,meanReturn=.1,meanLength=20,meanStd=.1,collectSeconds=.02,learnSeconds=.02,sps=500,snapshot=True,report={"meanErrorDeg":2})),flush=True)
+    print("KERN_PROGRESS "+row,flush=True)
     if stop:break
 '''
 class RemoteTest(unittest.TestCase):
