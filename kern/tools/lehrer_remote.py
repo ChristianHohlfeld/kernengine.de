@@ -3,7 +3,6 @@
 import argparse
 import contextlib
 import fcntl
-import hmac
 import json
 import math
 import os
@@ -203,9 +202,8 @@ class Server(ThreadingHTTPServer):
         self.root.mkdir(mode=0o700,parents=True,exist_ok=True)
         self.binary = str(Path(args.binary).resolve())
         self.build = args.build
-        self.token = os.environ.get("KERN_LEHRER_TOKEN","")
-        if len(self.token) < 32 or not re.fullmatch(r"[A-Za-z0-9_-]+", self.token):
-            raise ValueError("KERN_LEHRER_TOKEN must be at least 32 URL-safe characters")
+        if not args.tailnet_only:
+            raise ValueError("Explicit --tailnet-only required; restrict access using Tailscale ACLs")
         if not re.fullmatch(r"[a-f0-9]{40}",self.build):
             raise ValueError("full Git commit required")
         self.origins = set(args.origin)
@@ -217,8 +215,17 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt,*args):
-        # Do not log request data or bearer tokens.
+        # Never log arbitrary paths, headers, query strings or request bodies.
         pass
+    def log_request(self, code="-", size="-"):
+        method = self.command if self.command in ("GET","POST","OPTIONS") else "OTHER"
+        path = self.path
+        route = path if path in ("/v1/info","/v1/current","/v1/jobs") else "job"
+        if re.fullmatch(r"/v1/jobs/[a-f0-9-]{36}/(pause|resume|stop)",path):
+            route = "job/" + path.rsplit("/",1)[1]
+        # Avoid flooding the journal with successful progress polls.
+        if method != "GET" or route == "/v1/info" or int(code) >= 400:
+            print(f"HTTP {method} {route} -> {code}",flush=True)
     def allowed_origin(self):
         origin = self.headers.get("Origin")
         return not origin or origin in self.server.origins
@@ -239,7 +246,7 @@ class Handler(BaseHTTPRequestHandler):
         with contextlib.suppress(BrokenPipeError,ConnectionResetError):
             self.wfile.write(data)
     def authorized(self):
-        if not self.allowed_origin() or not hmac.compare_digest(self.headers.get("Authorization",""),"Bearer "+self.server.token):
+        if not self.allowed_origin() or self.headers.get("X-Kern-Lehrer") != "1":
             self.reply(403,{"error":"forbidden"})
             return False
         return True
@@ -248,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(403,{"error":"forbidden"});return
         self.send_response(204);self.cors()
         self.send_header("Access-Control-Allow-Methods","GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers","Authorization, Content-Type")
+        self.send_header("Access-Control-Allow-Headers","X-Kern-Lehrer, Content-Type")
         self.send_header("Content-Length","0");self.end_headers()
     def do_GET(self):
         if not self.authorized():return
@@ -313,6 +320,7 @@ def main():
     p.add_argument("--origin",action="append",default=["https://kernengine.de","https://www.kernengine.de"])
     p.add_argument("--gpu-lock",default="/var/lib/mag-idol/gpu.lock")
     p.add_argument("--hook",default="")
+    p.add_argument("--tailnet-only",action="store_true",help="Trust the private Tailscale access policy; no application token")
     args=p.parse_args()
     server=Server(args)
     def shutdown(_sig,_frame):

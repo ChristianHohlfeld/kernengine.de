@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 globalThis.location = {pathname: "/editor/", search:""};
 globalThis.window = {KERN_TRAINER_BUILD:"b".repeat(40)};
+if (!globalThis.navigator) globalThis.navigator = {hardwareConcurrency: 8};
 globalThis.localStorage = {getItem:()=>null,setItem:()=>{}};
 const src=fs.readFileSync(new URL("../web/studio/trainer.mjs",import.meta.url),"utf8")
   .replace(/^import \{.*\} from .*;\n/m,'const tr=x=>x, escHtml=x=>x, toBase64=x=>Buffer.from(x).toString("base64");\n');
@@ -12,7 +13,7 @@ const field=value=>({value:String(value)});
 function trainer(backend){
   const t=Object.create(p);
   Object.assign(t,{task:"stand",run:null,module:{},el:{
-    trCompute:field(backend),trRemoteUrl:field("https://mag.test:8443"),trRemoteToken:field("a".repeat(43)),
+    trCompute:field(backend),trRemoteUrl:field("https://mag.test:8443"),
     trWorkers:field(8),trEnvs:field(4),trIterations:field(2),trSeed:field(7),trInitStd:field(""),trLr:field("")
   },host:{querySelectorAll:()=>[]},draw(){},sync(){},status(s){this.message=s},end(run){assert.equal(this.run,run);this.run=null;}});
   return t;
@@ -29,6 +30,7 @@ mag.remotePractice=async run=>{
   assert.equal(run.remote.body.envs,4);
   assert.equal(run.remote.body.seed,7);
   assert.equal(run.remote.url,"https://mag.test:8443");
+  assert.equal("token" in run.remote,false);
   assert.equal(run.remote.body.task,"stand");
   mag.end(run);
 };
