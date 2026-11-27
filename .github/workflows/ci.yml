@@ -1,12 +1,12 @@
 name: CI
 
-# One pipeline: the site is built once and published as soon as it is built;
-# native and browser tests run in parallel and do not hold the deployment up.
+# Engine CI: build and test Kern independently of SpawnCity (spawncity.yml).
+# Publish only after all engine checks succeed. Manual probe/beleg calls stay here.
 #   native  unit tests with ASan / UBSan
 #   build   Kern Studio + example games (parallel ThinLTO; nothing kept between runs - each job builds anew)
 #   e2e     the browser test against the built Studio
 #   input   the browser test of the input of every host (the reader's contract, the example
-#           games, SpawnCity)
+#           games)
 #   deploy  main only: publishes the site to the gh-pages branch
 #           https://kernengine.de/ (custom domain via the CNAME file)
 on:
@@ -142,58 +142,6 @@ jobs:
       - name: build_native.sh on kern/tests/native_build
         run: CXX=clang++ CC=clang kern/tests/native_build/run.sh
 
-  # The game's own suite, next to the engine's (each builds the engine for itself: side by side they
-  # take as long as the longer one). It holds the converted Blueprints' comparison with their source.
-  # The game's suite, split so that every job stays within 45 minutes. One job builds (ASan/UBSan, ~27 min on 4 cores:
-  # first run of the matrix 44641939553) and hands its objects on; each job of the matrix only links and runs one pass
-  # (SC_TEST_PASS) of the k-th of every 12 tests (SC_TEST_SHARD - run_tests.sh). The converted Blueprints' tests cost
-  # ~48 000 CPU seconds a pass (full run 143319: 269 tests, the 32 of Game ~1 450 s each, the second pass as much): a
-  # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
-  # go with 1/12 of pass 1.
-  native-spawncity-build:
-    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # (the differential tests build an older state of a source beside today's: tests/run_tests.sh reads it with git archive)
-      - name: Build the SpawnCity tests (ASan/UBSan)
-        env:
-          SC_TEST_OUT: /home/runner/sc-tests
-          SC_TEST_BUILD_ONLY: 1
-        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sc-tests-objects
-          path: /home/runner/sc-tests
-          retention-days: 1
-          compression-level: 1
-
-  native-spawncity:
-    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
-    needs: native-spawncity-build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        pass: [1, 2]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    name: native-spawncity (pass ${{ matrix.pass }}, ${{ matrix.shard }}/12)
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: sc-tests-objects
-          path: /home/runner/sc-tests
-      - name: SpawnCity native tests (ASan/UBSan)
-        env:
-          SC_TEST_OUT: /home/runner/sc-tests
-          SC_TEST_PASS: ${{ matrix.pass }}
-          SC_TEST_SHARD: ${{ matrix.shard }}/12
-        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
-
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
   determinism:
@@ -234,22 +182,15 @@ jobs:
             kern/build.sh --app kern/examples/hello/hello.wasm kern/examples/hello/hello.cpp
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
             kern/build.sh --lehrer generated/kern_lehrer.wasm
-            kern/games/spawncity/build.sh
-            # The way "only Blueprints": SpawnCity's level alone, exported as Kern Studio exports any level, and
-            # what it still lacks (generated/spawncity_gaps.txt - BLUEPRINTS.md, "5 - Umschalten").
-            kern/games/spawncity/build.sh --only-blueprints
             # The native export: a level as a game with its Blueprints compiled in as C++ classes
             # (the browser test plays it: kern/tests/e2e/export_e2e.mjs).
             tools/export_game.sh kern/tests/e2e/native_export.klevel generated/native_export.html
-            for f in kern/games/spawncity/web/*.mjs kern/games/spawncity/web/audio/*.mjs; do node --check "$f"; done
             for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs tools/net_relay.mjs tools/export_game.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
-          set -o pipefail
-          if ! (set -euo pipefail; build) 2>&1 | tee /tmp/build.log; then
-            tail -n 25 /tmp/build.log | sed 's/^/::error::/'  # visible as annotations without the log
-            exit 1
-          fi
+          # Keep the build outside an if/! condition: Bash disables errexit in tested functions.
+          set -euo pipefail
+          build 2>&1 | tee /tmp/build.log
       - name: Lehrer in WebAssembly (one PPO iteration through the workers' C ABI)
         run: node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm
       - name: Logic JIT (graphs compiled to WebAssembly must match the interpreter)
@@ -298,18 +239,6 @@ jobs:
             mkdir -p _site/kern/examples/$g
             cp kern/examples/$g/index.html kern/examples/$g/$g.wasm _site/kern/examples/$g/
           done
-          # SpawnCity on Kern (kern/games/spawncity): the page, its modules and the module; /spawncity/
-          # leads there, and the single-file build is at /spawncity.html.
-          mkdir -p _site/kern/games/spawncity/web _site/spawncity
-          cp -r kern/games/spawncity/web/. _site/kern/games/spawncity/web/
-          cp generated/spawncity.html _site/spawncity.html
-          # its music (the original's track, loaded next to the page: sim/audio/, as on spawncity.de)
-          mkdir -p _site/sim/audio && cp kern/games/spawncity/web/sim/audio/8_bits_only.m4a _site/sim/audio/
-          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../kern/games/spawncity/web/"><a href="../kern/games/spawncity/web/">SpawnCity</a>\n' > _site/spawncity/index.html
-          # The drop-in for spawncity.de (tools/dropin.sh): the game at the original's address; here
-          # at /spawncity-de/drone_simulator.html to try, and as the branch spawncity-de-dropin.
-          kern/games/spawncity/tools/dropin.sh _site/spawncity-de
-          cp kern/games/spawncity/tools/drone_simulator.webmanifest _site/spawncity-de/
           touch _site/.nojekyll
           du -sh _site
       - uses: actions/upload-artifact@v4
@@ -320,26 +249,24 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: spawncity-only-blueprints
-          path: |
-            generated/spawncity_blueprints.html
-            generated/spawncity_gaps.txt
-          retention-days: 7
-      - uses: actions/upload-artifact@v4
-        with:
           name: native-export
           path: generated/native_export.html
           retention-days: 7
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, native, native-build, converter-cases, determinism, e2e, input, murmel, murmel-web]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
       group: pages
       cancel-in-progress: false  # a running publish finishes; only the newest waiting one follows
     steps:
+      # Keep the last published game files; do not rebuild or publish a new SpawnCity here.
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: _previous-pages
       - uses: actions/download-artifact@v4
         with:
           name: site
@@ -347,6 +274,12 @@ jobs:
       - name: Publish to the gh-pages branch
         run: |
           set -euo pipefail
+          for p in spawncity spawncity.html spawncity-de kern/games/spawncity/web sim/audio/8_bits_only.m4a; do
+            if [ -e "_previous-pages/$p" ]; then
+              mkdir -p "_site/$(dirname "$p")"
+              cp -a "_previous-pages/$p" "_site/$p"
+            fi
+          done
           cd _site
           touch .nojekyll
           echo kernengine.de > CNAME  # the custom domain; without this file every publish would drop it
@@ -356,15 +289,6 @@ jobs:
           git add -A
           git commit -q -m "Pages: ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-          # the spawncity.de drop-in as its own branch (lay it over the spawncity-de site)
-          cd spawncity-de
-          git init -q -b spawncity-de-dropin
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "SpawnCity on Kern, drop-in for spawncity.de: ${GITHUB_SHA}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" spawncity-de-dropin
-
   e2e:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
@@ -411,43 +335,6 @@ jobs:
           path: artifacts/e2e/
           if-no-files-found: ignore
 
-  # One input reader for every host (kern.mjs BrowserInput, readGamepad): its contract, the example
-  # games and SpawnCity with a real mouse and keyboard - beside the Studio's test, not after it.
-  e2e-spawncity:
-    # the game's cases: its level file in the editor (the engine's e2e above needs no game)
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/download-artifact@v4
-        with:
-          name: site
-          path: _site
-      - uses: actions/download-artifact@v4
-        with:
-          name: native-export
-          path: generated
-      - name: SpawnCity's level file in the editor
-        run: |
-          set -euo pipefail
-          mkdir -p generated && cp _site/editor/index.html generated/studio.html && cp _site/generated/kern_studio.wasm generated/
-          # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
-          cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
-          [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
-          # The browser itself (from Playwright's CDN, in every run - no cache) is what the test needs. Its system
-          # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
-          # within three minutes, the test runs with what the runner image has.
-          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
-          timeout 180 /tmp/e2e/node_modules/.bin/playwright install-deps chromium || echo "::warning::playwright install-deps failed: Ubuntu's archive is not reachable"
-          python3 -m http.server 8771 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
-          sleep 1
-          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771 kern/games/spawncity/level/spawncity.klevel
-
   input:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
@@ -471,11 +358,11 @@ jobs:
           # within three minutes, the test runs with what the runner image has.
           /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
           timeout 180 /tmp/e2e/node_modules/.bin/playwright install-deps chromium || echo "::warning::playwright install-deps failed: Ubuntu's archive is not reachable"
-          # the example games as built, next to their pages; SpawnCity as the drop-in for spawncity.de
+          # the example games as built, next to their pages
           for g in hello orbrun; do cp _site/kern/examples/$g/$g.wasm kern/examples/$g/; done
           python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-input.log 2>&1 &
           sleep 1
-          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772 "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1"
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/input_e2e.mjs http://127.0.0.1:8772
 
   # Murmel (kern/games/murmel): das zweite Spiel, allein aus der Engine gebaut - der Maßstab neben SpawnCity. Nativ:
   # die Welt-Blueprints der Levels sind ihre Texte (blueprints/*.cpp), der Lauf mit Tasten ist deterministisch

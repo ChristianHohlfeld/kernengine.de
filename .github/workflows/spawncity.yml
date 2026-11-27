@@ -1,11 +1,12 @@
 name: SpawnCity
 
 # SpawnCity on Kern (kern/games/spawncity): build, native tests and the full browser smoke test on
-# GitHub's runners - for the work branches (sc-*, spawncity-*) and on demand. Screenshots of every
-# mode are kept as an artifact. main is covered by ci.yml (native tests + build).
+# GitHub's runners - independent of engine CI. A failing game does not block Kern's build.
+# Retain the native ASan/UBSan matrix, browser tests and converter artifacts.
 on:
   push:
-    branches: ['sc-*', 'spawncity-*']
+    branches: [main, 'sc-*', 'spawncity-*']
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -16,6 +17,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The game's own suite, next to the engine's (each builds the engine for itself: side by side they
+  # take as long as the longer one). It holds the converted Blueprints' comparison with their source.
+  # The game's suite, split so that every job stays within 45 minutes. One job builds (ASan/UBSan, ~27 min on 4 cores:
+  # first run of the matrix 44641939553) and hands its objects on; each job of the matrix only links and runs one pass
+  # (SC_TEST_PASS) of the k-th of every 12 tests (SC_TEST_SHARD - run_tests.sh). The converted Blueprints' tests cost
+  # ~48 000 CPU seconds a pass (full run 143319: 269 tests, the 32 of Game ~1 450 s each, the second pass as much): a
+  # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
+  # go with 1/12 of pass 1.
+  native-spawncity-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the differential tests build an older state of a source beside today's: tests/run_tests.sh reads it with git archive)
+      - name: Build the SpawnCity tests (ASan/UBSan)
+        env:
+          SC_TEST_OUT: /home/runner/sc-tests
+          SC_TEST_BUILD_ONLY: 1
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sc-tests-objects
+          path: /home/runner/sc-tests
+          retention-days: 1
+          compression-level: 1
+
+  native-spawncity:
+    needs: native-spawncity-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        pass: [1, 2]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    name: native-spawncity (pass ${{ matrix.pass }}, ${{ matrix.shard }}/12)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sc-tests-objects
+          path: /home/runner/sc-tests
+      - name: SpawnCity native tests (ASan/UBSan)
+        env:
+          SC_TEST_OUT: /home/runner/sc-tests
+          SC_TEST_PASS: ${{ matrix.pass }}
+          SC_TEST_SHARD: ${{ matrix.shard }}/12
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
+
   spawncity:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -32,20 +83,48 @@ jobs:
           mkdir -p /home/runner/wasi-sdk
           curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
           tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
-      - name: Native tests (ASan/UBSan)
-        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
       - name: Build the game
         run: |
           set -euo pipefail
           export WASI_SDK=/home/runner/wasi-sdk
           kern/games/spawncity/build.sh
-          node --check kern/games/spawncity/web/host.mjs
+          kern/games/spawncity/build.sh --only-blueprints
+          tools/build_studio.sh
+          for f in kern/games/spawncity/web/*.mjs kern/games/spawncity/web/audio/*.mjs; do node --check "$f"; done
+          kern/games/spawncity/tools/dropin.sh _site/spawncity-de
+          cp kern/games/spawncity/tools/drone_simulator.webmanifest _site/spawncity-de/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spawncity-only-blueprints
+          path: |
+            generated/spawncity_blueprints.html
+            generated/spawncity_gaps.txt
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spawncity-site
+          path: |
+            generated/spawncity.html
+            _site/spawncity-de
+          retention-days: 7
       - name: Playwright + Chromium
+        id: browser_setup
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund playwright@1.56.0
           npx playwright install --with-deps chromium
+      - name: SpawnCity level in Studio and browser input
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-spawncity.log 2>&1 &
+          trap 'kill $! 2>/dev/null || true' EXIT
+          sleep 1
+          rc=0
+          node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8772 kern/games/spawncity/level/spawncity.klevel || rc=1
+          timeout 600 node kern/games/spawncity/tests/input_check.mjs "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1" || rc=1
+          exit "$rc"
       - name: Browser smoke test (desktop with map tiles, phone offline)
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
         run: node kern/games/spawncity/tests/smoke.mjs generated/spawncity-shots
       - uses: actions/upload-artifact@v4
         if: always()
