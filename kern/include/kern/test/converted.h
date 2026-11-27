@@ -50,6 +50,19 @@
 #include "kern/test/blueprint.h"
 #include "kern/test/test.h"
 
+namespace kern::logic {
+/// The test's source computes with the numbers of the Blueprint language - its f32 is a 64-bit number: an export of it that
+/// gives floats by a pointer and their length (export_floats) gives those, kept in the export's own place as the engine's
+/// does it with its f32 (kern/logic/blueprint_class.h). What the test compares is the piece the two say.
+template <auto Export> const double* export_floats(Span<const double> floats, u32* out_len) {
+  static std::vector<double> held;
+  held.assign(floats.begin(), floats.end());
+  if (out_len) *out_len = static_cast<u32>(held.size());
+  return held.empty() ? nullptr : held.data();
+}
+template <auto Export> const double* export_floats(const std::vector<double>& floats, u32* out_len) { return export_floats<Export>(Span<const double>(floats.data(), floats.size()), out_len); }
+}  // namespace kern::logic
+
 namespace kern::converted {
 
 using namespace ::kern::test;   // (the Blueprints a test runs, the cost of a call, the registry: kern/test/)

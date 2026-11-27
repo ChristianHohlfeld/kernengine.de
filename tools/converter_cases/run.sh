@@ -70,6 +70,15 @@
 #             caller does not include: its test holds the pieces with the headers of their files - written and compared
 #             (before: "expected class name", the pieces went, and reach waited on "use of undeclared identifier 'far'").
 #             far.klevel: the level's actor Lamps, whose variable the pieces read.
+#   appstate.cpp the program's App keeps the state itself (`class Spiel : public kern::App`, its object `static` in spiel()) and
+#             exports reach it through spiel(): functions of the App's Blueprint (before: "it calls Spiel::add(), which waits" -
+#             the program's variables were only of a state that implements no interface of the engine).
+#   worldapp.cpp + worldpads.cpp  the game's input maths in a file of its own: free functions (and a method of a value) of a second
+#             file that call the Blueprint of an actor of the world the program's App runs (an ActorBlueprint bound to that world
+#             there, bind(world)) - functions of the Blueprint of the program's one object, the App, in the part of their file;
+#             the App's own functions and the exports call them. Their tests: the piece of bind() in the test of the App's part
+#             has the world's stand-in with actor_named (before: 40 functions of a game waited, "the Blueprint of the actor ...
+#             of a world, called by a function that is none of the program's Blueprint"). worldapp.klevel: the actor Lamps.
 #   worldrules.cpp + worldmix.cpp  the program's C++ binds an ActorBlueprint to a world it runs (bind(GameWorld&), kern/docs/
 #             blueprint_cpp.md "An einen Actor einer Welt gebunden"): in the Blueprint of the program's one object (Runner) a
 #             variable Actor, set by bind with GameWorld actor named, which every call and read goes to; the tests bind the
@@ -150,6 +159,12 @@ check() {   # check <case> <what> yes|no <pattern in its Blueprint texts>
 }
 tested() {    # tested <case> <what> <pattern in its tests>
   if grep -qE -- "$3" "$top/$1"/pt/converted/*.cpp 2>/dev/null; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
+}
+ran() {       # ran <case> <what>: its tests, built with the engine and run (compare.sh) - every one compiles and links, none fails
+  if INCLUDES="-I$top/$1/src" "$here/compare.sh" "$top/$1/cases.kproject" "$top/$1/cases.klevel" "$top/$1/pt/converted" "$top/$1/built" > "$top/$1/compare.build" 2>&1 &&
+     ! grep -qE "does not compile|linked without" "$top/$1/compare.build" && grep -qE '^[0-9]+ tests?, [0-9]+ checks, 0 failures' "$top/$1/built/compare.log" && ! grep -q '^FAIL' "$top/$1/built/compare.log"
+  then echo "ok   $1: $2"
+  else echo "FAIL $1: $2: $(grep -m3 -hE 'does not compile|linked without|^FAIL|failures' "$top/$1/compare.build" "$top/$1/built/compare.log" 2>/dev/null | cut -c1-300)"; fail=1; fi
 }
 logged() {    # logged <case> <what> <pattern in its log>
   if grep -qE -- "$3" "$top/$1/convert.log"; then echo "ok   $1: $2"; else echo "FAIL $1: $2"; fail=1; fi
@@ -264,6 +279,9 @@ logged pieces "case_label (export_text with out_len) is written" '^ +case_label 
 logged pieces "case_bytes (export_bytes with out_len) is written" '^ +case_bytes \([0-9]+\): written$'
 logged pieces "all four are compared" '^4 functions of the Blueprints are compared'
 tested pieces "the test hands the source a place for the length and compares the piece" 'return given_ \? std::string\(given_, given_ \+ out_len_\)'
+# (the exports' Blueprint is a class of the program: its glue - level_blueprints_kern_blueprint_<id>.cpp - is built with the tests;
+# before: "undefined reference to blueprints::bind_kern_blueprint_<id>", the tests linked without it)
+ran pieces "the tests, built and run (the classes' glue linked)"
 
 convert logicarg logicarg_b
 logged logicarg "both_ready (hands the logic on to a function of another file) is written" '^ +both_ready \([0-9]+\): written'
@@ -295,15 +313,36 @@ check worldrules "... and what it gives: Has Blueprint of it" yes 'return \{func
 check worldrules "a call goes to that Actor (Call on Actor)" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, '
 check worldrules "a variable is read of it (Get Variable on Actor)" yes 'func_get_on<"PoleRadius", f64>\(worldrules_g_lamps\)'
 check worldrules "no call names the actor by its name in the program's logic" no 'actor_find\("Lamps"\)'
-logged worldrules "bind, radius, twice, Runner::start, Runner::pole and Runner::lit are written" '^Runner/worldrules_cpp +6 / +6 functions'
+logged worldrules "bind, radius, twice, Stick::step, Pad::go and the five of Runner are written" '^Runner/worldrules_cpp +10 / +10 functions'
+logged worldrules "Stick::step (a method of a value that calls the world's actor) is a function of the program's Blueprint" '^ +Stick::step \([0-9]+\): written'
+check worldrules "... its object its first input, the Actor the Blueprint's variable" yes 'func_call_on<"Lamps_Twice">\(worldrules_g_lamps, kern::out\(n[0-9]+\.out\), x\);'
+check worldrules "Runner::hz reads how often the world steps (GameWorld step hz: WorldSettings is no type of the Blueprints)" yes 'engine_game_world_step_hz\('
 logged worldrules "one bound to a world and to a logic waits, with the reason" '^ +radius \([0-9]+\): the Blueprint of an actor \(g_both\) bound to a world and to a logic'
 tested worldrules "the source's ActorBlueprint is bound to the test's world" 'worldrules::g_lamps\.bind\(bp\.source_world\(\)\);'
 # (built and run: the source - its ActorBlueprint bound to the test's world - and the Blueprint, in the interpreter and as its class)
-if INCLUDES="-I$top/worldrules/src" "$here/compare.sh" "$top/worldrules/cases.kproject" "$top/worldrules/cases.klevel" "$top/worldrules/pt/converted" "$top/worldrules/built" > "$top/worldrules/compare.build" 2>&1 &&
-   ! grep -q "does not compile" "$top/worldrules/compare.build" && grep -qE '^ok +converted_Runner__worldrules_cpp' "$top/worldrules/built/compare.log" &&
-   [ "$(grep -oE 'converted::Tally tally\("(bind|radius|twice|start|pole|lit)"\)' "$top/worldrules"/pt/converted/test_*.cpp | sort -u | wc -l)" = 6 ]
-then echo "ok   worldrules: the tests compare the six, the source and the Blueprint in the interpreter and as its class"
-else echo "FAIL worldrules: the tests compare the six: $(grep -m3 -E 'does not compile|FAIL|differ' "$top/worldrules/compare.build" "$top/worldrules/built/compare.log" 2>/dev/null | cut -c1-300)"; fail=1; fi
+if [ "$(grep -oE 'converted::Tally tally\("(bind|radius|twice|start|pole|lit|hz|Stick_step|Pad_go|press)"\)' "$top/worldrules"/pt/converted/test_*.cpp | sort -u | wc -l)" = 10 ]
+then echo "ok   worldrules: the tests compare the ten"; else echo "FAIL worldrules: the tests compare the ten"; fail=1; fi
+ran worldrules "the tests, built and run: the source and the Blueprint, in the interpreter and as its class, the same"
+
+convert appstate
+logged appstate "the exports that reach the App's state (spiel(): its one object) are functions of the App's Blueprint" '^Spiel/appstate_cpp +5 / +5 functions'
+logged appstate "case_take (a text by a pointer and its length, the state changed) is written" '^ +case_take \([0-9]+\): written'
+logged appstate "case_samples (floats by a pointer and their length: the test's own numbers) is written" '^ +case_samples \([0-9]+\): written'
+check appstate "case_add calls the App's add, its own function" yes 'KERN_EXPORT_AS\("case_add", "i32"\) void case_add\(i32 n = 0\) \{'
+stands appstate Spiel project
+ran appstate "the tests, built and run"
+
+convert worldapp worldpads
+logged worldapp "the free functions of the second file that call the world's actor are functions of the App's Blueprint, in the part of their file" '^Flight/worldpads_cpp +6 / +6 functions'
+logged worldapp "the App's own, which call them, and the exports" '^Flight/worldapp_cpp +7 / +7 functions'
+check worldapp "the Actor bind() took is a variable of the App's Blueprint, called by the second file" yes '^  Actor worldpads_g_rules = Actor\{\};'
+check worldapp "a free function of the second file calls on that Actor" yes 'func_call_on<"Lamps_Twice">\(worldpads_g_rules, '
+check worldapp "... and so does the method of a value of that file (Axis::step), its object its first input" yes 'Axis_stepResult Axis_step\(worldpads_Axis& self, f64 x = 0(\.0)?\)'
+logged worldapp "none waits (before: 'called by a function that is none of the program.s Blueprint')" '^13 of 13 functions of the program are written'
+logged worldapp "all are compared" '^13 functions of the Blueprints are compared'
+tested worldapp "the test of the App's part, which holds bind() as a piece of the other file, has the world's actor_named" 'GameWorld::actor_named\('
+stands worldapp Flight project
+ran worldapp "the tests, built and run: the source and the Blueprint, in the interpreter and as its class, the same"
 
 convert look lookapp
 logged look "LookApp's own constructor (C++'s, not written down) is its function" '^ +LookApp::LookApp \([0-9]+\): '
@@ -383,6 +422,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far worldrules look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far worldrules appstate worldapp look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

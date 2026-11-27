@@ -1675,6 +1675,11 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Ist eine solche Klasse kein Zustand, sagt die Wartemeldung warum („has a base class, and it is no state: 2 objects of
   it have static storage …“ / „… makes objects of it in other ways too“ / „its base is no interface of the engine“).
   Die Parameter ihrer Overrides sind Werte in der Reihenfolge von C++ (die Engine reicht Werte: `update(Int, Frame)`).
+  Die Variablen des Programms (einer Datei, eines Namensraums) und was sie teilt – ein Export, der den Zustand über
+  seinen Getter erreicht (`game().add(n)`) – gehören dem einen Zustand, der keine Schnittstelle implementiert; hat das
+  Programm keinen solchen, sondern hält seine App den Zustand selbst (`class Spiel final : public kern::App`, ihr Objekt
+  `static` in `spiel()`), dann der App: die Exporte sind Funktionen ihres Blueprints wie ihre eigenen Methoden (Fall
+  `appstate`). Eine andere Schnittstelle (ShaderExtension) ist nur das Objekt der Engine – ihr gehört nichts davon.
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.
@@ -1837,7 +1842,13 @@ ist als Blueprint des Programms eine Variable vom Typ Actor, die der Konverter
 `func_get_on<…>(controls_g_rules)` – die Logik des Programms reicht sie an die Welt des Actors weiter
 (`Host::world_runtime`, project.md 7). Die Funktionen, die ihn rufen, sind darum Funktionen des
 Blueprints des einen Objekts des Programms (des Zustands), wie jede, die eine Variable des Programms
-teilt. Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
+teilt – auch die freien Funktionen einer **anderen Datei** als der des Zustands (die Eingabe-Mathematik
+eines Spiels in `controls.cpp`, der Zustand – auch die App selbst – in `spiel.cpp`) und die Methode
+eines Werts dieser Datei (`LookAxis::step`: ihr Objekt ist ihr erster Eingang): Sie stehen im Teil
+ihrer Datei (`<Zustand>/controls_cpp`), und der Test des Teils, der `bind` nur als Stück der anderen
+Datei hält, hat die Welt mit `actor_named` (Fall `worldapp` + `worldpads`). Der Actor ist in jedem
+Test der der Engine (`kern::logic::ActorHandle`), keine Kopie.
+Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
 Ein Blueprint hält den Actor einer Welt oder nennt den Actor dort, wo seine Logik läuft – nicht
 beides. Geprüft: `cpp_reaches_actors_of_its_worlds` (kern/tests: zwei Welten mit Actors gleicher Id,
 Interpreter und Klasse, Welt gestoppt und neu gestartet), `tools/converter_cases` (`worldrules`,

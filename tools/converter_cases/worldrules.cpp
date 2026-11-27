@@ -9,6 +9,11 @@ kern::logic::ActorBlueprint g_lamps{"Lamps"};
 }
 bool bind(kern::game::GameWorld& world) { return g_lamps.bind(world); }
 double radius() { return g_lamps.get<double>("PoleRadius"); }
+double Stick::step(double x) {
+  v = v + g_lamps.number("Twice", x);
+  return v;
+}
+double Pad::go(double x) { return s.step(x) + 1; }
 double twice(double x) {
   double r = 0;
   g_lamps.call("Twice", std::tie(r), x);
@@ -21,5 +26,7 @@ bool Runner::start(kern::Engine& engine) {
 }
 float Runner::pole(float r) const { return static_cast<float>(worldrules::radius() + worldrules::twice(r)); }
 bool Runner::lit() const { return worldrules::radius() > 0.1; }
+double Runner::press(double x) { return pad_.go(x); }
+float Runner::hz() const { return world_->step_hz(); }
 Runner& runner() { static Runner m; return m; }
 }
