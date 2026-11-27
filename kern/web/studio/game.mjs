@@ -37,6 +37,8 @@ export const I18N_LANG = i18nPickLanguage();
 
 // Exact phrases (as the page shows them, trimmed). Product and level names stay English.
 const I18N_DE = {
+  "Compute backend": "Rechenbackend", "Local": "Lokal", "MAG · CPU + HIP GPUs": "MAG · CPU + HIP-GPUs",
+  "MAG URL": "MAG-Adresse", "MAG token": "MAG-Token", "Reconnect to MAG": "Mit MAG wiederverbinden",
   // menu bar, toolbar, tabs
   "File": "Datei", "Edit": "Bearbeiten", "Window": "Fenster", "Play": "Spielen", "Help": "Hilfe",
   "Untitled": "Unbenannt", "Unsaved changes": "Ungespeicherte Änderungen",

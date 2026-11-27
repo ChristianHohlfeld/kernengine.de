@@ -285,7 +285,7 @@ export class Trainer {
         `<div id="trRemoteSettings" hidden>` +
         field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8443" spellcheck="false" autocomplete="off">') +
         field("MAG token", '<input class="txt" id="trRemoteToken" type="password" autocomplete="off" spellcheck="false">') +
-        `</div>` +
+        `<div class="tr-buttons"><button class="btn small" id="trReconnect" type="button">Reconnect to MAG</button></div></div>` +
         `<div class="tr-buttons"><button class="btn go" id="trStart" type="button">Start</button><button class="btn" id="trPause" type="button">Pause</button><button class="btn" id="trStop" type="button">Stop</button></div>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
         `<div class="tr-buttons"><button class="btn small" id="trTest" type="button">Try the network on the duck</button><button class="btn small" id="trDownload" type="button">Download .onnx</button></div>` +
@@ -309,6 +309,7 @@ export class Trainer {
     for (const node of [...this.host.querySelectorAll("[id]"), ...this.bar.querySelectorAll("[id]")]) el[node.id] = node;
     try { el.trRemoteUrl.value = localStorage.getItem("kern-lehrer.remote-url") || ""; } catch { /* storage blocked */ }
     el.trCompute.onchange = () => this.sync();
+    el.trReconnect.onclick = () => void this.reconnectRemote();
     this.setScenario(TRAINER_SCENARIO);
     el.scName.value = tr(TRAINER_SCENARIO.name);
     this.wire();
@@ -408,7 +409,10 @@ export class Trainer {
     // A network that waited for the level to stop playing goes in now.
     if (this.handover && this.editable) {
       const why = this.deliver();
-      if (why) { if (this.run) this.end(this.run); this.status(why, true); }
+      if (why) {
+        if (this.run?.remote) this.note = "Network saved on MAG; level import failed: " + why;
+        else { if (this.run) this.end(this.run); this.status(why, true); }
+      }
     }
     this.covered = !!s.logic?.open;  // the Blueprint editor lies over the viewports, the stage with them
     document.getElementById("main").classList.toggle("trainer-open", open);
@@ -450,10 +454,11 @@ export class Trainer {
     el.trCompute.disabled = !!run;
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
     el.trRemoteToken.disabled = !!run || !remoteSelected;
+    el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
     el.trStart.disabled = !!run;
     el.trPause.disabled = !run || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
-    el.trStop.disabled = !run || !!run?.remote?.stopping;
+    el.trStop.disabled = !run || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
     el.trTest.disabled = !this.onnx?.move || !open;
@@ -637,11 +642,7 @@ export class Trainer {
       iteration: 0, paused: false, history: []};
     if (el.trCompute.value === "mag") {
       try {
-        const url = new URL(el.trRemoteUrl.value);
-        if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
-          throw Error("MAG needs an HTTPS origin (without a path).");
-        const token = el.trRemoteToken.value.trim();
-        if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw Error("Enter the MAG training token.");
+        const connection = this.remoteConnection();
         const build = window.KERN_TRAINER_BUILD;
         if (!/^[a-f0-9]{40}$/.test(build || "")) throw Error("Remote training needs a versioned Studio build.");
         const body = {id: crypto.randomUUID(), build, task: name, iterations: run.total, envs: run.envs, seed: run.seed};
@@ -649,8 +650,7 @@ export class Trainer {
           const value = trainerNumber(el[id].value);
           if (value > 0) body[field] = value;
         }
-        try { localStorage.setItem("kern-lehrer.remote-url", url.origin); } catch { /* storage blocked */ }
-        run.remote = {url: url.origin, token, body, id: null, state: "waiting", stopping: false, busy: false, network: null};
+        run.remote = {...connection, body, id: null, state: "waiting", stopping: false, busy: false, network: null};
       } catch (error) {
         this.end(run); this.status(error.message, true); return;
       }
@@ -711,6 +711,43 @@ export class Trainer {
     }
   }
 
+
+  remoteConnection() {
+    const url = new URL(this.el.trRemoteUrl.value);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
+      throw Error("MAG needs an HTTPS origin (without a path).");
+    const token = this.el.trRemoteToken.value.trim();
+    if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw Error("Enter the MAG training token.");
+    try { localStorage.setItem("kern-lehrer.remote-url", url.origin); } catch { /* storage blocked */ }
+    return {url: url.origin, token};
+  }
+
+  // Explicit recovery after a tab reload: never import into a possibly different level.
+  // The result is available for download and the original job can be paused/stopped.
+  async reconnectRemote() {
+    if (this.run) return;
+    let run;
+    try {
+      const connection = this.remoteConnection();
+      run = this.run = {task: "stand", label: "mag", move: null, workers: [], collectors: [],
+        total: 1, iteration: 0, paused: false, history: [], remote: {...connection,
+          state: "waiting", id: null, busy: true, stopping: false, network: null}};
+      this.history = run.history;
+      this.status("Reconnecting to MAG ...");
+      const data = await this.remoteRequest(run, "/v1/current");
+      if (this.run !== run) return;
+      if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
+      run.remote.id = data.id; run.remote.busy = false;
+      run.task = data.taskKind; run.label = "mag-" + data.id; run.token = run.label;
+      run.total = data.total; run.envs = data.envs;
+      this.onnx = null; this.handover = null;
+      this.note = "Reconnected: download the network to import it into the intended level.";
+      await this.remotePractice(run);
+    } catch (error) {
+      if (run && this.run === run) this.end(run);
+      this.status(error.message, true);
+    }
+  }
 
   // A second transport, not a second trainer. The existing run, stats, goal
   // and ONNX delivery are shared with the local worker path.

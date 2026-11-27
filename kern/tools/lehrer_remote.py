@@ -65,7 +65,8 @@ class Job:
         with self.lock:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
                         report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.server.workers,
-                        gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"])
+                        gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"],
+                        taskKind=self.config["task"].split(":",1)[0])
     def change(self,state,message):
         with self.lock:
             self.state,self.message = state,message
@@ -252,6 +253,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,dict(build=server.build,workers=server.workers,gpuRequired=True));return
         with server.job_lock:
             job=server.job
+        if self.path=="/v1/current":
+            self.reply(200,job.public()) if job else self.reply(404,{"error":"no MAG training job"});return
         if not job or not self.path.startswith("/v1/jobs/"+job.id):
             self.reply(404,{"error":"job not found"});return
         suffix=self.path[len("/v1/jobs/"+job.id):]

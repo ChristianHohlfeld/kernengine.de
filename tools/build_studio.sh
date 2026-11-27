@@ -29,7 +29,7 @@ if [ "$skip_wasm" = 0 ]; then "$root/kern/build.sh" --studio ${KERN_COMMERCIAL:+
 python3 - "$root" "$wasm" "$out" <<'PY'
 import base64, re, sys, pathlib, subprocess
 root, wasm, out = map(pathlib.Path, sys.argv[1:4])
-version = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+version = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, capture_output=True).stdout.strip()
 web = root / "kern/web"
 html = (web / "studio/index.html").read_text()
 css = (web / "studio/studio.css").read_text()
