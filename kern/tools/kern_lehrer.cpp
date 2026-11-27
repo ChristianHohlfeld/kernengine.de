@@ -699,8 +699,11 @@ int main(int argc, char** argv) {
     auto collectors=backend.save();
     if(collectors.empty())return false;
     checkpoint::Writer w;
-    w.scalar(u32{0x4b4c4e31});w.vector(ppo.save());w.vector(collectors);
+    w.scalar(u32{0x4b4c4e32});w.scalar(ppo.iteration());
+    w.vector(ppo.save());w.vector(collectors);
     w.vector(imitation?imitation->save():std::vector<u8>{});
+    // ONNX and the training state come from the same barrier, not separate files.
+    w.vector(export_onnx(ppo.actor(),ppo.actor_normalizer(),micro_duck_metadata(o.task)));
     return write_file(o.checkpoint,w.bytes);
   };
   if (!o.resume.empty()) {
@@ -708,11 +711,11 @@ int main(int argc, char** argv) {
     bool loaded=false;
     if(o.full_checkpoint){
       checkpoint::Reader r{bytes.data(),bytes.size()};u32 magic=0;
-      std::vector<u8> p,c,i;
-      loaded=r.scalar(magic)&&magic==0x4b4c4e31&&r.vector(p,bytes.size())&&
-        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.end()&&
+      std::vector<u8> p,c,i,net;i32 iteration=-1;
+      loaded=r.scalar(magic)&&magic==0x4b4c4e32&&r.scalar(iteration)&&iteration>=0&&r.vector(p,bytes.size())&&
+        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.vector(net,32*1024*1024)&&!net.empty()&&r.end()&&
         p.size()>=8&&std::memcmp(p.data(),"KERNPPO2",8)==0&&ppo.load(p.data(),p.size())&&
-        backend.load(c.data(),c.size())&&(imitation?imitation->load(i.data(),i.size()):i.empty());
+        ppo.iteration()==iteration&&backend.load(c.data(),c.size())&&(imitation?imitation->load(i.data(),i.size()):i.empty());
     }else loaded=!bytes.empty()&&ppo.load(bytes.data(),bytes.size());
     if(!loaded||ppo.iteration()>o.iterations){std::fprintf(stderr,"cannot resume from %s\n",o.resume.c_str());return 1;}
     std::printf("resumed at iteration %d (%lld steps)\n", ppo.iteration(), static_cast<long long>(ppo.total_steps()));
