@@ -40,6 +40,8 @@ const I18N_DE = {
   "Compute backend": "Rechenbackend", "Local": "Lokal", "MAG · CPU + HIP GPUs": "MAG · CPU + HIP-GPUs",
   "MAG URL": "MAG-Adresse (einmalig)", "MAG connection settings": "MAG-Verbindungseinstellungen", "Reconnect to MAG": "Mit MAG wiederverbinden",
   "Connected to MAG. Ready to start training.": "Mit MAG verbunden. Bereit zum Training.",
+  "Local training ready. MAG unavailable.": "Lokales Training bereit. MAG nicht erreichbar.",
+  "MAG connection interrupted — job may still be running. Reconnecting ...": "MAG-Verbindung unterbrochen. Training läuft möglicherweise weiter. Verbindung wird wiederhergestellt …",
   // menu bar, toolbar, tabs
   "File": "Datei", "Edit": "Bearbeiten", "Window": "Fenster", "Play": "Spielen", "Help": "Hilfe",
   "Untitled": "Unbenannt", "Unsaved changes": "Ungespeicherte Änderungen",
