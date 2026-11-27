@@ -32,9 +32,29 @@ def native_checkpoint_iteration(data):
         if size>len(data)-offset or (index in (0,1,3) and not size):
             raise ValueError("invalid native checkpoint section")
         if index==0 and data[offset:offset+8]!=b"KERNPPO2":raise ValueError("invalid learner checkpoint")
+        if index==3 and size>32*1024*1024:raise ValueError("invalid ONNX section")
         offset+=size
     if offset!=len(data):raise ValueError("unexpected native checkpoint bytes")
     return it
+
+def native_checkpoint_network(data):
+    native_checkpoint_iteration(data)
+    offset=8
+    for _ in range(3):
+        size=struct.unpack_from("<Q",data,offset)[0]
+        offset+=8+size
+    size=struct.unpack_from("<Q",data,offset)[0]
+    if not 0<size<=32*1024*1024:raise ValueError("invalid ONNX section")
+    return data[offset+8:offset+8+size]
+
+def atomic_bytes(path,data):
+    tmp=path.with_name(path.name+".tmp")
+    with tmp.open("wb") as f:
+        f.write(data);f.flush();os.fsync(f.fileno())
+    os.replace(tmp,path)
+    fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
 
 def encode_archive(meta,payload):
     meta=dict(meta,sha256=hashlib.sha256(payload).hexdigest())
@@ -515,8 +535,11 @@ class Handler(BaseHTTPRequestHandler):
                             self.reply(409,{"error":"MAG already has an active training job"});return
                         job=Job(server,jid,cfg)
                         job.resume_digest=digest
-                        with (job.dir/"resume.ckpt").open("xb") as f:
-                            f.write(payload);f.flush();os.fsync(f.fileno())
+                        atomic_bytes(job.dir/"resume.ckpt",payload)
+                        atomic_bytes(job.dir/"learner.ckpt",payload)
+                        atomic_bytes(job.dir/"network.onnx",native_checkpoint_network(payload))
+                        job.network=str((job.dir/"network.onnx").stat().st_mtime_ns)
+                        job.network_iteration=it
                         with (job.dir/"training.log").open("x",encoding="utf-8") as f:
                             for row in rows:
                                 f.write("KERN_PROGRESS "+json.dumps(row,allow_nan=False)+"\n")
