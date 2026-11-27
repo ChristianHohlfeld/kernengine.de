@@ -1,0 +1,80 @@
+    Terrain::height (7): it calls Terrain::node_height(), which waits
+    Terrain::normal (4): it calls Terrain::height(), which waits
+    Terrain::footprint_base (12): it calls Terrain::road_level(), which waits
+    Terrain::sampler (7): it calls Terrain::height(), which waits
+    Terrain::water_cell (7): written
+    Terrain::set_water_cell (6): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Terrain::on_bridge (9): it calls cos(), which waits
+    Terrain::water_at (5): it calls Terrain::on_bridge(), which waits
+    Terrain::flow_at (7): it calls Terrain::water_at(), which waits
+    Terrain::surface_at (6): it calls Terrain::water_at(), which waits
+    Terrain::add_water_polygon (23): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Terrain::set_water_cell(), a step; it calls Terrain::dirty(), a step)
+    Terrain::add_waterway (31): it calls hypot(), which waits
+    Terrain::add_bridge (8): it calls hypot(), which waits
+    albedo (9): written
+    srgb_lin8 (1): it calls pow(), which waits
+    Terrain::take_image_requests (10): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Terrain::image_bounds (9): tile_lonlat() is defined in another file
+    Terrain::plan_images (24): it calls hypot(), which waits
+    Terrain::provide_image (36): it calls srgb_lin8(), which waits
+    Terrain::fail_image (4): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Terrain::ground_albedo (14): unproject() is defined in another file
+    srgb_to_linear (1): it calls pow(), which waits
+    linear_to_srgb (1): it calls pow(), which waits
+    to_linear (1): it calls srgb_to_linear(), which waits
+    to_srgb (1): it calls linear_to_srgb(), which waits
+    Terrain::add_tint (10): it calls to_linear(), which waits
+    Terrain::remove_tints (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Terrain::repaint(), a step)
+    Terrain::repaint (10): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls unkey3(), a step)
+    Terrain::add_crater (12): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Terrain::dirty(), a step)
+    Terrain::crater_list (4): written (a step: it changes a place of its caller (a reference input); it changes out (an input it is handed by reference or pointer))
+    Terrain::set_craters (13): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Terrain::crater_list(), a step; it calls Terrain::dirty(), a step)
+    Terrain::dirty (21): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls unkey3(), a step)
+    Terrain::ground_ready (5): written
+    Terrain::has_collision (4): written
+    Terrain::want_tiles (60): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls want_tiles_finish(), a step)
+    Terrain::build_render_tile (91): it calls Terrain::node_height(), which waits
+    Terrain::build_collision_tile (43): it calls Terrain::node_height(), which waits
+    Terrain::build_water_chunk (117): it calls Terrain::on_bridge(), which waits
+    Terrain::ready_at (12): written
+    Terrain::update (50): it calls Terrain::plan_windows(), which waits
+    Terrain::collide (46): it calls hypot(), which waits
+tiles                           2 /    2 functions        2 /      2 lines
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+/dev/shm/spawncity-jobs-chris/probe-terrain-065203/tmp/kern-cpp-to-blueprint-lkcbxxzv/terrain_cpp.cpp: line 590, column 134: "b_row" is not known here: no variable, no function, no node
+  (the texts: /dev/shm/spawncity-jobs-chris/probe-terrain-065203/tmp/kern-cpp-to-blueprint-lkcbxxzv)
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+where the Blueprints stand (kern/docs/project.md):
+  engine_geo_roads: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_math_math: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  shapes: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  tiles: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_physics_physics: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  common: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  terrain: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  terrain_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+the Blueprints were not read: the level and the project are as they were
+
+real	5m4,008s
+user	7m29,538s
+sys	0m24,540s
