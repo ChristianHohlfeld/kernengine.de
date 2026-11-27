@@ -1706,6 +1706,9 @@ def own_function(tree, decl_id):
         return False   # (the program's way to call an actor's Blueprint: Call on Actor, Get Variable on Actor, Has Blueprint - nodes)
     if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS:
         return False
+    if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm"):
+        return False   # (the engine's functions of numbers - kern::dm::cos(f32), where a header of the engine brings dmath.h along:
+                       # the functions of a formula by their name, as std::cos is - never a library that calls kern_musl_cosf)
     return True
 
 
