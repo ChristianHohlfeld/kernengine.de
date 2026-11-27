@@ -9,7 +9,7 @@ Group=chris
 SupplementaryGroups=render video
 EnvironmentFile=/etc/kern-lehrer.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/kern-lehrer/kern/tools/lehrer_remote.py --binary /opt/kern-lehrer/build-hip/kern_lehrer --build ${KERN_LEHRER_BUILD} --jobs /var/lib/kern-lehrer/jobs --hook /usr/local/lib/kern-lehrer/mag-exclusive.py
+ExecStart=/usr/bin/python3 /opt/kern-lehrer/kern/tools/lehrer_remote.py --binary /opt/kern-lehrer/build-hip/kern_lehrer --build ${KERN_LEHRER_BUILD} --jobs /var/lib/kern-lehrer/jobs --tailnet-only --hook /usr/local/lib/kern-lehrer/mag-exclusive.py
 ExecStopPost=+/usr/bin/python3 /usr/local/lib/kern-lehrer/mag-exclusive.py leave
 StateDirectory=kern-lehrer
 UMask=0077

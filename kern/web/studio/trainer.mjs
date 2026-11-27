@@ -283,8 +283,8 @@ export class Trainer {
       sec("run", "Training",
         field("Compute backend", '<select class="sel" id="trCompute"><option value="local" selected>Local</option><option value="mag">MAG · CPU + HIP GPUs</option></select>') +
         `<div id="trRemoteSettings" hidden>` +
-        field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8443" spellcheck="false" autocomplete="off">') +
-        field("MAG token", '<input class="txt" id="trRemoteToken" type="password" autocomplete="off" spellcheck="false">') +
+        `<details id="trRemoteAddress"><summary>${tr("MAG connection settings")}</summary>` +
+        field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8444" spellcheck="false" autocomplete="off">') + `</details>` +
         `<div class="tr-buttons"><button class="btn small" id="trReconnect" type="button">Reconnect to MAG</button></div></div>` +
         `<div class="tr-buttons"><button class="btn go" id="trStart" type="button">Start</button><button class="btn" id="trPause" type="button">Pause</button><button class="btn" id="trStop" type="button">Stop</button></div>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
@@ -308,6 +308,7 @@ export class Trainer {
     const el = this.el = {};
     for (const node of [...this.host.querySelectorAll("[id]"), ...this.bar.querySelectorAll("[id]")]) el[node.id] = node;
     try { el.trRemoteUrl.value = localStorage.getItem("kern-lehrer.remote-url") || ""; } catch { /* storage blocked */ }
+    el.trRemoteAddress.open = !el.trRemoteUrl.value;
     el.trCompute.onchange = () => this.sync();
     el.trReconnect.onclick = () => void this.reconnectRemote();
     this.setScenario(TRAINER_SCENARIO);
@@ -453,7 +454,6 @@ export class Trainer {
     el.trRemoteSettings.hidden = !remoteSelected;
     el.trCompute.disabled = !!run;
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
-    el.trRemoteToken.disabled = !!run || !remoteSelected;
     el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
     el.trStart.disabled = !!run;
@@ -713,13 +713,13 @@ export class Trainer {
 
 
   remoteConnection() {
+    if (!this.el.trRemoteUrl.value.trim()) throw Error("Enter the MAG HTTPS address once in the connection settings.");
     const url = new URL(this.el.trRemoteUrl.value);
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
       throw Error("MAG needs an HTTPS origin (without a path).");
-    const token = this.el.trRemoteToken.value.trim();
-    if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw Error("Enter the MAG training token.");
     try { localStorage.setItem("kern-lehrer.remote-url", url.origin); } catch { /* storage blocked */ }
-    return {url: url.origin, token};
+    if (this.el.trRemoteAddress) this.el.trRemoteAddress.open = false;
+    return {url: url.origin};
   }
 
   // Explicit recovery after a tab reload: never import into a possibly different level.
@@ -756,7 +756,7 @@ export class Trainer {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const headers = {Authorization: "Bearer " + remote.token};
+      const headers = {"X-Kern-Lehrer": "1"};
       if (body !== undefined) headers["Content-Type"] = "application/json";
       const response = await fetch(remote.url + path, {method: body === undefined ? "GET" : "POST",
         headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,
@@ -768,6 +768,9 @@ export class Trainer {
         throw error;
       }
       return binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw Error("MAG did not respond within 12 seconds. Check Tailscale and browser local network access.");
+      throw error;
     } finally { clearTimeout(timeout); }
   }
 
@@ -823,7 +826,7 @@ export class Trainer {
         if (error.http && error.http < 500 && (!remote.id || error.http === 404 || error.http === 403)) {
           this.end(run); this.status(error.message + (remote.id ? " — check MAG if the job is still running." : ""), true); return;
         }
-        this.status("MAG connection interrupted; job may still be running. Reconnecting ...", true);
+        this.status("MAG connection interrupted: " + error.message + " — job may still be running. Reconnecting ...", true);
         await wait(2000);
       }
     }

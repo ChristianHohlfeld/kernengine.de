@@ -21,7 +21,6 @@ def load(name,path):
     mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod);return mod
 remote=load("remote",TOOLS/"lehrer_remote.py")
 exclusive=load("exclusive",TOOLS/"mag-exclusive.py")
-TOKEN="a"*43
 BUILD="b"*40
 ORIGIN="https://kernengine.de"
 FAKE=r'''#!/usr/bin/env python3
@@ -51,10 +50,8 @@ class RemoteTest(unittest.TestCase):
         self.root=Path(self.tmp.name)
         binary=self.root/"fake";binary.write_text(FAKE);binary.chmod(0o700)
         lock=self.root/"gpu.lock";lock.touch();Path(str(lock)+".idol").touch()
-        self.env=patch.dict(os.environ,{"KERN_LEHRER_TOKEN":TOKEN})
-        self.env.start()
         self.server=remote.Server(SimpleNamespace(jobs=str(self.root/"jobs"),binary=str(binary),build=BUILD,
-            origin=[ORIGIN],gpu_lock=str(lock),hook="",port=0))
+            origin=[ORIGIN],gpu_lock=str(lock),hook="",port=0,tailnet_only=True))
         self.base="http://127.0.0.1:"+str(self.server.server_address[1])
         self.thread=threading.Thread(target=self.server.serve_forever);self.thread.start()
         self.id=str(uuid.uuid4())
@@ -64,10 +61,10 @@ class RemoteTest(unittest.TestCase):
         if job and job.state not in remote.TERMINAL:
             job.control("stop");job.thread.join(10)
         self.server.shutdown();self.thread.join(5);self.server.server_close()
-        self.env.stop();self.tmp.cleanup()
-    def request(self,path,body=None,token=TOKEN,origin=ORIGIN,method=None):
+        self.tmp.cleanup()
+    def request(self,path,body=None,marker="1",origin=ORIGIN,method=None):
         data=None if body is None else json.dumps(body).encode()
-        req=urllib.request.Request(self.base+path,data=data,headers={"Authorization":"Bearer "+token,
+        req=urllib.request.Request(self.base+path,data=data,headers={"X-Kern-Lehrer":marker,
             "Origin":origin,"Content-Type":"application/json"},method=method)
         try:
             with urllib.request.urlopen(req,timeout=3) as r:
@@ -86,7 +83,11 @@ class RemoteTest(unittest.TestCase):
             time.sleep(.05)
         self.fail("job state did not arrive: "+repr(data))
     def test_auth_validation_and_control(self):
-        self.assertEqual(self.request("/v1/info",token="bad")[0],403)
+        self.assertEqual(self.request("/v1/info",marker="bad")[0],403)
+        self.assertEqual(self.request("/v1/info")[0],200)
+        self.assertEqual(self.request("/v1/jobs",self.body,marker="")[0],403)
+        self.assertEqual(self.request("/v1/info",origin="https://bad.example",method="OPTIONS")[0],403)
+        self.assertEqual(self.request("/v1/info",method="OPTIONS")[0],204)
         self.assertEqual(self.request("/v1/info",origin="https://bad.example")[0],403)
         self.assertEqual(self.request("/v1/jobs",{**self.body,"build":"0"*40})[0],400)
         self.assertEqual(self.request("/v1/jobs",{**self.body,"task":"--out /tmp/evil"})[0],400)

@@ -2,8 +2,7 @@
 
 Im Lehrer unter **Training → Rechenbackend** ist **Lokal** bei jedem Öffnen der Seite vorausgewählt.
 Das lokale WASM-Training, die Keyframes, die Aufgaben, das Level und der ONNX-Import bleiben unverändert.
-Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird auf dem Gerät gespeichert,
-das Token nicht. Kein automatischer Wechsel und kein CPU-Fallback bei einem HIP-Fehler.
+Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird einmalig auf dem Gerät gespeichert; danach bleiben die Verbindungseinstellungen eingeklappt. Kein Anwendungstoken; die Zugriffsberechtigung liegt vollständig bei Tailscale. Kein automatischer Wechsel und kein CPU-Fallback bei einem HIP-Fehler.
 
 ## Installation auf MAG (Ubuntu, Benutzer chris)
 
@@ -36,11 +35,12 @@ sudo install -o root -g root -m 644 kern/tools/mag-lehrer.service /etc/systemd/s
 printf '%s\n' 'chris ALL=(root) NOPASSWD: /usr/local/lib/kern-lehrer/mag-exclusive.py enter, /usr/local/lib/kern-lehrer/mag-exclusive.py leave' | sudo tee /etc/sudoers.d/kern-lehrer >/dev/null
 sudo chmod 440 /etc/sudoers.d/kern-lehrer
 sudo visudo -cf /etc/sudoers.d/kern-lehrer
-# Einmalig, nur falls /etc/kern-lehrer.env noch nicht existiert; nicht bei jedem Update rotieren.
+# Build-ID bei jedem Update abgleichen. Alte KERN_LEHRER_TOKEN-Zeilen entfernen.
 if ! sudo test -e /etc/kern-lehrer.env; then
   sudo install -m 600 /dev/null /etc/kern-lehrer.env
-  printf 'KERN_LEHRER_BUILD=%s\nKERN_LEHRER_TOKEN=%s\n' "$(git rev-parse HEAD)" "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" | sudo tee /etc/kern-lehrer.env >/dev/null
 fi
+sudo sed -i '/^KERN_LEHRER_BUILD=/d; /^KERN_LEHRER_TOKEN=/d' /etc/kern-lehrer.env
+printf 'KERN_LEHRER_BUILD=%s\n' "$(git rev-parse HEAD)" | sudo tee -a /etc/kern-lehrer.env >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now mag-lehrer.service
 ~~~
@@ -58,10 +58,7 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8799
 tailscale serve status
 ~~~
 
-Nur der eigene Tailnet darf zugreifen. Im Editor die HTTPS-Adresse aus der Ausgabe (inkl. Port)
-und das Token aus /etc/kern-lehrer.env eintragen. Im Browser ggf. den lokalen Netzwerkzugriff
-erlauben. Die öffentliche Website erhält keine Server-Zugangsdaten. Das Token nur am eigenen Gerät
-eingeben; niemals in Git, URL, Logs oder Screenshots.
+Nur ausdrücklich berechtigte Geräte dürfen über Tailscale-ACLs/Grants auf den Lehrer-Port zugreifen. Kein Funnel und keine weitere Weiterleitung des Loopback-Ports. Jeder berechtigte Client kann Trainingsaufträge steuern; der feste X-Kern-Lehrer-Header ist kein Geheimnis, sondern verhindert einfache browserbasierte Cross-Origin-Schreibanfragen zusammen mit der Origin-Prüfung. Der Dienst muss ausdrücklich mit --tailnet-only gestartet werden. Im Editor die HTTPS-Adresse aus der Ausgabe (inkl. Port) einmalig in den Verbindungseinstellungen eintragen. Im Browser ggf. den lokalen Netzwerkzugriff erlauben. Die private Adresse bleibt auf dem Gerät und wird nicht in die öffentliche Website eingebaut. HTTP-Status und Methode (ohne Nutzdaten, Header oder Job-IDs) erscheinen im Journal.
 
 ## Lauf und Ressourcen
 
@@ -105,7 +102,7 @@ python3 kern/tests/lehrer_remote_test.py
 node kern/tests/lehrer_remote_test.mjs
 ~~~
 
-Die Tests verwenden einen simulierten Trainer und prüfen HTTP, Authentifizierung, Versionskonflikt,
+Die Tests verwenden einen simulierten Trainer und prüfen HTTP, Origin- und Header-Prüfung, Versionskonflikt,
 Ressourcensperren, Pause, Resume, Stopp, Ergebnisübertragung und Wiederherstellung.
 Auf MAG zusätzlich: je ein kurzer Stand- und Keyframe-Lauf mit CPU/GPU-Lastmessung,
 ONNX-Import im Studio und Nachweis der wiederhergestellten MAG-Dienste. Kein Live-Release
