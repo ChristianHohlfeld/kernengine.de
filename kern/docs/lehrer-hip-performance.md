@@ -7,7 +7,11 @@ allocation/copy/kernel errors are still fatal, not CPU fallback. Each visible GP
 has four independent workspaces by default (device buffers, pinned host staging
 and nonblocking HIP stream); the CPU waits only for the stream producing its
 result. Workspaces grow lazily and are reused until process exit. Device
-selection remains round-robin across all visible GPUs.
+selection remains round-robin across all visible GPUs. Dense forward and weight-gradient
+kernels reuse input/weight tiles in GPU shared memory without reassociating sums.
+Rollout re-evaluation uses batches of 1024 rows and up to eight independent
+CPU submissions instead of sequential 256-row batches. Single-step environment
+inference and the existing all-core physics collector are unchanged.
 
 `KERN_HIP_STREAMS=1..8` selects the stream count per GPU at process start.
 Use 1, 2, 4 and 8 for a controlled sweep; 4 is an initial engineering default,
@@ -23,21 +27,31 @@ power cap, driver, GPU locks or host services for this comparison.
    MAG GPU lease or bypass the exclusive hook.
 2. Build the new commit in its own build directory with the existing ROCm and
    gfx906 flags. The Studio SHA and remote service SHA must match.
-3. Through the existing remote job path, run the same task, seed, iterations,
+3. Install the updated root-owned `mag-exclusive.py` from the same checkout using
+   the documented root install command. The hook verifies that the supervisor,
+   active model/compute units are frozen and h3d stopped before HIP starts; it
+   verifies restoration before reporting completion. Existing GPU guard and
+   priority locks stay in effect. An already-running Idol GPU stage is allowed
+   to drain. Do not start a parallel inference process outside these guards.
+4. Through the existing remote job path, run the same task, seed, iterations,
    ducks per worker, PPO options and number of visible GPUs as the baseline.
    Compare at least five steady-state iterations, omitting startup and
    imitation from PPO timings. Test imitation separately with the same task.
-4. The service runs the native `--hip-check` under the GPU lease. Each GPU and
+5. The service runs the native `--hip-check` under the GPU lease. Each GPU and
    each stream must pass three concurrent forward/gradient comparisons against
    the CPU, with distinct input parameters per stream. Check the training
    log for the stream count. Fail closed if HIP fails.
-5. The existing training log contains `KERN_PROGRESS` records with
+6. The existing training log contains `KERN_PROGRESS` records with
    `sps`, `collectSeconds` and `learnSeconds`. Use median steps/s and
    median learning/collection time; record GPU activity with rocm-smi.
    Compare output/checkpoints for an identical deterministic run as well.
    The small self-test alone does not establish whole-run bit identity.
-6. Verify ONNX import and that MAG services return to their prior state
-   after stop/completion. Keep the old binary and restore the old matched
+7. Verify ONNX import and that MAG services return to their prior state
+   after stop/completion and a deliberate trainer error. Check that CPU inference
+   resumes, the GPU guard reloads its model if previously enabled, and units
+   that were inactive or already frozen stay that way. A failed restoration
+   keeps a retry journal and rejects subsequent jobs; inspect the error log.
+   Keep the old binary and restore the old matched
    Studio/server release if acceptance fails.
 
 If necessary, configure the stream count with a systemd service drop-in
