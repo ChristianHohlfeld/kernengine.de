@@ -154,6 +154,8 @@ jobs:
         run: KERN_NATIVE=1 kern/tools/lehrer.sh build-mac
       - name: Same hashes as x86 and wasm
         run: build-mac/kern_lehrer --fingerprint 400 | diff - kern/tests/determinism_fingerprint.txt
+      - name: Complete native checkpoint and exact continuation
+        run: python3 kern/tests/lehrer_native_checkpoint_test.py build-mac/kern_lehrer
 
   build:
     if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
