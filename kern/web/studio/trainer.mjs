@@ -234,6 +234,7 @@ export class Trainer {
     this.history = [];        // the curve of the last run
     this.texts = new WeakMap();
     this.el = null;
+    this.remoteProbeTimer = null;
   }
 
   /** Sets an element's text when it changed (the page's translation rewrites text nodes: no needless writes). */
@@ -300,7 +301,7 @@ export class Trainer {
       sec("help", "How it works",
         `<p class="tr-note">A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.</p>` +
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
-        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local training is the default and does not contact MAG. CPU determinism is tested; HIP is a separate native build.</p>` +
+        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local is the default for new training. If a MAG address was saved, the Lehrer checks for an existing job when opened; reloading the page never stops or starts a remote job. CPU determinism is tested; HIP is a separate native build.</p>` +
         `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
     this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
@@ -309,7 +310,12 @@ export class Trainer {
     for (const node of [...this.host.querySelectorAll("[id]"), ...this.bar.querySelectorAll("[id]")]) el[node.id] = node;
     try { el.trRemoteUrl.value = localStorage.getItem("kern-lehrer.remote-url") || ""; } catch { /* storage blocked */ }
     el.trRemoteAddress.open = !el.trRemoteUrl.value;
-    el.trCompute.onchange = () => this.sync();
+    el.trCompute.onchange = () => {
+      clearTimeout(this.remoteProbeTimer);
+      this.remoteProbeTimer = null;
+      this.sync();
+      if (el.trCompute.value === "mag" && el.trRemoteUrl.value.trim()) void this.reconnectRemote({automatic:true});
+    };
     el.trReconnect.onclick = () => void this.reconnectRemote();
     this.setScenario(TRAINER_SCENARIO);
     el.scName.value = tr(TRAINER_SCENARIO.name);
@@ -399,11 +405,17 @@ export class Trainer {
       } catch (error) { this.status(error.message, true); }
     };
     addEventListener("resize", () => this.draw());
+    // Android may suspend polling in the background. On return, discover
+    // the server's current job again if no run is attached.
+    addEventListener("online", () => this.discoverRemote());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this.discoverRemote();
+    });
   }
 
   /** The engine's state changed (every Studio panel is drawn from it). */
   render(s) {
-    const open = !!s.trainer;
+    const open = !!s.trainer, wasOpen = !!this.s;
     this.s = s.trainer || null;
     this.motions = s.motions || [];
     this.editable = open || s.play.state === "editing";
@@ -422,6 +434,7 @@ export class Trainer {
     button.classList.toggle("on", open);
     if (open && !this.el) { this.build(); this.statusText = `Ready. ${navigator.hardwareConcurrency || "?"} cores on this device.`; }
     if (this.el) this.sync();
+    if (open && !wasOpen) this.discoverRemote();
   }
 
   /** Brings the panel and the bar in step with the engine's state and the run. */
@@ -651,6 +664,8 @@ export class Trainer {
           if (value > 0) body[field] = value;
         }
         run.remote = {...connection, body, id: null, state: "waiting", stopping: false, busy: false, network: null};
+        // Save before sending POST: a reload may lose the response, not the job.
+        this.rememberRemote(run.remote, body.id);
       } catch (error) {
         this.end(run); this.status(error.message, true); return;
       }
@@ -722,30 +737,99 @@ export class Trainer {
     return {url: url.origin};
   }
 
-  // Explicit recovery after a tab reload: never import into a possibly different level.
-  // The result is available for download and the original job can be paused/stopped.
-  async reconnectRemote() {
-    if (this.run) return;
-    let run;
+  remoteRecord(url) {
     try {
-      const connection = this.remoteConnection();
+      const record = JSON.parse(localStorage.getItem("kern-lehrer.remote-job") || "null");
+      return record?.url === url && /^[a-f0-9-]{36}$/.test(record.id) ? record : null;
+    } catch { return null; }
+  }
+
+  rememberRemote(remote, id = remote.id) {
+    if (!id) return;
+    try {
+      localStorage.setItem("kern-lehrer.remote-job", JSON.stringify({url:remote.url, id, stopping:!!remote.stopping}));
+    } catch { /* recovery can still discover the active job on the server */ }
+  }
+
+  forgetRemote(url, id) {
+    try {
+      const record = this.remoteRecord(url);
+      if (record && (!id || record.id === id)) localStorage.removeItem("kern-lehrer.remote-job");
+    } catch { /* storage blocked */ }
+  }
+
+  discoverRemote() {
+    if (!this.s || !this.el || this.run || !this.el.trRemoteUrl.value.trim()) return;
+    clearTimeout(this.remoteProbeTimer);
+    this.remoteProbeTimer = null;
+    void this.reconnectRemote({automatic:true});
+  }
+
+  // Read-only discovery: a reload never POSTs a new job or imports into a
+  // potentially different level. The existing job remains authoritative.
+  async reconnectRemote({automatic=false} = {}) {
+    if (this.run) return;
+    let run, connection, record;
+    try {
+      connection = this.remoteConnection();
+      record = this.remoteRecord(connection.url);
       run = this.run = {task: "stand", label: "mag", move: null, workers: [], collectors: [],
         total: 1, iteration: 0, paused: false, history: [], remote: {...connection,
           state: "waiting", id: null, busy: true, stopping: false, network: null}};
       this.history = run.history;
       this.status("Reconnecting to MAG ...");
-      const data = await this.remoteRequest(run, "/v1/current");
+      let data;
+      try {
+        data = await this.remoteRequest(run, "/v1/current");
+      } catch (error) {
+        if (this.run !== run) return;
+        // The known idle response is not a connection failure. Other 404s
+        // (e.g. a wrong server/path) remain errors.
+        if (error.http !== 404 || error.message !== "no MAG training job") throw error;
+        this.forgetRemote(connection.url);
+        this.end(run);
+        this.status("Connected to MAG. Ready to start training.");
+        return;
+      }
       if (this.run !== run) return;
       if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
+      const terminal = ["done","stopped","error"].includes(data.state);
+      if (automatic && terminal && record?.id !== data.id) {
+        this.forgetRemote(connection.url);
+        this.end(run);
+        this.status("Connected to MAG. Ready to start training.");
+        return;
+      }
+      this.el.trCompute.value = "mag";
       run.remote.id = data.id; run.remote.busy = false;
+      run.remote.state = data.state;
+      run.remote.stopping = !terminal && record?.id === data.id && !!record.stopping;
+      this.rememberRemote(run.remote);
       run.task = data.taskKind; run.label = "mag-" + data.id; run.token = run.label;
       run.total = data.total; run.envs = data.envs;
+      run.count = data.workers; run.paused = data.state === "paused";
       this.onnx = null; this.handover = null;
       this.note = "Reconnected: download the network to import it into the intended level.";
       await this.remotePractice(run);
     } catch (error) {
-      if (run && this.run === run) this.end(run);
-      this.status(error.message, true);
+      if (run && this.run !== run) return;
+      if (run) this.end(run);
+      if (automatic && !record) {
+        // A stored address does not make MAG the default for new training.
+        // Leave local mode usable if the optional host is offline.
+        if (this.el.trCompute.value !== "mag") { this.status("Local training ready. MAG unavailable."); return; }
+      }
+      if (record) {
+        this.el.trCompute.value = "mag";
+        this.status("MAG connection interrupted — job may still be running. Reconnecting ...", true);
+        if (this.s) {
+          clearTimeout(this.remoteProbeTimer);
+          this.remoteProbeTimer = setTimeout(() => {
+            this.remoteProbeTimer = null;
+            if (this.el.trCompute.value === "mag") this.discoverRemote();
+          }, 5000);
+        }
+      } else this.status(error.message, true);
     }
   }
 
@@ -785,6 +869,7 @@ export class Trainer {
           data = await this.remoteRequest(run, "/v1/jobs", remote.body);
           if (data.id !== remote.body.id) throw Object.assign(Error("MAG returned a different job id"), {http: 400});
           remote.id = data.id;
+          this.rememberRemote(remote);
           run.token = "mag-" + data.id;
         } else {
           data = await this.remoteRequest(run, "/v1/jobs/" + remote.id);
@@ -811,11 +896,18 @@ export class Trainer {
             catch (error) { this.note = "Network saved on MAG; level import failed: " + error.message; }
             remote.network = data.network;
           } catch (error) {
-            if (error.http !== 409) throw error;
-            await wait(200); continue;
+            // A snapshot transfer can fail independently of the job. Keep
+            // control attached and retry, rather than treating a download
+            // 404 as a missing training job.
+            if (!live()) return;
+            this.note = "Network download interrupted; retrying.";
+            this.sync();
+            await wait(error.http === 409 ? 200 : 1500);
+            continue;
           }
         }
         if (["done", "stopped", "error"].includes(data.state)) {
+          this.forgetRemote(remote.url, remote.id);
           this.end(run); this.status(data.message, data.state === "error"); return;
         }
         this.status(remote.stopping ? "Stop requested; waiting for MAG to finish." :
@@ -951,6 +1043,7 @@ export class Trainer {
     if (!run) return;
     if (run.remote) {
       run.remote.stopping = true;
+      this.rememberRemote(run.remote, run.remote.id || run.remote.body?.id);
       this.status("Stop requested; waiting for MAG to save and release its resources.");
       return;
     }
