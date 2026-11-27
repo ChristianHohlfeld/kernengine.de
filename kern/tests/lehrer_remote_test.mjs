@@ -51,4 +51,22 @@ t.remoteRequest=async (_,path)=>{
 await p.remotePractice.call(t,run);
 assert.equal(stats,2);assert.equal(imported,2);assert.equal(t.run,null);
 assert.deepEqual(requests,["/v1/jobs","/v1/jobs/"+id+"/network/1"]);
+// Only the documented idle response is a successful connection.
+for (const [http,message,expected,isError] of [
+  [404,"no MAG training job","Connected to MAG. Ready to start training.",false],
+  [404,"not found","not found",true],
+  [403,"forbidden","forbidden",true],
+  [undefined,"Failed to fetch","Failed to fetch",true],
+]) {
+  const t=trainer("mag");
+  t.status=(message,error=false)=>{t.message=message;t.statusError=error;};
+  t.remoteRequest=async (_,path)=>{
+    assert.equal(path,"/v1/current");
+    throw Object.assign(Error(message),{http});
+  };
+  await t.reconnectRemote();
+  assert.equal(t.run,null);
+  assert.equal(t.message,expected);
+  assert.equal(t.statusError,isError);
+}
 console.log("Lehrer local/MAG selection and remote result passed");
