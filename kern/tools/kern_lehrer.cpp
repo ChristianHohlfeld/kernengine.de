@@ -17,6 +17,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#include <fcntl.h>
+#endif
 
 #include "kern/game/walker.h"
 #include "kern/game/walker_policy.h"
@@ -64,8 +68,20 @@ bool write_file(const std::string& path, const std::vector<u8>& bytes) {
   const std::string tmp = path + ".tmp";
   FILE* f = std::fopen(tmp.c_str(), "wb");
   if (!f) return false;
-  const bool ok = std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
-  return std::fclose(f) == 0 && ok && std::rename(tmp.c_str(), path.c_str()) == 0;
+  bool ok = std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size() && std::fflush(f)==0;
+#if defined(__unix__) || defined(__APPLE__)
+  if(ok)ok=::fsync(::fileno(f))==0;
+#endif
+  if(std::fclose(f)!=0 || !ok || std::rename(tmp.c_str(),path.c_str())!=0)return false;
+#if defined(__unix__) || defined(__APPLE__)
+  const auto slash=path.find_last_of('/');
+  const std::string dir=slash==std::string::npos?".":slash==0?"/":path.substr(0,slash);
+  const int fd=::open(dir.c_str(),O_RDONLY);
+  if(fd<0)return false;
+  const bool durable=::fsync(fd)==0;::close(fd);
+  if(!durable)return false;
+#endif
+  return true;
 }
 
 std::vector<u8> read_file(const std::string& path) {
@@ -795,6 +811,11 @@ int main(int argc, char** argv) {
       if (!save_checkpoint()) {
         std::fprintf(stderr, "cannot write checkpoint\n"); if (log) std::fclose(log); return 1;
       }
+    }
+    if(o.full_checkpoint && !snapshot && !save_checkpoint()){
+      std::fprintf(stderr,"cannot commit complete training checkpoint\n");
+      if(log)std::fclose(log);
+      return 1;
     }
     if (o.progress_json) {
       json::Value v = json::Value::object();
