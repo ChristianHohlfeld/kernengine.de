@@ -24,15 +24,16 @@ ARCHIVE_MAGIC = b"KERNCP1\n"
 def native_checkpoint_iteration(data):
     if len(data)<8 or len(data)>MAX_CHECKPOINT:raise ValueError("invalid native checkpoint size")
     magic,it=struct.unpack_from("<Ii",data)
-    if magic!=0x4b4c4e32 or not 0<=it<=100000:raise ValueError("unsupported native checkpoint")
+    if magic!=0x4b4c4e33 or not 0<=it<=100000:raise ValueError("unsupported native checkpoint")
     offset=8
-    for index in range(4):
+    for index in range(5):
         if offset+8>len(data):raise ValueError("truncated native checkpoint")
         size=struct.unpack_from("<Q",data,offset)[0];offset+=8
         if size>len(data)-offset or (index in (0,1,3) and not size):
             raise ValueError("invalid native checkpoint section")
         if index==0 and data[offset:offset+8]!=b"KERNPPO2":raise ValueError("invalid learner checkpoint")
         if index==3 and size>32*1024*1024:raise ValueError("invalid ONNX section")
+        if index==4 and size>65536:raise ValueError("invalid progress section")
         offset+=size
     if offset!=len(data):raise ValueError("unexpected native checkpoint bytes")
     return it
@@ -46,6 +47,19 @@ def native_checkpoint_network(data):
     size=struct.unpack_from("<Q",data,offset)[0]
     if not 0<size<=32*1024*1024:raise ValueError("invalid ONNX section")
     return data[offset+8:offset+8+size]
+
+def native_checkpoint_progress(data):
+    it=native_checkpoint_iteration(data)
+    offset=8
+    for _ in range(4):
+        size=struct.unpack_from("<Q",data,offset)[0];offset+=8+size
+    size=struct.unpack_from("<Q",data,offset)[0]
+    if not size:
+        if it:raise ValueError("missing checkpoint progress")
+        return None
+    row=json.loads(data[offset+8:offset+8+size])
+    if not isinstance(row,dict) or row.get("iteration")!=it:raise ValueError("checkpoint progress mismatch")
+    return row
 
 def atomic_bytes(path,data):
     tmp=path.with_name(path.name+".tmp")
@@ -471,8 +485,11 @@ class Handler(BaseHTTPRequestHandler):
                 with (job.dir/"learner.ckpt").open("rb") as f:
                     data=f.read(MAX_CHECKPOINT+1)
                 it=native_checkpoint_iteration(data)
+                rows={row["iteration"]:row for row in training_rows(job,it)}
+                progress=native_checkpoint_progress(data)
+                if progress:rows[it]=progress
                 meta=dict(schema=1,backend="mag",build=job.build,workers=job.workers,
-                          config=job.config,iteration=it,rows=training_rows(job,it))
+                          config=job.config,iteration=it,rows=[rows[i] for i in sorted(rows)])
                 archive=encode_archive(meta,data)
                 if len(archive)>MAX_CHECKPOINT:raise ValueError("archive too large")
                 self.reply(200,archive,"application/octet-stream");return
@@ -512,6 +529,7 @@ class Handler(BaseHTTPRequestHandler):
                 it=native_checkpoint_iteration(payload)
                 if meta.get("iteration")!=it or it>cfg["iterations"]:raise ValueError("Checkpoint is inconsistent")
                 digest=hashlib.sha256(raw).hexdigest()
+                progress=native_checkpoint_progress(payload)
                 rows=meta.get("rows",[])
                 if not isinstance(rows,list) or len(rows)>it:raise ValueError("invalid progress history")
                 last=0
@@ -524,6 +542,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("invalid progress value")
                     json.dumps(row,allow_nan=False)
                     last=row["iteration"]
+                if progress and (not rows or rows[-1]!=progress):raise ValueError("checkpoint metrics mismatch")
                 with server.job_lock:
                     if server.closing:
                         self.reply(503,{"error":"MAG service is shutting down"});return
