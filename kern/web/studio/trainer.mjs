@@ -604,16 +604,16 @@ export class Trainer {
     // The run.
     const remoteSelected = el.trCompute.value === "mag";
     el.trRemoteSettings.hidden = !remoteSelected;
-    el.trCompute.disabled = !!run;
+    el.trCompute.disabled = !!run || !!this.checkpointBusy;
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
     el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
     for(const id of ["trEnvs","trIterations","trSeed","trInitStd","trLr"])if(el[id])el[id].disabled=!!run;
-    el.trStart.disabled = !!run || !!this.localBusy || (!remoteSelected && !!this.localSaved);
+    el.trStart.disabled = !!run || !!this.localBusy || !!this.checkpointBusy || (!remoteSelected && !!this.localSaved);
     if(el.trLocalRecovery){
       el.trLocalRecovery.hidden=remoteSelected || !this.localSaved || !!run;
-      el.trLocalResume.disabled=!!run || !!this.localBusy;
-      el.trLocalDiscard.disabled=!!run || !!this.localBusy;
+      el.trLocalResume.disabled=!!run || !!this.localBusy || !!this.checkpointBusy;
+      el.trLocalDiscard.disabled=!!run || !!this.localBusy || !!this.checkpointBusy;
       this.text(el.trLocalResume,this.localSaved?.iteration===this.localSaved?.total?"Open saved result":"Continue saved training");
       this.text(el.trLocalSaved,!remoteSelected && this.localSaved ? "Saved checkpoint: iteration "+this.localSaved.iteration+" / "+this.localSaved.total : "");
     }
@@ -876,7 +876,7 @@ export class Trainer {
   async uploadCheckpoint(file){
     if(this.run||this.localBusy||this.checkpointBusy)return;
     this.checkpointBusy=true;this.sync();
-    let release,localReady=false;
+    let release,localReady=false,remoteReconnect=false;
     try{
       if(file.size>CHECKPOINT_MAX)throw Error("Checkpoint too large");
       const bytes=new Uint8Array(await file.arrayBuffer());
@@ -901,19 +901,37 @@ export class Trainer {
         localReady=true;
       }else if(meta.backend==="mag"){
         if(meta.build!==window.KERN_TRAINER_BUILD)throw Error("Checkpoint requires the original Studio/MAG build.");
-        const connection=this.remoteConnection(),id=crypto.randomUUID();
+        const connection=this.remoteConnection(),digest=hex(await hashBytes(bytes));
+        const pendingKey="kern-lehrer.pending-upload";
+        let pending=null;
+        try{pending=JSON.parse(localStorage.getItem(pendingKey)||"null");}catch{}
+        const id=pending?.url===connection.url&&pending.digest===digest&&/^[a-f0-9-]{36}$/.test(pending.id)?pending.id:crypto.randomUUID();
+        const previous=this.remoteRecord(connection.url);
         this.el.trCompute.value="mag";
         const remote={...connection,id,config:meta.config,stopping:false};
-        // Upload may succeed even if its HTTP response is lost. Remember the
-        // job identity before sending; discovery never starts a second job.
+        // A lost response must not create another training job on retry.
+        try{localStorage.setItem(pendingKey,JSON.stringify({url:connection.url,digest,id}));}catch{}
         this.rememberRemote(remote);
-        await this.remoteRequest({remote},"/v1/checkpoints/"+id,bytes,false,120000);
+        try{
+          await this.remoteRequest({remote},"/v1/checkpoints/"+id,bytes,false,120000);
+          remoteReconnect=true;
+          try{localStorage.removeItem(pendingKey);}catch{}
+        }catch(error){
+          if(error.http && error.http<500){
+            try{
+              localStorage.removeItem(pendingKey);
+              if(previous)localStorage.setItem("kern-lehrer.remote-job",JSON.stringify(previous));
+              else this.forgetRemote(connection.url,id);
+            }catch{}
+          }else remoteReconnect=true;
+          throw error;
+        }
       }else throw Error("Unsupported checkpoint backend");
     }catch(error){
       this.status(error.message,true);
     }finally{release?.();this.checkpointBusy=false;this.sync();}
     if(localReady)await this.resumeLocal();
-    else if(this.el.trCompute.value==="mag")await this.reconnectRemote();
+    else if(remoteReconnect)await this.reconnectRemote();
   }
 
   async refreshLocal() {
@@ -931,7 +949,7 @@ export class Trainer {
   }
 
   async discardLocal() {
-    if(this.run||this.localBusy||!this.localSaved)return;
+    if(this.run||this.localBusy||this.checkpointBusy||!this.localSaved)return;
     if(!confirm(tr("Discard the saved local training? This cannot be undone.")))return;
     this.localBusy=true;this.sync();
     let release;
@@ -947,7 +965,7 @@ export class Trainer {
   }
 
   async resumeLocal() {
-    if(this.run||this.localBusy)return;
+    if(this.run||this.localBusy||this.checkpointBusy)return;
     this.localBusy=true;this.sync();
     let run,release;
     try{
