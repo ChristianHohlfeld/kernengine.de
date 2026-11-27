@@ -1,0 +1,80 @@
+      |              ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:367:45: note: because 'std::same_as<int, float>' evaluated to false
+  367 | template <class T, class L> concept Takes = std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>);
+      |                                             ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:63:9: note: because '__detail::__same_as<int, float>' evaluated to false
+   63 |       = __detail::__same_as<_Tp, _Up> && __detail::__same_as<_Up, _Tp>;
+      |         ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:57:27: note: because 'std::is_same_v<int, float>' evaluated to false
+   57 |       concept __same_as = std::is_same_v<_Tp, _Up>;
+      |                           ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:367:68: note: and 'float' does not satisfy 'Integer'
+  367 | template <class T, class L> concept Takes = std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>);
+      |                                                                    ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:64:51: note: because 'std::is_integral_v<float>' evaluated to false
+   64 | template <class T> concept Integer = Number<T> && std::is_integral_v<T> && !std::same_as<T, bool>;
+      |                                                   ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/games/spawncity/src/level_blueprints/kern_blueprint_8c426e9605569031.h:152:80: note: passing argument to parameter 'x' here
+  152 |   KERN_PURE Terrain_elevationResult Terrain_elevation(const Terrain& self, f32 x = 0.0f, f32 y = 0.0f) {
+      |                                                                                ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/games/spawncity/tests/test_terrain.cpp:147:13: error: no viable conversion from 'f32' (aka 'Typed<float>') to 'const f64' (aka 'const double')
+  147 |   const f64 east = tr.Terrain_elevation(t, 1000, 0).Result, north = tr.Terrain_elevation(t, 0, 1000).Result;
+      |             ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:391:13: note: candidate template ignored: constraints not satisfied [with U = double]
+  391 |   constexpr operator U() const { return v; }  // NOLINT
+      |             ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:390:14: note: because 'std::same_as<double, float>' evaluated to false
+  390 |     requires std::same_as<U, T>
+      |              ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:63:9: note: because '__detail::__same_as<double, float>' evaluated to false
+   63 |       = __detail::__same_as<_Tp, _Up> && __detail::__same_as<_Up, _Tp>;
+      |         ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:57:27: note: because 'std::is_same_v<double, float>' evaluated to false
+   57 |       concept __same_as = std::is_same_v<_Tp, _Up>;
+      |                           ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/games/spawncity/tests/test_terrain.cpp:147:93: error: no viable conversion from 'int' to 'f32' (aka 'Typed<float>')
+  147 |   const f64 east = tr.Terrain_elevation(t, 1000, 0).Result, north = tr.Terrain_elevation(t, 0, 1000).Result;
+      |                                                                                             ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:382:28: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'int' to 'const Typed<float> &' for 1st argument
+  382 | template <Number T> struct Typed {
+      |                            ^~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:382:28: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'int' to 'Typed<float> &&' for 1st argument
+  382 | template <Number T> struct Typed {
+      |                            ^~~~~
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:387:13: note: candidate template ignored: constraints not satisfied [with L = int]
+  387 |   constexpr Typed(L x) : v(static_cast<T>(x)) {}  // NOLINT (implicit: a number of the type, or one written out)
+      |             ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:386:14: note: because 'detail::Takes<float, int>' evaluated to false
+  386 |     requires detail::Takes<T, L>
+      |              ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:367:45: note: because 'std::same_as<int, float>' evaluated to false
+  367 | template <class T, class L> concept Takes = std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>);
+      |                                             ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:63:9: note: because '__detail::__same_as<int, float>' evaluated to false
+   63 |       = __detail::__same_as<_Tp, _Up> && __detail::__same_as<_Up, _Tp>;
+      |         ^
+/usr/bin/../lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/concepts:57:27: note: because 'std::is_same_v<int, float>' evaluated to false
+   57 |       concept __same_as = std::is_same_v<_Tp, _Up>;
+      |                           ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:367:68: note: and 'float' does not satisfy 'Integer'
+  367 | template <class T, class L> concept Takes = std::same_as<L, T> || (Integer<T> && std::is_integral_v<L> && !std::same_as<L, bool>);
+      |                                                                    ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/include/kern/logic/numbers.h:64:51: note: because 'std::is_integral_v<float>' evaluated to false
+   64 | template <class T> concept Integer = Number<T> && std::is_integral_v<T> && !std::same_as<T, bool>;
+      |                                                   ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/kern/games/spawncity/src/level_blueprints/kern_blueprint_8c426e9605569031.h:152:80: note: passing argument to parameter 'x' here
+  152 |   KERN_PURE Terrain_elevationResult Terrain_elevation(const Terrain& self, f32 x = 0.0f, f32 y = 0.0f) {
+      |                                                                                ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+59 warnings and 20 errors generated.
+1 warning generated.
+59 warnings and 16 errors generated.
+15 warnings generated.
+3 warnings generated.
+2 warnings generated.
+30 warnings generated.
+59 warnings generated.
+
+real	4m50,575s
+user	81m44,862s
+sys	2m4,280s

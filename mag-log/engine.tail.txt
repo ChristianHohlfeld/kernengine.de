@@ -1,0 +1,80 @@
+ok   studio_player_presets_and_gameplay_blocks
+ok   game_gameplay_blocks
+ok   studio_shortcuts_follow_the_keyboard_layout
+ok   studio_logic_functions
+ok   studio_logic_places_of_the_engine
+ok   studio_logic_local_variables
+ok   studio_logic_reference_inputs
+ok   studio_logic_implements
+ok   studio_play_project
+ok   studio_project
+ok   studio_logic_libraries
+ok   studio_logic_call_on_actor
+ok   studio_logic_project_types
+ok   studio_logic_cpp_view
+ok   studio_logic_editor_commands
+ok   studio_logic_lists
+ok   studio_logic_number_types
+ok   studio_logic_enums
+ok   studio_logic_structs
+ok   studio_blueprint_breakpoints_pause_the_game
+ok   studio_blueprint_comments_reroutes_promote
+ok   studio_multiplayer_play
+ok   studio_shortcuts_and_commands
+ok   studio_outliner_hierarchy
+ok   studio_play_orb_run
+    orbRun: worst on-screen shake 0.026 deg
+    physicsLab: worst on-screen shake 0.020 deg
+ok   studio_fast_player_does_not_shake_on_screen
+ok   studio_simulate_keep_changes
+ok   studio_save_load_and_textures
+    seed 19088743: 30 history steps, 9 actors
+    seed 12648430: 76 history steps, 43 actors
+    seed 20261022: 103 history steps, 31 actors
+ok   studio_undo_redo_is_exact_and_deterministic
+ok   studio_undo_transactions_and_dirty_state
+ok   studio_autosave_only_while_unsaved
+ok   studio_user_settings
+ok   studio_player_only
+ok   app_input_and_args
+ok   engine_libraries_use_no_library_of_a_level
+ok   engine_libraries_hold_only_marked_types
+ok   level_holds_no_copy_of_the_engine
+ok   level_with_a_copy_of_the_engine_is_refused
+63789 checks, 0 failures
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp:31:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Engine.h: In member function ‘virtual bool {anonymous}::Engine_Native::set(std::string_view, const kern::logic::Value&)’:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Engine.h:10086:8: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+10086 |   bool set(std::string_view variable, const kern::logic::Value& value) override {
+      |        ^~~
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Engine.h: In member function ‘virtual bool {anonymous}::Engine_Native::get(std::string_view, kern::logic::Value&) const’:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Engine.h:8940:8: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 8940 |   bool get(std::string_view variable, kern::logic::Value& out) const override {
+      |        ^~~
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp:41421:3: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+41421 |   [&] {
+      |   ^
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp:56250:3: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+56250 |   [&] {
+      |   ^
+In file included from /dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/blueprint_native_main.cpp:30:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Nodes.h: In member function ‘virtual bool {anonymous}::Nodes_Native::call(std::string_view, std::span<const kern::logic::Value>, kern::logic::Results&)’:
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/native_gen/bp_Nodes.h:9357:8: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 9357 |   bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {
+      |        ^~~~
+     Engine on the engine itself - what a clock gave (EngineFunction::clock), not compared: R168 R169
+ok   blueprint_native_test (85 Blueprints as their C++, 48657 calls on the class and by name through logic::Instance)
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/game_native_gen/arena_blueprints.cpp: 8 of 8 Blueprint(s) as C++ classes
+/dev/shm/spawncity-jobs-chris/kandidat-20-090604/tmp/kern-run-RQUkkq/kern-tests/game_native_gen/robot_blueprints.cpp: 1 of 1 Blueprint(s) as C++ classes
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+ok   game_native_test (9 Blueprints of two levels as their C++ classes, 687 lines compared with the interpreter's)
+
+real	48m29,929s
+user	64m26,049s
+sys	1m26,280s
