@@ -1011,6 +1011,27 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
   check(await until(async () => (await state(page)).trainer.stage === "pose"), "Lehrer: back on the posing stage");
   check((await state(page)).trainer.motion.keys.length === 3, "Lehrer: the keyframes are kept while trying");
   await shot(page, "lehrer.png");
+  // Restore a portable checkpoint in a fresh browser profile with an unrelated level.
+  // The downloaded file is the only link to the original training.
+  const [checkpointFile] = await Promise.all([page.waitForEvent("download"), page.click("#trCheckpointDownload")]);
+  check(checkpointFile.suggestedFilename() === "nod.kernckpt", "Lehrer: full checkpoint downloads");
+  const imported = await openStudio(base + "/generated/studio.html?train=1", {width: 1280, height: 800});
+  try {
+    await imported.page.locator("#trCheckpointFile").setInputFiles(await checkpointFile.path());
+    const restored = await until(() => imported.page.evaluate(() => {
+      const t=window.KernStudio.trainer;
+      return !window.KernStudio.training && t.onnx?.preview && t.onnx.iteration===1 && t.onnx.bytes.length;
+    }), 240000);
+    check(restored === trained, "Lehrer: checkpoint upload restores the completed iteration and ONNX");
+    check(await imported.page.locator("#trTest").isEnabled(), "Lehrer: restored snapshot can be played");
+    await imported.page.click("#trTest");
+    check(await until(async()=>{const t=await state(imported.page);return t.trainer.stage==="test"&&t.trainer.testing==="lehrer_preview";}), "Lehrer: restored network plays on an independent stage");
+    check((await state(imported.page)).motions.length===0 && !(await state(imported.page)).level.dirty, "Lehrer: restored preview leaves unrelated level unchanged");
+    await imported.page.click("#trAgain");
+    check(await until(async()=> (await state(imported.page)).trainer.testing==="lehrer_preview"), "Lehrer: restored network can be replayed");
+    check(imported.errors.length===0,"Lehrer: no page errors on portable restore"+(imported.errors.length?": "+imported.errors.join(" | "):""));
+  } finally { await imported.ctx.close(); }
+
   // Out through the toolbar: the editor as it was.
   await page.click("#trainerBtn");
   s = await until(async () => { const t = await state(page); return !t.trainer && t.play.state === "editing" ? t : null; });
