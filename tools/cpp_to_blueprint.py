@@ -11037,8 +11037,8 @@ class Emit:
                 self.f.indexes = True   # (C++ leaves a shift by the width of the number or more undefined; the formula's says what it is)
             if op in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>") + COMPARE:
                 left = self.fx(x, leaves)
-                if op in ("<<", ">>") and self.literal_only(bare(x)) and not self.alone(left.strip("()"), self.tp(x)):
-                    left = self.leaf(x, leaves, left.strip("()"), self.tp(x), force=True)   # (1ull << n: a 1 of its type)
+                if op in ("<<", ">>") and (self.literal_only(bare(x)) or INT_TEXT.fullmatch(left.strip("()"))) and not self.alone(left.strip("()"), self.tp(x)):
+                    left = self.leaf(x, leaves, left.strip("()"), self.tp(x), force=True)   # (1ull << n, u64{1} << n: a 1 of its type)
                 return f"({left} {op} {self.fx(y, leaves)})"
         if k == "ConditionalOperator":
             c, x, y = kids(b)

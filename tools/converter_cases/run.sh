@@ -84,6 +84,8 @@
 #             variable Actor, set by bind with GameWorld actor named, which every call and read goes to; the tests bind the
 #             source's ActorBlueprint to the test's world (kern::test::BlueprintRun). worldmix: one bound to a world and to a
 #             logic waits, with the reason. worldrules.klevel: the actor Lamps (PoleRadius, Twice).
+#   rowref.cpp a reference to an entry of a map (`Block& b = water_[key]`) and a bit set with `u64{1} << n`: the 1 written
+#             out is a value of its type - a bare 1 is an i32, and the reader takes no u64 | i32
 #   blasts.cpp a struct of a state's own (LookState::Blast) beside one of the namespace of the same short name (Blast): a list
 #             of it read through a reference (`LookState& L = look_; L.blasts.size()`) is the state's - the compiler writes the
 #             name in full (<namespace>::LookState::Blast), and that is the one (before: "a List<LookState_Blast> where a
@@ -300,6 +302,11 @@ logged running "it is compared" '^1 functions? of the Blueprints (is|are) compar
 convert blasts
 logged blasts "Viewer::blast (a list of LookState::Blast beside a Blast of the namespace) is written" '^ +Viewer::blast \([0-9]+\): written'
 logged blasts "both are compared" '^2 functions of the Blueprints are compared'
+convert rowref
+logged rowref "set_cell (a reference to an entry of a map, bits set with u64{1} << n) is written" '^ +Water::set_cell \([0-9]+\): written'
+check rowref "u64{1} << n: the 1 is a value of its type (not the i32 a bare 1 is)" no '\(1 << \(idx & 63\)\)'
+logged rowref "all are compared" '^5 functions of the Blueprints are compared'
+ran rowref "the tests, built and run: the source and the Blueprint the same"
 
 convert far far_b far_rules
 logged far "reach (calls far::pole_radius of another file, whose pieces need a header it does not include) is written" '^ +reach \([0-9]+\): written$'
@@ -422,6 +429,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts far worldrules appstate worldapp look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts rowref far worldrules appstate worldapp look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi
