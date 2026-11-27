@@ -50,6 +50,19 @@
 #include "kern/test/blueprint.h"
 #include "kern/test/test.h"
 
+namespace kern::logic {
+/// The test's source computes with the numbers of the Blueprint language - its f32 is a 64-bit number: an export of it that
+/// gives floats by a pointer and their length (export_floats) gives those, kept in the export's own place as the engine's
+/// does it with its f32 (kern/logic/blueprint_class.h). What the test compares is the piece the two say.
+template <auto Export> const double* export_floats(Span<const double> floats, u32* out_len) {
+  static std::vector<double> held;
+  held.assign(floats.begin(), floats.end());
+  if (out_len) *out_len = static_cast<u32>(held.size());
+  return held.empty() ? nullptr : held.data();
+}
+template <auto Export> const double* export_floats(const std::vector<double>& floats, u32* out_len) { return export_floats<Export>(Span<const double>(floats.data(), floats.size()), out_len); }
+}  // namespace kern::logic
+
 namespace kern::converted {
 
 using namespace ::kern::test;   // (the Blueprints a test runs, the cost of a call, the registry: kern/test/)
@@ -1473,8 +1486,9 @@ template <class T, class Shape> T& engine_place(const char* function, const std:
   return *kept;
 }
 
-/// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
-/// entry for entry.)
+/// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits as the language sees them - numbers.h,
+/// seen: 0 and -0 are two, a NaN is the one NaN; a struct, a list, a map entry for entry, each at its place: a NaN at one
+/// place and another number at another is a difference.)
 inline bool same_value(const Value& a, const Value& b) {
   using kern::logic::PinType;
   if (a.type != b.type) return false;
@@ -1981,9 +1995,9 @@ struct Tally {
     }
     // (a callback the source gives, called to compare it, that went where C++ says nothing: not compared - probe_source)
     g_probe_open = false;
-    // (the interpreter's and the class's value are one value: equal as C++ compares them - or, where a NaN stands in them,
-    // which equals nothing and not itself, each the same as the source's the way the language sees a number: same)
-    const bool one = ia && ib && a.size() == 1 && b.size() == 1 && (a[0] == b[0] || (!(a[0] == a[0]) && !(b[0] == b[0])));
+    // (the interpreter's and the class's value are one value, bit for bit as the language sees a number - same_value:
+    // entry for entry the same bits, a NaN the one NaN at the same place; a NaN somewhere excuses no other entry)
+    const bool one = ia && ib && a.size() == 1 && b.size() == 1 && same_value(a[0], b[0]);
     const bool equal = one && same(want, a[0]) && same(want, b[0]);
     if (g_probe_open) {
       g_probe_open = false;

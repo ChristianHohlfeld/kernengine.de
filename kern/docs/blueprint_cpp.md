@@ -1675,6 +1675,11 @@ struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> {
   Ist eine solche Klasse kein Zustand, sagt die Wartemeldung warum („has a base class, and it is no state: 2 objects of
   it have static storage …“ / „… makes objects of it in other ways too“ / „its base is no interface of the engine“).
   Die Parameter ihrer Overrides sind Werte in der Reihenfolge von C++ (die Engine reicht Werte: `update(Int, Frame)`).
+  Die Variablen des Programms (einer Datei, eines Namensraums) und was sie teilt – ein Export, der den Zustand über
+  seinen Getter erreicht (`game().add(n)`) – gehören dem einen Zustand, der keine Schnittstelle implementiert; hat das
+  Programm keinen solchen, sondern hält seine App den Zustand selbst (`class Spiel final : public kern::App`, ihr Objekt
+  `static` in `spiel()`), dann der App: die Exporte sind Funktionen ihres Blueprints wie ihre eigenen Methoden (Fall
+  `appstate`). Eine andere Schnittstelle (ShaderExtension) ist nur das Objekt der Engine – ihr gehört nichts davon.
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.
@@ -1837,7 +1842,13 @@ ist als Blueprint des Programms eine Variable vom Typ Actor, die der Konverter
 `func_get_on<…>(controls_g_rules)` – die Logik des Programms reicht sie an die Welt des Actors weiter
 (`Host::world_runtime`, project.md 7). Die Funktionen, die ihn rufen, sind darum Funktionen des
 Blueprints des einen Objekts des Programms (des Zustands), wie jede, die eine Variable des Programms
-teilt. Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
+teilt – auch die freien Funktionen einer **anderen Datei** als der des Zustands (die Eingabe-Mathematik
+eines Spiels in `controls.cpp`, der Zustand – auch die App selbst – in `spiel.cpp`) und die Methode
+eines Werts dieser Datei (`LookAxis::step`: ihr Objekt ist ihr erster Eingang): Sie stehen im Teil
+ihrer Datei (`<Zustand>/controls_cpp`), und der Test des Teils, der `bind` nur als Stück der anderen
+Datei hält, hat die Welt mit `actor_named` (Fall `worldapp` + `worldpads`). Der Actor ist in jedem
+Test der der Engine (`kern::logic::ActorHandle`), keine Kopie.
+Ein `ActorBlueprint`, der an eine Welt **und** an eine Logik gebunden wird, wartet mit Grund:
 Ein Blueprint hält den Actor einer Welt oder nennt den Actor dort, wo seine Logik läuft – nicht
 beides. Geprüft: `cpp_reaches_actors_of_its_worlds` (kern/tests: zwei Welten mit Actors gleicher Id,
 Interpreter und Klasse, Welt gestoppt und neu gestartet), `tools/converter_cases` (`worldrules`,
@@ -2468,8 +2479,8 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   Auslöschung nahe 0; über 709 `exp(a/2)²/2` gegen den frühen Überlauf; asinh über ein log1p mit zurückgegebenem Rundungsfehler, über
   2^28 `log(a) + ln 2`). Die f-Varianten rechnen in f64 und runden einmal auf f32. Jeder Bau nimmt `kern/src/math/*.c`, wo er
   musl_math nimmt (dieselben Schalter), die Hüllen unter den Standardnamen (std::sinh …) stehen in derselben Datei, `flags.sh` hält
-  `-fno-builtin-sinh` …. `kern::dm::sinh` …, die Formel-Funktionen `sinh cosh tanh asinh` (Blueprint, `kern::math::sinh` in `nodes.h`)
-  und `std::sinh` eines Programms rufen dieselbe Funktion; der Konverter schreibt `std::sinh` als `kern::math::sinh` (Fall
+  `-fno-builtin-sinh` …. `kern::dm::sinh` …, die Knoten und Formel-Funktionen `sinh cosh tanh asinh` (Blueprint, `num::sinh` in `numbers.h`)
+  und `std::sinh` eines Programms rufen dieselbe Funktion; der Konverter schreibt `std::sinh` als die Formel `sinh(x)` (Fall
   `tools/converter_cases` hyperbolic). Genauigkeit gegen 200-stellige Werte (`kern/tests/hyperbolic_reference.py` → `.h`):
   Schranke f64 2 ULP (gemessen: tanh 1,95, asinh 1,66, sinh 1,64, cosh 0,98), f32 1 ULP (gemessen 0,50); Ränder und Identitäten
   (±0, ±Inf, NaN, Überlaufschwelle 710,4758…/89,4159…, sinh x = x für kleine x, ungerade/gerade bitgleich, asinh(sinh x) = x
@@ -2490,8 +2501,8 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   keine 0 an ihrer Stelle; Test `numbers_against_cpp`, Knoten == `numbers.h` in `numbers_nodes_interpreter` und als Klasse).
   Der Konverter schreibt `std::log2` … `std::remainder` (und ihre f-Varianten) als diese Funktionen – kein „the engine has no X
   yet“ mehr –, Konstanten aus ihnen rechnet die Engine (`engine_formula`); Fall `tools/converter_cases/elementary` (f64 und f32,
-  mit den Rändern) gegen die echte Quelle. (Die alten f64-Funktionen `kern::math::acosh` … in `nodes.h` – außerhalb des Bereichs 0
-  wie log – ruft kein Knoten.) Genauigkeit gegen 200 Stellen bzw. exakt (`kern/tests/elementary_reference.py` → `.h`, Python
+  mit den Rändern) gegen die echte Quelle. (Die f64-Funktionen `kern::math::sinh` … `ldexp`, `remainder` aus `nodes.h` – außerhalb des Bereichs 0 wie log – sind
+  entfernt: je Funktion eine Implementierung, `kern::dm`.) Genauigkeit gegen 200 Stellen bzw. exakt (`kern/tests/elementary_reference.py` → `.h`, Python
   decimal/Fraction mit ausgeschriebener IEEE-Rundung): f64 ≤ 2 ULP (gemessen acosh 1,24, log2 1,19, atanh 1,17, log1p 0,86,
   exp2 0,66, cbrt 0,50), f32 ≤ 1 ULP (gemessen 0,50), ldexp/remainder 0 ULP; Ränder (±0, ±Inf, NaN, Definitionsgrenzen,
   Überlauf/Unterlauf von exp2 und ldexp, Subnormale) und Identitäten (log2(2^k) = k und exp2(k) = 2^k für alle k, cbrt(m³) = m,

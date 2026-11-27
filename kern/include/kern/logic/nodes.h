@@ -56,11 +56,6 @@ namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
 inline f64 div(f64 a, f64 b) { return b != 0 ? a / b : 0; }
 inline f64 mod(f64 a, f64 b) { return b != 0 ? std::fmod(a, b) : 0; }
-/// IEEE 754's remainder: a - n * b with n the whole number nearest to a / b (of two, the even one) -
-/// std::remainder, exact (the result is always a number a double holds; the engine's own,
-/// kern/src/math/elementary.c), so the same bits on every platform; its sign where it is 0 is a's.
-/// By 0 it gives 0, as mod.
-inline f64 remainder(f64 a, f64 b) { return b != 0 ? dm::remainder(a, b) : 0; }
 inline f64 pow(f64 a, f64 b) { return dm::pow(a, b); }
 inline f64 min(f64 a, f64 b) { return min_of(a, b); }
 inline f64 max(f64 a, f64 b) { return max_of(a, b); }
@@ -84,26 +79,8 @@ inline f64 asin(f64 a) { return dm::asin(kern::clamp(a, -1.0, 1.0)); }
 inline f64 acos(f64 a) { return dm::acos(kern::clamp(a, -1.0, 1.0)); }
 inline f64 atan(f64 a) { return dm::atan(a); }
 inline f64 atan2(f64 y, f64 x) { return dm::atan2(y, x); }
-/// The hyperbolic functions: the engine's own (kern/src/math/hyperbolic.c), as std::sinh ... of a program.
-inline f64 sinh(f64 a) { return dm::sinh(a); }
-inline f64 cosh(f64 a) { return dm::cosh(a); }
-inline f64 tanh(f64 a) { return dm::tanh(a); }
-inline f64 asinh(f64 a) { return dm::asinh(a); }
-/// acosh of what is below 1 is 0 (acosh 1), atanh of +-1 and beyond 0 - as log of what is not above 0.
-inline f64 acosh(f64 a) { return dm::acosh(max_of(1.0, a)); }
-inline f64 atanh(f64 a) { return a > -1 && a < 1 ? dm::atanh(a) : 0; }
-/// log2, log1p, exp2, cbrt: the engine's own (kern/src/math/elementary.c), as std::log2 ... of a program;
-/// log2(2^k) is k and exp2(k) is 2^k exactly. log2 of what is not above 0 and log1p of what is not above -1 are 0, as log.
-inline f64 log2(f64 a) { return a > 0 ? dm::log2(a) : 0; }
-inline f64 log1p(f64 a) { return a > -1 ? dm::log1p(a) : 0; }
-inline f64 exp2(f64 a) { return dm::exp2(a); }
-inline f64 cbrt(f64 a) { return dm::cbrt(a); }
-/// x * 2^n, exact (as std::ldexp; the engine's own): n is taken as the whole number it is (what stands
-/// after the point is cut off); a NaN n gives NaN.
-inline f64 ldexp(f64 x, f64 n) {
-  if (n != n) return n;
-  return dm::ldexp(x, static_cast<int>(kern::clamp(std::trunc(n), -100000.0, 100000.0)));
-}
+// (sinh ... atanh, log2, log1p, exp2, cbrt, ldexp, remainder: one implementation each - kern::dm (kern/src/math), which the
+// nodes and the Formula call through numbers.h (num::sinh ...), with what C++ gives outside what they are defined for.)
 inline f64 rad(f64 degrees) { return degrees * (pi / 180); }
 inline f64 deg(f64 radians) { return radians * (180 / pi); }
 inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }

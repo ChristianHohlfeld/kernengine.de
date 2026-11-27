@@ -267,6 +267,10 @@ class GameWorld {
   bool interior_view() const { return interior_view_; }
   f32 camera_pitch() const { return camera_pitch_; }
   f32 sim_time() const { return sim_time_; }
+  /// How often the world steps per second: the level's WorldSettings::step_hz as the world runs it (15 to 480) - what a
+  /// program whose own fixed step goes along with the world's asks (WorldSettings is no type of the Blueprints; this is
+  /// its node, "GameWorld step hz").
+  f32 step_hz() const { return clamp(level_.world.step_hz, 15.0f, 480.0f); }
 
   // ---- players (multiplayer) ----
   /// Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn

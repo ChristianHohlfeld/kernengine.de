@@ -84,6 +84,42 @@ struct Register {
 
 }  // namespace
 #include "number_tests.h"
+#include "kern/test/converted.h"
+
+TEST(converted_compares_a_nan_at_its_place) {
+  // The converter's tests (kern/test/converted.h) compare what a Blueprint gives with what its source gives, and the
+  // interpreter's value with the class's, bit for bit as the language sees a number (numbers.h, seen): entry for entry the
+  // same bits, a NaN the one NaN - at the same place. A NaN at one place excuses no other entry.
+  using kern::converted::same;
+  using kern::converted::same_value;
+  using logic::Value;
+  const f64 nan = std::numeric_limits<f64>::quiet_NaN(), other = std::copysign(nan, -1.0);   // (two NaNs of other bits)
+  const f32 nanf = std::numeric_limits<f32>::quiet_NaN();
+  CHECK(std::bit_cast<u64>(nan) != std::bit_cast<u64>(other));
+  auto list = [](std::vector<f64> v) { return Value::of(std::move(v)); };
+  auto list32 = [](std::vector<f32> v) { return Value::of(std::move(v)); };
+  // the interpreter's value against the class's (take: same_value)
+  CHECK(same_value(Value::number(nan), Value::number(other)) && !same_value(Value::number(nan), Value::number(0.0)));
+  CHECK(same_value(list({1.0, nan, 3.0}), list({1.0, other, 3.0})));
+  CHECK(!same_value(list({1.0, nan, 3.0}), list({1.0, nan, 4.0})));   // a NaN at [1] and another number at [2]: a difference
+  CHECK(!same_value(list({4.0, nan, 3.0}), list({1.0, other, 3.0})));
+  CHECK(!same_value(list({nan, 2.0}), list({2.0, nan})));             // the NaN at another place
+  CHECK(!same_value(list({nan, 1.0}), list({nan})) && !same_value(list({nan}), list({1.0})));
+  CHECK(!same_value(list({0.0, nan}), list({-0.0, nan})));            // 0 and -0 are two
+  CHECK(same_value(list32({nanf, 1.5f}), list32({-nanf, 1.5f})) && !same_value(list32({nanf, 1.5f}), list32({nanf, 1.25f})));
+  CHECK(!same_value(list({nan}), list32({nanf})));                    // of another type
+  CHECK(same_value(Value::structure({Value::number(nan), Value::integer(1)}), Value::structure({Value::number(other), Value::integer(1)})));
+  CHECK(!same_value(Value::structure({Value::number(nan), Value::integer(1)}), Value::structure({Value::number(nan), Value::integer(2)})));
+  CHECK(same_value(Value::vector({nanf, 1, 2}), Value::vector({-nanf, 1, 2})) && !same_value(Value::vector({nanf, 1, 2}), Value::vector({nanf, 1, 3})));
+  // the source's value against the Blueprint's (same)
+  CHECK(same(nan, Value::number(other)) && !same(nan, Value::number(1.0)) && !same(1.0, Value::number(nan)));
+  CHECK(same(std::vector<f64>{1.0, nan, 3.0}, list({1.0, other, 3.0})));
+  CHECK(!same(std::vector<f64>{1.0, nan, 3.0}, list({1.0, nan, 4.0})));
+  CHECK(!same(std::vector<f64>{nan, 2.0}, list({2.0, nan})));
+  CHECK(!same(std::vector<f64>{0.0, nan}, list({-0.0, nan})));
+  CHECK(same(std::vector<f32>{nanf, 1.5f}, list32({-nanf, 1.5f})) && !same(std::vector<f32>{nanf, 1.5f}, list32({nanf, 1.25f})));
+  CHECK(same(Vec3{nanf, 1, 2}, Value::vector({-nanf, 1, 2})) && !same(Vec3{nanf, 1, 2}, Value::vector({nanf, 1, 3})));
+}
 namespace {
 
 bool mat_near(const Mat4& a, const Mat4& b, f32 eps = 1e-5f) {
@@ -6998,14 +7034,14 @@ TEST(logic_library_place) {
   // have ids of the caller's, and the nodes that name the place name the binding node by its id there (before: the
   // library's id stayed - "bound" named no node that binds a place, or one of the caller's own).
   const char* places =
-      "struct Places : virtual kern::Library {\n  // ---- functions ----\n  struct take_eventsResult { Int Result = 0; };\n"
+      "struct Places : virtual kern::Library {\n  // ---- functions ----\n  struct take_eventsResult { i64 Result = 0; };\n"
       "  take_eventsResult take_events(Object<kern::game::GameWorld> w = Object<kern::game::GameWorld>{}) {\n"
-      "    Int n = 0;\n    engine_game_world_events(n10, w);\n    n = list_length<Text>(n10.result);\n    list_clear(n10.result);\n    return {n};\n  }\n\n"
+      "    i64 n = 0;\n    engine_game_world_events(n10, w);\n    n = list_length<Text>(n10.result);\n    list_clear(n10.result);\n    return {n};\n  }\n\n"
       "  // ---- what nodes give and keep ----\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n10;\n};\n";
   const char* taker =
-      "struct Taker : virtual kern::Library, virtual Places {\n  // ---- functions ----\n  struct twiceResult { Int Result = 0; };\n"
+      "struct Taker : virtual kern::Library, virtual Places {\n  // ---- functions ----\n  struct twiceResult { i64 Result = 0; };\n"
       "  twiceResult twice(Object<kern::game::GameWorld> w = Object<kern::game::GameWorld>{}) {\n"
-      "    n10 = Places::take_events(w);\n    n11 = Places::take_events(w);\n    return {kern::to<Int>(kern::formula([](Float a, Float b) -> Float { return a + b; }, kern::to<Float>(n10.Result), kern::to<Float>(n11.Result)))};\n  }\n\n"
+      "    n10 = Places::take_events(w);\n    n11 = Places::take_events(w);\n    return {math_add<i64>(n10.Result, n11.Result)};\n  }\n\n"
       "  // ---- what nodes give and keep ----\n  Places::take_eventsResult n10;\n  Places::take_eventsResult n11;\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
@@ -9566,6 +9602,75 @@ TEST(program_reaches_actors_of_its_worlds) {
   program.end();
 }
 
+TEST(logic_actor_blueprint_numbers_from_cpp) {
+  // The program's C++ hands a Blueprint of an actor numbers in the number types (kern::logic::ActorBlueprint): each
+  // argument goes in as the type C++ has it in - an int an i32, an unsigned char a u8, a float an f32, a u64 a u64 with
+  // every bit; none is made an i64 or a double on the way - and each output and variable is read as the type of its
+  // place. In the interpreter and in the JIT.
+  const char* typed_text = R"kn(
+struct Typed : kern::Blueprint {
+  f32 Gain = 0.1f;
+  u8 Small = 200;
+  i32 Count = -7;
+  u64 Big = 18446744073709551615u;
+
+  struct MixResult { f32 out = 0.0f; u8 small = 0; i32 count = 0; u64 big = 0; };
+  MixResult Mix(f32 x = 0.0f, u8 s = 0, i32 n = 0, u64 b = 0) {
+    return {math_mul<f32>(x, Gain), math_add<u8>(s, Small), math_add<i32>(n, Count), math_sub<u64>(Big, b)};
+  }
+
+  struct EchoResult { List<i32> back = List<i32>{}; List<f32> halves = List<f32>{}; };
+  EchoResult Echo(List<i32> marks = List<i32>{}, List<f32> parts = List<f32>{}) {
+    return {marks, parts};
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(typed_text, g, nullptr, &error));
+  if (!error.empty()) std::printf("  logic_actor_blueprint_numbers_from_cpp: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  struct OneHost : FakeLogicHost {
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Typed" ? 7 : 0; }
+  };
+  for (bool jit : {false, true}) {
+    OneHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* t = rt.add(g, 7, "Typed");
+    CHECK(t && !t->disabled());
+    if (!t) continue;
+    rt.begin();
+    logic::ActorBlueprint typed{"Typed"};
+    CHECK(typed.bind(rt));
+    // each argument in its own type, each output as the type of its place: computed in f32, u8, i32, u64
+    f32 out = 0;
+    unsigned char small = 0;
+    int count = 0;
+    u64 big = 0;
+    const f32 third = 1.0f / 3.0f, gain = 0.1f, x = 3.3f;
+    typed.call("Mix", std::tie(out, small, count, big), x, static_cast<unsigned char>(100), 2147483647, u64{1});
+    CHECK(std::bit_cast<u32>(out) == std::bit_cast<u32>(x * gain));       // (the f32 product: not the double's, rounded)
+    CHECK(std::bit_cast<u32>(out) != std::bit_cast<u32>(static_cast<f32>(static_cast<f64>(x) * 0.1)));
+    CHECK(small == static_cast<unsigned char>(300 - 256));               // (u8: 100 + 200 goes round)
+    CHECK(count == 2147483640);                                           // (i32: 2147483647 + -7)
+    CHECK(big == 18446744073709551614ull);                                // (u64 beyond 2^63 and 2^53, every bit)
+    typed.call("Mix", std::tie(out, small, count, big), 0.0f, static_cast<unsigned char>(0), -2147483647 - 1, u64{18446744073709551615ull});
+    CHECK(count == 2147483641 && big == 0 && small == 200);               // (i32: its least + -7 goes round)
+    // the variables, each read as its type - and as another number type: its zero (no number is converted)
+    CHECK(std::bit_cast<u32>(typed.get<f32>("Gain")) == std::bit_cast<u32>(gain) && typed.get<unsigned char>("Small") == 200 && typed.get<int>("Count") == -7 &&
+          typed.get<u64>("Big") == 18446744073709551615ull);
+    CHECK(typed.get<f64>("Gain") == 0 && typed.get<i64>("Count") == 0 && typed.get<i64>("Big") == 0 && typed.get<int>("Small") == 0);
+    // lists of their own number types
+    std::vector<int> back;
+    std::vector<f32> halves;
+    typed.call("Echo", std::tie(back, halves), std::vector<int>{1, -2, 2147483647}, std::vector<f32>{third, -0.0f});
+    CHECK(back == (std::vector<int>{1, -2, 2147483647}) && halves.size() == 2 && std::bit_cast<u32>(halves[0]) == std::bit_cast<u32>(third) && std::signbit(halves[1]));
+    CHECK(host.errors.empty());
+    if (!host.errors.empty()) std::printf("  logic_actor_blueprint_numbers_from_cpp: %s\n", host.errors[0].c_str());
+  }
+}
+
 TEST(cpp_reaches_actors_of_its_worlds) {
   // The program's C++ binds an ActorBlueprint to the actor of its name in a world it runs (bind(world): the Actor of it -
   // its id and that world, kern/docs/project.md 7) and reaches that actor's Blueprint there, as a program's Blueprint
@@ -9622,6 +9727,15 @@ TEST(cpp_reaches_actors_of_its_worlds) {
     CHECK(rules.number("Hit", i64{1}) == 0 && rules.get<i64>("Hits") == 0);
     CHECK(std::string(last_error()) == "the program's C++: Get Variable on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) +
                                            " - its world does not run any more (the GameWorld was stopped) (kern/docs/project.md 7)");
+    // the loop guard of a world's Blueprints is the project's (settings "loopBudget"), as the program's own is: a world
+    // without a project keeps the Runtime's default; with one, every start takes the project's
+    CHECK(wb.logic_runtime() && wb.logic_runtime()->budget == ProjectSettings{}.loop_budget);
+    game::Project guarded;
+    guarded.settings.loop_budget = 54321;
+    wb.stop();
+    wb.set_project(&guarded);
+    CHECK(wb.start(l, game::SimMode::play) && wb.logic_runtime() && wb.logic_runtime()->budget == 54321u);
+    wb.set_project(nullptr);
     // started again it is a new world: the Actor of the one before names nothing in it - until it is bound again
     CHECK(wa.start(l, game::SimMode::play));
     wa.step(1.0f / 60, game::PlayInput{});

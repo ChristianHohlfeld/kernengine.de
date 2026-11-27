@@ -186,12 +186,26 @@ struct ActorBlueprint {
   /// A vector of the program's own type: one that becomes a Vec3 and is made of one (not a plain struct).
   template <class T> static constexpr bool is_vector = std::is_same_v<T, Vec3> || (!is_struct<T> && !is_list<T> && std::is_convertible_v<const T&, Vec3> && std::is_constructible_v<T, Vec3>);
 
+  /// The number type of the language a number of the program's type T is - itself: C++'s type of that width (int an i32,
+  /// unsigned char a u8, long long and long an i64, float an f32). Nothing is widened on the way: an int goes in as an
+  /// i32 and a float as an f32, and an output is read as the type of its place.
+  template <class T> struct NumberOf { using type = T; };
+  template <class T>
+    requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
+  struct NumberOf<T> {
+    using type = std::conditional_t<std::is_signed_v<T>, std::conditional_t<sizeof(T) == 1, i8, std::conditional_t<sizeof(T) == 2, i16, std::conditional_t<sizeof(T) == 4, i32, i64>>>,
+                                    std::conditional_t<sizeof(T) == 1, u8, std::conditional_t<sizeof(T) == 2, u16, std::conditional_t<sizeof(T) == 4, u32, u64>>>>;
+  };
+  template <class T> using number_of = typename NumberOf<T>::type;
+  /// A number of the program (not a flag, not an enum's value): a whole number of 8 to 64 bits, a float, a double.
+  template <class T> static constexpr bool is_number_of = (std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_same_v<T, f32> || std::is_same_v<T, f64>;
+
   /// The pin type a value of the program's type T is in a Blueprint - what it is read as.
   template <class T> static constexpr PinType pin_of() {
     if constexpr (is_list<T>) return list_of(pin_of<typename T::value_type>());
     else if constexpr (std::is_same_v<T, bool>) return PinType::boolean;
     else if constexpr (std::is_enum_v<T>) return PinType::enumeration;
-    else if constexpr (logic::num::Number<T>) return number_type<T>();   // (a number: its own type)
+    else if constexpr (is_number_of<T>) return number_type<number_of<T>>();   // (a number: its own type)
     else if constexpr (is_vector<T>) return PinType::vector;
     else if constexpr (std::is_same_v<T, std::string>) return PinType::text;
     else {
@@ -201,31 +215,28 @@ struct ActorBlueprint {
   }
 
   template <class T> static Value argument(const T& x) {
-    static_assert(!std::is_same_v<T, f32>, "a 32-bit number goes in as the decimal it stands for, a 64-bit one (f64)");
     if constexpr (std::is_same_v<T, bool>) return Value::boolean(x);
     else if constexpr (std::is_enum_v<T>) return Value::enumeration(static_cast<i64>(x));
-    else if constexpr (std::is_integral_v<T>) return Value::integer(static_cast<i64>(x));
-    else if constexpr (std::is_same_v<T, f64>) return Value::number(x);
+    else if constexpr (is_number_of<T>) return Value::of_number(static_cast<number_of<T>>(x));   // (in its own type: an int an i32, a float an f32)
     else if constexpr (is_vector<T>) return Value::vector(static_cast<Vec3>(x));
     else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) return Value::text(std::string(x));
     else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) return Value::text(x ? x : "");
     else if constexpr (is_list<T>) return list_argument(x);
     else if constexpr (std::is_array_v<T> && std::is_same_v<std::remove_cv_t<std::remove_extent_t<T>>, char>) return Value::text(x);
     else {
-      static_assert(is_struct<T>, "a value is a flag, a whole number, a decimal number (64 bit), a vector, a text, an enum's value, a plain struct of such values or a list of them");
+      static_assert(is_struct<T>, "a value is a flag, a number (a whole one of 8 to 64 bits, a float, a double), a vector, a text, an enum's value, a plain struct of such values or a list of them");
       return std::apply([](const auto&... f) { return Value::structure({argument(f)...}); }, fields_of(x));
     }
   }
   template <class T> static Value list_argument(const std::vector<T>& items) {
-    static_assert(!std::is_same_v<T, f32>, "a 32-bit number goes in as the decimal it stands for, a 64-bit one (f64)");
     if constexpr (std::is_same_v<T, bool>) return Value::of(std::vector<bool>(items.begin(), items.end()));
     else if constexpr (std::is_enum_v<T>) {
       std::vector<i64> r;
       r.reserve(items.size());
       for (T e : items) r.push_back(static_cast<i64>(e));
       return Value::enumerations(std::move(r));
-    } else if constexpr (std::is_integral_v<T>) return Value::of(std::vector<i64>(items.begin(), items.end()));
-    else if constexpr (std::is_same_v<T, f64> || std::is_same_v<T, Vec3> || std::is_same_v<T, std::string>) return Value::of(items);
+    } else if constexpr (is_number_of<T>) return Value::of(std::vector<number_of<T>>(items.begin(), items.end()));   // (a list of its own number type)
+    else if constexpr (std::is_same_v<T, Vec3> || std::is_same_v<T, std::string>) return Value::of(items);
     else if constexpr (is_vector<T>) return Value::of(std::vector<Vec3>(items.begin(), items.end()));
     else {
       std::vector<Value> r;
@@ -238,20 +249,20 @@ struct ActorBlueprint {
   template <class T> static void taken(const Value& v, T& to) {
     if constexpr (std::is_same_v<T, bool>) to = v.b;
     else if constexpr (std::is_enum_v<T>) to = static_cast<T>(v.i);
-    else if constexpr (std::is_integral_v<T>) to = static_cast<T>(v.i);
-    else if constexpr (std::is_floating_point_v<T>) to = static_cast<T>(v.as_number());
+    else if constexpr (is_number_of<T>) to = v.type == number_type<number_of<T>>() ? static_cast<T>(v.template as<number_of<T>>()) : T{};   // (a number of its own type; no other is one)
     else if constexpr (is_vector<T>) to = T(v.as_vector());
     else if constexpr (std::is_same_v<T, std::string>) to = v.as_text();
     else if constexpr (is_list<T>) {
       using I = typename T::value_type;
       to.clear();
-      if constexpr (std::is_same_v<I, bool> || std::is_same_v<I, f64> || std::is_same_v<I, Vec3> || std::is_same_v<I, std::string>) {
+      if constexpr (std::is_same_v<I, bool> || std::is_same_v<I, Vec3> || std::is_same_v<I, std::string>) {
         const auto& got = v.items<I>();
         to.assign(got.begin(), got.end());
-      } else if constexpr (std::is_enum_v<I> || std::is_integral_v<I>) {
+      } else if constexpr (std::is_enum_v<I>) {
         for (i64 x : v.items<i64>()) to.push_back(static_cast<I>(x));
-      } else if constexpr (std::is_floating_point_v<I>) {
-        for (f64 x : v.items<f64>()) to.push_back(static_cast<I>(x));
+      } else if constexpr (is_number_of<I>) {   // (a list of its own number type: i32_list for a std::vector<int>)
+        if (v.type == list_of(number_type<number_of<I>>()))
+          for (number_of<I> x : v.template items<number_of<I>>()) to.push_back(static_cast<I>(x));
       } else if constexpr (is_vector<I>) {
         for (Vec3 x : v.items<Vec3>()) to.push_back(I(x));
       } else {
