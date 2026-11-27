@@ -70,6 +70,8 @@ class Collector {
   /// `steps` steps of every environment (finished episodes reset); the environments must have been
   /// reset once before the first call.
   void collect(std::vector<Env*>& envs, i32 steps, const Policy& policy, Rollout& out, const ParallelFor& parallel = {});
+  std::vector<u8> save() const;
+  bool load(const u8* data, std::size_t size, std::size_t environments);
 
  private:
   Rng rng_;
