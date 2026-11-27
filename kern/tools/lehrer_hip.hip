@@ -88,13 +88,31 @@ Target pick() {
   return {static_cast<int>(n % d.all.size()),
           static_cast<int>((n / d.all.size()) % static_cast<unsigned>(d.lanes))};
 }
+// 32 output columns x 8 observations per workgroup. Reuse weights
+// and observations from LDS while keeping each output's original sum order.
 __global__ void dense_kernel(const f32* x, int rows, int in, int out, const f32* w, const f32* b, f32* y) {
-  const size_t k = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (k >= size_t(rows) * out) return;
-  const int o = int(k % out), r = int(k / out);
-  f32 s = b[o];
-  for (int i = 0; i < in; ++i) s += w[size_t(i) * out + o] * x[size_t(r) * in + i];
-  y[k] = s;
+  constexpr int OC = 32, RC = 8, IC = 16;
+  __shared__ f32 weights[IC][OC];
+  __shared__ f32 inputs[RC][IC];
+  const int t = int(threadIdx.x), c = t % OC, a = t / OC;
+  const int o = int(blockIdx.x)*OC+c, r = int(blockIdx.y)*RC+a;
+  f32 sum = o < out ? b[o] : 0.0f;
+  for (int base = 0; base < in; base += IC) {
+    for (int k = t; k < IC*OC; k += OC*RC) {
+      const int i = base+k/OC, col = int(blockIdx.x)*OC+k%OC;
+      weights[k/OC][k%OC] = i < in && col < out ? w[size_t(i)*out+col] : 0.0f;
+    }
+    if (t < RC*IC) {
+      const int row = int(blockIdx.y)*RC+t/IC, i = base+t%IC;
+      inputs[t/IC][t%IC] = row < rows && i < in ? x[size_t(row)*in+i] : 0.0f;
+    }
+    __syncthreads();
+    const int count = in-base < IC ? in-base : IC;
+    if (r < rows && o < out)
+      for (int i=0; i<count; ++i) sum += weights[i][c]*inputs[a][i];
+    __syncthreads();
+  }
+  if (r < rows && o < out) y[size_t(r)*out+o] = sum;
 }
 __global__ void gradient_kernel(const f32* x, const f32* d, int rows, int in, int out, f32* gw, f32* gb) {
   const size_t k = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -122,7 +140,7 @@ void dense_on(Target target, const f32* x, int rows, int in, int out, const f32*
   const size_t nx = size_t(rows)*in, nw = size_t(in)*out, ny = size_t(rows)*out;
   d.x.need(nx); d.w.need(nw); d.b.need(out); d.y.need(ny);
   d.x.put(x,nx,d.stream); d.w.put(w,nw,d.stream); d.b.put(b,out,d.stream);
-  hipLaunchKernelGGL(dense_kernel, dim3((ny+255)/256), dim3(256), 0, d.stream, d.x.p, rows, in, out, d.w.p, d.b.p, d.y.p);
+  hipLaunchKernelGGL(dense_kernel, dim3((out+31)/32, (rows+7)/8), dim3(256), 0, d.stream, d.x.p, rows, in, out, d.w.p, d.b.p, d.y.p);
   check(hipGetLastError());
   d.y.read(ny,d.stream);
   check(hipStreamSynchronize(d.stream));
