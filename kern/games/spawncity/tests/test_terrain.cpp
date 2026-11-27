@@ -30,6 +30,10 @@ struct TerrainBlueprint {
   Tr& operator*() { return kern::logic::blueprint<Tr>(); }
   Common& common() { return kern::logic::blueprint<Common>(); }
 };
+/// A number of a place of the class (kern::logic::num::Typed<T>) as the number itself, and a number of the test as an
+/// f32 of the class.
+template <class T> T raw(kern::logic::num::Typed<T> v) { return static_cast<T>(v); }
+f32 F(f64 x) { return static_cast<f32>(x); }
 /// Konstanz, where the game starts (tiles.h).
 constexpr f64 kLon = 9.1766, kLat = 47.6600;
 /// The renderer and the physics world of a test, the terrain started on them.
@@ -43,13 +47,18 @@ struct TerrainRig {
     r.init(kern::RendererOptions{});
     world.create(kern::physics::WorldSettings{});
     if (!bp.bound) return;
+    // (the projector's init is the engine's own function - a node of the Blueprint, kern::GeoProjector here)
+    kern::GeoProjector engine;
+    engine.init(kLon, kLat);
     Tr::GeoProjector proj;
-    (*bp).GeoProjector_init(proj, kLon, kLat);
+    proj.lon0 = engine.lon0;
+    proj.lat0 = engine.lat0;
+    proj.cos_lat = engine.cos_lat;
     world_object = bp.rules.object(world);
     (*bp).Terrain_start(*t, proj, bp.rules.object(r), world_object, dem);
   }
   /// A ray straight down onto the world, as the program casts it (common: cast).
-  Common::the_RayResult_ down(f64 x, f64 y, f64 from, f64 len) { return bp.common().cast(world_object, {static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(from)}, {0, 0, -1}, len, {}, Common::Int64{~0ull}).Result; }
+  Common::the_RayResult_ down(f64 x, f64 y, f64 from, f64 len) { return bp.common().cast(world_object, {static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(from)}, {0, 0, -1}, F(len), {}, ~0ull).Result; }
 };
 Tr::List<Tr::U8> bytes_of(const std::vector<u8>& v) {
   Tr::List<Tr::U8> out;
@@ -63,7 +72,7 @@ KERN_TEST(terrain_crater_profile) {
   KERN_CHECK(bp.bound, "terrain_cpp and common run as their classes: %s", bp.rules.problems.c_str());
   if (!bp.bound) return;
   Tr& tr = *bp;
-  auto crater_profile = [&](f64 r, f64 radius, f64 depth, f64 rim) { return static_cast<f64>(tr.crater_profile(r, radius, depth, rim).Result); };
+  auto crater_profile = [&](f64 r, f64 radius, f64 depth, f64 rim) { return static_cast<f64>(raw(tr.crater_profile(F(r), F(radius), F(depth), F(rim)).Result)); };
   KERN_CHECK(std::fabs(crater_profile(0, 10, 2, 0.6) + 2) < 1e-4f, "centre at -depth");
   KERN_CHECK(crater_profile(10, 10, 2, 0.6) == 0 && crater_profile(30, 10, 2, 0.6) == 0, "nothing beyond the radius");
   f64 rim = -1;
@@ -78,21 +87,21 @@ KERN_TEST(terrain_bare_earth) {
   Tr& tr = *bp;
   const u32 n = 201;
   const f32 step = 10;
-  Tr::List<Tr::Float> h(std::vector<f64>(n * n));
+  Tr::List<Tr::f32> h(std::vector<f32>(n * n));
   for (u32 j = 0; j < n; ++j)
     for (u32 i = 0; i < n; ++i) {
       const f32 x = (static_cast<f32>(i) - 100) * step, y = (static_cast<f32>(j) - 100) * step;
       h[j * n + i] = 400 + 60 * std::exp(-(x * x + y * y) / (2 * 400.0f * 400.0f));  // a real hill
     }
-  Tr::List<Tr::Float> bare = h;
+  Tr::List<Tr::f32> bare = h;
   tr.bare_earth(bare, n, step, Tr::kOpen, Tr::kBlur);
   // a city block (40 x 40 m, 15 m high) somewhere on the slope
   for (u32 j = 130; j < 134; ++j)
-    for (u32 i = 60; i < 64; ++i) h[j * n + i] += 15;
-  const f64 hill = h[100 * n + 100];
+    for (u32 i = 60; i < 64; ++i) h[j * n + i] += 15.0f;
+  const f64 hill = raw(h[100 * n + 100]);
   tr.bare_earth(h, n, step, Tr::kOpen, Tr::kBlur);
-  KERN_CHECK(std::fabs(h[100 * n + 100] - hill) < 6, "the hill stays (%.1f -> %.1f)", hill, h[100 * n + 100]);
-  KERN_CHECK(std::fabs(h[132 * n + 62] - bare[132 * n + 62]) < 0.5f, "the block is gone (%.1f vs %.1f without it)", h[132 * n + 62], bare[132 * n + 62]);
+  KERN_CHECK(std::fabs(raw(h[100 * n + 100]) - hill) < 6, "the hill stays (%.1f -> %.1f)", hill, static_cast<f64>(raw(h[100 * n + 100])));
+  KERN_CHECK(std::fabs(raw(h[132 * n + 62]) - raw(bare[132 * n + 62])) < 0.5f, "the block is gone (%.1f vs %.1f without it)", static_cast<f64>(raw(h[132 * n + 62])), static_cast<f64>(raw(bare[132 * n + 62])));
 }
 
 namespace {
@@ -101,7 +110,7 @@ std::vector<u8> ramp_tile(const Tr::TileKey& k) {
   std::vector<u8> px(256 * 256 * 4);
   for (u32 y = 0; y < 256; ++y)
     for (u32 x = 0; x < 256; ++x) {
-      const f64 v = 400 + 0.5 * (static_cast<f64>(k.x) * 256 + x) - 0.5 * 256.0 * 4380 + 32768;
+      const f64 v = 400 + 0.5 * (static_cast<f64>(raw(k.x)) * 256 + x) - 0.5 * 256.0 * 4380 + 32768;
       u8* p = &px[(y * 256 + x) * 4];
       p[0] = static_cast<u8>(static_cast<u32>(v) / 256);
       p[1] = static_cast<u8>(static_cast<u32>(v) % 256);
@@ -121,11 +130,11 @@ KERN_TEST(terrain_dem_tiles) {
   u8 px[4];
   const f64 v = 512.25 + 32768;
   px[0] = static_cast<u8>(static_cast<u32>(v) / 256); px[1] = static_cast<u8>(static_cast<u32>(v) % 256); px[2] = 64;
-  const f64 decoded = tr.terrarium_height(px[0], px[1], px[2]).Result;
+  const f64 decoded = raw(tr.terrarium_height(px[0], px[1], px[2]).Result);
   KERN_CHECK(std::fabs(decoded - 512.25f) < 0.01f, "terrarium decode %.2f", decoded);
 
   KERN_CHECK(!tr.Terrain_settled(t).Result, "waits for its elevation");
-  tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 4);
+  tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 4.0);
   std::string req = tr.Terrain_take_requests(t).Result.str();
   KERN_CHECK(req.size() > 10 && req.find("[13,") != std::string::npos, "asks for z13 tiles: %s", req.c_str());
   // answer every request
@@ -139,21 +148,21 @@ KERN_TEST(terrain_dem_tiles) {
   // the elevation grid is built in a job (another thread here): wait for it by the clock
   const f64 give_up = kern::now_ms() + 60000;
   // (its collision: collide, as the game's fixed step writes it - one tile more a step)
-  while (!tr.Terrain_ready_at(t, {0, 0, 0}).Result && kern::now_ms() < give_up) { tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 3); tr.Terrain_collide(t, {0, 0, 0}, {0, 0, 0}, 1); ++frames; }
+  while (!tr.Terrain_ready_at(t, {0, 0, 0}).Result && kern::now_ms() < give_up) { tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 3.0); tr.Terrain_collide(t, {0, 0, 0}, {0, 0, 0}, 1); ++frames; }
   KERN_CHECK(tr.Terrain_settled(t).Result && tr.Terrain_has_dem(t).Result, "elevation loaded after %d frames", frames);
-  const f64 origin = tr.Terrain_elevation(t, 0, 0).Result;
+  const f64 origin = raw(tr.Terrain_elevation(t, 0.0f, 0.0f).Result);
   KERN_CHECK(std::fabs(origin) < 0.05f, "origin at z = 0 (%.3f)", origin);
   // z13 pixel at 47.66 N: 40075017 * cos(47.66) / 2^21 = 12.88 m -> 0.5 / 12.88 per metre
-  const f64 east = tr.Terrain_elevation(t, 1000, 0).Result, north = tr.Terrain_elevation(t, 0, 1000).Result;
+  const f64 east = raw(tr.Terrain_elevation(t, 1000.0f, 0.0f).Result), north = raw(tr.Terrain_elevation(t, 0.0f, 1000.0f).Result);
   KERN_CHECK(std::fabs(east - 38.8f) < 3, "1 km east is higher (%.1f m)", east);
   KERN_CHECK(std::fabs(north) < 1, "1 km north the same (%.1f m)", north);
   KERN_CHECK(tr.Terrain_ready_at(t, {0, 0, 0}).Result, "ground collision under the origin");
   for (Vec2 p : {Vec2{37, -21}, Vec2{-120.5f, 64.2f}, Vec2{3, 3}}) {
     const Common::the_RayResult_ h = rig.down(p.x, p.y, 500, 1000);
-    const f64 at = tr.Terrain_height(t, p.x, p.y).Result;
+    const f64 at = raw(tr.Terrain_height(t, p.x, p.y).Result);
     KERN_CHECK(h.hit && std::fabs(h.point.z - at) < 0.05f, "ray hits the ground at height() (%.2f vs %.2f)", static_cast<f64>(h.point.z), at);
   }
-  for (int i = 0; i < 300; ++i) tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 4);
+  for (int i = 0; i < 300; ++i) tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 4.0);
   KERN_CHECK(t.stats_.render_tiles > 20, "render tiles around the player (%u)", static_cast<unsigned>(t.stats_.render_tiles));
 }
 
@@ -163,26 +172,26 @@ KERN_TEST(terrain_water) {
   if (!rig.bp.bound) return;
   Tr& tr = *rig.bp;
   Tr::Terrain& t = *rig.t;
-  auto height = [&](f64 x, f64 y) { return static_cast<f64>(tr.Terrain_height(t, x, y).Result); };
-  auto water_at = [&](f64 x, f64 y) { return static_cast<bool>(tr.Terrain_water_at(t, x, y).Result); };
+  auto height = [&](f64 x, f64 y) { return static_cast<f64>(raw(tr.Terrain_height(t, F(x), F(y)).Result)); };
+  auto water_at = [&](f64 x, f64 y) { return static_cast<bool>(tr.Terrain_water_at(t, F(x), F(y)).Result); };
   KERN_CHECK(tr.Terrain_settled(t).Result, "flat ground is settled at once");
   Tr::List<Tr::Vector_row> lake;
   lake.push_back(Tr::Vector_row{Tr::List<Tr::Vector>(std::vector<Vec3>{{0, 0, 0}, {80, 0, 0}, {80, 60, 0}, {0, 60, 0}})});
   tr.Terrain_add_water_polygon(t, lake);
   KERN_CHECK(water_at(40, 30) && !water_at(100, 30), "lake cells");
-  KERN_CHECK(std::fabs(height(40, 30) + Tr::kWaterBed) < 0.01f, "a basin %.2f m deep", -height(40, 30));
-  KERN_CHECK(std::fabs(tr.Terrain_water_level(t, 40, 30).Result - Tr::kWaterLevel) < 1e-4f, "surface just below the bank");
-  tr.Terrain_add_bridge(t, {40, -10, 0}, {40, 70, 0}, 6);
+  KERN_CHECK(std::fabs(height(40, 30) + raw(Tr::kWaterBed)) < 0.01f, "a basin %.2f m deep", -height(40, 30));
+  KERN_CHECK(std::fabs(raw(tr.Terrain_water_level(t, 40.0f, 30.0f).Result) - raw(Tr::kWaterLevel)) < 1e-4f, "surface just below the bank");
+  tr.Terrain_add_bridge(t, {40, -10, 0}, {40, 70, 0}, 6.0f);
   KERN_CHECK(!water_at(40, 30) && std::fabs(height(40, 30)) < 0.01f, "the bridge keeps the ground");
-  tr.Terrain_add_waterway(t, Tr::List<Tr::Vector>(std::vector<Vec3>{{-200, 200, 0}, {200, 200, 0}}), 18, 1.6);
+  tr.Terrain_add_waterway(t, Tr::List<Tr::Vector>(std::vector<Vec3>{{-200, 200, 0}, {200, 200, 0}}), 18.0f, 1.6f);
   KERN_CHECK(water_at(0, 202) && !water_at(0, 220), "river 18 m wide");
-  const Vec3 f = tr.Terrain_flow_at(t, 0, 200).Result;
+  const Vec3 f = tr.Terrain_flow_at(t, 0.0f, 200.0f).Result;
   KERN_CHECK(f.x > 1.2f && std::fabs(f.y) < 0.01f, "the river flows east (%.2f, %.2f)", f.x, f.y);
-  tr.Terrain_add_crater(t, {300, 300, 0}, 8, 2);
-  KERN_CHECK(height(300, 300) < -1.9f && tr.Terrain_surface_at(t, 300, 300).Result == 2, "a crater (%.2f)", height(300, 300));
-  for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) { tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4); tr.Terrain_collide(t, {40, 30, 0}, {40, 30, 0}, 1); }
+  tr.Terrain_add_crater(t, {300, 300, 0}, 8.0f, 2.0f);
+  KERN_CHECK(height(300, 300) < -1.9f && raw(tr.Terrain_surface_at(t, 300.0f, 300.0f).Result) == 2, "a crater (%.2f)", height(300, 300));
+  for (int i = 0; i < 400 && !tr.Terrain_ready_at(t, {40, 30, 0}).Result; ++i) { tr.Terrain_update(t, {40, 30, 0}, {40, 30, 0}, 4.0); tr.Terrain_collide(t, {40, 30, 0}, {40, 30, 0}, 1); }
   const Common::the_RayResult_ h = rig.down(20, 20, 50, 100);
-  KERN_CHECK(h.hit && std::fabs(h.point.z + Tr::kWaterBed) < 0.1f, "the lake bed is solid (%.2f)", static_cast<f64>(h.point.z));
+  KERN_CHECK(h.hit && std::fabs(h.point.z + raw(Tr::kWaterBed)) < 0.1f, "the lake bed is solid (%.2f)", static_cast<f64>(h.point.z));
 }
 
 // world_ground.mjs: the aerial tiles of the 1600 m around the player are asked for once (z 15),
@@ -194,7 +203,7 @@ KERN_TEST(terrain_ground_imagery) {
   Tr& tr = *rig.bp;
   Tr::Terrain& t = *rig.t;
   auto requests = [&] { return tr.Terrain_take_image_requests(t).Result.str(); };
-  tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 50);
+  tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 50.0);
   const std::string req = requests();
   u32 n = 0;
   for (char c : req) n += c == '[';
@@ -210,10 +219,10 @@ KERN_TEST(terrain_ground_imagery) {
     if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) == 3) tr.Terrain_provide_image(t, Tr::TileKey{z, x, y}, field, 256, 256);
     ++at;
   }
-  for (int i = 0; i < 50; ++i) tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 20);
+  for (int i = 0; i < 50; ++i) tr.Terrain_update(t, {0, 0, 0}, {0, 0, 0}, 20.0);
   KERN_CHECK(requests() == "[]", "nothing more to fetch while the player stays");
-  tr.Terrain_update(t, {200, 0, 0}, {200, 0, 0}, 20);
+  tr.Terrain_update(t, {200, 0, 0}, {200, 0, 0}, 20.0);
   KERN_CHECK(requests() == "[]", "200 m is not 350 m: no new window");
-  tr.Terrain_update(t, {2000, 0, 0}, {2000, 0, 0}, 20);
+  tr.Terrain_update(t, {2000, 0, 0}, {2000, 0, 0}, 20.0);
   KERN_CHECK(requests() != "[]", "a new window after 350 m");
 }

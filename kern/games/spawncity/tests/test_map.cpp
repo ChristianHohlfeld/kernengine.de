@@ -37,14 +37,22 @@ KERN_TEST(map_tile_math) {
   Tiles& tl = *bp;
   const Tiles::TileKey t = tl.tile_at(kLon, kLat, kZoom).Result;
   KERN_CHECK(t.z == 14 && t.x == 8609 && t.y == 5718, "Konstanz tile %d/%d/%d", static_cast<int>(t.z), static_cast<int>(t.x), static_cast<int>(t.y));
-  f64 lon = 0, lat = 0;
-  tl.tile_lonlat(t, lon, lat, 0, 0);
+  Tiles::f64 lon_ = 0.0, lat_ = 0.0;   // (a place of the class: its numbers have the language's types)
+  tl.tile_lonlat(t, lon_, lat_, 0.0, 0.0);
+  const f64 lon = lon_, lat = lat_;
   KERN_CHECK(lon <= kLon && lat >= kLat, "north-west corner %.5f %.5f", lon, lat);
+  // (the projector's init and project are the engine's own functions - nodes of the Blueprint, kern::GeoProjector here)
+  kern::GeoProjector engine;
+  KERN_CHECK(engine.init(kLon, kLat), "the projector's origin");
+  f64 x = 0, y = 0;
+  engine.project(9.18, 47.665, x, y);
   Tiles::GeoProjector p;
-  tl.GeoProjector_init(p, kLon, kLat);
-  f64 x = 0, y = 0, lo = 0, la = 0;
-  tl.GeoProjector_project(p, x, y, 9.18, 47.665);
-  tl.unproject(p, lo, la, x, y);
+  p.lon0 = engine.lon0;
+  p.lat0 = engine.lat0;
+  p.cos_lat = engine.cos_lat;
+  Tiles::f64 lo_ = 0.0, la_ = 0.0;
+  tl.unproject(p, lo_, la_, x, y);
+  const f64 lo = lo_, la = la_;
   KERN_CHECK(std::fabs(lo - 9.18) < 1e-9 && std::fabs(la - 47.665) < 1e-9, "unproject inverts project");
 }
 
@@ -112,7 +120,7 @@ KERN_TEST(map_procedural_city) {
   if (!bp.bound) return;
   Tiles& tl = *bp;
   Tiles::MapFeatures f;
-  tl.procedural_city(f, 0, 0, 600, 7);
+  tl.procedural_city(f, 0.0, 0.0, 600.0, 7);
   KERN_CHECK(f.procedural, "marked as procedural");
   KERN_CHECK(f.buildings.size() > 150, "a town of buildings (%zu)", f.buildings.size());
   KERN_CHECK(f.roads.size() > 10, "streets (%zu)", f.roads.size());
@@ -120,7 +128,8 @@ KERN_TEST(map_procedural_city) {
   for (const auto& a : f.areas) water |= a.kind == Tiles::AreaKind::water;
   KERN_CHECK(water, "lake shore");
   for (const auto& b : f.buildings) {
-    if (!(b.top >= 8 && b.top < 25)) { KERN_CHECK(false, "storey heights %.1f", static_cast<f64>(b.top)); break; }
+    const f32 top = b.top;
+    if (!(top >= 8 && top < 25)) { KERN_CHECK(false, "storey heights %.1f", static_cast<f64>(top)); break; }
   }
 }
 
@@ -131,7 +140,7 @@ KERN_TEST(map_line_clipped_to_square) {
   if (!bp.bound) return;
   Tiles& tl = *bp;
   // a street as far as it lies in its tile's square: in order, a part per stay inside
-  const Tiles::Vec4 sq{0, 0, 100, 100};
+  const Tiles::Vec4 sq{0.0f, 0.0f, 100.0f, 100.0f};
   auto parts = tl.clip_line(line_of({{-20, 50, 0}, {50, 50, 0}, {50, 130, 0}, {80, 130, 0}, {80, 90, 0}, {120, 90, 0}}), sq).Result;
   KERN_CHECK(parts.size() == 2, "two stays inside (%zu)", parts.size());
   if (parts.size() == 2) {
@@ -144,7 +153,7 @@ KERN_TEST(map_line_clipped_to_square) {
   parts = tl.clip_line(line_of({{10, 10, 0}, {20, 20, 0}, {30, 10, 0}}), sq).Result;
   KERN_CHECK(parts.size() == 1 && parts[0].items.size() == 3, "inside: the whole line");
   // two tiles side by side cut the same street at the same point of their common edge
-  const auto left = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), sq).Result, right = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), Tiles::Vec4{100, 0, 200, 100}).Result;
+  const auto left = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), sq).Result, right = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), Tiles::Vec4{100.0f, 0.0f, 200.0f, 100.0f}).Result;
   KERN_CHECK(left.size() == 1 && right.size() == 1 && std::fabs(left[0].items.back().x - right[0].items.front().x) < 1e-3f &&
                std::fabs(left[0].items.back().y - right[0].items.front().y) < 1e-3f,
            "the parts meet on the edge");
