@@ -21,6 +21,7 @@
 #include "kern/game/walker.h"
 #include "kern/game/walker_policy.h"
 #include "kern/lehrer/backend.h"
+#include "kern/lehrer/checkpoint.h"
 #include "kern/lehrer/hip_dense.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/kalibrierung.h"
@@ -45,7 +46,7 @@ struct Options {
   std::string task = "jump", scenario, out, eval, log, checkpoint, resume, warm, trace;
   std::string calibrate, holdout, profile, compare, examples, demo, demo_search, demo_check, play_eval;
   i32 play = 0;
-  bool progress_json = false;
+  bool progress_json = false, full_checkpoint = false;
   std::string policies;
   i32 rounds = 0, round_episodes = 0, keep_every = 0, randomized = 0;
   std::string play_net, play_practice;
@@ -528,6 +529,7 @@ int main(int argc, char** argv) {
     const std::string a = argv[i];
     auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
     if (a == "--progress-json") o.progress_json = true;
+    else if (a == "--full-checkpoint") o.full_checkpoint = true;
     else if (a == "--task") o.task = next();
     else if (a == "--scenario") o.scenario = next();
     else if (a == "--envs") o.envs = std::atoi(next());
@@ -678,19 +680,55 @@ int main(int argc, char** argv) {
       threads, per_worker, o.seed,
       [&](i32 first, i32 count, u64 seed) {
         std::vector<std::unique_ptr<Env>> v;
-        for (i32 i = 0; i < count; ++i) v.push_back(make_env(recipe, seed, first + i));
+        for (i32 i = 0; i < count; ++i) {
+          auto env = make_env(recipe, seed, first + i);
+          if(o.full_checkpoint)env->enable_checkpoint();
+          v.push_back(std::move(env));
+        }
         return v;
       },
       [&](Env& e, i32 it) { prepare_env(static_cast<DuckEnv&>(e), recipe, it); });
   std::unique_ptr<Ppo> learner = make_learner(recipe, o.seed);
   if (!learner) { std::fprintf(stderr, "cannot warm-start from %s\n", recipe.warm_start.c_str()); return 1; }
   Ppo& ppo = *learner;
+  std::unique_ptr<JumpImitation> imitation;
+  if(recipe.imitate && o.full_checkpoint)imitation=std::make_unique<JumpImitation>(recipe,o.seed);
+  auto save_checkpoint=[&](){
+    if(o.checkpoint.empty())return true;
+    if(!o.full_checkpoint)return write_file(o.checkpoint,ppo.save());
+    auto collectors=backend.save();
+    if(collectors.empty())return false;
+    checkpoint::Writer w;
+    w.scalar(u32{0x4b4c4e31});w.vector(ppo.save());w.vector(collectors);
+    w.vector(imitation?imitation->save():std::vector<u8>{});
+    return write_file(o.checkpoint,w.bytes);
+  };
   if (!o.resume.empty()) {
     const std::vector<u8> bytes = read_file(o.resume);
-    if (bytes.empty() || !ppo.load(bytes.data(), bytes.size())) { std::fprintf(stderr, "cannot resume from %s\n", o.resume.c_str()); return 1; }
+    bool loaded=false;
+    if(o.full_checkpoint){
+      checkpoint::Reader r{bytes.data(),bytes.size()};u32 magic=0;
+      std::vector<u8> p,c,i;
+      loaded=r.scalar(magic)&&magic==0x4b4c4e31&&r.vector(p,bytes.size())&&
+        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.end()&&
+        p.size()>=8&&std::memcmp(p.data(),"KERNPPO2",8)==0&&ppo.load(p.data(),p.size())&&
+        backend.load(c.data(),c.size())&&(imitation?imitation->load(i.data(),i.size()):i.empty());
+    }else loaded=!bytes.empty()&&ppo.load(bytes.data(),bytes.size());
+    if(!loaded||ppo.iteration()>o.iterations){std::fprintf(stderr,"cannot resume from %s\n",o.resume.c_str());return 1;}
     std::printf("resumed at iteration %d (%lld steps)\n", ppo.iteration(), static_cast<long long>(ppo.total_steps()));
   }
-  if (recipe.imitate && o.resume.empty()) {
+  if(o.full_checkpoint){
+    if(o.resume.empty()&&!save_checkpoint())return 1;
+    if(imitation){
+      while(imitation->rounds_done()<recipe.imitation_rounds&&!stop_requested){
+        imitation->round(ppo,backend.update_parallel(),true);
+        if(imitation->rounds_done()==recipe.imitation_rounds)begin_practice(ppo,recipe);
+        if(!save_checkpoint())return 1;
+      }
+    }
+    if(!write_file(o.out,export_onnx(ppo.actor(),ppo.actor_normalizer(),micro_duck_metadata(o.task))))return 1;
+  }
+  if (!o.full_checkpoint && recipe.imitate && o.resume.empty()) {
     // Imitate the demonstration first (vorbild.h), then practise with PPO.
     std::printf("imitating the demonstration: %d rounds of %d episodes\n", recipe.imitation_rounds, recipe.imitation_episodes);
     const auto t0 = std::chrono::steady_clock::now();
@@ -751,7 +789,7 @@ int main(int argc, char** argv) {
       if ((!jumped || !o.stop_after_jump) && !write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) {
         std::fprintf(stderr, "cannot write network\n"); if (log) std::fclose(log); return 1;
       }
-      if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) {
+      if (!save_checkpoint()) {
         std::fprintf(stderr, "cannot write checkpoint\n"); if (log) std::fclose(log); return 1;
       }
     }
@@ -774,7 +812,7 @@ int main(int argc, char** argv) {
   if (log) std::fclose(log);
   if (stop_requested) {
     if (!write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) return 1;
-    if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) return 1;
+    if (!save_checkpoint()) return 1;
     std::printf("stopped at iteration %d\n", ppo.iteration());
   }
   std::printf("wrote %s\n", o.out.c_str());
