@@ -21,7 +21,7 @@
 
 namespace {
 
-// The App of the game as main.cpp gives it to the engine (SpawnCityApp: the entry is not linked into the tests).
+// The App of the game as main.cpp gives it to the engine (sc::game() is the App; the entry is not linked into the tests).
 struct GameApp final : kern::App {
   bool start(kern::Engine& e) override { return sc::game().start(e); }
   void update(kern::Engine& e, const kern::Frame& f) override { sc::game().update(e, f); }

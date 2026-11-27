@@ -56,7 +56,7 @@ Start, auf dem Boden).
 | Teil | Dateien (`src/`) |
 |---|---|
 | Spiel (Zustand, Frame, HUD, Befehle) | `spiel.{h,cpp}` – `sc::SpawnCity`, das eine Objekt `game()` |
-| Einstieg, Exporte der Seite | `main.cpp` – `SpawnCityApp` (die App der Engine), `sc_*`-Exporte |
+| Einstieg, Exporte der Seite | `main.cpp` – `kern_main` gibt `sc::game()` (das Spiel ist die App der Engine), `sc_*`-Exporte |
 | Drohne | `drone`, `drone_art`, `rigid_spec.h`; Firmware `firmware/` |
 | Stadt | `city_stream`, `city_jobs`, `tiles`, `mvt`, `terrain`, `wire.h` |
 | Eingabe, Einstellungen, Ton | `controls`, `touch_play`, `settings`, `sound_fx` |

@@ -11,7 +11,7 @@ wie Murmel (`kern/games/murmel`):
   `level/spawncity.klevel`) als simulierte Welt ohne Spieler und holt die Drohne aus der Vorlage `Drone`
   (`GameWorld::spawn`). Den festen Schritt der Drohne macht die App selbst: `GameWorld::step_once`, danach
   `Drone::step`, je 1/240 s, so viele, wie die Zeit des Frames erlaubt. Es gibt kein `FixedStep` und keinen
-  Getter eines anderen Zustands. Die App selbst (`SpawnCityApp` in `src/main.cpp`) ist schlank und gibt Start,
+  Getter eines anderen Zustands. Die App der Engine ist das Spiel selbst (`sc::SpawnCity : kern::App`, `src/spiel.h`); früher eine schlanke `SpawnCityApp`, die und gibt Start,
   Frames und Stop an den Zustand `sc::SpawnCity` (`game()`), so wie die Exporte. Die App hat keine
   Shader-Erweiterungen (siehe unten).
 - **Die Drohne**: `drone.*` mit der unveränderten Flugregler-Firmware (`firmware/`), Modell `drone_art.*`.

@@ -41,13 +41,13 @@ enum PadButtonIndex { kPadA = 0, kPadB, kPadX, kPadY, kPadLB, kPadRB, kPadLT, kP
 bool pad_down(const PadState& p, int b);
 bool pad_hit(const PadState& p, int b);
 
-/// The game (its one object: game()). The App the engine runs is SpawnCityApp (main.cpp): it hands its start, its
-/// frames and its stop to this.
-class SpawnCity {
+/// The game (its one object: game()) - and the App the engine runs (kern::App): its start, its frames and its stop
+/// are the game's own (main.cpp hands game() to kern::run).
+class SpawnCity final : public kern::App {
  public:
-  bool start(kern::Engine& e);
-  void update(kern::Engine& e, const kern::Frame& f);
-  void stop(kern::Engine& e);
+  bool start(kern::Engine& e) override;
+  void update(kern::Engine& e, const kern::Frame& f) override;
+  void stop(kern::Engine& e) override;
 
   // ---- what the page hands over (main.cpp: the exports)
   CityStream& city() { return city_; }

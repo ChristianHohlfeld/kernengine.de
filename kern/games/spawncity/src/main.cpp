@@ -14,27 +14,15 @@
 
 namespace sc {
 
-// The game as the App the engine runs (kern::App): its start, frames and stop are the game's (spiel.h). (The city's
+// The game is the App the engine runs (kern::App, spiel.h): game(). (The city's
 // shader extensions - the facades' wall records, the water - are out of the small game for now: an App's extensions
 // are pointers to objects of the engine, which a Blueprint cannot hand on yet - BLUEPRINTS.md, "Herausgenommen am
 // 26.11.".)
-class SpawnCityApp final : public kern::App {
- public:
-  bool start(kern::Engine& e) override { return game().start(e); }
-  void update(kern::Engine& e, const kern::Frame& f) override { game().update(e, f); }
-  void stop(kern::Engine& e) override { game().stop(e); }
-};
-
-SpawnCityApp& app() {
-  static SpawnCityApp a;
-  return a;
-}
-
 }  // namespace sc
 
 // The program's entry (kern/docs/project.md 4.): the App, with the project the game carries - its settings (the
 // renderer, the device profile "mobile"), its level.
-int kern_main() { return kern::run(sc::app(), kern::game::embedded_project()); }
+int kern_main() { return kern::run(sc::game(), kern::game::embedded_project()); }
 
 namespace sc {
 
