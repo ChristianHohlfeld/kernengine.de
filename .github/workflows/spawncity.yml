@@ -108,6 +108,7 @@ jobs:
             _site/spawncity-de
           retention-days: 7
       - name: Playwright + Chromium
+        id: browser_setup
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund playwright@1.56.0
@@ -118,9 +119,12 @@ jobs:
           python3 -m http.server 8772 --bind 127.0.0.1 >/tmp/http-spawncity.log 2>&1 &
           trap 'kill $! 2>/dev/null || true' EXIT
           sleep 1
-          node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8772 kern/games/spawncity/level/spawncity.klevel
-          timeout 600 node kern/games/spawncity/tests/input_check.mjs "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1"
+          rc=0
+          node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8772 kern/games/spawncity/level/spawncity.klevel || rc=1
+          timeout 600 node kern/games/spawncity/tests/input_check.mjs "http://127.0.0.1:8772/_site/spawncity-de/drone_simulator.html?offline=1&autostart=1" || rc=1
+          exit "$rc"
       - name: Browser smoke test (desktop with map tiles, phone offline)
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
         run: node kern/games/spawncity/tests/smoke.mjs generated/spawncity-shots
       - uses: actions/upload-artifact@v4
         if: always()
