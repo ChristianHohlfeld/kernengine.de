@@ -772,7 +772,10 @@ export class Trainer {
   async refreshLocal() {
     try {
       const saved=await readLocalCheckpoint();
-      if(!this.run?.localLease) this.localSaved=saved?.record||null;
+      if(!this.run?.localLease) {
+        const r=saved?.record;
+        this.localSaved=r?{token:r.token,iteration:r.iteration,total:r.total}:null;
+      }
     } catch(error) {
       if(!this.run && this.el?.trCompute.value==="local")
         this.status("Local checkpoint storage unavailable: "+error.message,true);
@@ -813,7 +816,8 @@ export class Trainer {
          !["motion","jump","stand","scenario"].includes(r.task))
         throw Error("Local checkpoint is missing or incompatible; it has not been deleted.");
       this.el.trCompute.value="local";
-      run=this.run={...r,move:null,workers:[],collectors:[],learner:null,workerUrl:null,
+      const {learner:ignoredLearner,collectors:ignoredCollectors,...metadata}=r;
+      run=this.run={...metadata,move:null,workers:[],collectors:[],learner:null,workerUrl:null,
         wake:null,policy:null,paused:false,localLease:release};
       release=null;
       this.history=run.history;
@@ -845,8 +849,14 @@ export class Trainer {
     const live=()=>this.run===run;
     if(!run.localLease)run.localLease=await acquireLocalLease();
     if(!live()){run.localLease?.();return;}
-    if(!saved && await readLocalCheckpoint())
-      throw Error("A local checkpoint exists. Continue it or explicitly discard it.");
+    if(!saved) {
+      const existing=await readLocalCheckpoint();
+      if(existing){
+        const r=existing.record;
+        this.localSaved={token:r.token,iteration:r.iteration,total:r.total};
+        throw Error("A local checkpoint exists. Continue it or explicitly discard it.");
+      }
+    }
     this.status(saved?"Restoring saved local training ...":"Loading the Lehrer ...");
     let wasm=saved?.wasm;
     if(!wasm){
@@ -943,7 +953,7 @@ export class Trainer {
   }
 
   discoverRemote() {
-    if (!this.s || !this.el || this.run || !this.el.trRemoteUrl.value.trim()) return;
+    if (!this.s || !this.el || this.run || this.localBusy || !this.el.trRemoteUrl.value.trim()) return;
     clearTimeout(this.remoteProbeTimer);
     this.remoteProbeTimer = null;
     void this.reconnectRemote({automatic:true});
@@ -952,7 +962,7 @@ export class Trainer {
   // Read-only discovery: a reload never POSTs a new job or imports into a
   // potentially different level. The existing job remains authoritative.
   async reconnectRemote({automatic=false} = {}) {
-    if (this.run) return;
+    if (this.run || this.localBusy) return;
     let run, connection, record;
     try {
       connection = this.remoteConnection();
