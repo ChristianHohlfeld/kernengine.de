@@ -1406,8 +1406,8 @@ export class Trainer {
   previewNetwork() {
     const net=this.onnx;
     if(!net)return;
-    const r=net.preview ? this.engine.command({cmd:"trainerPreview",...net.preview,onnx:toBase64(net.bytes)})
-      : net.move ? this.engine.command({cmd:"trainerTest",move:net.move}) : null;
+    const r=net.move ? this.engine.command({cmd:"trainerTest",move:net.move})
+      : net.preview ? this.engine.command({cmd:"trainerPreview",...net.preview,onnx:toBase64(net.bytes)}) : null;
     if(r&&!r.ok)this.toast(r.error);
   }
 
