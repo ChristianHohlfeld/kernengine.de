@@ -1,0 +1,11 @@
+round 1: 19 Blueprints - 19 for the first time
+round 2: 7 Blueprints - 7 for the first time
+common names what the engine's libraries do not have (tools/engine_api.py --libraries):
+  engine_physics_physics: the type or function QueryFilter_new - the engine does not write it - in `cast_ray = engine_world_cast_ray(w, origin, vector_scale(dir, max_len), engine_physics_physics::QueryFilter_new(mask, 18446744073709551615u).Result, self);`
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+
+real	2m12,128s
+user	11m23,910s
+sys	1m1,503s
