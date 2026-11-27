@@ -1000,6 +1000,7 @@ export class Trainer {
 
   discoverRemote() {
     if (!this.s || !this.el || this.run || this.localBusy || !this.el.trRemoteUrl.value.trim()) return;
+    if(this.lastRemoteResult && this.onnx && this.el.trCompute.value==="mag")return;
     clearTimeout(this.remoteProbeTimer);
     this.remoteProbeTimer = null;
     void this.reconnectRemote({automatic:true});
@@ -1016,7 +1017,6 @@ export class Trainer {
       run = this.run = {task: "stand", label: "mag", move: null, workers: [], collectors: [],
         total: 1, iteration: 0, paused: false, history: [], remote: {...connection,
           state: "waiting", id: null, busy: true, stopping: false, network: null}};
-      this.history = run.history;
       this.status("Reconnecting to MAG ...");
       let data;
       try {
@@ -1051,6 +1051,9 @@ export class Trainer {
       run.total = data.total; run.envs = data.envs;
       run.count = data.workers; run.paused = data.state === "paused";
       this.recoveredConfig(run,data,record?.id===data.id?record:null);
+      this.history=run.history;
+      this.lastProgress=null;
+      for(const tile of this.host.querySelectorAll("[data-stat] b"))this.text(tile,"-");
       this.onnx = null; this.handover = null;
       this.note = "Reconnected: the latest saved network can be previewed without changing this level.";
       if(data.config)await this.restoreRemoteHistory(run);
@@ -1321,7 +1324,7 @@ export class Trainer {
   /** Ends the run: its workers go; the newest exported network stays (one that waits for the level still goes in). */
   end(run) {
     if (this.run === run) {
-      this.lastProgress=Math.min(100,100*run.iteration/run.total);
+      if(!run.remote || run.remote.id)this.lastProgress=Math.min(100,100*run.iteration/run.total);
       this.run = null;
     }
     for (const w of run.workers) w.terminate();
