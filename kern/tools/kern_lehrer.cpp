@@ -708,6 +708,7 @@ int main(int argc, char** argv) {
   if (!learner) { std::fprintf(stderr, "cannot warm-start from %s\n", recipe.warm_start.c_str()); return 1; }
   Ppo& ppo = *learner;
   std::unique_ptr<JumpImitation> imitation;
+  std::string checkpoint_progress;
   if(recipe.imitate && o.full_checkpoint)imitation=std::make_unique<JumpImitation>(recipe,o.seed);
   auto save_checkpoint=[&](){
     if(o.checkpoint.empty())return true;
@@ -715,11 +716,12 @@ int main(int argc, char** argv) {
     auto collectors=backend.save();
     if(collectors.empty())return false;
     checkpoint::Writer w;
-    w.scalar(u32{0x4b4c4e32});w.scalar(ppo.iteration());
+    w.scalar(u32{0x4b4c4e33});w.scalar(ppo.iteration());
     w.vector(ppo.save());w.vector(collectors);
     w.vector(imitation?imitation->save():std::vector<u8>{});
     // ONNX and the training state come from the same barrier, not separate files.
     w.vector(export_onnx(ppo.actor(),ppo.actor_normalizer(),micro_duck_metadata(o.task)));
+    w.vector(std::vector<u8>(checkpoint_progress.begin(),checkpoint_progress.end()));
     return write_file(o.checkpoint,w.bytes);
   };
   if (!o.resume.empty()) {
@@ -727,11 +729,13 @@ int main(int argc, char** argv) {
     bool loaded=false;
     if(o.full_checkpoint){
       checkpoint::Reader r{bytes.data(),bytes.size()};u32 magic=0;
-      std::vector<u8> p,c,i,net;i32 iteration=-1;
-      loaded=r.scalar(magic)&&magic==0x4b4c4e32&&r.scalar(iteration)&&iteration>=0&&r.vector(p,bytes.size())&&
-        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.vector(net,32*1024*1024)&&!net.empty()&&r.end()&&
+      std::vector<u8> p,c,i,net,progress;i32 iteration=-1;
+      loaded=r.scalar(magic)&&magic==0x4b4c4e33&&r.scalar(iteration)&&iteration>=0&&r.vector(p,bytes.size())&&
+        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.vector(net,32*1024*1024)&&!net.empty()&&
+        r.vector(progress,65536)&&r.end()&&
         p.size()>=8&&std::memcmp(p.data(),"KERNPPO2",8)==0&&ppo.load(p.data(),p.size())&&
         ppo.iteration()==iteration&&backend.load(c.data(),c.size())&&(imitation?imitation->load(i.data(),i.size()):i.empty());
+      if(loaded)checkpoint_progress.assign(progress.begin(),progress.end());
     }else loaded=!bytes.empty()&&ppo.load(bytes.data(),bytes.size());
     if(!loaded||ppo.iteration()>o.iterations){std::fprintf(stderr,"cannot resume from %s\n",o.resume.c_str());return 1;}
     std::printf("resumed at iteration %d (%lld steps)\n", ppo.iteration(), static_cast<long long>(ppo.total_steps()));
@@ -804,6 +808,20 @@ int main(int argc, char** argv) {
       write_file(stem + name, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)));
     }
     const bool snapshot = it % o.save_every == 0 || it == o.iterations || stop_requested;
+    if (o.progress_json || o.full_checkpoint) {
+      json::Value v = json::Value::object();
+      v.set("iteration", s.iteration); v.set("steps", static_cast<f64>(s.steps));
+      v.set("episodes", s.episodes); v.set("meanReturn", static_cast<f64>(s.mean_return));
+      v.set("meanLength", static_cast<f64>(s.mean_length)); v.set("meanStd", static_cast<f64>(s.mean_std));
+      v.set("collectSeconds", static_cast<f64>(s.collect_seconds)); v.set("learnSeconds", static_cast<f64>(s.learn_seconds));
+      v.set("sps", sps); v.set("snapshot", snapshot);
+      if (snapshot && !stop_requested) {
+        json::Value report;
+        const std::string result = evaluate_training(recipe, ppo, 5);
+        if (!result.empty() && json::parse(result, report)) v.set("report", report);
+      }
+      checkpoint_progress=json::stringify(v);
+    }
     if (snapshot) {
       if ((!jumped || !o.stop_after_jump) && !write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) {
         std::fprintf(stderr, "cannot write network\n"); if (log) std::fclose(log); return 1;
@@ -817,19 +835,8 @@ int main(int argc, char** argv) {
       if(log)std::fclose(log);
       return 1;
     }
-    if (o.progress_json) {
-      json::Value v = json::Value::object();
-      v.set("iteration", s.iteration); v.set("steps", static_cast<f64>(s.steps));
-      v.set("episodes", s.episodes); v.set("meanReturn", static_cast<f64>(s.mean_return));
-      v.set("meanLength", static_cast<f64>(s.mean_length)); v.set("meanStd", static_cast<f64>(s.mean_std));
-      v.set("collectSeconds", static_cast<f64>(s.collect_seconds)); v.set("learnSeconds", static_cast<f64>(s.learn_seconds));
-      v.set("sps", sps); v.set("snapshot", snapshot);
-      if (snapshot && !stop_requested) {
-        json::Value report;
-        const std::string result = evaluate_training(recipe, ppo, 5);
-        if (!result.empty() && json::parse(result, report)) v.set("report", report);
-      }
-      std::printf("KERN_PROGRESS %s\n", json::stringify(v).c_str()); std::fflush(stdout);
+    if(o.progress_json){
+      std::printf("KERN_PROGRESS %s\n",checkpoint_progress.c_str());std::fflush(stdout);
     }
     if (jumped && o.stop_after_jump) break;
   }
