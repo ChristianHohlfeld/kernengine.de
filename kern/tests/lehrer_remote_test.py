@@ -128,6 +128,11 @@ class RemoteTest(unittest.TestCase):
         data=self.wait(lambda d:d["state"] in remote.TERMINAL)
         self.assertEqual(data["state"],"done")
         self.assertEqual(data["stats"]["iteration"],2)
+        self.assertEqual(data["config"]["task"],"stand")
+        self.assertEqual(data["config"]["seed"],1)
+        history=self.request("/v1/jobs/"+self.id+"/history")[2]["history"]
+        self.assertEqual([p["it"] for p in history],[1,2])
+        self.assertAlmostEqual(history[-1]["len"],.4)
 
     def reopen(self):
         old=self.server
