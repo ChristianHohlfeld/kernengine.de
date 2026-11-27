@@ -13,6 +13,7 @@
 #include "kern/api/c_api.h"
 #include "kern/core/json.h"
 #include "kern/lehrer/env.h"
+#include "kern/lehrer/checkpoint.h"
 #include "kern/lehrer/onnx_export.h"
 #include "kern/lehrer/ppo.h"
 #include "kern/lehrer/recipe.h"
@@ -61,6 +62,7 @@ KERN_EXPORT(kern_lehrer_create) i32 kern_lehrer_create(const char* task, u32 tas
   g->collector = Collector(seed, first);
   for (i32 i = 0; i < envs; ++i) {
     g->envs.push_back(make_env(g->recipe, seed, first + i));
+    g->envs.back()->enable_checkpoint();
     g->envs.back()->reset();
     g->env_ptrs.push_back(g->envs.back().get());
   }
@@ -243,6 +245,50 @@ KERN_EXPORT(kern_lehrer_learn) const char* kern_lehrer_learn(const u8* data, u32
   g->text = json::stringify(v);
   g->length = static_cast<u32>(g->text.size());
   return g->text.c_str();
+}
+
+// Worker checkpoints are taken only between messages. Each collector
+// restores its RNG/episode counters and the exact live physics via bounded
+// episode replay; each learner restores PPO and in-progress imitation.
+KERN_EXPORT(kern_lehrer_save_collector) const u8* kern_lehrer_save_collector() {
+  if(!g||g->envs.empty())return nullptr;
+  checkpoint::Writer w;
+  w.scalar(u32{1});w.scalar(static_cast<u32>(g->envs.size()));
+  w.vector(g->collector.save());
+  for(const auto& env:g->envs)w.vector(env->save_episode());
+  g->bytes=std::move(w.bytes);g->length=static_cast<u32>(g->bytes.size());
+  return g->bytes.data();
+}
+
+KERN_EXPORT(kern_lehrer_load_collector) i32 kern_lehrer_load_collector(const u8* data,u32 size) {
+  if(!g||g->envs.empty())return 0;
+  checkpoint::Reader r{data,size};
+  u32 version=0,n=0;std::vector<u8> bytes;
+  if(!r.scalar(version)||version!=1||!r.scalar(n)||n!=g->envs.size()||
+     !r.vector(bytes,size)||!g->collector.load(bytes.data(),bytes.size(),n))return 0;
+  for(auto& env:g->envs)
+    if(!r.vector(bytes,size)||!env->load_episode(bytes.data(),bytes.size()))return 0;
+  return r.end()?1:0;
+}
+
+KERN_EXPORT(kern_lehrer_save_learner) const u8* kern_lehrer_save_learner() {
+  if(!g||!g->learner)return nullptr;
+  checkpoint::Writer w;
+  w.scalar(u32{1});w.vector(g->learner->save());
+  w.vector(g->imitation?g->imitation->save():std::vector<u8>{});
+  g->bytes=std::move(w.bytes);g->length=static_cast<u32>(g->bytes.size());
+  return g->bytes.data();
+}
+
+KERN_EXPORT(kern_lehrer_load_learner) i32 kern_lehrer_load_learner(const u8* data,u32 size) {
+  if(!g||!g->learner)return 0;
+  checkpoint::Reader r{data,size};
+  u32 version=0;std::vector<u8> ppo,imitation;
+  if(!r.scalar(version)||version!=1||!r.vector(ppo,size)||!r.vector(imitation,size)||!r.end()||
+     ppo.size()<8||std::memcmp(ppo.data(),"KERNPPO2",8)!=0||
+     !g->learner->load(ppo.data(),ppo.size()))return 0;
+  if(g->imitation)return g->imitation->load(imitation.data(),imitation.size())?1:0;
+  return imitation.empty()?1:0;
 }
 
 /// The learner's actor as an ONNX file in the shape of Pollen's networks.
