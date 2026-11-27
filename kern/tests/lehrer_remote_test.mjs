@@ -7,7 +7,8 @@ if (!globalThis.navigator) globalThis.navigator = {hardwareConcurrency: 8};
 globalThis.localStorage = {getItem:()=>null,setItem:()=>{}};
 const src=fs.readFileSync(new URL("../web/studio/trainer.mjs",import.meta.url),"utf8")
   .replace(/^import \{.*\} from .*;\n/m,'const tr=x=>x, escHtml=x=>x, toBase64=x=>Buffer.from(x).toString("base64");\n');
-const {Trainer}=await import("data:text/javascript;base64,"+Buffer.from(src).toString("base64"));
+const {Trainer,encodeCheckpoint,decodeCheckpoint,frameCheckpoint,unframeCheckpoint,validLocalRecord}=await import(
+  "data:text/javascript;base64,"+Buffer.from(src+"\nexport {encodeCheckpoint,decodeCheckpoint,frameCheckpoint,unframeCheckpoint,validLocalRecord};").toString("base64"));
 const p=Trainer.prototype;
 const field=value=>({value:String(value)});
 function trainer(backend){
@@ -162,3 +163,21 @@ assert.equal(stopping.localStopping,true);
 assert.equal(stopping.paused,false);
 assert.match(stopLocal.message,/checkpoint/);
 console.log("Lehrer local/MAG selection and remote result passed");
+
+const record={schema:1,token:"run-test",task:"stand",name:"stand",label:"stand",count:2,envs:4,total:12,seed:1,config:{},
+  iteration:3,history:[{it:1,ret:5,len:2},{it:3,ret:6,len:2}]};
+assert.equal(validLocalRecord(record),true);
+assert.equal(validLocalRecord({...record,count:999}),false);
+assert.equal(validLocalRecord({...record,config:{learningRate:NaN}}),false);
+const sections=[new Uint8Array([1,2]),new Uint8Array([3]),new Uint8Array([4]),new Uint8Array([5,6])];
+const payload=frameCheckpoint(sections);
+const archive=await encodeCheckpoint({schema:1,backend:"local",record},payload);
+const decoded=await decodeCheckpoint(archive);
+assert.deepEqual(decoded.meta.record,record);
+assert.deepEqual(unframeCheckpoint(decoded.payload,4).map(x=>[...new Uint8Array(x)]),sections.map(x=>[...x]));
+await assert.rejects(decodeCheckpoint(new Uint8Array([1,2,3])),/complete/);
+const corrupt=archive.slice();corrupt[15]^=1;
+await assert.rejects(decodeCheckpoint(corrupt),/checksum/);
+const badPayload=payload.slice();badPayload[0]=255;
+assert.throws(()=>unframeCheckpoint(badPayload,4),/section/);
+console.log("Checkpoint archive integrity and section framing passed");
