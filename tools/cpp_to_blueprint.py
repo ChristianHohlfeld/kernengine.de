@@ -1706,6 +1706,9 @@ def own_function(tree, decl_id):
         return False   # (the program's way to call an actor's Blueprint: Call on Actor, Get Variable on Actor, Has Blueprint - nodes)
     if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS:
         return False
+    if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm"):
+        return False   # (the engine's functions of numbers - kern::dm::cos(f32), where a header of the engine brings dmath.h along:
+                       # the functions of a formula by their name, as std::cos is - never a library that calls kern_musl_cosf)
     return True
 
 
@@ -5237,6 +5240,13 @@ class Emit:
                 # (`_call`: the source has the call there - TestWriter.guard sees it, as it is written)
                 node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood, "_call": call})
             slot = self.unwrap(init)
+            if bare(slot).get("_rowref") and bare(slot).get("_call") is not None:
+                # (written before, in a round whose function then waited: the source's m[key] again - its row is found and
+                # held by the steps this writing puts before it, not by those of the round that is gone)
+                again = bare(slot)
+                source = again["_call"]
+                again.clear()
+                again.update(source)
             def map_of(n):   # (the declaration a map is named by: a variable or a field)
                 n = bare(n)
                 while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
@@ -5266,7 +5276,7 @@ class Emit:
                 held = self.entry(base, {"kind": "_Text", "_text": row, "_type": IDX, "_steady": True}, vt)   # (the row: set here alone)
                 call = dict(slot)
                 slot.clear()
-                slot.update({**held, "type": was, **stood, "_call": call})   # (the source has m[key] there: TestWriter.guard)
+                slot.update({**held, "type": was, **stood, "_call": call, "_rowref": True})   # (the source has m[key] there: TestWriter.guard)
             rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
@@ -11037,8 +11047,8 @@ class Emit:
                 self.f.indexes = True   # (C++ leaves a shift by the width of the number or more undefined; the formula's says what it is)
             if op in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>") + COMPARE:
                 left = self.fx(x, leaves)
-                if op in ("<<", ">>") and self.literal_only(bare(x)) and not self.alone(left.strip("()"), self.tp(x)):
-                    left = self.leaf(x, leaves, left.strip("()"), self.tp(x), force=True)   # (1ull << n: a 1 of its type)
+                if op in ("<<", ">>") and (self.literal_only(bare(x)) or INT_TEXT.fullmatch(left.strip("()"))) and not self.alone(left.strip("()"), self.tp(x)):
+                    left = self.leaf(x, leaves, left.strip("()"), self.tp(x), force=True)   # (1ull << n, u64{1} << n: a 1 of its type)
                 return f"({left} {op} {self.fx(y, leaves)})"
         if k == "ConditionalOperator":
             c, x, y = kids(b)
