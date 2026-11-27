@@ -72,6 +72,7 @@ class Job:
         self.lock = threading.RLock()
         self.stats, self.report = None,None
         self.gpus = 0
+        self.workers = server.workers
         self.network = None
         self.network_iteration = 0
         self.thread = threading.Thread(target=self.run, name="lehrer-"+job_id, daemon=False)
@@ -81,6 +82,7 @@ class Job:
             self.stats = recovered.get("stats")
             self.report = recovered.get("report")
             self.gpus = recovered.get("gpus",0)
+            self.workers = recovered.get("workers",server.workers)
             self.network = recovered.get("network")
             self.network_iteration = recovered.get("networkIteration",0)
             # Never claim an interrupted native process is still alive or
@@ -93,6 +95,12 @@ class Job:
             if not path.is_file() or not path.stat().st_size:
                 self.network = None
                 self.network_iteration = 0
+            elif self.network != str(path.stat().st_mtime_ns):
+                # Native output is atomically replaced, so a crash between
+                # writing it and recording the revision cannot strand a
+                # download at a permanent 409. Unknown iteration stays 0.
+                self.network = str(path.stat().st_mtime_ns)
+                self.network_iteration = 0
 
     def persist(self):
         # Caller holds the job lock, or is initializing before publication.
@@ -101,7 +109,7 @@ class Job:
     def public(self):
         with self.lock:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
-                        report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.server.workers,
+                        report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.workers,
                         gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"],
                         taskKind=self.config["task"].split(":",1)[0])
     def change(self,state,message):
@@ -120,9 +128,9 @@ class Job:
                     with contextlib.suppress(ProcessLookupError):
                         os.killpg(self.proc.pid,signal.SIGCONT)
                         os.killpg(self.proc.pid,signal.SIGTERM)
-                self.change("stopping","Saving the last training iteration")
                 if self.proc and self.proc.poll() is None:
                     threading.Thread(target=self.stop_watchdog,args=(self.proc,),daemon=True).start()
+                self.change("stopping","Saving the last training iteration")
             elif action in ("pause","resume") and self.state in ("running","paused") and self.proc and self.proc.poll() is None:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(self.proc.pid,signal.SIGSTOP if action=="pause" else signal.SIGCONT)
@@ -162,12 +170,18 @@ class Job:
             with contextlib.ExitStack() as stack:
                 # The existing MAG GPU guard yields when .idol is locked; active
                 # Idol work holds it shared. Drain that work, never kill it.
+                lease_fds = ()
                 if server.gpu_lock:
-                    if not self.acquire(stack,server.gpu_lock+".idol") or not self.acquire(stack,server.gpu_lock):
-                        self.change("stopped","Stopped before GPU allocation")
+                    priority = self.acquire(stack,server.gpu_lock+".idol")
+                    gpu = self.acquire(stack,server.gpu_lock) if priority else None
+                    if not priority or not gpu:
+                        state,message = "stopped","Stopped before GPU allocation"
                         return
+                    # The child retains both leases even if the Python
+                    # service is killed before systemd reaps the trainer.
+                    lease_fds = (priority.fileno(),gpu.fileno())
                 if self.stop.is_set():
-                    self.change("stopped","Stopped before training")
+                    state,message = "stopped","Stopped before training"
                     return
                 try:
                     if server.hook:
@@ -176,8 +190,12 @@ class Job:
                     if self.stop.is_set():
                         state,message = "stopped","Stopped before training"
                     else:
-                        self.change("checking","Checking native HIP on every visible GPU")
-                        check = subprocess.run([server.binary,"--hip-check"],capture_output=True,text=True,timeout=90,check=True)
+                        with self.lock:
+                            if self.stop.is_set():
+                                state,message = "stopped","Stopped before training"
+                                return
+                            self.change("checking","Checking native HIP on every visible GPU")
+                        check = subprocess.run([server.binary,"--hip-check"],capture_output=True,text=True,timeout=90,check=True,pass_fds=lease_fds)
                         match = re.search(r"HIP devices: ([1-9][0-9]*)",check.stdout)
                         if not match:
                             raise RuntimeError("native trainer has not verified a GPU")
@@ -201,7 +219,7 @@ class Job:
                                         state,message = "stopped","Stopped before training"
                                     else:
                                         self.proc = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                                            text=True,bufsize=1,start_new_session=True)
+                                            text=True,bufsize=1,start_new_session=True,pass_fds=lease_fds)
                                         self.change("running","Learning on MAG")
                                 if self.proc:
                                     for line in self.proc.stdout:
@@ -241,21 +259,27 @@ class Job:
                         except subprocess.TimeoutExpired:
                             with contextlib.suppress(ProcessLookupError):
                                 os.killpg(self.proc.pid,signal.SIGKILL)
-                            self.proc.wait(timeout=15)
+                            # An uninterruptible driver/kernel call is not
+                            # safe to release. Keep the lease until exit.
+                            self.proc.wait()
                     if entered:
                         # Keep GPU locks until restoration is requested. The GPU guard
                         # resumes only when the locks are released.
                         subprocess.run(server.hook+["leave"],check=True,timeout=120)
         except Exception as exc:
-            with open(self.dir/"error.log","a",encoding="utf-8") as f:
-                f.write(repr(exc)+"\n")
             state,message = "error","Training or MAG restoration failed; see server logs"
+            print("MAG training error:",repr(exc),flush=True)
+            with contextlib.suppress(OSError):
+                with open(self.dir/"error.log","a",encoding="utf-8") as f:
+                    f.write(repr(exc)+"\n")
         finally:
-            # Early cancelled lease already has its terminal state.
             with self.lock:
                 try:
                     if self.state not in TERMINAL:
                         self.change(state,message)
+                except OSError as exc:
+                    self.state,self.message = "error","MAG job state could not be saved; see server logs"
+                    print("MAG job storage error:",repr(exc),flush=True)
                 finally:
                     self.finished.set()
 
