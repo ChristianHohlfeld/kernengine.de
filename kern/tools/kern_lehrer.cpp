@@ -19,6 +19,7 @@
 #include "kern/game/walker.h"
 #include "kern/game/walker_policy.h"
 #include "kern/lehrer/backend.h"
+#include "kern/lehrer/hip_dense.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/kalibrierung.h"
 #include "kern/lehrer/onnx_export.h"
@@ -504,6 +505,15 @@ void load_pollen_policies(const std::string& dir_in) {
 }
 
 int main(int argc, char** argv) {
+  if (argc == 2 && std::strcmp(argv[1], "--hip-check") == 0) {
+#ifdef KERN_LEHRER_HIP
+    if (!hip_lehrer_check()) return 1;
+    std::printf("HIP devices: %d\n", hip_lehrer_devices());
+    return 0;
+#else
+    std::fprintf(stderr, "Lehrer built without HIP\n"); return 2;
+#endif
+  }
   Options o;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
