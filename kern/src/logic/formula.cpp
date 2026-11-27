@@ -18,6 +18,7 @@ enum Code : u8 {
   kMin, kMax, kClamp, kAbs, kSign, kCopysign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
   kSin, kCos, kTan, kAsin, kAcos, kAtan, kAtan2, kRad, kDeg, kLerp,
   kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle, kRemainder, kSinh, kCosh, kTanh, kAsinh,
+  kAcosh, kAtanh, kLog2, kLog1p, kExp2, kCbrt, kLdexp,
 };
 
 // whole: what the function gives is a whole number for any numbers it is given, and it takes them as
@@ -30,6 +31,8 @@ constexpr Fn kFunctions[] = {
     {"cos", kCos, 1},     {"tan", kTan, 1},     {"asin", kAsin, 1},   {"acos", kAcos, 1},   {"atan", kAtan, 1},   {"atan2", kAtan2, 2}, {"rad", kRad, 1},
     {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},     {"copysign", kCopysign, 2},
     {"remainder", kRemainder, 2}, {"sinh", kSinh, 1}, {"cosh", kCosh, 1}, {"tanh", kTanh, 1}, {"asinh", kAsinh, 1},
+    {"acosh", kAcosh, 1}, {"atanh", kAtanh, 1}, {"log2", kLog2, 1}, {"log1p", kLog1p, 1}, {"exp2", kExp2, 1}, {"cbrt", kCbrt, 1},
+    {"ldexp", kLdexp, 2},
     // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
     {"band", kBand, 2, true}, {"bor", kBor, 2, true}, {"bxor", kBxor, 2, true}, {"shl", kShl, 2, true}, {"shr", kShr, 2, true},
     {"wrap32", kWrap32, 1, true}, {"wrap32s", kWrap32s, 1, true}, {"mul32", kMul32, 2, true}, {"single", kSingle, 1},
@@ -475,6 +478,13 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kCosh: r = math::cosh(a); break;
       case kTanh: r = math::tanh(a); break;
       case kAsinh: r = math::asinh(a); break;
+      case kAcosh: r = math::acosh(a); break;
+      case kAtanh: r = math::atanh(a); break;
+      case kLog2: r = math::log2(a); break;
+      case kLog1p: r = math::log1p(a); break;
+      case kExp2: r = math::exp2(a); break;
+      case kCbrt: r = math::cbrt(a); break;
+      case kLdexp: r = math::ldexp(a, b); break;
       case kAtan2: r = math::atan2(a, b); break;
       case kRad: r = math::rad(a); break;
       case kDeg: r = math::deg(a); break;

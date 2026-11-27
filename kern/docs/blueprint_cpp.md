@@ -2455,7 +2455,8 @@ Heute (26.11.2026):
   deshalb nicht plattformfest, und sie rechnet anders als ihr Blueprint (Ursache 4 der Messung, z. B. slerp, heading_of).
 - Dazu kann clang Aufrufe selbst ändern: Konstanten falten (mit seiner eigenen, korrekt gerundeten Rechnung), `sin`+`cos` zu
   `sincos` zusammenlegen, `pow(x, 2)` zu `x*x` machen. Das hängt vom Compiler ab, nicht von der Quelle.
-- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt.
+- In musl_math fehlen sinh und tanh (die die Quelle ruft) sowie asinh, acosh, atanh, log2, exp2, log1p und cbrt (seit 26.11. alle
+  eigene der Engine, siehe unten).
 
 Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter den Namen der Standardbibliothek, für jedes Ziel.**
 - Ein zweiter Satz der musl-Objekte ohne Umbenennung (oder dünne Hüllen `extern "C" float sinf(float x) { return
@@ -2493,6 +2494,21 @@ Vorschlag für den einen Weg: **Der Bau bindet die musl-Mathe der Engine unter d
   (±0, ±Inf, NaN, Überlaufschwelle 710,4758…/89,4159…, sinh x = x für kleine x, ungerade/gerade bitgleich, asinh(sinh x) = x
   auf 4 ULP): Engine-Test `hyperbolic_functions_of_the_engine_are_accurate_and_exact_at_their_edges`; bitgleich nativ und Wasm:
   `math_of_the_standard_library_is_the_engines` (Digest erweitert).
+- **acosh, atanh, log2, log1p, exp2, cbrt, ldexp, remainder** (je f und d, 26.11.2026) sind ebenfalls eigener Code der Engine
+  (musl_math hat keine davon): acosh/atanh in `kern/src/math/hyperbolic.c`, die übrigen in `kern/src/math/elementary.c`. Exakt
+  (0 ULP, wie IEEE sie definiert): **ldexp** auf den Bits (Exponent verschoben; im Subnormalen einmal gerundet, Gleichstand auf
+  gerade; Überlauf ±Inf, unter der halben kleinsten Subnormalen ±0) und **remainder** (Langdivision der Mantissen: Rest und ob der
+  Quotient ungerade ist; Null mit dem Vorzeichen von x). Genau: log2 = k + log(m)/ln 2 (Produkt mit 1/ln 2 als hi + lo exakt nach
+  Dekker, log2(2^k) = k exakt), log1p = log(u) + (y − (u − 1))/u (Fehler der Summe exakt, Fast2Sum; |y| < 2^-29 Reihe), exp2 =
+  exp(f·ln 2)·2^k mit dem exakten ldexp (exp2(k) = 2^k exakt), cbrt = exp(log(m)/3) und ein Newton-Schritt mit exaktem Rest
+  y³ − m (Dekker), acosh nahe 1 mit mitgeführten Fehlern von Wurzel und Summe, atanh über log1p. f-Varianten in f64, einmal gerundet.
+  Formel-Funktionen `acosh atanh log2 log1p exp2 cbrt ldexp(x, n)` (`kern::math::…`, außerhalb des Bereichs 0 wie log), remainder
+  über `kern::dm::remainder`. Genauigkeit gegen 200 Stellen bzw. exakt (`kern/tests/elementary_reference.py` → `.h`, Python
+  decimal/Fraction mit ausgeschriebener IEEE-Rundung): f64 ≤ 2 ULP (gemessen acosh 1,24, log2 1,19, atanh 1,17, log1p 0,86,
+  exp2 0,66, cbrt 0,50), f32 ≤ 1 ULP (gemessen 0,50), ldexp/remainder 0 ULP; Ränder (±0, ±Inf, NaN, Definitionsgrenzen,
+  Überlauf/Unterlauf von exp2 und ldexp, Subnormale) und Identitäten (log2(2^k) = k und exp2(k) = 2^k für alle k, cbrt(m³) = m,
+  ungerade bitgleich, ldexp hebt sich auf, remainder ungerade/gerade/skaliert): Engine-Test
+  `elementary_functions_of_the_engine_are_accurate_exact_and_right_at_their_edges`; nativ == Wasm über den math_names-Digest.
 - Die Alternative (die Quelle ruft `kern::dm::`, `std::sin` ist ein Fehler des Konverters mit dem richtigen Namen) heißt 807 Stellen
   umschreiben, und sie lässt die Firmware (16 Stellen, nicht änderbar) und jede fremde Bibliothek aus. Darum nicht.
 

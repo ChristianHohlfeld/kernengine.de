@@ -1609,7 +1609,7 @@ void add_structs(Library& lib) {
     d.inputs = {data("value", "Value", PinType::structure)};
     d.outputs = {bytes_out("bytes", "Bytes")};
     d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
@@ -1641,7 +1641,7 @@ void add_structs(Library& lib) {
     d.inputs = {any_ints("bytes", "Bytes"), data("at", "At", PinType::integer, 0)};
     d.outputs = {data("value", "Value", PinType::structure)};
     d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
-    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
     d.run = [of](Context& c) {
       const Graph& g = c.instance().graph();
@@ -2111,7 +2111,7 @@ void add_math(Library& lib) {
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
                    "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) sinh cosh tanh asinh lerp remainder; "
+                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) sinh cosh tanh asinh acosh atanh log2 log1p exp2 cbrt ldexp(x, n) lerp remainder; "
                    "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); single (the number as a 32-bit float holds it); pi.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
   d.outputs = {data("result", "", PinType::number)};

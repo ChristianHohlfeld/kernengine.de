@@ -163,14 +163,14 @@ template <class T> using Span = kern::Span<T>;
 
 // the functions of numbers a formula does not have itself, as the converter writes them
 inline double hypot_bp(double a, double b) { return kern::math::sqrt((a * a) + (b * b)); }
-inline double ldexp_bp(double x, double n) { return (x * kern::math::pow(2.0, n)); }
+inline double ldexp_bp(double x, double n) { return kern::math::ldexp(x, n); }   // (the engine's own: kern/src/math/elementary.c)
 inline double tanh_bp(double x) { return kern::math::tanh(x); }   // (the engine's own: kern/src/math/hyperbolic.c)
 inline double sinh_bp(double x) { return kern::math::sinh(x); }
 inline double cosh_bp(double x) { return kern::math::cosh(x); }
 inline double asinh_bp(double x) { return kern::math::asinh(x); }
-inline double log2_bp(double x) { return kern::math::div(kern::math::log(x), 0.6931471805599453); }
+inline double log2_bp(double x) { return kern::math::log2(x); }
 inline double log10_bp(double x) { return kern::math::div(kern::math::log(x), 2.302585092994046); }
-inline double cbrt_bp(double x) { return (kern::math::sign(x) * kern::math::pow(kern::math::abs(x), 0.3333333333333333)); }
+inline double cbrt_bp(double x) { return kern::math::cbrt(x); }
 
 // A map and a set (kern::Map, kern::Set - the program's): the language's Map and Set are these very
 // containers, in the order the keys came (kern/core/map.h). The test's source holds them as they are.
