@@ -123,6 +123,8 @@ std::unique_ptr<Task> make_motion_task(const std::string& spec);
 class Env {
  public:
   virtual ~Env() = default;
+  virtual std::vector<u8> save_episode() const { return {}; }
+  virtual bool load_episode(const u8*,std::size_t) { return false; }
   virtual i32 obs_size() const = 0;
   virtual i32 critic_size() const = 0;
   virtual i32 action_size() const = 0;
@@ -159,8 +161,8 @@ class DuckEnv : public Env {
   // Record only the current episode, never all prior training.
   void enable_checkpoint() { checkpoint_enabled_ = true; }
   void set_training_progress(i32 iteration) { training_progress_ = iteration; }
-  std::vector<u8> save_episode() const;
-  bool load_episode(const u8* data, std::size_t size);
+  std::vector<u8> save_episode() const override;
+  bool load_episode(const u8* data, std::size_t size) override;
   i32 steps() const { return step_; }
   f32 episode_return() const { return return_; }
   game::GameWorld& world();
