@@ -309,6 +309,11 @@ logged mathf "std::hypot, std::cos, std::atan2 of f32 beside a header of the eng
 check mathf "... by their name, in f32" yes 'kern::formula<f32>\(\[\]\(auto x\) \{ return \(cos\(x\) \+ sin\(x\)\); \}, x\)'
 logged mathf "all are compared" '^3 functions of the Blueprints are compared'
 ran mathf "the tests, built and run: the source and the Blueprint the same, bit for bit"
+convert rootc
+logged rootc "span / (2.0f * std::sqrt(2.0f)): the root of a number written out is the number it gives" '^2 of 2 functions of the program are written'
+check rootc "... written out, no operation of numbers alone" no 'sqrt\('
+logged rootc "both are compared" '^2 functions of the Blueprints are compared'
+ran rootc "the tests, built and run: bit for bit"
 convert rowref
 logged rowref "set_cell (a reference to an entry of a map, bits set with u64{1} << n) is written" '^ +Water::set_cell \([0-9]+\): written'
 check rowref "u64{1} << n: the 1 is a value of its type (not the i32 a bare 1 is)" no '\(1 << \(idx & 63\)\)'
@@ -436,6 +441,6 @@ python3 "$here/libraries.py" || fail=1
 python3 "$here/placement.py" || fail=1
 
 if [ $fail != 0 ]; then
-  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts rowref mathf far worldrules appstate worldapp look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
+  for c in pad getter nodekind ownget frame makeworld objects actors bytes table nested meshextra views inner patch chain logicarg placelib running pieces blasts rowref mathf rootc far worldrules appstate worldapp look program; do echo "--- $c"; grep -v '^round' "$top/$c/convert.log" | tail -8; done
   exit 1
 fi

@@ -10984,6 +10984,9 @@ class Emit:
         if k == "CallExpr" and self.formula_function(b) and MATH.get(callee_name(b)) in ENGINE_MATH and len(kids(b)) - 1 == ENGINE_MATH[MATH[callee_name(b)]]:
             # (a function of the engine's mathematics of numbers written out - std::cbrt(27.0): the number the engine gives for it)
             return all(self.literal_only(bare(c)) for c in kids(b)[1:])
+        if k == "CallExpr" and self.formula_function(b) and callee_name(b) in ("sqrt", "sqrtf"):
+            # (the root of a number written out - 2.0f * std::sqrt(2.0f): exact in IEEE, the number it gives - Const.number)
+            return all(self.literal_only(bare(c)) for c in kids(b)[1:])
         return False
 
     # (the C++ type a number written out has alone, as the formula reads it: 7 an i32, 7u a u32, 0.5 an f64, 0.5f an f32)
