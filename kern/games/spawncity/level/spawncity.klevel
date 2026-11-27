@@ -497,8 +497,11 @@
        "x": 160,
        "y": 440,
        "params": {
-        "formula": "abs(clamp(v, -1.0, 1.0)) <= dz ? 0.0 : (v > 0.0 ? 1.0 : v < 0.0 ? -1.0 : 0.0) * pow(((abs(clamp(v, -1.0, 1.0)) - dz) / (1.0 - dz)), e)",
-        "types": "f64 f64 f64"
+        "formula": "abs(clamp(v, -1.0, 1.0)) <= dz ? zero : (v > 0.0 ? 1.0 : v < 0.0 ? -1.0 : 0.0) * pow(((abs(clamp(v, -1.0, 1.0)) - dz) / (1.0 - dz)), e)",
+        "types": "f64 f64 f64 f64"
+       },
+       "values": {
+        "zero": 0
        }
       },
       {
@@ -1389,8 +1392,11 @@
        "x": 1840,
        "y": 4140,
        "params": {
-        "formula": "(n >= 1.0 ? 1.0 : clamp(anti + (1.0 - anti) * (c * w + n * (1.0 - w)), 0.0, 1.0)) / max(raw, 1.0e-09)",
-        "types": "f64 f64 f64 f64 f64"
+        "formula": "(n >= 1.0 ? one : clamp(anti + (1.0 - anti) * (c * w + n * (1.0 - w)), 0.0, 1.0)) / max(raw, 1.0e-09)",
+        "types": "f64 f64 f64 f64 f64 f64"
+       },
+       "values": {
+        "one": 1
        }
       },
       {
@@ -2281,8 +2287,11 @@
        "x": 2120,
        "y": 7010,
        "params": {
-        "formula": "sqrt(yaw * yaw + pitch * pitch) < 0.002 || sqrt(iy * iy + ip * ip) < 1.0e-06 ? 1.0 : clamp((iy * yaw + ip * pitch) / (sqrt(iy * iy + ip * ip) * sqrt(yaw * yaw + pitch * pitch)), 0.0, 1.0)",
-        "types": "f64 f64 f64 f64"
+        "formula": "sqrt(yaw * yaw + pitch * pitch) < 0.002 || sqrt(iy * iy + ip * ip) < 1.0e-06 ? one : clamp((iy * yaw + ip * pitch) / (sqrt(iy * iy + ip * ip) * sqrt(yaw * yaw + pitch * pitch)), 0.0, 1.0)",
+        "types": "f64 f64 f64 f64 f64"
+       },
+       "values": {
+        "one": 1
        }
       },
       {
@@ -2496,8 +2505,11 @@
        "x": 160,
        "y": 8290,
        "params": {
-        "formula": "abs(clamp(v, -1.0, 1.0)) <= clamp(dz, 0.0, 0.5) ? 0.0 : (v > 0.0 ? 1.0 : v < 0.0 ? -1.0 : 0.0) * (abs(clamp(v, -1.0, 1.0)) - clamp(dz, 0.0, 0.5)) / (1.0 - clamp(dz, 0.0, 0.5))",
-        "types": "f64 f64"
+        "formula": "abs(clamp(v, -1.0, 1.0)) <= clamp(dz, 0.0, 0.5) ? zero : (v > 0.0 ? 1.0 : v < 0.0 ? -1.0 : 0.0) * (abs(clamp(v, -1.0, 1.0)) - clamp(dz, 0.0, 0.5)) / (1.0 - clamp(dz, 0.0, 0.5))",
+        "types": "f64 f64 f64"
+       },
+       "values": {
+        "zero": 0
        }
       },
       {
@@ -2524,8 +2536,11 @@
        "x": 160,
        "y": 8580,
        "params": {
-        "formula": "abs(v) < dz ? 0.0 : v",
-        "types": "f64 f64"
+        "formula": "abs(v) < dz ? zero : v",
+        "types": "f64 f64 f64"
+       },
+       "values": {
+        "zero": 0
        }
       },
       {
@@ -2552,8 +2567,11 @@
        "x": 160,
        "y": 8870,
        "params": {
-        "formula": "abs(rt - lt) < dz ? 0.0 : clamp(rt - lt, -1.0, 1.0)",
-        "types": "f64 f64 f64"
+        "formula": "abs(rt - lt) < dz ? zero : clamp(rt - lt, -1.0, 1.0)",
+        "types": "f64 f64 f64 f64"
+       },
+       "values": {
+        "zero": 0
        }
       },
       {
