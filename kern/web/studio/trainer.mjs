@@ -52,6 +52,63 @@ function writeLocalCheckpoint(record,wasm) {
 function clearLocalCheckpoint() {
   return localCheckpoint("readwrite",store=>{store.clear();return ()=>undefined;});
 }
+const CHECKPOINT_MAGIC = new TextEncoder().encode("KERNCP1\n");
+const CHECKPOINT_MAX = 512*1024*1024;
+const hashBytes=async bytes=>new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+function frameCheckpoint(buffers){
+  const total=buffers.reduce((sum,b)=>sum+8+b.byteLength,0);
+  if(total>CHECKPOINT_MAX)throw Error("Checkpoint too large");
+  const out=new Uint8Array(total),view=new DataView(out.buffer);
+  let at=0;
+  for(const b of buffers){view.setBigUint64(at,BigInt(b.byteLength),true);at+=8;out.set(new Uint8Array(b),at);at+=b.byteLength;}
+  return out;
+}
+function unframeCheckpoint(payload,count){
+  const view=new DataView(payload.buffer,payload.byteOffset,payload.byteLength),out=[];
+  let at=0;
+  for(let i=0;i<count;i++){
+    if(at+8>payload.length)throw Error("Truncated checkpoint");
+    const n=view.getBigUint64(at,true);at+=8;
+    if(n>BigInt(payload.length-at))throw Error("Invalid checkpoint section");
+    out.push(payload.slice(at,at+Number(n)).buffer);at+=Number(n);
+  }
+  if(at!==payload.length)throw Error("Unexpected checkpoint data");
+  return out;
+}
+async function encodeCheckpoint(meta,payload){
+  const header=new TextEncoder().encode(JSON.stringify({...meta,sha256:hex(await hashBytes(payload))}));
+  const size=12+header.length+payload.length+32;
+  if(size>CHECKPOINT_MAX||header.length>8*1024*1024)throw Error("Checkpoint too large");
+  const out=new Uint8Array(size);
+  out.set(CHECKPOINT_MAGIC);new DataView(out.buffer).setUint32(8,header.length,true);
+  out.set(header,12);out.set(payload,12+header.length);
+  out.set(await hashBytes(out.subarray(0,size-32)),size-32);
+  return out;
+}
+async function decodeCheckpoint(bytes){
+  if(bytes.length<44||bytes.length>CHECKPOINT_MAX||CHECKPOINT_MAGIC.some((v,i)=>bytes[i]!==v))
+    throw Error("Select a complete .kernckpt file, not a standalone ONNX network.");
+  const end=bytes.length-32,hash=await hashBytes(bytes.subarray(0,end));
+  if(hash.some((v,i)=>v!==bytes[end+i]))throw Error("Checkpoint checksum mismatch");
+  const n=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(8,true);
+  if(n<1||n>8*1024*1024||12+n>=end)throw Error("Invalid checkpoint header");
+  const meta=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes.subarray(12,12+n)));
+  const payload=bytes.subarray(12+n,end);
+  if(!meta||meta.schema!==1||meta.sha256!==hex(await hashBytes(payload)))throw Error("Invalid checkpoint metadata");
+  return {meta,payload};
+}
+function validLocalRecord(r){
+  const integer=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
+  return r && r.schema===1 && typeof r.token==="string" && r.token.length<=128 &&
+    ["motion","jump","stand","scenario"].includes(r.task) && typeof r.name==="string" && r.name.length<=16384 &&
+    (r.name===r.task||r.name.startsWith(r.task+":")) && typeof r.label==="string" && r.label.length<=256 &&
+    integer(r.count,1,64)&&integer(r.envs,1,256)&&integer(r.total,1,100000)&&
+    integer(r.seed,1,4294967295)&&integer(r.iteration,0,r.total)&&
+    r.config && typeof r.config==="object" && Object.keys(r.config).every(k=>
+      ["initStd","learningRate"].includes(k)&&Number.isFinite(r.config[k])&&r.config[k]>0&&r.config[k]<=1) &&
+    Array.isArray(r.history)&&r.history.length<=r.iteration&&r.history.every(p=>integer(p.it,1,r.iteration)&&Number.isFinite(p.ret)&&Number.isFinite(p.len));
+}
 function acquireLocalLease() {
   if(!navigator.locks)throw Error("Local resumable training requires browser Web Locks support.");
   return new Promise((resolve,reject)=>{
@@ -355,6 +412,8 @@ export class Trainer {
         `<p class="tr-note" id="trLocalSaved"></p>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
         `<div class="tr-buttons"><button class="btn small" id="trTest" type="button">Try the network on the duck</button><button class="btn small" id="trDownload" type="button">Download .onnx</button></div>` +
+        `<div class="tr-buttons"><button class="btn small" id="trCheckpointDownload" type="button">Download checkpoint</button><button class="btn small" id="trCheckpointUpload" type="button">Upload checkpoint</button><input id="trCheckpointFile" type="file" accept=".kernckpt" hidden></div>` +
+        `<p class="tr-note">ONNX is for playback; a checkpoint contains the complete training state.</p>` +
         `<div class="tr-status tr-saved" id="trNote"></div>` +
         `<div class="grp">Expert settings</div>` +
         field("Workers", num("trWorkers", Math.min(cores, 8))) + field("Ducks per worker", num("trEnvs", 8)) + field("Iterations", num("trIterations", 1500)) + field("Seed", num("trSeed", 1)) +
@@ -449,6 +508,12 @@ export class Trainer {
     el.trStop.onclick = () => this.stop();
     el.trTest.onclick = () => this.previewNetwork();
     el.trDownload.onclick = () => { if (this.onnx) trainerDownload(`${this.onnx.name}_kern.onnx`, this.onnx.bytes, "application/octet-stream"); };
+    el.trCheckpointDownload.onclick=()=>void this.downloadCheckpoint();
+    el.trCheckpointUpload.onclick=()=>el.trCheckpointFile.click();
+    el.trCheckpointFile.onchange=()=>{
+      const file=el.trCheckpointFile.files?.[0];el.trCheckpointFile.value="";
+      if(file)void this.uploadCheckpoint(file);
+    };
     el.scExample.onclick = () => { this.setScenario(TRAINER_SCENARIO); el.scName.value = tr(TRAINER_SCENARIO.name); };
     el.scApply.onclick = () => {
       try { this.setScenario(JSON.parse(el.scJson.value)); this.status("Scenario loaded."); }
@@ -556,6 +621,10 @@ export class Trainer {
     el.trStop.disabled = !run || !!run?.localStopping || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
+    if(el.trCheckpointDownload){
+      el.trCheckpointDownload.disabled=!!this.checkpointBusy || (remoteSelected?!(run?.remote?.id||this.lastRemoteResult):!this.localSaved);
+      el.trCheckpointUpload.disabled=!!run||!!this.localBusy||!!this.checkpointBusy;
+    }
     el.trTest.disabled = !(this.onnx?.preview || this.onnx?.move) || !open;
     this.text(el.trStatus, this.statusText);
     el.trStatus.classList.toggle("err", this.statusError);
@@ -715,7 +784,7 @@ export class Trainer {
   }
 
   async start() {
-    if (this.run || this.localBusy) return;
+    if (this.run || this.localBusy || this.checkpointBusy) return;
     const el = this.el, task = this.task;
     // `move`: the level's motion the run's network belongs to (Kern's jump: the level's own "jump").
     let name = task, move = task === "jump" ? "jump" : null, label = task;
@@ -774,6 +843,78 @@ export class Trainer {
     }
   }
 
+
+  async downloadCheckpoint(){
+    if(this.checkpointBusy)return;
+    this.checkpointBusy=true;this.sync();
+    try{
+      let bytes,name="training";
+      if(this.el.trCompute.value==="mag"){
+        const remote=this.run?.remote;
+        const id=remote?.id||this.lastRemoteResult;
+        if(!id)throw Error("No MAG checkpoint available");
+        const connection=remote||this.remoteConnection();
+        bytes=await this.remoteRequest({remote:connection},"/v1/jobs/"+id+"/checkpoint",undefined,true,120000);
+        await decodeCheckpoint(bytes);
+        name="mag-"+id.slice(0,8);
+      }else{
+        const saved=await readLocalCheckpoint();
+        if(!saved)throw Error("No local checkpoint available");
+        const {learner,collectors,onnx,...record}=saved.record;
+        if(!validLocalRecord(record)||!(onnx instanceof ArrayBuffer))throw Error("Checkpoint predates portable export");
+        const payload=frameCheckpoint([learner,...collectors,onnx]);
+        bytes=await encodeCheckpoint({schema:1,backend:"local",record,
+          wasmSha256:hex(await hashBytes(saved.wasm))},payload);
+        name=record.label;
+      }
+      trainerDownload(name.replace(/[^a-zA-Z0-9_-]/g,"_")+".kernckpt",bytes,"application/octet-stream");
+      this.note="Complete checkpoint downloaded.";
+    }catch(error){this.status(error.message,true);}
+    finally{this.checkpointBusy=false;this.sync();}
+  }
+
+  async uploadCheckpoint(file){
+    if(this.run||this.localBusy||this.checkpointBusy)return;
+    this.checkpointBusy=true;this.sync();
+    let release,localReady=false;
+    try{
+      if(file.size>CHECKPOINT_MAX)throw Error("Checkpoint too large");
+      const bytes=new Uint8Array(await file.arrayBuffer());
+      const {meta,payload}=await decodeCheckpoint(bytes);
+      if(meta.backend==="local"){
+        const record=meta.record;
+        if(!validLocalRecord(record))throw Error("Invalid local checkpoint metadata");
+        const buffers=unframeCheckpoint(payload,record.count+2);
+        if(buffers.some(b=>!b.byteLength))throw Error("Empty checkpoint section");
+        release=await acquireLocalLease();
+        const previous=await readLocalCheckpoint();
+        if(previous)throw Error("A local checkpoint exists. Download or discard it before importing another.");
+        // Never execute WASM supplied by an uploaded file. Only resume with
+        // the trusted current binary if it matches the original hash.
+        const response=await fetch(TRAINER_WASM);
+        if(!response.ok)throw Error("Lehrer WASM could not be loaded");
+        const wasm=await response.arrayBuffer();
+        if(hex(await hashBytes(wasm))!==meta.wasmSha256)throw Error("Checkpoint requires the original Lehrer WASM build.");
+        await writeLocalCheckpoint({...record,learner:buffers[0],collectors:buffers.slice(1,-1),onnx:buffers.at(-1)},wasm);
+        this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
+        this.el.trCompute.value="local";
+        localReady=true;
+      }else if(meta.backend==="mag"){
+        if(meta.build!==window.KERN_TRAINER_BUILD)throw Error("Checkpoint requires the original Studio/MAG build.");
+        const connection=this.remoteConnection(),id=crypto.randomUUID();
+        this.el.trCompute.value="mag";
+        const remote={...connection,id,config:meta.config,stopping:false};
+        // Upload may succeed even if its HTTP response is lost. Remember the
+        // job identity before sending; discovery never starts a second job.
+        this.rememberRemote(remote);
+        await this.remoteRequest({remote},"/v1/checkpoints/"+id,bytes,false,120000);
+      }else throw Error("Unsupported checkpoint backend");
+    }catch(error){
+      this.status(error.message,true);
+    }finally{release?.();this.checkpointBusy=false;this.sync();}
+    if(localReady)await this.resumeLocal();
+    else if(this.el.trCompute.value==="mag")await this.reconnectRemote();
+  }
 
   async refreshLocal() {
     try {
@@ -842,11 +983,12 @@ export class Trainer {
       trainerCall(run.learner,{type:"save-state",learner:true},"saved-state"),
       ...run.collectors.map(w=>trainerCall(w,{type:"save-state",learner:false},"saved-state"))
     ]);
+    const snapshot=await trainerCall(run.learner,{type:"export"},"onnx");
     if(this.run!==run)throw Error("Local run no longer active");
     const record={schema:1,token:run.token,task:run.task,name:run.name,label:run.label,
       count:run.count,envs:run.envs,total:run.total,seed:run.seed,config:run.config,
       iteration:run.iteration,history:run.history,stats:run.lastStats||null,report:run.lastReport||null,
-      learner:states[0].state,collectors:states.slice(1).map(s=>s.state)};
+      learner:states[0].state,collectors:states.slice(1).map(s=>s.state),onnx:snapshot.onnx};
     await writeLocalCheckpoint(record,initialWasm);
     this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
     this.sync();
@@ -999,7 +1141,7 @@ export class Trainer {
   }
 
   discoverRemote() {
-    if (!this.s || !this.el || this.run || this.localBusy || !this.el.trRemoteUrl.value.trim()) return;
+    if (!this.s || !this.el || this.run || this.localBusy || this.checkpointBusy || !this.el.trRemoteUrl.value.trim()) return;
     if(this.lastRemoteResult && this.onnx && this.el.trCompute.value==="mag")return;
     clearTimeout(this.remoteProbeTimer);
     this.remoteProbeTimer = null;
@@ -1009,7 +1151,7 @@ export class Trainer {
   // Read-only discovery: a reload never POSTs a new job or imports into a
   // potentially different level. The existing job remains authoritative.
   async reconnectRemote({automatic=false} = {}) {
-    if (this.run || this.localBusy) return;
+    if (this.run || this.localBusy || this.checkpointBusy) return;
     let run, connection, record;
     try {
       connection = this.remoteConnection();
@@ -1082,15 +1224,16 @@ export class Trainer {
 
   // A second transport, not a second trainer. The existing run, stats, goal
   // and ONNX delivery are shared with the local worker path.
-  async remoteRequest(run, path, body, binary = false) {
+  async remoteRequest(run, path, body, binary = false, timeoutMs = 12000) {
     const remote = run.remote;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const headers = {"X-Kern-Lehrer": "1"};
-      if (body !== undefined) headers["Content-Type"] = "application/json";
+      const raw=body instanceof Uint8Array;
+      if (body !== undefined) headers["Content-Type"] = raw?"application/octet-stream":"application/json";
       const response = await fetch(remote.url + path, {method: body === undefined ? "GET" : "POST",
-        headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,
+        headers, body: body === undefined ? undefined : raw?body:JSON.stringify(body), signal: controller.signal,
         cache: "no-store", credentials: "omit", redirect: "error", referrerPolicy: "no-referrer"});
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -1100,7 +1243,7 @@ export class Trainer {
       }
       return binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
     } catch (error) {
-      if (controller.signal.aborted) throw Error("MAG did not respond within 12 seconds. Check Tailscale and browser local network access.");
+      if (controller.signal.aborted) throw Error(timeoutMs===12000?"MAG did not respond within 12 seconds. Check Tailscale and browser local network access.":"Checkpoint transfer interrupted. Check MAG before retrying.");
       throw error;
     } finally { clearTimeout(timeout); }
   }
