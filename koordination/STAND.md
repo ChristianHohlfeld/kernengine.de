@@ -175,3 +175,9 @@ Kandidat 9 (ac491f28): convert rc=0, 1609/1839 geschrieben, 230 warten (31 an si
 - work-final 022cb3ab = + WIP zahlen8 (logic_library_place getypt, ActorBlueprint-Zahlen, alte f64-Mathe raus) + Merge work-konverter 16dfcf14 (Konflikt HONEST gelöst, worldapp/appstate getypt, engine_api neu). CI 45941270541.
 - work-spiel 25c2f1a2 = Level/Projekt getypt (WIP kleinspiel4) + Merge work-final + Zeile 74 (logic->budget) gestrichen. = work-kandidat-11, mag-Auftrag kandidat-11-054016 (voll).
 - Offen: test_controls/test_settings auf neue Aufrufform (zeigt der mag-Lauf), CI work-final, dann Level aus mag-Ergebnis nach work-spiel → work-final → Gate → Changelog → main.
+
+## Nachtrag 27.11. 11:20 — NACH MAIN GEMISCHT (Anweisung des Besitzers „Sofort", Tokens zu Ende)
+- main = work-final 112832d5 (fast-forward von 9ac74916). Vorher main: 9ac74916 (Rückweg: `git revert`/neuer Commit auf diesen Stand, kein force).
+- Inhalt: Projekt/Programm, bind(world), Leser-Fix logic::link, 12 eigene Mathe-Funktionen, Zahl-Typen (+Editor), Konverter-Fixes vom 27.11. (Bibliotheken behalten Konstruktoren/Operatoren, dm f32, Map-Verweis je Runde, u64{1}<<n, Wurzel-Konstante, clamp-Grenzen, WIDE_TEST aus), verkleinertes SpawnCity (Spiel = App, 561/561 geschrieben, 539 verglichen; Level aus mag kandidat-21-101026).
+- NICHT belegt beim Mischen: Spiel-Suite auf mag (kandidat-21 lief noch), CI-Gate 45980184716 auf 13612515 lief noch (native-spawncity, input, e2e, e2e-spawncity nie grün gesehen mit neuem Level). Deploy-Job braucht nur `build` auf main.
+- Offen: Ergebnis CI main; rote Jobs beheben; Engine-Regel „Literal-Zweig neben Wert in ?:" (Leser nimmt an, Klasse nicht); App-Lücken (extensions, WorldSettings), Fassaden/Wasser; Bausteine.
