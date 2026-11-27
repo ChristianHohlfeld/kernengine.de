@@ -7,6 +7,7 @@
 // Long runs (on a server, say): --checkpoint run.ckpt saves the whole learner every --save-every
 // iterations; --resume run.ckpt carries on from it.
 #include <chrono>
+#include <csignal>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -35,11 +36,14 @@ using namespace kern;
 using namespace kern::lehrer;
 
 namespace {
+volatile std::sig_atomic_t stop_requested = 0;
+void request_stop(int) { stop_requested = 1; }
 
 struct Options {
   std::string task = "jump", scenario, out, eval, log, checkpoint, resume, warm, trace;
   std::string calibrate, holdout, profile, compare, examples, demo, demo_search, demo_check, play_eval;
   i32 play = 0;
+  bool progress_json = false;
   std::string policies;
   i32 rounds = 0, round_episodes = 0, keep_every = 0, randomized = 0;
   std::string play_net, play_practice;
@@ -518,7 +522,8 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
-    if (a == "--task") o.task = next();
+    if (a == "--progress-json") o.progress_json = true;
+    else if (a == "--task") o.task = next();
     else if (a == "--scenario") o.scenario = next();
     else if (a == "--envs") o.envs = std::atoi(next());
     else if (a == "--threads") o.threads = std::atoi(next());
@@ -629,6 +634,11 @@ int main(int argc, char** argv) {
   if (o.play == 6) return demo_trace(o);
   if (o.play) return play_train(o);
   if (o.out.empty()) o.out = o.scenario.empty() ? o.task + ".onnx" : "scenario.onnx";
+  if (o.progress_json) { std::signal(SIGTERM, request_stop); std::signal(SIGINT, request_stop); }
+#ifdef KERN_LEHRER_HIP
+  if (!hip_lehrer_check()) return 1;
+  std::printf("HIP devices: %d\n", hip_lehrer_devices());
+#endif
   const i32 threads = o.threads > 0 ? o.threads : max_of(1, static_cast<i32>(std::thread::hardware_concurrency()));
   if (o.envs <= 0) o.envs = 16 * threads;
   // The task's recipe (recipe.h; the browser trains with the same), then what the command line says.
@@ -702,7 +712,7 @@ int main(int argc, char** argv) {
               threads, recipe.ppo.steps_per_env, recipe.substeps, o.resume.empty() ? recipe.warm_start.c_str() : "(resumed)");
   const auto start = std::chrono::steady_clock::now();
   bool jumped = false;
-  for (i32 it = ppo.iteration() + 1; it <= o.iterations; ++it) {
+  for (i32 it = ppo.iteration() + 1; it <= o.iterations && !stop_requested; ++it) {
     before_learning(ppo, recipe);
     const IterationStats s = train_iteration(ppo, backend);
     const f64 seconds = std::chrono::duration<f64>(std::chrono::steady_clock::now() - start).count();
@@ -732,13 +742,37 @@ int main(int argc, char** argv) {
       const std::string stem = o.out.size() > 5 && o.out.substr(o.out.size() - 5) == ".onnx" ? o.out.substr(0, o.out.size() - 5) : o.out;
       write_file(stem + name, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)));
     }
-    if (it % o.save_every == 0 || it == o.iterations) {
-      if (!jumped || !o.stop_after_jump) write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)));
-      if (!o.checkpoint.empty()) write_file(o.checkpoint, ppo.save());
+    const bool snapshot = it % o.save_every == 0 || it == o.iterations || stop_requested;
+    if (snapshot) {
+      if ((!jumped || !o.stop_after_jump) && !write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) {
+        std::fprintf(stderr, "cannot write network\n"); if (log) std::fclose(log); return 1;
+      }
+      if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) {
+        std::fprintf(stderr, "cannot write checkpoint\n"); if (log) std::fclose(log); return 1;
+      }
+    }
+    if (o.progress_json) {
+      json::Value v = json::Value::object();
+      v.set("iteration", s.iteration); v.set("steps", static_cast<f64>(s.steps));
+      v.set("episodes", s.episodes); v.set("meanReturn", static_cast<f64>(s.mean_return));
+      v.set("meanLength", static_cast<f64>(s.mean_length)); v.set("meanStd", static_cast<f64>(s.mean_std));
+      v.set("collectSeconds", static_cast<f64>(s.collect_seconds)); v.set("learnSeconds", static_cast<f64>(s.learn_seconds));
+      v.set("sps", sps); v.set("snapshot", snapshot);
+      if (snapshot && !stop_requested) {
+        json::Value report;
+        const std::string result = evaluate_training(recipe, ppo, 5);
+        if (!result.empty() && json::parse(result, report)) v.set("report", report);
+      }
+      std::printf("KERN_PROGRESS %s\n", json::stringify(v).c_str()); std::fflush(stdout);
     }
     if (jumped && o.stop_after_jump) break;
   }
   if (log) std::fclose(log);
+  if (stop_requested) {
+    if (!write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) return 1;
+    if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) return 1;
+    std::printf("stopped at iteration %d\n", ppo.iteration());
+  }
   std::printf("wrote %s\n", o.out.c_str());
   return 0;
 }
