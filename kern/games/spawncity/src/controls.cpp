@@ -23,20 +23,20 @@ void take(const Look& v, WorldLook& l) {
 }
 /// The Cook of the Blueprint, as it takes and gives it.
 struct Cook {
-  i32 carry = 0;
+  kern::i64 carry = 0;  // (the Blueprint's Int is i64)
   f64 regen_at = 0;
   bool cooking = false;
   f64 at = 0, power = 0;
-  i32 source = 0;
+  kern::i64 source = 0;
 };
 Cook cook_of(const GrenadeCook& g) { return {g.carry, rules::decimal(g.regen_at), g.cooking, rules::decimal(g.at), rules::decimal(g.power), g.source}; }
 void take(const Cook& c, GrenadeCook& g) {
-  g.carry = c.carry;
+  g.carry = static_cast<i32>(c.carry);
   g.regen_at = static_cast<f32>(c.regen_at);
   g.cooking = c.cooking;
   g.at = static_cast<f32>(c.at);
   g.power = static_cast<f32>(c.power);
-  g.source = c.source;
+  g.source = static_cast<i32>(c.source);
 }
 }  // namespace
 
@@ -143,7 +143,7 @@ void CarHeadSpring::step(f32 x, f32 y, f32 dt) {
 }
 
 int ViewButton::step(bool down, f32 now) {
-  i32 out = 0;
+  kern::i64 out = 0;  // (the Blueprint's Int is i64)
   bool now_was = false, now_held_map = false;
   f64 now_down_at = 0, now_map_at = 0;
   g_rules.call("ViewButtonStep", std::tie(out, now_was, now_held_map, now_down_at, now_map_at), was, held_map, rules::decimal(down_at), rules::decimal(map_at), down, rules::decimal(now));
@@ -151,7 +151,7 @@ int ViewButton::step(bool down, f32 now) {
   held_map = now_held_map;
   down_at = static_cast<f32>(now_down_at);
   map_at = static_cast<f32>(now_map_at);
-  return out;
+  return static_cast<int>(out);
 }
 
 VoiceChord::Out VoiceChord::step(bool r3_now, bool y_now, bool allowed) {
@@ -198,7 +198,7 @@ void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_poi
   fine = fine_pointer;
   coarse = coarse_pointer;
   touch_points = max_touch_points;
-  set(g_rules.flag("DevicePlatform", fine, touch_points));
+  set(g_rules.flag("DevicePlatform", fine, static_cast<kern::i64>(touch_points)));
 }
 void Devices::input(Event e) {
   bool now_desktop = false, now_pad = false;
