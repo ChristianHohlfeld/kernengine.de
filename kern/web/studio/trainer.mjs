@@ -893,6 +893,9 @@ export class Trainer {
       run.lastStats=r.stats;run.lastReport=r.report;
       if(r.stats)this.stats(run,r.stats,r.stats.collectSeconds+r.stats.learnSeconds,false);
       if(r.report)this.goal(run,r.report);
+      // The exact recovered policy is previewable immediately, including
+      // when the next imitation round has not yet finished.
+      await this.export(run);
     }else{
       // Do not start any training step until the initial checkpoint is durable.
       await this.saveLocal(run,wasm);
@@ -950,7 +953,7 @@ export class Trainer {
     const cfg=data.config || record?.config || {};
     run.name=typeof cfg.task==="string"?cfg.task:data.taskKind;
     run.config={initStd:cfg.initStd,learningRate:cfg.learningRate};
-    run.seed=cfg.seed;
+    run.seed=cfg.seed??"";
     run.label=data.taskKind;
     if(run.name.startsWith("motion:") || run.name.startsWith("scenario:")){
       try{run.label=JSON.parse(run.name.slice(run.name.indexOf(":")+1)).name||run.label;}catch{}
@@ -1031,10 +1034,11 @@ export class Trainer {
       if (this.run !== run) return;
       if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
       const terminal = ["done","stopped","error"].includes(data.state);
-      if (automatic && terminal && record?.id !== data.id) {
-        this.forgetRemote(connection.url);
+      if (automatic && terminal && (record?.id !== data.id || this.lastRemoteResult===data.id)) {
+        // A terminal result already displayed in this tab must not be
+        // reopened (or forgotten) on every visibility/online event.
         this.end(run);
-        this.status("Connected to MAG. Ready to start training.");
+        if(this.lastRemoteResult!==data.id)this.status("Connected to MAG. Ready to start training.");
         return;
       }
       this.el.trCompute.value = "mag";
@@ -1150,6 +1154,7 @@ export class Trainer {
         if (["done", "stopped", "error"].includes(data.state)) {
           if(data.config)await this.restoreRemoteHistory(run);
           remote.stopping=false;
+          this.lastRemoteResult=remote.id;
           this.rememberRemote(remote);
           this.end(run); this.status(data.message, data.state === "error"); return;
         }
