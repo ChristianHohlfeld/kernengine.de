@@ -1,5 +1,6 @@
 // Vorbild (vorbild.h): the jump's demonstration, its search, and imitation by DAgger.
 #include "kern/lehrer/vorbild.h"
+#include "kern/lehrer/checkpoint.h"
 
 #include <cmath>
 #include <cstring>
@@ -200,6 +201,29 @@ struct JumpImitation::Data {
 
 JumpImitation::JumpImitation(const Recipe& recipe, u64 seed) : d_(std::make_unique<Data>()), seed_(seed) { d_->recipe = recipe; }
 JumpImitation::~JumpImitation() = default;
+
+std::vector<u8> JumpImitation::save() const {
+  checkpoint::Writer w;
+  w.scalar(u32{1});w.scalar(seed_);w.scalar(round_);
+  // Completed imitation is never used again; omit its large training set.
+  if(round_==d_->recipe.imitation_rounds){
+    w.vector(std::vector<f32>{});w.vector(std::vector<f32>{});
+  }else{
+    w.vector(d_->obs);w.vector(d_->act);
+  }
+  return std::move(w.bytes);
+}
+bool JumpImitation::load(const u8* data,std::size_t size) {
+  checkpoint::Reader r{data,size};
+  u32 version=0;u64 seed=0;i32 round=0;
+  std::vector<f32> obs,act;
+  if(!r.scalar(version)||version!=1||!r.scalar(seed)||seed!=seed_||
+     !r.scalar(round)||round<0||round>d_->recipe.imitation_rounds||
+     !r.vector(obs,size/sizeof(f32))||!r.vector(act,size/sizeof(f32))||!r.end()||
+     act.size()%kActions||obs.size()!=act.size()/kActions*kObs)return false;
+  round_=round;d_->obs=std::move(obs);d_->act=std::move(act);
+  return true;
+}
 
 void dagger_episodes(const Recipe& recipe, u64 seed, i32 round, i32 first, i32 count, const Policy* student, std::vector<f32>& obs_out,
                      std::vector<f32>& act_out) {
