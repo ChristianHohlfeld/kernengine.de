@@ -11089,7 +11089,9 @@ class Emit:
         if name in ("clamp", "clampf") and len(a) == 3:
             # C++'s clamp (std::clamp, kern::clamp), as it is written: v below lo is lo, v above hi is hi - each value
             # once (an input of its own where it is more than a name)
-            v, lo, hi = (self.leaf(x, leaves, self.ex(x, t), t) for x in a)
+            # (a bound written out is an input of its type too: as a branch of ?: beside a place of the language a bare
+            # number is another type - in the class C++ takes neither for the other)
+            v, lo, hi = (self.leaf(x, leaves, self.ex(x, t), t, force=at > 0) for at, x in enumerate(a))
             return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
         if name in ("ldexp", "ldexpf") and len(a) == 2:
             # (x * 2^n, exact: the node Ldexp - the engine's own; n the int C++ gives it)
