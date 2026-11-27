@@ -94,6 +94,8 @@ class JumpImitation {
   /// The same with the round's episodes collected elsewhere (dagger_episodes, joined in order).
   ImitationReport round_from(Ppo& learner, const std::vector<f32>& observations, const std::vector<f32>& actions, const ParallelFor& parallel, bool evaluate);
   i32 rounds_done() const { return round_; }
+  std::vector<u8> save() const;
+  bool load(const u8* data, std::size_t size);
 
  private:
   struct Data;
