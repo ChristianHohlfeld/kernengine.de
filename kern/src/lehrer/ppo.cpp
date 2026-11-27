@@ -294,10 +294,22 @@ IterationStats Ppo::learn(const std::vector<const Rollout*>& rollouts) {
   if (!cfg_.freeze_actor_normalizer) policy_.normalizer.update(obs_buf_.data(), static_cast<i32>(rows));
   critic_norm_.update(crit_buf_.data(), static_cast<i32>(rows));
   {
+#ifdef KERN_LEHRER_HIP
+    // Independent rows: keep their arithmetic order but submit larger batches
+    // concurrently to the HIP streams. Bound host workers and scratch memory.
+    const std::size_t chunk = 1024;
+    const i32 workers = static_cast<i32>(std::min<std::size_t>(kLearnChunks, (rows + chunk - 1) / chunk));
+    const ParallelFor run = parallel_ ? parallel_ : thread_pool();
+    const i32 A = act_;
+    run(workers, [&](i32 worker) {
+      std::vector<f32> xo(chunk * static_cast<std::size_t>(obs_)), xcr(chunk * static_cast<std::size_t>(crit_));
+      for (std::size_t s = static_cast<std::size_t>(worker) * chunk; s < rows; s += chunk * static_cast<std::size_t>(workers)) {
+#else
     const std::size_t chunk = 256;
     const i32 A = act_;
     std::vector<f32> xo(chunk * static_cast<std::size_t>(obs_)), xcr(chunk * static_cast<std::size_t>(crit_));
     for (std::size_t s = 0; s < rows; s += chunk) {
+#endif
       const i32 n = static_cast<i32>(std::min(chunk, rows - s));
       policy_.normalizer.apply(obs_buf_.data() + s * obs_, n, xo.data());
       critic_norm_.apply(crit_buf_.data() + s * crit_, n, xcr.data());
@@ -312,6 +324,9 @@ IterationStats Ppo::learn(const std::vector<const Rollout*>& rollouts) {
         logp_buf_[s + static_cast<std::size_t>(k)] = logp;
       }
     }
+#ifdef KERN_LEHRER_HIP
+    });
+#endif
   }
   // GAE (lambda) per environment; a time-out is bootstrapped with the value where it stood (rsl_rl).
   {
