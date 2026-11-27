@@ -39,6 +39,7 @@ export const I18N_LANG = i18nPickLanguage();
 const I18N_DE = {
   "Compute backend": "Rechenbackend", "Local": "Lokal", "MAG · CPU + HIP GPUs": "MAG · CPU + HIP-GPUs",
   "MAG URL": "MAG-Adresse (einmalig)", "MAG connection settings": "MAG-Verbindungseinstellungen", "Reconnect to MAG": "Mit MAG wiederverbinden",
+  "Connected to MAG. Ready to start training.": "Mit MAG verbunden. Bereit zum Training.",
   // menu bar, toolbar, tabs
   "File": "Datei", "Edit": "Bearbeiten", "Window": "Fenster", "Play": "Spielen", "Help": "Hilfe",
   "Untitled": "Unbenannt", "Unsaved changes": "Ungespeicherte Änderungen",
