@@ -15,6 +15,54 @@ const TRAINER_LEGACY = "kern-lehrer.motion-skills.v1";
 /** Set once taking those into a level was offered. */
 const TRAINER_OFFERED = "kern-studio.lehrer-import.v1";
 
+// Each committed checkpoint contains all workers at one common barrier.
+// Store the exact WASM binary once, in the same transaction as the first state.
+function localCheckpoint(mode, action) {
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open("kern-lehrer-checkpoint",1);
+    req.onupgradeneeded=()=>req.result.createObjectStore("state");
+    req.onerror=()=>reject(req.error);
+    req.onblocked=()=>reject(Error("Local checkpoint database is blocked"));
+    req.onsuccess=()=>{
+      const db=req.result;
+      let tx, result;
+      try {
+        tx=db.transaction("state",mode,mode==="readwrite"?{durability:"strict"}:{});
+        result=action(tx.objectStore("state"));
+      }catch(error){db.close();reject(error);return;}
+      tx.oncomplete=()=>{db.close();resolve(result());};
+      tx.onabort=()=>{db.close();reject(tx.error||Error("Local checkpoint transaction aborted"));};
+      tx.onerror=()=>{}; // abort is authoritative
+    };
+  });
+}
+function readLocalCheckpoint() {
+  return localCheckpoint("readonly",store=>{
+    const current=store.get("current"),wasm=store.get("wasm");
+    return ()=>current.result?{record:current.result,wasm:wasm.result}:null;
+  });
+}
+function writeLocalCheckpoint(record,wasm) {
+  return localCheckpoint("readwrite",store=>{
+    if(wasm)store.put(wasm,"wasm");
+    store.put(record,"current");
+    return ()=>undefined;
+  });
+}
+function clearLocalCheckpoint() {
+  return localCheckpoint("readwrite",store=>{store.clear();return ()=>undefined;});
+}
+function acquireLocalLease() {
+  if(!navigator.locks)throw Error("Local resumable training requires browser Web Locks support.");
+  return new Promise((resolve,reject)=>{
+    navigator.locks.request("kern-lehrer-local-training",{ifAvailable:true},lock=>{
+      if(!lock){reject(Error("Local training is open in another tab."));return;}
+      return new Promise(release=>resolve(release));
+    }).catch(reject);
+  });
+}
+
+
 // A Lehrer worker: one Kern module (kern_lehrer.wasm) per worker. A worker is a collector (its own
 // ducks, the policy it is handed, returns rollouts) or the learner (PPO).
 const TRAINER_WORKER = `
@@ -98,6 +146,19 @@ self.onmessage = async ({ data: m }) => {
       const stats = JSON.parse(kern.string(statsPtr, kern.exports.kern_lehrer_result_length()));
       const policy = policyBuffer();
       self.postMessage({ type: "learned", stats, policy }, [policy]);
+    } else if (m.type === "save-state") {
+      const ptr = m.learner ? kern.exports.kern_lehrer_save_learner() : kern.exports.kern_lehrer_save_collector();
+      const state = resultBytes(ptr);
+      if(!state)throw Error("Checkpoint capture failed");
+      self.postMessage({type:"saved-state",state:state.buffer},[state.buffer]);
+    } else if (m.type === "load-state") {
+      const ok=withBytes(new Uint8Array(m.state),(p,n)=>m.learner?
+        kern.exports.kern_lehrer_load_learner(p,n):kern.exports.kern_lehrer_load_collector(p,n));
+      if(!ok)throw Error("Checkpoint could not be restored exactly");
+      if(m.learner) {
+        const policy=policyBuffer();
+        self.postMessage({type:"restored-state",policy,left:kern.exports.kern_lehrer_imitation_left()},[policy]);
+      }else self.postMessage({type:"restored-state"});
     } else if (m.type === "export") {
       const onnx = resultBytes(kern.exports.kern_lehrer_export_onnx());
       self.postMessage({ type: "onnx", onnx: onnx.buffer }, [onnx.buffer]);
@@ -235,6 +296,8 @@ export class Trainer {
     this.texts = new WeakMap();
     this.el = null;
     this.remoteProbeTimer = null;
+    this.localSaved = null;
+    this.localBusy = false;
   }
 
   /** Sets an element's text when it changed (the page's translation rewrites text nodes: no needless writes). */
@@ -288,6 +351,8 @@ export class Trainer {
         field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8444" spellcheck="false" autocomplete="off">') + `</details>` +
         `<div class="tr-buttons"><button class="btn small" id="trReconnect" type="button">Reconnect to MAG</button></div></div>` +
         `<div class="tr-buttons"><button class="btn go" id="trStart" type="button">Start</button><button class="btn" id="trPause" type="button">Pause</button><button class="btn" id="trStop" type="button">Stop</button></div>` +
+        `<div class="tr-buttons" id="trLocalRecovery" hidden><button class="btn small" id="trLocalResume" type="button">Continue saved training</button><button class="btn small" id="trLocalDiscard" type="button">Discard checkpoint</button></div>` +
+        `<p class="tr-note" id="trLocalSaved"></p>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
         `<div class="tr-buttons"><button class="btn small" id="trTest" type="button">Try the network on the duck</button><button class="btn small" id="trDownload" type="button">Download .onnx</button></div>` +
         `<div class="tr-status tr-saved" id="trNote"></div>` +
@@ -317,6 +382,8 @@ export class Trainer {
       if (el.trCompute.value === "mag" && el.trRemoteUrl.value.trim()) void this.reconnectRemote({automatic:true});
     };
     el.trReconnect.onclick = () => void this.reconnectRemote();
+    el.trLocalResume.onclick = () => void this.resumeLocal();
+    el.trLocalDiscard.onclick = () => void this.discardLocal();
     this.setScenario(TRAINER_SCENARIO);
     el.scName.value = tr(TRAINER_SCENARIO.name);
     this.wire();
@@ -434,7 +501,10 @@ export class Trainer {
     button.classList.toggle("on", open);
     if (open && !this.el) { this.build(); this.statusText = `Ready. ${navigator.hardwareConcurrency || "?"} cores on this device.`; }
     if (this.el) this.sync();
-    if (open && !wasOpen) this.discoverRemote();
+    if (open && !wasOpen) {
+      void this.refreshLocal();
+      this.discoverRemote();
+    }
   }
 
   /** Brings the panel and the bar in step with the engine's state and the run. */
@@ -469,9 +539,16 @@ export class Trainer {
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
     el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
-    el.trStart.disabled = !!run;
-    el.trPause.disabled = !run || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
-    el.trStop.disabled = !run || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
+    el.trStart.disabled = !!run || !!this.localBusy || (!remoteSelected && !!this.localSaved);
+    if(el.trLocalRecovery){
+      el.trLocalRecovery.hidden=remoteSelected || !this.localSaved || !!run;
+      el.trLocalResume.disabled=!!run || !!this.localBusy;
+      el.trLocalDiscard.disabled=!!run || !!this.localBusy;
+      this.text(el.trLocalResume,this.localSaved?.iteration===this.localSaved?.total?"Open saved result":"Continue saved training");
+      this.text(el.trLocalSaved,!remoteSelected && this.localSaved ? "Saved checkpoint: iteration "+this.localSaved.iteration+" / "+this.localSaved.total : "");
+    }
+    el.trPause.disabled = !run || !!run.localStopping || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
+    el.trStop.disabled = !run || !!run?.localStopping || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
     el.trTest.disabled = !this.onnx?.move || !open;
@@ -628,12 +705,12 @@ export class Trainer {
     }
     const w = new Worker(run.workerUrl, {type: "module"});
     run.workers.push(w);
-    await trainerCall(w, {type: "load", module: this.module}, "loaded");
+    await trainerCall(w, {type: "load", module: run.module || this.module}, "loaded");
     return w;
   }
 
   async start() {
-    if (this.run) return;
+    if (this.run || this.localBusy) return;
     const el = this.el, task = this.task;
     // `move`: the level's motion the run's network belongs to (Kern's jump: the level's own "jump").
     let name = task, move = task === "jump" ? "jump" : null, label = task;
@@ -679,46 +756,11 @@ export class Trainer {
     const live = () => this.run === run;
     try {
       if (run.remote) { await this.remotePractice(run); return; }
-      if (!this.module) {
-        this.status("Loading the Lehrer ...");
-        this.module = await WebAssembly.compileStreaming(fetch(TRAINER_WASM)).catch(async () => WebAssembly.compile(await (await fetch(TRAINER_WASM)).arrayBuffer()));
-        if (!live()) return;
-      }
-      this.status(`Starting ${run.count} ${run.count === 1 ? "worker" : "workers"} with ${run.envs} ${run.envs === 1 ? "duck" : "ducks"} each ...`);
-      run.wake = await navigator.wakeLock?.request("screen").catch(() => null);
-      run.learner = await this.spawn(run);
-      run.collectors = await Promise.all(Array.from({length: run.count}, () => this.spawn(run)));
-      // Worker i steps ducks i*envs .. (i+1)*envs-1 of one run: the same run as natively with as many
-      // ducks in all (bit for bit, docs/lehrer.md).
-      await Promise.all(run.collectors.map((w, i) => trainerCall(w, {type: "collector", task: name, envs: run.envs, seed: run.seed, first: i * run.envs}, "ready")
-        .then(d => { if (!d.ok) throw Error("The Lehrer does not take this task"); })));
       const config = {};
       if (trainerNumber(el.trInitStd.value) > 0) config.initStd = trainerNumber(el.trInitStd.value);
       if (trainerNumber(el.trLr.value) > 0) config.learningRate = trainerNumber(el.trLr.value);
-      const made = await trainerCall(run.learner, {type: "learner", task: name, seed: run.seed, config}, "policy");
-      if (!live()) return;
-      run.policy = made.policy;
-      run.steps = made.steps || 24;
-      // First imitation of the demonstration (the jump's recipe), round by round, then practice.
-      let left = made.imitationLeft || 0;
-      while (live() && left > 0) {
-        const round = made.imitationLeft - left;
-        this.status(`Imitating: round ${round + 1} of ${made.imitationLeft} ...`);
-        // The round's episodes spread over the collectors (worker i: its share, in episode order).
-        const episodes = made.imitationEpisodes, k = run.collectors.length;
-        const shares = await Promise.all(run.collectors.map((w, i) => {
-          const first = Math.floor(i * episodes / k), count = Math.floor((i + 1) * episodes / k) - first;
-          return trainerCall(w, {type: "dagger", policy: run.policy.slice(0), round, first, count}, "share").then(d => d.share);
-        }));
-        const d = await trainerCall(run.learner, {type: "imitate", shares}, "imitated", shares);
-        if (!live()) return;
-        run.policy = d.policy;
-        left = d.left;
-        this.goal(run, d.report);
-        this.status(`Imitating: round ${d.report.round} of ${d.report.rounds}, ${d.report.samples.toLocaleString()} samples, error ${d.report.error.toFixed(4)}`);
-      }
-      if (made.imitationLeft && live()) await this.export(run);
-      await this.practice(run);
+      run.config=config;
+      await this.runLocal(run);
     } catch (error) {
       if (!live()) return;
       this.end(run);
@@ -726,6 +768,148 @@ export class Trainer {
     }
   }
 
+
+  async refreshLocal() {
+    try {
+      const saved=await readLocalCheckpoint();
+      if(!this.run?.localLease) this.localSaved=saved?.record||null;
+    } catch(error) {
+      if(!this.run && this.el?.trCompute.value==="local")
+        this.status("Local checkpoint storage unavailable: "+error.message,true);
+    }
+    this.sync();
+  }
+
+  async discardLocal() {
+    if(this.run||this.localBusy||!this.localSaved)return;
+    if(!confirm(tr("Discard the saved local training? This cannot be undone.")))return;
+    this.localBusy=true;this.sync();
+    let release;
+    try{
+      release=await acquireLocalLease();
+      const saved=await readLocalCheckpoint();
+      if(saved?.record.token!==this.localSaved.token)throw Error("Saved training changed in another tab.");
+      await clearLocalCheckpoint();
+      this.localSaved=null;
+      this.status("Local checkpoint discarded.");
+    }catch(error){this.status(error.message,true);}
+    finally{release?.();this.localBusy=false;this.sync();}
+  }
+
+  async resumeLocal() {
+    if(this.run||this.localBusy)return;
+    this.localBusy=true;this.sync();
+    let run,release;
+    try{
+      release=await acquireLocalLease();
+      const saved=await readLocalCheckpoint(),r=saved?.record;
+      if(!r||r.schema!==1||!(saved.wasm instanceof ArrayBuffer)||
+         !Number.isInteger(r.count)||r.count<1||r.count>64||
+         !Number.isInteger(r.envs)||r.envs<1||r.envs>256||
+         !Number.isInteger(r.iteration)||r.iteration<0||r.iteration>r.total||
+         !Array.isArray(r.collectors)||r.collectors.length!==r.count||
+         !(r.learner instanceof ArrayBuffer)||
+         r.collectors.some(b=>!(b instanceof ArrayBuffer))||
+         !["motion","jump","stand","scenario"].includes(r.task))
+        throw Error("Local checkpoint is missing or incompatible; it has not been deleted.");
+      this.el.trCompute.value="local";
+      run=this.run={...r,move:null,workers:[],collectors:[],learner:null,workerUrl:null,
+        wake:null,policy:null,paused:false,localLease:release};
+      release=null;
+      this.history=run.history;
+      this.onnx=null;this.handover=null;
+      await this.runLocal(run,saved);
+    }catch(error){
+      if(run&&this.run===run)this.end(run);
+      this.status(error.message,true);
+    }finally{release?.();this.localBusy=false;this.sync();}
+  }
+
+  async saveLocal(run,initialWasm=null) {
+    if(this.run!==run)throw Error("Local run no longer active");
+    const states=await Promise.all([
+      trainerCall(run.learner,{type:"save-state",learner:true},"saved-state"),
+      ...run.collectors.map(w=>trainerCall(w,{type:"save-state",learner:false},"saved-state"))
+    ]);
+    if(this.run!==run)throw Error("Local run no longer active");
+    const record={schema:1,token:run.token,task:run.task,name:run.name,label:run.label,
+      count:run.count,envs:run.envs,total:run.total,seed:run.seed,config:run.config,
+      iteration:run.iteration,history:run.history,stats:run.lastStats||null,report:run.lastReport||null,
+      learner:states[0].state,collectors:states.slice(1).map(s=>s.state)};
+    await writeLocalCheckpoint(record,initialWasm);
+    this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
+    this.sync();
+  }
+
+  async runLocal(run,saved=null) {
+    const live=()=>this.run===run;
+    if(!run.localLease)run.localLease=await acquireLocalLease();
+    if(!live()){run.localLease?.();return;}
+    if(!saved && await readLocalCheckpoint())
+      throw Error("A local checkpoint exists. Continue it or explicitly discard it.");
+    this.status(saved?"Restoring saved local training ...":"Loading the Lehrer ...");
+    let wasm=saved?.wasm;
+    if(!wasm){
+      const response=await fetch(TRAINER_WASM);
+      if(!response.ok)throw Error("Lehrer WASM could not be loaded");
+      wasm=await response.arrayBuffer();
+    }
+    run.module=await WebAssembly.compile(wasm);
+    if(!live())return;
+    run.wake=await navigator.wakeLock?.request("screen").catch(()=>null);
+    run.learner=await this.spawn(run);
+    run.collectors=await Promise.all(Array.from({length:run.count},()=>this.spawn(run)));
+    await Promise.all(run.collectors.map((w,i)=>trainerCall(w,{type:"collector",task:run.name,
+      envs:run.envs,seed:run.seed,first:i*run.envs},"ready").then(d=>{
+      if(!d.ok)throw Error("The Lehrer does not take this task");
+    })));
+    const made=await trainerCall(run.learner,{type:"learner",task:run.name,seed:run.seed,config:run.config},"policy");
+    run.steps=made.steps||24;run.policy=made.policy;
+    let left=made.imitationLeft||0;
+    if(saved){
+      const r=saved.record;
+      const [learner]=await Promise.all([
+        trainerCall(run.learner,{type:"load-state",learner:true,state:r.learner},"restored-state"),
+        ...run.collectors.map((w,i)=>trainerCall(w,{type:"load-state",learner:false,state:r.collectors[i]},"restored-state"))
+      ]);
+      run.policy=learner.policy;left=learner.left;
+      run.lastStats=r.stats;run.lastReport=r.report;
+      if(r.stats)this.stats(run,r.stats,r.stats.collectSeconds+r.stats.learnSeconds,false);
+      if(r.report)this.goal(run,r.report);
+    }else{
+      // Do not start any training step until the initial checkpoint is durable.
+      await this.saveLocal(run,wasm);
+    }
+    this.localBusy=false;this.sync();
+    while(live() && left>0 && !run.localStopping){
+      if(run.paused){await new Promise(r=>setTimeout(r,200));continue;}
+      const round=made.imitationLeft-left;
+      this.status("Imitating: round "+(round+1)+" of "+made.imitationLeft+" ...");
+      const episodes=made.imitationEpisodes,k=run.collectors.length;
+      const shares=await Promise.all(run.collectors.map((w,i)=>{
+        const first=Math.floor(i*episodes/k),count=Math.floor((i+1)*episodes/k)-first;
+        return trainerCall(w,{type:"dagger",policy:run.policy.slice(0),round,first,count},"share").then(d=>d.share);
+      }));
+      const d=await trainerCall(run.learner,{type:"imitate",shares},"imitated",shares);
+      if(!live())return;
+      run.policy=d.policy;left=d.left;run.lastReport=d.report;
+      await this.saveLocal(run);
+      this.goal(run,d.report);
+    }
+    if(!live())return;
+    if(run.localStopping){await this.finishLocal(run,true);return;}
+    if(made.imitationLeft||saved)await this.export(run);
+    await this.practice(run);
+  }
+
+  async finishLocal(run,stopped) {
+    // At this point all worker states already share a committed boundary.
+    // Keep the checkpoint even when stopped or completed; discard is explicit.
+    try{await this.export(run);}
+    catch(error){this.note="Checkpoint saved; network export failed: "+error.message;}
+    this.end(run);
+    this.status(stopped?"Local training saved. Continue whenever ready.":"Local training complete. Result and checkpoint saved.");
+  }
 
   remoteConnection() {
     if (!this.el.trRemoteUrl.value.trim()) throw Error("Enter the MAG HTTPS address once in the connection settings.");
@@ -940,7 +1124,7 @@ export class Trainer {
 
   async practice(run) {
     const live = () => this.run === run;
-    while (live() && run.iteration < run.total) {
+    while (live() && run.iteration < run.total && !run.localStopping) {
       if (run.paused) { await new Promise(r => setTimeout(r, 200)); continue; }
       const t0 = performance.now();
       const rollouts = await Promise.all(run.collectors.map(w =>
@@ -949,16 +1133,20 @@ export class Trainer {
       if (!live()) return;
       run.policy = learned.policy;
       run.iteration = learned.stats.iteration;
-      this.stats(run, learned.stats, (performance.now() - t0) / 1000);
+      run.lastStats=learned.stats;
+      const seconds=(performance.now()-t0)/1000;
+      if(learned.stats.episodes)run.history.push({it:run.iteration,ret:learned.stats.meanReturn,len:learned.stats.meanLength*0.02});
       if (run.iteration % 25 === 0 || run.iteration === run.total) {
-        if (TRAINER_GOAL[run.task]) this.goal(run, (await trainerCall(run.learner, {type: "evaluate", episodes: 5}, "evaluated")).report);
-        if (!live()) return;
-        await this.export(run);
+        if (TRAINER_GOAL[run.task]) run.lastReport=(await trainerCall(run.learner, {type:"evaluate",episodes:5},"evaluated")).report;
       }
+      if(!live())return;
+      await this.saveLocal(run);
+      this.stats(run,learned.stats,seconds,false);
+      if(run.lastReport)this.goal(run,run.lastReport);
+      if(run.iteration%25===0||run.iteration===run.total)await this.export(run);
     }
     if (!live()) return;
-    this.end(run);
-    this.status(`Done: ${run.iteration} iterations. Download the network, or play the move in your level.`);
+    await this.finishLocal(run,!!run.localStopping);
   }
 
   /** The learner's network as ONNX: a motion's goes into the level (Level::motions), the others are for download. */
@@ -1003,7 +1191,7 @@ export class Trainer {
     return "";
   }
 
-  stats(run, s, seconds) {
+  stats(run, s, seconds, append=true) {
     const set = (id, text) => this.text(this.host.querySelector(`[data-stat="${id}"] b`), text);
     set("it", s.iteration);
     set("steps", Math.round(s.steps).toLocaleString());
@@ -1011,7 +1199,7 @@ export class Trainer {
     if (s.episodes) {
       set("ret", s.meanReturn.toFixed(2));
       set("len", (s.meanLength * 0.02).toFixed(2));
-      run.history.push({it: s.iteration, ret: s.meanReturn, len: s.meanLength * 0.02});
+      if(append)run.history.push({it: s.iteration, ret: s.meanReturn, len: s.meanLength * 0.02});
     }
     set("std", s.meanStd.toFixed(3));
     this.status(`Learning: iteration ${s.iteration} of ${run.total}, collecting ${s.collectSeconds.toFixed(2)} s, learning ${s.learnSeconds.toFixed(2)} s`);
@@ -1047,8 +1235,9 @@ export class Trainer {
       this.status("Stop requested; waiting for MAG to save and release its resources.");
       return;
     }
-    this.end(run);
-    this.status(`Stopped after ${run.iteration} iterations.`);
+    run.localStopping=true;
+    run.paused=false;
+    this.status("Stop requested; saving local training at the next complete checkpoint.");
   }
 
   /** Ends the run: its workers go; the newest exported network stays (one that waits for the level still goes in). */
@@ -1057,6 +1246,7 @@ export class Trainer {
     for (const w of run.workers) w.terminate();
     if (run.workerUrl) URL.revokeObjectURL(run.workerUrl);
     run.wake?.release?.().catch(() => {});
+    run.localLease?.();run.localLease=null;
     this.sync();
   }
 
