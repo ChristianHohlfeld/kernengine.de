@@ -129,6 +129,47 @@ class RemoteTest(unittest.TestCase):
         self.assertEqual(data["state"],"done")
         self.assertEqual(data["stats"]["iteration"],2)
 
+    def reopen(self):
+        old=self.server
+        old.shutdown();self.thread.join(5);old.server_close()
+        self.server=remote.Server(SimpleNamespace(jobs=str(self.root/"jobs"),binary=str(self.root/"fake"),build=BUILD,
+            origin=[ORIGIN],gpu_lock=str(self.root/"gpu.lock"),hook="",port=0,tailnet_only=True))
+        self.base="http://127.0.0.1:"+str(self.server.server_address[1])
+        self.thread=threading.Thread(target=self.server.serve_forever);self.thread.start()
+
+    def test_completed_job_survives_restart(self):
+        body={**self.body,"iterations":2}
+        self.assertEqual(self.request("/v1/jobs",body)[0],200)
+        prior=self.wait(lambda d:d["state"] in remote.TERMINAL)
+        self.server.job.thread.join(5)
+        self.reopen()
+        self.assertEqual(self.request("/v1/current")[2],prior)
+        self.assertEqual(self.request("/v1/jobs",body)[2],prior)
+        self.assertEqual(self.request("/v1/jobs/"+self.id+"/network/"+prior["network"])[2],b"onnx")
+        self.assertIsNone(self.server.job.proc)
+
+    def test_interrupted_job_is_not_restarted(self):
+        self.assertEqual(self.request("/v1/jobs",{**self.body,"iterations":2})[0],200)
+        data=self.wait(lambda d:d["state"] in remote.TERMINAL)
+        self.server.job.thread.join(5)
+        path=self.root/"jobs"/self.id/"job.json"
+        meta=json.loads(path.read_text())
+        meta["public"]["state"]="running"
+        meta["public"]["message"]="Learning on MAG"
+        remote.atomic_json(path,meta)
+        self.reopen()
+        recovered=self.request("/v1/current")[2]
+        self.assertEqual(recovered["state"],"error")
+        self.assertIn("interrupted",recovered["message"])
+        self.assertEqual(recovered["id"],self.id)
+        self.assertEqual(recovered["network"],data["network"])
+        self.assertIsNone(self.server.job.proc)
+
+    def test_shutdown_rejects_new_jobs(self):
+        self.server.closing=True
+        self.assertEqual(self.request("/v1/jobs",self.body)[0],503)
+        self.assertIsNone(self.server.job)
+
 class FakeSystemd:
     def __init__(self):
         self.active={unit:"active" for unit in (*exclusive.FREEZE,*exclusive.STOP)}
