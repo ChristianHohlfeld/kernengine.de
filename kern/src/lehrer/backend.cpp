@@ -40,9 +40,7 @@ std::vector<u8> ThreadBackend::save() const {
   for(const Group& g:groups_){
     w.scalar(static_cast<u32>(g.envs.size()));w.vector(g.collector.save());
     for(const auto& e:g.envs){
-      const auto* duck=dynamic_cast<const DuckEnv*>(e.get());
-      if(!duck)return {};
-      const auto state=duck->save_episode();if(state.empty())return {};
+      const auto state=e->save_episode();if(state.empty())return {};
       w.vector(state);
     }
   }
@@ -57,8 +55,7 @@ bool ThreadBackend::load(const u8* data,std::size_t size) {
     if(!r.scalar(n)||n!=g.envs.size()||!r.vector(bytes,size)||
        !g.collector.load(bytes.data(),bytes.size(),n))return false;
     for(auto& e:g.envs){
-      auto* duck=dynamic_cast<DuckEnv*>(e.get());
-      if(!duck||!r.vector(bytes,size)||!duck->load_episode(bytes.data(),bytes.size()))return false;
+      if(!r.vector(bytes,size)||!e->load_episode(bytes.data(),bytes.size()))return false;
     }
   }
   return r.end();
