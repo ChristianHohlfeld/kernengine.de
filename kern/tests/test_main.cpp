@@ -9312,6 +9312,15 @@ TEST(cpp_reaches_actors_of_its_worlds) {
     CHECK(rules.number("Hit", i64{1}) == 0 && rules.get<i64>("Hits") == 0);
     CHECK(std::string(last_error()) == "the program's C++: Get Variable on Actor: actor " + std::to_string(door_id) + " (Door) is of world " + std::to_string(rules.handle().world) +
                                            " - its world does not run any more (the GameWorld was stopped) (kern/docs/project.md 7)");
+    // the loop guard of a world's Blueprints is the project's (settings "loopBudget"), as the program's own is: a world
+    // without a project keeps the Runtime's default; with one, every start takes the project's
+    CHECK(wb.logic_runtime() && wb.logic_runtime()->budget == ProjectSettings{}.loop_budget);
+    game::Project guarded;
+    guarded.settings.loop_budget = 54321;
+    wb.stop();
+    wb.set_project(&guarded);
+    CHECK(wb.start(l, game::SimMode::play) && wb.logic_runtime() && wb.logic_runtime()->budget == 54321u);
+    wb.set_project(nullptr);
     // started again it is a new world: the Actor of the one before names nothing in it - until it is bound again
     CHECK(wa.start(l, game::SimMode::play));
     wa.step(1.0f / 60, game::PlayInput{});

@@ -5961,6 +5961,17 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Float>(this->kern_engine("engine.game_world.sim_time", {to_value(game_world)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
+  /// How often the world steps per second: the level's WorldSettings::step_hz as the world runs it (15 to 480) - what a program whose own fixed step goes along with the world's asks (WorldSettings is no type of the Blueprints; this is its node, "GameWorld step hz").
+  Float engine_game_world_step_hz(::kern::logic::Object<::kern::game::GameWorld> game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, game_world.ref, "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.step_hz"); return Float{}; }
+      decltype(auto) kern_r = kern_self->step_hz();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
+    }
+    return from_value<Float>(this->kern_engine("engine.game_world.step_hz", {to_value(game_world)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+  }
   /// ---- players (multiplayer) ---- Adds a player's pawn: a copy of the level's template `template_name` (it has a player controller) made as spawn makes one - the one way of copying (kern/docs/runtime_actors.md) -, placed next to the level's player start. `id` forces the root's id (a network client mirrors its server); children follow with consecutive ids. The level's own player (world.player) is an actor of the level, never a copy. Returns the pawn's root actor (0, with the reason: the world does not run, no such template, it has no controller, the ids are taken).
   void engine_game_world_add_pawn(::kern::logic::Object<::kern::game::GameWorld> game_world, const Text& template_name, Int id) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

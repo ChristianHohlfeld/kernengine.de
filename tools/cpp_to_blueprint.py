@@ -4067,7 +4067,19 @@ class Emit:
             self.export_gives = {r["id"]: g for r, g in zip(returns, given)}
             ret = re.sub(r"^const\s+|\s*&$", "", qtype(given[0]).strip())
         f.value = u.place(ret) if d.get("kind") != "CXXConstructorDecl" else None
-        if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
+        owner_of = self.tree.owner.get(d["id"])
+        if u.state is not None and owner_of and owner_of != u.state and function_key(self.tree, d) in u.world.state_functions:
+            # a method of another class of the program that shares a variable of the state (World: movable): a function of the
+            # state's Blueprint whose object is its first input (below) - the state's variables are the Blueprint's
+            f.sees_state = True
+            for x in walk(d):
+                if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "VarDecl":
+                    v = self.tree.decl.get(x["referencedDecl"]["id"])
+                    if v is not None and v["id"] not in self.names and u.kept_by_state(v):
+                        self.names[v["id"]], self.types[v["id"]] = u.state_static(v, os.path.splitext(os.path.basename(v.get("_file") or "file"))[0])
+            if any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d)):
+                f.effect("it changes the Blueprint's variables")
+        elif u.state is not None and (owner_of == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
             # handed in. It changes them unless it says it does not (const) and writes no mutable field.
             # Its constructor makes what C++ makes of its fields when the one object is made (the variables begin
@@ -10128,6 +10140,10 @@ class Emit:
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
             self.f.mutates = True   # (what a function of the state it calls changes, it changes)
+            if not any(src == "state" for _, _, src in self.f.out_fields) and not self.f.ctor:
+                # (found in its body - a const method that calls a function of the state's Blueprint which may change the
+                # state: its test compares the Blueprint's variables too, as of every function that changes them)
+                self.f.out_fields.insert(0, ("State", self.u.name, "state"))
             self.f.effect(f"it calls {g.cpp}(), which changes the state")
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
@@ -13783,6 +13799,8 @@ class TestWriter:
                 f"[[maybe_unused]] static bool defined(const {t}&) {{ return true; }}",
                 f"[[maybe_unused]] static std::string text(const {t}& s) {{ return converted::Value::actor(kern::logic::ActorHandle{{s.id, s.world}}).as_text(); }}",
                 f"[[maybe_unused]] static void take({t}& s, const converted::Value& v) {{ const kern::logic::ActorHandle a = v.as_actor(); s.id = a.id; s.world = a.world; }}"]
+            if t.lstrip(":") == ACTOR:   # (the engine's own, not a copy: converted.h has its arg, same, defined, text and take)
+                self.helped[q] = self.helped[q][:1]
             self.helped.move_to_end(q)
             return name
         o = self.tree.records[q]
@@ -14766,6 +14784,11 @@ class TestWriter:
                 # struct of the engine, compiled along; what such a value holds that is an object of the engine - a
                 # Variable, a json::Value - is a stand-in, by its handle, as the Blueprint has it)
                 return
+            if t == ACTOR:
+                # (an Actor is the engine's own in every test, no copy of it: what a world's stand-in gives - GameWorld::
+                # actor_named - is what the engine's ActorBlueprint::bind(world) takes, also where the bind stands in a piece
+                # of another file; its id and its world are the same numbers in both)
+                return
             parts = t.split("::")
             if t.startswith(ENGINE + "::") and any("::".join(parts[:i]) in tree.records and u.engine_object("::".join(parts[:i])) for i in range(2, len(parts))):
                 return   # (what an object of the engine has inside it - LightPool::Request -: its stand-in has none of it)
@@ -15524,6 +15547,16 @@ class TestWriter:
                     # it is one function, with one stand-in)
                     if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e) or u.api().field_node(e) is not None):
                         out[e["id"]] = e
+                # an ActorBlueprint bound to a world (`g_rules.bind(world)`, actor_bindings): the engine's bind asks that world
+                # for the actor of its name - GameWorld::actor_named, which the source does not spell (the Blueprint's node)
+                if x.get("kind") == "CXXMemberCallExpr" and len(kids(x)) == 2:
+                    m = callee(x)
+                    if m.get("kind") == "MemberExpr" and m.get("name") == "bind" and (tree.owner.get(m.get("referencedMemberDecl")) or "").endswith("logic::ActorBlueprint"):
+                        rec = tree.records.get(re.sub(r"^const\s+|\s*&$", "", qtype(bare(kids(x)[1]))).strip())
+                        named = next((c for c in kids(rec) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "actor_named"), None) if rec is not None else None
+                        if named is not None and tree.decl.get(named["id"], named)["id"] not in out:
+                            e = tree.decl.get(named["id"], named)
+                            out[e["id"]] = e
                 # an object of the engine made - `std::make_unique<kern::net::Client>(transport_, config(), seed)`, or by its
                 # constructor: its constructor of these arguments is one the source calls (the test that takes the piece
                 # holds the stand-in's constructor too - Session::join in the tests of Game)
@@ -15541,9 +15574,20 @@ class TestWriter:
                         makers = u.api().makers(q)
                     except Wait:
                         makers = []
+                    handed = kids(x)[1:]
+                    fit = []
                     for c in makers:
                         ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
-                        if len([p for p in ps if not kids(p)]) <= given <= len(ps) and c["id"] not in out:
+                        if len([p for p in ps if not kids(p)]) <= given <= len(ps):
+                            fit.append(c)
+                    if len(fit) > 1:
+                        # (of several by the count, the one whose parameters take these arguments, as the converter chooses it
+                        # - Emit, make_unique: GameWorld(Engine&) for an Engine, not GameWorld(Renderer&, NightWindows* = nullptr))
+                        takes = lambda c: all((u.object_of(qtype(p)) or u.object_of(qtype(y))) is None or u.object_of(qtype(p)) == u.object_of(qtype(y))
+                                              for p, y in zip([p for p in kids(c) if p.get("kind") == "ParmVarDecl"], handed))
+                        fit = [c for c in fit if takes(c)] or fit
+                    for c in fit:
+                        if c["id"] not in out:
                             out[c["id"]] = c
         return out
 
@@ -15812,9 +15856,19 @@ class TestWriter:
                 if f.ctor:
                     give = f"return {counted};"
                 elif len(f.out_fields) > 1:
-                    fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
+                    result_t = self.spell(ret) if any(src_ == "result" for _, _, src_ in f.out_fields) and f.export_len is None else None
+                    got = f"auto r = {counted};" if f.value is not None else f"{counted};"
+                    if f.export_len is not None:
+                        # (an export that gives a piece by a pointer and its length - and changes the state: the piece, then the state)
+                        if [src_ for _, _, src_ in f.out_fields if src_ not in ("result", "state")]:
+                            raise Wait("an export that gives a piece by a pointer and changes what it is handed")
+                        length = next(p for p in params if p["id"] == f.export_len)
+                        result_t = "std::string" if re.match(r"(?:const\s+)?char\s*\*", ret) else f"std::vector<{self.spell(re.sub(r'^const\s+|\s*\*\s*$', '', ret.strip()))}>"
+                        got = (f"{self.spell(re.sub(r'\s*\*\s*$', '', qtype(length)))} out_len_ = 0; const auto* given_ = {counted}; "
+                               f"auto r = given_ ? {result_t}(given_, given_ + out_len_) : {result_t}();")
+                    fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else result_t if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
-                    give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
+                    give = f"{got} return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
                 elif f.export_len is not None:
                     # an export that gives a text, bytes or floats by a pointer and its length (export_text, export_bytes,
                     # export_floats): what it gives is the piece the two say - as the host reads it, and as the Blueprint gives it
@@ -16086,7 +16140,9 @@ class TestWriter:
                     outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
                     # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
                     spaces = self.spaces_of(outer_scope) if self.outside_its_class(home, records) else classes_of(outer_scope)
-                    if HONEST[0] and self.engine_record(q):   # (a type of the engine, itself: its helpers in its own namespace - where a call from converted.h finds them)
+                    if q == ACTOR:   # (the engine's own Actor: its draw alone, here - arg, same, defined, text and take are converted.h's)
+                        pass
+                    elif HONEST[0] and self.engine_record(q):   # (a type of the engine, itself: its helpers in its own namespace - where a call from converted.h finds them)
                         hl = [*hl[:-5], f"}} namespace {q.rsplit('::', 1)[0]} {{ using ::kern::converted::arg; using ::kern::converted::same; using ::kern::converted::defined; using ::kern::converted::text; using ::kern::converted::take;",
                               *hl[-5:], f"}} namespace {ns} {{"]
                     elif spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
@@ -17392,6 +17448,14 @@ def main(argv):
     getters = {k for k, f in functions.items() if f.get("gives_state") and f.get("free") and world.program(f["file"])
                and f.get("keeps") and all(tuple(p) in itself for p in f["keeps"])}
     holders = {b for q, b in world.states.items() if q not in world.state_implements}
+    if not holders:
+        # (a program whose one state is its App - kern::App keeps the game's state itself, its object made by `static T x;`:
+        # the program's variables are of that one, and what shares them - an export that reaches it through its getter - is a
+        # function of the App's Blueprint, as the App's own methods are; the engine calls the interface's functions of it, the
+        # host the exports. Another interface - a ShaderExtension - is the engine's object alone.)
+        holders = {b for q, b in world.states.items() if (world.state_implements.get(q) or [None])[0] == "App"}
+        if len(holders) != 1:
+            holders = set()
     world.getters = getters
     if len(holders) == 1:
         state = next(iter(holders))
@@ -17399,13 +17463,17 @@ def main(argv):
         for k, f in functions.items():
             for c in f["calls"]:
                 callers[c].add(k)
+        # (a method of a class of the program that is no state - LookAxis::step, which calls the Blueprint of an actor the
+        # program holds - is one too: its object is its first input, as everywhere, and the state's variables are the
+        # Blueprint's - Emit: sees_state. A method of another state stays with its own Blueprint.)
+        movable = lambda k, f: world.program(f["file"]) and k not in getters and (f.get("free") or (f.get("owner") and f["owner"] not in world.states))
         kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))
-                                                    or any(c in getters for c in f["calls"])) and f.get("free") and world.program(f["file"]) and k not in getters}
+                                                    or any(c in getters for c in f["calls"])) and movable(k, f)}
         todo = list(kept)
         while todo:
             for k in callers.get(todo.pop(), ()):
                 f = functions[k]
-                if k not in kept and k not in getters and f.get("free") and world.program(f["file"]):
+                if k not in kept and movable(k, f):
                     kept.add(k)
                     todo.append(k)
         for k in kept:

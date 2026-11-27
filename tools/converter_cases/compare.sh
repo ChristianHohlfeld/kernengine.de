@@ -53,7 +53,11 @@ if ! "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blue
   "$root/tools/blueprint_cpp.sh" --project "$project" "$level" "$o/level_blueprints.cpp" > /dev/null
   printf '#pragma once\n// (no Blueprint the program calls as its class in this project - tools/converter_cases/compare.sh)\n' > "$o/level_blueprints.h"
 fi
-own=("$o/project.cpp" "$o/level_blueprints.cpp" "$tests"/test_*.cpp "$@")
+# (each class of the header binds in the source of its glue - <out>_kern_blueprint_<id>.cpp beside level_blueprints.cpp, which
+# blueprints::bind calls: compiled with it, or the link misses blueprints::bind_kern_blueprint_<id>)
+glue=()
+for g in "$o"/level_blueprints_kern_blueprint_*.cpp; do [ -f "$g" ] && glue+=("$g"); done
+own=("$o/project.cpp" "$o/level_blueprints.cpp" "${glue[@]}" "$tests"/test_*.cpp "$@")
 export cxx o
 printf '%s\n' "${own[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   s="$1"; shift; x="$o/obj/$(basename "$s" .cpp).o"
