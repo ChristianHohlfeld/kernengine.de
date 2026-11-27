@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-27",time:"11:15",title:"Kern: Zahl-Typen, Projekt und ein kleineres SpawnCity",items:[
+    "SpawnCity ist vorerst die Drohne über der Stadt: zu Fuß, Waffen, Fahrzeuge, Jet, Mehrspieler und VR sind herausgenommen und kommen als Bausteine der Engine zurück.",
+    "Das ganze Spiel steht jetzt als Blueprints: 561 von 561 Funktionen, 539 davon vergleicht ein Test Bit für Bit mit ihrem Quelltext.",
+    "Die Sprache der Blueprints rechnet mit den Zahl-Typen von C++ (i8 bis u64, f32, f64) - nichts wird mehr gerundet oder umgedeutet; der Editor zeigt und wählt die Typen.",
+    "Engine: ein Projekt über den Levels, Programme als Blueprints, eigene Mathematik (gleich auf jedem Gerät), Regeln eines Levels vom Programm aus erreichbar.",
+  ]},
   {date:"2026-11-25",time:"15:30",title:"Blueprints: das Spiel als Blueprints, Stufe 1",items:[
     "Aus dem C++ des Spiels schreibt der Konverter jetzt 1.763 von 1.847 Funktionen als Blueprints (158 Blueprints). 1.718 davon vergleicht ein Test Bit für Bit mit ihrem Quelltext.",
     "Das Spiel selbst läuft weiter aus seinem C++ und trägt die erzeugten Blueprints nicht mit: Laden und Spielen bleiben, wie sie waren.",
