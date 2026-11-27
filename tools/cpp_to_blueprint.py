@@ -16689,9 +16689,10 @@ def convert_unit(job):
             for d in mine:
                 if world.wanted is not None and function_key(tree, d) not in world.wanted:
                     continue   # (of a Blueprint that is not the program's own: what the program calls)
-                if ENGINE_RUN[0] and not d.get("virtual"):
+                if ENGINE_RUN[0] and not d.get("virtual") and d.get("kind") != "CXXConstructorDecl":
                     continue   # (a function a header of the engine defines is a node that runs the engine's own function - tools/engine_api.py -,
-                               # no graph of the language computing it again; a library keeps the virtual ones, which a Blueprint implements)
+                               # no graph of the language computing it again; a library keeps the virtual ones, which a Blueprint implements,
+                               # and the constructors of its values: how a value is made is no node - QueryFilter(mask), X_new)
                 if implicit_maker(d) and not any(unit.computed_init(c) for c in kids(tree.records.get(tree.owner.get(d["id"], ""), {}))):
                     continue   # (C++'s own constructor of a state that has nothing to make - no field starts with what is computed: its
                                # fields start as the struct says, and there is no step to write)
