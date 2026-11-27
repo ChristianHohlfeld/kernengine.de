@@ -623,7 +623,15 @@ std::string SpawnCity::command(const std::string& cmd) {
       if (j == std::string::npos) j = cmd.size();
       char id[32] = {};
       TouchPlay::DomRect d;
-      if (std::sscanf(cmd.substr(i, j - i).c_str(), " %31s %f %f %f %f", id, &d.x, &d.y, &d.w, &d.h) == 5) { d.id = id; rects.push_back(d); }
+      f64 x = 0, y = 0, w = 0, h = 0;  // (read as the page writes them, then the layout's f32)
+      if (std::sscanf(cmd.substr(i, j - i).c_str(), " %31s %lf %lf %lf %lf", id, &x, &y, &w, &h) == 5) {
+        d.id = id;
+        d.x = static_cast<f32>(x);
+        d.y = static_cast<f32>(y);
+        d.w = static_cast<f32>(w);
+        d.h = static_cast<f32>(h);
+        rects.push_back(d);
+      }
       i = j + 1;
     }
     touch_.set_dom_rects(std::move(rects));
