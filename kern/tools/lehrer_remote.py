@@ -3,6 +3,8 @@
 import argparse
 import contextlib
 import fcntl
+import hashlib
+import struct
 import json
 import math
 import os
@@ -16,6 +18,54 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TERMINAL = {"done", "stopped", "error"}
 MAX_BODY = 65536
+MAX_CHECKPOINT = 512*1024*1024
+ARCHIVE_MAGIC = b"KERNCP1\n"
+
+def native_checkpoint_iteration(data):
+    if len(data)<8 or len(data)>MAX_CHECKPOINT:raise ValueError("invalid native checkpoint size")
+    magic,it=struct.unpack_from("<Ii",data)
+    if magic!=0x4b4c4e32 or not 0<=it<=100000:raise ValueError("unsupported native checkpoint")
+    offset=8
+    for index in range(4):
+        if offset+8>len(data):raise ValueError("truncated native checkpoint")
+        size=struct.unpack_from("<Q",data,offset)[0];offset+=8
+        if size>len(data)-offset or (index in (0,1,3) and not size):
+            raise ValueError("invalid native checkpoint section")
+        if index==0 and data[offset:offset+8]!=b"KERNPPO2":raise ValueError("invalid learner checkpoint")
+        offset+=size
+    if offset!=len(data):raise ValueError("unexpected native checkpoint bytes")
+    return it
+
+def encode_archive(meta,payload):
+    meta=dict(meta,sha256=hashlib.sha256(payload).hexdigest())
+    header=json.dumps(meta,allow_nan=False,separators=(",",":")).encode()
+    if len(header)>8*1024*1024:raise ValueError("checkpoint header too large")
+    return ARCHIVE_MAGIC+struct.pack("<I",len(header))+header+payload
+
+def decode_archive(data):
+    if len(data)<12 or data[:8]!=ARCHIVE_MAGIC:raise ValueError("Expected a complete .kernckpt archive, not ONNX")
+    size=struct.unpack_from("<I",data,8)[0]
+    if not 0<size<=8*1024*1024 or 12+size>=len(data):raise ValueError("invalid checkpoint header")
+    meta=json.loads(data[12:12+size])
+    if not isinstance(meta,dict):raise ValueError("invalid checkpoint metadata")
+    payload=data[12+size:]
+    if meta.get("sha256")!=hashlib.sha256(payload).hexdigest():raise ValueError("checkpoint checksum mismatch")
+    return meta,payload
+
+def training_rows(job,limit):
+    rows={}
+    try:
+        with (job.dir/"training.log").open(encoding="utf-8") as f:
+            for line in f:
+                if not line.startswith("KERN_PROGRESS ") or not line.endswith("\n"):continue
+                try:
+                    row=json.loads(line[len("KERN_PROGRESS "):])
+                    it=row.get("iteration")
+                    if type(it) is int and 0<it<=limit:rows[it]=row
+                except (ValueError,TypeError):continue
+    except FileNotFoundError:pass
+    return [rows[i] for i in sorted(rows)]
+
 STOP_GRACE = 90
 JOB_ID = re.compile(r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")
 
@@ -73,6 +123,8 @@ class Job:
         self.stats, self.report = None,None
         self.gpus = 0
         self.workers = server.workers
+        self.build = server.build
+        self.resume_digest = None
         self.network = None
         self.network_iteration = 0
         self.thread = threading.Thread(target=self.run, name="lehrer-"+job_id, daemon=False)
@@ -83,6 +135,8 @@ class Job:
             self.report = recovered.get("report")
             self.gpus = recovered.get("gpus",0)
             self.workers = recovered.get("workers",server.workers)
+            self.build = recovered.get("build",server.build)
+            self.resume_digest = recovered.get("resumeDigest")
             self.network = recovered.get("network")
             self.network_iteration = recovered.get("networkIteration",0)
             # Never claim an interrupted native process is still alive or
@@ -111,7 +165,8 @@ class Job:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
                         report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.workers,
                         gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"],
-                        taskKind=self.config["task"].split(":",1)[0],config=dict(self.config))
+                        taskKind=self.config["task"].split(":",1)[0],config=dict(self.config),
+                        build=self.build,resumeDigest=self.resume_digest)
     def change(self,state,message):
         with self.lock:
             self.state,self.message = state,message
@@ -207,7 +262,7 @@ class Job:
                             state,message = "stopped","Stopped before training"
                         else:
                             cfg = self.config
-                            cmd = [server.binary,"--progress-json","--task",cfg["task"],
+                            cmd = [server.binary,"--progress-json","--full-checkpoint","--task",cfg["task"],
                                    "--threads",str(server.workers),"--envs",str(server.workers*cfg["envs"]),
                                    "--iterations",str(cfg["iterations"]),"--seed",str(cfg["seed"]),
                                    "--save-every","25","--eval-every","25","--out",str(self.dir/"network.onnx"),
@@ -215,7 +270,9 @@ class Job:
                             for field,flag in (("initStd","--init-std"),("learningRate","--lr")):
                                 if field in cfg:
                                     cmd += [flag,str(cfg[field])]
-                            with open(self.dir/"training.log","w",encoding="utf-8") as log:
+                            resume = self.dir/"resume.ckpt"
+                            if resume.is_file():cmd += ["--resume",str(resume)]
+                            with open(self.dir/"training.log","a" if resume.is_file() else "w",encoding="utf-8") as log:
                                 with self.lock:
                                     if self.stop.is_set():
                                         state,message = "stopped","Stopped before training"
@@ -379,23 +436,28 @@ class Handler(BaseHTTPRequestHandler):
         if suffix=="":
             self.reply(200,job.public());return
         if suffix=="/history":
-            # The training log is authoritative, even after disconnection.
-            # Ignore a final incomplete line while the native trainer writes.
-            points={}
+            points=[]
+            for row in training_rows(job,job.config["iterations"]):
+                try:
+                    ret,length=float(row["meanReturn"]),float(row["meanLength"])*.02
+                    if row.get("episodes") and math.isfinite(ret) and math.isfinite(length):
+                        points.append({"it":row["iteration"],"ret":ret,"len":length})
+                except (ValueError,TypeError,KeyError):continue
+            self.reply(200,{"history":points});return
+        if suffix=="/checkpoint":
             try:
-                with (job.dir/"training.log").open(encoding="utf-8") as f:
-                    for line in f:
-                        if not line.startswith("KERN_PROGRESS ") or not line.endswith("\n"):continue
-                        try:
-                            row=json.loads(line[len("KERN_PROGRESS "):])
-                            if row.get("episodes") and type(row.get("iteration")) is int:
-                                it=row["iteration"]
-                                ret,length=float(row["meanReturn"]),float(row["meanLength"])*.02
-                                if 0<it<=job.config["iterations"] and math.isfinite(ret) and math.isfinite(length):
-                                    points[it]={"it":it,"ret":ret,"len":length}
-                        except (ValueError,TypeError,KeyError):continue
-            except FileNotFoundError:pass
-            self.reply(200,{"history":[points[i] for i in sorted(points)]});return
+                with (job.dir/"learner.ckpt").open("rb") as f:
+                    data=f.read(MAX_CHECKPOINT+1)
+                it=native_checkpoint_iteration(data)
+                meta=dict(schema=1,backend="mag",build=job.build,workers=job.workers,
+                          config=job.config,iteration=it,rows=training_rows(job,it))
+                archive=encode_archive(meta,data)
+                if len(archive)>MAX_CHECKPOINT:raise ValueError("archive too large")
+                self.reply(200,archive,"application/octet-stream");return
+            except FileNotFoundError:
+                self.reply(409,{"error":"No complete checkpoint saved yet"});return
+            except (OSError,ValueError):
+                self.reply(409,{"error":"No compatible complete checkpoint available"});return
         if suffix.startswith("/network/"):
             rev=suffix.split("/")[-1];path=job.dir/"network.onnx"
             try:
@@ -413,6 +475,46 @@ class Handler(BaseHTTPRequestHandler):
         server=self.server
         try:
             length=int(self.headers.get("Content-Length","0"))
+            resume_match=re.fullmatch(r"/v1/checkpoints/([a-f0-9-]{36})",self.path)
+            if resume_match:
+                jid=resume_match.group(1)
+                if not JOB_ID.fullmatch(jid) or not 0<length<=MAX_CHECKPOINT:raise ValueError("invalid checkpoint upload")
+                self.connection.settimeout(120)
+                raw=self.rfile.read(length)
+                if len(raw)!=length:raise ValueError("incomplete checkpoint upload")
+                meta,payload=decode_archive(raw)
+                if meta.get("schema")!=1 or meta.get("backend")!="mag" or meta.get("build")!=server.build:
+                    raise ValueError("Checkpoint requires the same MAG build")
+                if meta.get("workers")!=server.workers:raise ValueError("Checkpoint requires the original worker count")
+                cfg=validate({**meta["config"],"id":jid,"build":server.build},server.build,server.workers)
+                it=native_checkpoint_iteration(payload)
+                if meta.get("iteration")!=it or it>=cfg["iterations"]:raise ValueError("Checkpoint is complete or inconsistent")
+                digest=hashlib.sha256(raw).hexdigest()
+                rows=meta.get("rows",[])
+                if not isinstance(rows,list) or len(rows)>it:raise ValueError("invalid progress history")
+                with server.job_lock:
+                    if server.closing:
+                        self.reply(503,{"error":"MAG service is shutting down"});return
+                    job=server.job
+                    if job and job.id==jid:
+                        if job.resume_digest!=digest: self.reply(409,{"error":"Job ID already exists"});return
+                    else:
+                        if job and job.state not in TERMINAL:
+                            self.reply(409,{"error":"MAG already has an active training job"});return
+                        job=Job(server,jid,cfg)
+                        job.resume_digest=digest
+                        with (job.dir/"resume.ckpt").open("xb") as f:
+                            f.write(payload);f.flush();os.fsync(f.fileno())
+                        with (job.dir/"training.log").open("x",encoding="utf-8") as f:
+                            for row in rows:
+                                if not isinstance(row,dict) or type(row.get("iteration")) is not int or not 0<row["iteration"]<=it:
+                                    raise ValueError("invalid progress row")
+                                f.write("KERN_PROGRESS "+json.dumps(row,allow_nan=False)+"\n")
+                        if rows:
+                            job.stats=rows[-1]
+                            job.report=rows[-1].get("report")
+                        server.publish(job)
+                self.reply(200,job.public());return
             if not 0<=length<=MAX_BODY:raise ValueError("request too large")
             data=json.loads(self.rfile.read(length) or b"{}")
             if self.path=="/v1/jobs":
