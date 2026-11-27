@@ -171,7 +171,7 @@ bool ReleaseLatch::step(const std::array<f32, 9>& values) {
 bool GrenadeCook::pull(f32 now, int from) {
   Cook c;
   bool pulled = false;
-  g_rules.call("GrenadePull", std::tie(c, pulled), cook_of(*this), rules::decimal(now), from);
+  g_rules.call("GrenadePull", std::tie(c, pulled), cook_of(*this), rules::decimal(now), static_cast<kern::i64>(from));
   take(c, *this);
   return pulled;
 }
