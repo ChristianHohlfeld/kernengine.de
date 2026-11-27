@@ -111,7 +111,7 @@ class Job:
             return dict(id=self.id,state=self.state,message=self.message,stats=self.stats,
                         report=self.report,network=self.network,networkIteration=self.network_iteration,workers=self.workers,
                         gpus=self.gpus,total=self.config["iterations"],envs=self.config["envs"],
-                        taskKind=self.config["task"].split(":",1)[0])
+                        taskKind=self.config["task"].split(":",1)[0],config=dict(self.config))
     def change(self,state,message):
         with self.lock:
             self.state,self.message = state,message
@@ -378,6 +378,24 @@ class Handler(BaseHTTPRequestHandler):
         suffix=self.path[len("/v1/jobs/"+job.id):]
         if suffix=="":
             self.reply(200,job.public());return
+        if suffix=="/history":
+            # The training log is authoritative, even after disconnection.
+            # Ignore a final incomplete line while the native trainer writes.
+            points={}
+            try:
+                with (job.dir/"training.log").open(encoding="utf-8") as f:
+                    for line in f:
+                        if not line.startswith("KERN_PROGRESS ") or not line.endswith("\n"):continue
+                        try:
+                            row=json.loads(line[len("KERN_PROGRESS "):])
+                            if row.get("episodes") and type(row.get("iteration")) is int:
+                                it=row["iteration"]
+                                ret,length=float(row["meanReturn"]),float(row["meanLength"])*.02
+                                if 0<it<=job.config["iterations"] and math.isfinite(ret) and math.isfinite(length):
+                                    points[it]={"it":it,"ret":ret,"len":length}
+                        except (ValueError,TypeError,KeyError):continue
+            except FileNotFoundError:pass
+            self.reply(200,{"history":[points[i] for i in sorted(points)]});return
         if suffix.startswith("/network/"):
             rev=suffix.split("/")[-1];path=job.dir/"network.onnx"
             try:
