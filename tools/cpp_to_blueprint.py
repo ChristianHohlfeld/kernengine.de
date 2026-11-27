@@ -335,6 +335,9 @@ def number_literal(x, t):
     return str(v) + ("u" if t == "u64" and v > (1 << 63) - 1 else "")
 
 
+# (The test once held a float of the program as a 64-bit number and wrote its bytes out field by field - converted::layout.
+# Since the number types the test is the source with its own numbers: a float is a float, memcpy and sizeof are the program's.)
+WIDE_TEST = False
 INT_TEXT = re.compile(r"-?\d+u?")
 F32_TEXT = re.compile(r"-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?f")
 F64_TEXT = re.compile(r"-?(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|-?\d+[eE][+-]?\d+")
@@ -12775,6 +12778,8 @@ class TestWriter:
             """The fields of the record q where the test holds them otherwise than the program (a float of the
             program is a 64-bit number there): ([(field, its number, its place)], the size) - None where the test
             holds every field as the program does (record_bytes)."""
+            if not WIDE_TEST:
+                return None   # (the test is the source with its own numbers: a float is a float, its bytes the program's)
             try:
                 text, size, fields = record_bytes(self.tree, q) if q is not None else (None, None, ())
             except Wait:
@@ -12843,11 +12848,11 @@ class TestWriter:
                 # the bits of a float of the program (the test holds it as a 64-bit number): of the float it is
                 plain = lambda x: re.sub(r"\bconst\b", "", qtype(x)).strip()
                 to, frm = plain(n), plain(ks[1])
-                if frm == "float" and to in ("unsigned int", "int"):
+                if WIDE_TEST and frm == "float" and to in ("unsigned int", "int"):
                     a, b = span(n)
                     edits.append((a, 1, 0, b, "static_cast<%s>(converted::layout::float_bits(%s))" % (to, text_of(ks[1]))))
                     return
-                if to == "float" and frm in ("unsigned int", "int"):
+                if WIDE_TEST and to == "float" and frm in ("unsigned int", "int"):
                     a, b = span(n)
                     edits.append((a, 1, 0, b, "converted::layout::float_of_bits(static_cast<kern::u32>(%s))" % text_of(ks[1])))
                     return
@@ -12876,10 +12881,10 @@ class TestWriter:
                 # between lists of numbers of which one holds floats of the program (Copy Bytes): the bytes the
                 # program copies, a float as its 32 bits (converted::layout::copy_bytes)
                 to_code, from_code = pointer_code(self.u, ks[1]), pointer_code(self.u, ks[2])
-                if to_code is not None and from_code is not None and "f32" in (to_code, from_code):
+                if WIDE_TEST and to_code is not None and from_code is not None and "f32" in (to_code, from_code):
                     a, b = span(ks[0])
                     edits.append((a, 1, 0, b, "converted::layout::copy_bytes<%s, %s>" % ("true" if to_code == "f32" else "false", "true" if from_code == "f32" else "false")))
-            if k == "CallExpr" and callee_name(n) == "memset" and len(ks) == 4 and pointer_code(self.u, ks[1]) == "f32":
+            if WIDE_TEST and k == "CallExpr" and callee_name(n) == "memset" and len(ks) == 4 and pointer_code(self.u, ks[1]) == "f32":
                 # into a list of floats of the program: the bytes the program sets - `sizeof` is the program's (below) -, a float
                 # as its 32 bits (converted::layout::set_bytes; the test holds the float in 64 bits)
                 a, b = span(ks[0])
@@ -12887,7 +12892,7 @@ class TestWriter:
             if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
                 # the bytes of what holds a float of the program, as the program has them (the test holds it in 64 bits)
                 got = byte_size(self.u, sized(n) or "")
-                if got is not None and got[1]:
+                if WIDE_TEST and got is not None and got[1]:
                     a, b = span(n)
                     edits.append((a, 1, 0, b, "std::size_t{%d}" % got[0]))
                     return
