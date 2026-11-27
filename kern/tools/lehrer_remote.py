@@ -490,7 +490,7 @@ class Handler(BaseHTTPRequestHandler):
                 if meta.get("workers")!=server.workers:raise ValueError("Checkpoint requires the original worker count")
                 cfg=validate({**meta["config"],"id":jid,"build":server.build},server.build,server.workers)
                 it=native_checkpoint_iteration(payload)
-                if meta.get("iteration")!=it or it>=cfg["iterations"]:raise ValueError("Checkpoint is complete or inconsistent")
+                if meta.get("iteration")!=it or it>cfg["iterations"]:raise ValueError("Checkpoint is inconsistent")
                 digest=hashlib.sha256(raw).hexdigest()
                 rows=meta.get("rows",[])
                 if not isinstance(rows,list) or len(rows)>it:raise ValueError("invalid progress history")
