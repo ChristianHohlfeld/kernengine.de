@@ -103,3 +103,82 @@ check(onnx.length > 50000 && new TextDecoder().decode(onnx).includes("actions"),
 }
 
 console.log(`Lehrer wasm ok (bit-identical with native): imitation round of ${ticks} ticks, 16 duck steps in ${ms.toFixed(0)} ms, learn ${stats.learnSeconds.toFixed(2)} s, onnx ${onnx.length} bytes`);
+
+// Recreate all WASM instances as after a hard reload. Match the next
+// rollout (excluding wall-clock timing) and complete next learner state.
+const binary=fs.readFileSync(file);
+async function worker(task,seed,learner=false){
+  const k=await loadKern({bytes:binary}), e=k.exports;
+  const bytes=x=>typeof x==="string"?enc.encode(x):x;
+  const input=(x,fn)=>{
+    const b=bytes(x),p=e.kern_alloc(b.byteLength);
+    try{k.u8.set(b,p);return fn(p,b.byteLength);}finally{e.kern_free(p);}
+  };
+  const output=p=>{check(p!==0,"checkpoint ABI output");return k.u8.slice(p,p+e.kern_lehrer_result_length());};
+  check(input(task,(p,n)=>learner?input('{"steps":4}',(q,m)=>e.kern_lehrer_learner(p,n,q,m,seed)):e.kern_lehrer_create(p,n,2,seed,0))===1,"checkpoint worker setup");
+  return {e,input,output,policy:()=>output(e.kern_lehrer_policy()),
+    save:()=>output(learner?e.kern_lehrer_save_learner():e.kern_lehrer_save_collector()),
+    restore:state=>input(state,(p,n)=>learner?e.kern_lehrer_load_learner(p,n):e.kern_lehrer_load_collector(p,n)),
+    collect:(policy,iteration,steps)=>{
+      e.kern_lehrer_progress(iteration);
+      check(input(policy,(p,n)=>e.kern_lehrer_set_policy(p,n/4))===1,"checkpoint policy");
+      return output(e.kern_lehrer_collect(steps));
+    },
+    learn:rollout=>{
+      const frame=new Uint8Array(4+rollout.length);
+      new DataView(frame.buffer).setUint32(0,rollout.length,true);frame.set(rollout,4);
+      check(input(frame,(p,n)=>e.kern_lehrer_learn(p,n,1))!==0,"checkpoint learn");
+    }};
+}
+function same(a,b,label){
+  check(a.length===b.length && Buffer.from(a).equals(Buffer.from(b)),label);
+}
+function physicsOnly(rollout){
+  const b=rollout.slice();
+  b.fill(0,36,44); // Rollout::serialize includes one f64 wall-clock duration.
+  return b;
+}
+const tasks=["stand","jump","motion:"+JSON.stringify({name:"checkpoint_nod",duration:.6,frames:[
+  {time:0,joints:Array(14).fill(0)},{time:.6,joints:Array(14).fill(.05)}]}),
+  "scenario:"+JSON.stringify({name:"checkpoint_course",duration:2,commands:{forward:.1},
+    waypoints:[{x:.4,y:0,radius:.15}],objects:[{kind:"box",x:.5,y:.2,width:.15,depth:.15,height:.15,dynamic:true}],
+    rewards:{progress:12,waypoint:8,finish:20,upright:2}})];
+for(const task of tasks){
+  const kind=task.split(":")[0];
+  const a=await worker(task,17), learner=await worker(task,17,true);
+  // A checkpoint in the middle of an episode, after curriculum changes.
+  a.collect(learner.policy(),200,9);
+  const batch=a.collect(learner.policy(),301,4);
+  learner.learn(batch);
+  const c=a.save(),l=learner.save();
+  const b=await worker(task,17), resumed=await worker(task,17,true);
+  check(b.restore(c)===1,kind+" restore collector");
+  check(resumed.restore(l)===1,kind+" restore learner");
+  same(b.save(),c,kind+" collector state roundtrip");
+  same(resumed.save(),l,kind+" learner state roundtrip");
+  const x=a.collect(learner.policy(),501,4),y=b.collect(resumed.policy(),501,4);
+  same(physicsOnly(x),physicsOnly(y),kind+" next rollout exact");
+  learner.learn(x);resumed.learn(y);
+  same(learner.save(),resumed.save(),kind+" next PPO state exact");
+  same(a.save(),b.save(),kind+" next collector state exact");
+  console.log("checkpoint exact:",kind);
+}
+// Preserve the accumulated imitation dataset and round number as well.
+{
+  const a=await worker("jump",23,true), c=await worker("jump",23);
+  function imitate(l,round){
+    const policy=l.policy();
+    check(c.input(policy,(p,n)=>c.e.kern_lehrer_set_policy(p,n/4))===1,"imitation policy");
+    const share=c.output(c.e.kern_lehrer_dagger(round,0,1));
+    const framed=new Uint8Array(share.length+4);
+    new DataView(framed.buffer).setUint32(0,share.length,true);framed.set(share,4);
+    check(l.input(framed,(p,n)=>l.e.kern_lehrer_imitate(p,n,1))!==0,"imitation checkpoint round");
+  }
+  imitate(a,0);
+  const b=await worker("jump",23,true);
+  check(b.restore(a.save())===1,"imitation restore");
+  check(b.e.kern_lehrer_imitation_left()===7,"imitation round retained");
+  imitate(a,1);imitate(b,1);
+  same(a.save(),b.save(),"next imitation state exact");
+}
+console.log("Full local checkpoint continuation checks passed");
