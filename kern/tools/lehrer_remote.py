@@ -159,8 +159,10 @@ class Job:
         path = self.dir/"network.onnx"
         if path.is_file() and path.stat().st_size:
             with self.lock:
-                self.network = str(path.stat().st_mtime_ns)
-                self.network_iteration = self.stats["iteration"] if self.stats else 0
+                revision = str(path.stat().st_mtime_ns)
+                if self.network != revision:
+                    self.network = revision
+                    self.network_iteration = self.stats["iteration"] if self.stats else 0
                 self.persist()
     def run(self):
         server = self.server
@@ -299,6 +301,7 @@ class Server(ThreadingHTTPServer):
         self.gpu_lock = args.gpu_lock
         self.hook = ["/usr/bin/sudo","-n",args.hook] if args.hook else []
         self.job,self.job_lock = None,threading.RLock()
+        self.closing = False
         self.current_file = self.root/"current.json"
         if self.current_file.exists():
             record = json.loads(self.current_file.read_text())
@@ -397,6 +400,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=="/v1/jobs":
                 cfg=validate(data,server.build,server.workers)
                 with server.job_lock:
+                    if server.closing:
+                        self.reply(503,{"error":"MAG service is shutting down"});return
                     job=server.job
                     if job and (job.id==data["id"] or job.state not in TERMINAL):
                         if job.id!=data["id"] or job.config!=cfg:
@@ -437,8 +442,11 @@ def main():
     signal.signal(signal.SIGTERM,shutdown);signal.signal(signal.SIGINT,shutdown)
     try:server.serve_forever()
     finally:
-        if server.job and server.job.state not in TERMINAL:
-            server.job.control("stop")
-            server.job.thread.join()
+        with server.job_lock:
+            server.closing = True
+            job = server.job
+        if job and job.state not in TERMINAL:
+            try: job.control("stop")
+            finally: job.thread.join()
         server.server_close()
 if __name__=="__main__":main()
