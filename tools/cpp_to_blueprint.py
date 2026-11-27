@@ -5237,6 +5237,13 @@ class Emit:
                 # (`_call`: the source has the call there - TestWriter.guard sees it, as it is written)
                 node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood, "_call": call})
             slot = self.unwrap(init)
+            if bare(slot).get("_rowref") and bare(slot).get("_call") is not None:
+                # (written before, in a round whose function then waited: the source's m[key] again - its row is found and
+                # held by the steps this writing puts before it, not by those of the round that is gone)
+                again = bare(slot)
+                source = again["_call"]
+                again.clear()
+                again.update(source)
             def map_of(n):   # (the declaration a map is named by: a variable or a field)
                 n = bare(n)
                 while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
@@ -5266,7 +5273,7 @@ class Emit:
                 held = self.entry(base, {"kind": "_Text", "_text": row, "_type": IDX, "_steady": True}, vt)   # (the row: set here alone)
                 call = dict(slot)
                 slot.clear()
-                slot.update({**held, "type": was, **stood, "_call": call})   # (the source has m[key] there: TestWriter.guard)
+                slot.update({**held, "type": was, **stood, "_call": call, "_rowref": True})   # (the source has m[key] there: TestWriter.guard)
             rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
