@@ -245,11 +245,9 @@ jobs:
             for f in kern/web/kern.mjs kern/web/app.mjs kern/web/jobs.mjs kern/web/studio/*.mjs tools/net_relay.mjs tools/export_game.mjs; do node --check "$f"; done
             python3 -I tools/kern_notices.py --check
           }
-          set -o pipefail
-          if ! (set -euo pipefail; build) 2>&1 | tee /tmp/build.log; then
-            tail -n 25 /tmp/build.log | sed 's/^/::error::/'  # visible as annotations without the log
-            exit 1
-          fi
+          # Keep the build outside an if/! condition: Bash disables errexit in tested functions.
+          set -euo pipefail
+          build 2>&1 | tee /tmp/build.log
       - name: Lehrer in WebAssembly (one PPO iteration through the workers' C ABI)
         run: node kern/tests/lehrer_wasm_test.mjs generated/kern_lehrer.wasm
       - name: Logic JIT (graphs compiled to WebAssembly must match the interpreter)
