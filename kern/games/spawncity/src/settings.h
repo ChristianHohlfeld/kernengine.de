@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/game/runtime.h"
 #include "kern/logic/logic.h"
 
 namespace sc {
@@ -69,11 +70,10 @@ struct SettingsTable {
   std::vector<OptSpec> specs;
 };
 
-/// Binds the settings to the logic the level's Blueprints run in (the game once its world has started,
-/// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call -
-/// and takes its table. False when the actor has no Blueprint that runs there or the table has not
+/// Binds the settings to the actor "Settings" of the world (after its start_level) and takes the table of its
+/// Blueprint. False when the actor has no Blueprint that runs there or the table has not
 /// one row per Opt (the table is then empty).
-bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table);
+bool bind_settings(kern::game::GameWorld& world, SettingsTable& table);
 /// A setting's row (an empty one while the table is empty).
 const OptSpec& opt_spec(const SettingsTable& table, Opt o);
 bool find_opt(const SettingsTable& table, std::string_view key, Opt& out);

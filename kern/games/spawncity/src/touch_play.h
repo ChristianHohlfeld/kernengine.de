@@ -30,6 +30,7 @@ struct TouchLayout {
   bool near_car = false, near_jet = false, emp = false;
   bool strike_ready = true, aiming = false;
   bool armed = false;              // drone
+  std::string camera = "FPV";      // drone: the camera's name on its button (simulator.mjs #soloCamera: FPV, FOLLOW, THIRD)
   bool cockpit = false;            // car camera (label INNEN / AUSSEN)
   bool hover = false, rocket = false, ground = false;  // jet: hover mode, rocket selected, on its gear
   bool drone_cooldown = false;     // the mode button shows DRONE while a new drone is not ready

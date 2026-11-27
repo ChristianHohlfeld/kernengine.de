@@ -89,8 +89,7 @@ void TouchPlay::layout() {
     add(mode);
   }
   std::vector<TouchBtn> left;
-  if (m == TouchMode::drone) left.push_back(btn("mode", "⇄ FPS", 96, 40, blue, false, false));
-  if (m == TouchMode::foot || m == TouchMode::drone) left.push_back(btn("strike", "STRIKE", 58, 58, lay_.strike_ready ? dark : 0x3a3a3a, true));
+  if (m == TouchMode::foot) left.push_back(btn("strike", "STRIKE", 58, 58, lay_.strike_ready ? dark : 0x3a3a3a, true));
   if (m == TouchMode::foot && lay_.grenade) {
     TouchBtn g = btn("nade", lay_.grenade_left >= 0 ? (std::to_string(static_cast<int>(lay_.grenade_left * 10) / 10) + "." + std::to_string(static_cast<int>(lay_.grenade_left * 10) % 10)) : "● " + std::to_string(lay_.grenades), 64, 64,
                      lay_.grenade_left >= 0 ? 0x3a1c0c : 0x1c2414, true);
@@ -110,7 +109,8 @@ void TouchPlay::layout() {
   std::vector<TouchBtn> low;
   if (m == TouchMode::car) low.push_back(btn("enter", "↗", 54, 54, 0xff6b5a, true, false));
   else if (m == TouchMode::drone) {
-    low.push_back(btn("wpn", "⇄ " + lay_.weapon, 60, 60, amber, true));
+    // the drone of the small game: ARM and STOP under the thumb (no weapon, no mode switch - the areas that had them
+    // are not in it); its camera is the button above the look stick
     if (!lay_.pad_drone) {
       low.push_back(btn("arm", lay_.armed ? "ARMED" : "ARM", 104, 44, lay_.armed ? green : 0xf5b301, false, false));
       low.push_back(btn("stop", "STOP", 94, 44, red, false, false));
@@ -148,7 +148,13 @@ void TouchPlay::layout() {
     cam.y = hb.y - 8 - cam.h;
     add(cam);
     add(hb);
-  } else if (m == TouchMode::foot || m == TouchMode::drone) {
+  } else if (m == TouchMode::drone) {
+    // simulator.mjs #soloCamera: the next camera on a tap, its name on it - above the look stick, right aligned
+    TouchBtn cam = btn("cam", "🎥 " + lay_.camera, 104, 36, blue, false, false);
+    cam.x = w_ - kSafe - cam.w;
+    cam.y = Ry - 8 - cam.h;
+    add(cam);
+  } else if (m == TouchMode::foot) {
     std::vector<TouchBtn> up;
     if (m == TouchMode::foot && lay_.near_car) up.push_back(btn("enter", "🚗", 54, 54, yellow, true, false));
     if (m == TouchMode::foot && lay_.near_jet) up.push_back(btn("jet", "✈", 54, 54, 0x7fd3ff, true, false));

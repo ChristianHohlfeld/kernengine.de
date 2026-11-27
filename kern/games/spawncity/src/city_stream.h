@@ -1,7 +1,8 @@
 // The streamed real city: vector tiles around the player are requested from the host (the browser
 // fetches OpenFreeMap), decoded, extruded with Kern's BuildingBuilder / RoadBuilder, uploaded as
-// chunk meshes and given static Box3D collision (one triangle-mesh shape per building) - every
-// stage in time slices, so loading never stalls a frame. Tiles far behind are unloaded.
+// chunk meshes - every stage in time slices, so loading never stalls a frame - and given static Box3D
+// collision (one triangle-mesh shape per building) in the fixed steps of the world (collide), never
+// by the clock. Tiles far behind are unloaded.
 // Without map data the procedural stand-in town is built through the same pipeline.
 #pragma once
 
@@ -64,8 +65,20 @@ class CityStream {
   void go_offline();
   bool offline() const { return offline_; }
   bool has_real_data() const { return real_tiles_ > 0; }
-  /// True once the tile under the player is built (or the stand-in town is).
+  /// True once what the player stands on is known: the ground under p settled and the streets that level it there
+  /// (the stand-in town: built) - the game may put him down; its collision comes with collide().
+  bool loaded_at(Vec3 p) const;
+  /// True once the collision under p stands (loaded_at, the ground's tiles round p, the stand-in town's walls).
   bool ready_at(Vec3 p) const;
+  /// Writes the city's collision into the physics world - the one place that does (update() never does: what the
+  /// bodies collide with must not depend on the clock or the speed of the machine). The game calls it before every
+  /// fixed step of its world, with the place of the body it moves: the ground under the focus is there before the
+  /// step (Terrain::collide), one more ground tile per step, the set of buildings round the way ahead is picked anew
+  /// at most every kNearSteps steps and built kNearPerStep buildings a step. `whole`: all of it at once (the start,
+  /// before the first step).
+  void collide(Vec3 focus, bool whole);
+  static constexpr u32 kNearSteps = 60;    // 250 ms at the world's 240 Hz (world_building_collisions.mjs: 250 ms)
+  static constexpr u32 kNearPerStep = 16;  // buildings of a new set a step (480 in 30 steps, an eighth of a second)
 
   // ---- gameplay queries ----
   const std::vector<Lane>& lanes() const { return lanes_; }
@@ -176,7 +189,7 @@ class CityStream {
   struct NearCollision {
     kern::physics::Body body, old_body;
     Vec2 at{1e9f, 1e9f}, ahead{1e9f, 1e9f};
-    f64 at_ms = -1e9;
+    u32 steps = 1000000;  // fixed steps since the last pick (collide)
     std::vector<std::pair<u64, u32>> list;
     std::vector<kern::physics::Shape> shapes;  // list[i]'s collider (destruction replaces one)
     std::size_t next = 0;
@@ -198,8 +211,8 @@ class CityStream {
   f64 vis_ms_ = -1e9;
   void select_cells(Vec3 focus, bool force);
   void drop_cell(Tile& t, u64 cell);
-  void update_collision(Vec3 focus, f64 deadline);
-  bool build_near(f64 deadline);
+  void update_collision(Vec3 focus, bool whole);
+  bool build_near(bool whole);
   kern::physics::Shape building_shape(kern::physics::Body body, const MapFeatures::Building& b);
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };

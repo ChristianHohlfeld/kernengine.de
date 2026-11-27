@@ -52,7 +52,14 @@ if [ "$skip_wasm" = 0 ]; then
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
   # The project's - the program's: files of the game that are Blueprints now - the game's C++ calls as their
   # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").
-  "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h"
+  # (a project that ships no Blueprint of the program - the small game: its program is C++, the level's rules are
+  # world Blueprints - has no such header: the game's C++ calls no class of it)
+  if python3 -I -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("blueprints") else 1)' "$shipped_project"; then
+    "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h"
+  else
+    rm -f "$here/src/level_blueprints.h"
+    "$root/tools/blueprint_cpp.sh" --project "$shipped_project" "$shipped" "$here/src/level_blueprints.cpp"
+  fi
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).
@@ -85,10 +92,7 @@ sources = {
     "kern_audio": (web / "audio.mjs").read_text(),
     "app": (web / "app.mjs").read_text(),
     "game": (web / "studio/game.mjs").read_text(),
-    "mp_host": (here / "web/mp_host.mjs").read_text(),
     "ui": (here / "web/ui.mjs").read_text(),
-    "gaps_hud": (here / "web/gaps_hud.mjs").read_text(),
-    "life": (here / "web/life.mjs").read_text(),
     "jobs": (web / "jobs.mjs").read_text(),
     "view": (here / "web/view.mjs").read_text(),
     "view_modes": (here / "web/view_modes.mjs").read_text(),
@@ -155,7 +159,7 @@ map_tiles = strip((here / "web/world_map_tiles.mjs").read_text())
 map_base = strip((here / "web/world_map.mjs").read_text())
 view_inline += ("globalThis.__scMapTiles = (() => {\n" + map_tiles + "\nreturn {parseTile, renderTile, labelsOf};\n})();\n" +
                 "const {WorldBasemap, mercX, mercY, lonOf, latOf} = (() => {\n" + map_base + "\nreturn {WorldBasemap, mercX, mercY, lonOf, latOf};\n})();\n").replace("</script", "<\\/script")
-bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "gaps_hud", "mp_host", "life", "jobs", "view", "view_modes", "view_menu", "audio", "host"))
+bundle = view_inline + "\n".join(f"// ---- {n} ----\n" + strip(sources[n]) for n in ("kern", "app", "game", "ui", "jobs", "view", "view_modes", "view_menu", "audio", "host"))
 boot = ('<script type="text/plain" id="sc-wasm">' + b64 + '</script>\n<script type="module">\n' + bundle +
         '\nstartSpawnCity({base64: document.getElementById("sc-wasm").textContent.trim()});\n</script>')
 start = html.index('<script type="module"')

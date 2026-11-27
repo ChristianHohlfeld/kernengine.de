@@ -55,6 +55,7 @@ KERN_TEST(stream_tile_pipeline) {
   while (!built() && kern::now_ms() < give_up) {
     const f64 t0 = kern::now_ms();
     city.update({0, 0, 0}, 3);
+    city.collide({0, 0, 0}, false);   // (as the game's fixed step: the collision is written there alone)
     const f64 took = kern::now_ms() - t0;
     if (took > worst) { worst = took; if (std::getenv("SC_VERBOSE")) std::printf("  frame %d took %.1f ms\n", frames, took); }
     ++frames;
@@ -89,6 +90,7 @@ KERN_TEST(stream_tile_pipeline) {
   KERN_CHECK(city.street_point(rng, {0, 0, 0}, 500, p, heading), "street point");
   // Moving far away unloads it.
   city.update({20000, 0, 0}, 1);
+  for (u32 i = 0; i < 2 * CityStream::kNearSteps; ++i) city.collide({20000, 0, 0}, false);   // (a set being built is finished first: the steps of half a second)
   city.take_requests();
   KERN_CHECK(city.stats().colliders == 0 && city.stats().meshes == 0, "far tile unloaded (%u colliders)", city.stats().colliders);
 }
@@ -107,9 +109,14 @@ KERN_TEST(stream_offline_town) {
   city.fail(key);
   city.fail(key);  // no map service: three times nothing
   KERN_CHECK(city.offline(), "falls back to the stand-in town");
+  // Until it stands - bounded by the clock, as the tile above and the terrain (test_terrain.cpp), not by a number of
+  // frames: the town is built in slices of milliseconds and its jobs run on threads - how many frames that takes is a
+  // matter of the machine's speed. Its collision is written by the fixed steps alone (collide, here one a frame): what
+  // is built is the same on every machine.
   int frames = 0;
-  while (!city.ready_at({0, 0, 0}) && frames++ < 3000) city.update({0, 0, 0}, 4);
-  KERN_CHECK(city.ready_at({0, 0, 0}), "stand-in town built");
+  const f64 give_up = kern::now_ms() + 60000;
+  while (!city.ready_at({0, 0, 0}) && kern::now_ms() < give_up) { city.update({0, 0, 0}, 4); city.collide({0, 0, 0}, false); ++frames; }
+  KERN_CHECK(city.ready_at({0, 0, 0}), "stand-in town built (%d frames)", frames);
   KERN_CHECK(city.stats().colliders > 100, "with collision (%u)", city.stats().colliders);
   KERN_CHECK(!city.has_real_data(), "marked as not real map data");
 }

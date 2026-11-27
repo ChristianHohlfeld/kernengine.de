@@ -31,8 +31,8 @@ std::string num(f32 v) {
 }
 }  // namespace
 
-bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table) {
-  const bool runs = g_rules.bind(logic);
+bool bind_settings(kern::game::GameWorld& world, SettingsTable& table) {
+  const bool runs = g_rules.bind(world);
   table.specs.clear();
   table.rows = g_rules.get<std::vector<Option>>("Options");
   if (!runs || table.rows.size() != kCount) {

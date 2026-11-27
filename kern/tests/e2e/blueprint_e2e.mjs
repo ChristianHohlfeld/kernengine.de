@@ -760,7 +760,9 @@ if (gameLevel) {
     // (the level file says which actors carry a Blueprint; the editor's state lists every actor as [id, name])
     const carriers = file.actors.filter(a => a.components?.logic).map(a => a.name);
     withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
-    check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its ${carriers.length} Blueprints are there (${what})`);
+    // (among them at least one the game runs - a Blueprint outside the folder "Source", which the built game carries)
+    const runs = file.actors.filter(a => a.components?.logic && a.folder !== "Source").map(a => a.name);
+    check(carriers.length >= 1 && withBlueprint.length === carriers.length && runs.length >= 1, `its ${carriers.length} Blueprints are there, ${runs.length} of them run by the game (${what}: ${runs.slice(0, 6).join(", ")})`);
     let slowest = ["", 0], nodes = 0, bad = 0;
     for (const a of withBlueprint) {
       const start = Date.now();

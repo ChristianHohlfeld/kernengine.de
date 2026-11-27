@@ -3,6 +3,9 @@
 //   node profile.mjs <url> <out dir> <label> [mode ...]
 // Per mode: frame times (p50 / p95 / p99 / max), draw calls and WebGL calls per frame, and a CPU
 // profile of the main thread (self time per function, wasm functions by name) -> <label>.md
+// Modes: "drone" (the default; both games start with the drone after START), or a camera of the drone ("fpv",
+// "follow", "third"; the original: C, the next one). (Until 26.11.2026 also foot, car and jet: out of the small game with them -
+// BLUEPRINTS.md, "Herausgenommen am 26.11.".)
 import fs from "node:fs";
 import path from "node:path";
 import {chromium} from "playwright";
@@ -59,9 +62,9 @@ await p.waitForTimeout(8000);
 const cdp = await ctx.newCDPSession(p);
 await cdp.send("Profiler.enable");
 await cdp.send("Profiler.setSamplingInterval", {interval: 250});
-for (const mode of modes.length ? modes : ["foot"]) {
-  if (kern && mode !== "foot") await p.evaluate(m => window.SpawnCity.command?.(`mode ${m}`), mode);
-  if (!kern && mode !== "foot") await p.keyboard.press(mode === "drone" ? "v" : "f").catch(() => {});
+for (const mode of modes.length ? modes : ["drone"]) {
+  if (kern && mode !== "drone") await p.evaluate(m => window.SpawnCity.command?.(`cam ${m}`), mode);
+  if (!kern && mode !== "drone") await p.keyboard.press("c").catch(() => {});
   await p.waitForTimeout(5000);
   await p.evaluate(() => { window.__ft.length = 0; Object.assign(window.__gl, {draws: 0, calls: 0, frames: 0, time: {}, count: {}, long: []}); });
   await cdp.send("Profiler.start");
