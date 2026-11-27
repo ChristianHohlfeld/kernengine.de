@@ -676,11 +676,28 @@ bool Ppo::load(const u8* d, std::size_t size) {
   if (!get_all(d, size, at, head) || head.size() != 4 || !get_all(d, size, at, pol) || !get_all(d, size, at, cp, critic_.params().size()) ||
       !get_all(d, size, at, cm) || !get_all(d, size, at, cv) || !get_all(d, size, at, count) || count.size() != 1)
     return false;
+  auto finite=[](const auto& values){for(auto x:values)if(!std::isfinite(x))return false;return true;};
+  if(!finite(head)||head[0]<0||head[0]>2147483647.0||std::floor(head[0])!=head[0]||
+     head[1]<0||head[1]>9007199254740991.0||std::floor(head[1])!=head[1]||
+     head[2]<=0||head[2]>1||(head[3]!=0&&head[3]!=1)||!finite(count)||count[0]<0||
+     cm.size()!=static_cast<std::size_t>(crit_)||cv.size()!=cm.size()||
+     !finite(cm)||!finite(cv)||!finite(cp)||!finite(pol))return false;
+  for(f32 v:cv)if(v<0)return false;
+  const auto& dims=policy_.actor.dims();
+  if(pol.size()!=policy_.serialize().size()||pol[0]!=static_cast<f32>(dims.size()))return false;
+  for(std::size_t i=0;i<dims.size();++i)if(pol[i+1]!=static_cast<f32>(dims[i]))return false;
   Policy p = policy_;
-  if (!p.deserialize(pol.data(), pol.size()) || p.actor.dims() != policy_.actor.dims()) return false;
+  if (!p.deserialize(pol.data(), pol.size()) || p.actor.dims() != dims) return false;
+  for(f32 v:p.stddev)if(v<=0)return false;
+  for(f32 v:p.normalizer.variance())if(v<0)return false;
+  if(p.normalizer.count()<0)return false;
   for (Adam* a : {&actor_adam_, &critic_adam_}) {
     std::vector<f64> t;
     if (!get_all(d, size, at, a->m()) || !get_all(d, size, at, a->v()) || !get_all(d, size, at, t) || t.size() != 1) return false;
+    const auto expected=a==&actor_adam_?policy_.actor.params().size()+policy_.stddev.size():critic_.params().size();
+    if(a->m().size()!=a->v().size()||(!a->m().empty()&&a->m().size()!=expected)||
+       !finite(a->m())||!finite(a->v())||!finite(t)||t[0]<0||t[0]>9007199254740991.0||std::floor(t[0])!=t[0])return false;
+    for(f32 v:a->v())if(v<0)return false;
     a->t() = static_cast<i64>(t[0]);
   }
   if(exact){
