@@ -1,0 +1,80 @@
+    Reader::get_i16 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_u32 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_i32 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_u64 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_i64 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_f32 (7): its test cannot compare it yet (its source does not compile: no member named 'get_f32' in 'converted_wire::wire::Reader')
+    Reader::get_f64 (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Reader::get_vec3 (7): its test cannot compare it yet (its source does not compile: no member named 'get_vec3' in 'converted_wire::wire::Reader')
+    Reader::get_quat (7): its test cannot compare it yet (its source does not compile: no member named 'get_quat' in 'converted_wire::wire::Reader')
+    Reader::get_bytes (7): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Reader::get_u16(), a step)
+    Reader::done (1): written
+
+where the Blueprints stand (kern/docs/project.md):
+  Arondight45_DroneFC_Core: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  blueprint_call: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  controls: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  drone_art: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_audio_audio: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_audio_synth: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_geo_roads: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_input_actions: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_math_math: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  settings: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  shapes: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  sound_fx: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  spiel: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  touch_play: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_StateControl: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  controls_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  engine_gfx_mesh: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  engine_physics_physics: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt: the project - the program's tiles_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  settings_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  spiel_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  tiles: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  wire: the project - the program's city_jobs_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_HardwareSensors: the project - the program's Arondight45_FirmwareRuntime uses it - a Blueprint of the program finds its libraries only in the project
+  common: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the projectcc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+/dev/shm/spawncity-jobs-chris/kandidat-15-065553/tmp/kern-cpp-to-blueprint-cf59668v/terrain_cpp.cpp: line 510, column 39: "t_row" is not known here: no variable, no function, no node
+  (the texts: /dev/shm/spawncity-jobs-chris/kandidat-15-065553/tmp/kern-cpp-to-blueprint-cf59668v)
+
+  engine_geo_mesh_data: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  mvt_cpp: the project - the program's tiles_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  rigid_spec: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  terrain: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  Arondight45_FirmwareRuntime: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  drone_art_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  drone_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  engine_geo_buildings: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  sound_fx_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  tiles_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  touch_play_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_jobs_cpp: the project - the program's city_stream_cpp uses it - a Blueprint of the program finds its libraries only in the project
+  drone: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  terrain_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  city_stream_cpp: the project - the program's SpawnCity uses it - a Blueprint of the program finds its libraries only in the project
+  SpawnCity: the project - it exports sc_tile_requests, sc_tile_data, sc_dem_requests, sc_dem_data and 9 more - exports belong to the program
+the Blueprints were not read: the level and the project are as they were
+
+real	10m25,369s
+user	25m57,105s
+sys	1m52,156s
