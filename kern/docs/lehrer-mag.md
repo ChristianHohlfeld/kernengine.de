@@ -112,3 +112,40 @@ Ressourcensperren, Pause, Resume, Stopp, Ergebnisübertragung und Wiederherstell
 Auf MAG zusätzlich: je ein kurzer Stand- und Keyframe-Lauf mit CPU/GPU-Lastmessung,
 ONNX-Import im Studio und Nachweis der wiederhergestellten MAG-Dienste. Kein Live-Release
 der HIP-Integration ohne diesen Hardwaretest.
+
+
+### Portable Trainings-Checkpoints (Lokal und MAG)
+
+Der Lehrer bietet **Checkpoint herunterladen** und **Checkpoint hochladen**.
+`.onnx` bleibt ein separates Format für die Wiedergabe. Die Datei
+`.kernckpt` enthält das ONNX-Netz des gespeicherten Zustands, den PPO-Lerner
+inklusive Adam und Normalisierung, Zufallszustände, Imitationsdaten, alle
+laufenden Physikepisoden, Trainingsparameter und bisherige Fortschrittswerte.
+Die Datei besitzt eine versionierte Struktur und SHA-256-Prüfsummen für
+Metadaten und Nutzdaten (Integrität, keine Signatur).
+
+Lokal wird nach jeder vollständig abgeschlossenen Iteration beziehungsweise
+Imitationsrunde atomar in IndexedDB gespeichert. MAG schreibt dieselbe
+Trainingsgrenze mit atomarem Dateiaustausch und fsync; die gewöhnliche
+ONNX-Vorschau und Evaluation behalten ihren eigenen Rhythmus. Der Export
+liest ausschließlich eine vollständig veröffentlichte Checkpoint-Version.
+Ein Stopp oder Reload löscht sie nicht. Unvollständige Iterationen werden
+bei Fortsetzung wiederholt.
+
+Ein Import darf keine vorhandenen lokalen Checkpoints oder laufenden
+MAG-Jobs überschreiben. Das Hochladen setzt den gespeicherten Lauf mit
+denselben Parametern fort, bzw. öffnet ein abgeschlossenes Ergebnis.
+Ein verlorener HTTP-Response wird mit derselben Upload-ID behandelt.
+Die Vorschau der wiederhergestellten Sprung- und Keyframe-Netze verändert
+das aktuelle Level nicht.
+
+Portable Wiederaufnahme ist innerhalb desselben Backends mit derselben
+kompatiblen Version möglich. Ein lokaler Import führt niemals aus der Datei
+stammenden WASM-Code aus; der SHA-256-Hash des vertrauenswürdigen aktuellen
+WASM muss stimmen. MAG verlangt den ursprünglichen Build und dieselbe
+Worker-Anzahl. Wechsel Lokal ↔ MAG und Migration auf andere Builds sind
+nicht als bitgenau unterstützt. ONNX allein ist kein Trainingscheckpoint.
+Alte unvollständige MAG-Checkpoints können nicht nachträglich zu exakten
+Checkpoints rekonstruiert werden. Bei einem MAG-Dienstabsturz wird der
+unterbrochene Job angezeigt; der vollständige Checkpoint kann exportiert
+und erneut importiert werden, ohne einen laufenden Job vorzutäuschen.
