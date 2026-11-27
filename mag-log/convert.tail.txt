@@ -1,0 +1,80 @@
+--- drone_cpp: clang: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-converted-check-6wtmd4lt/test_drone_cpp.cpp:2575:163: error: invalid use of 'this' outside of a non-static member function
+--- drone_cpp: line 2575: inline Vec3 Quat::rotate(const Vec3& v) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.quat.rotate", {converted::value_of(*this), converted::value_of(v)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
+--- drone_cpp: without the engine 0x6479e3691538: redefinition of 'Quat' as different kind of symbol
+--- drone_cpp: without the engine 0x6479e3691988: cannot define or redeclare 'rotate' here because namespace 'converted_drone_cpp' does not enclose namespace 'Quat'
+--- drone_cpp: without the engine 0x71d9714dcd88: cannot define or redeclare 'valid' here because namespace 'converted_drone_cpp' does not enclose namespace 'Body'
+    Drone::telemetry (1): a name for a place - written where it is called
+    Drone::params (1): a name for a place - written where it is called
+    Drone::motor_position (1): written
+    Drone::rotor_angle (1): written
+    Drone::parked (1): written
+drone_cpp                      13 /   13 functions      342 /    342 lines
+    battery_ocv (4): written
+    battery_under_load (3): written
+    encode_sbus (10): written (a step: it changes a place of its caller (a reference input); it changes p (an input it is handed by reference or pointer))
+    put_be16 (6): written (a step: it changes a place of its caller (a reference input); it changes out (an input it is handed by reference or pointer))
+    quat_yaw_deg (3): written
+    clearance_rate (6): written
+    clearance_lead (6): written
+    Drone::Drone (12): written (a step: it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls FirmwareRuntime::FirmwareRuntime(), a step; it calls Drone::reset(), a step)
+    Drone::rigid_spec (75): written
+    Drone::reset (22): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls FirmwareRuntime::reset(), a step)
+    Drone::imu_bytes (25): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Rng::gaussian(), a step; it calls put_be16(), a step)
+    Drone::motor_tick (39): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives))
+    Drone::step (131): written (a step: it changes a place of its caller (a reference input); it changes what is not a variable of its own (through a pointer, a reference, the place a call gives); it calls Drone::imu_bytes(), a step; it calls encode_sbus(), a step; it calls Rng::gaussian(), a step; it calls FirmwareRuntime::reset(), a step; it calls FirmwareRuntime::step(), a step; it calls Drone::motor_tick(), a step; it runs the engine's engine.world.apply_force; it runs the engine's engine.world.apply_torque; it runs the engine's engine.world.apply_force_to_center)
+engine_physics_physics          1 /    1 functions        1 /      1 lines   (what the program calls of it)
+--- rigid_spec: clang: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-converted-check-bcw4usg5/test_rigid_spec.cpp:37:11: error: redefinition of 'Quat' as different kind of symbol
+--- rigid_spec: line 37: namespace Quat { Quat axis_angle(const Vec3& axis, const float& radians); }
+--- rigid_spec: clang: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-converted-check-bcw4usg5/test_rigid_spec.cpp:36:7: note: previous definition is here
+--- rigid_spec: line 36: using Quat = ::kern::Quat;
+--- rigid_spec: clang: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-converted-check-bcw4usg5/test_rigid_spec.cpp:301:11: error: redefinition of 'Quat' as different kind of symbol
+--- rigid_spec: line 301: namespace Quat { inline Quat axis_angle(const Vec3& axis, const float& radians) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.quat.axis_angle", {converted::value_of(axis), converted::value_of(radians)}); Quat kern_result = converted::quiet<Quat>(); converted::take_as<Quat>(kern_result, kern_out[0]); return kern_result; } }
+--- rigid_spec: clang: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-converted-check-bcw4usg5/test_rigid_spec.cpp:36:7: note: previous definition is here
+--- rigid_spec: line 36: using Quat = ::kern::Quat;
+--- rigid_spec: clang: 2 errors generated.
+--- rigid_spec: without the engine 0x61ff094b97b8: redefinition of 'Quat' as different kind of symbol
+    QueryFilter::QueryFilter (1): written
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+cc1plus: note: disable pass tree-powcabs for functions in the range of [0, 4294967295]
+/dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-cpp-to-blueprint-to_o4z7v/drone_cpp.cpp: line 144, column 79: the formula: an operation of numbers written out only: write the number it gives (at 17)
+  (the texts: /dev/shm/spawncity-jobs-chris/probe-drone-072311/tmp/kern-cpp-to-blueprint-to_o4z7v)
+    capsule_between (14): written
+    create_body (29): written (a step: it changes w (an input it is handed by reference or pointer); it runs the engine's engine.world.create_body; it runs the engine's engine.world.create_shape; it runs the engine's engine.world.set_mass_data)
+    box_inertia (8): written (a step: it changes a place of its caller (a reference input); it changes mass (an input it is handed by reference or pointer))
+
+where the Blueprints stand (kern/docs/project.md):
+  Arondight45_DroneFC_Core: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_math_math: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  Arondight45_StateControl: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  engine_physics_physics: the engine - a library of the engine - the engine has it (kern/logic/engine_libraries.h, tools/engine_api.py --libraries); neither the level nor the project holds one
+  Arondight45_HardwareSensors: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  common: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  rigid_spec: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  Arondight45_FirmwareRuntime: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  drone: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+  drone_cpp: the level - a world's - it is not the App, has no export, and no Blueprint of the program uses it
+the Blueprints were not read: the level and the project are as they were
+
+real	2m55,619s
+user	5m15,033s
+sys	0m17,008s
