@@ -16689,11 +16689,11 @@ def convert_unit(job):
             for d in mine:
                 if world.wanted is not None and function_key(tree, d) not in world.wanted:
                     continue   # (of a Blueprint that is not the program's own: what the program calls)
-                if ENGINE_RUN[0] and not d.get("virtual") and unit.api().declared_only(d):
+                if ENGINE_RUN[0] and not d.get("virtual") and not ((d.get("kind") == "CXXConstructorDecl" or (d.get("name") or "").startswith("operator")) and not engine_skipped(tree.scope_of.get(d["id"], ""))):
                     continue   # (a function a header of the engine defines is a node that runs the engine's own function - tools/engine_api.py -,
                                # no graph of the language computing it again; a library keeps the virtual ones, which a Blueprint implements,
-                               # and what is no node (declared_only): the constructors of its values and their operators - QueryFilter(mask)
-                               # is QueryFilter_new, Mat4 * Mat4 is Mat4_mul; what a program names of a library, the library has)
+                               # and what is no node: the constructors of its values and their operators - QueryFilter(mask) is
+                               # QueryFilter_new, Mat4 * Mat4 is Mat4_mul; the language's own helpers (engine_skipped: kern::dm) stay out)
                 if implicit_maker(d) and not any(unit.computed_init(c) for c in kids(tree.records.get(tree.owner.get(d["id"], ""), {}))):
                     continue   # (C++'s own constructor of a state that has nothing to make - no field starts with what is computed: its
                                # fields start as the struct says, and there is no step to write)
