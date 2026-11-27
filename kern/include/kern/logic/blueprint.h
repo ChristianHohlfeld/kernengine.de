@@ -373,7 +373,7 @@ struct BlueprintCore : logic::PureNodes {
       const List<T>* list = static_cast<const List<T>*>(n.kept.get());
       const std::size_t at = static_cast<std::size_t>(n.memory[0]);
       if (!list || at >= list->size() || !self.kern_pass()) return false;
-      n.item = T((*list)[at]);
+      n.item = T((*list)[static_cast<u64>(at)]);
       n.index = static_cast<i64>(at);
       return true;
     }
@@ -807,7 +807,7 @@ struct BlueprintCore : logic::PureNodes {
   static auto list_find_row(const List<decltype(owner_of(Field))>& list, const std::type_identity_t<decltype(field_of(Field))>& value) {
     FoundRow<decltype(owner_of(Field))> r;
     for (std::size_t k = 0; k < list.size(); ++k)
-      if (list[k].*Field == value) return FoundRow<decltype(owner_of(Field))>{true, list[k], static_cast<Int>(k)};
+      if (list[static_cast<u64>(k)].*Field == value) return FoundRow<decltype(owner_of(Field))>{true, list[static_cast<u64>(k)], static_cast<Int>(k)};
     return r;
   }
   template <class S> static const S& struct_break(const std::type_identity_t<S>& value) { return value; }
