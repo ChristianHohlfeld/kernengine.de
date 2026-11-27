@@ -90,6 +90,35 @@ for (const state of ["running","paused","waiting","checking","stopping"]) {
   await recovered.reconnectRemote({automatic:true});
   assert.deepEqual(paths,["/v1/current"]);
 }
+// Recover the actual configuration, full graph, and a playable snapshot
+// without writing anything into the current level.
+const resumed=trainer("local");
+const spec="motion:"+JSON.stringify({name:"nod",duration:1.2,frames:[]});
+const cfg={task:spec,iterations:1500,envs:8,seed:42,initStd:.12,learningRate:.0002};
+let commands=[];
+resumed.engine={command:c=>{commands.push(c);return {ok:true};}};
+resumed.remoteRequest=async (_,path)=>{
+  if(path==="/v1/current")return {...active,config:cfg};
+  if(path.endsWith("/history"))return {history:[{it:1,ret:3,len:1.2},{it:34,ret:14,len:1.2}]};
+  throw Error("unexpected request "+path);
+};
+resumed.remotePractice=async run=>{
+  assert.equal(resumed.task,"motion");
+  assert.equal(resumed.el.trSeed.value,"42");
+  assert.equal(resumed.el.trIterations.value,"1500");
+  assert.equal(resumed.el.trWorkers.value,"56");
+  assert.equal(run.label,"nod");
+  assert.equal(run.name,spec);
+  assert.equal(run.move,null);
+  assert.deepEqual(run.history.map(p=>p.it),[1,34]);
+  resumed.acceptNetwork(run,new Uint8Array([1,2]),25);
+  assert.equal(resumed.onnx.iteration,25);
+  assert.deepEqual(commands,[]);
+  resumed.previewNetwork();
+  assert.deepEqual(commands,[{cmd:"trainerPreview",kind:"motion",duration:1.2,onnx:"AQI="}]);
+  resumed.end(run);
+};
+await resumed.reconnectRemote();
 const idle=trainer("local");
 store.clear();
 idle.remoteRequest=async ()=>({...active,state:"done"});
