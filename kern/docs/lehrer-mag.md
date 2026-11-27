@@ -19,7 +19,8 @@ sudo install -d -o chris -g chris /opt/kern-lehrer
 git clone https://github.com/ChristianHohlfeld/kernengine.de.git /opt/kern-lehrer
 cd /opt/kern-lehrer
 # Nach Freigabe den vollständigen SHA des Studio-Builds aus editor/build.json auschecken:
-git checkout --detach <vollstaendiger-studio-commit>
+STUDIO_SHA="$(curl -fsS https://kernengine.de/editor/build.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')"
+git checkout --detach "$STUDIO_SHA"
 # HIPCC bzw. PATH/LD_LIBRARY_PATH auf MAGs tatsächlich funktionierendes ROCm setzen.
 KERN_LEHRER_HIP=1 KERN_HIP_ARCH=gfx906 kern/tools/lehrer.sh /opt/kern-lehrer/build-hip
 ~~~
@@ -36,8 +37,10 @@ printf '%s\n' 'chris ALL=(root) NOPASSWD: /usr/local/lib/kern-lehrer/mag-exclusi
 sudo chmod 440 /etc/sudoers.d/kern-lehrer
 sudo visudo -cf /etc/sudoers.d/kern-lehrer
 # Einmalig, nur falls /etc/kern-lehrer.env noch nicht existiert; nicht bei jedem Update rotieren.
-sudo install -m 600 /dev/null /etc/kern-lehrer.env
-printf 'KERN_LEHRER_BUILD=%s\nKERN_LEHRER_TOKEN=%s\n' "$(git rev-parse HEAD)" "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" | sudo tee /etc/kern-lehrer.env >/dev/null
+if ! sudo test -e /etc/kern-lehrer.env; then
+  sudo install -m 600 /dev/null /etc/kern-lehrer.env
+  printf 'KERN_LEHRER_BUILD=%s\nKERN_LEHRER_TOKEN=%s\n' "$(git rev-parse HEAD)" "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" | sudo tee /etc/kern-lehrer.env >/dev/null
+fi
 sudo systemctl daemon-reload
 sudo systemctl enable --now mag-lehrer.service
 ~~~
@@ -67,7 +70,7 @@ bestehenden PPO-Einstellungen. Alle CPUs im Affinitätsbereich des Dienstes werd
 keine CPU-Quote. Die GPU-Prioritätssperre wird exklusiv gehalten. Eine bereits laufende
 Idol-GPU-Aufgabe darf fertig werden (nicht mitten in GPU-Arbeit einfrieren); danach pausiert
 der Root-Hook die bekannten MAG-Rechendienste. Bereits vorher inaktive oder eingefrorene
-Dienste werden nicht gestartet/aufgetaut. h3d wird nach Freigabe des GPU-Locks regulär gestoppt,
+Dienste werden nicht gestartet/aufgetaut. h3d wird nach Erwerb des GPU-Locks regulär gestoppt,
 damit der VRAM frei wird, und am Ende wieder gestartet. MAG-Netzwerk, Speicher und Chat-UI
 bleiben erreichbar. Keine Gewichte werden gelöscht oder verändert.
 
@@ -79,7 +82,7 @@ Geschwindigkeitsfaktor ist erst nach Messung auf MAG belegbar. Bitgleichheit gan
 ist nicht durch den kleinen Selbsttest bewiesen.
 
 Start/Pause/Resume/Stopp und Fortschritt kommen aus derselben Oberfläche. Pause hält die
-Ressourcen für den aktuellen Job; Stopp wartet auf das Ende der Iteration und sichert ONNX
+Ressourcen für den aktuellen Job; Stopp wartet auf das Ende der laufenden Initialisierung oder Iteration und sichert ONNX
 und Checkpoint. Alle 25 Iterationen wird ein neues Netz atomar gespeichert und in das Level
 übernommen. Beim Ende, Fehler oder Dienststopp werden nur die vom Hook reservierten Dienste
 wieder freigegeben. Der Root-Hook merkt den vorherigen Zustand unter /run/mag-lehrer-exclusive.json.

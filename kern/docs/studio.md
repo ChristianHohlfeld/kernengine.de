@@ -211,7 +211,8 @@ der Werkzeugleiste, Window → Lehrer oder die Adresse `…/editor/?train=1` (di
 - **Panel** (`web/studio/trainer.mjs`, anstelle von Outliner und Details; auf dem Telefon das Blatt
   über der Bühne): Aufgabe (Bewegung aus Keyframes, Sprung, Stehen, freies Szenario), Keyframes,
   Start / Pause / Stopp, Experteneinstellungen, Fortschritt mit Kurve, „Bewegungen dieses Levels“.
-- **Training:** in Web Workern der Seite, je Worker ein `kern_lehrer.wasm` (Sammler und ein Lerner).
+- **Training:** standardmäßig lokal in Web Workern der Seite, je Worker ein `kern_lehrer.wasm` (Sammler und ein Lerner).
+  Unter Training → Rechenbackend ist optional MAG als privater nativer Trainingsserver wählbar ([Installation und Grenzen](lehrer-mag.md)).
   Es läuft weiter, während man bearbeitet, spielt oder den Arbeitsbereich verlässt; der Knopf in der
   Werkzeugleiste zeigt den Fortschritt.
 - **Ergebnis im Level:** Eine Bewegung (Name, Länge, Keyframes, trainiertes Netz) steht im Level unter

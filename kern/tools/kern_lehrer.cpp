@@ -6,6 +6,7 @@
 //
 // Long runs (on a server, say): --checkpoint run.ckpt saves the whole learner every --save-every
 // iterations; --resume run.ckpt carries on from it.
+#include <atomic>
 #include <chrono>
 #include <csignal>
 #include <cmath>
@@ -36,8 +37,9 @@ using namespace kern;
 using namespace kern::lehrer;
 
 namespace {
-volatile std::sig_atomic_t stop_requested = 0;
-void request_stop(int) { stop_requested = 1; }
+static_assert(std::atomic<bool>::is_always_lock_free);
+std::atomic<bool> stop_requested{false};
+void request_stop(int) { stop_requested.store(true, std::memory_order_relaxed); }
 
 struct Options {
   std::string task = "jump", scenario, out, eval, log, checkpoint, resume, warm, trace;
@@ -509,6 +511,9 @@ void load_pollen_policies(const std::string& dir_in) {
 }
 
 int main(int argc, char** argv) {
+  for (int i = 1; i < argc; ++i) if (std::strcmp(argv[i], "--progress-json") == 0) {
+    std::signal(SIGTERM, request_stop); std::signal(SIGINT, request_stop); break;
+  }
   if (argc == 2 && std::strcmp(argv[1], "--hip-check") == 0) {
 #ifdef KERN_LEHRER_HIP
     if (!hip_lehrer_check()) return 1;
@@ -634,7 +639,6 @@ int main(int argc, char** argv) {
   if (o.play == 6) return demo_trace(o);
   if (o.play) return play_train(o);
   if (o.out.empty()) o.out = o.scenario.empty() ? o.task + ".onnx" : "scenario.onnx";
-  if (o.progress_json) { std::signal(SIGTERM, request_stop); std::signal(SIGINT, request_stop); }
 #ifdef KERN_LEHRER_HIP
   if (!hip_lehrer_check()) return 1;
   std::printf("HIP devices: %d\n", hip_lehrer_devices());

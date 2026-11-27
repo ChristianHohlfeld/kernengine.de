@@ -155,11 +155,15 @@ class Job:
                                 if self.proc:
                                     for line in self.proc.stdout:
                                         log.write(line); log.flush()
+                                        if line.startswith(("imitating the demonstration:", "  round ")):
+                                            with self.lock:
+                                                if self.state == "running": self.message = line.strip()[:300]
                                         if line.startswith("KERN_PROGRESS "):
                                             stats = json.loads(line[len("KERN_PROGRESS "):])
                                             with self.lock:
                                                 self.report = stats.get("report",self.report)
                                                 self.stats = stats
+                                                if self.state == "running": self.message = "Learning on MAG"
                                             if stats.get("snapshot"):
                                                 self.snapshot()
                                     code = self.proc.wait()
