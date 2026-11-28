@@ -1021,8 +1021,14 @@ for (const viewport of [{width: 390, height: 844}, {width: 844, height: 390}]) {
     const restored = await until(() => imported.page.evaluate(() => {
       const t=window.KernStudio.trainer;
       return !window.KernStudio.training && t.onnx?.preview && t.onnx.iteration===1 && t.onnx.bytes.length;
-    }), 240000);
-    check(restored === trained, "Lehrer: checkpoint upload restores the completed iteration and ONNX");
+    }), 30000);
+    const details=await imported.page.evaluate(()=>{
+      const t=window.KernStudio.trainer;
+      return {status:t.statusText,error:t.statusError,note:t.note,checkpoint:t.localSaved,
+        busy:t.localBusy,transfer:t.checkpointBusy,run:t.run?.iteration,network:t.onnx?.iteration};
+    });
+    check(restored === trained, "Lehrer: checkpoint upload restores the completed iteration and ONNX"+(restored===trained?"":": "+JSON.stringify(details)+"; "+imported.errors.join(" | ")));
+    if(restored!==trained)throw Error("Portable checkpoint restoration failed: "+JSON.stringify(details));
     check(await imported.page.locator("#trTest").isEnabled(), "Lehrer: restored snapshot can be played");
     await imported.page.click("#trTest");
     check(await until(async()=>{const t=await state(imported.page);return t.trainer.stage==="test"&&t.trainer.testing==="lehrer_preview";}), "Lehrer: restored network plays on an independent stage");
