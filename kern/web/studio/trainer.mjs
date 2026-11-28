@@ -929,8 +929,13 @@ export class Trainer {
       }else throw Error("Unsupported checkpoint backend");
     }catch(error){
       this.status(error.message,true);
-    }finally{release?.();this.checkpointBusy=false;this.sync();}
-    if(localReady)await this.resumeLocal();
+    }finally{
+      if(!localReady)release?.();
+      this.checkpointBusy=false;this.sync();
+    }
+    // Transfer the held Web Lock directly. Resolving its callback and
+    // immediately requesting ifAvailable can race the asynchronous release.
+    if(localReady)await this.resumeLocal(release);
     else if(remoteReconnect)await this.reconnectRemote();
   }
 
@@ -964,12 +969,12 @@ export class Trainer {
     finally{release?.();this.localBusy=false;this.sync();}
   }
 
-  async resumeLocal() {
-    if(this.run||this.localBusy||this.checkpointBusy)return;
+  async resumeLocal(heldLease=null) {
+    if(this.run||this.localBusy||this.checkpointBusy){heldLease?.();return;}
     this.localBusy=true;this.sync();
-    let run,release;
+    let run,release=heldLease;
     try{
-      release=await acquireLocalLease();
+      if(!release)release=await acquireLocalLease();
       const saved=await readLocalCheckpoint(),r=saved?.record;
       if(!r||r.schema!==1||!(saved.wasm instanceof ArrayBuffer)||
          !Number.isInteger(r.count)||r.count<1||r.count>64||
@@ -988,7 +993,16 @@ export class Trainer {
       this.history=run.history;
       this.restoreRunFields(run);
       this.onnx=null;this.handover=null;
-      await this.runLocal(run,saved);
+      // A completed checkpoint needs no workers. The saved ONNX belongs to
+      // the same committed iteration and is sufficient for playback.
+      if(run.iteration===run.total && r.onnx instanceof ArrayBuffer && r.onnx.byteLength){
+        run.steps=r.steps||24;
+        if(r.stats)this.stats(run,r.stats,r.stats.collectSeconds+r.stats.learnSeconds,false);
+        if(r.report)this.goal(run,r.report);
+        this.acceptNetwork(run,new Uint8Array(r.onnx),run.iteration);
+        this.end(run);
+        this.status("Local training complete. Result and checkpoint saved.");
+      }else await this.runLocal(run,saved);
     }catch(error){
       if(run&&this.run===run)this.end(run);
       this.status(error.message,true);
@@ -1005,7 +1019,7 @@ export class Trainer {
     if(this.run!==run)throw Error("Local run no longer active");
     const record={schema:1,token:run.token,task:run.task,name:run.name,label:run.label,
       count:run.count,envs:run.envs,total:run.total,seed:run.seed,config:run.config,
-      iteration:run.iteration,history:run.history,stats:run.lastStats||null,report:run.lastReport||null,
+      iteration:run.iteration,steps:run.steps,history:run.history,stats:run.lastStats||null,report:run.lastReport||null,
       learner:states[0].state,collectors:states.slice(1).map(s=>s.state),onnx:snapshot.onnx};
     await writeLocalCheckpoint(record,initialWasm);
     this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
@@ -1437,7 +1451,7 @@ export class Trainer {
     const set = (id, text) => this.text(this.host.querySelector(`[data-stat="${id}"] b`), text);
     set("it", s.iteration);
     set("steps", Math.round(s.steps).toLocaleString());
-    set("sps", Math.round(run.remote ? s.sps : run.collectors.length * run.envs * run.steps / seconds).toLocaleString());
+    set("sps", Math.round(run.remote ? s.sps : run.count * run.envs * run.steps / seconds).toLocaleString());
     if (s.episodes) {
       set("ret", s.meanReturn.toFixed(2));
       set("len", (s.meanLength * 0.02).toFixed(2));
