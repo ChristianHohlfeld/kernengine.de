@@ -1,0 +1,1200 @@
+/* The original SpawnCity's CSS at run time (spawncity.de, taken by tools/take_original_view.py). */
+@font-face { font-family: Inter; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/InterVariable.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: italic; font-weight: 100 900; font-display: swap; src: url("fonts/InterVariable-Italic.woff2") format("woff2"); }
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: rgb(1, 8, 6); color: rgb(182, 255, 207); }
+* { box-sizing: border-box; }
+html, body { margin: 0px; width: 100%; height: 100%; overflow: hidden; background: rgb(1, 8, 6); }
+.viewport { position: fixed; inset: 0px; }
+canvas { display: block; width: 100%; height: 100%; }
+.panel { position: fixed; z-index: 5; top: 12px; left: 12px; width: 360px; max-height: calc(-24px + 100vh); overflow: auto; background: rgba(9, 16, 27, 0.918); border: 1px solid rgb(39, 48, 68); border-radius: 14px; padding: 14px; backdrop-filter: blur(12px); box-shadow: rgba(0, 0, 0, 0.6) 0px 12px 36px; }
+.telemetry { position: fixed; z-index: 5; right: 12px; top: 12px; width: 292px; background: rgba(9, 16, 27, 0.875); border: 1px solid rgb(39, 48, 68); border-radius: 12px; padding: 12px; backdrop-filter: blur(10px); }
+h1 { font-size: 18px; margin: 0px 0px 4px; }
+.sub { font-size: 12px; color: rgb(150, 166, 189); line-height: 1.45; margin: 0px 0px 12px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0px; }
+.tabs button.active { background: rgb(23, 95, 73); border-color: rgb(56, 169, 133); }
+.row { display: flex; gap: 8px; margin: 8px 0px; }
+.row > * { flex: 1 1 0%; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.card { border: 1px solid rgb(38, 49, 72); border-radius: 9px; padding: 10px; margin: 10px 0px; }
+.card h2 { font-size: 12px; margin: 0px 0px 8px; color: rgb(203, 215, 232); }
+.help { font-size: 11px; color: rgb(143, 159, 182); line-height: 1.5; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.good { color: rgb(91, 217, 170) !important; border-color: rgb(45, 130, 102) !important; }
+.warn { color: rgb(255, 208, 109) !important; border-color: rgb(131, 107, 52) !important; }
+.bad { color: rgb(255, 113, 133) !important; border-color: rgb(139, 52, 67) !important; }
+button, input, select, textarea { font: inherit; }
+button, .linkbutton { border: 1px solid rgb(58, 73, 100); border-radius: 7px; background: rgb(24, 34, 53); color: rgb(238, 244, 255); padding: 8px; cursor: pointer; text-align: center; text-decoration: none; }
+button:hover, .linkbutton:hover { background: rgb(34, 48, 74); }
+button:disabled { opacity: 0.42; cursor: not-allowed; }
+.primary { background: rgb(23, 95, 73); border-color: rgb(46, 155, 119); }
+label { font-size: 11px; color: rgb(170, 182, 200); display: block; }
+input[type="number"], input[type="text"], input[type="range"], select, textarea { width: 100%; background: rgb(13, 20, 32); color: rgb(255, 255, 255); border: 1px solid rgb(48, 58, 78); border-radius: 6px; padding: 6px; }
+.modebox { padding: 8px; border-radius: 8px; background: rgb(12, 21, 34); border: 1px solid rgb(36, 49, 73); font-size: 12px; line-height: 1.45; }
+.mobile-controls { display: none !important; }
+.statusline { font-size: 11px; color: rgb(157, 176, 201); margin-top: 6px; }
+.progress { height: 7px; background: rgb(17, 27, 41); border-radius: 999px; overflow: hidden; }
+.progress > div { height: 100%; width: 0px; background: rgb(79, 191, 146); }
+.remote-card { border-color: rgb(49, 93, 115); }
+.remote-card .row { align-items: end; }
+dialog { width: min(94vw, 760px); max-height: 94vh; overflow: auto; border: 1px solid rgb(53, 67, 93); border-radius: 14px; background: rgb(9, 16, 27); color: rgb(238, 244, 255); padding: 16px; box-shadow: rgba(0, 0, 0, 0.8) 0px 24px 80px; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px); }
+dialog h2 { font-size: 18px; margin: 0px 0px 6px; }
+dialog p { font-size: 12px; color: rgb(155, 172, 191); line-height: 1.45; }
+.signal { width: 100%; min-height: 70px; resize: vertical; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair-step { border: 1px solid rgb(38, 49, 72); border-radius: 10px; padding: 10px; background: rgb(13, 21, 34); min-width: 0px; }
+.pair-step b { display: block; margin-bottom: 6px; }
+.scanner { position: relative; width: min(100%, 340px); aspect-ratio: 1 / 1; margin: 8px auto; border-radius: 10px; overflow: hidden; background: rgb(3, 6, 9); border: 1px solid rgb(48, 64, 90); }
+.scanner video { width: 100%; height: 100%; object-fit: cover; }
+.scanner::after { content: "SCAN CONTROLLER OFFER"; position: absolute; left: 9%; right: 9%; top: 44%; padding: 7px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.533); border-radius: 8px; background: rgba(0, 0, 0, 0.533); font-size: 11px; letter-spacing: 0.08em; }
+.qr { display: block; width: min(100%, 340px); aspect-ratio: 1 / 1; margin: 8px auto; background: rgb(255, 255, 255); border-radius: 10px; padding: 8px; image-rendering: pixelated; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+details { margin-top: 12px; border-top: 1px solid rgb(38, 49, 72); padding-top: 10px; }
+summary { cursor: pointer; color: rgb(130, 148, 173); font-size: 11px; }
+@media (max-width: 900px) {
+  html, body { height: auto; min-height: 100%; overflow: hidden auto; }
+  .viewport { position: relative; height: 48vh; min-height: 320px; max-height: 520px; inset: auto; }
+  .panel, .telemetry { position: relative; inset: auto; width: auto; max-height: none; margin: 10px 12px; }
+  .telemetry { margin-bottom: max(18px,env(safe-area-inset-bottom)); }
+  .desktop-help { display: none; }
+  .grid { grid-template-columns: 1fr 1fr; }
+  .panel { order: 1; }
+  .telemetry { order: 2; }
+  body { display: flex; flex-direction: column; }
+  .viewport { order: 0; }
+  .tabs button { padding: 10px 4px; }
+  .row { flex-wrap: wrap; }
+  .kv { font-size: 11px; }
+  .pair-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-height: 500px) {
+  dialog { padding: 10px; }
+  .qr, .scanner { width: min(28vh, 250px); }
+}
+#gameMenu { position: fixed; inset: 0px; z-index: 100000; display: flex; align-items: center; justify-content: center; background: rgb(11, 13, 16); color: rgb(238, 240, 242); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; touch-action: manipulation; user-select: none; }
+#gameMenu[hidden] { display: none !important; }
+#gameMenu { transition: opacity 0.6s; }
+#gameMenu.gm-leaving { opacity: 0; pointer-events: none; }
+#gameMenuBg { position: absolute; inset: 0px; width: 100%; height: 100%; display: block; }
+#gameMenu .gm-center { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2.4vh, 22px); padding: 24px; text-align: center; }
+#gameMenu .gm-title { position: relative; display: flex; flex-direction: column; align-items: center; font-family: Inter, system-ui, -apple-system, sans-serif; font-weight: 900; font-style: italic; font-size: clamp(34px, min(10vw, 15vh), 120px); letter-spacing: 0.02em; line-height: 0.9; color: rgb(244, 245, 246); text-transform: uppercase; text-shadow: rgba(0, 0, 0, 0.55) 0px 3px 0px, rgba(0, 0, 0, 0.6) 0px 10px 30px; padding: 0px 0.08em 0.16em; }
+#gameMenu .gm-title > span { display: block; }
+#gameMenu .gm-title::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: 0.02em; height: 0.09em; background: linear-gradient(90deg, transparent, rgb(255, 122, 26) 18%, rgb(255, 176, 46) 60%, transparent); transform: skewX(-24deg); box-shadow: rgba(255, 122, 26, 0.55) 0px 0px 18px; }
+#gameMenu .gm-sub { font-weight: 700; font-size: clamp(11px, 1.6vw, 15px); letter-spacing: 0.42em; color: rgba(238, 240, 242, 0.78); text-shadow: rgba(0, 0, 0, 0.7) 0px 2px 4px; }
+#gameMenuStart { margin-top: clamp(6px, 2vh, 18px); min-width: min(64vw, 300px); padding: 15px 28px; font: 700 clamp(17px, 2.4vw, 22px) Inter, system-ui, -apple-system, sans-serif; letter-spacing: 0.32em; text-transform: uppercase; color: rgb(22, 18, 12); background: linear-gradient(rgb(255, 176, 46), rgb(255, 122, 26)); border: 0px; border-radius: 4px; box-shadow: rgba(0, 0, 0, 0.55) 0px 6px 18px, rgba(0, 0, 0, 0.18) 0px -3px 0px inset; text-shadow: none; cursor: pointer; clip-path: polygon(4% 0px, 100% 0px, 96% 100%, 0px 100%); }
+#gameMenuStart:not([disabled]) { animation: auto ease 0s 1 normal none running none; }
+#gameMenuStart:active { filter: brightness(0.92); }
+#gameMenuStart[disabled] { opacity: 0.7; cursor: default; animation: auto ease 0s 1 normal none running none; filter: saturate(0.4); }
+#gameMenuStatus { min-height: 1.2em; font-size: 11px; font-weight: 700; letter-spacing: 0.3em; color: rgba(238, 240, 242, 0.62); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 3px; }
+@keyframes gmPulse { 
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+#soundSwitch { position: fixed; z-index: 100001; top: max(10px,env(safe-area-inset-top)); right: max(10px,env(safe-area-inset-right)); width: 40px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0px; background: rgba(10, 13, 18, 0.56); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; color: rgb(255, 255, 255); cursor: pointer; box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px; }
+#soundSwitch svg { width: 20px; height: 20px; display: block; }
+#soundSwitch[data-on="0"] .ss-wave { display: none; }
+#soundSwitch[data-on="1"] .ss-x { display: none; }
+#soundSwitch[hidden], #musicSwitch[hidden] { display: none !important; }
+#musicSwitch { position: fixed; z-index: 100001; top: max(10px,env(safe-area-inset-top)); right: calc(max(10px,env(safe-area-inset-right)) + 46px); width: 40px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0px; background: rgba(10, 13, 18, 0.56); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; color: rgb(255, 255, 255); cursor: pointer; box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px; }
+#musicSwitch svg { width: 20px; height: 20px; display: block; }
+#musicSwitch[data-on="1"] .ms-x { display: none; }
+#musicSwitch[data-on="0"] { color: rgba(255, 255, 255, 0.55); }
+#installApp { position: fixed; z-index: 100001; top: max(10px,env(safe-area-inset-top)); left: max(10px,env(safe-area-inset-left)); height: 32px; display: flex; align-items: center; gap: 7px; padding: 0px 11px; background: rgba(10, 13, 18, 0.56); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; color: rgb(255, 255, 255); font: 600 11px Inter, system-ui, sans-serif; letter-spacing: 0.12em; cursor: pointer; box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px; }
+#installApp svg { width: 14px; height: 14px; }
+#installApp[hidden], #installHint[hidden] { display: none !important; }
+#installHint { position: fixed; z-index: 100002; top: calc(max(10px,env(safe-area-inset-top)) + 40px); left: max(10px,env(safe-area-inset-left)); max-width: min(80vw, 320px); padding: 12px 14px; background: rgba(18, 22, 28, 0.96); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 14px; color: rgb(255, 255, 255); font: 600 13px / 1.4 system-ui, sans-serif; }
+#installHint b { color: rgb(245, 179, 1); font-weight: 700; }
+body:not(.dev-ui) .panel, body:not(.dev-ui) .telemetry { display: none !important; }
+@media (max-width: 900px) {
+  body:not(.dev-ui) .viewport { position: fixed; inset: 0px; height: auto; min-height: 0px; max-height: none; }
+}
+#gameMenu { overflow: hidden auto; align-items: safe center; justify-content: safe center; }
+#gameMenu > #gameMenuBg { position: fixed; }
+#gameMenu .gm-center { margin: auto; box-sizing: border-box; max-width: 100%; padding: calc(max(12px,env(safe-area-inset-top)) + 44px) max(16px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+@media (orientation: landscape) and (max-height: 560px) {
+  #gameMenu .gm-center { display: grid; grid-template-columns: minmax(0px, auto) minmax(240px, 340px); grid-auto-rows: auto; gap: clamp(6px, 1.8vh, 10px) clamp(24px, 6vw, 72px); place-items: center; padding-top: calc(max(10px,env(safe-area-inset-top)) + 44px); }
+  #gameMenu .gm-title { grid-area: 1 / 1 / span 4; align-self: end; font-size: clamp(40px, min(22vh, 10vw), 104px); }
+  #gameMenu .gm-sub { grid-area: 5 / 1 / span 2; align-self: start; font-size: clamp(10px, 1.5vw, 13px); letter-spacing: 0.34em; }
+  #gameMenu .gm-center > :not(.gm-title):not(.gm-sub) { grid-column: 2; width: 100%; min-width: 0px; box-sizing: border-box; }
+  #gameMenu #gameMenuStart { margin-top: 0px; min-width: 0px; padding-top: clamp(9px, 2.6vh, 15px); padding-bottom: clamp(9px, 2.6vh, 15px); }
+  #gameMenu #gameMenuWorld, #gameMenu #gameMenuChangelog { min-height: 0px; padding-top: clamp(7px, 2vh, 12px) !important; padding-bottom: clamp(7px, 2vh, 12px) !important; }
+  #gameMenu #gameMenuStatus { min-height: 1em; margin: 0px; }
+  #gameMenu #startPlaceButton { margin-top: 0px; }
+}
+@media (orientation: landscape) and (max-height: 360px) {
+  #gameMenu .gm-center { padding-top: calc(max(6px,env(safe-area-inset-top)) + 40px); row-gap: 5px; }
+  #gameMenu #gameMenuStatus { display: none; }
+}
+#soundSwitch, #musicSwitch { height: 36px; transition: none !important; animation: auto ease 0s 1 normal none running none !important; }
+#scExit { position: fixed; z-index: 2147483000; left: max(8px,env(safe-area-inset-left)); top: max(8px,env(safe-area-inset-top)); height: 36px; padding: 0px 12px; display: flex; align-items: center; gap: 6px; border-radius: 10px; border: 1.5px solid rgba(255, 138, 106, 0.6); background: rgba(42, 20, 16, 0.9); color: rgb(255, 226, 216); font: 900 11px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.12em; cursor: pointer; touch-action: manipulation; }
+#scExit[hidden] { display: none !important; }
+#scExitAsk { position: fixed; inset: 0px; z-index: 2147483001; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.667); }
+#scExitAsk[hidden] { display: none !important; }
+#scExitAsk .box { background: rgb(18, 22, 28); border: 1px solid rgba(255, 255, 255, 0.165); border-radius: 14px; padding: 18px 20px; color: rgb(238, 240, 242); text-align: center; font: 800 13px / 1.3 system-ui, sans-serif; letter-spacing: 0.06em; min-width: 240px; }
+#scExitAsk .row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+#scExitAsk button { min-width: 96px; height: 42px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgb(29, 35, 43); color: rgb(255, 255, 255); font: 800 13px system-ui, sans-serif; letter-spacing: 0.1em; }
+#scExitAsk button[data-yes] { background: linear-gradient(rgb(255, 176, 46), rgb(255, 122, 26)); color: rgb(22, 18, 12); border: 0px; }
+html body.desktop-input #viewport #footHud #footMove, html body.desktop-input #viewport #footHud #footLook, html body.desktop-input #viewport #footHud #footFire, html body.desktop-input #viewport #footHud #footJump, html body.desktop-input #viewport #footHud #footLookZone { display: none !important; pointer-events: none !important; }
+body.desktop-input #footMove, body.desktop-input #footLook, body.desktop-input #footJump, body.desktop-input #footFire, body.desktop-input #footLookZone, body.desktop-input #soloLeft, body.desktop-input #soloRight, body.desktop-input #soloHeightPad, body.desktop-input .vehicle-stick, body.desktop-input #vehicleCamButton, body.desktop-input #footWeaponToggle, body.desktop-input #droneWeaponToggle, body.desktop-input #vehicleBrakeButton, body.desktop-input #jetHud .jet-btns { display: none !important; pointer-events: none !important; }
+body.desktop-input #mobileGameplayDock button::after { display: inline-block; margin-left: 6px; padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 9px / 1.2 system-ui, sans-serif; letter-spacing: 0.04em; opacity: 0.8; }
+html body.desktop-input.mobile-gameplay-compact.solo-flight #mobileGameplayDock { width: min(100% - 300px, 470px); }
+html body.desktop-input #airStrikeButton { position: relative; }
+html body.desktop-input #airStrikeButton::after, html body.pad-input #airStrikeButton::after { position: absolute; right: -6px; top: -6px; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.4); color: rgb(255, 255, 255); font: 800 10px / 1.2 system-ui, sans-serif; }
+html body.desktop-input:not(.pad-input) #airStrikeButton::after { content: "4"; }
+html body.desktop-input #wantedEmpButton { position: relative; }
+html body.desktop-input:not(.pad-input) #wantedEmpButton::after, html body.pad-input #wantedEmpButton::after { position: absolute; right: -6px; top: -6px; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255, 255, 255, 0.4); color: rgb(255, 255, 255); font: 800 10px / 1.2 system-ui, sans-serif; }
+html body.desktop-input:not(.pad-input) #wantedEmpButton::after { content: "G"; }
+html body.desktop-input:not(.pad-input) #mobileGameplayMultiplayer::after { content: "P"; margin-left: 5px; padding: 0px 4px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 9px / 1.3 system-ui, sans-serif; }
+html body.desktop-input #mobileGameplayMultiplayer { width: auto !important; padding: 0px 8px !important; }
+html body.pad-input #wantedEmpButton::after { content: "B"; }
+html body.pad-input #airStrikeButton::after { content: "D-PAD ⬆"; }
+html body.pad-input #desktopKeyHints { display: none !important; }
+html body.pad-input #mobileGameplayDock button::after { display: inline-block; margin-left: 6px; padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 9px / 1.2 system-ui, sans-serif; opacity: 0.85; }
+html body.pad-input #mobileGameplayMode::after { content: "D-PAD ⬇" !important; }
+html body.pad-input #mobileGameplayWeapon::after { content: "Y" !important; }
+html body.pad-input #mobileGameplaySettings::after { content: "☰" !important; }
+body.desktop-input #mobileGameplayMode::after { content: "V"; }
+body.desktop-input #mobileGameplayWeapon::after { content: "Q"; }
+body.desktop-input #mobileGameplaySettings::after { content: "ESC"; }
+#desktopKeyHints { position: absolute; left: 50%; top: calc(max(8px,env(safe-area-inset-top)) + 102px); transition: opacity 0.6s; transform: translateX(-50%); z-index: 30; max-width: min(70vw, 860px); padding: 4px 10px; border-radius: 6px; background: rgba(11, 15, 22, 0.5); color: rgba(223, 231, 242, 0.8); font: 600 10px / 1.35 Inter, system-ui, sans-serif; letter-spacing: 0.04em; text-align: center; pointer-events: none; display: none; white-space: normal; }
+body.desktop-input.solo-flight #desktopKeyHints { display: block; }
+#desktopKeyHints.faded { opacity: 0; }
+body.desktop-input #navGuide { top: calc(max(8px,env(safe-area-inset-top)) + 150px) !important; }
+#desktopClickToPlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 31; padding: 14px 22px; border-radius: 8px; background: rgba(11, 15, 22, 0.816); border: 1px solid rgba(255, 255, 255, 0.267); color: rgb(255, 255, 255); font: 800 15px / 1.2 Inter, system-ui, sans-serif; letter-spacing: 0.12em; text-align: center; pointer-events: none; display: none; }
+#desktopClickToPlay small { display: block; margin-top: 6px; font-weight: 600; font-size: 11px; letter-spacing: 0.05em; opacity: 0.75; }
+body.desktop-input.solo-flight #desktopClickToPlay.show { display: block; }
+#startPlaceButton { display: flex; align-items: center; gap: 8px; margin: 10px auto 0px; max-width: min(86vw, 420px); padding: 7px 12px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(11, 17, 24, 0.72); color: rgb(234, 244, 255); font: 700 12px / 1.2 system-ui, sans-serif; letter-spacing: 0.04em; cursor: pointer; }
+#startPlaceButton b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62vw; }
+#startPlaceButton i { font-style: normal; opacity: 0.6; font-size: 10px; margin-left: 4px; }
+#startPlacePanel { position: absolute; inset: 0px; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding: max(12px,env(safe-area-inset-top)) 12px 12px; background: rgba(5, 8, 12, 0.8); backdrop-filter: blur(3px); }
+#startPlacePanel[hidden] { display: none; }
+#startPlacePanel .sp-card { width: min(94vw, 520px); max-height: calc(-24px + 100dvh); display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgb(15, 21, 29); color: rgb(234, 244, 255); font: 600 13px / 1.3 system-ui, sans-serif; }
+#startPlacePanel .sp-head { display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.08em; }
+#startPlacePanel .sp-x { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.07); color: rgb(255, 255, 255); font-size: 14px; }
+#startPlacePanel .sp-q { width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(127, 211, 255, 0.533); background: rgb(8, 16, 24); color: rgb(255, 255, 255); font: 600 16px / 1.2 system-ui, sans-serif; }
+#startPlacePanel .sp-list { overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 60px; }
+#startPlacePanel .sp-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, 0.11); background: rgba(255, 255, 255, 0.04); color: rgb(234, 244, 255); text-align: left; cursor: pointer; }
+#startPlacePanel .sp-item:hover, #startPlacePanel .sp-item:focus { border-color: rgb(127, 211, 255); background: rgba(127, 211, 255, 0.1); outline: none; }
+#startPlacePanel .sp-item.sp-on { border-color: rgb(127, 240, 197); }
+#startPlacePanel .sp-item small { opacity: 0.65; font-weight: 500; }
+#startPlacePanel .sp-wait { padding: 12px; opacity: 0.7; letter-spacing: 0.06em; }
+#startPlacePanel .sp-note { opacity: 0.45; font-size: 10px; }
+#thumbWeapon { position: absolute; z-index: 23; display: none; width: 60px; height: 60px; margin: 0px; padding: 0px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.667); background: rgba(42, 29, 12, 0.816); color: rgb(255, 255, 255); touch-action: none; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 16px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+#thumbWeapon b { font: 900 18px / 1 system-ui, sans-serif; }
+#thumbWeapon small { font: 800 8.5px / 1 system-ui, sans-serif; letter-spacing: 0.06em; max-width: 54px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html body #viewport #thumbWeapon { border-radius: 50% !important; padding: 0px !important; }
+#thumbWeapon.show { display: flex; }
+#thumbWeapon:active { transform: scale(0.94); background: rgba(74, 50, 18, 0.88); }
+html body:not(.desktop-input) #viewport :is(#footMove, #footLook, #soloLeft, #soloRight) { clip-path: circle(50% at 50% 50%); width: 168px !important; height: 168px !important; overflow: visible !important; border-radius: 50% !important; }
+html body:not(.desktop-input) #viewport :is(#footMove, #soloLeft) { left: var(--solo-safe-left,env(safe-area-inset-left,0px)) !important; right: auto !important; bottom: var(--solo-safe-bottom,env(safe-area-inset-bottom,0px)) !important; top: auto !important; transform: none !important; }
+html body:not(.desktop-input) #viewport :is(#footLook, #soloRight) { right: var(--solo-safe-right,env(safe-area-inset-right,0px)) !important; left: auto !important; bottom: var(--solo-safe-bottom,env(safe-area-inset-bottom,0px)) !important; top: auto !important; transform: none !important; }
+html body:not(.desktop-input) #viewport :is(#footMove, #footLook, #soloLeft, #soloRight)::before { content: ""; position: absolute; border-radius: 50%; background: transparent; pointer-events: auto; }
+html body:not(.desktop-input) #viewport :is(#footMove, #soloLeft)::before { inset: 0px; }
+html body:not(.desktop-input) #viewport :is(#footLook, #soloRight)::before { inset: 0px; }
+html body:not(.desktop-input) #viewport :is(#footMove, #footLook, #soloLeft, #soloRight) > span { opacity: 0 !important; }
+html body.thumb-weapon:not(.desktop-input) #viewport #mobileGameplayDock #mobileGameplayWeapon, html body.thumb-weapon:not(.desktop-input) #mobileGameplayDock #mobileGameplayWeapon, html body.mobile-gameplay-compact:not(.desktop-input) #viewport #footHud #footWeaponToggle, html body.mobile-gameplay-compact:not(.desktop-input) #viewport #footWeaponToggle, html body.mobile-gameplay-compact:not(.desktop-input) #footWeaponToggle { display: none !important; }
+#sniperScope { position: absolute; inset: 0px; z-index: 12; pointer-events: none; display: none; --r: min(47vw,47vh); }
+body.scope-active #sniperScope { display: block; }
+#sniperScope .ss-tube { position: absolute; inset: 0px; background: radial-gradient(circle at 50% 50%,transparent 0,transparent calc(var(--r) - 18px),#06080a8c calc(var(--r) - 6px),#020304 calc(var(--r) - 1px),#000 var(--r),#000 100%); }
+#sniperScope .ss-ring { position: absolute; left: 50%; top: 50%; width: calc(var(--r)*2); height: calc(var(--r)*2); transform: translate(-50%, -50%); border-radius: 50%; box-shadow: rgba(42, 58, 72, 0.333) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.667) 0px 0px 26px 6px inset; background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.02) 18%, transparent 38%); }
+#sniperScope .ss-h, #sniperScope .ss-v { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(11, 11, 11, 0.867); }
+#sniperScope .ss-h { width: calc(var(--r)*2); height: 1px; }
+#sniperScope .ss-v { height: calc(var(--r)*2); width: 1px; }
+#sniperScope .ss-h::before, #sniperScope .ss-h::after { content: ""; position: absolute; top: -2px; height: 5px; width: 30%; background: rgb(5, 5, 5); }
+#sniperScope .ss-h::before { left: 0px; }
+#sniperScope .ss-h::after { right: 0px; }
+#sniperScope .ss-v::after { content: ""; position: absolute; left: -2px; width: 5px; height: 30%; background: rgb(5, 5, 5); bottom: 0px; }
+#sniperScope .ss-dots { position: absolute; left: 50%; top: 50%; width: 0px; height: 0px; }
+#sniperScope .ss-dots i { position: absolute; width: 3px; height: 3px; margin: -1.5px 0px 0px -1.5px; border-radius: 50%; background: rgb(11, 11, 11); }
+#sniperScope .ss-dot { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0px 0px -1.5px; border-radius: 50%; background: rgb(255, 59, 34); box-shadow: rgba(255, 59, 34, 0.6) 0px 0px 3px 1px; }
+#sniperScope .ss-range { position: absolute; left: 50%; top: calc(50% + var(--r)*.52); transform: translateX(-50%); font: 700 11px / 1 "Barlow Condensed", Inter, system-ui, sans-serif; letter-spacing: 0.12em; color: rgb(255, 122, 90); text-shadow: rgb(0, 0, 0) 0px 0px 3px, rgb(0, 0, 0) 0px 0px 1px; white-space: nowrap; }
+#scopeButton { position: absolute; z-index: 23; display: none; width: 60px; height: 60px; margin: 0px; padding: 0px; border: 2px solid rgba(255, 255, 255, 0.667); background: rgba(12, 26, 20, 0.816); color: rgb(255, 255, 255); font: 900 10px / 1 system-ui, sans-serif; letter-spacing: 0.06em; touch-action: none; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 16px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 50% !important; }
+#scopeButton b { font-size: 20px; line-height: 1; }
+#scopeButton.show { display: flex; }
+#scopeButton.on { background: rgba(179, 38, 30, 0.847); border-color: rgb(255, 208, 200); }
+#mpFunHud { position: absolute; inset: 0px; pointer-events: none; z-index: 16; font-family: Inter, system-ui, sans-serif; }
+#mpKillFeed { position: absolute; right: max(10px,env(safe-area-inset-right)); top: max(58px,calc(env(safe-area-inset-top) + 52px)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#mpKillFeed div { padding: 4px 9px; border-radius: 7px; background: rgba(7, 11, 16, 0.77); color: rgb(255, 255, 255); font: 800 12px / 1.2 Inter, system-ui, sans-serif; letter-spacing: 0.03em; white-space: nowrap; animation: 0.18s ease-out 0s 1 normal none running mpFeedIn; transition: opacity 0.4s; }
+#mpKillFeed div.me { box-shadow: rgb(255, 215, 106) 0px 0px 0px 1.5px; }
+#mpKillFeed b { font-weight: 900; }
+#mpKillFeed i { font-style: normal; opacity: 0.75; margin: 0px 6px; }
+#mpKillFeed em { font-style: normal; color: rgb(255, 90, 70); margin-left: 5px; }
+@keyframes mpFeedIn { 
+  0% { transform: translateX(16px); opacity: 0; }
+}
+#mpScore { position: absolute; left: max(10px,env(safe-area-inset-left)); top: max(96px,calc(env(safe-area-inset-top) + 90px)); display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; border-radius: 8px; background: rgba(7, 11, 16, 0.66); color: rgb(255, 255, 255); font-style: normal; font-variant: tabular-nums; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-weight: 800; font-stretch: normal; font-size: 11px; line-height: 1.25; font-family: Inter, system-ui, sans-serif; }
+#mpScore[hidden] { display: none; }
+#mpScore span { display: flex; gap: 8px; justify-content: space-between; }
+#mpScore span.me { color: rgb(255, 215, 106); }
+#mpScore u { text-decoration: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+#mpHitMarker { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0px 0px -13px; opacity: 0; transition: opacity 0.12s; }
+#mpHitMarker::before, #mpHitMarker::after { content: ""; position: absolute; left: 12px; top: 0px; width: 2.5px; height: 26px; background: rgb(255, 255, 255); box-shadow: rgb(0, 0, 0) 0px 0px 3px; transform: rotate(45deg); }
+#mpHitMarker::after { transform: rotate(-45deg); }
+#mpHitMarker.kill::before, #mpHitMarker.kill::after { background: rgb(255, 59, 47); }
+#mpHitMarker.head::before, #mpHitMarker.head::after { background: rgb(255, 215, 106); }
+#mpHitMarker.show { opacity: 1; transition: none; }
+#mpHurt { position: absolute; left: 50%; top: 50%; width: min(56vmin, 340px); height: min(56vmin, 340px); margin: calc(-0.5 * min(56vmin, 340px)) 0px 0px calc(-0.5 * min(56vmin, 340px)); border-radius: 50%; opacity: 0; transition: opacity 0.6s; background: conic-gradient(from calc(var(--a) - 22deg),#ff2b1f 0deg,#ff2b1fcc 44deg,transparent 44deg); mask: radial-gradient(circle, transparent 62%, rgb(0, 0, 0) 63%, rgb(0, 0, 0) 70%, transparent 71%); }
+#mpHurt.show { opacity: 0.9; transition: none; }
+#mpShield { position: absolute; inset: 0px; opacity: 0; transition: opacity 0.5s; box-shadow: rgba(127, 212, 255, 0.667) 0px 0px 60px 10px inset; }
+#mpShield.show { opacity: 1; }
+#mpShield b { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font: 900 13px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.2em; color: rgb(191, 234, 255); text-shadow: rgb(0, 0, 0) 0px 1px 3px; }
+#gameMenuWorld { margin-top: 4px; min-width: min(64vw, 300px); padding: 11px 24px; font: 800 clamp(13px, 1.8vw, 16px) Inter, system-ui, sans-serif; letter-spacing: 0.28em; color: rgb(238, 240, 242); background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 10px; cursor: pointer; }
+#gameMenuWorld:hover, #gameMenuWorld:focus-visible { background: rgba(255, 255, 255, 0.14); outline: none; }
+#worldOptionsPanel { position: absolute; inset: 0px; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(11, 13, 16, 0.91); backdrop-filter: blur(4px); }
+#worldOptionsPanel[hidden] { display: none; }
+#worldOptionsPanel .wo-card { width: min(92vw, 460px); max-height: calc(-40px + 100dvh); overflow: auto; padding: 18px 18px 14px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 14px; background: rgba(18, 22, 28, 0.9); text-align: left; }
+#worldOptionsPanel h2 { margin: 0px 0px 4px; font: italic 900 22px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(255, 176, 46); }
+#worldOptionsPanel .wo-sub { margin: 0px 0px 12px; font: 600 12px / 1.35 system-ui, sans-serif; color: rgb(185, 195, 204); }
+#worldOptionsPanel .wo-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; width: 100%; margin: 0px 0px 6px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; background: rgba(255, 255, 255, 0.04); color: rgb(238, 240, 242); text-align: left; cursor: pointer; font: inherit; }
+#worldOptionsPanel .wo-row b { display: block; font: 850 14px / 1.1 system-ui, sans-serif; letter-spacing: 0.1em; }
+#worldOptionsPanel .wo-row small { display: block; margin-top: 3px; font: 500 11.5px / 1.3 system-ui, sans-serif; color: rgb(170, 180, 190); }
+#worldOptionsPanel .wo-row i { width: 44px; height: 24px; border-radius: 12px; background: rgb(58, 65, 75); position: relative; }
+#worldOptionsPanel .wo-row i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: rgb(223, 229, 234); }
+html body #worldOptionsPanel .wo-row[aria-checked="false"] i { background: rgb(58, 65, 75) !important; }
+html body #worldOptionsPanel .wo-row[aria-checked="true"] i { background: rgb(255, 138, 31) !important; }
+#worldOptionsPanel .wo-row[aria-checked="true"] i::after { left: 23px; }
+#worldOptionsPanel .wo-row:focus-visible, #worldOptionsPanel .wo-done:focus-visible, body.pad-input #worldOptionsPanel :focus { outline: rgb(255, 215, 106) solid 3px; outline-offset: 2px; }
+#worldOptionsPanel .wo-vote { border-top: 1px solid rgba(255, 255, 255, 0.184); margin-top: 12px; padding-top: 10px; }
+#worldOptionsPanel .wo-vote-actions { display: flex; gap: 8px; margin-top: 8px; }
+#worldOptionsPanel .wo-vote-actions[hidden] { display: none !important; }
+#worldOptionsPanel .wo-vote-actions button { flex: 1 1 0%; min-height: 40px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.333); background: rgb(37, 53, 72); color: rgb(255, 255, 255); font: 800 12px system-ui, sans-serif; cursor: pointer; }
+#worldOptionsPanel .wo-done { display: block; width: 100%; margin-top: 8px; padding: 12px; border: 0px; border-radius: 10px; background: linear-gradient(rgb(255, 176, 46), rgb(255, 122, 26)); color: rgb(22, 18, 12); font: 850 15px / 1 system-ui, sans-serif; letter-spacing: 0.24em; cursor: pointer; }
+#gameMenuChangelog { margin-top: 4px; min-width: min(64vw, 300px); padding: 9px 24px; font: 800 clamp(12px, 1.6vw, 14px) Inter, system-ui, sans-serif; letter-spacing: 0.24em; color: rgb(216, 221, 226); background: rgba(255, 255, 255, 0.047); border: 1px solid rgba(255, 255, 255, 0.19); border-radius: 10px; cursor: pointer; }
+#gameMenuChangelog:hover, #gameMenuChangelog:focus-visible { background: rgba(255, 255, 255, 0.125); outline: none; }
+#changelogPanel { position: absolute; inset: 0px; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(11, 13, 16, 0.91); backdrop-filter: blur(4px); }
+#changelogPanel[hidden] { display: none; }
+#changelogPanel .cl-card { width: min(94vw, 560px); max-height: calc(-32px + 100dvh); display: flex; flex-direction: column; padding: 16px 16px 12px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 14px; background: rgba(18, 22, 28, 0.9); text-align: left; }
+#changelogPanel h2 { margin: 0px 0px 10px; font: italic 900 22px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(255, 176, 46); }
+#changelogPanel .cl-list { overflow: auto; flex: 1 1 0%; padding-right: 4px; overscroll-behavior: contain; }
+#changelogPanel section { margin: 0px 0px 12px; }
+#changelogPanel h3 { margin: 0px 0px 5px; font: 850 13px / 1.2 system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(238, 240, 242); }
+#changelogPanel h3 span { color: rgb(255, 154, 58); margin-right: 8px; font-variant-numeric: tabular-nums; }
+#changelogPanel section:first-child h3::after { content: "NEU"; margin-left: 8px; padding: 1px 6px; border-radius: 5px; background: rgb(255, 138, 31); color: rgb(22, 18, 12); font-size: 10px; letter-spacing: 0.14em; vertical-align: 1px; }
+#changelogPanel ul { margin: 0px; padding-left: 18px; }
+#changelogPanel li { margin: 2px 0px; font: 500 12.5px / 1.38 system-ui, sans-serif; color: rgb(195, 204, 212); }
+#changelogPanel .cl-done { display: block; width: 100%; margin-top: 10px; padding: 12px; border: 0px; border-radius: 10px; background: linear-gradient(rgb(255, 176, 46), rgb(255, 122, 26)); color: rgb(22, 18, 12); font: 850 15px / 1 system-ui, sans-serif; letter-spacing: 0.24em; cursor: pointer; }
+#changelogPanel .cl-done:focus-visible, body.pad-input #changelogPanel :focus { outline: rgb(255, 215, 106) solid 3px; outline-offset: 2px; }
+#gameMenuShare { margin-top: 4px; min-width: min(64vw, 300px); padding: 9px 24px; font: 800 clamp(12px, 1.6vw, 14px) Inter, system-ui, sans-serif; letter-spacing: 0.24em; color: rgb(216, 221, 226); background: rgba(255, 255, 255, 0.047); border: 1px solid rgba(255, 255, 255, 0.19); border-radius: 10px; cursor: pointer; }
+#gameMenuShare:hover, #gameMenuShare:focus-visible { background: rgba(255, 255, 255, 0.125); outline: none; }
+#gameMenuShareToast { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 8px 14px; border-radius: 9px; background: rgba(18, 22, 28, 0.9); border: 1px solid rgba(255, 176, 46, 0.533); color: rgb(255, 210, 122); font: 800 12px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.2em; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 6; }
+#gameMenuShareToast[data-on="1"] { opacity: 1; }
+html body.pad-input:not(:has(dialog[open])):not(:has(#resetVoteDialog)), html body.pad-input:not(:has(dialog[open])):not(:has(#resetVoteDialog)) #viewport, html body.pad-input:not(:has(dialog[open])):not(:has(#resetVoteDialog)) #viewport * { cursor: none !important; }
+html body.pad-input dialog :is(button, input, select, summary, [tabindex]):focus { outline: rgb(255, 215, 106) solid 3px !important; outline-offset: 2px !important; box-shadow: rgba(255, 215, 106, 0.2) 0px 0px 0px 6px !important; }
+html body.pad-input dialog input[type="range"]:focus { outline-offset: 6px !important; }
+html body.pad-connected #gameMenuStart::after { content: "Ⓐ"; display: inline-block; margin-left: 10px; padding: 0px 7px; border-radius: 50%; background: rgb(63, 191, 90); color: rgb(255, 255, 255); font-weight: 900; }
+html body.pad-connected #gameMenu::after { content: "Ⓐ START  ·  ☰ MENU"; position: fixed; left: 50%; bottom: max(18px,env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 6px 14px; border-radius: 16px; background: rgba(0, 0, 0, 0.667); color: rgb(234, 255, 247); font: 800 13px / 1 system-ui, sans-serif; letter-spacing: 0.1em; pointer-events: none; animation: 1.6s ease-in-out 0s infinite normal none running padHintPulse; }
+@keyframes padHintPulse { 
+  50% { opacity: 0.55; }
+}
+html body dialog.phone-settings-dialog .setting-help { display: block; margin: -4px 0px 10px; font: 500 11.5px / 1.35 system-ui, -apple-system, sans-serif; letter-spacing: 0px; text-transform: none; color: rgb(185, 214, 203); opacity: 0.86; }
+html body dialog.phone-settings-dialog label.phone-settings-toggle + .setting-help, html body dialog.phone-settings-dialog label.player-control-toggle + .setting-help { margin-top: -6px; }
+html body dialog.phone-settings-dialog [hidden] + .setting-help, html body dialog.phone-settings-dialog [style*="display: none"] + .setting-help, html body dialog.phone-settings-dialog [aria-hidden="true"] + .setting-help { display: none; }
+html body dialog.settings-tidy .phone-settings-note:not([data-world-location-note]), html body dialog.settings-tidy .player-control-note, html body dialog.settings-tidy [data-control-description] { display: none !important; }
+html body dialog.phone-settings-dialog .player-mode-grid + .setting-help { margin: 8px 0px 2px; }
+html body dialog.settings-tidy > details.debug-settings-section { margin: 18px 0px 6px; padding-top: 6px; border-top: 2px solid rgba(255, 255, 255, 0.17); }
+html body dialog.settings-tidy > details.debug-settings-section > summary { cursor: pointer; font: 850 13px system-ui, -apple-system, sans-serif; letter-spacing: 0.08em; color: rgb(143, 169, 160); padding: 8px 0px; }
+html body dialog.settings-tidy .world-settings-section label.phone-settings-toggle:not([hidden]) { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+html body dialog.settings-tidy > section.game-actions-section { margin: 6px 0px 4px; }
+html body dialog.settings-tidy .game-actions-grid { display: grid; grid-template-columns: repeat(3, minmax(0px, 1fr)); gap: 6px; }
+html body dialog.settings-tidy .game-actions-grid button { min-height: 40px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(22, 32, 44, 0.8); color: rgb(234, 246, 255); font: 850 12px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.06em; cursor: pointer; }
+html body dialog.settings-tidy .game-actions-grid button[data-game-action="resume"] { background: rgb(29, 90, 67); border-color: rgba(127, 240, 197, 0.667); }
+html body dialog.settings-tidy .game-actions-grid button[data-game-action="exit"] { background: rgb(76, 31, 37); border-color: rgba(255, 139, 149, 0.533); }
+html body dialog.settings-tidy .game-actions-grid button:focus-visible { outline: rgb(255, 215, 106) solid 3px; outline-offset: 1px; }
+html body dialog.settings-tidy .rule-vote-menu { padding: 8px 0px; border-top: 1px solid rgba(255, 255, 255, 0.184); }
+html body dialog.settings-tidy .rule-vote-actions { display: flex; gap: 8px; margin: 8px 0px; }
+html body dialog.settings-tidy .rule-vote-actions[hidden] { display: none !important; }
+html body dialog.settings-tidy .rule-vote-actions button { flex: 1 1 0%; min-height: 42px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgb(36, 55, 74); color: rgb(234, 246, 255); font: 800 12px system-ui, sans-serif; }
+html body dialog.settings-tidy section.collapsible:not(.open) > :not(.sec-head) { display: none !important; }
+html body dialog.settings-tidy section.collapsible { padding-bottom: 2px; }
+html body dialog.settings-tidy .sec-head { cursor: pointer; align-items: center; justify-content: space-between; padding: 8px 2px; border-radius: 6px; display: flex !important; margin: 6px 0px !important; }
+html body dialog.settings-tidy .sec-head::after { content: "▸"; font-size: 14px; opacity: 0.8; transition: transform 0.15s; }
+html body dialog.settings-tidy section.open > .sec-head::after { transform: rotate(90deg); }
+html body dialog.settings-tidy .sec-head:hover { background: rgba(255, 255, 255, 0.05); }
+html body:is(.on-foot-mode, .player-driving, .jet-mode) #soloTopbar :is(#soloArmToolbar, #soloLogbook, #soloCamera, #droneWeaponToggle, #desktopDroneWeaponSwitch, #soloAlt, #soloRangeStatus, #soloState) { display: none !important; }
+html body.desktop-input:not(:has(#viewport[data-gamepad-connected="1"])) #soloTopbar #soloGamepadStatus { display: none !important; }
+body.on-foot-mode #viewport, body.on-foot-mode #viewport * { touch-action: none !important; user-select: none !important; }
+#footMove.sprinting .ring { border-color: rgb(0, 255, 156) !important; box-shadow: rgba(0, 255, 156, 0.55) 0px 0px 14px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) { --ui-fill: rgba(10,13,18,.56); --ui-fill-strong: rgba(10,13,18,.82); --ui-line: rgba(255,255,255,.16); --ui-text: #f2f4f7; --ui-soft: rgba(242,244,247,.72); --ui-accent: #f5b301; --ui-accent-ink: #1a1200; --ui-cyan: #7cc4ff; --ui-shadow: 0 1px 2px rgba(0,0,0,.45); --ui-font: "Inter",-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif; --ng: var(--ui-text); --ng-core: #fff; --ng-dim: var(--ui-line); --ng-glow: transparent; --ng-glow-soft: transparent; --ng-fill: var(--ui-fill); --ng-text: var(--ui-text); --ng-font: var(--ui-font); }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #viewport :is(button, [role="button"], a.linkbutton), html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#mobileGameplayDock, #soloTopbar, #cameraModes, #desktopDroneWeaponSwitch) button, html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) .phone-settings-button, html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#playerModeButton, #driveModeButton, #gtaVehicleButton, #lanVsButton, #wantedEmpButton, #droneWeaponToggle, #footWeaponToggle, #footFire, #soloArm, #soloReset, #soloExit, #soloWorld, #soloLogbook, #soloCamera, #mobileGameplayReset, #mobileGameplayMultiplayer, #gameExitButton, #gameplayContractButton, #soundToggle) { background-position-x:  !important; background-position-y:  !important; background-size:  !important; background-repeat:  !important; background-attachment:  !important; background-origin:  !important; background-clip:  !important; background-color:  !important; background-image: none !important; color: var(--ui-text) !important; border: 1px solid var(--ui-line) !important; border-radius: 6px !important; box-shadow: var(--ui-shadow) !important; text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 1px !important; filter: none !important; text-transform: uppercase !important; font-family: var(--ui-font) !important; font-weight: 600 !important; font-style: normal !important; letter-spacing: 0.05em !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: clip !important; backdrop-filter: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#soloArm, #gameMenu .menu-start, #gameMenuStart) { background: var(--ui-accent) !important; color: var(--ui-accent-ink) !important; border-color: rgba(255, 255, 255, 0.35) !important; text-shadow: none !important; box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #soloArm.armed { background: rgb(47, 158, 90) !important; color: rgb(255, 255, 255) !important; box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #wantedEmpButton { background: rgba(40, 110, 170, 0.85) !important; color: rgb(255, 255, 255) !important; border-color: rgba(255, 255, 255, 0.35) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #viewport :is(button, [role="button"]):active { background: var(--ui-fill-strong) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #viewport button[disabled] { opacity: 0.45 !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#soloClearance, #soloRaceHud, #soloHeightPad, .solo-height-pad, #playerVitalsHud, #wantedHud, #vsCombatHud, #vsRespawnHud, #worldLookHud, #worldMapLegend, #gameplayContractHud, #gameplayContractBar, #gameplayScorePill, #gameplayToast, #mobileGameplayDock, #mobileGameplayMultiplayerStatus, #soloArmToolbar, #cameraModes) { background-position-x:  !important; background-position-y:  !important; background-size:  !important; background-repeat:  !important; background-attachment:  !important; background-origin:  !important; background-clip:  !important; background-color:  !important; background-image: none !important; border: 1px solid var(--ui-line) !important; box-shadow: var(--ui-shadow) !important; color: var(--ui-text) !important; border-radius: 6px !important; font-family: var(--ui-font) !important; text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 1px !important; backdrop-filter: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#soloHud, #playerVitalsHud, #footHud, #vehicleHud, #wantedHud, #soloClearance, .solo-height-pad, #soloHeightPad) * { color: inherit; text-shadow: rgba(0, 0, 0, 0.3) 0px 1px 0px !important; background-image: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#playerVitalsHud, #soloClearance, .solo-height-pad, #soloHeightPad) :is(b, strong, output, [data-value]) { color: var(--ui-accent) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick .ring, .solo-ring) { border: 1.5px solid rgba(255, 255, 255, 0.2) !important; background: none transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick .knob, .solo-knob) { background: none rgba(255, 255, 255, 0.16) !important; border: 1.5px solid rgba(255, 255, 255, 0.42) !important; box-shadow: none !important; backdrop-filter: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick, .solo-stick).stick-live :is(.ring, .solo-ring) { border-color: rgba(255, 255, 255, 0.5) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick, .solo-stick).stick-live :is(.knob, .solo-knob) { background: rgba(255, 255, 255, 0.34) !important; border-color: rgba(255, 255, 255, 0.75) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) .solo-height-knob { background: none rgba(242, 244, 247, 0.7) !important; border: 1px solid rgba(255, 255, 255, 0.9) !important; box-shadow: rgba(0, 0, 0, 0.4) 0px 1px 3px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick, .solo-stick), html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.foot-stick, .solo-stick) * { color: rgb(242, 244, 247) !important; font-family: var(--ui-font) !important; font-weight: 600 !important; letter-spacing: 0.06em !important; text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 1px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #footMove.sprinting .ring { border-color: var(--ui-accent) !important; box-shadow: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.phone-settings-dialog, #flightLogbookDialog, dialog:not(#airStrikeTargeting)) { background: none rgba(18, 22, 28, 0.96) !important; border: 1px solid var(--ui-line) !important; box-shadow: rgba(0, 0, 0, 0.45) 0px 10px 30px !important; color: var(--ui-text) !important; font-family: var(--ui-font) !important; border-radius: 8px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.phone-settings-dialog, dialog) :is(h2, h3, h4) { color: var(--ui-accent) !important; text-shadow: none !important; letter-spacing: 0.06em !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.phone-settings-dialog, dialog) :is(button, select, input[type="number"], input[type="text"]) { background: none rgba(255, 255, 255, 0.1) !important; color: rgb(255, 255, 255) !important; border: 1.5px solid var(--ui-line) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.phone-settings-dialog, dialog) input[type="range"], html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(.phone-settings-dialog, dialog) input[type="checkbox"] { accent-color: var(--ui-accent) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #viewport { background: rgb(183, 201, 220) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) body, html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) body :not(svg):not(svg *):not(code):not(pre) { font-family: var(--ui-font) !important; font-feature-settings: "tnum", "cv11"; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#footReticle, .xbox-crosshair) { display: none !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #worldLookHud { z-index: 12 !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #wantedHud { top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 56px) !important; background: var(--ui-fill) !important; border: 1px solid var(--ui-line) !important; border-radius: 6px !important; box-shadow: var(--ui-shadow) !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) :is(#soloHud, #footHud, #vehicleHud, #gtaVehicleHud, #sandboxHud) { background: transparent !important; border: 0px !important; box-shadow: none !important; }
+html #viewport #wantedEmpButton { transform: none; width: 62px !important; height: 36px !important; min-width: 62px !important; min-height: 36px !important; padding: 2px 4px !important; gap: 0px !important; border-radius: 8px !important; }
+html #viewport #wantedEmpButton strong { font-size: 12px !important; line-height: 1 !important; letter-spacing: 0.08em !important; }
+html #viewport #wantedEmpButton small { font-size: 6px !important; line-height: 1.1 !important; max-width: 54px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+html #viewport #wantedEmpButton:not(:disabled):active { transform: scale(0.94); }
+#geoViewport { position: absolute; inset: 0px; z-index: 0; overflow: hidden; background: rgb(183, 201, 220); }
+#geoViewport .maplibregl-map, #geoViewport .maplibregl-canvas-container { position: absolute; inset: 0px; overflow: hidden; width: 100% !important; height: 100% !important; }
+#geoViewport .maplibregl-canvas { position: absolute; left: 0px; top: 0px; width: 100% !important; height: 100% !important; }
+#geoViewport .maplibregl-canvas-container, #geoViewport .maplibregl-canvas, #geoViewport .maplibregl-control-container { visibility: hidden !important; opacity: 0 !important; }
+#geoViewport .geo-attribution { position: absolute; right: 4px; bottom: 3px; z-index: 4; padding: 2px 5px; border-radius: 4px; background: rgba(14, 26, 52, 0.5); color: rgba(255, 255, 255, 0.8); font: 7px / 1.25 system-ui, sans-serif; pointer-events: none; }
+#worldLookHud { display: none; position: absolute; z-index: 4; right: max(10px,var(--solo-safe-right,env(safe-area-inset-right))); top: max(48px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 42px)); width: 116px; height: 116px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; background: rgba(10, 13, 18, 0.56); box-shadow: rgba(0, 0, 0, 0.45) 0px 1px 2px; touch-action: none; user-select: none; overflow: hidden; color: rgb(255, 255, 255); }
+body.solo-flight #viewport[data-world-mode="real"] #worldLookHud { display: block; }
+#worldLookHud .world-look-title { position: absolute; left: 7px; right: 7px; top: 5px; z-index: 3; display: flex; justify-content: space-between; font: 600 7px / 1.1 ui-monospace, Menlo, monospace; letter-spacing: 0.08em; color: rgb(255, 255, 255); pointer-events: none; }
+#worldLookHud .world-look-stage { position: absolute; inset: 22px 9px 8px; border-radius: 50%; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.5); background: rgb(42, 48, 38); pointer-events: none; }
+#worldLookHud.expanded { width: min(72vw, 560px); height: min(68dvh, 430px); border-radius: 16px; background: rgba(10, 13, 18, 0.9); }
+#worldLookHud.expanded .world-look-stage { border-radius: 16px; }
+#worldLookHud.expanded .world-look-cardinal { font-size: 10px; }
+#worldLookHud .world-mini-canvas { position: absolute; inset: 0px; width: 100%; height: 100%; display: block; }
+#worldLookHud .world-look-cardinal { position: absolute; font: 600 7px Inter, system-ui, sans-serif; color: rgb(242, 244, 247); opacity: 0.9; text-shadow: rgba(0, 0, 0, 0.5) 0px 1px 1px; pointer-events: none; }
+.world-look-n { top: 22px; left: 53px; }
+.world-look-e { top: 62px; right: 12px; }
+.world-look-s { bottom: 9px; left: 54px; }
+.world-look-w { top: 62px; left: 12px; }
+#worldMapLegend { display: none; position: absolute; z-index: 4; left: max(10px,var(--solo-safe-left,env(safe-area-inset-left))); top: max(52px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 46px)); padding: 5px 7px; border-radius: 8px; background: rgba(7, 21, 34, 0.91); border: 1px solid rgba(255, 255, 255, 0.145); color: rgb(220, 233, 242); font: 800 7px / 1.4 system-ui, -apple-system, sans-serif; letter-spacing: 0.03em; pointer-events: none; }
+body.solo-flight #viewport[data-world-mode="real"] #worldMapLegend { display: none !important; }
+#worldMapLegend i { width: 10px; height: 7px; border-radius: 2px; display: inline-block; margin-right: 4px; box-shadow: rgba(255, 255, 255, 0.14) 0px 0px 0px 1px; }
+.legend-imagery i { background: linear-gradient(135deg, rgb(80, 104, 62), rgb(175, 156, 106) 48%, rgb(77, 114, 130)); }
+.legend-road i { background: rgb(255, 211, 79); }
+.legend-building i { background: rgb(219, 228, 233); }
+.legend-water i { background: rgb(8, 106, 157); }
+body.solo-flight #viewport[data-world-mode="real"] #soloTopbar span, body.solo-flight #viewport[data-world-mode="real"] #soloTopbar button, body.solo-flight #viewport[data-world-mode="real"] #soloRaceHud, body.solo-flight #viewport[data-world-mode="real"] #soloClearance, body.solo-flight #viewport[data-world-mode="real"] .solo-action { backdrop-filter: none !important; }
+#realWorldStatus { line-height: 1.4; }
+#worldLookHud [data-map-expand] { position: absolute; right: 3px; top: 3px; z-index: 15; display: grid; place-items: center; width: 27px; height: 27px; padding: 0px; border: 1px solid rgba(156, 220, 255, 0.6); border-radius: 7px; background: rgba(6, 32, 52, 0.867); color: rgb(217, 247, 255); font: 900 17px / 1 system-ui; pointer-events: auto; touch-action: manipulation; }
+body.vs-combat-dead .xbox-crosshair { display: none !important; }
+body.vs-combat-dead #viewport { cursor: not-allowed; }
+#vsEnemyMarker { width: 84px !important; height: 68px !important; filter: drop-shadow(rgba(0, 0, 0, 0.6) 0px 1px 1px) !important; }
+#vsEnemyMarker .vs-enemy-reticle { left: 50% !important; top: 34px !important; width: 28px !important; height: 28px !important; transform: translate(-50%, -50%) rotate(45deg) !important; border: 0.75px solid rgba(255, 118, 95, 0.8) !important; border-radius: 1px !important; box-shadow: rgba(255, 59, 34, 0.22) 0px 0px 3px !important; background: transparent !important; }
+#vsEnemyMarker .vs-enemy-reticle::before, #vsEnemyMarker .vs-enemy-reticle::after { display: none !important; content: none !important; }
+#vsEnemyMarker strong { top: 0px !important; }
+#vsEnemyMarker small { left: -10px !important; right: -10px !important; top: 55px !important; }
+#vsEnemyMarker .vs-enemy-hp { left: 28px !important; right: 28px !important; top: 64px !important; height: 1px !important; }
+#vsEnemyMarker.offscreen { width: 76px !important; height: 40px !important; }
+#vsEnemyMarker.offscreen .vs-enemy-reticle, #vsEnemyMarker.offscreen .vs-enemy-hp { display: none !important; }
+#vsEnemyMarker.offscreen strong { top: 22px !important; }
+#vsEnemyMarker.offscreen small { top: 31px !important; }
+@media (max-height: 340px) {
+  #vsEnemyMarker { width: 76px !important; height: 62px !important; }
+  #vsEnemyMarker .vs-enemy-reticle { width: 25px !important; height: 25px !important; top: 31px !important; }
+  #vsEnemyMarker small { top: 50px !important; }
+  #vsEnemyMarker .vs-enemy-hp { top: 58px !important; }
+}
+html, body, #viewport { overscroll-behavior: none; }
+body.solo-flight #viewport, body.on-foot-mode #viewport, #viewport canvas { user-select: none; touch-action: none !important; }
+#playerVitalsHud { display: none; position: absolute; z-index: 18; left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))); top: max(50px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 44px)); min-width: 128px; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.157); border-radius: 9px; background: rgba(7, 17, 26, 0.85); box-shadow: rgba(0, 0, 0, 0.533) 0px 5px 18px; color: rgb(242, 248, 255); font-family: system-ui, -apple-system, sans-serif; pointer-events: none; backdrop-filter: blur(4px); }
+body.solo-flight #playerVitalsHud { display: flex; gap: 8px; }
+#playerVitalsHud span { display: grid; grid-template-columns: auto auto; gap: 5px; align-items: center; }
+#playerVitalsHud i { font: 850 7px / 1 system-ui; letter-spacing: 0.08em; color: rgb(146, 169, 185); }
+#playerVitalsHud b { font-style: normal; font-variant: tabular-nums; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-weight: 950; font-stretch: normal; font-size: 10px; line-height: 1; font-family: system-ui; }
+#playerVitalsHud [data-vital="player"] b { color: rgb(156, 240, 201); }
+#playerVitalsHud [data-vital="drone"] b { color: rgb(142, 220, 255); }
+#playerVitalsHud[data-player-dead="1"] [data-vital="player"] b, #playerVitalsHud[data-drone-destroyed="1"] [data-vital="drone"] b { color: rgb(255, 126, 143); }
+body.player-dead #footMove, body.player-dead #footLook, body.player-dead #footLookZone, body.player-dead #footFire { pointer-events: none !important; opacity: 0.22 !important; }
+body.drone-destroyed #soloArm, body.drone-destroyed #soloKill { pointer-events: none !important; opacity: 0.3 !important; }
+@media (max-height: 340px) {
+  #playerVitalsHud { top: max(37px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 32px)); padding: 4px 6px; min-width: 116px; gap: 6px; }
+  #playerVitalsHud i { font-size: 6px; }
+  #playerVitalsHud b { font-size: 9px; }
+}
+#wantedHud { display: none; position: absolute; z-index: 17; left: 50%; top: max(48px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 42px)); transform: translateX(-50%); min-width: 190px; padding: 7px 12px 8px; border: 1px solid rgba(90, 184, 255, 0.4); border-radius: 10px; background: linear-gradient(rgba(7, 17, 26, 0.933), rgba(9, 13, 20, 0.91)); box-shadow: rgba(0, 0, 0, 0.667) 0px 6px 22px, rgba(32, 125, 202, 0.133) 0px 0px 20px; color: rgb(255, 255, 255); text-align: center; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; backdrop-filter: blur(5px); }
+body.solo-flight #wantedHud:not([hidden]) { display: block; }
+#wantedHud[hidden] { display: none !important; }
+.wanted-stars { height: 18px; white-space: nowrap; }
+.wanted-stars i { display: inline-block; margin: 0px 1px; color: rgb(57, 66, 76); font: 900 20px / 1 system-ui; text-shadow: rgb(0, 0, 0) 0px 1px 2px; }
+.wanted-stars i.hot { color: rgb(255, 211, 79); text-shadow: rgb(255, 156, 40) 0px 0px 7px, rgb(0, 0, 0) 0px 1px 2px; }
+#wantedHud strong { display: block; margin-top: 1px; font: 950 9px / 1 system-ui; letter-spacing: 0.18em; color: rgb(233, 246, 255); }
+#wantedHud small { display: block; margin-top: 4px; font: 850 8px / 1.15 system-ui; letter-spacing: 0.06em; color: rgb(142, 214, 255); white-space: nowrap; }
+#wantedHud[data-phase="pursuit"] { border-color: rgba(255, 87, 105, 0.533); box-shadow: rgba(0, 0, 0, 0.667) 0px 6px 22px, rgba(255, 41, 67, 0.2) 0px 0px 22px; }
+#wantedHud[data-phase="pursuit"] small { color: rgb(255, 142, 160); }
+#wantedHud[data-phase="searching"] .wanted-stars i.hot { animation: 0.72s steps(1) 0s infinite normal none running wantedSearchBlink; }
+#wantedHud[data-phase="escaped"] { border-color: rgba(107, 228, 176, 0.533); box-shadow: rgba(0, 0, 0, 0.667) 0px 6px 22px, rgba(50, 201, 138, 0.2) 0px 0px 20px; }
+#wantedHud[data-phase="escaped"] strong, #wantedHud[data-phase="escaped"] small { color: rgb(143, 240, 200); }
+@keyframes wantedSearchBlink { 
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0.22; }
+}
+@media (max-height: 340px) {
+  #wantedHud { top: max(37px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 32px)); min-width: 166px; padding: 4px 9px 5px; }
+  .wanted-stars { height: 14px; }
+  .wanted-stars i { font-size: 16px; }
+  #wantedHud strong { font-size: 8px; }
+  #wantedHud small { font-size: 7px; margin-top: 3px; }
+}
+#wantedEmpButton { display: none; position: absolute; z-index: 20; right: max(16px,var(--solo-safe-right,env(safe-area-inset-right))); top: max(58px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 50px)); width: 108px; height: 68px; padding: 7px 8px; border: 2px solid rgba(115, 231, 255, 0.8); border-radius: 18px; background: radial-gradient(circle at 38% 28%, rgb(23, 111, 135), rgb(10, 52, 72) 58%, rgb(6, 28, 42)); color: rgb(239, 252, 255); box-shadow: rgba(0, 0, 0, 0.667) 0px 8px 26px, rgba(67, 217, 255, 0.12) 0px 0px 0px 4px, rgba(76, 228, 255, 0.157) 0px 0px 22px inset; pointer-events: auto; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+body.solo-flight #wantedEmpButton:not([hidden]) { display: flex; }
+#wantedEmpButton[hidden] { display: none !important; }
+#wantedEmpButton strong { font: 950 22px / 1 system-ui; letter-spacing: 0.09em; text-shadow: rgb(0, 0, 0) 0px 2px 5px; }
+#wantedEmpButton small { font: 850 8px / 1.05 system-ui; letter-spacing: 0.05em; white-space: nowrap; color: rgb(174, 239, 255); }
+#wantedEmpButton[data-state="ready"] { animation: 1.35s ease-in-out 0s infinite normal none running wantedEmpReady; }
+#wantedEmpButton[data-state="empty"] { border-color: rgba(138, 168, 180, 0.467); background: linear-gradient(rgba(24, 49, 61, 0.8), rgba(16, 29, 39, 0.867)); box-shadow: rgba(0, 0, 0, 0.533) 0px 7px 22px; }
+#wantedEmpButton[data-state="empty"] small { color: rgb(168, 186, 195); }
+#wantedEmpButton[data-state="miss"] { border-color: rgba(255, 206, 114, 0.6); background: linear-gradient(rgba(73, 58, 29, 0.8), rgba(39, 29, 16, 0.91)); }
+#wantedEmpButton[data-state="cooldown"] { border-color: rgba(83, 110, 123, 0.533); background: conic-gradient(rgb(18, 56, 74), rgb(12, 28, 39) 70%, rgb(19, 43, 55)); box-shadow: rgba(0, 0, 0, 0.533) 0px 7px 20px; animation: auto ease 0s 1 normal none running none; }
+#wantedEmpButton:disabled { opacity: 0.76 !important; cursor: not-allowed; }
+#wantedEmpButton:not(:disabled):active { transform: scale(0.94); filter: brightness(1.2); }
+@keyframes wantedEmpReady { 
+  0%, 100% { box-shadow: rgba(0, 0, 0, 0.667) 0px 8px 26px, rgba(67, 217, 255, 0.094) 0px 0px 0px 4px, rgba(46, 223, 255, 0.333) 0px 0px 12px, rgba(76, 228, 255, 0.157) 0px 0px 22px inset; }
+  50% { box-shadow: rgba(0, 0, 0, 0.667) 0px 8px 26px, rgba(67, 217, 255, 0.14) 0px 0px 0px 7px, rgba(46, 223, 255, 0.6) 0px 0px 28px, rgba(76, 228, 255, 0.26) 0px 0px 28px inset; }
+}
+@media (max-height: 340px) {
+  #wantedEmpButton { top: max(42px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 36px)); width: 94px; height: 58px; border-radius: 15px; padding: 5px 6px; }
+  #wantedEmpButton strong { font-size: 18px; }
+  #wantedEmpButton small { font-size: 7px; }
+}
+#gpsLiveButton { position: fixed; z-index: 100001; height: 32px; padding: 0px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.227); background: rgba(11, 18, 32, 0.8); color: rgb(255, 255, 255); font: 800 11px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px; cursor: pointer; touch-action: manipulation; }
+#gpsLiveButton.on { background: rgb(26, 86, 201); border-color: rgb(143, 180, 255); }
+#gpsLiveHud { position: absolute; z-index: 24; left: 50%; top: max(56px,calc(env(safe-area-inset-top) + 50px)); transform: translateX(-50%); display: none; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 12px; background: rgba(11, 18, 32, 0.88); color: rgb(255, 255, 255); font: 700 12px / 1.15 Inter, system-ui, sans-serif; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 18px; white-space: nowrap; }
+body.gps-live #gpsLiveHud { display: flex; }
+#gpsLiveHud b { font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+#gpsLiveHud small { display: block; font-size: 9px; opacity: 0.7; letter-spacing: 0.08em; }
+#gpsLiveHud .act { font-size: 22px; }
+#gpsLiveHud button { border: 1px solid rgba(255, 255, 255, 0.267); background: rgba(255, 255, 255, 0.08); color: rgb(255, 255, 255); border-radius: 8px; padding: 6px 8px; font: 800 10px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; }
+#gpsLiveHud .err { color: rgb(255, 180, 168); max-width: 40vw; white-space: normal; }
+#gpsLiveHud .dot { width: 8px; height: 8px; border-radius: 50%; background: rgb(52, 199, 89); box-shadow: rgb(52, 199, 89) 0px 0px 6px; }
+#gpsLiveHud .dot.weak { background: rgb(255, 204, 0); box-shadow: rgb(255, 204, 0) 0px 0px 6px; }
+#gpsLiveHud .dot.none { background: rgb(255, 59, 48); box-shadow: none; }
+body.gps-live #footMove { visibility: hidden !important; }
+body.edge-hud #viewport #proximityVoiceBar { display: flex; }
+body.edge-hud #viewport #proximityVoiceBar button { width: 36px !important; height: 36px !important; min-height: 36px !important; }
+body.solo-flight.on-foot-mode #footLookZone::after { display: none !important; }
+body.solo-flight.on-foot-mode .foot-stick span { padding: 2px 5px; border-radius: 5px; background: rgba(7, 21, 34, 0.667); bottom: 7px !important; font-size: 8px !important; line-height: 1 !important; }
+body.solo-flight.on-foot-mode #footReadout { max-width: min(48vw, 430px); box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.solo-flight.on-foot-mode #worldLookHud { z-index: 6 !important; }
+body.solo-flight.on-foot-mode #geoViewport .geo-attribution { opacity: 0.72; left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))) !important; right: auto !important; top: max(94px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 88px)) !important; bottom: auto !important; max-width: min(48vw, 420px) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 6.5px !important; }
+body.solo-flight.on-foot-mode #worldLookHud.expanded { width: min(72vw, 560px) !important; height: min(68dvh, 430px) !important; right: max(8px,var(--solo-safe-right,env(safe-area-inset-right))) !important; }
+@media (max-width: 1100px) {
+  body.solo-flight.on-foot-mode #soloTopbar { gap: 3px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar span, body.solo-flight.on-foot-mode #soloTopbar button { padding: 4px 6px !important; font-size: 9.5px !important; border-radius: 7px !important; min-height: 25px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar #soloCamera, body.solo-flight.on-foot-mode #soloTopbar .phone-settings-button, body.solo-flight.on-foot-mode #soloTopbar #lanVsButton { min-width: 48px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar #vsCombatHud { min-width: 88px !important; font-size: 8.5px !important; padding-left: 5px !important; padding-right: 5px !important; }
+  body.solo-flight.on-foot-mode #worldLookHud:not(.expanded) { width: 108px !important; height: 108px !important; right: max(8px,var(--solo-safe-right,env(safe-area-inset-right))) !important; top: max(52px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 46px)) !important; }
+  body.solo-flight.on-foot-mode #footReadout { top: max(48px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 42px)) !important; font-size: 8px !important; max-width: 46vw !important; }
+}
+@media (max-width: 900px) {
+  body.solo-flight.on-foot-mode #soloTopbar { gap: 3px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar span, body.solo-flight.on-foot-mode #soloTopbar button { padding: 3px 5px !important; font-size: 8.5px !important; min-height: 23px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar #soloCamera, body.solo-flight.on-foot-mode #soloTopbar .phone-settings-button, body.solo-flight.on-foot-mode #soloTopbar #lanVsButton { min-width: 43px !important; }
+  body.solo-flight.on-foot-mode #soloTopbar #vsCombatHud { min-width: 78px !important; font-size: 7.8px !important; }
+  body.solo-flight.on-foot-mode #worldLookHud:not(.expanded) { width: 100px !important; height: 100px !important; }
+  body.solo-flight.on-foot-mode #footReadout { max-width: 42vw !important; }
+  body.solo-flight.on-foot-mode #geoViewport .geo-attribution { max-width: 42vw !important; top: max(88px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 82px)) !important; }
+}
+#footJump { --jump-stick: min(25vw,150px); --jump-arc: calc((var(--jump-stick) * .5 + 40px) * .7071); display: none; position: absolute; z-index: 22; right: calc(max(12px,var(--solo-safe-right,env(safe-area-inset-right))) + var(--jump-stick) * .5 + var(--jump-arc) + 4px); bottom: calc(max(20px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + var(--jump-stick) * .5 + var(--jump-arc) - 32px); width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(13, 17, 24, 0.72); color: rgb(255, 255, 255); font: 800 12px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.08em; touch-action: none; user-select: none; pointer-events: auto; }
+#footJump:active { background: rgba(255, 122, 26, 0.8); transform: scale(0.94); }
+body.on-foot-mode:not(.player-dead) #footJump { display: block; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #viewport #footJump { border-radius: 50% !important; padding: 0px !important; }
+#playerModeButton { border-color: rgba(120, 216, 255, 0.4) !important; background: rgba(11, 39, 64, 0.91) !important; color: rgb(229, 248, 255) !important; }
+body.on-foot-mode #playerModeButton { border-color: rgba(255, 211, 107, 0.533) !important; background: rgba(64, 43, 16, 0.91) !important; color: rgb(255, 241, 201) !important; }
+#footHud { display: none; position: absolute; inset: 0px; z-index: 8; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; color: rgb(238, 248, 255); }
+body.on-foot-mode #footHud { display: block; }
+body.on-foot-mode #soloLeft, body.on-foot-mode #soloRight, body.on-foot-mode #soloClearance, body.on-foot-mode .solo-action { display: none !important; opacity: 0 !important; pointer-events: none !important; }
+body.on-foot-mode #soloState, body.on-foot-mode #soloRaceHud { display: none !important; }
+body.on-foot-mode #worldLookHud { z-index: 10 !important; }
+.foot-stick { position: absolute; bottom: max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); width: min(25vw, 150px); aspect-ratio: 1 / 1; border-radius: 50%; border: 1px solid rgba(198, 237, 255, 0.333); background: rgba(7, 21, 34, 0.49); box-shadow: rgba(57, 189, 240, 0.11) 0px 0px 34px inset, rgba(0, 0, 0, 0.4) 0px 6px 20px; pointer-events: auto; touch-action: none; z-index: 3; }
+#footMove { left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))); }
+#footLook { right: max(12px,var(--solo-safe-right,env(safe-area-inset-right))); width: min(25vw, 148px); opacity: 0.68; background: rgba(7, 21, 34, 0.333); }
+.foot-stick .ring { position: absolute; inset: 0px; border-radius: 50%; border: 1px solid rgba(230, 248, 255, 0.2); }
+.foot-stick .knob { position: absolute; left: 50%; top: 50%; width: 32%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(233, 248, 255, 0.8); border: 1px solid rgb(255, 255, 255); box-shadow: rgba(0, 0, 0, 0.533) 0px 3px 12px; }
+.foot-stick span { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font: 850 9px / 1 system-ui; letter-spacing: 0.08em; white-space: nowrap; text-shadow: rgb(0, 0, 0) 0px 2px 5px; }
+#footLookZone { position: absolute; display: block; left: 0px; right: 0px; top: max(44px,var(--solo-safe-top,env(safe-area-inset-top))); bottom: 0px; width: auto; z-index: 1; pointer-events: auto; touch-action: none; background: transparent; cursor: crosshair; }
+#footLookZone::after { content: "DRAG · LOOK"; position: absolute; right: 18px; top: 8px; color: rgba(217, 245, 255, 0.333); font: 800 7px / 1 system-ui; letter-spacing: 0.1em; pointer-events: none; }
+#footFire { position: absolute; right: calc(max(12px,var(--solo-safe-right,env(safe-area-inset-right))) + min(25vw,148px) + 18px); bottom: max(22px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 18px)); width: clamp(96px, 13vw, 116px); height: clamp(96px, 13vw, 116px); border-radius: 50%; border: 2px solid rgba(255, 209, 114, 0.8); background: radial-gradient(circle at 38% 30%, rgb(152, 81, 35), rgb(90, 47, 22) 58%, rgb(43, 23, 14)); color: rgb(255, 246, 221); font: 950 13px / 1 system-ui; letter-spacing: 0.08em; text-shadow: rgb(0, 0, 0) 0px 2px 4px; box-shadow: rgba(0, 0, 0, 0.6) 0px 8px 28px, rgba(255, 179, 74, 0.125) 0px 0px 0px 5px, rgba(255, 186, 77, 0.22) 0px 0px 24px inset; pointer-events: auto; touch-action: none; z-index: 6; user-select: none; -webkit-tap-highlight-color: transparent; }
+#footFire::before { content: ""; position: absolute; inset: 15%; border: 1px solid rgba(255, 225, 165, 0.42); border-radius: 50%; }
+#footFire:active { transform: scale(0.94); filter: brightness(1.18); }
+#footReadout { position: absolute; left: 50%; top: max(46px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 40px)); transform: translateX(-50%); padding: 5px 9px; border-radius: 8px; background: rgba(7, 21, 34, 0.78); border: 1px solid rgba(255, 255, 255, 0.133); font: 850 9px / 1 system-ui; letter-spacing: 0.08em; pointer-events: none; z-index: 4; }
+#footReadout b { color: rgb(255, 211, 107); }
+#footReticle { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; transform: translate(-50%, -50%); border: 1px solid rgba(245, 251, 255, 0.8); border-radius: 50%; box-shadow: rgb(0, 0, 0) 0px 0px 5px, rgba(255, 255, 255, 0.267) 0px 0px 7px; opacity: 0.85; z-index: 4; }
+#footReticle.aim-assisted { border-color: rgb(143, 231, 255); box-shadow: rgb(0, 0, 0) 0px 0px 5px, rgba(66, 207, 255, 0.667) 0px 0px 9px; opacity: 1; }
+@media (max-height: 340px) {
+  .foot-stick { width: min(22vw, 128px); bottom: max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); }
+  #footLook { width: min(22vw, 124px); }
+  #footFire { right: calc(max(10px,var(--solo-safe-right,env(safe-area-inset-right))) + min(22vw,124px) + 12px); width: 92px; height: 92px; bottom: max(14px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); font-size: 11px; }
+}
+body:not(.xbox-aim-active) #viewport .xbox-crosshair { display: none !important; }
+body.xbox-aim-active #viewport .xbox-crosshair { display: block !important; }
+.xbox-control-mode-settings select { width: 100%; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgb(10, 23, 37); color: rgb(238, 248, 255); padding: 8px 9px; font: 750 12px system-ui, -apple-system, sans-serif; }
+.world-location-selector { display: grid; gap: 8px; margin-top: 10px; }
+.world-location-selector h4 { margin: 0px; font-size: 12px; letter-spacing: 0.08em; }
+.world-location-selector label { display: grid; gap: 5px; }
+.world-location-selector select, .world-location-selector input { width: 100%; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgb(10, 23, 37); color: rgb(238, 248, 255); padding: 8px 9px; font: 750 12px system-ui, -apple-system, sans-serif; }
+.world-location-selector button { min-height: 36px; }
+.world-location-custom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.world-location-custom[hidden] { display: none !important; }
+.world-location-selector .help { margin: 0px; }
+.world-location-selector.compact { padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.11); }
+#gameplayScorePill { font-variant-numeric: tabular-nums; letter-spacing: 0.025em; min-width: 132px; color: rgb(255, 228, 155) !important; border-color: rgba(255, 200, 91, 0.333) !important; background: linear-gradient(rgba(43, 36, 20, 0.85), rgba(21, 18, 8, 0.85)) !important; }
+#gameplayContractHud { display: none; position: absolute; z-index: 18; left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))); top: max(88px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 82px)); width: 172px; color: rgb(238, 248, 255); font-family: system-ui, -apple-system, sans-serif; pointer-events: auto; }
+body.solo-flight #gameplayContractHud { display: block; }
+#gameplayContractButton { display: block; width: 100%; padding: 8px 9px 7px; border: 1px solid rgba(114, 207, 255, 0.4); border-radius: 11px; background: linear-gradient(145deg, rgba(12, 36, 56, 0.93), rgba(7, 19, 31, 0.93)); box-shadow: rgba(0, 0, 0, 0.533) 0px 6px 20px, rgba(255, 255, 255, 0.07) 0px 1px inset; color: rgb(238, 248, 255); text-align: left; touch-action: manipulation; }
+#gameplayContractButton:active { transform: scale(0.975); filter: brightness(1.16); }
+#gameplayContractButton > small { display: block; font: 850 6.5px / 1 system-ui; letter-spacing: 0.13em; color: rgb(112, 215, 255); }
+#gameplayContractButton > strong { display: block; margin-top: 4px; padding-right: 36px; overflow: hidden; text-overflow: ellipsis; font: 950 10px / 1 system-ui; letter-spacing: 0.055em; white-space: nowrap; }
+#gameplayContractProgress { position: absolute; right: 9px; top: 20px; font: 950 10px / 1 ui-monospace, SFMono-Regular, Menlo, monospace; color: rgb(255, 224, 131); }
+#gameplayContractHint { display: block; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; font: 800 6.5px / 1.15 system-ui; letter-spacing: 0.035em; color: rgb(184, 203, 215); white-space: nowrap; }
+#gameplayContractBar { display: block; height: 3px; margin-top: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.094); overflow: hidden; }
+#gameplayContractBar > i { display: block; width: 0px; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgb(53, 185, 255), rgb(127, 240, 197), rgb(255, 227, 110)); box-shadow: rgb(88, 221, 255) 0px 0px 8px; transition: width 0.22s; }
+#gameplayRiskHint { display: block; margin-top: 4px; min-height: 8px; font: 900 6.5px / 1.1 system-ui; letter-spacing: 0.06em; color: rgb(255, 190, 114); }
+#gameplayMomentum { display: flex; align-items: center; gap: 4px; margin-top: 5px; padding: 0px 2px; }
+#gameplayMomentum > small { margin-right: auto; font: 850 6px / 1 system-ui; letter-spacing: 0.09em; color: rgb(145, 170, 186); }
+#gameplayMomentum > i { width: 13px; height: 3px; border-radius: 99px; background: rgba(255, 255, 255, 0.125); box-shadow: rgb(0, 0, 0) 0px 0px 2px inset; }
+#gameplayMomentum > i.hot { background: rgb(98, 229, 255); box-shadow: rgb(50, 207, 255) 0px 0px 7px; }
+#gameplayContractHud[data-overdrive="1"] #gameplayMomentum > i { background: rgb(255, 224, 92); box-shadow: rgb(255, 173, 46) 0px 0px 9px; }
+#gameplayContractHud[data-complete="1"] #gameplayContractButton { border-color: rgba(127, 240, 197, 0.667); box-shadow: rgba(0, 0, 0, 0.533) 0px 6px 20px, rgba(63, 224, 163, 0.267) 0px 0px 24px; }
+#gameplayToast { display: none; position: absolute; z-index: 34; left: 50%; top: 34%; transform: translate(-50%, -50%); min-width: 170px; padding: 10px 16px; border: 1px solid rgba(255, 225, 132, 0.55); border-radius: 13px; background: radial-gradient(circle at 50% 0px, rgba(74, 56, 25, 0.933), rgba(11, 16, 24, 0.95) 68%); box-shadow: rgba(0, 0, 0, 0.733) 0px 10px 34px, rgba(255, 186, 53, 0.267) 0px 0px 30px; color: rgb(255, 255, 255); text-align: center; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; }
+body.solo-flight #gameplayToast.active { display: block; animation: 0.78s cubic-bezier(0.18, 0.82, 0.23, 1) 0s 1 normal forwards running gameplayToast; }
+#gameplayToast strong { display: block; font: 950 18px / 1 system-ui; letter-spacing: 0.055em; color: rgb(255, 229, 140); text-shadow: rgba(255, 181, 46, 0.533) 0px 0px 12px; }
+#gameplayToast small { display: block; margin-top: 5px; font: 850 8px / 1.15 system-ui; letter-spacing: 0.08em; color: rgb(217, 239, 255); }
+#gameplayToast[data-kind="fail"] { border-color: rgba(255, 119, 136, 0.667); background: radial-gradient(circle at 50% 0px, rgba(84, 27, 40, 0.933), rgba(11, 16, 24, 0.95) 68%); }
+#gameplayToast[data-kind="fail"] strong { color: rgb(255, 154, 170); text-shadow: rgba(255, 51, 79, 0.4) 0px 0px 12px; }
+#gameplayToast[data-kind="bank"] { border-color: rgba(114, 240, 185, 0.667); background: radial-gradient(circle at 50% 0px, rgba(22, 76, 56, 0.933), rgba(11, 16, 24, 0.95) 68%); }
+#gameplayToast[data-kind="bank"] strong { color: rgb(143, 240, 200); text-shadow: rgba(48, 221, 147, 0.4) 0px 0px 12px; }
+@keyframes gameplayToast { 
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(0.72); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(0.96); }
+}
+body.solo-flight #viewport[data-world-mode="real"] #gameplayContractHud { left: max(148px,calc(var(--solo-safe-left,env(safe-area-inset-left)) + 140px)); top: max(58px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 52px)); }
+@media (max-height: 340px) {
+  #gameplayScorePill { min-width: 112px !important; font-size: 7.5px !important; }
+  #gameplayContractHud { top: max(70px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 64px)); width: 154px; }
+  #gameplayContractButton { padding: 6px 7px 5px; }
+  #gameplayContractButton > small { font-size: 5.5px; }
+  #gameplayContractButton > strong { font-size: 8.5px; margin-top: 3px; }
+  #gameplayContractProgress { right: 7px; top: 16px; font-size: 8.5px; }
+  #gameplayContractHint { font-size: 5.5px; margin-top: 4px; }
+  #gameplayRiskHint { font-size: 5.5px; margin-top: 3px; }
+  #gameplayMomentum { margin-top: 4px; }
+  #gameplayMomentum > i { width: 11px; }
+  body.solo-flight #viewport[data-world-mode="real"] #gameplayContractHud { left: max(128px,calc(var(--solo-safe-left,env(safe-area-inset-left)) + 120px)); top: max(62px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 56px)); }
+}
+body.player-driving .vehicle-stick, html body.player-driving #footHud #footFire, html body.player-driving #footHud #footJump, body.player-driving #soloLeft, body.player-driving #soloRight, body.player-driving #soloClearance, body.player-driving .solo-action { display: none !important; pointer-events: none !important; }
+#vehicleHud { display: none; position: absolute; inset: 0px; z-index: 12; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; }
+body.player-driving #vehicleHud { display: block; }
+.vehicle-stick { position: absolute !important; bottom: max(20px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) !important; width: min(25vw, 150px) !important; aspect-ratio: 1 / 1 !important; border: 0px !important; border-radius: 50% !important; background: transparent !important; box-shadow: none !important; opacity: 1 !important; pointer-events: auto !important; touch-action: none !important; z-index: 20 !important; }
+.vehicle-stick .ring { position: absolute !important; inset: 0px !important; border-radius: 50% !important; border: 2px solid rgba(255, 255, 255, 0.4) !important; background: rgba(11, 24, 38, 0.36) !important; box-shadow: rgba(0, 0, 0, 0.333) 0px 0px 45px inset, rgba(0, 0, 0, 0.333) 0px 6px 22px !important; }
+.vehicle-stick .knob { left: 50%; top: 50%; position: absolute !important; width: 31% !important; aspect-ratio: 1 / 1 !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; background: rgba(243, 247, 255, 0.8) !important; border: 2px solid rgb(255, 255, 255) !important; box-shadow: rgba(0, 0, 0, 0.533) 0px 3px 14px !important; }
+.vehicle-stick span { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); color: rgb(242, 244, 247); font: 600 9px / 1 system-ui; letter-spacing: 0.06em; white-space: nowrap; text-shadow: rgba(0, 0, 0, 0.533) 0px 1px 1px; }
+#vehicleMove { left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))) !important; }
+#vehicleLook { right: max(12px,var(--solo-safe-right,env(safe-area-inset-right))) !important; }
+#vehicleButtons { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 36px); display: flex; gap: 8px; pointer-events: auto; }
+#vehicleButtons button { height: 36px; padding: 0px 14px; border-radius: 6px; font: 600 12px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(242, 244, 247); background: rgba(10, 13, 18, 0.6); border: 1px solid rgba(255, 255, 255, 0.18); }
+#vehicleReadout { position: absolute; left: 50%; bottom: max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); transform: translateX(-50%); padding: 7px 10px; border: 1px solid rgba(255, 255, 255, 0.173); border-radius: 9px; background: rgba(7, 21, 34, 0.847); color: rgb(223, 245, 255); font: 900 9px / 1 system-ui; letter-spacing: 0.07em; }
+#driveModeButton[data-near="1"] { border-color: rgba(125, 231, 185, 0.533) !important; background: rgba(21, 73, 50, 0.91) !important; }
+body.player-driving #driveModeButton { border-color: rgba(255, 207, 111, 0.533) !important; background: rgba(82, 53, 15, 0.91) !important; }
+@media (max-height: 340px) {
+  .vehicle-stick { width: min(22vw, 128px) !important; bottom: max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) !important; }
+  #vehicleReadout { bottom: max(10px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); font-size: 8px; }
+}
+#worldMapFull { position: absolute; inset: 0px; z-index: 100020; margin: 0px; padding: 0px; border: 0px; width: 100%; height: 100%; max-width: none; max-height: none; background: rgb(14, 18, 23); color: rgb(255, 255, 255); font: 600 13px / 1.3 Inter, system-ui, -apple-system, sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+#worldMapFull:not([open]) { display: none; }
+#worldMapFull .wm-stage { position: absolute; inset: 0px; overflow: hidden; }
+#worldMapFull .wm-stage > div, #worldMapFull .wm-stage > canvas { position: absolute; inset: 0px; width: 100%; height: 100%; }
+#worldMapFull .wm-gl canvas { position: absolute; left: 0px; top: 0px; filter: saturate(0.9) brightness(0.92) contrast(1.04); }
+#worldMapFull .wm-top { position: absolute; left: max(10px,var(--solo-safe-left,env(safe-area-inset-left))); right: max(10px,var(--solo-safe-right,env(safe-area-inset-right))); top: max(10px,var(--solo-safe-top,env(safe-area-inset-top))); display: flex; gap: 8px; align-items: flex-start; z-index: 3; pointer-events: none; }
+#worldMapFull .wm-search { flex: 1 1 0%; max-width: 520px; margin: 0px auto; position: relative; pointer-events: auto; }
+#worldMapFull input { width: 100%; box-sizing: border-box; height: 42px; border-radius: 21px; border: 1.5px solid rgba(255, 255, 255, 0.267); background: rgba(11, 15, 20, 0.933); color: rgb(255, 255, 255); font: 600 15px / 1 Inter, system-ui, sans-serif; padding: 0px 16px 0px 38px; outline: none; box-shadow: rgba(0, 0, 0, 0.533) 0px 6px 18px; user-select: text; }
+#worldMapFull input:focus { border-color: rgb(127, 211, 255); }
+#worldMapFull .wm-search::before { content: "⌕"; position: absolute; left: 14px; top: 9px; font: 900 19px / 1 system-ui; opacity: 0.7; pointer-events: none; }
+#worldMapFull .wm-sugg { position: absolute; left: 0px; right: 0px; top: 48px; background: rgba(11, 15, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.165); border-radius: 14px; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.667) 0px 10px 24px; }
+#worldMapFull .wm-sugg:empty { display: none; }
+#worldMapFull .wm-sugg button { display: block; width: 100%; text-align: left; border: 0px; background: transparent; color: rgb(255, 255, 255); padding: 9px 14px; font: 700 14px / 1.25 Inter, system-ui, sans-serif; cursor: pointer; }
+#worldMapFull .wm-sugg button small { display: block; font-weight: 500; font-size: 11.5px; opacity: 0.65; }
+#worldMapFull .wm-sugg button:hover, #worldMapFull .wm-sugg button:focus { background: rgb(28, 42, 56); outline: none; }
+#worldMapFull .wm-sugg .wm-none { padding: 10px 14px; opacity: 0.7; }
+#worldMapFull .wm-close { pointer-events: auto; flex: 0 0 auto; width: 42px; height: 42px; border-radius: 21px; border: 1.5px solid rgba(255, 255, 255, 0.333); background: rgba(11, 15, 20, 0.933); color: rgb(255, 255, 255); font: 900 18px / 1 system-ui; cursor: pointer; box-shadow: rgba(0, 0, 0, 0.533) 0px 6px 18px; }
+#worldMapFull .wm-side { position: absolute; right: max(10px,var(--solo-safe-right,env(safe-area-inset-right))); bottom: max(30px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 24px)); display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+#worldMapFull .wm-side button { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid rgba(255, 255, 255, 0.267); background: rgba(11, 15, 20, 0.9); color: rgb(255, 255, 255); font: 900 20px / 1 system-ui; cursor: pointer; }
+#worldMapFull .wm-dest { position: absolute; left: max(10px,var(--solo-safe-left,env(safe-area-inset-left))); bottom: max(12px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); max-width: min(440px, 100% - 90px); display: flex; gap: 10px; align-items: center; background: rgba(11, 15, 20, 0.933); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 14px; padding: 8px 10px 8px 14px; z-index: 3; box-shadow: rgba(0, 0, 0, 0.533) 0px 6px 18px; }
+#worldMapFull .wm-dest[hidden] { display: none; }
+#worldMapFull .wm-dest b { display: block; font: 800 14px / 1.2 Inter, system-ui, sans-serif; }
+#worldMapFull .wm-dest small { display: block; opacity: 0.7; font-size: 11.5px; }
+#worldMapFull .wm-dest button { flex: 0 0 auto; height: 34px; border-radius: 10px; border: 1px solid rgba(255, 138, 106, 0.533); background: rgb(42, 20, 16); color: rgb(255, 217, 207); font: 800 11px / 1 Inter, system-ui; letter-spacing: 0.06em; padding: 0px 10px; cursor: pointer; }
+#worldMapFull .wm-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); font: 700 11px / 1 Inter, system-ui; opacity: 0.55; white-space: nowrap; z-index: 2; pointer-events: none; text-shadow: rgb(0, 0, 0) 0px 1px 3px; }
+#worldMapFull .wm-hint[hidden] { display: none; }
+@media (max-width: 960px) {
+  #worldMapFull .wm-dest:not([hidden]) ~ .wm-hint { display: none; }
+}
+#worldMapFull .wm-cross { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0px 0px -13px; z-index: 2; pointer-events: none; display: none; }
+body.pad-input #worldMapFull .wm-cross { display: block; }
+#worldMapFull .wm-cross::before, #worldMapFull .wm-cross::after { content: ""; position: absolute; background: rgb(255, 255, 255); box-shadow: rgb(0, 0, 0) 0px 0px 3px; }
+#worldMapFull .wm-cross::before { left: 12px; top: 0px; width: 2px; height: 26px; }
+#worldMapFull .wm-cross::after { top: 12px; left: 0px; height: 2px; width: 26px; }
+#worldMapFull .wm-me, #worldMapFull .wm-pin { position: absolute; left: 0px; top: 0px; z-index: 2; pointer-events: none; will-change: transform; }
+#worldMapFull .wm-me { width: 0px; height: 0px; }
+#worldMapFull .wm-me i { position: absolute; left: -11px; top: -13px; width: 22px; height: 26px; background: rgb(245, 179, 1); clip-path: polygon(50% 0px, 100% 100%, 50% 76%, 0px 100%); filter: drop-shadow(rgb(0, 0, 0) 0px 0px 2px) drop-shadow(rgb(0, 0, 0) 0px 0px 1px); }
+#worldMapFull .wm-pin { width: 0px; height: 0px; }
+#worldMapFull .wm-pin i { position: absolute; left: -12px; top: -34px; width: 24px; height: 34px; background: rgb(255, 75, 92); clip-path: path("M 12 34 C 12 34 0 19 0 12 A 12 12 0 1 1 24 12 C 24 19 12 34 12 34 Z"); filter: drop-shadow(rgba(0, 0, 0, 0.667) 0px 2px 3px); }
+#worldMapFull .wm-pin i::after { content: ""; position: absolute; left: 8px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: rgb(255, 255, 255); }
+#worldMapFull .wm-pin[hidden], #worldMapFull .wm-me[hidden] { display: none; }
+#worldMapFull .wm-peers { position: absolute; inset: 0px; pointer-events: none; z-index: 2; }
+#worldMapFull .wm-peer { position: absolute; left: 0px; top: 0px; z-index: 2; pointer-events: none; will-change: transform; transform: translate(-100px, -100px); --peer-color: #40dcff; }
+#worldMapFull .wm-peer i { position: absolute; left: -9px; top: -11px; width: 18px; height: 22px; background: var(--peer-color); clip-path: polygon(50% 0px, 100% 100%, 50% 72%, 0px 100%); filter: drop-shadow(rgb(0, 0, 0) 0px 1px 2px); }
+#worldMapFull .wm-peer b { position: absolute; left: 50%; top: 13px; transform: translateX(-50%); white-space: nowrap; border: 1px solid var(--peer-color); background: rgba(6, 18, 27, 0.86); color: rgb(255, 255, 255); padding: 2px 5px; border-radius: 6px; font: 800 11px / 1 system-ui; }
+#worldMapFull .wm-peer.offmap i { outline: rgba(255, 255, 255, 0.6) solid 2px; outline-offset: 3px; }
+#worldMapFull .wm-peer.dead { opacity: 0.45; filter: grayscale(1); }
+#worldMapFull .wm-attr { position: absolute; right: max(62px,calc(var(--solo-safe-right,env(safe-area-inset-right)) + 62px)); bottom: 2px; font: 500 9px / 1.2 Inter, system-ui; opacity: 0.55; z-index: 2; }
+#worldMapFull .wm-attr a { color: rgb(255, 255, 255); }
+body.world-map-open > :not(#viewport):not(dialog):not(script):not(style):not(link) { visibility: hidden !important; }
+#navGuide { position: absolute; left: 50%; top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 50px); transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 7px; padding: 4px 11px 4px 7px; border-radius: 14px; background: rgba(11, 15, 20, 0.66); border: 1px solid rgba(255, 255, 255, 0.133); color: rgb(255, 255, 255); font: 700 11.5px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.02em; pointer-events: none; white-space: nowrap; max-width: min(70vw, 420px); overflow: hidden; text-overflow: ellipsis; opacity: 0.86; }
+#navGuide[hidden], #navAr[hidden], #navArTrail[hidden] { display: none; }
+#navGuide i { display: inline-block; width: 16px; height: 16px; background: rgb(127, 211, 255); clip-path: polygon(50% 0px, 92% 100%, 50% 74%, 8% 100%); flex: 0 0 auto; }
+#navGuide span { overflow: hidden; text-overflow: ellipsis; }
+#navAr { position: absolute; left: 0px; top: 0px; z-index: 29; width: 0px; height: 0px; pointer-events: none; will-change: transform; opacity: 0.72; }
+#navAr i { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; background: rgb(127, 211, 255); clip-path: polygon(50% 0px, 100% 100%, 50% 70%, 0px 100%); filter: drop-shadow(rgba(0, 0, 0, 0.6) 0px 0px 2px); }
+#navAr small { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); font: 800 10px / 1 Inter, system-ui, sans-serif; color: rgb(223, 244, 255); text-shadow: rgb(0, 0, 0) 0px 1px 2px; white-space: nowrap; }
+#navArTrail { position: absolute; inset: 0px; z-index: 28; pointer-events: none; overflow: hidden; }
+#navArTrail i { display: none; position: absolute; left: 0px; top: 0px; width: 14px; height: 19px; margin: -9px 0px 0px -7px; background: rgb(127, 211, 255); clip-path: polygon(50% 0px, 100% 100%, 50% 72%, 0px 100%); filter: drop-shadow(rgb(0, 0, 0) 0px 1px 3px); will-change: transform; opacity: 0.8; }
+body.jet-mode #navAr i { background: rgb(125, 255, 154); }
+body.jet-mode #navGuide i { background: rgb(125, 255, 154); }
+#guidedCooldownNear { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); padding: 3px 9px; border-radius: 10px; background: rgba(11, 17, 24, 0.816); border: 1px solid rgb(255, 178, 74); color: rgb(255, 226, 184); font: 800 11px / 1.3 system-ui, sans-serif; letter-spacing: 0.06em; pointer-events: none; z-index: 25; display: none; }
+body.guided-denied #guidedCooldownNear { display: block; }
+body.guided-reloading #droneWeaponToggle, body.guided-reloading #mobileGameplayWeapon, body.guided-reloading [data-drone-weapon="guided"] { background-image: linear-gradient(90deg,#ffb24a55 calc((1 - var(--guided-cd,0))*100%),transparent 0) !important; }
+#droneWeaponToggle[data-guided-cd]::after, #mobileGameplayWeapon[data-guided-cd]::before, [data-drone-weapon="guided"][data-guided-cd]::after { content: " ⏳" attr(data-guided-cd); font-weight: 700; opacity: 0.85; }
+#enterCarButton { position: absolute; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(max(14px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 64px); min-width: 150px; height: 46px; padding: 0px 18px; border-radius: 14px; font: 900 15px / 1 Nunito, "Trebuchet MS", system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(58, 38, 0); background: rgb(255, 201, 60); border: 2.5px solid rgb(255, 255, 255); box-shadow: rgb(196, 138, 18) 0px 4px 0px; pointer-events: auto; touch-action: manipulation; }
+#enterCarButton[hidden] { display: none !important; }
+#enterCarButton[data-mode="exit"] { background: rgb(255, 107, 90); color: rgb(255, 255, 255); box-shadow: rgb(177, 59, 46) 0px 4px 0px; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #enterCarButton { background: rgb(255, 201, 60) !important; color: rgb(58, 38, 0) !important; border: 2.5px solid rgb(255, 255, 255) !important; box-shadow: rgb(196, 138, 18) 0px 4px 0px !important; }
+html.neon-line-style:not(#ng-a):not(#ng-b):not(#ng-c) #enterCarButton[data-mode="exit"] { background: rgb(255, 107, 90) !important; color: rgb(255, 255, 255) !important; box-shadow: rgb(177, 59, 46) 0px 4px 0px !important; }
+html body.mobile-gameplay-compact.solo-flight:not(.desktop-input) #viewport #enterCarButton { left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))) !important; right: auto !important; transform: none !important; bottom: calc(max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,150px) + 16px) !important; min-width: 54px !important; width: 54px !important; height: 54px !important; padding: 0px !important; border-radius: 50% !important; font: 900 24px / 1 system-ui, -apple-system, sans-serif !important; }
+#footFire { display: block !important; width: 64px !important; height: 64px !important; right: calc(max(10px,var(--solo-safe-right,env(safe-area-inset-right))) + min(25vw,148px) + 12px) !important; bottom: max(16px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 12px)) !important; font-size: 9px !important; border-width: 1px !important; opacity: 0.92 !important; box-shadow: rgba(0, 0, 0, 0.533) 0px 5px 16px, rgba(255, 179, 74, 0.094) 0px 0px 0px 3px !important; }
+#footLookZone::after { display: none !important; }
+#droneGuidedLock { position: absolute; left: 50%; top: 50%; z-index: 17; transform: translate(-50%, -50%); font: 900 12px / 1 ui-monospace, monospace; color: rgb(232, 250, 173); text-shadow: rgb(0, 0, 0) 0px 0px 5px; letter-spacing: 0.11em; pointer-events: none; white-space: nowrap; padding: 7px 10px; border: 1.5px solid rgba(213, 235, 114, 0.6); border-radius: 8px; background: rgba(7, 22, 27, 0.6); }
+#droneGuidedLock[data-locked="1"] { color: rgb(255, 218, 120); border-color: rgb(255, 189, 59); box-shadow: rgba(255, 157, 41, 0.267) 0px 0px 12px; }
+#droneGuidedLock[hidden] { display: none !important; }
+#footWeaponToggle, #droneWeaponToggle { position: absolute; z-index: 21; bottom: max(18px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 10px)); left: 50%; transform: translateX(-50%); min-width: 112px; height: 32px; padding: 0px 10px; border: 1px solid rgba(255, 255, 255, 0.29); border-radius: 9px; background: rgba(10, 24, 38, 0.91); color: rgb(234, 247, 255); font: 900 8px / 1 system-ui; letter-spacing: 0.05em; box-shadow: rgba(0, 0, 0, 0.467) 0px 4px 14px; touch-action: manipulation; }
+#footWeaponToggle { border-color: rgba(255, 210, 122, 0.467); color: rgb(255, 233, 185); }
+#droneWeaponToggle { border-color: rgba(124, 223, 255, 0.467); color: rgb(201, 244, 255); }
+#footWeaponToggle[hidden], #droneWeaponToggle[hidden] { display: none !important; }
+@media (max-height: 340px) {
+  #footFire { width: 54px !important; height: 54px !important; right: calc(max(8px,var(--solo-safe-right,env(safe-area-inset-right))) + min(22vw,124px) + 8px) !important; bottom: max(8px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) !important; }
+  #footWeaponToggle, #droneWeaponToggle { height: 28px; min-width: 102px; font-size: 7px; bottom: max(8px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); }
+}
+body:not(.solo-flight) #proximityVoiceBar { display: none !important; }
+#viewport #proximityVoiceBar { position: absolute; top: max(8px,var(--solo-safe-top,env(safe-area-inset-top))); left: clamp(180px, 27vw, 320px); bottom: auto; z-index: 100002; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+#viewport #proximityVoiceBar[hidden] { display: none !important; }
+body.solo-flight:not(.desktop-input) #viewport #proximityVoiceBar { flex-direction: column; gap: 5px; align-items: center; }
+body.solo-flight:not(.desktop-input) #viewport #proximityVoiceBar button { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+@media (max-height: 360px) {
+  body.solo-flight:not(.desktop-input) #viewport #proximityVoiceBar button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; }
+}
+#viewport #proximityVoiceBar button { width: 38px; height: 38px; min-width: 38px; min-height: 38px; padding: 0px; border: 1.5px solid rgba(148, 212, 234, 0.565); background: rgba(19, 43, 61, 0.86); color: rgb(234, 248, 255); box-shadow: rgba(0, 0, 0, 0.467) 0px 3px 12px; font: 800 19px / 1 system-ui, sans-serif; display: grid; place-items: center; pointer-events: auto; touch-action: none; border-radius: 50% !important; }
+#viewport #proximityVoicePtt[aria-pressed="true"] { background: rgb(27, 103, 79); border-color: rgb(145, 255, 215); }
+#viewport #proximityVoiceMute[aria-pressed="true"] { background: rgb(96, 51, 44); border-color: rgb(255, 169, 152); }
+body.desktop-input.solo-flight #viewport #proximityVoiceBar { top: max(56px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 48px)); gap: 8px; flex-direction: row; align-items: center; }
+body.desktop-input.solo-flight #viewport #proximityVoiceBar button { min-width: 116px; min-height: 39px; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 850; width: auto !important; height: 39px !important; padding: 0px 10px !important; border-radius: 9px !important; font-size: 16px !important; }
+body.desktop-input.solo-flight #viewport #proximityVoiceBar button::after { color: rgb(232, 246, 255); font: 850 11px / 1 system-ui, sans-serif; letter-spacing: 0.035em; white-space: nowrap; }
+body.desktop-input.solo-flight:not(.pad-input) #proximityVoicePtt::after { content: "H · MIC ON/OFF"; }
+body.desktop-input.solo-flight:not(.pad-input) #proximityVoiceMute::after { content: "K · MUTE"; }
+body.desktop-input.solo-flight.pad-input #proximityVoicePtt::after { content: "R3 · MIC ON/OFF"; }
+body.desktop-input.solo-flight.pad-input #proximityVoiceMute::after { content: "R3+Y · MUTE"; }
+#viewport #proximityVoiceBar button:focus-visible { outline: rgb(255, 215, 106) solid 3px; outline-offset: 2px; }
+#proximityVoiceBar #proximityVoiceStatus { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#proximityVoiceBar #proximityVoiceSpeaking { position: absolute; top: auto; bottom: calc(100% + 4px); left: 0px; background: rgba(17, 42, 52, 0.85); padding: 2px 5px; border-radius: 7px; color: rgb(198, 255, 230); font: 750 10px system-ui, sans-serif; pointer-events: none; }
+#proximityVoiceBar #proximityVoiceSpeaking[hidden] { display: none !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body #viewport #gameExitButton { position: absolute; left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))); top: max(8px,var(--solo-safe-top,env(safe-area-inset-top))); z-index: 100003; width: 56px; height: 36px; min-height: 0px; margin: 0px; align-items: center; justify-content: center; gap: 4px; pointer-events: auto; touch-action: manipulation; box-shadow: rgba(0, 0, 0, 0.4) 0px 4px 12px; padding: 0px !important; display: flex !important; border-radius: 10px !important; border: 1.5px solid rgba(255, 138, 106, 0.6) !important; background: rgba(42, 20, 16, 0.88) !important; color: rgb(255, 226, 216) !important; font: 900 10px / 1 system-ui, -apple-system, sans-serif !important; letter-spacing: 0.12em !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body #viewport #gameExitButton::before { content: "⟵"; font-size: 12px; letter-spacing: 0px; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body #viewport #gameExitButton[hidden] { display: none !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMultiplayer.hud-after-exit { min-width: 60px; align-items: center; justify-content: center; display: flex !important; visibility: visible !important; opacity: 1 !important; position: absolute !important; left: calc(max(8px,var(--solo-safe-left,env(safe-area-inset-left))) + 62px) !important; top: max(8px,var(--solo-safe-top,env(safe-area-inset-top))) !important; height: 36px !important; min-height: 0px !important; width: auto !important; padding: 0px 10px !important; border-radius: 10px !important; border-width: 1.5px !important; z-index: 100003 !important; pointer-events: auto !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMultiplayerStatus { left: calc(max(8px,var(--solo-safe-left,env(safe-area-inset-left))) + 62px) !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.desktop-input #gameExitButton::after { content: "ESC"; margin-left: 3px; padding: 0px 3px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 8px / 1.3 system-ui, sans-serif; letter-spacing: 0px; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.desktop-input #viewport #gameExitButton { width: auto; padding: 0px 8px !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch { left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))); top: auto; bottom: max(12px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); min-width: 96px; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; touch-action: manipulation; box-shadow: rgba(0, 0, 0, 0.467) 0px 5px 14px; display: flex !important; visibility: visible !important; position: absolute !important; right: auto !important; transform: none !important; z-index: 40 !important; height: 40px !important; min-height: 0px !important; width: auto !important; margin: 0px !important; padding: 0px 12px !important; border-radius: 20px !important; border: 2px solid rgba(127, 211, 255, 0.8) !important; background: rgba(14, 42, 62, 0.9) !important; color: rgb(232, 247, 255) !important; font: 900 11px / 1 system-ui, -apple-system, sans-serif !important; letter-spacing: 0.08em !important; pointer-events: auto !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight.jet-mode #viewport #mobileGameplayMode.hud-mode-switch { display: none !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch.by-stick { bottom: auto !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch::before { content: "⇄"; font-size: 14px; letter-spacing: 0px; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch[data-target="drone"] { border-color: rgba(127, 211, 255, 0.8) !important; background: rgba(14, 42, 62, 0.9) !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch[data-target="foot"] { border-color: rgba(255, 211, 107, 0.8) !important; background: rgba(58, 40, 16, 0.9) !important; color: rgb(255, 243, 210) !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch[data-current="jet"] { border-color: rgba(255, 106, 90, 0.8) !important; background: rgba(58, 20, 16, 0.9) !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch:disabled { opacity: 0.55; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayMode.hud-mode-switch:active { transform: scale(0.95) !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.desktop-input #viewport #mobileGameplayMode.hud-mode-switch::after { content: "V"; margin-left: 2px; padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 9px / 1.2 system-ui, sans-serif; letter-spacing: 0px; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.desktop-input.jet-mode #viewport #mobileGameplayMode.hud-mode-switch::after, html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.desktop-input.player-driving #viewport #mobileGameplayMode.hud-mode-switch::after { content: "F"; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.pad-input #viewport #mobileGameplayMode.hud-mode-switch::after { content: "↓"; margin-left: 2px; padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 3px; font: 800 9px / 1.2 system-ui, sans-serif; }
+#jetHud .jet-btns [data-a="exit"] { display: none !important; }
+html:not(#hud-a):not(#hud-b):not(#hud-c):not(#hud-d) body.solo-flight #viewport #mobileGameplayDock { grid-template-columns: none !important; grid-auto-flow: column !important; grid-auto-columns: minmax(96px, auto) !important; width: auto !important; }
+#soloTopbarActions #droneWeaponToggle, #soloTopbar #droneWeaponToggle { position: static !important; inset: auto !important; transform: none !important; min-width: 92px !important; width: auto !important; height: 30px !important; padding: 0px 8px !important; margin: 0px !important; flex: 0 1 auto !important; font-size: 8px !important; z-index: auto !important; pointer-events: auto !important; }
+#droneWeaponToggle.desktop-segment-replaced { display: none !important; }
+#desktopDroneWeaponSwitch { display: flex; align-items: stretch; gap: 2px; height: 30px; padding: 2px; border: 1px solid rgba(107, 131, 155, 0.467); border-radius: 8px; background: rgba(8, 19, 29, 0.867); box-shadow: rgba(0, 0, 0, 0.333) 0px 2px 10px; }
+#desktopDroneWeaponSwitch[hidden] { display: none !important; }
+#desktopDroneWeaponSwitch button { display: flex; align-items: center; justify-content: center; min-width: 56px; height: 24px; margin: 0px; padding: 0px 8px; border: 1px solid rgba(87, 112, 135, 0.4); border-radius: 6px; background: rgb(22, 35, 49); color: rgb(220, 232, 245); font: 900 8px / 1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0.055em; text-align: center; cursor: pointer; }
+#desktopDroneWeaponSwitch button[hidden] { display: none !important; }
+#desktopDroneWeaponSwitch button.active { background: rgb(33, 74, 104); border-color: rgba(105, 202, 255, 0.667); color: rgb(255, 255, 255); box-shadow: rgba(120, 209, 255, 0.267) 0px 0px 0px 1px inset, rgba(46, 155, 215, 0.267) 0px 0px 9px; }
+body.mobile-gameplay-compact #desktopDroneWeaponSwitch { display: none !important; }
+body.on-foot-mode #desktopDroneWeaponSwitch, body.on-foot-mode #droneWeaponToggle { display: none !important; }
+#soloArm, #soloKill { display: inline-flex; align-items: center !important; justify-content: center !important; text-align: center !important; line-height: 1 !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+#soloKill { min-width: 74px !important; width: auto !important; padding-inline: 12px !important; }
+#wantedEmpButton { width: 72px !important; height: 44px !important; min-width: 72px !important; min-height: 44px !important; padding: 4px 6px !important; border-width: 1px !important; border-radius: 11px !important; gap: 1px !important; right: max(8px,var(--solo-safe-right,env(safe-area-inset-right))) !important; top: max(52px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 44px)) !important; }
+#wantedEmpButton strong { font-size: 14px !important; line-height: 1 !important; letter-spacing: 0.06em !important; }
+#wantedEmpButton small { font-size: 6px !important; line-height: 1 !important; letter-spacing: 0.025em !important; max-width: 64px !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+body.on-foot-mode #footHud #footWeaponToggle { isolation: isolate; display: block !important; position: absolute !important; left: 50% !important; bottom: max(16px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 10px)) !important; transform: translateX(-50%) !important; z-index: 30 !important; pointer-events: auto !important; touch-action: manipulation !important; }
+.player-control-hardware .phone-settings-toggle[data-native-xbox-control="1"] { display: flex !important; margin: 4px 0px 8px !important; border-top: 0px !important; }
+#mobileGameplayDock, #mobileGameplayReset, #mobileGameplayMultiplayer, #mobileGameplayMultiplayerStatus { display: none; }
+body.solo-flight.mobile-gameplay-compact:not(.desktop-input) #buildTag { display: none !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayDock { display: grid; grid-template-columns: repeat(3, minmax(0px, 1fr)); gap: 5px; position: absolute; top: max(5px,var(--solo-safe-top,env(safe-area-inset-top))); left: 50%; transform: translateX(-50%); width: min(100% - 170px, 330px); z-index: 46; pointer-events: auto; padding: 4px; border: 1px solid rgba(124, 204, 251, 0.21); border-radius: 11px; background: rgba(7, 21, 34, 0.85); box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 18px; backdrop-filter: blur(7px); }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayDock button, body.mobile-gameplay-compact.solo-flight #mobileGameplayReset, body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer { min-width: 0px; min-height: 36px; margin: 0px; border-radius: 8px; letter-spacing: 0.035em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; touch-action: manipulation; appearance: none; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0px 7px !important; font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important; font-size: 9px !important; font-weight: 900 !important; line-height: 1 !important; text-align: center !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMode { background: rgb(18, 59, 87) !important; border-color: rgba(95, 199, 255, 0.533) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayWeapon { background: rgb(71, 51, 18) !important; border-color: rgba(255, 197, 109, 0.533) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplaySettings { background: rgb(32, 45, 66) !important; border-color: rgba(157, 185, 220, 0.4) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer { position: absolute; top: max(9px,var(--solo-safe-top,env(safe-area-inset-top))); left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))); width: 72px; z-index: 47; pointer-events: auto; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 18px; backdrop-filter: blur(7px); background: rgb(18, 54, 76) !important; border: 1px solid rgba(112, 221, 255, 0.533) !important; color: rgb(233, 251, 255) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer[data-state="connected"] { background: rgb(23, 75, 61) !important; border-color: rgba(118, 239, 186, 0.667) !important; color: rgb(234, 255, 246) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer[data-state="finding"], body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer[data-state="waiting"] { background: rgb(35, 68, 86) !important; border-color: rgba(142, 231, 255, 0.667) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer[data-state="error"] { background: rgb(84, 42, 49) !important; border-color: rgba(255, 154, 166, 0.667) !important; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus { position: absolute; display: none; top: max(50px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 41px)); left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))); z-index: 45; max-width: 150px; padding: 4px 6px; border: 1px solid rgba(112, 221, 255, 0.333); border-radius: 7px; background: rgba(7, 21, 34, 0.85); color: rgb(223, 247, 255); font: 800 8px / 1.15 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0.025em; pointer-events: none; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.4) 0px 4px 12px; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus[data-state="connected"], body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus[data-state="finding"], body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus[data-state="waiting"], body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus[data-state="error"] { display: block; }
+body.mobile-gameplay-compact.solo-flight #mobileGameplayReset { position: absolute; top: max(9px,var(--solo-safe-top,env(safe-area-inset-top))); right: max(8px,var(--solo-safe-right,env(safe-area-inset-right))); width: 72px; z-index: 47; pointer-events: auto; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 18px; backdrop-filter: blur(7px); display: flex !important; background: rgb(76, 31, 37) !important; border: 1px solid rgba(255, 139, 149, 0.533) !important; color: rgb(255, 255, 255) !important; }
+body.mobile-gameplay-compact.solo-flight #soloTopbar { display: none !important; }
+html body.mobile-gameplay-compact.solo-flight #gameExitButton { display: none !important; }
+body.mobile-gameplay-compact.solo-flight #soloTopbarStatus, body.mobile-gameplay-compact.solo-flight #soloTopbarActions { display: none !important; }
+body.mobile-gameplay-compact.solo-flight #soloArm { display: flex !important; visibility: visible !important; pointer-events: auto !important; left: 50% !important; right: auto !important; transform: translateX(-105%) !important; bottom: max(18px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 8px)) !important; z-index: 31 !important; }
+body.mobile-gameplay-compact.solo-flight.on-foot-mode #soloArm { display: none !important; }
+body.mobile-gameplay-compact.solo-flight #soloKill { display: flex !important; left: 50% !important; right: auto !important; transform: translateX(5%) !important; bottom: max(18px,calc(var(--solo-safe-bottom,env(safe-area-inset-bottom)) + 8px)) !important; width: 94px !important; min-width: 94px !important; padding-inline: 8px !important; font-size: 9px !important; letter-spacing: 0.04em !important; white-space: nowrap !important; z-index: 31 !important; }
+body.mobile-gameplay-compact.solo-flight #soloArm, body.mobile-gameplay-compact.solo-flight #soloKill { align-items: center !important; justify-content: center !important; text-align: center !important; font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important; font-weight: 900 !important; line-height: 1 !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+body.mobile-gameplay-compact.solo-flight.on-foot-mode #soloKill { display: none !important; }
+body.mobile-gameplay-compact.solo-flight #droneWeaponToggle, body.mobile-gameplay-compact.solo-flight #footWeaponToggle { display: none !important; }
+@media (max-height: 360px) {
+  body.mobile-gameplay-compact.solo-flight #mobileGameplayDock { width: min(100% - 160px, 300px); gap: 3px; padding: 3px; }
+  body.mobile-gameplay-compact.solo-flight #mobileGameplayDock button, body.mobile-gameplay-compact.solo-flight #mobileGameplayReset, body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer { min-height: 32px; padding: 0px 5px !important; font-size: 8px !important; }
+  body.mobile-gameplay-compact.solo-flight #mobileGameplayReset { width: 64px; top: max(7px,var(--solo-safe-top,env(safe-area-inset-top))); }
+  body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayer { width: 64px; top: max(7px,var(--solo-safe-top,env(safe-area-inset-top))); }
+  body.mobile-gameplay-compact.solo-flight #mobileGameplayMultiplayerStatus { top: max(44px,calc(var(--solo-safe-top,env(safe-area-inset-top)) + 37px)); font-size: 7px; max-width: 132px; }
+  body.mobile-gameplay-compact.solo-flight #soloArm, body.mobile-gameplay-compact.solo-flight #soloKill { bottom: max(12px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) !important; }
+}
+body.mobile-gameplay-compact.solo-flight #mobileGameplayMode.hud-mode-switch { margin-left: -19px !important; }
+#gameplayContractHud { visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+#gameplayScorePill, #gameplayToast, #gameplayMomentum { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+body.on-foot-mode #footLookZone, body.on-foot-mode #footFire, body.on-foot-mode #footReadout { display: none !important; pointer-events: none !important; }
+body.on-foot-mode .foot-stick { position: absolute !important; width: min(25vw, 150px) !important; aspect-ratio: 1 / 1 !important; bottom: max(20px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) !important; border: 0px !important; border-radius: 50% !important; background: transparent !important; box-shadow: none !important; opacity: 1 !important; pointer-events: auto !important; touch-action: none !important; z-index: 20 !important; }
+body.on-foot-mode #footMove { left: max(12px,var(--solo-safe-left,env(safe-area-inset-left))) !important; }
+body.on-foot-mode #footLook { right: max(12px,var(--solo-safe-right,env(safe-area-inset-right))) !important; width: min(25vw, 150px) !important; opacity: 1 !important; background: transparent !important; }
+body.on-foot-mode .foot-stick .ring { position: absolute !important; inset: 0px !important; border-radius: 50% !important; border: 2px solid rgba(255, 255, 255, 0.4) !important; background: rgba(11, 24, 38, 0.36) !important; box-shadow: rgba(0, 0, 0, 0.333) 0px 0px 45px inset, rgba(0, 0, 0, 0.333) 0px 6px 22px !important; }
+body.on-foot-mode .foot-stick .knob { left: 50%; top: 50%; position: absolute !important; width: 31% !important; aspect-ratio: 1 / 1 !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; background: rgba(243, 247, 255, 0.8) !important; border: 2px solid rgb(255, 255, 255) !important; box-shadow: rgba(0, 0, 0, 0.533) 0px 3px 14px !important; }
+body.on-foot-mode .foot-stick span { bottom: -15px !important; font-size: 9px !important; }
+dialog.phone-settings-dialog[open] { box-sizing: border-box !important; position: fixed !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; margin: 0px !important; width: min(94vw, 560px) !important; height: min(94dvh, -10px + 100dvh) !important; max-height: none !important; overflow: hidden auto !important; overscroll-behavior-y: contain !important; touch-action: pan-y !important; padding-bottom: max(20px,env(safe-area-inset-bottom)) !important; }
+dialog.phone-settings-dialog[open] .phone-settings-titlebar { position: sticky !important; top: -16px !important; z-index: 20 !important; }
+@media (max-height: 430px) {
+  dialog.phone-settings-dialog[open] { width: min(96vw, 680px) !important; height: calc(-8px + 100dvh) !important; padding: 10px 14px 20px !important; }
+  dialog.phone-settings-dialog[open] .phone-settings-titlebar { top: -10px !important; margin: -10px -14px 8px !important; padding: 8px 12px !important; }
+  .phone-settings-row { margin: 9px 0px !important; }
+  .phone-settings-toggle { margin: 8px 0px 6px !important; padding: 7px 0px !important; }
+  .phone-settings-profile { margin-bottom: 10px !important; padding: 8px 10px !important; }
+}
+body.on-foot-mode #footFire { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+.player-control-modes, .player-control-section { margin: 12px 0px; padding: 11px; border: 1px solid rgba(255, 255, 255, 0.133); border-radius: 11px; background: rgb(12, 25, 38); }
+.player-control-modes h4, .player-control-section h4 { margin: 0px 0px 9px; font: 900 12px / 1 system-ui; letter-spacing: 0.1em; color: rgb(117, 230, 181); }
+.player-mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.player-mode-grid button { min-height: 36px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 8px; background: rgb(22, 36, 55); color: rgb(255, 255, 255); font: 850 10px / 1 system-ui; }
+.player-mode-grid button[data-active="1"] { border-color: rgb(113, 229, 178); background: rgb(24, 80, 61); }
+.player-control-row { margin: 10px 0px; }
+.player-control-row label { display: flex; justify-content: space-between; gap: 10px; margin: 0px 0px 5px; font: 750 11px / 1.2 system-ui; }
+.player-control-row output { font: 900 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.player-control-row input[type="range"] { width: 100%; accent-color: rgb(107, 228, 176); }
+.player-control-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0px; border-top: 1px solid rgba(255, 255, 255, 0.086); font: 750 11px / 1.2 system-ui; }
+.player-control-toggle input { width: 20px; height: 20px; accent-color: rgb(107, 228, 176); }
+.player-control-note { margin: 6px 0px 0px !important; color: rgb(143, 165, 189) !important; font-size: 10px !important; }
+.player-control-section[data-profile-section="vehicle"] h4 { color: rgb(255, 211, 123); }
+.player-control-section[data-profile-section="first-person"] h4 { color: rgb(139, 220, 255); }
+.player-control-hardware { margin-bottom: 16px; }
+body.solo-flight { overflow: hidden !important; background: rgb(0, 0, 0) !important; user-select: none !important; -webkit-tap-highlight-color: transparent !important; }
+body.solo-flight #viewport, body.solo-flight #viewport * { user-select: none !important; -webkit-tap-highlight-color: transparent !important; }
+body.solo-flight dialog input, body.solo-flight dialog textarea { user-select: text !important; }
+body.solo-flight .panel, body.solo-flight .telemetry { display: none !important; }
+body.solo-flight #viewport { --solo-safe-top: env(safe-area-inset-top,0px); --solo-safe-right: env(safe-area-inset-right,0px); --solo-safe-bottom: env(safe-area-inset-bottom,0px); --solo-safe-left: env(safe-area-inset-left,0px); position: fixed !important; inset: 0px !important; width: 100vw !important; height: 100dvh !important; min-height: 0px !important; max-height: none !important; margin: 0px !important; z-index: 50 !important; overflow: hidden !important; transform: none !important; transform-origin: 0px 0px !important; }
+html.android-stable-webgl body.solo-flight #viewport { height: 100dvh !important; }
+body.solo-flight #cameraModes { top: max(8px,var(--solo-safe-top)) !important; left: 50% !important; }
+#soloHud { position: absolute; inset: 0px; z-index: 8; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; color: rgb(255, 255, 255); touch-action: none; user-select: none; }
+#soloHud[hidden] { display: none !important; }
+#soloTopbar { position: absolute; top: max(8px,var(--solo-safe-top)); left: max(8px,var(--solo-safe-left)); right: max(8px,var(--solo-safe-right)); display: flex; gap: 8px; align-items: center; justify-content: flex-start; pointer-events: auto; }
+#soloTopbar span, #soloTopbar button { border: 1px solid rgba(255, 255, 255, 0.333); background: rgba(17, 32, 51, 0.8); color: rgb(255, 255, 255); border-radius: 9px; padding: 7px 10px; font-weight: 800; font-size: 12px; backdrop-filter: blur(8px); }
+#soloTopbar #soloExit { background: rgba(107, 35, 48, 0.867); }
+#soloTopbar #soloReset { background: rgba(154, 91, 24, 0.867); }
+#soloTopbar #soloCamera { margin-left: auto; background: rgba(23, 79, 112, 0.867); }
+#soloTopbar #soloGamepadStatus { background: rgba(23, 105, 79, 0.867); border-color: rgb(127, 240, 197); color: rgb(234, 255, 247); white-space: nowrap; }
+#soloRaceHud { position: absolute; top: max(52px,calc(var(--solo-safe-top) + 44px)); left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto auto; gap: 3px 12px; align-items: center; min-width: 290px; padding: 7px 12px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 10px; background: rgba(17, 32, 51, 0.78); backdrop-filter: blur(8px); box-shadow: rgba(0, 0, 0, 0.267) 0px 5px 18px; text-align: center; pointer-events: none; }
+#soloRaceHud span { font-size: 10px; font-weight: 850; letter-spacing: 0.06em; white-space: nowrap; }
+#soloRaceTime { font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; color: rgb(255, 255, 255); }
+.solo-stick { position: absolute; width: min(34vw, 230px); aspect-ratio: 1 / 1; bottom: max(18px,var(--solo-safe-bottom)); pointer-events: auto; touch-action: none; border-radius: 50%; }
+#soloLeft { left: max(16px,var(--solo-safe-left)); }
+#soloRight { right: max(16px,var(--solo-safe-right)); }
+.solo-ring { position: absolute; inset: 0px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); background: rgba(11, 24, 38, 0.36); box-shadow: rgba(0, 0, 0, 0.333) 0px 0px 45px inset, rgba(0, 0, 0, 0.333) 0px 6px 22px; }
+.solo-knob { position: absolute; left: 50%; top: 50%; width: 31%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(243, 247, 255, 0.8); border: 2px solid rgb(255, 255, 255); box-shadow: rgba(0, 0, 0, 0.533) 0px 3px 14px; }
+.solo-stick span { position: absolute; left: 50%; bottom: -18px; transform: translateX(-50%); font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-shadow: rgb(0, 0, 0) 0px 2px 5px; white-space: nowrap; }
+#soloClearance { position: absolute; left: 50%; bottom: max(96px,calc(var(--solo-safe-bottom) + 80px)); transform: translateX(-50%); width: 66px; height: 176px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 5px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 13px; background: rgba(11, 24, 38, 0.79); backdrop-filter: blur(8px); pointer-events: auto; box-shadow: rgba(0, 0, 0, 0.333) 0px 6px 22px; }
+#soloClearance small { font-size: 8px; font-weight: 850; line-height: 1.05; text-align: center; letter-spacing: 0.06em; }
+#soloClearance strong { font: 900 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: rgb(107, 228, 176); white-space: nowrap; }
+#soloClearance span { font-size: 8px; font-weight: 850; color: rgb(255, 208, 109); white-space: nowrap; }
+.solo-height-pad { position: relative; height: 98px; width: 50px; touch-action: none; border-radius: 10px; background: linear-gradient(rgba(23, 79, 112, 0.667) 0%, rgba(16, 34, 54, 0.733) 46%, rgba(16, 34, 54, 0.733) 54%, rgba(112, 64, 42, 0.667) 100%); border: 1px solid rgba(255, 255, 255, 0.2); overflow: hidden; }
+.solo-height-track { position: absolute; left: 50%; top: 14px; bottom: 14px; width: 3px; transform: translateX(-50%); background: rgba(255, 255, 255, 0.208); border-radius: 4px; }
+.solo-height-knob { position: absolute; left: 50%; top: 50%; width: 28px; height: 20px; transform: translate(-50%, -50%); border-radius: 999px; background: rgb(239, 250, 255); border: 2px solid rgb(143, 232, 255); box-shadow: rgba(0, 0, 0, 0.6) 0px 2px 10px; pointer-events: none; }
+.solo-height-up, .solo-height-hold, .solo-height-down { position: absolute !important; left: 50% !important; transform: translateX(-50%) !important; font: 800 6px / 1 system-ui, -apple-system, sans-serif !important; letter-spacing: 0.04em !important; color: rgb(217, 244, 255) !important; pointer-events: none !important; }
+.solo-height-up { top: 4px !important; }
+.solo-height-hold { top: 50% !important; transform: translate(-50%, -50%) !important; color: rgb(127, 240, 197) !important; }
+.solo-height-down { bottom: 4px !important; color: rgb(255, 194, 155) !important; }
+.solo-action { position: absolute; bottom: max(34px,calc(var(--solo-safe-bottom) + 18px)); pointer-events: auto; width: 86px; height: 52px; backdrop-filter: blur(8px); border-radius: 999px !important; font-weight: 900 !important; color: rgb(255, 255, 255) !important; border: 2px solid rgba(255, 255, 255, 0.333) !important; }
+body.solo-flight .solo-action:disabled { cursor: not-allowed; filter: saturate(0.72); opacity: 1 !important; }
+@keyframes startSimPulse { 
+  0%, 100% { box-shadow: rgba(99, 231, 184, 0.2) 0px 0px 0px 0px, rgba(50, 216, 154, 0.267) 0px 0px 10px; }
+  50% { box-shadow: rgba(99, 231, 184, 0.133) 0px 0px 0px 5px, rgba(50, 216, 154, 0.6) 0px 0px 26px; }
+}
+@keyframes armStartPulse { 
+  0%, 100% { box-shadow: rgba(99, 231, 184, 0.267) 0px 0px 0px 0px, rgba(50, 216, 154, 0.333) 0px 0px 12px; }
+  50% { box-shadow: rgba(99, 231, 184, 0.133) 0px 0px 0px 6px, rgba(50, 216, 154, 0.667) 0px 0px 30px; }
+}
+#camSolo.start-sim-cta { animation: 1.55s ease-in-out 0s infinite normal none running startSimPulse; transition: filter 0.14s, background 0.14s, border-color 0.14s, box-shadow 0.14s; background: rgb(23, 105, 79) !important; border-color: rgb(99, 231, 184) !important; color: rgb(255, 255, 255) !important; }
+#camSolo.start-sim-cta:hover, #camSolo.start-sim-cta:focus-visible { filter: brightness(1.14); outline: none; background: rgb(33, 136, 101) !important; border-color: rgb(178, 255, 227) !important; box-shadow: rgba(99, 231, 184, 0.2) 0px 0px 0px 4px, rgba(50, 216, 154, 0.8) 0px 0px 32px !important; }
+#soloArm { left: 50%; transform: translateX(-105%); transition: filter 0.14s, background 0.14s, border-color 0.14s, box-shadow 0.14s; background: rgba(23, 105, 79, 0.867) !important; }
+body.solo-flight #soloArm.arm-start-cta.attention:not(:disabled) { animation: 1.3s ease-in-out 0s infinite normal none running armStartPulse; border-color: rgb(127, 240, 197) !important; }
+body.solo-flight #soloArm:not(:disabled):hover, body.solo-flight #soloArm:not(:disabled):focus-visible { filter: brightness(1.16); outline: none; background: rgb(33, 136, 101) !important; border-color: rgb(194, 255, 234) !important; box-shadow: rgba(99, 231, 184, 0.2) 0px 0px 0px 4px, rgba(50, 216, 154, 0.8) 0px 0px 32px !important; }
+body.solo-flight #soloArm.arming, body.solo-flight #soloArm.armed { animation: auto ease 0s 1 normal none running none !important; }
+#soloKill { left: 50%; transform: translateX(5%); background: rgba(139, 36, 54, 0.9) !important; }
+#soloGamepadHelp { position: absolute; left: 50%; bottom: max(10px,var(--solo-safe-bottom)); transform: translateX(-50%); max-width: 94%; padding: 6px 10px; border: 1px solid rgba(112, 221, 255, 0.4); border-radius: 999px; background: rgba(7, 21, 34, 0.867); color: rgb(223, 247, 255); font: 800 9px / 1.1 system-ui, -apple-system, sans-serif; letter-spacing: 0.04em; white-space: nowrap; pointer-events: none; }
+body.solo-flight #viewport[data-gamepad-enabled="1"] .solo-stick, body.solo-flight #viewport[data-gamepad-enabled="1"] #soloClearance, body.solo-flight #viewport[data-gamepad-enabled="1"] .solo-action, body.solo-flight #viewport[data-control-source="xbox"] .solo-stick, body.solo-flight #viewport[data-control-source="xbox"] #soloClearance, body.solo-flight #viewport[data-control-source="xbox"] .solo-action { display: none !important; }
+@media (orientation: portrait) {
+  body.solo-flight #viewport { --solo-safe-top: env(safe-area-inset-right,0px); --solo-safe-right: env(safe-area-inset-bottom,0px); --solo-safe-bottom: env(safe-area-inset-left,0px); --solo-safe-left: env(safe-area-inset-top,0px); inset: 0px auto auto 100vw !important; width: 100dvh !important; height: 100vw !important; transform: rotate(90deg) !important; }
+  html.android-stable-webgl body.solo-flight #viewport { width: 100dvh !important; height: 100vw !important; }
+  body.solo-flight dialog[open] { transform: rotate(90deg); transform-origin: 50% 50%; }
+}
+@media (max-height: 430px) {
+  .solo-stick { width: min(30vw, 180px); }
+  .solo-action { width: 76px; height: 46px; }
+}
+body.solo-flight #cameraModes { display: none !important; }
+body.solo-flight #soloTopbar { top: max(5px,var(--solo-safe-top)); left: 50%; right: auto; width: min(calc(100% - max(16px,calc(var(--solo-safe-left) + var(--solo-safe-right)))),980px); transform: translateX(-50%); display: grid; grid-template-rows: auto auto; gap: 4px; min-width: 0px; overflow: visible; pointer-events: none; }
+body.solo-flight #viewport[data-world-mode="real"] #soloTopbar { left: max(8px,var(--solo-safe-left)); width: min(calc(100% - max(154px,calc(var(--solo-safe-right) + 146px))),920px); transform: none; }
+body.solo-flight #soloTopbarActions { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0px; padding: 4px; border: 1px solid rgba(124, 204, 251, 0.23); border-radius: 12px; background: linear-gradient(rgba(13, 33, 51, 0.91), rgba(7, 21, 34, 0.863)); box-shadow: rgba(0, 0, 0, 0.4) 0px 7px 22px, rgba(255, 255, 255, 0.07) 0px 1px inset; pointer-events: auto; }
+body.solo-flight #soloTopbarStatus { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 20px; min-width: 0px; pointer-events: none; }
+body.solo-flight #soloTopbar span, body.solo-flight #soloTopbar button { box-sizing: border-box; padding: 5px 8px; font-size: 10px; line-height: 1; border-radius: 8px; white-space: nowrap; }
+body.solo-flight #soloTopbar button { flex: 0 1 auto; min-width: 0px; min-height: 30px; align-items: center; justify-content: center; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.025em; display: inline-flex !important; }
+body.solo-flight #soloTopbarStatus > span { display: inline-flex; align-items: center; justify-content: center; flex: 0 1 auto; min-width: 0px; min-height: 20px; padding: 3px 7px; border-color: rgba(142, 205, 240, 0.176); background: rgba(7, 21, 34, 0.76); color: rgb(217, 239, 255); font-size: 9px; font-variant-numeric: tabular-nums; box-shadow: rgba(0, 0, 0, 0.267) 0px 3px 10px; }
+body.solo-flight #soloTopbar #soloState { color: rgb(189, 231, 255); }
+body.solo-flight #soloTopbar #soloAlt { color: rgb(112, 231, 181); }
+body.solo-flight #soloTopbar #soloExit { background: rgba(103, 37, 50, 0.875) !important; border-color: rgba(215, 111, 125, 0.467) !important; }
+body.solo-flight #soloTopbar #soloReset { background: rgba(112, 72, 25, 0.863) !important; border-color: rgba(225, 173, 97, 0.44) !important; }
+body.solo-flight #soloTopbar #soloCamera { margin-left: 0px !important; background: rgba(22, 76, 108, 0.867) !important; }
+body.solo-flight #soloTopbar #soloCamera, body.solo-flight #soloTopbar .phone-settings-button, body.solo-flight #soloTopbar #lanVsButton { min-width: 54px; }
+body.solo-flight #soloTopbar #vsCombatHud { display: inline-flex; align-items: center; justify-content: center; min-width: 112px; font-size: 9px; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
+body.solo-flight #soloTopbar #vsCombatHud[hidden] { display: none !important; }
+body.solo-flight #soloRaceHud { display: none !important; }
+body.solo-flight .solo-stick { width: min(25vw, 150px); bottom: max(20px,var(--solo-safe-bottom)); }
+body.solo-flight #soloLeft { left: max(12px,var(--solo-safe-left)); }
+body.solo-flight #soloRight { right: max(12px,var(--solo-safe-right)); }
+body.solo-flight .solo-stick span { bottom: -15px; font-size: 9px; }
+body.solo-flight #soloClearance { left: calc(max(12px,var(--solo-safe-left)) + min(25vw,150px) + 10px); right: auto; bottom: max(22px,calc(var(--solo-safe-bottom) + 8px)); transform: none; width: 48px; height: 132px; padding: 6px 3px; border-radius: 10px; overflow: visible; }
+body.solo-flight #soloClearance small { font-size: 6.5px; line-height: 1.05; letter-spacing: 0.04em; }
+body.solo-flight #soloClearance strong { font-size: 11px; }
+body.solo-flight #soloClearance span { font-size: 7px; }
+body.solo-flight .solo-height-pad { height: 72px; width: 58px; margin-left: -5px; margin-right: -5px; touch-action: none; overflow: hidden; }
+body.solo-flight .solo-action { bottom: max(22px,calc(var(--solo-safe-bottom) + 8px)); width: 104px; height: 44px; padding: 0px 10px; font-size: 12px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+@media (max-height: 340px) {
+  body.solo-flight #soloTopbar { top: max(3px,var(--solo-safe-top)); gap: 2px; }
+  body.solo-flight #soloTopbarActions { gap: 3px; padding: 3px; border-radius: 9px; }
+  body.solo-flight #soloTopbar span, body.solo-flight #soloTopbar button { padding: 4px 6px; font-size: 9px; border-radius: 6px; }
+  body.solo-flight #soloTopbar button { min-height: 25px; }
+  body.solo-flight #soloTopbar #soloCamera, body.solo-flight #soloTopbar .phone-settings-button, body.solo-flight #soloTopbar #lanVsButton { min-width: 46px; }
+  body.solo-flight #soloTopbar #vsCombatHud { min-width: 94px; font-size: 8px; padding-left: 5px; padding-right: 5px; }
+  body.solo-flight .solo-stick { width: min(22vw, 128px); bottom: max(16px,var(--solo-safe-bottom)); }
+  body.solo-flight .solo-stick span { bottom: -13px; font-size: 8px; }
+  body.solo-flight #soloClearance { left: calc(max(10px,var(--solo-safe-left)) + min(22vw,128px) + 8px); bottom: max(16px,var(--solo-safe-bottom)); width: 42px; height: 112px; padding: 5px 2px; }
+  body.solo-flight #soloClearance small { font-size: 5.8px; }
+  body.solo-flight #soloClearance strong { font-size: 10px; }
+  body.solo-flight #soloClearance span { font-size: 6.5px; }
+  body.solo-flight .solo-height-pad { height: 58px; width: 54px; margin-left: -6px; margin-right: -6px; }
+  body.solo-flight .solo-action { bottom: max(16px,var(--solo-safe-bottom)); width: 92px; height: 40px; padding: 0px 8px; font-size: 10px; }
+}
+@media (orientation: portrait) {
+  body.solo-flight .solo-stick { width: min(25%, 150px); }
+  body.solo-flight #soloClearance { left: calc(max(12px,var(--solo-safe-left)) + min(25%,150px) + 10px); }
+}
+@media (orientation: portrait) and (max-width: 340px) {
+  body.solo-flight #soloTopbar { top: max(3px,var(--solo-safe-top)); gap: 2px; }
+  body.solo-flight #soloTopbarActions { gap: 3px; padding: 3px; border-radius: 9px; }
+  body.solo-flight #soloTopbar span, body.solo-flight #soloTopbar button { padding: 4px 6px; font-size: 9px; border-radius: 6px; }
+  body.solo-flight #soloTopbar button { min-height: 25px; }
+  body.solo-flight #soloTopbar #soloCamera, body.solo-flight #soloTopbar .phone-settings-button, body.solo-flight #soloTopbar #lanVsButton { min-width: 46px; }
+  body.solo-flight #soloTopbar #vsCombatHud { min-width: 94px; font-size: 8px; padding-left: 5px; padding-right: 5px; }
+  body.solo-flight .solo-stick { width: min(22%, 128px); bottom: max(16px,var(--solo-safe-bottom)); }
+  body.solo-flight #soloClearance { left: calc(max(10px,var(--solo-safe-left)) + min(22%,128px) + 8px); bottom: max(16px,var(--solo-safe-bottom)); width: 42px; height: 112px; padding: 5px 2px; }
+  body.solo-flight #soloClearance small { font-size: 5.8px; }
+  body.solo-flight #soloClearance strong { font-size: 10px; }
+  body.solo-flight #soloClearance span { font-size: 6.5px; }
+  body.solo-flight .solo-height-pad { height: 58px; width: 54px; margin-left: -6px; margin-right: -6px; }
+  body.solo-flight .solo-action { bottom: max(16px,var(--solo-safe-bottom)); width: 92px; height: 40px; padding: 0px 8px; font-size: 10px; }
+}
+body.solo-flight #soloArmToolbar { align-items: center; justify-content: center; display: inline-flex !important; min-width: 68px !important; min-height: 30px !important; padding: 5px 10px !important; border-color: rgb(99, 231, 184) !important; background: rgb(23, 105, 79) !important; color: rgb(255, 255, 255) !important; font-weight: 900 !important; letter-spacing: 0.04em !important; }
+body.solo-flight #soloArmToolbar[data-state="armed"] { border-color: rgb(255, 135, 149) !important; background: rgb(125, 38, 53) !important; }
+body.solo-flight #soloArmToolbar[data-state="arming"] { border-color: rgb(255, 208, 109) !important; background: rgb(111, 84, 32) !important; }
+body.solo-flight #soloArmToolbar:disabled { opacity: 0.72 !important; }
+@media (max-height: 340px) {
+  body.solo-flight #soloArmToolbar { min-width: 58px !important; padding: 4px 7px !important; font-size: 9px !important; }
+}
+#vsEnemyMarker { position: absolute; z-index: 13; left: 0px; top: 0px; width: 82px; height: 46px; pointer-events: none; will-change: transform; filter: drop-shadow(rgba(0, 0, 0, 0.733) 0px 1px 2px); font-family: system-ui, -apple-system, sans-serif; text-align: center; color: rgb(255, 255, 255); transform-origin: 50% 50%; }
+#vsEnemyMarker[hidden] { display: none !important; }
+#vsEnemyMarker .vs-enemy-reticle { position: absolute; left: 50%; top: 30px; width: 20px; height: 20px; transform: translate(-50%, -50%); border: 1px solid rgba(255, 118, 95, 0.6); border-radius: 50%; box-shadow: rgba(255, 59, 34, 0.3) 0px 0px 5px; background: transparent; }
+#vsEnemyMarker .vs-enemy-reticle::before, #vsEnemyMarker .vs-enemy-reticle::after { content: ""; position: absolute; left: 50%; top: 50%; background: rgba(255, 118, 95, 0.667); transform: translate(-50%, -50%); }
+#vsEnemyMarker .vs-enemy-reticle::before { width: 28px; height: 1px; }
+#vsEnemyMarker .vs-enemy-reticle::after { width: 1px; height: 28px; }
+#vsEnemyMarker strong { position: absolute; left: 0px; right: 0px; top: 0px; font: 900 8px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.1em; color: rgb(255, 150, 126); text-shadow: rgb(0, 0, 0) 0px 1px 2px; }
+#vsEnemyMarker small { position: absolute; left: 0px; right: 0px; top: 11px; font: 750 7px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.02em; color: rgb(248, 248, 248); white-space: nowrap; text-shadow: rgb(0, 0, 0) 0px 1px 2px; }
+#vsEnemyMarker .vs-enemy-hp { position: absolute; left: 24px; right: 24px; top: 20px; height: 2px; border-radius: 2px; overflow: hidden; background: rgba(59, 8, 8, 0.533); }
+#vsEnemyMarker .vs-enemy-hp > b { display: block; width: 100%; height: 100%; transform-origin: left center; background: rgb(255, 105, 79); }
+#vsEnemyMarker .vs-enemy-pointer { display: none; position: absolute; left: 50%; top: 20px; margin-left: -5px; margin-top: -6px; font: 800 12px / 1 system-ui; color: rgb(255, 118, 95); text-shadow: rgb(0, 0, 0) 0px 1px 3px; transform-origin: 50% 50%; }
+#vsEnemyMarker.offscreen { width: 76px; height: 40px; }
+#vsEnemyMarker.offscreen .vs-enemy-reticle, #vsEnemyMarker.offscreen .vs-enemy-hp { display: none; }
+#vsEnemyMarker.offscreen .vs-enemy-pointer { display: block; }
+#vsEnemyMarker.offscreen strong { top: 22px; }
+#vsEnemyMarker.offscreen small { top: 31px; }
+#vsEnemyMarker.dead { opacity: 0.72; }
+#vsEnemyMarker.dead strong, #vsEnemyMarker.dead small { color: rgb(255, 192, 112); }
+#vsRespawnHud { position: absolute; z-index: 18; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: min(78vw, 330px); padding: 20px 24px; border-radius: 16px; border: 1px solid rgba(255, 90, 66, 0.733); background: rgba(19, 5, 4, 0.95); box-shadow: rgba(0, 0, 0, 0.867) 0px 12px 44px, rgba(255, 53, 27, 0.2) 0px 0px 34px; color: rgb(255, 255, 255); text-align: center; pointer-events: none; font-family: system-ui, -apple-system, sans-serif; }
+#vsRespawnHud[hidden] { display: none !important; }
+#vsRespawnHud strong { display: block; font: 950 29px / 0.95 system-ui, -apple-system, sans-serif; letter-spacing: 0.09em; color: rgb(255, 102, 80); text-shadow: rgba(255, 46, 29, 0.533) 0px 0px 16px; }
+#vsRespawnHud span { display: block; margin-top: 9px; font: 850 11px / 1.25 system-ui, -apple-system, sans-serif; letter-spacing: 0.1em; color: rgb(255, 255, 255); }
+#vsRespawnHud button { margin-top: 15px; min-width: 150px; padding: 11px 18px; border-radius: 999px; border: 1px solid rgb(255, 195, 182); background: rgb(213, 60, 39); color: rgb(255, 255, 255); font: 900 13px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.06em; pointer-events: auto; touch-action: manipulation; box-shadow: rgba(0, 0, 0, 0.533) 0px 5px 18px; }
+#vsRespawnHud button[hidden] { display: none !important; }
+#vsRespawnHud.enemy { top: 28%; min-width: min(56vw, 230px); padding: 10px 14px; background: rgba(9, 16, 24, 0.91); border-color: rgba(255, 116, 79, 0.4); box-shadow: rgba(0, 0, 0, 0.6) 0px 5px 20px; }
+#vsRespawnHud.enemy strong { font-size: 16px; }
+#vsRespawnHud.enemy span { font-size: 9px; margin-top: 5px; color: rgb(216, 225, 232); }
+#vsExplosionFlash { position: absolute; z-index: 15; inset: 0px; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgb(255, 246, 189) 0%, rgba(255, 122, 45, 0.333) 22%, rgba(255, 42, 22, 0) 67%); mix-blend-mode: screen; }
+#vsExplosionFlash.pulse { animation: 0.48s ease-out 0s 1 normal both running vsExplosionFlash; }
+#vsExplosionFlash.local { background: radial-gradient(circle, rgb(255, 255, 255) 0%, rgba(255, 76, 43, 0.6) 20%, rgba(168, 0, 0, 0.22) 58%, transparent 78%); }
+@keyframes vsExplosionFlash { 
+  0% { opacity: 0.92; }
+  35% { opacity: 0.46; }
+  100% { opacity: 0; }
+}
+@media (max-height: 340px) {
+  #vsEnemyMarker { width: 72px; height: 40px; }
+  #vsRespawnHud { padding: 14px 18px; }
+  #vsRespawnHud strong { font-size: 23px; }
+  #vsRespawnHud span { font-size: 9px; }
+  #vsRespawnHud button { margin-top: 10px; padding: 9px 16px; }
+}
+body.vs-multiplayer #vsEnemyMarker { display: none !important; }
+.vs-player-marker { --vs-player-color: #fff; --vpm-angle: 180deg; position: absolute; z-index: 14; left: 0px; top: 0px; display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif; filter: drop-shadow(rgba(0, 0, 0, 0.8) 0px 1px 2px); transform-origin: 50% 100%; will-change: transform; }
+.vs-player-marker .vpm-tag { display: flex; align-items: baseline; gap: 6px; padding: 3px 8px; border-radius: 8px; background: rgba(6, 11, 16, 0.72); border: 1.5px solid var(--vs-player-color); white-space: nowrap; }
+.vs-player-marker strong { font: 900 13px / 1 system-ui, -apple-system, sans-serif; letter-spacing: 0.06em; color: var(--vs-player-color); }
+.vs-player-marker small { font-style: normal; font-variant: tabular-nums; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-weight: 800; font-stretch: normal; font-size: 11.5px; line-height: 1; font-family: system-ui, -apple-system, sans-serif; opacity: 0.92; }
+.vs-player-marker .vpm-hp { display: block; width: 44px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.19); overflow: hidden; }
+.vs-player-marker .vpm-hp u { display: block; height: 100%; background: var(--vs-player-color); }
+.vs-player-marker .vpm-arrow { order: 3; width: 0px; height: 0px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 12px solid var(--vs-player-color); }
+.vs-player-marker.offscreen { transform-origin: 50% 50%; }
+.vs-player-marker.offscreen .vpm-hp { display: none; }
+.vs-player-marker.offscreen .vpm-arrow { position: absolute; left: 50%; top: 50%; margin: -6px 0px 0px -9px; transform: rotate(var(--vpm-angle)) translateY(30px); }
+.vs-player-marker.offscreen .vpm-tag { border-radius: 999px; }
+.vs-player-marker.near .vpm-tag small { display: none; }
+.vs-player-marker.dead { filter: grayscale(1) drop-shadow(rgba(0, 0, 0, 0.8) 0px 1px 2px); opacity: 0.75; }
+.phone-settings-button { white-space: nowrap; }
+.phone-settings-dialog { width: min(92vw, 390px) !important; max-height: calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom))) !important; overflow: hidden auto !important; overscroll-behavior: contain !important; scrollbar-gutter: stable !important; touch-action: pan-y !important; border: 1px solid rgba(255, 255, 255, 0.267) !important; border-radius: 14px !important; background: rgba(11, 20, 32, 0.957) !important; color: rgb(255, 255, 255) !important; padding: 16px !important; box-shadow: rgba(0, 0, 0, 0.667) 0px 20px 70px !important; }
+.phone-settings-dialog::backdrop { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px); }
+.phone-settings-titlebar { position: sticky; top: -16px; z-index: 8; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -16px -16px 10px; padding: 14px 14px 10px 16px; background: linear-gradient(rgb(11, 20, 32) 72%, rgba(11, 20, 32, 0.91) 88%, rgba(11, 20, 32, 0)); }
+.phone-settings-dialog h3 { margin: 0px; font: 800 17px system-ui, -apple-system, sans-serif; }
+.phone-settings-close-top { flex: 0 0 auto; width: 40px; height: 40px; border: 1px solid rgba(255, 255, 255, 0.333); border-radius: 10px; background: rgb(22, 36, 55); color: rgb(255, 255, 255); font: 900 18px / 1 system-ui, -apple-system, sans-serif; }
+.phone-settings-dialog :is(button, input, select, textarea):focus-visible { outline: rgb(107, 228, 176) solid 3px !important; outline-offset: 3px !important; }
+.camera-settings-section, .world-settings-section { margin-top: 18px; padding-top: 4px; border-top: 2px solid rgba(255, 255, 255, 0.17); }
+.camera-settings-section h4, .world-settings-section h4 { margin: 12px 0px 4px; font: 850 14px system-ui, -apple-system, sans-serif; letter-spacing: 0.08em; color: rgb(107, 228, 176); }
+.phone-settings-dialog p { margin: 0px 0px 14px; color: rgb(174, 189, 208); font: 12px / 1.4 system-ui, -apple-system, sans-serif; }
+.phone-settings-profile { display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; align-items: center; margin: 2px 0px 16px; padding: 11px 12px; border: 1px solid rgba(107, 228, 176, 0.267); border-radius: 10px; background: rgb(14, 28, 42); }
+.phone-settings-profile label { font: 850 12px system-ui, -apple-system, sans-serif; letter-spacing: 0.06em; color: rgb(159, 240, 203); }
+.phone-settings-profile select { min-width: 148px; border: 1px solid rgba(255, 255, 255, 0.267); border-radius: 8px; background: rgb(22, 36, 55); color: rgb(255, 255, 255); padding: 8px 9px; font: 850 12px system-ui, -apple-system, sans-serif; }
+.phone-settings-profile p { grid-column: 1 / 3; margin: 0px !important; color: rgb(145, 165, 188) !important; }
+.phone-settings-row { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; align-items: center; margin: 15px 0px; }
+.phone-settings-row label { font: 750 13px system-ui, -apple-system, sans-serif; }
+.phone-settings-row output { font: 900 13px ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 40px; text-align: right; }
+.phone-settings-row input[type="range"] { grid-column: 1 / 3; width: 100%; accent-color: rgb(107, 228, 176); }
+.phone-settings-scale { grid-column: 1 / 3; display: flex; justify-content: space-between; color: rgb(130, 149, 173); font: 800 9px system-ui, -apple-system, sans-serif; letter-spacing: 0.08em; margin-top: -3px; }
+.phone-settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0px 8px; padding: 10px 0px; border-top: 1px solid rgba(255, 255, 255, 0.133); border-bottom: 1px solid rgba(255, 255, 255, 0.133); font: 750 13px system-ui, -apple-system, sans-serif; }
+.phone-settings-toggle input { width: 22px; height: 22px; accent-color: rgb(107, 228, 176); }
+.phone-settings-toggle.fullscreen-inactive { opacity: 0.52; }
+.phone-settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-bottom: max(2px,env(safe-area-inset-bottom)); }
+.phone-settings-actions button, .world-settings-actions button { border: 1px solid rgba(255, 255, 255, 0.267); border-radius: 9px; background: rgb(22, 36, 55); color: rgb(255, 255, 255); padding: 8px 12px; font-weight: 800; }
+.phone-settings-note { font-size: 11px !important; color: rgb(143, 161, 184) !important; }
+.world-settings-section label { font: 750 13px system-ui, -apple-system, sans-serif; display: block; margin: 12px 0px 6px; }
+.world-settings-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0px; }
+.world-settings-actions [data-world-use] { background: rgb(23, 95, 73); border-color: rgb(46, 155, 119); }
+.world-settings-status { padding: 9px 10px; margin: 8px 0px 10px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 9px; background: rgb(7, 16, 26); color: rgb(157, 176, 201); font: 750 11px / 1.35 system-ui, -apple-system, sans-serif; }
+body.solo-flight #soloTopbar .world-mode-button { flex: 0 0 auto; min-width: 54px; min-height: 28px; align-items: center; justify-content: center; white-space: nowrap; display: inline-flex !important; }
+body.solo-flight #soloTopbar .world-mode-button[data-active="1"] { background: rgb(23, 95, 73) !important; border-color: rgb(98, 214, 170) !important; color: rgb(255, 255, 255) !important; }
+body.solo-flight #soloTopbar .world-mode-button[data-loading="1"] { background: rgb(123, 90, 24) !important; border-color: rgb(255, 208, 109) !important; }
+@media (max-height: 340px) {
+  .phone-settings-dialog { max-height: calc(-10px + 100dvh) !important; padding: 12px !important; }
+  .phone-settings-titlebar { top: -12px; margin: -12px -12px 8px; padding: 9px 10px 7px 12px; }
+  .phone-settings-close-top { width: 36px; height: 36px; }
+  body.solo-flight #soloTopbar .world-mode-button { min-width: 48px; min-height: 24px; font-size: 10px; padding: 4px 7px; }
+}
+.flight-logbook-dialog { width: min(96vw, 720px); max-height: 90dvh; overflow: auto; border: 1px solid rgba(255, 255, 255, 0.267); border-radius: 14px; background: rgba(11, 20, 32, 0.97); color: rgb(255, 255, 255); padding: 16px; box-shadow: rgba(0, 0, 0, 0.733) 0px 20px 70px; }
+.flight-logbook-dialog::backdrop { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); }
+.flight-logbook-dialog h3 { margin: 0px 0px 4px; }
+.flight-logbook-dialog h4 { margin: 14px 0px 6px; font: 900 10px system-ui; letter-spacing: 0.12em; color: rgb(143, 232, 255); }
+.flight-logbook-dialog > p { color: rgb(158, 176, 198); font: 12px / 1.4 system-ui; }
+.flight-logbook-list, .network-logbook-list { display: grid; gap: 8px; }
+.flight-logbook-empty { padding: 18px; border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 10px; color: rgb(145, 164, 186); text-align: center; font: 800 12px system-ui; }
+.flight-log-entry, .network-log-entry { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.145); border-radius: 10px; background: rgb(16, 29, 43); }
+.flight-log-entry strong, .network-log-entry strong { font: 850 12px system-ui; }
+.flight-log-entry time, .network-log-entry time { font: 750 10px ui-monospace, monospace; color: rgb(145, 167, 188); }
+.flight-log-entry .stats, .network-log-entry .stats { grid-column: 1 / 3; color: rgb(199, 213, 227); font: 700 10px / 1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
+.flight-log-entry .reason, .network-log-entry .reason { font: 850 9px system-ui; color: rgb(255, 208, 109); letter-spacing: 0.04em; }
+.network-log-entry.good { border-color: rgba(92, 230, 168, 0.267); }
+.network-log-entry.bad { border-color: rgba(255, 102, 119, 0.333); }
+.network-log-entry .stats { color: rgb(185, 216, 233); }
+body.solo-flight #soloLogbook { background: rgba(38, 59, 81, 0.867) !important; }
+#viewport { touch-action: none; overscroll-behavior: none; }
+.flight-fire-impact { position: absolute; z-index: 11; width: 13px; height: 13px; margin: -6.5px 0px 0px -6.5px; border-radius: 50%; border: 1px solid rgb(255, 247, 194); background: radial-gradient(circle, rgb(255, 249, 190) 0px, rgb(255, 249, 190) 16%, rgb(255, 191, 85) 22%, rgba(255, 109, 53, 0.667) 42%, transparent 68%); box-shadow: rgb(255, 177, 74) 0px 0px 12px; pointer-events: none; display: none; }
+.flight-fire-impact.active { display: block; animation: 0.26s ease-out 0s 1 normal forwards running flightImpactFade; }
+.xbox-crosshair { display: none; position: absolute; z-index: 12; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px; border: 1px solid rgba(234, 252, 255, 0.8); border-radius: 50%; pointer-events: none; filter: drop-shadow(rgb(71, 207, 255) 0px 0px 4px); box-shadow: rgba(7, 21, 34, 0.333) 0px 0px 0px 4px inset; }
+.xbox-crosshair::before, .xbox-crosshair::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.xbox-crosshair::before { width: 38px; height: 1px; background: linear-gradient(90deg, rgb(234, 255, 255) 0px, rgb(234, 255, 255) 38%, transparent 38%, transparent 62%, rgb(234, 255, 255) 62%); }
+.xbox-crosshair::after { width: 1px; height: 38px; background: linear-gradient(rgb(234, 255, 255) 0px, rgb(234, 255, 255) 38%, transparent 38%, transparent 62%, rgb(234, 255, 255) 62%); }
+.xbox-crosshair.active { display: block; }
+.xbox-crosshair.hit-confirm { animation: 0.14s ease-out 0s 1 normal none running combatHitConfirm; border-color: rgb(255, 239, 239); filter: drop-shadow(rgb(255, 88, 77) 0px 0px 7px); }
+.combat-damage-vignette { position: absolute; inset: 0px; z-index: 13; pointer-events: none; opacity: 0; background: radial-gradient(circle, transparent 42%, rgba(213, 0, 0, 0.063) 61%, rgba(255, 22, 22, 0.49) 100%); }
+.combat-damage-vignette.active { animation: 0.34s ease-out 0s 1 normal none running combatDamagePulse; }
+@keyframes flightImpactFade { 
+  0% { opacity: 1; transform: scale(0.65); }
+  100% { opacity: 0; transform: scale(1.55); }
+}
+@keyframes combatHitConfirm { 
+  0% { transform: scale(1); }
+  35% { transform: scale(0.72); }
+  100% { transform: scale(1); }
+}
+@keyframes combatDamagePulse { 
+  0% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+#airStrikeButton { position: absolute; z-index: 22; left: calc(max(12px,var(--solo-safe-left,env(safe-area-inset-left))) + min(25vw,148px)*.5 - 29px); bottom: calc(max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,148px) + 18px); width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.733); background: rgba(13, 17, 24, 0.72); color: rgb(255, 255, 255); font: 800 10px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; touch-action: none; pointer-events: auto; overflow: hidden; }
+#airStrikeButton span { font-size: 20px; line-height: 1; }
+body.air-strike-targeting #airStrikeButton { z-index: 41; border-color: rgb(255, 58, 42); background: rgba(58, 13, 8, 0.88); }
+#airStrikeTargeting { position: fixed; inset: 0px; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0px; padding: 0px; border: 0px; background: transparent; z-index: 40; cursor: crosshair; touch-action: none; color: rgb(255, 255, 255); font-family: Inter, system-ui, sans-serif; }
+#airStrikeTargeting::backdrop { background: transparent !important; }
+html body #airStrikeTargeting, html body #airStrikeTargeting[open] { background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; border: 0px !important; outline: none !important; }
+#airStrikeTargeting b { position: absolute; left: 50%; top: max(58px, 9%); transform: translateX(-50%); font: 900 13px / 1 Inter, sans-serif; letter-spacing: 0.16em; color: rgb(255, 74, 58); text-shadow: rgb(0, 0, 0) 0px 1px 3px, rgb(0, 0, 0) 0px 0px 8px; }
+#airStrikeTargeting small { position: absolute; left: 50%; top: calc(18px + max(58px, 9%)); transform: translateX(-50%); font: 600 12px / 1.2 Inter, sans-serif; opacity: 0.85; white-space: nowrap; text-shadow: rgb(0, 0, 0) 0px 1px 3px; }
+#airStrikeTargeting .as-actions { position: absolute; left: 50%; bottom: calc(max(18px,env(safe-area-inset-bottom)) + 12px); transform: translateX(-50%); display: flex; gap: 12px; }
+#airStrikeTargeting .as-actions button { pointer-events: auto; min-width: 58px; height: 48px; padding: 0px 18px; border-radius: 24px; border: 2px solid rgba(255, 255, 255, 0.667); background: rgba(13, 17, 24, 0.816); color: rgb(255, 255, 255); font: 900 14px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.08em; touch-action: none; }
+#airStrikeTargeting .as-actions button[data-a="go"] { opacity: 0.45; border-color: rgb(255, 58, 42); }
+#airStrikeTargeting.placed .as-actions button[data-a="go"] { opacity: 1; background: rgba(163, 23, 13, 0.847); }
+#airStrikeButton[data-ready="0"] { opacity: 0.55; }
+#airStrikeButton::after { content: ""; position: absolute; left: 0px; bottom: 0px; height: 3px; width: var(--cool,100%); background: rgb(255, 122, 26); }
+body.player-driving #airStrikeButton { display: none; }
+#jetHud { display: none; position: absolute; inset: 0px; z-index: 31; pointer-events: none; font-family: Inter, system-ui, sans-serif; color: rgb(255, 255, 255); }
+body.jet-mode #jetHud { display: block; }
+html body.jet-mode #viewport #mobileGameplayMode.hud-mode-switch, html body.jet-mode #mobileGameplayMode, html body.jet-mode #soloLeft, html body.jet-mode #soloRight, html body.jet-mode #soloClearance, html body.jet-mode .solo-action, html body.jet-mode #vehicleHud, html body.jet-mode #airStrikeButton, html body.jet-mode #enterCarButton, html body.jet-mode #zombieRepair, html body.jet-mode #viewport #footHud #footWeaponToggle, html body.jet-mode #viewport #footWeaponToggle, html body.jet-mode #droneWeaponToggle, html body.jet-mode #viewport #footHud #footJump, html body.jet-mode #viewport #mobileGameplayDock #mobileGameplayWeapon, html body.jet-mode #viewport #mobileGameplayDock #mobileGameplayMode, html body.jet-mode #playerModeButton { display: none !important; }
+#jetHud .jet-btns [data-a="mode"] { border-color: rgb(127, 211, 255); }
+#jetHud .jet-btns [data-a="mode"][data-flight="1"] { background: rgba(29, 76, 107, 0.88); }
+#jetHud { --hud: #7dff9a; --hud-dim: #7dff9a99; }
+#jetHud .jet-svg { position: absolute; inset: 0px; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+#jetHud .jet-svg line, #jetHud .jet-svg circle { stroke: var(--hud); stroke-width: 1.4; fill: none; vector-effect: non-scaling-stroke; }
+#jetHud .jet-city-line { stroke-dasharray: 6, 7; opacity: 0.55; }
+#jetHud .jet-city-dot { fill: var(--hud) !important; opacity: 0.8; }
+#jetHud .jet-fpm { opacity: 0.85; }
+#jetHud .jet-city { position: absolute; left: 50%; top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 50px); transform: translateX(-50%); text-align: center; color: var(--hud); text-shadow: rgba(0, 0, 0, 0.8) 0px 0px 4px, rgb(0, 0, 0) 0px 1px 2px; pointer-events: none; white-space: nowrap; }
+#jetHud .jet-city b { display: block; font: 700 13px / 1.1 "Barlow Condensed", Inter, system-ui, sans-serif; letter-spacing: 0.22em; }
+#jetHud .jet-city small { display: block; font: 600 10px / 1.2 Inter, system-ui, sans-serif; letter-spacing: 0.12em; opacity: 0.75; }
+#jetHud .jet-read { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 3px; color: var(--hud); font: 700 13px / 1 "Barlow Condensed", Inter, system-ui, sans-serif; letter-spacing: 0.06em; text-shadow: rgba(0, 0, 0, 0.8) 0px 0px 4px, rgb(0, 0, 0) 0px 1px 2px; pointer-events: none; }
+#jetHud .jet-read b[data-k="spd"], #jetHud .jet-read b[data-k="alt"] { font-size: 22px; padding: 3px 6px; border: 1.3px solid var(--hud-dim); border-radius: 3px; min-width: 54px; text-align: center; }
+#jetHud .jet-read small { font: 700 9px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.14em; opacity: 0.7; }
+#jetHud .jet-left { left: calc(max(12px,var(--solo-safe-left,env(safe-area-inset-left))) + min(25vw,148px) + 52px); align-items: flex-end; text-align: right; }
+#jetHud .jet-right { right: calc(max(12px,var(--solo-safe-right,env(safe-area-inset-right))) + min(25vw,148px) + 26px); align-items: flex-start; }
+#jetHud [data-k="mach"][data-super="1"] { color: rgb(255, 210, 122); }
+#jetHud [data-k="hp"][data-low="1"] { color: rgb(255, 106, 90); }
+#jetHud [data-k="aoa"][data-high="1"] { color: rgb(255, 210, 122); }
+#jetHud .jet-mode-row { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 52px); color: var(--hud); font: 700 12px / 1 "Barlow Condensed", Inter, system-ui, sans-serif; letter-spacing: 0.18em; text-shadow: rgba(0, 0, 0, 0.8) 0px 0px 4px; pointer-events: none; }
+body.jet-mode #navGuide { top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 88px); }
+html body.jet-mode #viewport #worldLookHud { opacity: 0.8; }
+#jetHud .jet-thr { position: absolute; left: calc(max(12px,var(--solo-safe-left,env(safe-area-inset-left))) + min(25vw,148px) + 26px); bottom: calc(max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 8px); width: 12px; height: min(25vw, 148px); border-radius: 6px; background: rgba(13, 17, 24, 0.72); border: 1.5px solid rgba(255, 255, 255, 0.533); overflow: hidden; }
+#jetHud .jet-thr i { position: absolute; left: 0px; right: 0px; bottom: 0px; height: 0px; background: linear-gradient(rgb(255, 122, 26), rgb(244, 210, 122) 25%, rgb(143, 160, 173)); }
+#jetHud .jet-thr span { display: none; }
+#jetHud .jet-btns { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))); display: flex; gap: 8px; pointer-events: auto; }
+#jetHud .jet-btns button { height: 40px; min-width: 60px; padding: 0px 10px; border-radius: 10px; border: 1.5px solid rgba(125, 255, 154, 0.533); background: rgba(8, 20, 12, 0.753); color: rgb(201, 255, 214); font: 900 12px / 1 Inter; letter-spacing: 0.08em; touch-action: none; }
+#jetHud .jet-btns [data-a="rocket"][data-armed="1"] { background: rgba(101, 64, 11, 0.91); border-color: rgb(255, 227, 118); color: rgb(255, 240, 168); box-shadow: rgba(255, 189, 84, 0.376) 0px 0px 0px 2px; }
+#jetHud .jet-btns [data-a="rocket"][data-ready="0"] { opacity: 0.8; }
+body.jet-chute #jetHud .jet-btns, body.jet-chute #jetHud .jet-read, body.jet-chute #jetHud .jet-thr, body.jet-chute #jetHud .jet-svg { display: none !important; }
+#jetHud [data-a="exit"] { position: absolute; top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 55px); left: max(8px,var(--solo-safe-left,env(safe-area-inset-left))); right: auto; height: 38px; min-width: 84px; z-index: 40; background: rgba(65, 24, 17, 0.85); color: rgb(255, 229, 216); border: 1.5px solid rgb(255, 90, 74); border-radius: 10px; pointer-events: auto; touch-action: none; }
+#jetHud [data-a="exit"][data-holding="1"] { background: rgb(178, 73, 39); border-color: rgb(255, 221, 170); box-shadow: rgba(255, 187, 136, 0.6) 0px 0px 0px 2px; }
+body.jet-passenger :is(#footHud, #soloLeft, #soloRight, #vehicleHud, #footMove, #footFire) { display: none !important; }
+body.jet-passenger #enterJetButton { display: block !important; }
+#enterJetButton { position: absolute; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(max(14px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 118px); min-width: 170px; height: 46px; padding: 0px 18px; border-radius: 14px; font: 900 15px / 1 Nunito, "Trebuchet MS", system-ui, sans-serif; letter-spacing: 0.06em; color: rgb(15, 36, 51); background: rgb(127, 211, 255); border: 2.5px solid rgb(255, 255, 255); box-shadow: rgb(45, 134, 181) 0px 4px 0px; pointer-events: auto; touch-action: manipulation; }
+body.jet-mode #enterJetButton { display: none !important; }
+html body.mobile-gameplay-compact.solo-flight:not(.desktop-input) #viewport #enterJetButton { left: auto !important; right: max(12px,var(--solo-safe-right,env(safe-area-inset-right))) !important; transform: none !important; bottom: calc(max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,150px) + 56px) !important; min-width: 54px !important; width: 54px !important; height: 54px !important; padding: 0px !important; border-radius: 50% !important; font: 900 24px / 1 system-ui, -apple-system, sans-serif !important; }
+@media (max-height: 340px) {
+  html body.mobile-gameplay-compact.solo-flight:not(.desktop-input) #viewport #enterJetButton { bottom: calc(max(18px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,150px) + 27px) !important; }
+}
+html body.jet-mode #viewport #footHud #footFire { display: block !important; pointer-events: auto !important; }
+#zombieHud { position: absolute; inset: 0px; pointer-events: none; z-index: 19; font-family: Inter, system-ui, sans-serif; color: rgb(255, 255, 255); }
+#zombieHud[hidden] { display: none; }
+#zombieHud .zh-round { position: absolute; left: max(14px,var(--solo-safe-left,env(safe-area-inset-left))); bottom: calc(max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,148px) + 90px); font: 900 34px / 1 "Barlow Condensed", Inter, sans-serif; color: rgb(179, 18, 27); text-shadow: rgb(0, 0, 0) 0px 2px 0px, rgba(255, 0, 0, 0.267) 0px 0px 12px; letter-spacing: 0.04em; }
+#zombieHud .zh-points { position: absolute; right: max(14px,var(--solo-safe-right,env(safe-area-inset-right))); bottom: calc(max(16px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + min(25vw,148px) + 96px); font: 800 20px / 1 Inter, sans-serif; color: rgb(244, 210, 122); text-shadow: rgb(0, 0, 0) 0px 2px 0px; }
+#zombieHud .zh-banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font: 900 28px / 1.1 "Barlow Condensed", Inter, sans-serif; letter-spacing: 0.12em; color: rgb(232, 226, 208); text-shadow: rgb(0, 0, 0) 0px 2px 6px; opacity: 0; transition: opacity 0.6s; text-align: center; white-space: nowrap; }
+#zombieHud .zh-banner[data-on="1"] { opacity: 1; }
+#zombieRepair { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(14px,var(--solo-safe-bottom,env(safe-area-inset-bottom))) + 120px); height: 44px; padding: 0px 18px; border-radius: 12px; border: 2px solid rgb(244, 210, 122); background: rgba(26, 20, 8, 0.88); color: rgb(244, 210, 122); font: 900 14px / 1 Inter, sans-serif; letter-spacing: 0.08em; pointer-events: auto; display: none; }
+#zombieRepair[data-show="1"] { display: block; }
+#sandboxHud { position: absolute; inset: 0px; z-index: 9; pointer-events: none; font-family: Inter, system-ui, -apple-system, sans-serif; }
+#sandboxHud .sb-score { position: absolute; left: max(14px,var(--solo-safe-left,env(safe-area-inset-left))); top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 82px); font-weight: 700; font-size: clamp(17px, 2.6vw, 24px); letter-spacing: 0.08em; color: rgb(242, 244, 247); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 3px; }
+#sandboxHud .sb-flow { position: absolute; left: max(14px,var(--solo-safe-left,env(safe-area-inset-left))); top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 112px); display: flex; align-items: center; gap: 6px; color: rgb(242, 244, 247); font-weight: 600; font-size: 10px; letter-spacing: 0.18em; text-shadow: rgba(0, 0, 0, 0.6) 0px 1px 2px; }
+#sandboxHud .sb-flow i { display: block; width: 70px; height: 4px; border-radius: 2px; background: rgba(10, 13, 18, 0.5); overflow: hidden; box-shadow: none; }
+#sandboxHud .sb-flow b { display: block; height: 100%; width: 0px; background: rgb(245, 179, 1); transition: width 0.15s linear; }
+#sandboxHud .sb-flow em { color: rgb(245, 179, 1); font-style: normal; text-shadow: rgba(0, 0, 0, 0.6) 0px 1px 2px; min-width: 2.2em; }
+#sandboxHud .sb-pops { position: absolute; left: 0px; right: 0px; top: 40%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#sandboxHud .sb-pop { font-weight: 700; font-size: clamp(15px, 2.6vw, 24px); letter-spacing: 0.16em; animation: 1.5s ease-out 0s 1 normal forwards running sbPop; white-space: nowrap; }
+#sandboxHud .sb-pop.pink { color: rgb(242, 244, 247); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 4px; }
+#sandboxHud .sb-pop.cyan { color: rgb(159, 211, 255); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 4px; }
+#sandboxHud .sb-pop.red { color: rgb(255, 106, 90); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 4px; }
+#sandboxHud .sb-pop.gold { color: rgb(245, 179, 1); text-shadow: rgba(0, 0, 0, 0.7) 0px 1px 4px; }
+body.solo-flight.vs-multiplayer #sandboxHud .sb-score, body.solo-flight.vs-multiplayer #sandboxHud .sb-flow { display: none !important; }
+@media (max-width: 380px) and (orientation: portrait) {
+  body.solo-flight #sandboxHud .sb-flow { top: calc(max(8px,var(--solo-safe-top,env(safe-area-inset-top))) + 104px); }
+}
+@media (max-height: 340px) and (pointer: coarse) {
+  body.solo-flight #sandboxHud .sb-score, body.solo-flight #sandboxHud .sb-flow { display: none !important; }
+}
+@keyframes sbPop { 
+  0% { opacity: 0; transform: scale(1.25); }
+  10% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+#handGrenadeBtn { position: absolute; z-index: 23; display: none; width: 64px; height: 64px; margin: 0px; padding: 0px; border: 0px; background: rgba(28, 36, 20, 0.847); color: rgb(233, 242, 216); touch-action: none; box-shadow: rgba(0, 0, 0, 0.467) 0px 6px 16px; flex-direction: column; align-items: center; justify-content: center; gap: 0px; user-select: none; border-radius: 50% !important; }
+#handGrenadeBtn.show { display: flex; }
+#handGrenadeBtn svg { position: absolute; inset: 0px; width: 100%; height: 100%; transform: rotate(-90deg); }
+#handGrenadeBtn .ring { fill: none; stroke: rgba(255, 255, 255, 0.333); stroke-width: 3; }
+#handGrenadeBtn .fuse { fill: none; stroke: rgb(255, 138, 42); stroke-width: 4; stroke-dasharray: 182.2; stroke-dashoffset: 182.2; }
+#handGrenadeBtn b { font: 900 20px / 1 system-ui, sans-serif; color: rgb(125, 143, 78); position: relative; }
+#handGrenadeBtn small { font: 800 7.5px / 1 system-ui, sans-serif; letter-spacing: 0.08em; position: relative; margin-top: 2px; }
+#handGrenadeBtn i { position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: rgb(255, 215, 106); color: rgb(17, 17, 17); font: 900 11px / 18px system-ui, sans-serif; text-align: center; }
+#handGrenadeBtn.cooking { background: rgba(58, 28, 12, 0.91); transform: scale(1.08); }
+#handGrenadeBtn.cooking b { color: rgb(255, 255, 255); font-size: 22px; }
+#handGrenadeBtn.empty { opacity: 0.45; }
+#handGrenadeBtn.urgent { animation: 0.25s ease 0s infinite alternate none running hgPulse; }
+@keyframes hgPulse { 
+  100% { box-shadow: rgba(255, 59, 31, 0.533) 0px 0px 0px 6px; }
+}
+#jetpackFuel { position: absolute; left: 50%; bottom: calc(max(64px,env(safe-area-inset-bottom) + 56px)); transform: translateX(-50%); width: 120px; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.533); border: 1px solid rgba(255, 255, 255, 0.267); z-index: 24; pointer-events: none; opacity: 0; transition: opacity 0.25s; }
+#jetpackFuel.show { opacity: 1; }
+#jetpackFuel i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, rgb(255, 138, 58), rgb(255, 212, 106)); width: 100%; }
+#jetpackFuel.thrust i { background: linear-gradient(90deg, rgb(255, 90, 42), rgb(255, 240, 160)); }
+#streetVoiceBubbles { position: absolute; inset: 0px; pointer-events: none; z-index: 12; overflow: hidden; }
+#streetVoiceBubbles div { position: absolute; left: 0px; top: 0px; transform: translate(-50%, -100%); padding: 4px 9px; border-radius: 10px; background: rgba(255, 255, 255, 0.94); color: rgb(17, 17, 17); font: 800 12px / 1.2 Inter, system-ui, sans-serif; white-space: nowrap; box-shadow: rgba(0, 0, 0, 0.4) 0px 3px 10px; transition: opacity 0.35s; }
+#streetVoiceBubbles div::after { content: ""; position: absolute; left: 50%; bottom: -6px; margin-left: -6px; border-width: 6px 6px 0px; border-top-style: solid; border-right-style: solid; border-left-style: solid; border-right-color: transparent; border-left-color: transparent; border-image: initial; border-bottom-style: initial; border-bottom-color: initial; border-top-color: rgba(255, 255, 255, 0.94); }
+#streetVoiceBubbles div.angry, #streetVoiceBubbles div.nearmiss { background: rgba(255, 226, 220, 0.95); color: rgb(122, 13, 0); }
+#streetVoiceBubbles div.angry::after, #streetVoiceBubbles div.nearmiss::after { border-top-color: rgba(255, 226, 220, 0.95); }
+#quitConfirmDialog { position: fixed; inset: 0px; z-index: 99; display: flex; align-items: center; justify-content: center; background: transparent; pointer-events: auto; }
+#quitConfirmDialog .qc-box { background: rgba(17, 21, 27, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 14px; padding: 18px 22px; color: rgb(255, 255, 255); font: 600 14px / 1.4 Inter, system-ui, sans-serif; min-width: 260px; text-align: center; box-shadow: rgba(0, 0, 0, 0.667) 0px 12px 40px; }
+#quitConfirmDialog b { display: block; font: 900 17px / 1.2 Inter, system-ui, sans-serif; letter-spacing: 0.08em; margin-bottom: 12px; }
+#quitConfirmDialog .qc-row { display: flex; gap: 12px; justify-content: center; }
+#quitConfirmDialog button { min-width: 104px; height: 46px; border-radius: 10px; border: 0px; font: 900 15px / 1 Inter, system-ui, sans-serif; letter-spacing: 0.06em; cursor: pointer; }
+#quitConfirmDialog [data-yes] { background: rgb(255, 122, 26); color: rgb(17, 17, 17); }
+#quitConfirmDialog [data-no] { background: rgb(42, 48, 56); color: rgb(255, 255, 255); }
+#quitConfirmDialog button:focus-visible, body.pad-input #quitConfirmDialog button:focus { outline: rgb(255, 215, 106) solid 3px; outline-offset: 2px; }
+#quitConfirmDialog small { display: block; margin-top: 10px; opacity: 0.7; font-size: 11px; }
