@@ -443,6 +443,33 @@ json::Value Studio::trainer_command(const std::string& name, const json::Value& 
     if (!start_stage(TrainerStage::pose, stage, duck) || !world_->set_walker_pose_edit(duck, true)) return error("The Lehrer's stage could not start");
     return ok();
   }
+  if (name == "trainerPreview") {
+    // A recovered network is previewed on a temporary stage, never written
+    // into the currently open level or its undo history.
+    const std::string kind = str("kind");
+    if (kind != "motion" && kind != "jump") return error("This task has no motion preview");
+    std::string bytes;
+    game::WalkerPolicy net;
+    if (!json::base64_decode(str("onnx"), bytes) ||
+        !game::parse_onnx_policy(Span<const u8>(reinterpret_cast<const u8*>(bytes.data()), bytes.size()), net) ||
+        net.dims.empty() || net.dims.front() != 61 || net.dims.back() != 14)
+      return error("The network is not one the robot runs");
+    const f64 duration = kind == "jump" ? game::kJumpSeconds : num("duration", -1);
+    if (!std::isfinite(duration) || duration < kMotionMinSeconds || duration > kMotionMaxSeconds)
+      return error("Invalid preview duration");
+    MotionAsset asset;
+    asset.name = "lehrer_preview";
+    asset.duration = static_cast<f32>(duration);
+    asset.onnx = std::make_shared<const std::string>(std::move(bytes));
+    ActorId duck = 0;
+    const game::Level stage = test_stage(duck, {asset});
+    if (!start_stage(TrainerStage::test, stage, duck)) return error("The Lehrer's stage could not start");
+    const std::string why = world_->walker_skill(duck, asset.name);
+    if (!why.empty()) return error(why);
+    t.testing = asset.name;
+    touch();
+    return ok();
+  }
   if (name == "trainerTest") {
     // The duck on the ground, as an episode of its training starts: it runs the learned move.
     const std::string move = str("move");

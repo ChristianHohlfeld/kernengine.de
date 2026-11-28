@@ -1,8 +1,8 @@
 # Lehrer: MAG als optionaler Trainingsrechner
 
-Im Lehrer unter **Training → Rechenbackend** ist **Lokal** bei jedem Öffnen der Seite vorausgewählt.
+Im Lehrer unter **Training → Rechenbackend** ist **Lokal** für neue Trainings vorausgewählt. Bei hinterlegter MAG-Adresse wird beim Öffnen geprüft, ob ein bestehender Trainingslauf übernommen werden muss.
 Das lokale WASM-Training, die Keyframes, die Aufgaben, das Level und der ONNX-Import bleiben unverändert.
-Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird einmalig auf dem Gerät gespeichert; danach bleiben die Verbindungseinstellungen eingeklappt. Kein Anwendungstoken; die Zugriffsberechtigung liegt vollständig bei Tailscale. Kein automatischer Wechsel und kein CPU-Fallback bei einem HIP-Fehler.
+Nur bei MAG wird eine private HTTPS-Verbindung benutzt. Die Adresse wird einmalig auf dem Gerät gespeichert; danach bleiben die Verbindungseinstellungen eingeklappt. Kein Anwendungstoken; die Zugriffsberechtigung liegt vollständig bei Tailscale. Keine automatische Umleitung eines neuen lokalen Trainings auf MAG und kein CPU-Fallback bei einem HIP-Fehler.
 
 ## Installation auf MAG (Ubuntu, Benutzer chris)
 
@@ -88,9 +88,14 @@ Bei unvollständiger Wiederherstellung startet kein neuer Job; prüfen:
 **nur nachdem der Trainer beendet ist**. Bei Neustart des Servers sind vorher eingefrorene
 Prozesse ohnehin beendet; der Checkpoint bleibt unter /var/lib/kern-lehrer/jobs.
 
-Die Browser-Verbindung darf unterbrochen werden. Mit "Mit MAG wiederverbinden" kann der
-aktuelle Lauf auch nach Tab-Neuladen kontrolliert werden; aus Sicherheitsgründen wird dann
-nur der Download angeboten, keine automatische Übernahme in ein möglicherweise anderes Level.
+Die Browser-Verbindung darf unterbrochen werden. Beim Öffnen des Lehrers, nach Tab-Neuladen
+und bei Rückkehr aus dem Hintergrund wird ein bestehender MAG-Lauf anhand des Serverzustands
+automatisch wiedergefunden. Ein Reload sendet weder einen Start- noch einen Stoppbefehl.
+Eine zuvor ausdrücklich angeforderte Beendigung wird ausschließlich für dieselbe Job-ID
+erneut zugestellt, falls nötig. Ein wiederverbundener Lauf übernimmt Fortschritt und Steuerung;
+der Download ist verfügbar, aber kein automatischer Import in ein möglicherweise anderes Level.
+"Mit MAG wiederverbinden" bleibt für eine manuelle Abfrage verfügbar. Ohne laufenden Job bleibt
+Lokal die Voreinstellung. Der Server liefert den letzten Fortschrittsstand, nicht die gesamte Kurvenhistorie.
 Ein Neustart des Dienstes setzt einen laufenden Job nicht automatisch fort. Ein Checkpoint
 enthält den Lernzustand, nicht jeden laufenden Physikzustand; keine bitgleiche Fortsetzung
 nach Prozessneustart versprechen.
@@ -107,3 +112,40 @@ Ressourcensperren, Pause, Resume, Stopp, Ergebnisübertragung und Wiederherstell
 Auf MAG zusätzlich: je ein kurzer Stand- und Keyframe-Lauf mit CPU/GPU-Lastmessung,
 ONNX-Import im Studio und Nachweis der wiederhergestellten MAG-Dienste. Kein Live-Release
 der HIP-Integration ohne diesen Hardwaretest.
+
+
+### Portable Trainings-Checkpoints (Lokal und MAG)
+
+Der Lehrer bietet **Checkpoint herunterladen** und **Checkpoint hochladen**.
+`.onnx` bleibt ein separates Format für die Wiedergabe. Die Datei
+`.kernckpt` enthält das ONNX-Netz des gespeicherten Zustands, den PPO-Lerner
+inklusive Adam und Normalisierung, Zufallszustände, Imitationsdaten, alle
+laufenden Physikepisoden, Trainingsparameter und bisherige Fortschrittswerte.
+Die Datei besitzt eine versionierte Struktur und SHA-256-Prüfsummen für
+Metadaten und Nutzdaten (Integrität, keine Signatur).
+
+Lokal wird nach jeder vollständig abgeschlossenen Iteration beziehungsweise
+Imitationsrunde atomar in IndexedDB gespeichert. MAG schreibt dieselbe
+Trainingsgrenze mit atomarem Dateiaustausch und fsync; die gewöhnliche
+ONNX-Vorschau und Evaluation behalten ihren eigenen Rhythmus. Der Export
+liest ausschließlich eine vollständig veröffentlichte Checkpoint-Version.
+Ein Stopp oder Reload löscht sie nicht. Unvollständige Iterationen werden
+bei Fortsetzung wiederholt.
+
+Ein Import darf keine vorhandenen lokalen Checkpoints oder laufenden
+MAG-Jobs überschreiben. Das Hochladen setzt den gespeicherten Lauf mit
+denselben Parametern fort, bzw. öffnet ein abgeschlossenes Ergebnis.
+Ein verlorener HTTP-Response wird mit derselben Upload-ID behandelt.
+Die Vorschau der wiederhergestellten Sprung- und Keyframe-Netze verändert
+das aktuelle Level nicht.
+
+Portable Wiederaufnahme ist innerhalb desselben Backends mit derselben
+kompatiblen Version möglich. Ein lokaler Import führt niemals aus der Datei
+stammenden WASM-Code aus; der SHA-256-Hash des vertrauenswürdigen aktuellen
+WASM muss stimmen. MAG verlangt den ursprünglichen Build und dieselbe
+Worker-Anzahl. Wechsel Lokal ↔ MAG und Migration auf andere Builds sind
+nicht als bitgenau unterstützt. ONNX allein ist kein Trainingscheckpoint.
+Alte unvollständige MAG-Checkpoints können nicht nachträglich zu exakten
+Checkpoints rekonstruiert werden. Bei einem MAG-Dienstabsturz wird der
+unterbrochene Job angezeigt; der vollständige Checkpoint kann exportiert
+und erneut importiert werden, ohne einen laufenden Job vorzutäuschen.

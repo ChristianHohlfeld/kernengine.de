@@ -1,5 +1,6 @@
 // The Lehrer's environment: one Micro Duck in its own headless GameWorld (see env.h).
 #include "kern/lehrer/env.h"
+#include "kern/lehrer/checkpoint.h"
 
 #include <cmath>
 #include <cstring>
@@ -46,6 +47,12 @@ i32 DuckEnv::push_interval() {
 }
 
 void DuckEnv::reset() {
+  if (checkpoint_enabled_) {
+    reset_rng_ = rng_.state;
+    reset_progress_ = training_progress_;
+    reset_push_scale_ = push_scale;
+    replay_progress_.clear(); replay_push_.clear(); replay_actions_.clear();
+  }
   const Task::Start s = task_->reset(rng_);
   game::Level l = impl_->base;
   task_->scene(l, rng_);  // fresh deterministic obstacles / objects for each episode
@@ -124,6 +131,11 @@ Env::Step DuckEnv::step(const f32* action) {
   game::GameWorld& w = *impl_->world;
   std::memcpy(previous_action_, last_action_, sizeof previous_action_);
   for (i32 j = 0; j < kActions; ++j) last_action_[j] = std::isfinite(action[j]) ? action[j] : 0.0f;
+  if (checkpoint_enabled_) {
+    replay_progress_.push_back(training_progress_);
+    replay_push_.push_back(push_scale);
+    replay_actions_.insert(replay_actions_.end(),last_action_,last_action_+kActions);
+  }
   w.set_walker_action(duck_, last_action_);
   // One control tick: the fixed steps until the next one is due (4 at the walker rate).
   i32 guard = 0;
@@ -144,6 +156,61 @@ Env::Step DuckEnv::step(const f32* action) {
   return_ += r.reward;
   observe();
   return r;
+}
+
+// Rebuild the live solver/controller/task state by replaying the current
+// episode from its exact pre-reset seed and curriculum. No physics state is
+// approximated and no previous completed episode needs replaying.
+std::vector<u8> DuckEnv::save_episode() const {
+  if (!checkpoint_enabled_) return {};
+  checkpoint::Writer w;
+  w.scalar(u32{1}); w.scalar(reset_rng_); w.scalar(reset_progress_); w.scalar(reset_push_scale_);
+  w.scalar(training_progress_); w.scalar(push_scale); w.scalar(rng_.state); w.scalar(return_);
+  w.vector(replay_progress_); w.vector(replay_push_); w.vector(replay_actions_);
+  w.vector(obs_); w.vector(critic_);
+  return std::move(w.bytes);
+}
+
+bool DuckEnv::load_episode(const u8* data, std::size_t size) {
+  checkpoint::Reader r{data,size};
+  u32 version=0; u64 seed=0, expected_rng=0;
+  i32 initial=-1, current=-1;
+  f32 initial_push=0, current_push=0, expected_return=0;
+  std::vector<i32> progress;
+  std::vector<f32> pushes, actions, obs, critic;
+  const auto max=static_cast<std::size_t>(max_steps_);
+  if (!r.scalar(version) || version!=1 || !r.scalar(seed) || !r.scalar(initial) ||
+      !r.scalar(initial_push) || !r.scalar(current) || !r.scalar(current_push) ||
+      !r.scalar(expected_rng) || !r.scalar(expected_return) ||
+      !r.vector(progress,max) || !r.vector(pushes,max) || !r.vector(actions,max*kActions) ||
+      !r.vector(obs,kObs) || !r.vector(critic,critic_.size()) || !r.end() ||
+      pushes.size()!=progress.size() || actions.size()!=progress.size()*kActions ||
+      obs.size()!=obs_.size() || critic.size()!=critic_.size() || initial < -1 || current < initial ||
+      !std::isfinite(initial_push) || !std::isfinite(current_push)) return false;
+  for(std::size_t i=0;i<progress.size();++i)
+    if(progress[i]<initial || progress[i]>current || (i && progress[i]<progress[i-1]) ||
+       !std::isfinite(pushes[i]))return false;
+  for(f32 a:actions)if(!std::isfinite(a))return false;
+  auto apply=[&](i32 iteration,f32 push){
+    if(iteration>=0 && iteration!=training_progress_)task_->progress(iteration);
+    training_progress_=iteration;push_scale=push;
+  };
+  // This method is called only on a fresh environment with the same task.
+  if(training_progress_!=-1)return false;
+  checkpoint_enabled_=true;
+  rng_.state=seed;
+  apply(initial,initial_push);
+  reset();
+  for(std::size_t i=0;i<progress.size();++i){
+    apply(progress[i],pushes[i]);
+    const Step result=step(actions.data()+i*kActions);
+    if(result.terminal||result.timeout)return false;
+  }
+  apply(current,current_push);
+  return rng_.state==expected_rng &&
+    std::memcmp(&return_,&expected_return,sizeof(f32))==0 &&
+    std::memcmp(obs_.data(),obs.data(),obs.size()*sizeof(f32))==0 &&
+    std::memcmp(critic_.data(),critic.data(),critic.size()*sizeof(f32))==0;
 }
 
 }  // namespace kern::lehrer

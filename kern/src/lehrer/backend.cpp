@@ -1,5 +1,6 @@
 // Backends (backend.h): where rollouts are collected and the update's parallel work runs.
 #include "kern/lehrer/backend.h"
+#include "kern/lehrer/checkpoint.h"
 
 namespace kern::lehrer {
 
@@ -32,6 +33,32 @@ void ThreadBackend::collect(const Policy& policy, i32 steps, i32 iteration, std:
       for (Env* e : g.ptrs) prepare_(*e, iteration);
     g.collector.collect(g.ptrs, steps, policy, out[static_cast<std::size_t>(w)]);  // its group, on this thread
   });
+}
+
+std::vector<u8> ThreadBackend::save() const {
+  checkpoint::Writer w;w.scalar(u32{1});w.scalar(static_cast<u32>(groups_.size()));
+  for(const Group& g:groups_){
+    w.scalar(static_cast<u32>(g.envs.size()));w.vector(g.collector.save());
+    for(const auto& e:g.envs){
+      const auto state=e->save_episode();if(state.empty())return {};
+      w.vector(state);
+    }
+  }
+  return std::move(w.bytes);
+}
+bool ThreadBackend::load(const u8* data,std::size_t size) {
+  checkpoint::Reader r{data,size};
+  u32 version=0,n=0;
+  if(!r.scalar(version)||version!=1||!r.scalar(n)||n!=groups_.size())return false;
+  std::vector<u8> bytes;
+  for(Group& g:groups_){
+    if(!r.scalar(n)||n!=g.envs.size()||!r.vector(bytes,size)||
+       !g.collector.load(bytes.data(),bytes.size(),n))return false;
+    for(auto& e:g.envs){
+      if(!r.vector(bytes,size)||!e->load_episode(bytes.data(),bytes.size()))return false;
+    }
+  }
+  return r.end();
 }
 
 IterationStats train_iteration(Ppo& ppo, Backend& backend) {

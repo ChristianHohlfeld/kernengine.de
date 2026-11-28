@@ -15,6 +15,111 @@ const TRAINER_LEGACY = "kern-lehrer.motion-skills.v1";
 /** Set once taking those into a level was offered. */
 const TRAINER_OFFERED = "kern-studio.lehrer-import.v1";
 
+// Each committed checkpoint contains all workers at one common barrier.
+// Store the exact WASM binary once, in the same transaction as the first state.
+function localCheckpoint(mode, action) {
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open("kern-lehrer-checkpoint",1);
+    req.onupgradeneeded=()=>req.result.createObjectStore("state");
+    req.onerror=()=>reject(req.error);
+    req.onblocked=()=>reject(Error("Local checkpoint database is blocked"));
+    req.onsuccess=()=>{
+      const db=req.result;
+      let tx, result;
+      try {
+        tx=db.transaction("state",mode,mode==="readwrite"?{durability:"strict"}:{});
+        result=action(tx.objectStore("state"));
+      }catch(error){db.close();reject(error);return;}
+      tx.oncomplete=()=>{db.close();resolve(result());};
+      tx.onabort=()=>{db.close();reject(tx.error||Error("Local checkpoint transaction aborted"));};
+      tx.onerror=()=>{}; // abort is authoritative
+    };
+  });
+}
+function readLocalCheckpoint() {
+  return localCheckpoint("readonly",store=>{
+    const current=store.get("current"),wasm=store.get("wasm");
+    return ()=>current.result?{record:current.result,wasm:wasm.result}:null;
+  });
+}
+function writeLocalCheckpoint(record,wasm) {
+  return localCheckpoint("readwrite",store=>{
+    if(wasm)store.put(wasm,"wasm");
+    store.put(record,"current");
+    return ()=>undefined;
+  });
+}
+function clearLocalCheckpoint() {
+  return localCheckpoint("readwrite",store=>{store.clear();return ()=>undefined;});
+}
+const CHECKPOINT_MAGIC = new TextEncoder().encode("KERNCP1\n");
+const CHECKPOINT_MAX = 512*1024*1024;
+const hashBytes=async bytes=>new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+function frameCheckpoint(buffers){
+  const total=buffers.reduce((sum,b)=>sum+8+b.byteLength,0);
+  if(total>CHECKPOINT_MAX)throw Error("Checkpoint too large");
+  const out=new Uint8Array(total),view=new DataView(out.buffer);
+  let at=0;
+  for(const b of buffers){view.setBigUint64(at,BigInt(b.byteLength),true);at+=8;out.set(new Uint8Array(b),at);at+=b.byteLength;}
+  return out;
+}
+function unframeCheckpoint(payload,count){
+  const view=new DataView(payload.buffer,payload.byteOffset,payload.byteLength),out=[];
+  let at=0;
+  for(let i=0;i<count;i++){
+    if(at+8>payload.length)throw Error("Truncated checkpoint");
+    const n=view.getBigUint64(at,true);at+=8;
+    if(n>BigInt(payload.length-at))throw Error("Invalid checkpoint section");
+    out.push(payload.slice(at,at+Number(n)).buffer);at+=Number(n);
+  }
+  if(at!==payload.length)throw Error("Unexpected checkpoint data");
+  return out;
+}
+async function encodeCheckpoint(meta,payload){
+  const header=new TextEncoder().encode(JSON.stringify({...meta,sha256:hex(await hashBytes(payload))}));
+  const size=12+header.length+payload.length+32;
+  if(size>CHECKPOINT_MAX||header.length>8*1024*1024)throw Error("Checkpoint too large");
+  const out=new Uint8Array(size);
+  out.set(CHECKPOINT_MAGIC);new DataView(out.buffer).setUint32(8,header.length,true);
+  out.set(header,12);out.set(payload,12+header.length);
+  out.set(await hashBytes(out.subarray(0,size-32)),size-32);
+  return out;
+}
+async function decodeCheckpoint(bytes){
+  if(bytes.length<44||bytes.length>CHECKPOINT_MAX||CHECKPOINT_MAGIC.some((v,i)=>bytes[i]!==v))
+    throw Error("Select a complete .kernckpt file, not a standalone ONNX network.");
+  const end=bytes.length-32,hash=await hashBytes(bytes.subarray(0,end));
+  if(hash.some((v,i)=>v!==bytes[end+i]))throw Error("Checkpoint checksum mismatch");
+  const n=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(8,true);
+  if(n<1||n>8*1024*1024||12+n>=end)throw Error("Invalid checkpoint header");
+  const meta=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes.subarray(12,12+n)));
+  const payload=bytes.subarray(12+n,end);
+  if(!meta||meta.schema!==1||meta.sha256!==hex(await hashBytes(payload)))throw Error("Invalid checkpoint metadata");
+  return {meta,payload};
+}
+function validLocalRecord(r){
+  const integer=(n,min,max)=>Number.isInteger(n)&&n>=min&&n<=max;
+  return r && r.schema===1 && typeof r.token==="string" && r.token.length<=128 &&
+    ["motion","jump","stand","scenario"].includes(r.task) && typeof r.name==="string" && r.name.length<=16384 &&
+    (r.name===r.task||r.name.startsWith(r.task+":")) && typeof r.label==="string" && r.label.length<=256 &&
+    integer(r.count,1,64)&&integer(r.envs,1,256)&&integer(r.total,1,100000)&&
+    integer(r.seed,1,4294967295)&&integer(r.iteration,0,r.total)&&
+    r.config && typeof r.config==="object" && Object.keys(r.config).every(k=>
+      ["initStd","learningRate"].includes(k)&&Number.isFinite(r.config[k])&&r.config[k]>0&&r.config[k]<=1) &&
+    Array.isArray(r.history)&&r.history.length<=r.iteration&&r.history.every(p=>integer(p.it,1,r.iteration)&&Number.isFinite(p.ret)&&Number.isFinite(p.len));
+}
+function acquireLocalLease() {
+  if(!navigator.locks)throw Error("Local resumable training requires browser Web Locks support.");
+  return new Promise((resolve,reject)=>{
+    navigator.locks.request("kern-lehrer-local-training",{ifAvailable:true},lock=>{
+      if(!lock){reject(Error("Local training is open in another tab."));return;}
+      return new Promise(release=>resolve(release));
+    }).catch(reject);
+  });
+}
+
+
 // A Lehrer worker: one Kern module (kern_lehrer.wasm) per worker. A worker is a collector (its own
 // ducks, the policy it is handed, returns rollouts) or the learner (PPO).
 const TRAINER_WORKER = `
@@ -98,6 +203,19 @@ self.onmessage = async ({ data: m }) => {
       const stats = JSON.parse(kern.string(statsPtr, kern.exports.kern_lehrer_result_length()));
       const policy = policyBuffer();
       self.postMessage({ type: "learned", stats, policy }, [policy]);
+    } else if (m.type === "save-state") {
+      const ptr = m.learner ? kern.exports.kern_lehrer_save_learner() : kern.exports.kern_lehrer_save_collector();
+      const state = resultBytes(ptr);
+      if(!state)throw Error("Checkpoint capture failed");
+      self.postMessage({type:"saved-state",state:state.buffer},[state.buffer]);
+    } else if (m.type === "load-state") {
+      const ok=withBytes(new Uint8Array(m.state),(p,n)=>m.learner?
+        kern.exports.kern_lehrer_load_learner(p,n):kern.exports.kern_lehrer_load_collector(p,n));
+      if(!ok)throw Error("Checkpoint could not be restored exactly");
+      if(m.learner) {
+        const policy=policyBuffer();
+        self.postMessage({type:"restored-state",policy,left:kern.exports.kern_lehrer_imitation_left()},[policy]);
+      }else self.postMessage({type:"restored-state"});
     } else if (m.type === "export") {
       const onnx = resultBytes(kern.exports.kern_lehrer_export_onnx());
       self.postMessage({ type: "onnx", onnx: onnx.buffer }, [onnx.buffer]);
@@ -234,6 +352,9 @@ export class Trainer {
     this.history = [];        // the curve of the last run
     this.texts = new WeakMap();
     this.el = null;
+    this.remoteProbeTimer = null;
+    this.localSaved = null;
+    this.localBusy = false;
   }
 
   /** Sets an element's text when it changed (the page's translation rewrites text nodes: no needless writes). */
@@ -255,7 +376,7 @@ export class Trainer {
     const cores = Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
     const stats = TRAINER_STATS.map(([id, label]) => `<div class="tr-stat" data-stat="${id}"><b>-</b><span>${label}</span></div>`).join("");
     this.host.innerHTML =
-      sec("task", "Task", field("Teach", `<select class="sel" id="trTask">${TRAINER_TASKS.map(([id, label]) => `<option value="${id}">${escHtml(tr(label))}</option>`).join("")}</select>`)) +
+      sec("task", "Task", field("Teach", `<select class="sel" id="trTask">${TRAINER_TASKS.map(([id, label]) => `<option value="${id}">${escHtml(tr(label))}</option>`).join("")}</select>`) + '<p class="tr-note" id="trRecoveredTask" hidden></p>') +
       sec("motion", "Motion from keyframes",
         field("Name", `<input class="txt" id="trName" maxlength="38" spellcheck="false" autocomplete="off">`) +
         field("Length", num("trDuration"), "s") +
@@ -287,8 +408,12 @@ export class Trainer {
         field("MAG URL", '<input class="txt" id="trRemoteUrl" type="url" placeholder="https://mag.…ts.net:8444" spellcheck="false" autocomplete="off">') + `</details>` +
         `<div class="tr-buttons"><button class="btn small" id="trReconnect" type="button">Reconnect to MAG</button></div></div>` +
         `<div class="tr-buttons"><button class="btn go" id="trStart" type="button">Start</button><button class="btn" id="trPause" type="button">Pause</button><button class="btn" id="trStop" type="button">Stop</button></div>` +
+        `<div class="tr-buttons" id="trLocalRecovery" hidden><button class="btn small" id="trLocalResume" type="button">Continue saved training</button><button class="btn small" id="trLocalDiscard" type="button">Discard checkpoint</button></div>` +
+        `<p class="tr-note" id="trLocalSaved"></p>` +
         `<div class="tr-status" id="trStatus"></div><div class="tr-bar"><i id="trProgress"></i></div>` +
         `<div class="tr-buttons"><button class="btn small" id="trTest" type="button">Try the network on the duck</button><button class="btn small" id="trDownload" type="button">Download .onnx</button></div>` +
+        `<div class="tr-buttons"><button class="btn small" id="trCheckpointDownload" type="button">Download checkpoint</button><button class="btn small" id="trCheckpointUpload" type="button">Upload checkpoint</button><input id="trCheckpointFile" type="file" accept=".kernckpt" hidden></div>` +
+        `<p class="tr-note">ONNX is for playback; a checkpoint contains the complete training state.</p>` +
         `<div class="tr-status tr-saved" id="trNote"></div>` +
         `<div class="grp">Expert settings</div>` +
         field("Workers", num("trWorkers", Math.min(cores, 8))) + field("Ducks per worker", num("trEnvs", 8)) + field("Iterations", num("trIterations", 1500)) + field("Seed", num("trSeed", 1)) +
@@ -300,7 +425,7 @@ export class Trainer {
       sec("help", "How it works",
         `<p class="tr-note">A motion from keyframes is learned in two steps: first the network imitates the poses you set, played through the servos under gravity; then it practices with PPO and all the variations (masses, centers of mass, servos, sensors) until it holds the motion on its own. The jump imitates a demonstration that a search (CMA-ES) found in the same physics. At run time there is only the network.</p>` +
         `<p class="tr-note">Each worker runs its own ducks in Kern's engine (the same servos, sensors and the same 50 Hz controller as in the viewport) and acts with the current policy. The learner collects their steps and improves the policy with PPO, the recipe Pollen Robotics uses to train the robot's networks. The result is an ONNX file in the format of Pollen's networks; Kern Studio and the robot itself can load it.</p>` +
-        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local training is the default and does not contact MAG. CPU determinism is tested; HIP is a separate native build.</p>` +
+        `<p class="tr-note">Local training needs the tab open. MAG runs on the server and uses its available CPU threads and HIP GPUs. Local is the default for new training. If a MAG address was saved, the Lehrer checks for an existing job when opened; reloading the page never stops or starts a remote job. CPU determinism is tested; HIP is a separate native build.</p>` +
         `<p class="tr-note">Every 25 iterations the newest network goes into the level: a motion is a move the Blueprint node Robot Move plays by its name, a jump network is the level's own "jump". They are saved with the level, and a packaged or exported game has them.</p>`, true);
     this.bar.innerHTML = `<div class="tr-pose"><span class="dim">Keyframe at</span>${num("trTime")}<span class="dim">s</span>` +
       `<button class="btn primary" id="trCapture" type="button">+ Keyframe</button><button class="btn" id="trHome" type="button">Home pose</button></div>` +
@@ -309,8 +434,15 @@ export class Trainer {
     for (const node of [...this.host.querySelectorAll("[id]"), ...this.bar.querySelectorAll("[id]")]) el[node.id] = node;
     try { el.trRemoteUrl.value = localStorage.getItem("kern-lehrer.remote-url") || ""; } catch { /* storage blocked */ }
     el.trRemoteAddress.open = !el.trRemoteUrl.value;
-    el.trCompute.onchange = () => this.sync();
+    el.trCompute.onchange = () => {
+      clearTimeout(this.remoteProbeTimer);
+      this.remoteProbeTimer = null;
+      this.sync();
+      if (el.trCompute.value === "mag" && el.trRemoteUrl.value.trim()) void this.reconnectRemote({automatic:true});
+    };
     el.trReconnect.onclick = () => void this.reconnectRemote();
+    el.trLocalResume.onclick = () => void this.resumeLocal();
+    el.trLocalDiscard.onclick = () => void this.discardLocal();
     this.setScenario(TRAINER_SCENARIO);
     el.scName.value = tr(TRAINER_SCENARIO.name);
     this.wire();
@@ -370,12 +502,18 @@ export class Trainer {
     };
     el.trHome.onclick = () => command({cmd: "trainerStage"});
     el.trPosing.onclick = () => command({cmd: "trainerStage"});
-    el.trAgain.onclick = () => { if (this.s?.testing) command({cmd: "trainerTest", move: this.s.testing}); };
+    el.trAgain.onclick = () => { if (this.s?.testing === "lehrer_preview") this.previewNetwork(); else if (this.s?.testing) command({cmd: "trainerTest", move: this.s.testing}); };
     el.trStart.onclick = () => this.start();
     el.trPause.onclick = () => this.pause();
     el.trStop.onclick = () => this.stop();
-    el.trTest.onclick = () => { if (this.onnx?.move) command({cmd: "trainerTest", move: this.onnx.move}); };
+    el.trTest.onclick = () => this.previewNetwork();
     el.trDownload.onclick = () => { if (this.onnx) trainerDownload(`${this.onnx.name}_kern.onnx`, this.onnx.bytes, "application/octet-stream"); };
+    el.trCheckpointDownload.onclick=()=>void this.downloadCheckpoint();
+    el.trCheckpointUpload.onclick=()=>el.trCheckpointFile.click();
+    el.trCheckpointFile.onchange=()=>{
+      const file=el.trCheckpointFile.files?.[0];el.trCheckpointFile.value="";
+      if(file)void this.uploadCheckpoint(file);
+    };
     el.scExample.onclick = () => { this.setScenario(TRAINER_SCENARIO); el.scName.value = tr(TRAINER_SCENARIO.name); };
     el.scApply.onclick = () => {
       try { this.setScenario(JSON.parse(el.scJson.value)); this.status("Scenario loaded."); }
@@ -399,11 +537,17 @@ export class Trainer {
       } catch (error) { this.status(error.message, true); }
     };
     addEventListener("resize", () => this.draw());
+    // Android may suspend polling in the background. On return, discover
+    // the server's current job again if no run is attached.
+    addEventListener("online", () => this.discoverRemote());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this.discoverRemote();
+    });
   }
 
   /** The engine's state changed (every Studio panel is drawn from it). */
   render(s) {
-    const open = !!s.trainer;
+    const open = !!s.trainer, wasOpen = !!this.s;
     this.s = s.trainer || null;
     this.motions = s.motions || [];
     this.editable = open || s.play.state === "editing";
@@ -422,17 +566,25 @@ export class Trainer {
     button.classList.toggle("on", open);
     if (open && !this.el) { this.build(); this.statusText = `Ready. ${navigator.hardwareConcurrency || "?"} cores on this device.`; }
     if (this.el) this.sync();
+    if (open && !wasOpen) {
+      void this.refreshLocal();
+      this.discoverRemote();
+    }
   }
 
   /** Brings the panel and the bar in step with the engine's state and the run. */
   sync() {
     const el = this.el, s = this.s, run = this.run;
     if (!el) return;
-    const open = !!s, task = this.task, motion = s?.motion;
+    const open = !!s, task = run?.task ?? this.task, motion = s?.motion;
     el.trTask.value = task;
     el.trTask.disabled = !!run;
-    this.host.querySelector('[data-tsec="motion"]').hidden = task !== "motion";
-    this.host.querySelector('[data-tsec="scenario"]').hidden = task !== "scenario";
+    this.host.querySelector('[data-tsec="motion"]').hidden = task !== "motion" || !!run?.recovered;
+    if(el.trRecoveredTask) {
+      el.trRecoveredTask.hidden=!run?.recovered;
+      this.text(el.trRecoveredTask,run?.recovered ? "Recovered training: "+(run.label||run.task) : "");
+    }
+    this.host.querySelector('[data-tsec="scenario"]').hidden = task !== "scenario" || !!run?.recovered;
     if (motion) {
       if (document.activeElement !== el.trName) el.trName.value = motion.name;
       if (document.activeElement !== el.trDuration) el.trDuration.value = motion.duration;
@@ -452,20 +604,32 @@ export class Trainer {
     // The run.
     const remoteSelected = el.trCompute.value === "mag";
     el.trRemoteSettings.hidden = !remoteSelected;
-    el.trCompute.disabled = !!run;
+    el.trCompute.disabled = !!run || !!this.checkpointBusy;
     el.trRemoteUrl.disabled = !!run || !remoteSelected;
     el.trReconnect.disabled = !!run || !remoteSelected;
     el.trWorkers.disabled = !!run || remoteSelected;
-    el.trStart.disabled = !!run;
-    el.trPause.disabled = !run || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
-    el.trStop.disabled = !run || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
+    for(const id of ["trEnvs","trIterations","trSeed","trInitStd","trLr"])if(el[id])el[id].disabled=!!run;
+    el.trStart.disabled = !!run || !!this.localBusy || !!this.checkpointBusy || (!remoteSelected && !!this.localSaved);
+    if(el.trLocalRecovery){
+      el.trLocalRecovery.hidden=remoteSelected || !this.localSaved || !!run;
+      el.trLocalResume.disabled=!!run || !!this.localBusy || !!this.checkpointBusy;
+      el.trLocalDiscard.disabled=!!run || !!this.localBusy || !!this.checkpointBusy;
+      this.text(el.trLocalResume,this.localSaved?.iteration===this.localSaved?.total?"Open saved result":"Continue saved training");
+      this.text(el.trLocalSaved,!remoteSelected && this.localSaved ? "Saved checkpoint: iteration "+this.localSaved.iteration+" / "+this.localSaved.total : "");
+    }
+    el.trPause.disabled = !run || !!run.localStopping || !!(run.remote && (!run.remote.id || run.remote.busy || run.remote.stopping || !["running", "paused"].includes(run.remote.state)));
+    el.trStop.disabled = !run || !!run?.localStopping || !!run?.remote?.stopping || !!(run?.remote?.busy && !run.remote.id);
     this.text(el.trPause, run?.paused ? "Resume" : "Pause");
     el.trDownload.disabled = !this.onnx;
-    el.trTest.disabled = !this.onnx?.move || !open;
+    if(el.trCheckpointDownload){
+      el.trCheckpointDownload.disabled=!!this.checkpointBusy || (remoteSelected?!(run?.remote?.id||this.lastRemoteResult):!this.localSaved);
+      el.trCheckpointUpload.disabled=!!run||!!this.localBusy||!!this.checkpointBusy;
+    }
+    el.trTest.disabled = !(this.onnx?.preview || this.onnx?.move) || !open;
     this.text(el.trStatus, this.statusText);
     el.trStatus.classList.toggle("err", this.statusError);
     this.text(el.trNote, this.note);
-    el.trProgress.style.width = run ? `${Math.min(100, 100 * run.iteration / run.total).toFixed(1)}%` : this.onnx ? "100%" : "0";
+    el.trProgress.style.width = run ? `${Math.min(100, 100 * run.iteration / run.total).toFixed(1)}%` : this.lastProgress != null ? this.lastProgress + "%" : "0";
     const shown = run?.task ?? this.onnx?.task ?? task;
     for (const tile of this.host.querySelectorAll("[data-stat]")) {
       const id = tile.dataset.stat;
@@ -615,12 +779,12 @@ export class Trainer {
     }
     const w = new Worker(run.workerUrl, {type: "module"});
     run.workers.push(w);
-    await trainerCall(w, {type: "load", module: this.module}, "loaded");
+    await trainerCall(w, {type: "load", module: run.module || this.module}, "loaded");
     return w;
   }
 
   async start() {
-    if (this.run) return;
+    if (this.run || this.localBusy || this.checkpointBusy) return;
     const el = this.el, task = this.task;
     // `move`: the level's motion the run's network belongs to (Kern's jump: the level's own "jump").
     let name = task, move = task === "jump" ? "jump" : null, label = task;
@@ -651,6 +815,8 @@ export class Trainer {
           if (value > 0) body[field] = value;
         }
         run.remote = {...connection, body, id: null, state: "waiting", stopping: false, busy: false, network: null};
+        // Save before sending POST: a reload may lose the response, not the job.
+        this.rememberRemote(run.remote, body.id);
       } catch (error) {
         this.end(run); this.status(error.message, true); return;
       }
@@ -658,52 +824,18 @@ export class Trainer {
     this.onnx = null;
     this.handover = null;
     this.note = "";
+    this.lastProgress=null;
     this.history = run.history;
     for (const tile of this.host.querySelectorAll("[data-stat] b")) this.text(tile, "-");
     this.draw();
     const live = () => this.run === run;
     try {
       if (run.remote) { await this.remotePractice(run); return; }
-      if (!this.module) {
-        this.status("Loading the Lehrer ...");
-        this.module = await WebAssembly.compileStreaming(fetch(TRAINER_WASM)).catch(async () => WebAssembly.compile(await (await fetch(TRAINER_WASM)).arrayBuffer()));
-        if (!live()) return;
-      }
-      this.status(`Starting ${run.count} ${run.count === 1 ? "worker" : "workers"} with ${run.envs} ${run.envs === 1 ? "duck" : "ducks"} each ...`);
-      run.wake = await navigator.wakeLock?.request("screen").catch(() => null);
-      run.learner = await this.spawn(run);
-      run.collectors = await Promise.all(Array.from({length: run.count}, () => this.spawn(run)));
-      // Worker i steps ducks i*envs .. (i+1)*envs-1 of one run: the same run as natively with as many
-      // ducks in all (bit for bit, docs/lehrer.md).
-      await Promise.all(run.collectors.map((w, i) => trainerCall(w, {type: "collector", task: name, envs: run.envs, seed: run.seed, first: i * run.envs}, "ready")
-        .then(d => { if (!d.ok) throw Error("The Lehrer does not take this task"); })));
       const config = {};
       if (trainerNumber(el.trInitStd.value) > 0) config.initStd = trainerNumber(el.trInitStd.value);
       if (trainerNumber(el.trLr.value) > 0) config.learningRate = trainerNumber(el.trLr.value);
-      const made = await trainerCall(run.learner, {type: "learner", task: name, seed: run.seed, config}, "policy");
-      if (!live()) return;
-      run.policy = made.policy;
-      run.steps = made.steps || 24;
-      // First imitation of the demonstration (the jump's recipe), round by round, then practice.
-      let left = made.imitationLeft || 0;
-      while (live() && left > 0) {
-        const round = made.imitationLeft - left;
-        this.status(`Imitating: round ${round + 1} of ${made.imitationLeft} ...`);
-        // The round's episodes spread over the collectors (worker i: its share, in episode order).
-        const episodes = made.imitationEpisodes, k = run.collectors.length;
-        const shares = await Promise.all(run.collectors.map((w, i) => {
-          const first = Math.floor(i * episodes / k), count = Math.floor((i + 1) * episodes / k) - first;
-          return trainerCall(w, {type: "dagger", policy: run.policy.slice(0), round, first, count}, "share").then(d => d.share);
-        }));
-        const d = await trainerCall(run.learner, {type: "imitate", shares}, "imitated", shares);
-        if (!live()) return;
-        run.policy = d.policy;
-        left = d.left;
-        this.goal(run, d.report);
-        this.status(`Imitating: round ${d.report.round} of ${d.report.rounds}, ${d.report.samples.toLocaleString()} samples, error ${d.report.error.toFixed(4)}`);
-      }
-      if (made.imitationLeft && live()) await this.export(run);
-      await this.practice(run);
+      run.config=config;
+      await this.runLocal(run);
     } catch (error) {
       if (!live()) return;
       this.end(run);
@@ -711,6 +843,267 @@ export class Trainer {
     }
   }
 
+
+  async downloadCheckpoint(){
+    if(this.checkpointBusy)return;
+    this.checkpointBusy=true;this.sync();
+    try{
+      let bytes,name="training";
+      if(this.el.trCompute.value==="mag"){
+        const remote=this.run?.remote;
+        const id=remote?.id||this.lastRemoteResult;
+        if(!id)throw Error("No MAG checkpoint available");
+        const connection=remote||this.remoteConnection();
+        bytes=await this.remoteRequest({remote:connection},"/v1/jobs/"+id+"/checkpoint",undefined,true,120000);
+        await decodeCheckpoint(bytes);
+        name="mag-"+id.slice(0,8);
+      }else{
+        const saved=await readLocalCheckpoint();
+        if(!saved)throw Error("No local checkpoint available");
+        const {learner,collectors,onnx,...record}=saved.record;
+        if(!validLocalRecord(record)||!(onnx instanceof ArrayBuffer))throw Error("Checkpoint predates portable export");
+        const payload=frameCheckpoint([learner,...collectors,onnx]);
+        bytes=await encodeCheckpoint({schema:1,backend:"local",record,
+          wasmSha256:hex(await hashBytes(saved.wasm))},payload);
+        name=record.label;
+      }
+      trainerDownload(name.replace(/[^a-zA-Z0-9_-]/g,"_")+".kernckpt",bytes,"application/octet-stream");
+      this.note="Complete checkpoint downloaded.";
+    }catch(error){this.status(error.message,true);}
+    finally{this.checkpointBusy=false;this.sync();}
+  }
+
+  async uploadCheckpoint(file){
+    if(this.run||this.localBusy||this.checkpointBusy)return;
+    this.checkpointBusy=true;this.sync();
+    let release,localReady=false,remoteReconnect=false;
+    try{
+      if(file.size>CHECKPOINT_MAX)throw Error("Checkpoint too large");
+      const bytes=new Uint8Array(await file.arrayBuffer());
+      const {meta,payload}=await decodeCheckpoint(bytes);
+      if(meta.backend==="local"){
+        const record=meta.record;
+        if(!validLocalRecord(record))throw Error("Invalid local checkpoint metadata");
+        const buffers=unframeCheckpoint(payload,record.count+2);
+        if(buffers.some(b=>!b.byteLength))throw Error("Empty checkpoint section");
+        release=await acquireLocalLease();
+        const previous=await readLocalCheckpoint();
+        if(previous)throw Error("A local checkpoint exists. Download or discard it before importing another.");
+        // Never execute WASM supplied by an uploaded file. Only resume with
+        // the trusted current binary if it matches the original hash.
+        const response=await fetch(TRAINER_WASM);
+        if(!response.ok)throw Error("Lehrer WASM could not be loaded");
+        const wasm=await response.arrayBuffer();
+        if(hex(await hashBytes(wasm))!==meta.wasmSha256)throw Error("Checkpoint requires the original Lehrer WASM build.");
+        await writeLocalCheckpoint({...record,learner:buffers[0],collectors:buffers.slice(1,-1),onnx:buffers.at(-1)},wasm);
+        this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
+        this.el.trCompute.value="local";
+        localReady=true;
+      }else if(meta.backend==="mag"){
+        if(meta.build!==window.KERN_TRAINER_BUILD)throw Error("Checkpoint requires the original Studio/MAG build.");
+        const connection=this.remoteConnection(),digest=hex(await hashBytes(bytes));
+        const pendingKey="kern-lehrer.pending-upload";
+        let pending=null;
+        try{pending=JSON.parse(localStorage.getItem(pendingKey)||"null");}catch{}
+        const id=pending?.url===connection.url&&pending.digest===digest&&/^[a-f0-9-]{36}$/.test(pending.id)?pending.id:crypto.randomUUID();
+        const previous=this.remoteRecord(connection.url);
+        this.el.trCompute.value="mag";
+        const remote={...connection,id,config:meta.config,stopping:false};
+        // A lost response must not create another training job on retry.
+        try{localStorage.setItem(pendingKey,JSON.stringify({url:connection.url,digest,id}));}catch{}
+        this.rememberRemote(remote);
+        try{
+          await this.remoteRequest({remote},"/v1/checkpoints/"+id,bytes,false,120000);
+          remoteReconnect=true;
+          try{localStorage.removeItem(pendingKey);}catch{}
+        }catch(error){
+          if(error.http && error.http<500){
+            try{
+              localStorage.removeItem(pendingKey);
+              if(previous)localStorage.setItem("kern-lehrer.remote-job",JSON.stringify(previous));
+              else this.forgetRemote(connection.url,id);
+            }catch{}
+          }else remoteReconnect=true;
+          throw error;
+        }
+      }else throw Error("Unsupported checkpoint backend");
+    }catch(error){
+      this.status(error.message,true);
+    }finally{
+      if(!localReady)release?.();
+      this.checkpointBusy=false;this.sync();
+    }
+    // Transfer the held Web Lock directly. Resolving its callback and
+    // immediately requesting ifAvailable can race the asynchronous release.
+    if(localReady)await this.resumeLocal(release);
+    else if(remoteReconnect)await this.reconnectRemote();
+  }
+
+  async refreshLocal() {
+    try {
+      const saved=await readLocalCheckpoint();
+      if(!this.run?.localLease) {
+        const r=saved?.record;
+        this.localSaved=r?{token:r.token,iteration:r.iteration,total:r.total}:null;
+      }
+    } catch(error) {
+      if(!this.run && this.el?.trCompute.value==="local")
+        this.status("Local checkpoint storage unavailable: "+error.message,true);
+    }
+    this.sync();
+  }
+
+  async discardLocal() {
+    if(this.run||this.localBusy||this.checkpointBusy||!this.localSaved)return;
+    if(!confirm(tr("Discard the saved local training? This cannot be undone.")))return;
+    this.localBusy=true;this.sync();
+    let release;
+    try{
+      release=await acquireLocalLease();
+      const saved=await readLocalCheckpoint();
+      if(saved?.record.token!==this.localSaved.token)throw Error("Saved training changed in another tab.");
+      await clearLocalCheckpoint();
+      this.localSaved=null;
+      this.status("Local checkpoint discarded.");
+    }catch(error){this.status(error.message,true);}
+    finally{release?.();this.localBusy=false;this.sync();}
+  }
+
+  async resumeLocal(heldLease=null) {
+    if(this.run||this.localBusy||this.checkpointBusy){heldLease?.();return;}
+    this.localBusy=true;this.sync();
+    let run,release=heldLease;
+    try{
+      if(!release)release=await acquireLocalLease();
+      const saved=await readLocalCheckpoint(),r=saved?.record;
+      if(!r||r.schema!==1||!(saved.wasm instanceof ArrayBuffer)||
+         !Number.isInteger(r.count)||r.count<1||r.count>64||
+         !Number.isInteger(r.envs)||r.envs<1||r.envs>256||
+         !Number.isInteger(r.iteration)||r.iteration<0||r.iteration>r.total||
+         !Array.isArray(r.collectors)||r.collectors.length!==r.count||
+         !(r.learner instanceof ArrayBuffer)||
+         r.collectors.some(b=>!(b instanceof ArrayBuffer))||
+         !["motion","jump","stand","scenario"].includes(r.task))
+        throw Error("Local checkpoint is missing or incompatible; it has not been deleted.");
+      this.el.trCompute.value="local";
+      const {learner:ignoredLearner,collectors:ignoredCollectors,...metadata}=r;
+      run=this.run={...metadata,move:null,workers:[],collectors:[],learner:null,workerUrl:null,
+        wake:null,policy:null,paused:false,recovered:true,localLease:release};
+      release=null;
+      this.history=run.history;
+      this.restoreRunFields(run);
+      this.onnx=null;this.handover=null;
+      // A completed checkpoint needs no workers. The saved ONNX belongs to
+      // the same committed iteration and is sufficient for playback.
+      if(run.iteration===run.total && r.onnx instanceof ArrayBuffer && r.onnx.byteLength){
+        run.steps=r.steps||24;
+        if(r.stats)this.stats(run,r.stats,r.stats.collectSeconds+r.stats.learnSeconds,false);
+        if(r.report)this.goal(run,r.report);
+        this.acceptNetwork(run,new Uint8Array(r.onnx),run.iteration);
+        this.end(run);
+        this.status("Local training complete. Result and checkpoint saved.");
+      }else await this.runLocal(run,saved);
+    }catch(error){
+      if(run&&this.run===run)this.end(run);
+      this.status(error.message,true);
+    }finally{release?.();this.localBusy=false;this.sync();}
+  }
+
+  async saveLocal(run,initialWasm=null) {
+    if(this.run!==run)throw Error("Local run no longer active");
+    const states=await Promise.all([
+      trainerCall(run.learner,{type:"save-state",learner:true},"saved-state"),
+      ...run.collectors.map(w=>trainerCall(w,{type:"save-state",learner:false},"saved-state"))
+    ]);
+    const snapshot=await trainerCall(run.learner,{type:"export"},"onnx");
+    if(this.run!==run)throw Error("Local run no longer active");
+    const record={schema:1,token:run.token,task:run.task,name:run.name,label:run.label,
+      count:run.count,envs:run.envs,total:run.total,seed:run.seed,config:run.config,
+      iteration:run.iteration,steps:run.steps,history:run.history,stats:run.lastStats||null,report:run.lastReport||null,
+      learner:states[0].state,collectors:states.slice(1).map(s=>s.state),onnx:snapshot.onnx};
+    await writeLocalCheckpoint(record,initialWasm);
+    this.localSaved={token:record.token,iteration:record.iteration,total:record.total};
+    this.sync();
+  }
+
+  async runLocal(run,saved=null) {
+    const live=()=>this.run===run;
+    if(!run.localLease)run.localLease=await acquireLocalLease();
+    if(!live()){run.localLease?.();return;}
+    if(!saved) {
+      const existing=await readLocalCheckpoint();
+      if(existing){
+        const r=existing.record;
+        this.localSaved={token:r.token,iteration:r.iteration,total:r.total};
+        throw Error("A local checkpoint exists. Continue it or explicitly discard it.");
+      }
+    }
+    this.status(saved?"Restoring saved local training ...":"Loading the Lehrer ...");
+    let wasm=saved?.wasm;
+    if(!wasm){
+      const response=await fetch(TRAINER_WASM);
+      if(!response.ok)throw Error("Lehrer WASM could not be loaded");
+      wasm=await response.arrayBuffer();
+    }
+    run.module=await WebAssembly.compile(wasm);
+    if(!live())return;
+    run.wake=await navigator.wakeLock?.request("screen").catch(()=>null);
+    run.learner=await this.spawn(run);
+    run.collectors=await Promise.all(Array.from({length:run.count},()=>this.spawn(run)));
+    await Promise.all(run.collectors.map((w,i)=>trainerCall(w,{type:"collector",task:run.name,
+      envs:run.envs,seed:run.seed,first:i*run.envs},"ready").then(d=>{
+      if(!d.ok)throw Error("The Lehrer does not take this task");
+    })));
+    const made=await trainerCall(run.learner,{type:"learner",task:run.name,seed:run.seed,config:run.config},"policy");
+    run.steps=made.steps||24;run.policy=made.policy;
+    let left=made.imitationLeft||0;
+    if(saved){
+      const r=saved.record;
+      const [learner]=await Promise.all([
+        trainerCall(run.learner,{type:"load-state",learner:true,state:r.learner},"restored-state"),
+        ...run.collectors.map((w,i)=>trainerCall(w,{type:"load-state",learner:false,state:r.collectors[i]},"restored-state"))
+      ]);
+      run.policy=learner.policy;left=learner.left;
+      run.lastStats=r.stats;run.lastReport=r.report;
+      if(r.stats)this.stats(run,r.stats,r.stats.collectSeconds+r.stats.learnSeconds,false);
+      if(r.report)this.goal(run,r.report);
+      // The exact recovered policy is previewable immediately, including
+      // when the next imitation round has not yet finished.
+      await this.export(run);
+    }else{
+      // Do not start any training step until the initial checkpoint is durable.
+      await this.saveLocal(run,wasm);
+    }
+    this.localBusy=false;this.sync();
+    while(live() && left>0 && !run.localStopping){
+      if(run.paused){await new Promise(r=>setTimeout(r,200));continue;}
+      const round=made.imitationLeft-left;
+      this.status("Imitating: round "+(round+1)+" of "+made.imitationLeft+" ...");
+      const episodes=made.imitationEpisodes,k=run.collectors.length;
+      const shares=await Promise.all(run.collectors.map((w,i)=>{
+        const first=Math.floor(i*episodes/k),count=Math.floor((i+1)*episodes/k)-first;
+        return trainerCall(w,{type:"dagger",policy:run.policy.slice(0),round,first,count},"share").then(d=>d.share);
+      }));
+      const d=await trainerCall(run.learner,{type:"imitate",shares},"imitated",shares);
+      if(!live())return;
+      run.policy=d.policy;left=d.left;run.lastReport=d.report;
+      await this.saveLocal(run);
+      this.goal(run,d.report);
+    }
+    if(!live())return;
+    if(run.localStopping){await this.finishLocal(run,true);return;}
+    if(made.imitationLeft||saved)await this.export(run);
+    await this.practice(run);
+  }
+
+  async finishLocal(run,stopped) {
+    // At this point all worker states already share a committed boundary.
+    // Keep the checkpoint even when stopped or completed; discard is explicit.
+    try{await this.export(run);}
+    catch(error){this.note="Checkpoint saved; network export failed: "+error.message;}
+    this.end(run);
+    this.status(stopped?"Local training saved. Continue whenever ready.":"Local training complete. Result and checkpoint saved.");
+  }
 
   remoteConnection() {
     if (!this.el.trRemoteUrl.value.trim()) throw Error("Enter the MAG HTTPS address once in the connection settings.");
@@ -722,44 +1115,157 @@ export class Trainer {
     return {url: url.origin};
   }
 
-  // Explicit recovery after a tab reload: never import into a possibly different level.
-  // The result is available for download and the original job can be paused/stopped.
-  async reconnectRemote() {
-    if (this.run) return;
-    let run;
+  restoreRunFields(run) {
+    this.task=run.task;
+    const cfg=run.config||{};
+    for(const [id,value] of [["trTask",run.task],["trWorkers",run.count],["trEnvs",run.envs],
+      ["trIterations",run.total],["trSeed",run.seed],["trInitStd",cfg.initStd??""],["trLr",cfg.learningRate??""]])
+      if(this.el[id] && value!==undefined && value!==null)this.el[id].value=String(value);
+  }
+
+  recoveredConfig(run,data,record) {
+    const cfg=data.config || record?.config || {};
+    run.name=typeof cfg.task==="string"?cfg.task:data.taskKind;
+    run.config={initStd:cfg.initStd,learningRate:cfg.learningRate};
+    run.seed=cfg.seed??"";
+    run.label=data.taskKind;
+    if(run.name.startsWith("motion:") || run.name.startsWith("scenario:")){
+      try{run.label=JSON.parse(run.name.slice(run.name.indexOf(":")+1)).name||run.label;}catch{}
+    }
+    run.recovered=true;
+    this.restoreRunFields(run);
+  }
+
+  async restoreRemoteHistory(run) {
+    try{
+      const data=await this.remoteRequest(run,"/v1/jobs/"+run.remote.id+"/history");
+      if(this.run!==run || !Array.isArray(data.history))return;
+      const points=new Map(run.history.map(p=>[p.it,p]));
+      for(const p of data.history)if(Number.isInteger(p.it)&&Number.isFinite(p.ret)&&Number.isFinite(p.len))points.set(p.it,p);
+      run.history=[...points.values()].sort((a,b)=>a.it-b.it);
+      this.history=run.history;
+      this.draw();
+    }catch(error){
+      // Older MAG builds have no history endpoint. Live control still works.
+      if(error.http!==404 && this.run===run)this.note="Progress history temporarily unavailable.";
+    }
+  }
+
+  remoteRecord(url) {
     try {
-      const connection = this.remoteConnection();
+      const record = JSON.parse(localStorage.getItem("kern-lehrer.remote-job") || "null");
+      return record?.url === url && /^[a-f0-9-]{36}$/.test(record.id) ? record : null;
+    } catch { return null; }
+  }
+
+  rememberRemote(remote, id = remote.id) {
+    if (!id) return;
+    try {
+      localStorage.setItem("kern-lehrer.remote-job", JSON.stringify({url:remote.url, id, stopping:!!remote.stopping, config:remote.body || remote.config || (this.remoteRecord(remote.url)?.id===id?this.remoteRecord(remote.url)?.config:undefined)}));
+    } catch { /* recovery can still discover the active job on the server */ }
+  }
+
+  forgetRemote(url, id) {
+    try {
+      const record = this.remoteRecord(url);
+      if (record && (!id || record.id === id)) localStorage.removeItem("kern-lehrer.remote-job");
+    } catch { /* storage blocked */ }
+  }
+
+  discoverRemote() {
+    if (!this.s || !this.el || this.run || this.localBusy || this.checkpointBusy || !this.el.trRemoteUrl.value.trim()) return;
+    if(this.lastRemoteResult && this.onnx && this.el.trCompute.value==="mag")return;
+    clearTimeout(this.remoteProbeTimer);
+    this.remoteProbeTimer = null;
+    void this.reconnectRemote({automatic:true});
+  }
+
+  // Read-only discovery: a reload never POSTs a new job or imports into a
+  // potentially different level. The existing job remains authoritative.
+  async reconnectRemote({automatic=false} = {}) {
+    if (this.run || this.localBusy || this.checkpointBusy) return;
+    let run, connection, record;
+    try {
+      connection = this.remoteConnection();
+      record = this.remoteRecord(connection.url);
       run = this.run = {task: "stand", label: "mag", move: null, workers: [], collectors: [],
         total: 1, iteration: 0, paused: false, history: [], remote: {...connection,
           state: "waiting", id: null, busy: true, stopping: false, network: null}};
-      this.history = run.history;
       this.status("Reconnecting to MAG ...");
-      const data = await this.remoteRequest(run, "/v1/current");
+      let data;
+      try {
+        data = await this.remoteRequest(run, "/v1/current");
+      } catch (error) {
+        if (this.run !== run) return;
+        // The known idle response is not a connection failure. Other 404s
+        // (e.g. a wrong server/path) remain errors.
+        if (error.http !== 404 || error.message !== "no MAG training job") throw error;
+        this.forgetRemote(connection.url);
+        this.end(run);
+        this.status("Connected to MAG. Ready to start training.");
+        return;
+      }
       if (this.run !== run) return;
       if (!/^[a-f0-9-]{36}$/.test(data.id) || !["jump","stand","motion","scenario"].includes(data.taskKind)) throw Error("Invalid MAG job");
+      const terminal = ["done","stopped","error"].includes(data.state);
+      if (automatic && terminal && (record?.id !== data.id || this.lastRemoteResult===data.id)) {
+        // A terminal result already displayed in this tab must not be
+        // reopened (or forgotten) on every visibility/online event.
+        this.end(run);
+        if(this.lastRemoteResult!==data.id)this.status("Connected to MAG. Ready to start training.");
+        return;
+      }
+      this.el.trCompute.value = "mag";
       run.remote.id = data.id; run.remote.busy = false;
+      run.remote.state = data.state;
+      run.remote.stopping = !terminal && record?.id === data.id && !!record.stopping;
+      run.remote.config=data.config || (record?.id===data.id?record.config:undefined);
+      this.rememberRemote(run.remote);
       run.task = data.taskKind; run.label = "mag-" + data.id; run.token = run.label;
       run.total = data.total; run.envs = data.envs;
+      run.count = data.workers; run.paused = data.state === "paused";
+      this.recoveredConfig(run,data,record?.id===data.id?record:null);
+      this.history=run.history;
+      this.lastProgress=null;
+      for(const tile of this.host.querySelectorAll("[data-stat] b"))this.text(tile,"-");
       this.onnx = null; this.handover = null;
-      this.note = "Reconnected: download the network to import it into the intended level.";
-      await this.remotePractice(run);
+      this.note = "Reconnected: the latest saved network can be previewed without changing this level.";
+      if(data.config)await this.restoreRemoteHistory(run);
+      if(this.run===run)await this.remotePractice(run);
     } catch (error) {
-      if (run && this.run === run) this.end(run);
-      this.status(error.message, true);
+      if (run && this.run !== run) return;
+      if (run) this.end(run);
+      if (automatic && !record) {
+        // A stored address does not make MAG the default for new training.
+        // Leave local mode usable if the optional host is offline.
+        if (this.el.trCompute.value !== "mag") { this.status("Local training ready. MAG unavailable."); return; }
+      }
+      if (record) {
+        this.el.trCompute.value = "mag";
+        this.status("MAG connection interrupted — job may still be running. Reconnecting ...", true);
+        if (this.s) {
+          clearTimeout(this.remoteProbeTimer);
+          this.remoteProbeTimer = setTimeout(() => {
+            this.remoteProbeTimer = null;
+            if (this.el.trCompute.value === "mag") this.discoverRemote();
+          }, 5000);
+        }
+      } else this.status(error.message, true);
     }
   }
 
   // A second transport, not a second trainer. The existing run, stats, goal
   // and ONNX delivery are shared with the local worker path.
-  async remoteRequest(run, path, body, binary = false) {
+  async remoteRequest(run, path, body, binary = false, timeoutMs = 12000) {
     const remote = run.remote;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const headers = {"X-Kern-Lehrer": "1"};
-      if (body !== undefined) headers["Content-Type"] = "application/json";
+      const raw=body instanceof Uint8Array;
+      if (body !== undefined) headers["Content-Type"] = raw?"application/octet-stream":"application/json";
       const response = await fetch(remote.url + path, {method: body === undefined ? "GET" : "POST",
-        headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,
+        headers, body: body === undefined ? undefined : raw?body:JSON.stringify(body), signal: controller.signal,
         cache: "no-store", credentials: "omit", redirect: "error", referrerPolicy: "no-referrer"});
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -769,7 +1275,7 @@ export class Trainer {
       }
       return binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
     } catch (error) {
-      if (controller.signal.aborted) throw Error("MAG did not respond within 12 seconds. Check Tailscale and browser local network access.");
+      if (controller.signal.aborted) throw Error(timeoutMs===12000?"MAG did not respond within 12 seconds. Check Tailscale and browser local network access.":"Checkpoint transfer interrupted. Check MAG before retrying.");
       throw error;
     } finally { clearTimeout(timeout); }
   }
@@ -785,6 +1291,7 @@ export class Trainer {
           data = await this.remoteRequest(run, "/v1/jobs", remote.body);
           if (data.id !== remote.body.id) throw Object.assign(Error("MAG returned a different job id"), {http: 400});
           remote.id = data.id;
+          this.rememberRemote(remote);
           run.token = "mag-" + data.id;
         } else {
           data = await this.remoteRequest(run, "/v1/jobs/" + remote.id);
@@ -795,7 +1302,8 @@ export class Trainer {
         run.paused = data.state === "paused";
         if (data.stats && data.stats.iteration > run.iteration) {
           run.iteration = data.stats.iteration;
-          this.stats(run, data.stats, data.stats.collectSeconds + data.stats.learnSeconds);
+          this.stats(run, data.stats, data.stats.collectSeconds + data.stats.learnSeconds,
+            !run.history?.some(p=>p.it===data.stats.iteration));
         }
         if (data.report) this.goal(run, data.report);
         // Stop is independent of model download (even an invalid ONNX cannot block it).
@@ -811,11 +1319,21 @@ export class Trainer {
             catch (error) { this.note = "Network saved on MAG; level import failed: " + error.message; }
             remote.network = data.network;
           } catch (error) {
-            if (error.http !== 409) throw error;
-            await wait(200); continue;
+            // A snapshot transfer can fail independently of the job. Keep
+            // control attached and retry, rather than treating a download
+            // 404 as a missing training job.
+            if (!live()) return;
+            this.note = "Network download interrupted; retrying.";
+            this.sync();
+            await wait(error.http === 409 ? 200 : 1500);
+            continue;
           }
         }
         if (["done", "stopped", "error"].includes(data.state)) {
+          if(data.config)await this.restoreRemoteHistory(run);
+          remote.stopping=false;
+          this.lastRemoteResult=remote.id;
+          this.rememberRemote(remote);
           this.end(run); this.status(data.message, data.state === "error"); return;
         }
         this.status(remote.stopping ? "Stop requested; waiting for MAG to finish." :
@@ -848,7 +1366,7 @@ export class Trainer {
 
   async practice(run) {
     const live = () => this.run === run;
-    while (live() && run.iteration < run.total) {
+    while (live() && run.iteration < run.total && !run.localStopping) {
       if (run.paused) { await new Promise(r => setTimeout(r, 200)); continue; }
       const t0 = performance.now();
       const rollouts = await Promise.all(run.collectors.map(w =>
@@ -857,16 +1375,20 @@ export class Trainer {
       if (!live()) return;
       run.policy = learned.policy;
       run.iteration = learned.stats.iteration;
-      this.stats(run, learned.stats, (performance.now() - t0) / 1000);
+      run.lastStats=learned.stats;
+      const seconds=(performance.now()-t0)/1000;
+      if(learned.stats.episodes)run.history.push({it:run.iteration,ret:learned.stats.meanReturn,len:learned.stats.meanLength*0.02});
       if (run.iteration % 25 === 0 || run.iteration === run.total) {
-        if (TRAINER_GOAL[run.task]) this.goal(run, (await trainerCall(run.learner, {type: "evaluate", episodes: 5}, "evaluated")).report);
-        if (!live()) return;
-        await this.export(run);
+        if (TRAINER_GOAL[run.task]) run.lastReport=(await trainerCall(run.learner, {type:"evaluate",episodes:5},"evaluated")).report;
       }
+      if(!live())return;
+      await this.saveLocal(run);
+      this.stats(run,learned.stats,seconds,false);
+      if(run.lastReport)this.goal(run,run.lastReport);
+      if(run.iteration%25===0||run.iteration===run.total)await this.export(run);
     }
     if (!live()) return;
-    this.end(run);
-    this.status(`Done: ${run.iteration} iterations. Download the network, or play the move in your level.`);
+    await this.finishLocal(run,!!run.localStopping);
   }
 
   /** The learner's network as ONNX: a motion's goes into the level (Level::motions), the others are for download. */
@@ -878,7 +1400,13 @@ export class Trainer {
 
   acceptNetwork(run, bytes, iteration) {
     if (this.run !== run) return;
-    this.onnx = {bytes, name: run.label, task: run.task, move: null};
+    let duration=null;
+    if(run.task==="jump")duration=2;
+    if(run.task==="motion" && typeof run.name==="string" && run.name.startsWith("motion:")){
+      try{duration=JSON.parse(run.name.slice(7)).duration;}catch{}
+    }
+    const preview=Number.isFinite(duration)&&duration>0?{kind:run.task,duration}:null;
+    this.onnx = {bytes, name: run.label, task: run.task, move: null, preview, iteration};
     if (run.move) {
       this.handover = {name: run.move, onnx: toBase64(bytes), run: run.token, iteration};
       const why = this.deliver();
@@ -887,6 +1415,14 @@ export class Trainer {
       this.note = `The network is ready to download (iteration ${iteration}).`;
     }
     this.sync();
+  }
+
+  previewNetwork() {
+    const net=this.onnx;
+    if(!net)return;
+    const r=net.move ? this.engine.command({cmd:"trainerTest",move:net.move})
+      : net.preview ? this.engine.command({cmd:"trainerPreview",...net.preview,onnx:toBase64(net.bytes)}) : null;
+    if(r&&!r.ok)this.toast(r.error);
   }
 
   /**
@@ -911,15 +1447,15 @@ export class Trainer {
     return "";
   }
 
-  stats(run, s, seconds) {
+  stats(run, s, seconds, append=true) {
     const set = (id, text) => this.text(this.host.querySelector(`[data-stat="${id}"] b`), text);
     set("it", s.iteration);
     set("steps", Math.round(s.steps).toLocaleString());
-    set("sps", Math.round(run.remote ? s.sps : run.collectors.length * run.envs * run.steps / seconds).toLocaleString());
+    set("sps", Math.round(run.remote ? s.sps : run.count * run.envs * run.steps / seconds).toLocaleString());
     if (s.episodes) {
       set("ret", s.meanReturn.toFixed(2));
       set("len", (s.meanLength * 0.02).toFixed(2));
-      run.history.push({it: s.iteration, ret: s.meanReturn, len: s.meanLength * 0.02});
+      if(append)run.history.push({it: s.iteration, ret: s.meanReturn, len: s.meanLength * 0.02});
     }
     set("std", s.meanStd.toFixed(3));
     this.status(`Learning: iteration ${s.iteration} of ${run.total}, collecting ${s.collectSeconds.toFixed(2)} s, learning ${s.learnSeconds.toFixed(2)} s`);
@@ -951,19 +1487,25 @@ export class Trainer {
     if (!run) return;
     if (run.remote) {
       run.remote.stopping = true;
+      this.rememberRemote(run.remote, run.remote.id || run.remote.body?.id);
       this.status("Stop requested; waiting for MAG to save and release its resources.");
       return;
     }
-    this.end(run);
-    this.status(`Stopped after ${run.iteration} iterations.`);
+    run.localStopping=true;
+    run.paused=false;
+    this.status("Stop requested; saving local training at the next complete checkpoint.");
   }
 
   /** Ends the run: its workers go; the newest exported network stays (one that waits for the level still goes in). */
   end(run) {
-    if (this.run === run) this.run = null;
+    if (this.run === run) {
+      if(!run.remote || run.remote.id)this.lastProgress=Math.min(100,100*run.iteration/run.total);
+      this.run = null;
+    }
     for (const w of run.workers) w.terminate();
     if (run.workerUrl) URL.revokeObjectURL(run.workerUrl);
     run.wake?.release?.().catch(() => {});
+    run.localLease?.();run.localLease=null;
     this.sync();
   }
 
@@ -983,7 +1525,7 @@ export class Trainer {
     g.strokeRect(pad, 8, w - 2 * pad, h - 8 - pad);
     if (history.length < 2) return;
     const line = (key, color) => {
-      const v = history.map(p => p[key]), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+      const v = history.map(p => p[key]), lo = v.reduce((a,b)=>Math.min(a,b),Infinity), hi = v.reduce((a,b)=>Math.max(a,b),-Infinity), span = hi - lo || 1;
       g.strokeStyle = color;
       g.lineWidth = 2;
       g.beginPath();

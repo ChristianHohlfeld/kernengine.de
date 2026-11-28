@@ -24,7 +24,7 @@ exclusive=load("exclusive",TOOLS/"mag-exclusive.py")
 BUILD="b"*40
 ORIGIN="https://kernengine.de"
 FAKE=r'''#!/usr/bin/env python3
-import json,os,signal,sys,time
+import json,os,signal,sys,time,struct
 from pathlib import Path
 if "--hip-check" in sys.argv:
     print("HIP devices: 2",flush=True);sys.exit(0)
@@ -37,11 +37,18 @@ args=sys.argv
 out=Path(args[args.index("--out")+1])
 ckpt=Path(args[args.index("--checkpoint")+1])
 total=int(args[args.index("--iterations")+1])
-for it in range(1,total+1):
+first=1
+if "--resume" in args:
+    first=struct.unpack_from("<Ii",Path(args[args.index("--resume")+1]).read_bytes())[1]+1
+for it in range(first,total+1):
     time.sleep(.04)
     tmp=out.with_suffix(".tmp");tmp.write_bytes(b"onnx");os.replace(tmp,out)
-    ckpt.write_bytes(b"checkpoint")
-    print("KERN_PROGRESS "+json.dumps(dict(iteration=it,steps=it*20,episodes=1,meanReturn=.1,meanLength=20,meanStd=.1,collectSeconds=.02,learnSeconds=.02,sps=500,snapshot=True,report={"meanErrorDeg":2})),flush=True)
+    row=json.dumps(dict(iteration=it,steps=it*20,episodes=1,meanReturn=.1,meanLength=20,meanStd=.1,collectSeconds=.02,learnSeconds=.02,sps=500,snapshot=True,report={"meanErrorDeg":2}))
+    payload=struct.pack("<Ii",0x4b4c4e33,it)
+    for part in (b"KERNPPO2fake",b"collectors",b"",b"onnx",row.encode()):
+        payload+=struct.pack("<Q",len(part))+part
+    tmp=ckpt.with_suffix(".tmp");tmp.write_bytes(payload);os.replace(tmp,ckpt)
+    print("KERN_PROGRESS "+row,flush=True)
     if stop:break
 '''
 class RemoteTest(unittest.TestCase):
@@ -63,9 +70,9 @@ class RemoteTest(unittest.TestCase):
         self.server.shutdown();self.thread.join(5);self.server.server_close()
         self.tmp.cleanup()
     def request(self,path,body=None,marker="1",origin=ORIGIN,method=None):
-        data=None if body is None else json.dumps(body).encode()
+        data=None if body is None else body if isinstance(body,bytes) else json.dumps(body).encode()
         req=urllib.request.Request(self.base+path,data=data,headers={"X-Kern-Lehrer":marker,
-            "Origin":origin,"Content-Type":"application/json"},method=method)
+            "Origin":origin,"Content-Type":"application/octet-stream" if isinstance(body,bytes) else "application/json"},method=method)
         try:
             with urllib.request.urlopen(req,timeout=3) as r:
                 content=r.read()
@@ -128,6 +135,80 @@ class RemoteTest(unittest.TestCase):
         data=self.wait(lambda d:d["state"] in remote.TERMINAL)
         self.assertEqual(data["state"],"done")
         self.assertEqual(data["stats"]["iteration"],2)
+        self.assertEqual(data["config"]["task"],"stand")
+        self.assertEqual(data["config"]["seed"],1)
+        history=self.request("/v1/jobs/"+self.id+"/history")[2]["history"]
+        self.assertEqual([p["it"] for p in history],[1,2])
+        self.assertAlmostEqual(history[-1]["len"],.4)
+
+    def test_checkpoint_roundtrip(self):
+        self.assertEqual(self.request("/v1/jobs",self.body)[0],200)
+        self.wait(lambda d:d["stats"] and d["stats"]["iteration"]>=2)
+        self.assertEqual(self.request("/v1/jobs/"+self.id+"/pause",{})[0],200)
+        code,_,archive=self.request("/v1/jobs/"+self.id+"/checkpoint")
+        self.assertEqual(code,200)
+        meta,payload=remote.decode_archive(archive)
+        self.assertEqual(meta["backend"],"mag")
+        self.assertEqual(meta["config"]["task"],"stand")
+        self.assertEqual(meta["iteration"],remote.native_checkpoint_iteration(payload))
+        self.assertEqual(remote.native_checkpoint_network(payload),b"onnx")
+        target="/v1/checkpoints/"+str(uuid.uuid4())
+        self.assertEqual(self.request(target,archive)[0],409)
+        self.assertEqual(self.request("/v1/jobs/"+self.id+"/stop",{})[0],200)
+        self.wait(lambda d:d["state"] in remote.TERMINAL)
+        self.assertEqual(self.request(target,archive[:-1]+bytes([archive[-1]^1]))[0],400)
+        bad=remote.encode_archive({**meta,"build":"0"*40},payload)
+        self.assertEqual(self.request(target,bad)[0],400)
+        self.assertEqual(self.request(target,b"onnx")[0],400)
+        code,_,resumed=self.request(target,archive)
+        self.assertEqual(code,200)
+        self.id=resumed["id"]
+        self.assertEqual(self.request(target,archive)[0],200)
+        self.assertEqual((self.root/"jobs"/self.id/"resume.ckpt").read_bytes(),payload)
+        self.wait(lambda d:d["stats"] and d["stats"]["iteration"]>meta["iteration"])
+        history=self.request("/v1/jobs/"+self.id+"/history")[2]["history"]
+        self.assertEqual(history[0]["it"],1)
+
+    def reopen(self):
+        old=self.server
+        old.shutdown();self.thread.join(5);old.server_close()
+        self.server=remote.Server(SimpleNamespace(jobs=str(self.root/"jobs"),binary=str(self.root/"fake"),build=BUILD,
+            origin=[ORIGIN],gpu_lock=str(self.root/"gpu.lock"),hook="",port=0,tailnet_only=True))
+        self.base="http://127.0.0.1:"+str(self.server.server_address[1])
+        self.thread=threading.Thread(target=self.server.serve_forever);self.thread.start()
+
+    def test_completed_job_survives_restart(self):
+        body={**self.body,"iterations":2}
+        self.assertEqual(self.request("/v1/jobs",body)[0],200)
+        prior=self.wait(lambda d:d["state"] in remote.TERMINAL)
+        self.server.job.thread.join(5)
+        self.reopen()
+        self.assertEqual(self.request("/v1/current")[2],prior)
+        self.assertEqual(self.request("/v1/jobs",body)[2],prior)
+        self.assertEqual(self.request("/v1/jobs/"+self.id+"/network/"+prior["network"])[2],b"onnx")
+        self.assertIsNone(self.server.job.proc)
+
+    def test_interrupted_job_is_not_restarted(self):
+        self.assertEqual(self.request("/v1/jobs",{**self.body,"iterations":2})[0],200)
+        data=self.wait(lambda d:d["state"] in remote.TERMINAL)
+        self.server.job.thread.join(5)
+        path=self.root/"jobs"/self.id/"job.json"
+        meta=json.loads(path.read_text())
+        meta["public"]["state"]="running"
+        meta["public"]["message"]="Learning on MAG"
+        remote.atomic_json(path,meta)
+        self.reopen()
+        recovered=self.request("/v1/current")[2]
+        self.assertEqual(recovered["state"],"error")
+        self.assertIn("interrupted",recovered["message"])
+        self.assertEqual(recovered["id"],self.id)
+        self.assertEqual(recovered["network"],data["network"])
+        self.assertIsNone(self.server.job.proc)
+
+    def test_shutdown_rejects_new_jobs(self):
+        self.server.closing=True
+        self.assertEqual(self.request("/v1/jobs",self.body)[0],503)
+        self.assertIsNone(self.server.job)
 
 class FakeSystemd:
     def __init__(self):

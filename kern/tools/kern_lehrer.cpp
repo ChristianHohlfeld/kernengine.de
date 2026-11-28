@@ -17,10 +17,15 @@
 #include <string>
 #include <thread>
 #include <vector>
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#include <fcntl.h>
+#endif
 
 #include "kern/game/walker.h"
 #include "kern/game/walker_policy.h"
 #include "kern/lehrer/backend.h"
+#include "kern/lehrer/checkpoint.h"
 #include "kern/lehrer/hip_dense.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/kalibrierung.h"
@@ -45,7 +50,7 @@ struct Options {
   std::string task = "jump", scenario, out, eval, log, checkpoint, resume, warm, trace;
   std::string calibrate, holdout, profile, compare, examples, demo, demo_search, demo_check, play_eval;
   i32 play = 0;
-  bool progress_json = false;
+  bool progress_json = false, full_checkpoint = false;
   std::string policies;
   i32 rounds = 0, round_episodes = 0, keep_every = 0, randomized = 0;
   std::string play_net, play_practice;
@@ -63,8 +68,20 @@ bool write_file(const std::string& path, const std::vector<u8>& bytes) {
   const std::string tmp = path + ".tmp";
   FILE* f = std::fopen(tmp.c_str(), "wb");
   if (!f) return false;
-  const bool ok = std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
-  return std::fclose(f) == 0 && ok && std::rename(tmp.c_str(), path.c_str()) == 0;
+  bool ok = std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size() && std::fflush(f)==0;
+#if defined(__unix__) || defined(__APPLE__)
+  if(ok)ok=::fsync(::fileno(f))==0;
+#endif
+  if(std::fclose(f)!=0 || !ok || std::rename(tmp.c_str(),path.c_str())!=0)return false;
+#if defined(__unix__) || defined(__APPLE__)
+  const auto slash=path.find_last_of('/');
+  const std::string dir=slash==std::string::npos?".":slash==0?"/":path.substr(0,slash);
+  const int fd=::open(dir.c_str(),O_RDONLY);
+  if(fd<0)return false;
+  const bool durable=::fsync(fd)==0;::close(fd);
+  if(!durable)return false;
+#endif
+  return true;
 }
 
 std::vector<u8> read_file(const std::string& path) {
@@ -528,6 +545,7 @@ int main(int argc, char** argv) {
     const std::string a = argv[i];
     auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
     if (a == "--progress-json") o.progress_json = true;
+    else if (a == "--full-checkpoint") o.full_checkpoint = true;
     else if (a == "--task") o.task = next();
     else if (a == "--scenario") o.scenario = next();
     else if (a == "--envs") o.envs = std::atoi(next());
@@ -678,19 +696,62 @@ int main(int argc, char** argv) {
       threads, per_worker, o.seed,
       [&](i32 first, i32 count, u64 seed) {
         std::vector<std::unique_ptr<Env>> v;
-        for (i32 i = 0; i < count; ++i) v.push_back(make_env(recipe, seed, first + i));
+        for (i32 i = 0; i < count; ++i) {
+          auto env = make_env(recipe, seed, first + i);
+          if(o.full_checkpoint)env->enable_checkpoint();
+          v.push_back(std::move(env));
+        }
         return v;
       },
       [&](Env& e, i32 it) { prepare_env(static_cast<DuckEnv&>(e), recipe, it); });
   std::unique_ptr<Ppo> learner = make_learner(recipe, o.seed);
   if (!learner) { std::fprintf(stderr, "cannot warm-start from %s\n", recipe.warm_start.c_str()); return 1; }
   Ppo& ppo = *learner;
+  std::unique_ptr<JumpImitation> imitation;
+  std::string checkpoint_progress;
+  if(recipe.imitate && o.full_checkpoint)imitation=std::make_unique<JumpImitation>(recipe,o.seed);
+  auto save_checkpoint=[&](){
+    if(o.checkpoint.empty())return true;
+    if(!o.full_checkpoint)return write_file(o.checkpoint,ppo.save());
+    auto collectors=backend.save();
+    if(collectors.empty())return false;
+    checkpoint::Writer w;
+    w.scalar(u32{0x4b4c4e33});w.scalar(ppo.iteration());
+    w.vector(ppo.save());w.vector(collectors);
+    w.vector(imitation?imitation->save():std::vector<u8>{});
+    // ONNX and the training state come from the same barrier, not separate files.
+    w.vector(export_onnx(ppo.actor(),ppo.actor_normalizer(),micro_duck_metadata(o.task)));
+    w.vector(std::vector<u8>(checkpoint_progress.begin(),checkpoint_progress.end()));
+    return write_file(o.checkpoint,w.bytes);
+  };
   if (!o.resume.empty()) {
     const std::vector<u8> bytes = read_file(o.resume);
-    if (bytes.empty() || !ppo.load(bytes.data(), bytes.size())) { std::fprintf(stderr, "cannot resume from %s\n", o.resume.c_str()); return 1; }
+    bool loaded=false;
+    if(o.full_checkpoint){
+      checkpoint::Reader r{bytes.data(),bytes.size()};u32 magic=0;
+      std::vector<u8> p,c,i,net,progress;i32 iteration=-1;
+      loaded=r.scalar(magic)&&magic==0x4b4c4e33&&r.scalar(iteration)&&iteration>=0&&r.vector(p,bytes.size())&&
+        r.vector(c,bytes.size())&&r.vector(i,bytes.size())&&r.vector(net,32*1024*1024)&&!net.empty()&&
+        r.vector(progress,65536)&&r.end()&&
+        p.size()>=8&&std::memcmp(p.data(),"KERNPPO2",8)==0&&ppo.load(p.data(),p.size())&&
+        ppo.iteration()==iteration&&backend.load(c.data(),c.size())&&(imitation?imitation->load(i.data(),i.size()):i.empty());
+      if(loaded)checkpoint_progress.assign(progress.begin(),progress.end());
+    }else loaded=!bytes.empty()&&ppo.load(bytes.data(),bytes.size());
+    if(!loaded||ppo.iteration()>o.iterations){std::fprintf(stderr,"cannot resume from %s\n",o.resume.c_str());return 1;}
     std::printf("resumed at iteration %d (%lld steps)\n", ppo.iteration(), static_cast<long long>(ppo.total_steps()));
   }
-  if (recipe.imitate && o.resume.empty()) {
+  if(o.full_checkpoint){
+    if(o.resume.empty()&&!save_checkpoint())return 1;
+    if(imitation){
+      while(imitation->rounds_done()<recipe.imitation_rounds&&!stop_requested){
+        imitation->round(ppo,backend.update_parallel(),true);
+        if(imitation->rounds_done()==recipe.imitation_rounds)begin_practice(ppo,recipe);
+        if(!save_checkpoint())return 1;
+      }
+    }
+    if(!write_file(o.out,export_onnx(ppo.actor(),ppo.actor_normalizer(),micro_duck_metadata(o.task))))return 1;
+  }
+  if (!o.full_checkpoint && recipe.imitate && o.resume.empty()) {
     // Imitate the demonstration first (vorbild.h), then practise with PPO.
     std::printf("imitating the demonstration: %d rounds of %d episodes\n", recipe.imitation_rounds, recipe.imitation_episodes);
     const auto t0 = std::chrono::steady_clock::now();
@@ -747,15 +808,7 @@ int main(int argc, char** argv) {
       write_file(stem + name, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)));
     }
     const bool snapshot = it % o.save_every == 0 || it == o.iterations || stop_requested;
-    if (snapshot) {
-      if ((!jumped || !o.stop_after_jump) && !write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) {
-        std::fprintf(stderr, "cannot write network\n"); if (log) std::fclose(log); return 1;
-      }
-      if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) {
-        std::fprintf(stderr, "cannot write checkpoint\n"); if (log) std::fclose(log); return 1;
-      }
-    }
-    if (o.progress_json) {
+    if (o.progress_json || o.full_checkpoint) {
       json::Value v = json::Value::object();
       v.set("iteration", s.iteration); v.set("steps", static_cast<f64>(s.steps));
       v.set("episodes", s.episodes); v.set("meanReturn", static_cast<f64>(s.mean_return));
@@ -767,14 +820,30 @@ int main(int argc, char** argv) {
         const std::string result = evaluate_training(recipe, ppo, 5);
         if (!result.empty() && json::parse(result, report)) v.set("report", report);
       }
-      std::printf("KERN_PROGRESS %s\n", json::stringify(v).c_str()); std::fflush(stdout);
+      checkpoint_progress=json::stringify(v);
+    }
+    if (snapshot) {
+      if ((!jumped || !o.stop_after_jump) && !write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) {
+        std::fprintf(stderr, "cannot write network\n"); if (log) std::fclose(log); return 1;
+      }
+      if (!save_checkpoint()) {
+        std::fprintf(stderr, "cannot write checkpoint\n"); if (log) std::fclose(log); return 1;
+      }
+    }
+    if(o.full_checkpoint && !snapshot && !save_checkpoint()){
+      std::fprintf(stderr,"cannot commit complete training checkpoint\n");
+      if(log)std::fclose(log);
+      return 1;
+    }
+    if(o.progress_json){
+      std::printf("KERN_PROGRESS %s\n",checkpoint_progress.c_str());std::fflush(stdout);
     }
     if (jumped && o.stop_after_jump) break;
   }
   if (log) std::fclose(log);
   if (stop_requested) {
     if (!write_file(o.out, export_onnx(ppo.actor(), ppo.actor_normalizer(), micro_duck_metadata(o.task)))) return 1;
-    if (!o.checkpoint.empty() && !write_file(o.checkpoint, ppo.save())) return 1;
+    if (!save_checkpoint()) return 1;
     std::printf("stopped at iteration %d\n", ppo.iteration());
   }
   std::printf("wrote %s\n", o.out.c_str());

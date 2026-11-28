@@ -7,7 +7,8 @@ if (!globalThis.navigator) globalThis.navigator = {hardwareConcurrency: 8};
 globalThis.localStorage = {getItem:()=>null,setItem:()=>{}};
 const src=fs.readFileSync(new URL("../web/studio/trainer.mjs",import.meta.url),"utf8")
   .replace(/^import \{.*\} from .*;\n/m,'const tr=x=>x, escHtml=x=>x, toBase64=x=>Buffer.from(x).toString("base64");\n');
-const {Trainer}=await import("data:text/javascript;base64,"+Buffer.from(src).toString("base64"));
+const {Trainer,encodeCheckpoint,decodeCheckpoint,frameCheckpoint,unframeCheckpoint,validLocalRecord}=await import(
+  "data:text/javascript;base64,"+Buffer.from(src+"\nexport {encodeCheckpoint,decodeCheckpoint,frameCheckpoint,unframeCheckpoint,validLocalRecord};").toString("base64"));
 const p=Trainer.prototype;
 const field=value=>({value:String(value)});
 function trainer(backend){
@@ -20,7 +21,7 @@ function trainer(backend){
 }
 const local=trainer("local");
 local.remotePractice=()=>{throw Error("local must never contact MAG")};
-local.spawn=()=>{throw Error("local worker path")};
+local.runLocal=()=>{throw Error("local worker path")};
 await local.start();
 assert.equal(local.message,"local worker path");
 const mag=trainer("mag");
@@ -51,4 +52,132 @@ t.remoteRequest=async (_,path)=>{
 await p.remotePractice.call(t,run);
 assert.equal(stats,2);assert.equal(imported,2);assert.equal(t.run,null);
 assert.deepEqual(requests,["/v1/jobs","/v1/jobs/"+id+"/network/1"]);
+// Only the documented idle response is a successful connection.
+for (const [http,message,expected,isError] of [
+  [404,"no MAG training job","Connected to MAG. Ready to start training.",false],
+  [404,"not found","not found",true],
+  [403,"forbidden","forbidden",true],
+  [undefined,"Failed to fetch","Failed to fetch",true],
+]) {
+  const t=trainer("mag");
+  t.status=(message,error=false)=>{t.message=message;t.statusError=error;};
+  t.remoteRequest=async (_,path)=>{
+    assert.equal(path,"/v1/current");
+    throw Object.assign(Error(message),{http});
+  };
+  await t.reconnectRemote();
+  assert.equal(t.run,null);
+  assert.equal(t.message,expected);
+  assert.equal(t.statusError,isError);
+}
+// A fresh page with the saved address queries the current job, never starts one.
+const store = new Map();
+globalThis.localStorage = {getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
+const active = {id,taskKind:"motion",state:"running",total:1500,envs:8,workers:56,gpus:1,
+  stats:{iteration:34,collectSeconds:1,learnSeconds:1},network:null};
+for (const state of ["running","paused","waiting","checking","stopping"]) {
+  const recovered=trainer("local"), paths=[];
+  recovered.remoteRequest=async (_,path)=>{paths.push(path);return {...active,state};};
+  recovered.remotePractice=async run=>{
+    assert.equal(run.remote.id,id);
+    assert.equal(run.remote.body,undefined);
+    assert.equal(run.remote.state,state);
+    assert.equal(run.count,56);
+    assert.equal(run.paused,state==="paused");
+    assert.equal(run.move,null); // no automatic import into another level
+    assert.equal(recovered.el.trCompute.value,"mag");
+    recovered.end(run);
+  };
+  await recovered.reconnectRemote({automatic:true});
+  assert.deepEqual(paths,["/v1/current"]);
+}
+// Recover the actual configuration, full graph, and a playable snapshot
+// without writing anything into the current level.
+const resumed=trainer("local");
+const spec="motion:"+JSON.stringify({name:"nod",duration:1.2,frames:[]});
+const cfg={task:spec,iterations:1500,envs:8,seed:42,initStd:.12,learningRate:.0002};
+let commands=[];
+resumed.engine={command:c=>{commands.push(c);return {ok:true};}};
+resumed.remoteRequest=async (_,path)=>{
+  if(path==="/v1/current")return {...active,config:cfg};
+  if(path.endsWith("/history"))return {history:[{it:1,ret:3,len:1.2},{it:34,ret:14,len:1.2}]};
+  throw Error("unexpected request "+path);
+};
+resumed.remotePractice=async run=>{
+  assert.equal(resumed.task,"motion");
+  assert.equal(resumed.el.trSeed.value,"42");
+  assert.equal(resumed.el.trIterations.value,"1500");
+  assert.equal(resumed.el.trWorkers.value,"56");
+  assert.equal(run.label,"nod");
+  assert.equal(run.name,spec);
+  assert.equal(run.move,null);
+  assert.deepEqual(run.history.map(p=>p.it),[1,34]);
+  resumed.acceptNetwork(run,new Uint8Array([1,2]),25);
+  assert.equal(resumed.onnx.iteration,25);
+  assert.deepEqual(commands,[]);
+  resumed.previewNetwork();
+  assert.deepEqual(commands,[{cmd:"trainerPreview",kind:"motion",duration:1.2,onnx:"AQI="}]);
+  resumed.end(run);
+};
+await resumed.reconnectRemote();
+const idle=trainer("local");
+store.clear();
+idle.remoteRequest=async ()=>({...active,state:"done"});
+idle.remotePractice=()=>{throw Error("do not adopt unrelated finished job on opening");};
+await idle.reconnectRemote({automatic:true});
+assert.equal(idle.el.trCompute.value,"local");
+assert.equal(idle.message,"Connected to MAG. Ready to start training.");
+// Recover a completed job belonging to this browser, and a pending stop
+// only if the server still reports the exact same job.
+const url="https://mag.test:8443";
+for (const [serverId,state,stopping] of [[id,"running",true],[id,"done",false],["b".repeat(8)+"-bbbb-bbbb-bbbb-"+"b".repeat(12),"running",false]]) {
+  store.set("kern-lehrer.remote-job",JSON.stringify({url,id,stopping:true}));
+  const recovered=trainer("local");
+  recovered.remoteRequest=async (_,path)=>{assert.equal(path,"/v1/current");return {...active,id:serverId,state};};
+  recovered.remotePractice=async run=>{assert.equal(run.remote.id,serverId);assert.equal(run.remote.stopping,stopping);recovered.end(run);};
+  await recovered.reconnectRemote({automatic:true});
+}
+// A real timeout must not be interpreted as idle; local mode remains usable
+// when there is no known remote job.
+store.clear();
+const offline=trainer("local");
+offline.remoteRequest=async()=>{throw Error("timeout");};
+await offline.reconnectRemote({automatic:true});
+assert.equal(offline.el.trCompute.value,"local");
+assert.equal(offline.run,null);
+assert.equal(offline.message,"Local training ready. MAG unavailable.");
+const opening=trainer("local");
+opening.s={};
+let discovered=0;
+opening.reconnectRemote=options=>{assert.equal(options.automatic,true);discovered++;};
+opening.discoverRemote();
+assert.equal(discovered,1);
+opening.el.trRemoteUrl.value="";
+opening.discoverRemote();
+assert.equal(discovered,1);
+const stopLocal=trainer("local");
+const stopping=stopLocal.run={iteration:7,paused:true,workers:[]};
+stopLocal.stop();
+assert.equal(stopLocal.run,stopping);
+assert.equal(stopping.localStopping,true);
+assert.equal(stopping.paused,false);
+assert.match(stopLocal.message,/checkpoint/);
 console.log("Lehrer local/MAG selection and remote result passed");
+
+const record={schema:1,token:"run-test",task:"stand",name:"stand",label:"stand",count:2,envs:4,total:12,seed:1,config:{},
+  iteration:3,history:[{it:1,ret:5,len:2},{it:3,ret:6,len:2}]};
+assert.equal(validLocalRecord(record),true);
+assert.equal(validLocalRecord({...record,count:999}),false);
+assert.equal(validLocalRecord({...record,config:{learningRate:NaN}}),false);
+const sections=[new Uint8Array([1,2]),new Uint8Array([3]),new Uint8Array([4]),new Uint8Array([5,6])];
+const payload=frameCheckpoint(sections);
+const archive=await encodeCheckpoint({schema:1,backend:"local",record},payload);
+const decoded=await decodeCheckpoint(archive);
+assert.deepEqual(decoded.meta.record,record);
+assert.deepEqual(unframeCheckpoint(decoded.payload,4).map(x=>[...new Uint8Array(x)]),sections.map(x=>[...x]));
+await assert.rejects(decodeCheckpoint(new Uint8Array([1,2,3])),/complete/);
+const corrupt=archive.slice();corrupt[15]^=1;
+await assert.rejects(decodeCheckpoint(corrupt),/checksum/);
+const badPayload=payload.slice();badPayload[0]=255;
+assert.throws(()=>unframeCheckpoint(badPayload,4),/section/);
+console.log("Checkpoint archive integrity and section framing passed");

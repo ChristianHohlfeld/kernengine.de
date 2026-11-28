@@ -67,6 +67,7 @@ std::unique_ptr<DuckEnv> make_env(const Recipe& recipe, u64 seed, i32 index) {
 
 void prepare_env(DuckEnv& env, const Recipe& recipe, i32 iteration) {
   env.task().progress(iteration);
+  env.set_training_progress(iteration);
   env.push_scale = recipe.push_scale(iteration);
 }
 

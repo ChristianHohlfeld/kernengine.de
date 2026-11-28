@@ -123,6 +123,8 @@ std::unique_ptr<Task> make_motion_task(const std::string& spec);
 class Env {
  public:
   virtual ~Env() = default;
+  virtual std::vector<u8> save_episode() const { return {}; }
+  virtual bool load_episode(const u8*,std::size_t) { return false; }
   virtual i32 obs_size() const = 0;
   virtual i32 critic_size() const = 0;
   virtual i32 action_size() const = 0;
@@ -155,6 +157,12 @@ class DuckEnv : public Env {
   const f32* critic() const override { return critic_.data(); }
   /// One control tick (50 Hz real) with `action`.
   Step step(const f32* action) override;
+  // Opt-in deterministic replay checkpoint for browser collectors.
+  // Record only the current episode, never all prior training.
+  void enable_checkpoint() { checkpoint_enabled_ = true; }
+  void set_training_progress(i32 iteration) { training_progress_ = iteration; }
+  std::vector<u8> save_episode() const override;
+  bool load_episode(const u8* data, std::size_t size) override;
   i32 steps() const { return step_; }
   f32 episode_return() const { return return_; }
   game::GameWorld& world();
@@ -184,6 +192,12 @@ class DuckEnv : public Env {
   i32 imu_lag_ = 0, imu_lag_left_ = 0;
   std::vector<f32> obs_, critic_;
   game::GameWorld::WalkerProbe probe_;
+  bool checkpoint_enabled_ = false;
+  i32 training_progress_ = -1, reset_progress_ = -1;
+  f32 reset_push_scale_ = 1;
+  u64 reset_rng_ = 0;
+  std::vector<i32> replay_progress_;
+  std::vector<f32> replay_push_, replay_actions_;
 };
 
 }  // namespace kern::lehrer

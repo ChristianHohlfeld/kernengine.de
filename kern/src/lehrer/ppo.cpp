@@ -1,5 +1,6 @@
 // PPO as rsl_rl runs it (see ppo.h): the same losses, schedule and bookkeeping, in C++.
 #include "kern/lehrer/ppo.h"
+#include "kern/lehrer/checkpoint.h"
 #include "kern/core/dmath.h"
 
 #include <chrono>
@@ -202,6 +203,33 @@ void Collector::collect(std::vector<Env*>& envs, i32 steps, const Policy& policy
       out.episode_lengths.push_back(len);
     }
   out.seconds = seconds_since(t0);
+}
+
+std::vector<u8> Collector::save() const {
+  checkpoint::Writer w;
+  w.scalar(u32{1}); w.scalar(rng_.state); w.scalar(first_env_);
+  std::vector<u64> states;
+  for(const Rng& rng:env_rng_)states.push_back(rng.state);
+  w.vector(states); w.vector(episode_return_); w.vector(episode_length_);
+  return std::move(w.bytes);
+}
+
+bool Collector::load(const u8* data,std::size_t size,std::size_t environments) {
+  checkpoint::Reader r{data,size};
+  u32 version=0; u64 seed=0; i32 first=0;
+  std::vector<u64> states;
+  std::vector<f32> returns;
+  std::vector<i32> lengths;
+  if(!r.scalar(version)||version!=1||!r.scalar(seed)||!r.scalar(first)||
+     first!=first_env_||!r.vector(states,environments)||!r.vector(returns,environments)||
+     !r.vector(lengths,environments)||!r.end()||
+     (states.size()!=0&&states.size()!=environments)||returns.size()!=states.size()||
+     lengths.size()!=states.size())return false;
+  rng_.state=seed;
+  env_rng_.clear();
+  for(u64 state:states)env_rng_.emplace_back(state);
+  episode_return_=std::move(returns);episode_length_=std::move(lengths);
+  return true;
 }
 
 Ppo::Ppo(const PpoConfig& config, i32 obs_size, i32 critic_size, i32 action_size)
@@ -601,7 +629,7 @@ template <typename T>
 void put_all(std::vector<u8>& out, const std::vector<T>& v) {
   const u64 n = v.size();
   out.insert(out.end(), reinterpret_cast<const u8*>(&n), reinterpret_cast<const u8*>(&n) + 8);
-  out.insert(out.end(), reinterpret_cast<const u8*>(v.data()), reinterpret_cast<const u8*>(v.data()) + n * sizeof(T));
+  if(n)out.insert(out.end(), reinterpret_cast<const u8*>(v.data()), reinterpret_cast<const u8*>(v.data()) + n * sizeof(T));
 }
 template <typename T>
 bool get_all(const u8* d, std::size_t size, std::size_t& at, std::vector<T>& v, std::size_t expect = ~std::size_t{0}) {
@@ -619,7 +647,7 @@ bool get_all(const u8* d, std::size_t size, std::size_t& at, std::vector<T>& v, 
 
 std::vector<u8> Ppo::save() const {
   std::vector<u8> out;
-  const char magic[8] = {'K', 'E', 'R', 'N', 'P', 'P', 'O', '1'};
+  const char magic[8] = {'K', 'E', 'R', 'N', 'P', 'P', 'O', '2'};
   out.insert(out.end(), magic, magic + 8);
   put_all(out, std::vector<f64>{static_cast<f64>(iteration_), static_cast<f64>(total_steps_), lr_, cfg_.freeze_actor_normalizer ? 1.0 : 0.0});
   put_all(out, policy_.serialize());
@@ -633,24 +661,54 @@ std::vector<u8> Ppo::save() const {
     put_all(out, a->v());
     put_all(out, std::vector<f64>{static_cast<f64>(a->t())});
   }
+  put_all(out, std::vector<u64>{rng_.state, actor_frozen_ ? 1ull : 0ull});
+  put_all(out, std::vector<f64>{policy_.normalizer.count()});
   return out;
 }
 
 bool Ppo::load(const u8* d, std::size_t size) {
-  if (size < 8 || std::memcmp(d, "KERNPPO1", 8) != 0) return false;
+  if (size < 8) return false;
+  const bool exact = std::memcmp(d,"KERNPPO2",8)==0;
+  if(!exact && std::memcmp(d,"KERNPPO1",8)!=0)return false;
   std::size_t at = 8;
   std::vector<f64> head, count;
   std::vector<f32> pol, cp, cm, cv;
   if (!get_all(d, size, at, head) || head.size() != 4 || !get_all(d, size, at, pol) || !get_all(d, size, at, cp, critic_.params().size()) ||
       !get_all(d, size, at, cm) || !get_all(d, size, at, cv) || !get_all(d, size, at, count) || count.size() != 1)
     return false;
+  auto finite=[](const auto& values){for(auto x:values)if(!std::isfinite(x))return false;return true;};
+  if(!finite(head)||head[0]<0||head[0]>2147483647.0||std::floor(head[0])!=head[0]||
+     head[1]<0||head[1]>9007199254740991.0||std::floor(head[1])!=head[1]||
+     head[2]<=0||head[2]>1||(head[3]!=0&&head[3]!=1)||!finite(count)||count[0]<0||
+     cm.size()!=static_cast<std::size_t>(crit_)||cv.size()!=cm.size()||
+     !finite(cm)||!finite(cv)||!finite(cp)||!finite(pol))return false;
+  for(f32 v:cv)if(v<0)return false;
+  const auto& dims=policy_.actor.dims();
+  if(pol.size()!=policy_.serialize().size()||pol[0]!=static_cast<f32>(dims.size()))return false;
+  for(std::size_t i=0;i<dims.size();++i)if(pol[i+1]!=static_cast<f32>(dims[i]))return false;
   Policy p = policy_;
-  if (!p.deserialize(pol.data(), pol.size()) || p.actor.dims() != policy_.actor.dims()) return false;
+  if (!p.deserialize(pol.data(), pol.size()) || p.actor.dims() != dims) return false;
+  for(f32 v:p.stddev)if(v<=0)return false;
+  for(f32 v:p.normalizer.variance())if(v<0)return false;
+  if(p.normalizer.count()<0)return false;
   for (Adam* a : {&actor_adam_, &critic_adam_}) {
     std::vector<f64> t;
     if (!get_all(d, size, at, a->m()) || !get_all(d, size, at, a->v()) || !get_all(d, size, at, t) || t.size() != 1) return false;
+    const auto expected=a==&actor_adam_?policy_.actor.params().size()+policy_.stddev.size():critic_.params().size();
+    if(a->m().size()!=a->v().size()||(!a->m().empty()&&a->m().size()!=expected)||
+       !finite(a->m())||!finite(a->v())||!finite(t)||t[0]<0||t[0]>9007199254740991.0||std::floor(t[0])!=t[0])return false;
+    for(f32 v:a->v())if(v<0)return false;
     a->t() = static_cast<i64>(t[0]);
   }
+  if(exact){
+    std::vector<u64> state;
+    std::vector<f64> actor_count;
+    if(!get_all(d,size,at,state,2)||!get_all(d,size,at,actor_count,1)||
+       state[1]>1||!std::isfinite(actor_count[0])||actor_count[0]<0)return false;
+    rng_.state=state[0];actor_frozen_=state[1]!=0;
+    p.normalizer.set(p.normalizer.mean(),p.normalizer.variance(),actor_count[0]);
+  }
+  if(at!=size)return false;
   policy_ = std::move(p);
   critic_.params() = std::move(cp);
   critic_norm_.set(std::move(cm), std::move(cv), count[0]);

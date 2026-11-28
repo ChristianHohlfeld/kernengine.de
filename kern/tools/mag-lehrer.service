@@ -15,8 +15,10 @@ StateDirectory=kern-lehrer
 UMask=0077
 Restart=on-failure
 RestartSec=5
-KillMode=control-group
-TimeoutStopSec=180
+# Let the HTTP supervisor stop/checkpoint its native process before the
+# systemd kill deadline. Any surviving children are killed at the deadline.
+KillMode=mixed
+TimeoutStopSec=360
 CPUAccounting=yes
 # No CPUAffinity, CPUQuota, HIP_VISIBLE_DEVICES or memory cap: use the whole host.
 [Install]
